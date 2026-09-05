@@ -471,6 +471,7 @@ export type MergeWorldState = {
   stepplingEgg?: import('@/features/onboarding/steppling-egg-policy').StepplingEggProgress;
   worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
   glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1 };
+  stepplingGardenLesson?: { preparedAt: number; servedAt?: number };
   version: 22;
   /** The first personal Merge World is owned by Mossprout. */
   ownerCharacterId: 'mossprout';
@@ -545,6 +546,7 @@ export type MergeWorldCommand =
   | { type: 'transferDiscoveryEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
   | { type: 'hatchWorldEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
   | { type: 'prepareGlowDiscoveryLesson'; now: number }
+  | { type: 'prepareStepplingGardenLesson'; now: number }
   | { type: 'refreshTime'; boardId?: MergeBoardId; now: number }
   | { type: 'tapGenerator'; boardId?: MergeBoardId; generatorId: string; now: number; seed: string; spendEnergy?: boolean; activityOpportunityId?: string }
   | { type: 'setGeneratorForcedDrop'; boardId?: MergeBoardId; generatorId: string; definitionId: string | null; now: number }

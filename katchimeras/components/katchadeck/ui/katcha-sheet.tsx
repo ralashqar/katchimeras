@@ -45,6 +45,7 @@ export type KatchaSheetHeader = {
 export type KatchaSheetProps = {
   children: ReactNode;
   footer?: ReactNode;
+  overlay?: ReactNode;
   entranceMotion?: KatchaSheetEntranceMotion;
   fullBleed?: boolean;
   header?: KatchaSheetHeader;
@@ -66,6 +67,7 @@ export function KatchaSheet({
   children,
   entranceMotion = 'sheet',
   footer,
+  overlay,
   fullBleed = false,
   header,
   keyboardAvoiding = false,
@@ -216,6 +218,7 @@ export function KatchaSheet({
         ) : null}
         </Animated.View>
       </Animated.View>
+      {overlay}
     </View>
   );
 

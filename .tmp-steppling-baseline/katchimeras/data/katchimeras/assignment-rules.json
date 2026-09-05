@@ -1,0 +1,68 @@
+{
+  "dailyReward": {
+    "featuredEarnsPerDay": 1,
+    "duplicateCurrency": "essence",
+    "duplicateConversion": {
+      "common": 1,
+      "uncommon": 2,
+      "rare": 4
+    },
+    "selectionModel": "score strongest daily vector bundle against family and habitat affinity, then choose stage based on progression state"
+  },
+  "scoringWeights": {
+    "activityLevel": 0.26,
+    "explorationStyle": 0.22,
+    "routineDepth": 0.2,
+    "placeAffinity": 0.2,
+    "timeAffinity": 0.12
+  },
+  "progression": {
+    "days_1_to_7": {
+      "stageBias": ["sprout"],
+      "noveltyBoost": 0.35,
+      "duplicatePenalty": 0.4
+    },
+    "days_8_to_30": {
+      "stageBias": ["sprout", "shaped"],
+      "noveltyBoost": 0.2,
+      "duplicatePenalty": 0.15
+    },
+    "day_30_plus": {
+      "stageBias": ["shaped", "ascended"],
+      "noveltyBoost": 0.08,
+      "duplicatePenalty": 0.0
+    }
+  },
+  "stageUnlockRules": {
+    "sprout": {
+      "requires": ["first matching line or low-collection discovery state"]
+    },
+    "shaped": {
+      "requires": [
+        "matching line already discovered",
+        "repeat behavior or essence threshold met",
+        "routineDepth at recurring or higher"
+      ]
+    },
+    "ascended": {
+      "requires": [
+        "matching line already shaped",
+        "strong vector fit across at least 3 primary axes",
+        "consistency at stable or disciplined, or unusual time/place combination"
+      ]
+    }
+  },
+  "behaviorNotes": [
+    "Low-step recovery days should still produce valid home or cozy-aligned creatures.",
+    "Novel places should increase habitat discovery chance, not automatically raise rarity.",
+    "Repeated places should deepen evolution chance more than raw volume alone.",
+    "Time-of-day should decorate the earned instance and occasionally break ties between candidates."
+  ],
+  "instanceTagging": {
+    "timeTags": true,
+    "movementTags": true,
+    "placeTags": true,
+    "weatherTags": false,
+    "socialTags": false
+  }
+}

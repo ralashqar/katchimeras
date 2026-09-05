@@ -1,0 +1,119 @@
+export type KatchimeraRenderProfile = {
+  id: string;
+  familyId: string;
+  habitatAspectId: string;
+  stageId: string;
+  displayName: string;
+  subtitle: string;
+  caption: string;
+  userFacingDescription: string;
+  motivationalQuote: string;
+  deckRole: string;
+  lifestyleMatch: string;
+  associatedLifestyleProperties: string[];
+  visualDescription: string;
+  imagePrompt: string;
+  paletteHints: string[];
+  signatureDetails: string[];
+  styleGuideId: string;
+};
+
+export type KatchimeraEncounterProfile = {
+  id: string;
+  seedId: string;
+  topLevelType: string;
+  triggerCategory: string;
+  triggerSubtype: string;
+  theme: string;
+  creatureKind: string;
+  name: string;
+  displayName: string;
+  caption: string;
+  userFacingDescription: string;
+  motivationalQuote: string;
+  baseRarity: string;
+  variantSupport: string[];
+  lifestyleSignals: string[];
+  sourceExamples: string[];
+  visualTone: string;
+  visualMotifs: string[];
+  visualDescription: string;
+  promptHooks: string[];
+  imagePrompt: string;
+  identityInsight: string;
+  unlockLine: string;
+  repeatLine: string;
+  rareLine: string;
+  restorativeLine: string;
+  progressLine: string;
+  storySeed: string;
+};
+
+export type KatchimeraArtProfile = KatchimeraRenderProfile | KatchimeraEncounterProfile;
+
+export type GeneratedKatchimeraRecord = {
+  id: string;
+  render_profile_id: string;
+  family_id: string | null;
+  habitat_aspect_id: string | null;
+  stage_id: string | null;
+  top_level_type: string | null;
+  trigger_category: string | null;
+  trigger_subtype: string | null;
+  theme: string | null;
+  creature_kind: string | null;
+  display_name: string;
+  model_id: string;
+  status: 'queued' | 'generating' | 'completed' | 'failed';
+  prompt: string;
+  caption: string | null;
+  motivational_quote: string | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  image_url: string | null;
+  fal_request_id: string | null;
+  error_message: string | null;
+  approved: boolean;
+  source_profile: KatchimeraArtProfile;
+  result_payload: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LifeAspectId =
+  | 'daily-ritual'
+  | 'food-cooking'
+  | 'movement-fitness'
+  | 'rest-sleep'
+  | 'emotional-recovery'
+  | 'social-connection'
+  | 'parenting-caregiving'
+  | 'pet-companionship'
+  | 'work-focus'
+  | 'life-admin'
+  | 'learning-culture'
+  | 'hobbies-creativity'
+  | 'nature-outdoors'
+  | 'weather-atmosphere'
+  | 'travel-exploration'
+  | 'commute-routes'
+  | 'milestones-chapters'
+  | 'reflection-solitude'
+  | 'contribution-community';
+
+export type LifeAspectCategory =
+  | 'body'
+  | 'relationships'
+  | 'purpose'
+  | 'daily-life'
+  | 'world'
+  | 'inner-life';
+
+export type KatchimeraSkinId = string;
+export type KatchimeraFamilyId = string;
+export type KatchimeraCompanionId = `companion:${KatchimeraFamilyId}`;
+
+export type KatchimeraWardrobeState = {
+  version: 2 | 3;
+  equippedByFamily: Partial<Record<KatchimeraFamilyId, KatchimeraSkinId>>;
+};

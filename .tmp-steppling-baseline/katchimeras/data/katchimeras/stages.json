@@ -1,0 +1,29 @@
+[
+  {
+    "id": "sprout",
+    "index": 1,
+    "title": "Sprout",
+    "description": "First-form discovery. Early collection and easiest unlock window.",
+    "defaultRarity": "common",
+    "unlockWindow": "days_1_to_7",
+    "visualMarkers": ["small silhouette", "clean body shape", "single accent detail"]
+  },
+  {
+    "id": "shaped",
+    "index": 2,
+    "title": "Shaped",
+    "description": "Behavior has repeated enough to deepen the line.",
+    "defaultRarity": "uncommon",
+    "unlockWindow": "days_8_to_30",
+    "visualMarkers": ["clear secondary form", "enhanced markings", "stronger habitat motif"]
+  },
+  {
+    "id": "ascended",
+    "index": 3,
+    "title": "Ascended",
+    "description": "Deepest launch-form. Requires repetition, identity fit, or unusual conditions.",
+    "defaultRarity": "rare",
+    "unlockWindow": "day_30_plus",
+    "visualMarkers": ["signature aura", "full habitat expression", "rare silhouette extension"]
+  }
+]

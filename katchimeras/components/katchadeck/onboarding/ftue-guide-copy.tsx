@@ -1,3 +1,4 @@
+import { normalizeSpeechText } from '@/utils/speech-text';
 import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 import { Meadow } from '@/constants/meadow-theme';
 import { StyleSheet, View } from 'react-native';
@@ -15,7 +16,7 @@ export type FtueGuide = {
 export function EggHeroGuide({ guide, topInset, topHudVisible = false }: {
   guide: FtueGuide; topInset: number; topHudVisible?: boolean;
 }) {
-  return <Animated.View key={`focus:${guide.title}`} pointerEvents="none"
+  return <Animated.View key={`focus:${normalizeSpeechText(guide.title)}`} pointerEvents="none"
     entering={FadeInDown.duration(260).easing(Easing.out(Easing.cubic))}
     style={[styles.eggHero, { top: topInset + (topHudVisible ? 82 : 22) }]}>
     <FtueGuideCopy guide={guide} hero />
@@ -40,7 +41,7 @@ export function FtueGuideCopy({ guide, hero = false }: {
         </View>
       ) : null}
       <View style={styles.contentPanel}>
-        <View accessibilityLabel={guide.title} style={styles.titleStack}>
+        <View accessibilityLabel={normalizeSpeechText(guide.title)} style={styles.titleStack}>
           <ThemedText
             accessibilityElementsHidden
             numberOfLines={hero ? 3 : 2}
@@ -48,7 +49,7 @@ export function FtueGuideCopy({ guide, hero = false }: {
             style={[titleStyle, styles.titleShadow]}
             lightColor={KatchaDeckUI.ftue.goldDeep}
             darkColor={KatchaDeckUI.ftue.goldDeep}>
-            {guide.title}
+            {normalizeSpeechText(guide.title)}
           </ThemedText>
           <ThemedText
             numberOfLines={hero ? 3 : 2}
@@ -56,7 +57,7 @@ export function FtueGuideCopy({ guide, hero = false }: {
             style={titleStyle}
             lightColor={KatchaDeckUI.ftue.gold}
             darkColor={KatchaDeckUI.ftue.gold}>
-            {guide.title}
+            {normalizeSpeechText(guide.title)}
           </ThemedText>
         </View>
         {!hero && guide.body ? (
@@ -64,7 +65,7 @@ export function FtueGuideCopy({ guide, hero = false }: {
             style={styles.body}
             lightColor={KatchaDeckUI.ftue.contentText}
             darkColor={KatchaDeckUI.ftue.contentText}>
-            {guide.body}
+            {normalizeSpeechText(guide.body)}
           </ThemedText>
         ) : null}
       </View>

@@ -67,7 +67,24 @@ The retained hatch subject remains mounted until the normal resident projection
 is available, then opens the same hosted companion interaction used by Mossprout.
 There is no extra claim button or intervening camera retreat. No spawner is granted at hatch.
 
-Day 1 is a regular conversation with no FTUE locks or spotlights. Leaving through
+Day 1 version 3 is a two-selection conversation: choose A little walk, Movement my way,
+or A gentle day; then press Tend garden under the personalised response. There are no
+reply acknowledgements, timing questions, habit offers or extra completion controls.
+Day 2 retains optional habit setup. The normal steps, Garden and trail-chat cards
+remain available without any required walking or new permissions prompt.
+
+The final selection completes the conversation before the receipt-backed parcel grant.
+A pending Garden handoff survives a restart until the shared Garden mounts with the
+parcel present and records `gardenHandoffAt`. Existing completed v1/v2 sessions are
+not replayed; unfinished sessions retain their turns and resume at the new question
+or the response to their saved movement choice. Archived definitions remain available
+for settling older completed sessions and their rewards.
+
+Speech bubbles normalize whitespace before rendering and FTUE pagination. Authored
+newlines no longer force extra pages; the 120-character FTUE limit and natural text
+wrapping remain. Inline emphasis keeps its word-boundary spaces.
+
+Day 1 remains a regular conversation with no FTUE locks or spotlights. Leaving through
 the shared Back control and tapping Steppling resumes the saved conversation. Completing its closing
 beat delivers one Journey Locker parcel. Opening it uses the existing parcel
 flight, installs a generator only into an empty unlocked, mist-free cell, and

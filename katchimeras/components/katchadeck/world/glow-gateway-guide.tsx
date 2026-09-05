@@ -61,10 +61,10 @@ export function GlowGatewayGuide({ world, onClose, onOpenMerge }: {
     </View>
     <FtueGuideCopy hero guide={{
       ...(scene?.view.guide ?? { eyebrow: 'Light a path', title: 'Back to the Garden.', body: 'Complete requests to earn Glow.' }),
-      body: `${scene?.view.guide.body ?? 'Complete requests to earn Glow.'}${egg ? '' : `\n${Math.min(world.coins, GLOW.mistUnlockCost)} / ${GLOW.mistUnlockCost} Glow`}`,
+      body: `${scene?.view.guide.body ?? 'Complete requests to earn Glow.'}${egg || buying ? '' : `\n${Math.min(world.coins, GLOW.mistUnlockCost)} / ${GLOW.mistUnlockCost} Glow`}`,
     }} />
     {error || failed ? <ThemedText accessibilityRole="alert">{error ?? run.error ?? 'Please try again.'}</ThemedText> : null}
-    <KatchaButton fullWidth loading={busy} label={failedPurchase && !affordable ? 'Earn Glow in Merge' : failed ? 'Try again' : inLesson ? 'Continue in Merge' : buying ? !affordable ? 'Earn Glow in Merge' : !artReady ? 'Load clearing' : `${scene?.view.actionLabel} · ${GLOW.mistUnlockCost} Glow` : scene?.view.actionLabel ?? 'Continue'} icon="sparkles" onPress={() => void perform()} />
+    <KatchaButton fullWidth loading={busy} cost={buying && affordable && artReady && !failed ? { currency: 'coins', amount: GLOW.mistUnlockCost } : undefined} label={failedPurchase && !affordable ? 'Earn Glow in Merge' : failed ? 'Try again' : inLesson ? 'Continue in Merge' : buying ? !affordable ? 'Earn Glow in Merge' : !artReady ? 'Load clearing' : scene?.view.actionLabel ?? 'Clear mist' : scene?.view.actionLabel ?? 'Continue'} icon="sparkles" onPress={() => void perform()} />
     {failed && inLesson ? <KatchaButton label="Make room in Merge" onPress={onOpenMerge} /> : null}
     {!glowDiscoveryLocksCamera(run) ? <Pressable accessibilityRole="button" accessibilityLabel="Explore later" onPress={onClose} style={{ alignSelf: 'center', padding: 12 }}><ThemedText lightColor="#FFF4D4" darkColor="#FFF4D4">Explore later</ThemedText></Pressable> : null}
   </Animated.View>;

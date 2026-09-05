@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "base": {
+    "assetKey": "base_env2",
+    "path": "assets/images/katchimeras/world/base/base_env2.png"
+  },
+  "bounds": {
+    "mode": "backplate",
+    "minX": 0,
+    "maxX": 760,
+    "minY": 0,
+    "maxY": 760,
+    "minScale": 0.35,
+    "maxScale": 3.5
+  },
+  "positions": {
+    "memory": {
+      "col": 0.901,
+      "row": -1.139,
+      "nx": 0.70958,
+      "ny": 0.41662
+    },
+    "notes": {
+      "col": -1.197,
+      "row": -1.447,
+      "nx": 0.52568,
+      "ny": 0.29302
+    },
+    "photos": {
+      "col": -1.746,
+      "row": -0.796,
+      "nx": 0.4024,
+      "ny": 0.29826
+    },
+    "featured": {
+      "col": -3.227,
+      "row": -0.81,
+      "nx": 0.25169,
+      "ny": 0.22147
+    },
+    "places": {
+      "col": -1.828,
+      "row": -2.411,
+      "nx": 0.5599,
+      "ny": 0.21109
+    },
+    "journey": {
+      "col": -2.723,
+      "row": -1.574,
+      "nx": 0.38196,
+      "ny": 0.20811
+    },
+    "sleep": {
+      "col": -1.356,
+      "row": 1.264,
+      "nx": 0.23083,
+      "ny": 0.42412
+    },
+    "reflection": {
+      "col": 0.144,
+      "row": -2.693,
+      "nx": 0.79146,
+      "ny": 0.2979
+    },
+    "mood": {
+      "col": -0.368,
+      "row": -1.493,
+      "nx": 0.61558,
+      "ny": 0.33325
+    },
+    "food": {
+      "col": 3.088,
+      "row": 1.772,
+      "nx": 0.6352,
+      "ny": 0.67849
+    },
+    "studio": {
+      "col": 1.369,
+      "row": 2.14,
+      "nx": 0.42079,
+      "ny": 0.60909
+    },
+    "chronicle": {
+      "col": -1.525,
+      "row": 0.519,
+      "nx": 0.29001,
+      "ny": 0.37717
+    },
+    "quests": {
+      "col": -0.208,
+      "row": 1.268,
+      "nx": 0.34836,
+      "ny": 0.48329
+    },
+    "egg": {
+      "col": -0.47,
+      "row": -0.427,
+      "nx": 0.49561,
+      "ny": 0.38276
+    }
+  },
+  "scaleByCategory": {
+    "notes": 1,
+    "photos": 0.95,
+    "featured": 1.25,
+    "sleep": 1,
+    "mood": 1,
+    "food": 1,
+    "studio": 1.6,
+    "chronicle": 1,
+    "quests": 1
+  },
+  "scaleByAssetKey": {
+    "home": 0.773,
+    "food_pavilion": 0.732,
+    "study": 0.621,
+    "featured_board": 0.682,
+    "quest_board": 0.435,
+    "sleep_nook_empty": 0.35,
+    "home_home_09": 0.713,
+    "steps_path_1": 0.404,
+    "photos_stack": 0.35,
+    "observatory_empty": 0.737,
+    "sanctuary_empty": 0.692,
+    "mood_monument_empty": 0.707,
+    "notes_stack": 0.35,
+    "memory_vault_empty": 0.65,
+    "egg": 0.37
+  }
+}

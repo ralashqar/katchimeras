@@ -1,3 +1,4 @@
+import { normalizeSpeechText } from '@/utils/speech-text';
 import { Image } from 'expo-image';
 import { roundedMultiCutoutSegments } from '@/features/onboarding/spotlight-geometry';
 import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
@@ -215,7 +216,7 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   // Keep the prior cutout visible while measuring the next target. Readiness
   // still gates input above; only an explicit null spotlight dismisses the mask.
   const spotlightReady = Boolean(spotlight && currentLayout?.spotlightFrames.length);
-  const guideKey = guide && presentationReady ? `${configKey}:${guide.title}:${guide.body}` : null;
+  const guideKey = guide && presentationReady ? `${configKey}:${normalizeSpeechText(guide.title)}:${normalizeSpeechText(guide.body)}` : null;
   const [hintKey, setHintKey] = useState<string | null>(null);
   const practice = guide?.coaching === 'practice';
   useEffect(() => {
@@ -705,7 +706,7 @@ export function MergeFtueEggGuide({ anchor, guide, screen, children, hideAvatar 
 
   return (
     <View
-      accessibilityLabel={`${guide.title} ${guide.body}`}
+      accessibilityLabel={`${normalizeSpeechText(guide.title)} ${normalizeSpeechText(guide.body)}`}
       accessibilityLiveRegion="polite"
       pointerEvents={children ? 'auto' : 'none'}
       onLayout={(event) => setMeasuredHeight(event.nativeEvent.layout.height)}
@@ -728,9 +729,9 @@ export function MergeFtueEggGuide({ anchor, guide, screen, children, hideAvatar 
       </Animated.View> : null}
       <ThemedText style={[styles.eggGuideMessage, styles.eggGuideMessageLayout, { width: hideAvatar ? calloutWidth - 24 : calloutWidth - 24 - 76 - 9 }]} lightColor="#35422F" darkColor="#35422F">
         <ThemedText style={[styles.eggGuideMessage, styles.eggGuideEmphasis]} lightColor="#668A49" darkColor="#668A49">
-          {guide.title}
+          {normalizeSpeechText(guide.title)}
         </ThemedText>
-        {' '}{guide.body}
+        {' '}{normalizeSpeechText(guide.body)}
       </ThemedText>
       </View>
       {children ? <View style={styles.eggGuideActionRow}>{children}</View> : null}

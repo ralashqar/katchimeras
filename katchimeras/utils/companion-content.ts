@@ -1,3 +1,4 @@
+import { migrateStepplingDayOneSession } from './steppling-day-one-session';
 import type { CompanionContentItem } from '@/constants/companion-content';
 import type { CompanionSupportStyle } from '@/constants/companion-introductions';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
@@ -262,7 +263,7 @@ export function normaliseCompanionContentState(value: unknown): CompanionContent
     events: uniqueById((Array.isArray(candidate.events) ? candidate.events.filter(isContentEvent) : []).map(canonicalizeOwner)).slice(-4000),
     introductions: uniqueById((Array.isArray(candidate.introductions) ? candidate.introductions.filter(isIntroduction) : []).map(canonicalizeOwner)).slice(-200),
     visits: uniqueById((Array.isArray(candidate.visits) ? candidate.visits.filter(isVisit) : []).map(canonicalizeOwner)).slice(-200),
-    conversationSessions: uniqueById((Array.isArray(candidate.conversationSessions) ? candidate.conversationSessions.filter(isConversationSession) : [])).slice(-1000),
+    conversationSessions: uniqueById((Array.isArray(candidate.conversationSessions) ? candidate.conversationSessions.filter(isConversationSession).map(migrateStepplingDayOneSession) : [])).slice(-1000),
     conversationSignals: uniqueById((Array.isArray(candidate.conversationSignals) ? candidate.conversationSignals.filter(isConversationSignal) : [])).slice(-1000),
     processedConversationEvidenceIds: [...new Set(Array.isArray(candidate.processedConversationEvidenceIds) ? candidate.processedConversationEvidenceIds.filter((id): id is string => typeof id === 'string') : [])].slice(-4000),
     servedConversationDayKeys: [...new Set([

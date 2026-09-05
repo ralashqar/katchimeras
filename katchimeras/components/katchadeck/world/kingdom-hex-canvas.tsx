@@ -1,3 +1,5 @@
+import { WorldUpgradeMarker } from './world-upgrade-marker';
+import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { useFocusEffect } from '@react-navigation/native';
 import { SHARED_RESIDENT_WIDTH, SHARED_RESIDENT_HEIGHT, SHARED_RESIDENT_BASELINE_LIFT, SHARED_EGG_REST_ZOOM, SHARED_EGG_SCREEN_ANCHOR_Y, SHARED_RESIDENT_SCREEN_ANCHOR_Y, SHARED_RESIDENT_FOCUS_DURATION_MS, sharedResidentCenterY, residentArtLayerId, usesSharedResidentStage } from './shared-resident-presentation';
 import * as Haptics from 'expo-haptics';
@@ -143,6 +145,13 @@ type Props = {
   onCameraSnapshotChange?: (snapshot: KingdomCameraSnapshot) => void;
   onCameraMotionChange?: (moving: boolean) => void;
   onOpenGarden?: (orderId?: string | null) => void;
+  upgradeOffers?: readonly WorldUpgradeOffer[];
+  selectedUpgradeOffer?: WorldUpgradeOffer | null;
+  preserveUpgradeCamera?: boolean;
+  upgradeSelectionCommitted?: boolean;
+  upgradeFailed?: boolean;
+  onUpgradeOfferPress?: (offer: WorldUpgradeOffer) => void;
+  onUpgradeOfferTargetChange?: (id: string, node: ViewType | null) => void;
   tileUpgradeOffer?: KingdomTileUpgradeOffer | null;
   onTileUpgradeOfferPress?: () => void;
   onTileUpgradeOfferTargetChange?: (node: ViewType | null) => void;
@@ -390,6 +399,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onCameraSnapshotChange,
   onCameraMotionChange,
   onOpenGarden,
+  upgradeOffers = [],
+  selectedUpgradeOffer = null,
+  preserveUpgradeCamera = false,
+  upgradeSelectionCommitted = false,
+  upgradeFailed = false,
+  onUpgradeOfferPress,
+  onUpgradeOfferTargetChange,
   tileUpgradeOffer = null,
   onTileUpgradeOfferPress,
   onTileUpgradeOfferTargetChange,
@@ -680,6 +696,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const initialTutorialFocus = useMemo(() => {
     if (!initialTutorialCameraScale || !tutorialCamera || tutorialCamera.kind !== 'focus_target') return null;
     const target = tutorialCamera.target;
+    if (target.kind === 'haven_gateway') {
+      const frame = scene.tileArtLayers.find((layer) => layer.id === 'structure:steppling-home')?.frame;
+      return frame ? {
+        durationMs: tutorialCamera.durationMs,
+        initialScale: initialTutorialCameraScale,
+        scale: tutorialCamera.zoom ?? initialTutorialCameraScale,
+        screenY: viewport.height * (tutorialCamera.anchorY ?? 0.5),
+        x: frame.left + frame.width / 2, y: frame.top + frame.height / 2,
+      } : null;
+    }
     if (target.kind === 'haven_garden_tile') {
       if (!gardenFocusFrame) return null;
       return {
@@ -780,14 +806,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     frame: { height: number; left: number; top: number; width: number },
   ) => {
     if (cameraLocked || storyCameraInputLocked) return;
-    camera.focusFrame(frame, {
+    if (!upgradeOffers.some((offer) => offer.target.kind === 'haven_nature_island' && offer.target.islandId === islandId)) camera.focusFrame(frame, {
       durationMs: reduceMotion ? 0 : 280,
       horizontalPadding: 70,
       screenCenterY: viewport.height * 0.42,
       verticalPadding: 140,
     });
     onSelectNatureIsland?.(islandId);
-  }, [camera, cameraLocked, storyCameraInputLocked, onSelectNatureIsland, reduceMotion, viewport.height]);
+  }, [camera, cameraLocked, storyCameraInputLocked, onSelectNatureIsland, reduceMotion, upgradeOffers, viewport.height]);
   const fitTutorialWorld = camera.fitWorld;
   const focusTutorialResident = camera.focusResident;
   const focusInteractionTile = camera.focusFrame;
@@ -831,9 +857,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (tutorialCamera.kind === 'focus_target' && tutorialCamera.projectionOnly) return;
     const applicationKey = tutorialCameraKey;
     if (!tutorialCameraReady || appliedTutorialCameraRef.current === applicationKey) return;
-    appliedTutorialCameraRef.current = applicationKey;
     const durationMs = tutorialCamera.durationMs;
     if (tutorialCamera.kind === 'fit_targets') {
+      appliedTutorialCameraRef.current = applicationKey;
       fitTutorialWorld(durationMs);
       return;
     }
@@ -843,10 +869,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       : null;
     if (target.kind === 'haven_gateway') {
       const frame = scene.tileArtLayers.find((layer) => layer.id === 'structure:steppling-home')?.frame;
-      if (frame) focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, { anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom });
+      if (!frame) return;
+      appliedTutorialCameraRef.current = applicationKey;
+      focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, { anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom });
       return;
     }
     if (target.kind === 'haven_garden_tile' && gardenFrame) {
+      appliedTutorialCameraRef.current = applicationKey;
       focusTutorialResident(
         gardenFrame.left + gardenFrame.width / 2,
         gardenFrame.top + gardenFrame.height / 2,
@@ -867,6 +896,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           ))
         : null;
     if (!tile) return;
+    appliedTutorialCameraRef.current = applicationKey;
     const residentAnchor = target.kind === 'haven_resident' || tile.companion?.kind === 'revealed_egg'
       ? scene.tileArtLayers.find((layer) => layer.id === tile.id)?.residentAnchor
       : null;
@@ -890,7 +920,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const layer = scene.tileArtLayers.find((candidate) => candidate.id === sceneHomeTile.id);
       return layer?.frame ?? { left: sceneHomeTile.cx - HEX_TILE_W / 2, top: sceneHomeTile.cy - HEX_TILE_H / 2, width: HEX_TILE_W, height: HEX_TILE_H };
     }
-    if (target.kind === 'haven_nature_island') return natureIslandFrames.find((candidate) => candidate.islandId === target.islandId)?.frame ?? null;
+    if (target.kind === 'haven_nature_island') return natureIslandFrames.find((candidate) => candidate.islandId === target.islandId)?.frame
+      ?? scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame ?? null;
     if (target.kind === 'haven_structure') return scene.tileArtLayers.find((candidate) => candidate.id === target.structureId || candidate.id === `structure:${target.structureId}`)?.frame ?? null;
     if (target.kind === 'haven_garden_plot') return gardenPlotFrames.find((candidate) => candidate.slotId === target.slotId)?.frame ?? null;
     if (target.kind === 'haven_tile' || target.kind === 'haven_resident') {
@@ -905,6 +936,27 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
     return null;
   }, [creatureWorldSize, gardenPlotFrames, natureIslandFrames, scene.height, scene.tileArtLayers, scene.tiles, scene.width, sceneHomeTile]);
+  const upgradeOrigin = useRef<KingdomCameraSnapshot | null>(null);
+  const upgradeFocusId = useRef<string | null>(null);
+  const upgradeCameraCommitted = useRef(false);
+  useEffect(() => {
+    if (upgradeSelectionCommitted || upgradePresentation) upgradeCameraCommitted.current = true;
+    if (selectedUpgradeOffer) {
+      // FTUE already owns the planting or mist close-up; opening its upgrade sheet
+      // must not fit the tile again or save a competing return-camera snapshot.
+      if (preserveUpgradeCamera) return;
+      if (!tutorialCameraReady || upgradeFocusId.current === selectedUpgradeOffer.id) return;
+      upgradeOrigin.current ??= readLiveCameraSnapshot();
+      upgradeCameraCommitted.current = false;
+      upgradeFocusId.current = selectedUpgradeOffer.id;
+      const frame = storyTargetFrame(selectedUpgradeOffer.visualTarget);
+      if (frame) focusInteractionTile(frame, { durationMs: reduceMotion ? 80 : 440, horizontalPadding: 48, verticalPadding: 150, screenCenterY: viewport.height * 0.3 });
+    } else if (upgradeFocusId.current) {
+      const origin = upgradeOrigin.current;
+      if (origin && !upgradeCameraCommitted.current) animateToCameraSnapshot(origin, reduceMotion ? 80 : 440);
+      upgradeOrigin.current = null; upgradeFocusId.current = null; upgradeCameraCommitted.current = false;
+    }
+  }, [animateToCameraSnapshot, focusInteractionTile, preserveUpgradeCamera, readLiveCameraSnapshot, reduceMotion, selectedUpgradeOffer, storyTargetFrame, tutorialCameraReady, upgradePresentation, upgradeSelectionCommitted, viewport.height]);
   const havenTargetRegistry = useMemo(() => storyTargetRegistry('haven'), []);
   const registeredStoryTargets = useMemo<StoryTarget[]>(() => [
     { kind: 'haven_world' },
@@ -915,9 +967,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     ...scene.tileArtLayers.flatMap<StoryTarget>((layer) => layer.id.startsWith('structure:')
       ? [{ kind: 'haven_structure', structureId: layer.id.slice('structure:'.length) }]
       : []),
-    ...natureIslandFrames.map<StoryTarget>((entry) => ({ kind: 'haven_nature_island', islandId: entry.islandId })),
+    ...scene.tileArtLayers.filter((layer) => layer.id.startsWith('nature:mossprout:') && !layer.id.endsWith(':growth')).map<StoryTarget>((layer) => ({ kind: 'haven_nature_island', islandId: layer.id.replace('nature:mossprout:', '') })),
     ...gardenPlotFrames.map<StoryTarget>((entry) => ({ kind: 'haven_garden_plot', slotId: entry.slotId })),
-  ], [gardenPlotFrames, natureIslandFrames, scene.tileArtLayers, scene.tiles]);
+  ], [gardenPlotFrames, scene.tileArtLayers, scene.tiles]);
   useEffect(() => {
     const unregister = registeredStoryTargets.flatMap((target) => {
       const frame = storyTargetFrame(target);
@@ -976,6 +1028,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     // so it can take over without changing a single rendered frame.
     setStorySceneGuard(null);
   }, [storySceneGuard, upgradePresentation]);
+  useEffect(() => { if (upgradeFailed) setStorySceneGuard(null); }, [upgradeFailed]);
   const tileUpgradeOfferFrame = tileUpgradeOffer
     ? storyTargetFrame(tileUpgradeOffer.target)
     : null;
@@ -1577,6 +1630,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             ) : null}
             {creatureNodes}
           </Animated.View>
+
         </View>
       </GestureDetector>
       {revealedEggProjection ? (
@@ -1636,6 +1690,17 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           visualKey={plant.visualKey}
         />
       ))}
+      {!upgradePresentation && !selectedUpgradeOffer && interactionEnabled && onUpgradeOfferPress ? upgradeOffers.map((offer) => {
+        // Anchor to the painted stairs, not the island's larger touch target.
+        const target = offer.visualTarget;
+        const frame = target.kind === 'haven_nature_island'
+          ? scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame
+          : storyTargetFrame(target);
+        return frame ? <WorldUpgradeMarker key={offer.id} offer={offer} frame={frame}
+          cameraScale={camera.scaleValue} cameraX={camera.translationXValue} cameraY={camera.translationYValue}
+          sceneWidth={scene.width} sceneHeight={scene.height} moving={camera.isMoving}
+          onPress={onUpgradeOfferPress} onTargetChange={onUpgradeOfferTargetChange} /> : null;
+      }) : null}
       {!upgradePresentation && interactionEnabled && !cameraLocked && !storyCameraInputLocked ? (
         <Pressable
           accessibilityRole="button"

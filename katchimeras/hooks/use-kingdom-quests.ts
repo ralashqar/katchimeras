@@ -157,7 +157,7 @@ import {
 import { reconcileConversationJournalSignals } from '@/utils/companion-conversation-signals';
 import { loadCompanionContentState, saveCompanionContentState, subscribeCompanionContentResets } from '@/utils/companion-content-storage';
 import { resolveMossproutFtueConversation } from '@/constants/mossprout-ftue-conversations';
-import { legacyStepplingDayOneConversation } from '@/constants/steppling-day-one-conversation';
+import { legacyStepplingDayOneConversation, legacyStepplingDayOneConversationV2 } from '@/constants/steppling-day-one-conversation';
 import { recordLifeConversation } from '@/utils/companion-life-recording';
 import { loadOnboardingProfile as loadLifeOnboardingProfile } from '@/utils/onboarding-state';
 import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/companion-journey-storage';
@@ -1004,6 +1004,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (!selectedConversationSession) return null;
     const definition = companionConversationDefinitionById.get(selectedConversationSession.definitionId) ?? null;
     if (definition?.id === 'steppling:journey:day-one' && selectedConversationSession.definitionVersion < 2) return legacyStepplingDayOneConversation;
+    if (definition?.id === 'steppling:journey:day-one' && selectedConversationSession.definitionVersion === 2) return legacyStepplingDayOneConversationV2;
     if (!definition || definition.familyId !== 'mossprout') return definition;
     if (definition.id.startsWith('mossprout:ftue:first-meeting:')) return resolveMossproutFtueConversation(definition, loadLifeOnboardingProfile().mossproutAnswers.growthIntentId, selectedConversationSession.definitionVersion);
     return resolveMossproutCampaignConversation(

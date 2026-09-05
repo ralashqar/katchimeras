@@ -1,0 +1,484 @@
+import {
+  companionQuickGoalTemplateById,
+  type CompanionQuickGoalTemplate,
+} from '@/constants/companion-quick-goals';
+import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { canonicalFamilyId } from '@/constants/katchimera-skins';
+
+export type CompanionQuickGoalCadence =
+  | { kind: 'once'; dayId: string }
+  | { kind: 'daily' }
+  | { kind: 'weekdays'; weekdays: number[] };
+
+export type CompanionQuickGoalStatus = 'active' | 'paused' | 'archived';
+
+export type CompanionQuickGoal = {
+  id: string;
+  familyId: KatchimeraFamilyId;
+  templateId?: string;
+  title: string;
+  cadence: CompanionQuickGoalCadence;
+  status: CompanionQuickGoalStatus;
+  createdAt: number;
+  updatedAt: number;
+};
+
+export type CompanionQuickGoalCompletion = {
+  id: string;
+  goalId: string;
+  familyId: KatchimeraFamilyId;
+  dayId: string;
+  completedAt: number;
+  journaledAt?: number;
+};
+
+export type CompanionQuickGoalDismissal = {
+  id: string;
+  goalId: string;
+  familyId: KatchimeraFamilyId;
+  dayId: string;
+  kind: 'snoozed' | 'skipped';
+  createdAt: number;
+};
+
+export type CompanionQuickGoalState = {
+  schemaVersion: 2 | 3;
+  storyHabitIds?: Partial<Record<KatchimeraFamilyId, string>>;
+  goals: CompanionQuickGoal[];
+  completions: CompanionQuickGoalCompletion[];
+  dismissals: CompanionQuickGoalDismissal[];
+};
+
+export type CompanionQuickGoalForDay = {
+  goal: CompanionQuickGoal;
+  completion: CompanionQuickGoalCompletion | null;
+};
+
+export type CompanionQuickGoalTemplateDayStatus =
+  | 'active'
+  | 'completed'
+  | 'paused'
+  | 'scheduled'
+  | 'skipped'
+  | 'snoozed';
+
+export type AddCompanionQuickGoalInput = {
+  familyId: KatchimeraFamilyId;
+  title: string;
+  cadence: CompanionQuickGoalCadence;
+  templateId?: string;
+};
+
+export type AddCompanionQuickGoalResult = {
+  state: CompanionQuickGoalState;
+  goal: CompanionQuickGoal | null;
+  reason: 'blank_title' | 'duplicate' | 'invalid_template' | null;
+};
+
+export function emptyCompanionQuickGoalState(): CompanionQuickGoalState {
+  return { schemaVersion: 3, goals: [], completions: [], dismissals: [] };
+}
+
+export function normaliseCompanionQuickGoalState(value: unknown): CompanionQuickGoalState {
+  if (!value || typeof value !== 'object') return emptyCompanionQuickGoalState();
+  const candidate = value as Partial<CompanionQuickGoalState>;
+  const goals = Array.isArray(candidate.goals)
+    ? uniqueById(candidate.goals.filter(isValidGoal).map((goal) => ({
+        ...goal,
+        familyId: canonicalFamilyId(goal.familyId) ?? goal.familyId,
+        title: goal.title.trim(),
+        cadence: normaliseCadence(goal.cadence),
+      })))
+    : [];
+  const goalIds = new Set(goals.map((goal) => goal.id));
+  const completions = Array.isArray(candidate.completions)
+    ? uniqueById(candidate.completions.filter((completion) =>
+        isValidCompletion(completion) && goalIds.has(completion.goalId)
+      ).map((completion) => ({ ...completion, familyId: canonicalFamilyId(completion.familyId) ?? completion.familyId })))
+    : [];
+  const dismissals = Array.isArray(candidate.dismissals)
+    ? uniqueById(candidate.dismissals.filter((dismissal) =>
+        isValidDismissal(dismissal) && goalIds.has(dismissal.goalId)
+      ).map((dismissal) => ({ ...dismissal, familyId: canonicalFamilyId(dismissal.familyId) ?? dismissal.familyId })))
+    : [];
+  const storyHabitIds = Object.fromEntries(Object.entries(candidate.storyHabitIds ?? {}).filter(([familyId, id]) =>
+    goals.some((goal) => goal.id === id && goal.familyId === familyId && goal.status !== 'archived')));
+  return { schemaVersion: 3, goals, completions, dismissals, ...(Object.keys(storyHabitIds).length ? { storyHabitIds } : {}) };
+}
+
+export function cadenceFromTemplate(
+  template: CompanionQuickGoalTemplate,
+  dayId: string
+): CompanionQuickGoalCadence {
+  if (template.defaultCadence.kind === 'once') return { kind: 'once', dayId };
+  if (template.defaultCadence.kind === 'daily') return { kind: 'daily' };
+  return { kind: 'weekdays', weekdays: [...template.defaultCadence.weekdays] };
+}
+
+export function addCompanionQuickGoal(
+  state: CompanionQuickGoalState,
+  input: AddCompanionQuickGoalInput,
+  createdAt = Date.now()
+): AddCompanionQuickGoalResult {
+  const familyId = canonicalFamilyId(input.familyId) ?? input.familyId;
+  const title = input.title.trim();
+  if (!title) return { state, goal: null, reason: 'blank_title' };
+  if (input.templateId) {
+    const template = companionQuickGoalTemplateById.get(input.templateId);
+    if (!template || template.familyId !== familyId) {
+      return { state, goal: null, reason: 'invalid_template' };
+    }
+  }
+  const duplicate = state.goals.some((goal) =>
+    goal.familyId === familyId &&
+    goal.status !== 'archived' &&
+    (
+      input.templateId
+        ? goal.templateId === input.templateId
+        : normalisedTitle(goal.title) === normalisedTitle(title)
+    )
+  );
+  if (duplicate) return { state, goal: null, reason: 'duplicate' };
+  const goal: CompanionQuickGoal = {
+    id: `quick-goal:${familyId}:${createdAt}:${slug(title)}`,
+    familyId,
+    ...(input.templateId ? { templateId: input.templateId } : {}),
+    title,
+    cadence: normaliseCadence(input.cadence),
+    status: 'active',
+    createdAt,
+    updatedAt: createdAt,
+  };
+  return { state: { ...state, goals: [...state.goals, goal] }, goal, reason: null };
+}
+
+export function updateCompanionQuickGoal(
+  state: CompanionQuickGoalState,
+  goalId: string,
+  updates: {
+    title?: string;
+    cadence?: CompanionQuickGoalCadence;
+    status?: CompanionQuickGoalStatus;
+  },
+  updatedAt = Date.now()
+): CompanionQuickGoalState {
+  const goal = state.goals.find((item) => item.id === goalId);
+  if (!goal) return state;
+  const title = updates.title === undefined ? goal.title : updates.title.trim();
+  if (!title) return state;
+  const nextGoal: CompanionQuickGoal = {
+    ...goal,
+    title,
+    cadence: updates.cadence ? normaliseCadence(updates.cadence) : goal.cadence,
+    status: updates.status ?? goal.status,
+    updatedAt,
+  };
+  if (JSON.stringify(nextGoal) === JSON.stringify(goal)) return state;
+  return {
+    ...state,
+    goals: state.goals.map((item) => item.id === goalId ? nextGoal : item),
+  };
+}
+
+export function quickGoalsForDay(
+  state: CompanionQuickGoalState,
+  dayId: string,
+  familyId?: KatchimeraFamilyId | null
+): CompanionQuickGoalForDay[] {
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
+  const completionByGoalId = new Map(
+    state.completions
+      .filter((completion) => completion.dayId === dayId)
+      .map((completion) => [completion.goalId, completion])
+  );
+  const dismissedGoalIds = new Set(
+    state.dismissals
+      .filter((dismissal) => dismissal.dayId === dayId)
+      .map((dismissal) => dismissal.goalId)
+  );
+  return state.goals
+    .filter((goal) =>
+      goal.status === 'active' &&
+      (!ownerFamilyId || goal.familyId === ownerFamilyId) &&
+      cadenceIncludesDay(goal.cadence, dayId) &&
+      !dismissedGoalIds.has(goal.id)
+    )
+    .map((goal) => ({ goal, completion: completionByGoalId.get(goal.id) ?? null }))
+    .sort((left, right) => {
+      if (Boolean(left.completion) !== Boolean(right.completion)) return left.completion ? 1 : -1;
+      return left.goal.createdAt - right.goal.createdAt;
+    });
+}
+
+/**
+ * One-off goals only belong to the day they were created for. Once that day
+ * has passed, archive the instance so it remains available to completion
+ * history without permanently blocking the same preset or custom goal.
+ * Repeating goals intentionally remain active and get a fresh daily state
+ * from their day-scoped completion/dismissal records.
+ */
+export function rollCompanionQuickGoalsToDay(
+  state: CompanionQuickGoalState,
+  dayId: string,
+  updatedAt = Date.now()
+): CompanionQuickGoalState {
+  let changed = false;
+  const goals = state.goals.map((goal) => {
+    if (
+      goal.status !== 'archived' &&
+      goal.cadence.kind === 'once' &&
+      goal.cadence.dayId < dayId
+    ) {
+      changed = true;
+      return { ...goal, status: 'archived' as const, updatedAt };
+    }
+    return goal;
+  });
+  return changed ? { ...state, goals } : state;
+}
+
+/**
+ * Drives the Add-screen tick from the same day-scoped rules as the Goals
+ * screen. A stale one-off returns null; repeating goals stay added and reset
+ * their completion automatically on the next eligible day.
+ */
+export function quickGoalTemplateStatusForDay(
+  state: CompanionQuickGoalState,
+  templateId: string,
+  dayId: string
+): CompanionQuickGoalTemplateDayStatus | null {
+  const goal = state.goals.find((candidate) =>
+    candidate.templateId === templateId &&
+    candidate.status !== 'archived' &&
+    !(candidate.cadence.kind === 'once' && candidate.cadence.dayId < dayId)
+  );
+  if (!goal) return null;
+  if (goal.status === 'paused') return 'paused';
+  if (state.completions.some((completion) =>
+    completion.goalId === goal.id && completion.dayId === dayId
+  )) return 'completed';
+  const dismissal = state.dismissals.find((candidate) =>
+    candidate.goalId === goal.id && candidate.dayId === dayId
+  );
+  if (dismissal) return dismissal.kind;
+  return cadenceIncludesDay(goal.cadence, dayId) ? 'active' : 'scheduled';
+}
+
+export function snoozeCompanionQuickGoal(
+  state: CompanionQuickGoalState,
+  goalId: string,
+  dayId: string,
+  createdAt = Date.now()
+): { state: CompanionQuickGoalState; snoozed: boolean } {
+  const goal = state.goals.find((item) =>
+    item.id === goalId && item.status === 'active' && cadenceIncludesDay(item.cadence, dayId)
+  );
+  if (!goal || state.completions.some((item) => item.id === quickGoalCompletionId(goalId, dayId))) {
+    return { state, snoozed: false };
+  }
+  if (goal.cadence.kind === 'once') {
+    return {
+      state: updateCompanionQuickGoal(state, goalId, {
+        cadence: { kind: 'once', dayId: nextDayId(dayId) },
+      }, createdAt),
+      snoozed: true,
+    };
+  }
+  const result = dismissCompanionQuickGoal(state, goal, dayId, 'snoozed', createdAt);
+  return { state: result.state, snoozed: result.dismissed };
+}
+
+export function skipCompanionQuickGoal(
+  state: CompanionQuickGoalState,
+  goalId: string,
+  dayId: string,
+  createdAt = Date.now()
+): { state: CompanionQuickGoalState; skipped: boolean } {
+  const goal = state.goals.find((item) =>
+    item.id === goalId && item.status === 'active' && cadenceIncludesDay(item.cadence, dayId)
+  );
+  if (!goal || state.completions.some((item) => item.id === quickGoalCompletionId(goalId, dayId))) {
+    return { state, skipped: false };
+  }
+  const result = dismissCompanionQuickGoal(state, goal, dayId, 'skipped', createdAt);
+  return { state: result.state, skipped: result.dismissed };
+}
+
+export function completeCompanionQuickGoal(
+  state: CompanionQuickGoalState,
+  goalId: string,
+  dayId: string,
+  completedAt = Date.now()
+): { state: CompanionQuickGoalState; completion: CompanionQuickGoalCompletion | null; completed: boolean } {
+  const goal = state.goals.find((item) =>
+    item.id === goalId && item.status === 'active' && cadenceIncludesDay(item.cadence, dayId)
+  );
+  if (!goal) return { state, completion: null, completed: false };
+  const id = quickGoalCompletionId(goalId, dayId);
+  const existing = state.completions.find((item) => item.id === id);
+  if (existing) return { state, completion: existing, completed: false };
+  const completion: CompanionQuickGoalCompletion = {
+    id,
+    goalId,
+    familyId: goal.familyId,
+    dayId,
+    completedAt,
+  };
+  return {
+    state: { ...state, completions: [...state.completions, completion] },
+    completion,
+    completed: true,
+  };
+}
+
+export function undoCompanionQuickGoal(
+  state: CompanionQuickGoalState,
+  goalId: string,
+  dayId: string
+): { state: CompanionQuickGoalState; completion: CompanionQuickGoalCompletion | null; undone: boolean } {
+  const id = quickGoalCompletionId(goalId, dayId);
+  const completion = state.completions.find((item) => item.id === id) ?? null;
+  if (!completion) return { state, completion: null, undone: false };
+  return {
+    state: { ...state, completions: state.completions.filter((item) => item.id !== id) },
+    completion,
+    undone: true,
+  };
+}
+
+/** Clears only one day's receipts so recurring goal definitions remain intact. */
+export function resetCompanionQuickGoalProgressForDay(
+  state: CompanionQuickGoalState,
+  dayId: string
+): CompanionQuickGoalState {
+  const completions = state.completions.filter((item) => item.dayId !== dayId);
+  const dismissals = state.dismissals.filter((item) => item.dayId !== dayId);
+  if (completions.length === state.completions.length && dismissals.length === state.dismissals.length) {
+    return state;
+  }
+  return { ...state, completions, dismissals };
+}
+
+export function markQuickGoalCompletionJournaled(
+  state: CompanionQuickGoalState,
+  completionId: string,
+  journaledAt = Date.now()
+): CompanionQuickGoalState {
+  const completion = state.completions.find((item) => item.id === completionId);
+  if (!completion || completion.journaledAt) return state;
+  return {
+    ...state,
+    completions: state.completions.map((item) =>
+      item.id === completionId ? { ...item, journaledAt } : item
+    ),
+  };
+}
+
+export function quickGoalCompletionId(goalId: string, dayId: string): string {
+  return `quick-goal-completion:${goalId}:${dayId}`;
+}
+
+export function cadenceIncludesDay(cadence: CompanionQuickGoalCadence, dayId: string): boolean {
+  if (cadence.kind === 'once') return cadence.dayId === dayId;
+  if (cadence.kind === 'daily') return true;
+  const weekday = new Date(`${dayId}T12:00:00`).getDay();
+  return cadence.weekdays.includes(weekday);
+}
+
+export function quickGoalCadenceLabel(cadence: CompanionQuickGoalCadence): string {
+  if (cadence.kind === 'once') return 'Today only';
+  if (cadence.kind === 'daily') return 'Every day';
+  if (cadence.weekdays.join(',') === '1,2,3,4,5') return 'Weekdays';
+  const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return cadence.weekdays.map((day) => labels[day]).filter(Boolean).join(', ');
+}
+
+function normaliseCadence(cadence: CompanionQuickGoalCadence): CompanionQuickGoalCadence {
+  if (cadence.kind === 'once') return { kind: 'once', dayId: cadence.dayId };
+  if (cadence.kind === 'daily') return { kind: 'daily' };
+  return {
+    kind: 'weekdays',
+    weekdays: [...new Set(cadence.weekdays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))].sort(),
+  };
+}
+
+function isValidGoal(value: unknown): value is CompanionQuickGoal {
+  if (!value || typeof value !== 'object') return false;
+  const goal = value as CompanionQuickGoal;
+  return typeof goal.id === 'string' && typeof goal.familyId === 'string' &&
+    typeof goal.title === 'string' && Boolean(goal.title.trim()) &&
+    ['active', 'paused', 'archived'].includes(goal.status) &&
+    isValidCadence(goal.cadence) && Number.isFinite(goal.createdAt) && Number.isFinite(goal.updatedAt);
+}
+
+function isValidCadence(value: unknown): value is CompanionQuickGoalCadence {
+  if (!value || typeof value !== 'object') return false;
+  const cadence = value as CompanionQuickGoalCadence;
+  return cadence.kind === 'daily' ||
+    (cadence.kind === 'once' && typeof cadence.dayId === 'string' && Boolean(cadence.dayId)) ||
+    (cadence.kind === 'weekdays' && Array.isArray(cadence.weekdays));
+}
+
+function isValidCompletion(value: unknown): value is CompanionQuickGoalCompletion {
+  if (!value || typeof value !== 'object') return false;
+  const completion = value as CompanionQuickGoalCompletion;
+  return typeof completion.id === 'string' && typeof completion.goalId === 'string' &&
+    typeof completion.familyId === 'string' && typeof completion.dayId === 'string' &&
+    Number.isFinite(completion.completedAt) &&
+    (completion.journaledAt === undefined || Number.isFinite(completion.journaledAt));
+}
+
+function isValidDismissal(value: unknown): value is CompanionQuickGoalDismissal {
+  if (!value || typeof value !== 'object') return false;
+  const dismissal = value as CompanionQuickGoalDismissal;
+  return typeof dismissal.id === 'string' && typeof dismissal.goalId === 'string' &&
+    typeof dismissal.familyId === 'string' && typeof dismissal.dayId === 'string' &&
+    ['snoozed', 'skipped'].includes(dismissal.kind) && Number.isFinite(dismissal.createdAt);
+}
+
+function dismissCompanionQuickGoal(
+  state: CompanionQuickGoalState,
+  goal: CompanionQuickGoal,
+  dayId: string,
+  kind: CompanionQuickGoalDismissal['kind'],
+  createdAt: number
+): { state: CompanionQuickGoalState; dismissed: boolean } {
+  const id = `quick-goal-dismissal:${goal.id}:${dayId}`;
+  if (state.dismissals.some((item) => item.id === id)) return { state, dismissed: false };
+  return {
+    state: {
+      ...state,
+      dismissals: [...state.dismissals, {
+        id,
+        goalId: goal.id,
+        familyId: goal.familyId,
+        dayId,
+        kind,
+        createdAt,
+      }],
+    },
+    dismissed: true,
+  };
+}
+
+function nextDayId(dayId: string): string {
+  const date = new Date(`${dayId}T12:00:00`);
+  date.setDate(date.getDate() + 1);
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  return [...new Map(items.map((item) => [item.id, item])).values()];
+}
+
+function normalisedTitle(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+function slug(value: string): string {
+  return normalisedTitle(value).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'goal';
+}

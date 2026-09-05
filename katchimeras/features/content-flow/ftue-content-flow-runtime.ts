@@ -115,6 +115,13 @@ export async function reconcileFtueCheckpoint(ftue: FtueRunState) {
     }
     const node = contentFlowDefinition(run.definitionId, run.definitionVersion)?.nodes.find((node) => node.id === run.nodeId);
     if (node?.kind !== 'scene') break;
+    // Version 47 and earlier saved the confirmation checkpoint directly after
+    // serving. Its journal can lag behind the newly inserted marker scene.
+    if (run.nodeId === 'world.first_bloom_offer' && ftue.stepId !== 'world.first_bloom_offer'
+      && ftue.receipts.some((receipt) => receipt.stepId === 'merge.serve_sprout' && receipt.scriptVersion < 48 && receipt.status !== 'pending')) {
+      run = await dispatchContentFlowCommand(run.runId, { type: 'submit_scene', actionId: 'world.open_first_bloom_upgrade' }) ?? run;
+      continue;
+    }
     const receipt = ftue.receipts.find((receipt) => receipt.stepId === run.nodeId && receipt.status !== 'pending'
       && node.actions.some((action) => action.id === receipt.actionId));
     if (!receipt) break;

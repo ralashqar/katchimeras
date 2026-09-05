@@ -1,3 +1,4 @@
+import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from '@/features/content-flow/steppling-day-one-flow-v2';
 import type { ConversationDefinition, ConversationNode } from '@/types/companion-conversation';
 import { LEGACY_STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/steppling-day-one-flow-v1';
 import type { ContentFlowDefinition } from '@/types/content-flow';
@@ -17,7 +18,7 @@ function conversationFromFlow(flow: ContentFlowDefinition): ConversationDefiniti
   title: 'A little way together', trigger: 'evergreen', minimumBondLevel: 1,
   cooldownDays: 0, contextualOnly: true, repeatPolicy: 'once_ever',
   purpose: 'journey', format: 'narrative', returnTarget: 'character_home',
-  entryNodeId: 'welcome',
+  entryNodeId: flow.entryNodeId,
   nodes: [
     ...flow.nodes.flatMap((node): ConversationNode[] => {
       if (node.kind !== 'scene') return [];
@@ -36,3 +37,5 @@ function conversationFromFlow(flow: ContentFlowDefinition): ConversationDefiniti
 }
 export const stepplingDayOneConversation = conversationFromFlow(STEPPLING_DAY_ONE_FLOW);
 export const legacyStepplingDayOneConversation = conversationFromFlow(LEGACY_STEPPLING_DAY_ONE_FLOW);
+
+export const legacyStepplingDayOneConversationV2 = conversationFromFlow(LEGACY_STEPPLING_DAY_ONE_FLOW_V2);

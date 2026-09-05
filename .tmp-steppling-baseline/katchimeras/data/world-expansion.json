@@ -1,0 +1,12 @@
+{
+  "comment": "Territory growth dials (docs/world-objects-expansion-design.md §10). A new tile unlocks when its authored requirements are met AND the pressure gate passes (>=pressureGate of current capacity actually planted) — so new land never arrives while the old land is empty. Beyond the authored list the formula takes over; sides cycle ne→sw→se→nw and step outward a ring every 4 tiles (roads stay connected edge-to-edge).",
+  "capacityPerTile": 24,
+  "pressureGate": 0.6,
+  "tiles": [
+    { "index": 2, "side": "ne", "requires": { "daysLived": 5, "propsPlanted": 8 } },
+    { "index": 3, "side": "sw", "requires": { "daysLived": 14, "propsPlanted": 20, "discoveries": 1 } },
+    { "index": 4, "side": "se", "requires": { "daysLived": 30, "propsPlanted": 40, "discoveries": 3 } },
+    { "index": 5, "side": "nw", "requires": { "daysLived": 60, "propsPlanted": 70, "epicDiscoveries": 1 } }
+  ],
+  "formula": { "daysPerTile": 30, "propsPerTile": 35 }
+}

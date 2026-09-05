@@ -1,0 +1,296 @@
+import type { ImageSourcePropType } from 'react-native';
+
+import { lifeAspectById } from '@/constants/life-aspects';
+import { katchimeraFamilyById } from '@/constants/katchimera-skins';
+import type { WorldIdentityState } from '@/types/world-identity';
+import { katchimeraHexTileForCreature } from '@/utils/katchimera-hex-tiles';
+import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
+import {
+  HEX_TILE_LIP,
+  hexDrawDepth,
+  hexTileTopPoints,
+  hexToWorld,
+  type HexCoord,
+} from '@/utils/world-hex';
+import { kingdomSceneMetrics } from '@/utils/kingdom-rendering';
+import {
+  kingdomTileArtFrame,
+  kingdomStructureArtFrame,
+  type KingdomHexVerticalAlignmentMode,
+} from '@/utils/kingdom-tile-alignment';
+import {
+  MOSSPROUT_GARDEN_BOARD_BOTTOM,
+  MOSSPROUT_GARDEN_BOARD_TOP,
+} from '@/utils/kingdom-map-layout';
+import { MOSSPROUT_GARDEN_BOARD } from '@/utils/kingdom-map-structures';
+import type {
+  KingdomHexTileLodSources,
+  KingdomHexTileSelection,
+} from '@/utils/world-visuals';
+
+export type KingdomTileRender = {
+  id: string;
+  kind: 'home' | 'companion';
+  coord: HexCoord;
+  cx: number;
+  cy: number;
+  depth: number;
+  companion?: KingdomHexCompanionSlot;
+  squareCoord?: { column: number; row: number };
+};
+
+export type KingdomTileArtLayer = {
+  alphaBounds: { left: number; top: number; right: number; bottom: number };
+  id: string;
+  kind: 'structure' | 'tile';
+  coord: HexCoord;
+  custom: boolean;
+  depth: number;
+  fallbackSource: ImageSourcePropType | null;
+  fallbackSources?: KingdomHexTileLodSources;
+  frame: { left: number; top: number; width: number; height: number };
+  interactionFrame?: { left: number; top: number; width: number; height: number };
+  overlaySource?: ImageSourcePropType;
+  overlaySources?: KingdomHexTileLodSources;
+  residentAnchor?: { x: number; y: number };
+  residentSource?: ImageSourcePropType;
+  sourceSize: { width: number; height: number };
+  source: ImageSourcePropType;
+  sources?: KingdomHexTileLodSources;
+  squareCoord?: { column: number; row: number };
+};
+
+export type KingdomHexScene = {
+  centerTile: KingdomTileRender;
+  height: number;
+  tileArtLayers: KingdomTileArtLayer[];
+  tileById: Map<string, KingdomTileRender>;
+  tiles: KingdomTileRender[];
+  width: number;
+};
+
+const CENTER_ID = 'kingdom';
+const FULL_IMAGE_BOUNDS = { left: 0, top: 0, right: 1024, bottom: 1024 };
+const warnedMissingBounds = new Set<string>();
+
+function validAlphaBounds(bounds: KingdomHexTileSelection['default']['alphaBounds'] | null | undefined) {
+  return Boolean(
+    bounds &&
+      Number.isFinite(bounds.left) &&
+      Number.isFinite(bounds.top) &&
+      Number.isFinite(bounds.right) &&
+      Number.isFinite(bounds.bottom) &&
+      bounds.right > bounds.left &&
+      bounds.bottom > bounds.top
+  );
+}
+
+function tileAlphaBoundsOrBase(
+  tileId: string,
+  bounds: KingdomHexTileSelection['default']['alphaBounds'] | null | undefined,
+  baseBounds: KingdomHexTileSelection['default']['alphaBounds']
+) {
+  if (validAlphaBounds(bounds)) return bounds!;
+  if (__DEV__ && !warnedMissingBounds.has(tileId)) {
+    warnedMissingBounds.add(tileId);
+    console.warn(`[Kingdom] Missing alignment bounds for ${tileId}; using the selected base tile bounds.`);
+  }
+  return baseBounds;
+}
+
+export function tileVisibleBounds(cx: number, cy: number) {
+  const topPoints = hexTileTopPoints(cx, cy);
+  let left = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+
+  for (const point of topPoints) {
+    left = Math.min(left, point.x);
+    right = Math.max(right, point.x);
+    top = Math.min(top, point.y);
+    bottom = Math.max(bottom, point.y + HEX_TILE_LIP);
+  }
+  return { left, right, top, bottom };
+}
+
+function artLayerFor(
+  tile: KingdomTileRender,
+  hexTiles: KingdomHexTileSelection,
+  identity: Pick<WorldIdentityState, 'selectedHomeArchetypeId'> | null | undefined,
+  verticalAlignmentMode: KingdomHexVerticalAlignmentMode,
+  useWorldSelectorTiles: boolean,
+): KingdomTileArtLayer {
+  const familyAnchor =
+    tile.kind === 'companion' && tile.companion?.kind === 'owned' && tile.companion.creature.familyId
+      ? katchimeraFamilyById.get(tile.companion.creature.familyId)?.anchorVisualKey ?? null
+      : null;
+  const aspectAnchor =
+    familyAnchor ?? (tile.kind === 'companion' && tile.companion?.kind === 'owned' && tile.companion.creature.aspectId
+      ? lifeAspectById.get(tile.companion.creature.aspectId)?.anchorVisualKey ?? null
+      : null);
+  const worldSelectorTile =
+    useWorldSelectorTiles && tile.kind === 'companion' && tile.companion && tile.companion.kind !== 'locked'
+      ? hexTiles.worldSelectorResidentTiles?.[tile.companion.familyId] ?? null
+      : null;
+  const havenResidentTile =
+    tile.kind === 'companion' && (tile.companion?.kind === 'owned' || tile.companion?.kind === 'revealed_egg')
+      ? hexTiles.havenResidentTiles?.[tile.companion.familyId]?.[tile.companion.havenStage] ?? null
+      : null;
+  const themedResidentTile = worldSelectorTile ?? havenResidentTile ?? (
+    tile.kind === 'companion' && tile.companion?.kind === 'owned'
+      ? hexTiles.residentTiles?.[tile.companion.creature.visualKey]
+        ?? (aspectAnchor ? hexTiles.residentTiles?.[aspectAnchor] : null)
+        ?? null
+      : null
+  );
+  const customResidentTile =
+    !themedResidentTile && hexTiles.useCustomResidentTiles && tile.kind === 'companion' && tile.companion?.kind === 'owned'
+      ? katchimeraHexTileForCreature(tile.companion.creature)
+        ?? (aspectAnchor
+          ? katchimeraHexTileForCreature({ ...tile.companion.creature, visualKey: aspectAnchor })
+          : null)
+      : null;
+  const homeTile = identity?.selectedHomeArchetypeId
+    ? hexTiles.homes[identity.selectedHomeArchetypeId]
+    : hexTiles.center;
+  const residentTile = themedResidentTile ?? customResidentTile;
+  const locked = tile.kind === 'companion' && tile.companion?.kind === 'locked';
+  const selected = locked
+    ? hexTiles.locked
+    : residentTile ?? (tile.kind === 'home' ? homeTile : hexTiles.default);
+  const baseBounds = tileAlphaBoundsOrBase('selected-base', hexTiles.default.alphaBounds, FULL_IMAGE_BOUNDS);
+  const selectedBounds = tileAlphaBoundsOrBase(tile.id, selected.alphaBounds, baseBounds);
+  const frame = kingdomTileArtFrame({
+    alignmentMode: verticalAlignmentMode,
+    assetBounds: selectedBounds,
+    faceBounds: selected.faceBounds,
+    referenceBounds: baseBounds,
+    target: tileVisibleBounds(tile.cx, tile.cy),
+  });
+
+  return {
+    alphaBounds: selectedBounds,
+    id: tile.id,
+    kind: 'tile',
+    coord: tile.coord,
+    custom: Boolean(residentTile),
+    depth: tile.depth,
+    fallbackSource: residentTile || locked ? hexTiles.default.source : null,
+    fallbackSources: residentTile || locked ? hexTiles.default.sources : undefined,
+    frame,
+    overlaySource: selected.overlaySource,
+    overlaySources: selected.overlaySources,
+    residentAnchor: selected.residentAnchor
+      ? {
+          x: frame.left + frame.width * selected.residentAnchor.x,
+          y: frame.top + frame.height * selected.residentAnchor.y,
+        }
+      : undefined,
+    source: selected.source,
+    sourceSize: { width: 1024, height: 1024 },
+    sources: selected.sources,
+  };
+}
+
+function mossproutGardenLayer(
+  companionSlots: KingdomHexCompanionSlot[],
+  centerX: number,
+  centerY: number,
+  layoutProfile: KingdomHexTileSelection['layoutProfile'],
+): KingdomTileArtLayer {
+  const mossprout = companionSlots.find((slot) => slot.familyId === 'mossprout');
+  const art = mossprout && mossprout.kind !== 'locked'
+    ? MOSSPROUT_GARDEN_BOARD.art.revealed
+    : MOSSPROUT_GARDEN_BOARD.art.locked;
+  const topPoint = hexToWorld(MOSSPROUT_GARDEN_BOARD_TOP, layoutProfile);
+  const bottomPoint = hexToWorld(MOSSPROUT_GARDEN_BOARD_BOTTOM, layoutProfile);
+  const topBounds = tileVisibleBounds(topPoint.x + centerX, topPoint.y + centerY);
+  const bottomBounds = tileVisibleBounds(bottomPoint.x + centerX, bottomPoint.y + centerY);
+  const target = {
+    left: Math.min(topBounds.left, bottomBounds.left),
+    top: Math.min(topBounds.top, bottomBounds.top),
+    right: Math.max(topBounds.right, bottomBounds.right),
+    bottom: Math.max(topBounds.bottom, bottomBounds.bottom),
+  };
+  const frame = kingdomStructureArtFrame({
+    assetBounds: art.alphaBounds,
+    sourceSize: art.sourceSize,
+    target,
+  });
+  const mergeSurface = art.mergeSurfaceBounds;
+  const interactionFrame = {
+    left: frame.left + (mergeSurface.left / art.sourceSize.width) * frame.width,
+    top: frame.top + (mergeSurface.top / art.sourceSize.height) * frame.height,
+    width: ((mergeSurface.right - mergeSurface.left) / art.sourceSize.width) * frame.width,
+    height: ((mergeSurface.bottom - mergeSurface.top) / art.sourceSize.height) * frame.height,
+  };
+
+  return {
+    alphaBounds: art.alphaBounds,
+    id: MOSSPROUT_GARDEN_BOARD.id,
+    kind: 'structure',
+    coord: MOSSPROUT_GARDEN_BOARD_TOP,
+    custom: true,
+    depth: hexDrawDepth({ x: bottomPoint.x + centerX, y: bottomPoint.y + centerY }),
+    fallbackSource: null,
+    frame,
+    interactionFrame,
+    overlaySource: art.overlaySource,
+    source: art.source,
+    sourceSize: art.sourceSize,
+  };
+}
+
+export function buildKingdomHexScene(
+  companionSlots: KingdomHexCompanionSlot[],
+  hexTiles: KingdomHexTileSelection,
+  identity?: Pick<WorldIdentityState, 'selectedHomeArchetypeId'> | null,
+  verticalAlignmentMode: KingdomHexVerticalAlignmentMode = 'ground-bottom',
+  options: { includeMossproutGarden?: boolean; useWorldSelectorTiles?: boolean } = {},
+): KingdomHexScene {
+  const includeMossproutGarden = options.includeMossproutGarden ?? true;
+  const useWorldSelectorTiles = options.useWorldSelectorTiles ?? false;
+  const metrics = kingdomSceneMetrics(
+    companionSlots.length + 1,
+    hexTiles.layoutProfile,
+    includeMossproutGarden ? MOSSPROUT_GARDEN_BOARD.footprint : [],
+  );
+  const { width, height } = metrics;
+  const rawTiles: Omit<KingdomTileRender, 'cx' | 'cy' | 'depth'>[] = [
+    { id: CENTER_ID, kind: 'home', coord: { q: 0, r: 0 } },
+    ...companionSlots.map((companion) => ({
+      id: companion.id,
+      kind: 'companion' as const,
+      coord: companion.coord,
+      companion,
+    })),
+  ];
+
+  const tiles = rawTiles
+    .map((tile) => {
+      const point = hexToWorld(tile.coord, hexTiles.layoutProfile);
+      const cx = point.x + metrics.centerX;
+      const cy = point.y + metrics.centerY;
+      return { ...tile, cx, cy, depth: hexDrawDepth({ x: cx, y: cy }) };
+    })
+    .sort((a, b) => a.depth - b.depth);
+  const centerTile = tiles.find((tile) => tile.id === CENTER_ID) ?? tiles[0];
+  const tileById = new Map(tiles.map((tile) => [tile.id, tile]));
+
+  const tileArtLayers = [
+    ...tiles.map((tile) => artLayerFor(tile, hexTiles, identity, verticalAlignmentMode, useWorldSelectorTiles)),
+    ...(includeMossproutGarden
+      ? [mossproutGardenLayer(companionSlots, metrics.centerX, metrics.centerY, hexTiles.layoutProfile)]
+      : []),
+  ].sort((a, b) => a.depth - b.depth);
+
+  return {
+    centerTile,
+    height,
+    tileArtLayers,
+    tileById,
+    tiles,
+    width,
+  };
+}

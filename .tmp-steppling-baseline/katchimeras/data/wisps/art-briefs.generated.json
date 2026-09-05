@@ -1,0 +1,1247 @@
+{
+  "version": 3,
+  "items": [
+    {
+      "id": "crema",
+      "name": "Crema",
+      "rarity": "rare",
+      "seriesId": "baristabbit-constellation",
+      "primaryFamilyId": "baristabbit",
+      "visualSummary": "Milk-foam swirl with tiny cup fins.",
+      "palette": [
+        "latte",
+        "caramel"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "crema.png",
+        "crema.webp",
+        "thumbnails/crema.webp"
+      ]
+    },
+    {
+      "id": "nibble",
+      "name": "Nibble",
+      "rarity": "rare",
+      "seriesId": "feastle-constellation",
+      "primaryFamilyId": "feastle",
+      "visualSummary": "Dumpling orb with crumb cheeks.",
+      "palette": [
+        "honey",
+        "coral"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "nibble.png",
+        "nibble.webp",
+        "thumbnails/nibble.webp"
+      ]
+    },
+    {
+      "id": "pacespark",
+      "name": "Pacespark",
+      "rarity": "rare",
+      "seriesId": "steppling-constellation",
+      "primaryFamilyId": "steppling",
+      "visualSummary": "Bootprint spark with speed fins.",
+      "palette": [
+        "path green",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "pacespark.png",
+        "pacespark.webp",
+        "thumbnails/pacespark.webp"
+      ]
+    },
+    {
+      "id": "kinetic",
+      "name": "Kinetic",
+      "rarity": "rare",
+      "seriesId": "flexel-constellation",
+      "primaryFamilyId": "flexel",
+      "visualSummary": "Cobalt energy knot with coral sparks.",
+      "palette": [
+        "cobalt",
+        "coral"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "kinetic.png",
+        "kinetic.webp",
+        "thumbnails/kinetic.webp"
+      ]
+    },
+    {
+      "id": "doze",
+      "name": "Doze",
+      "rarity": "rare",
+      "seriesId": "bedrotte-constellation",
+      "primaryFamilyId": "bedrotte",
+      "visualSummary": "Lavender pillow cloud with tucked wings.",
+      "palette": [
+        "lavender",
+        "cream"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "doze.png",
+        "doze.webp",
+        "thumbnails/doze.webp"
+      ]
+    },
+    {
+      "id": "firstlight",
+      "name": "Firstlight",
+      "rarity": "rare",
+      "seriesId": "dawnle-constellation",
+      "primaryFamilyId": "dawnle",
+      "visualSummary": "Peach ray bud with a gold core.",
+      "palette": [
+        "peach",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "firstlight.png",
+        "firstlight.webp",
+        "thumbnails/firstlight.webp"
+      ]
+    },
+    {
+      "id": "mallow",
+      "name": "Mallow",
+      "rarity": "rare",
+      "seriesId": "mendle-constellation",
+      "primaryFamilyId": "mendle",
+      "visualSummary": "Stitched puff with tiny mint seams.",
+      "palette": [
+        "blush",
+        "mint"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "mallow.png",
+        "mallow.webp",
+        "thumbnails/mallow.webp"
+      ]
+    },
+    {
+      "id": "huddle",
+      "name": "Huddle",
+      "rarity": "rare",
+      "seriesId": "gatherglow-constellation",
+      "primaryFamilyId": "gatherglow",
+      "visualSummary": "Cluster of three amber lights.",
+      "palette": [
+        "amber",
+        "coral"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "huddle.png",
+        "huddle.webp",
+        "thumbnails/huddle.webp"
+      ]
+    },
+    {
+      "id": "cherish",
+      "name": "Cherish",
+      "rarity": "rare",
+      "seriesId": "heartmote-constellation",
+      "primaryFamilyId": "heartmote",
+      "visualSummary": "Rose heart wrapped in a gold ribbon.",
+      "palette": [
+        "rose",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "cherish.png",
+        "cherish.webp",
+        "thumbnails/cherish.webp"
+      ]
+    },
+    {
+      "id": "beacon",
+      "name": "Beacon",
+      "rarity": "rare",
+      "seriesId": "kindling-constellation",
+      "primaryFamilyId": "kindling",
+      "visualSummary": "Amber lantern spark with teal fins.",
+      "palette": [
+        "amber",
+        "teal"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "beacon.png",
+        "beacon.webp",
+        "thumbnails/beacon.webp"
+      ]
+    },
+    {
+      "id": "nuzzle",
+      "name": "Nuzzle",
+      "rarity": "rare",
+      "seriesId": "snuglet-constellation",
+      "primaryFamilyId": "snuglet",
+      "visualSummary": "Quilted feather puff.",
+      "palette": [
+        "cream",
+        "rose"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "nuzzle.png",
+        "nuzzle.webp",
+        "thumbnails/nuzzle.webp"
+      ]
+    },
+    {
+      "id": "wag",
+      "name": "Wag",
+      "rarity": "rare",
+      "seriesId": "waglet-constellation",
+      "primaryFamilyId": "waglet",
+      "visualSummary": "Honey orb with a sky-blue tail swish.",
+      "palette": [
+        "honey",
+        "sky"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "wag.png",
+        "wag.webp",
+        "thumbnails/wag.webp"
+      ]
+    },
+    {
+      "id": "ticker",
+      "name": "Ticker",
+      "rarity": "rare",
+      "seriesId": "tasklet-constellation",
+      "primaryFamilyId": "tasklet",
+      "visualSummary": "Clock orb with a checkmark wing.",
+      "palette": [
+        "teal",
+        "navy"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "ticker.png",
+        "ticker.webp",
+        "thumbnails/ticker.webp"
+      ]
+    },
+    {
+      "id": "knot",
+      "name": "Knot",
+      "rarity": "rare",
+      "seriesId": "errandimp-constellation",
+      "primaryFamilyId": "errandimp",
+      "visualSummary": "Rust reminder string with paper wings.",
+      "palette": [
+        "rust",
+        "cream"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "knot.png",
+        "knot.webp",
+        "thumbnails/knot.webp"
+      ]
+    },
+    {
+      "id": "inkling",
+      "name": "Inkling",
+      "rarity": "rare",
+      "seriesId": "pagelet-constellation",
+      "primaryFamilyId": "pagelet",
+      "visualSummary": "Indigo ink drop with ivory page fins.",
+      "palette": [
+        "indigo",
+        "ivory"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "inkling.png",
+        "inkling.webp",
+        "thumbnails/inkling.webp"
+      ]
+    },
+    {
+      "id": "curio",
+      "name": "Curio",
+      "rarity": "rare",
+      "seriesId": "relicoon-constellation",
+      "primaryFamilyId": "relicoon",
+      "visualSummary": "Bronze relic orb with a jade keyhole.",
+      "palette": [
+        "bronze",
+        "jade"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "curio.png",
+        "curio.webp",
+        "thumbnails/curio.webp"
+      ]
+    },
+    {
+      "id": "daub",
+      "name": "Daub",
+      "rarity": "rare",
+      "seriesId": "museling-constellation",
+      "primaryFamilyId": "museling",
+      "visualSummary": "Coral paint blob with cyan brush wings.",
+      "palette": [
+        "coral",
+        "cyan"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "daub.png",
+        "daub.webp",
+        "thumbnails/daub.webp"
+      ]
+    },
+    {
+      "id": "chime",
+      "name": "Chime",
+      "rarity": "rare",
+      "seriesId": "encora-constellation",
+      "primaryFamilyId": "encora",
+      "visualSummary": "Indigo bell with gold sound rings.",
+      "palette": [
+        "indigo",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "chime.png",
+        "chime.webp",
+        "thumbnails/chime.webp"
+      ]
+    },
+    {
+      "id": "reel",
+      "name": "Reel",
+      "rarity": "rare",
+      "seriesId": "flickerbun-constellation",
+      "primaryFamilyId": "flickerbun",
+      "visualSummary": "Amber film spool with violet projector wings.",
+      "palette": [
+        "amber",
+        "violet"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "reel.png",
+        "reel.webp",
+        "thumbnails/reel.webp"
+      ]
+    },
+    {
+      "id": "glitch",
+      "name": "Glitch",
+      "rarity": "rare",
+      "seriesId": "pixooka-constellation",
+      "primaryFamilyId": "pixooka",
+      "visualSummary": "Split pixel cube with mismatched fins.",
+      "palette": [
+        "magenta",
+        "teal"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "glitch.png",
+        "glitch.webp",
+        "thumbnails/glitch.webp"
+      ]
+    },
+    {
+      "id": "pearl",
+      "name": "Pearl",
+      "rarity": "rare",
+      "seriesId": "shellio-constellation",
+      "primaryFamilyId": "shellio",
+      "visualSummary": "Pearl orb with shell fins.",
+      "palette": [
+        "seafoam",
+        "pearl"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "pearl.png",
+        "pearl.webp",
+        "thumbnails/pearl.webp"
+      ]
+    },
+    {
+      "id": "skylamp",
+      "name": "Skylamp",
+      "rarity": "rare",
+      "seriesId": "skylo-constellation",
+      "primaryFamilyId": "skylo",
+      "visualSummary": "Blue city lamp with tiny gold windows.",
+      "palette": [
+        "blue",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "skylamp.png",
+        "skylamp.webp",
+        "thumbnails/skylamp.webp"
+      ]
+    },
+    {
+      "id": "compass",
+      "name": "Compass",
+      "rarity": "rare",
+      "seriesId": "voyagle-constellation",
+      "primaryFamilyId": "voyagle",
+      "visualSummary": "Compass rose with airy fins.",
+      "palette": [
+        "sky",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "compass.png",
+        "compass.webp",
+        "thumbnails/compass.webp"
+      ]
+    },
+    {
+      "id": "jubilee",
+      "name": "Jubilee",
+      "rarity": "rare",
+      "seriesId": "cheerlet-constellation",
+      "primaryFamilyId": "cheerlet",
+      "visualSummary": "Confetti crown with ribbon fins.",
+      "palette": [
+        "coral",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "jubilee.png",
+        "jubilee.webp",
+        "thumbnails/jubilee.webp"
+      ]
+    },
+    {
+      "id": "dewdrop",
+      "name": "Dewdrop",
+      "rarity": "common",
+      "seriesId": "garden-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Clear aqua droplet with leaflike fins.",
+      "palette": [
+        "aqua",
+        "mint"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "dewdrop.png",
+        "dewdrop.webp",
+        "thumbnails/dewdrop.webp"
+      ]
+    },
+    {
+      "id": "bubble",
+      "name": "Bubble",
+      "rarity": "common",
+      "seriesId": "soft-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Iridescent soap bubble with tiny cheeks.",
+      "palette": [
+        "pearl",
+        "sky"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "bubble.png",
+        "bubble.webp",
+        "thumbnails/bubble.webp"
+      ]
+    },
+    {
+      "id": "nimbus",
+      "name": "Nimbus",
+      "rarity": "common",
+      "seriesId": "soft-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Small white cloud orb with blue feet.",
+      "palette": [
+        "cloud",
+        "sky"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "nimbus.png",
+        "nimbus.webp",
+        "thumbnails/nimbus.webp"
+      ]
+    },
+    {
+      "id": "clover",
+      "name": "Clover",
+      "rarity": "common",
+      "seriesId": "garden-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Four-leaf orb with gold freckles.",
+      "palette": [
+        "clover green",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "clover.png",
+        "clover.webp",
+        "thumbnails/clover.webp"
+      ]
+    },
+    {
+      "id": "pebble",
+      "name": "Pebble",
+      "rarity": "common",
+      "seriesId": "garden-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Smooth warm-grey stone with miniature fins.",
+      "palette": [
+        "warm grey",
+        "cream"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "pebble.png",
+        "pebble.webp",
+        "thumbnails/pebble.webp"
+      ]
+    },
+    {
+      "id": "crystal",
+      "name": "Crystal",
+      "rarity": "rare",
+      "seriesId": "treasure-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Faceted crystal sprite.",
+      "palette": [
+        "ice blue",
+        "violet"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "crystal.png",
+        "crystal.webp",
+        "thumbnails/crystal.webp"
+      ]
+    },
+    {
+      "id": "marble",
+      "name": "Marble",
+      "rarity": "rare",
+      "seriesId": "treasure-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Swirled glass marble with gold specks.",
+      "palette": [
+        "teal",
+        "amber"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "marble.png",
+        "marble.webp",
+        "thumbnails/marble.webp"
+      ]
+    },
+    {
+      "id": "jelly",
+      "name": "Jelly",
+      "rarity": "rare",
+      "seriesId": "soft-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Translucent jelly orb with soft tentacles.",
+      "palette": [
+        "coral",
+        "aqua"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "jelly.png",
+        "jelly.webp",
+        "thumbnails/jelly.webp"
+      ]
+    },
+    {
+      "id": "potion",
+      "name": "Potion",
+      "rarity": "rare",
+      "seriesId": "treasure-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Round potion bottle with a cork cap.",
+      "palette": [
+        "violet",
+        "mint"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "potion.png",
+        "potion.webp",
+        "thumbnails/potion.webp"
+      ]
+    },
+    {
+      "id": "ribbon",
+      "name": "Ribbon",
+      "rarity": "rare",
+      "seriesId": "soft-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Floating coral ribbon bow.",
+      "palette": [
+        "coral",
+        "cream"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "ribbon.png",
+        "ribbon.webp",
+        "thumbnails/ribbon.webp"
+      ]
+    },
+    {
+      "id": "acorn",
+      "name": "Acorn",
+      "rarity": "rare",
+      "seriesId": "garden-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Acorn orb with oak-leaf wings.",
+      "palette": [
+        "oak brown",
+        "leaf green"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "acorn.png",
+        "acorn.webp",
+        "thumbnails/acorn.webp"
+      ]
+    },
+    {
+      "id": "quill",
+      "name": "Quill",
+      "rarity": "rare",
+      "seriesId": "pagelet-constellation",
+      "primaryFamilyId": "pagelet",
+      "visualSummary": "Ivory quill spirit with an ink-blue tip.",
+      "palette": [
+        "ivory",
+        "ink blue"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "quill.png",
+        "quill.webp",
+        "thumbnails/quill.webp"
+      ]
+    },
+    {
+      "id": "locket",
+      "name": "Locket",
+      "rarity": "rare",
+      "seriesId": "treasure-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Gold locket with rose enamel wings.",
+      "palette": [
+        "gold",
+        "rose"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "locket.png",
+        "locket.webp",
+        "thumbnails/locket.webp"
+      ]
+    },
+    {
+      "id": "prism",
+      "name": "Prism",
+      "rarity": "epic",
+      "seriesId": "treasure-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Triangular prism with rainbow fins.",
+      "palette": [
+        "crystal",
+        "rainbow"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "prism.png",
+        "prism.webp",
+        "thumbnails/prism.webp"
+      ]
+    },
+    {
+      "id": "velvet",
+      "name": "Velvet",
+      "rarity": "epic",
+      "seriesId": "soft-visitors",
+      "primaryFamilyId": null,
+      "visualSummary": "Deep-purple plush orb with satin fins.",
+      "palette": [
+        "plum",
+        "midnight"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "velvet.png",
+        "velvet.webp",
+        "thumbnails/velvet.webp"
+      ]
+    },
+    {
+      "id": "opal",
+      "name": "Opal",
+      "rarity": "rare",
+      "seriesId": "plus-keepsakes",
+      "primaryFamilyId": null,
+      "visualSummary": "Opal orb with translucent fins.",
+      "palette": [
+        "opal",
+        "rose"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "opal.png",
+        "opal.webp",
+        "thumbnails/opal.webp"
+      ]
+    },
+    {
+      "id": "halo",
+      "name": "Halo",
+      "rarity": "epic",
+      "seriesId": "plus-keepsakes",
+      "primaryFamilyId": null,
+      "visualSummary": "Cream mote inside a soft gold halo.",
+      "palette": [
+        "cream",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "halo.png",
+        "halo.webp",
+        "thumbnails/halo.webp"
+      ]
+    },
+    {
+      "id": "eclipse",
+      "name": "Eclipse",
+      "rarity": "epic",
+      "seriesId": "plus-keepsakes",
+      "primaryFamilyId": null,
+      "visualSummary": "Black-violet orb with a solar ring.",
+      "palette": [
+        "black violet",
+        "solar gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "eclipse.png",
+        "eclipse.webp",
+        "thumbnails/eclipse.webp"
+      ]
+    },
+    {
+      "id": "celestine",
+      "name": "Celestine",
+      "rarity": "legendary",
+      "seriesId": "plus-keepsakes",
+      "primaryFamilyId": null,
+      "visualSummary": "Celestial blue gem with star-map wings.",
+      "palette": [
+        "celestial blue",
+        "silver"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "celestine.png",
+        "celestine.webp",
+        "thumbnails/celestine.webp"
+      ]
+    },
+    {
+      "id": "gild",
+      "name": "Gild",
+      "rarity": "epic",
+      "seriesId": "heirloom-bundle",
+      "primaryFamilyId": null,
+      "visualSummary": "Gold filigree orb with leaflike curls.",
+      "palette": [
+        "gold",
+        "cream"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "gild.png",
+        "gild.webp",
+        "thumbnails/gild.webp"
+      ]
+    },
+    {
+      "id": "porcelain",
+      "name": "Porcelain",
+      "rarity": "rare",
+      "seriesId": "heirloom-bundle",
+      "primaryFamilyId": null,
+      "visualSummary": "White porcelain orb with blue floral marks.",
+      "palette": [
+        "porcelain",
+        "cobalt"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "porcelain.png",
+        "porcelain.webp",
+        "thumbnails/porcelain.webp"
+      ]
+    },
+    {
+      "id": "nebula",
+      "name": "Nebula",
+      "rarity": "epic",
+      "seriesId": "celestial-bundle",
+      "primaryFamilyId": null,
+      "visualSummary": "Violet nebula puff with star freckles.",
+      "palette": [
+        "violet",
+        "cyan"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "nebula.png",
+        "nebula.webp",
+        "thumbnails/nebula.webp"
+      ]
+    },
+    {
+      "id": "rosette",
+      "name": "Rosette",
+      "rarity": "rare",
+      "seriesId": "heirloom-bundle",
+      "primaryFamilyId": null,
+      "visualSummary": "Rose ribbon rosette with gold centre.",
+      "palette": [
+        "rose",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "rosette.png",
+        "rosette.webp",
+        "thumbnails/rosette.webp"
+      ]
+    },
+    {
+      "id": "leaflet",
+      "name": "Leaflet",
+      "rarity": "common",
+      "seriesId": "autumn-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Copper leaf mote with seed eyes.",
+      "palette": [
+        "copper",
+        "amber"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "leaflet.png",
+        "leaflet.webp",
+        "thumbnails/leaflet.webp"
+      ]
+    },
+    {
+      "id": "goldleaf",
+      "name": "Goldleaf",
+      "rarity": "epic",
+      "seriesId": "autumn-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Gold leaf mote with ember edges.",
+      "palette": [
+        "gold",
+        "ember"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "goldleaf.png",
+        "goldleaf.webp",
+        "thumbnails/goldleaf.webp"
+      ]
+    },
+    {
+      "id": "snowbell",
+      "name": "Snowbell",
+      "rarity": "common",
+      "seriesId": "winter-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Snow bell with powder-blue fins.",
+      "palette": [
+        "snow",
+        "powder blue"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "snowbell.png",
+        "snowbell.webp",
+        "thumbnails/snowbell.webp"
+      ]
+    },
+    {
+      "id": "snowglobe",
+      "name": "Snowglobe",
+      "rarity": "epic",
+      "seriesId": "winter-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Glass snow globe mote with a star inside.",
+      "palette": [
+        "glass blue",
+        "silver"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "snowglobe.png",
+        "snowglobe.webp",
+        "thumbnails/snowglobe.webp"
+      ]
+    },
+    {
+      "id": "petal",
+      "name": "Petal",
+      "rarity": "common",
+      "seriesId": "spring-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Pink petal orb with green tips.",
+      "palette": [
+        "pink",
+        "spring green"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "petal.png",
+        "petal.webp",
+        "thumbnails/petal.webp"
+      ]
+    },
+    {
+      "id": "sakura",
+      "name": "Sakura",
+      "rarity": "epic",
+      "seriesId": "spring-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Sakura blossom mote with pearl glow.",
+      "palette": [
+        "sakura pink",
+        "pearl"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "sakura.png",
+        "sakura.webp",
+        "thumbnails/sakura.webp"
+      ]
+    },
+    {
+      "id": "sol",
+      "name": "Sol",
+      "rarity": "common",
+      "seriesId": "summer-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Sun orb with coral rays.",
+      "palette": [
+        "sun yellow",
+        "coral"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "sol.png",
+        "sol.webp",
+        "thumbnails/sol.webp"
+      ]
+    },
+    {
+      "id": "mirage",
+      "name": "Mirage",
+      "rarity": "epic",
+      "seriesId": "summer-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Heat-haze prism mote.",
+      "palette": [
+        "gold",
+        "aqua"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "mirage.png",
+        "mirage.webp",
+        "thumbnails/mirage.webp"
+      ]
+    },
+    {
+      "id": "lantern",
+      "name": "Lantern",
+      "rarity": "common",
+      "seriesId": "festival-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Red paper lantern mote with tassel tail.",
+      "palette": [
+        "red",
+        "warm gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "lantern.png",
+        "lantern.webp",
+        "thumbnails/lantern.webp"
+      ]
+    },
+    {
+      "id": "firework",
+      "name": "Firework",
+      "rarity": "epic",
+      "seriesId": "festival-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Midnight spark with multicolour burst fins.",
+      "palette": [
+        "midnight",
+        "rainbow"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "firework.png",
+        "firework.webp",
+        "thumbnails/firework.webp"
+      ]
+    },
+    {
+      "id": "pumpkin",
+      "name": "Pumpkin",
+      "rarity": "common",
+      "seriesId": "spooky-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Round pumpkin mote with vine curl.",
+      "palette": [
+        "pumpkin",
+        "leaf green"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "pumpkin.png",
+        "pumpkin.webp",
+        "thumbnails/pumpkin.webp"
+      ]
+    },
+    {
+      "id": "moonmask",
+      "name": "Moonmask",
+      "rarity": "epic",
+      "seriesId": "spooky-pair",
+      "primaryFamilyId": null,
+      "visualSummary": "Violet crescent mask with silver ribbons.",
+      "palette": [
+        "violet",
+        "silver"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "moonmask.png",
+        "moonmask.webp",
+        "thumbnails/moonmask.webp"
+      ]
+    },
+    {
+      "id": "postie",
+      "name": "Postie",
+      "rarity": "common",
+      "seriesId": "messenger-motes",
+      "primaryFamilyId": null,
+      "visualSummary": "Envelope mote with stamp-red wings.",
+      "palette": [
+        "paper cream",
+        "stamp red"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "postie.png",
+        "postie.webp",
+        "thumbnails/postie.webp"
+      ]
+    },
+    {
+      "id": "wink",
+      "name": "Wink",
+      "rarity": "common",
+      "seriesId": "messenger-motes",
+      "primaryFamilyId": null,
+      "visualSummary": "Lemon wink orb with a purple trail.",
+      "palette": [
+        "lemon",
+        "purple"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "wink.png",
+        "wink.webp",
+        "thumbnails/wink.webp"
+      ]
+    },
+    {
+      "id": "bravo",
+      "name": "Bravo",
+      "rarity": "rare",
+      "seriesId": "messenger-motes",
+      "primaryFamilyId": null,
+      "visualSummary": "Gold applause spark with ribbon hands.",
+      "palette": [
+        "gold",
+        "coral"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "bravo.png",
+        "bravo.webp",
+        "thumbnails/bravo.webp"
+      ]
+    },
+    {
+      "id": "highfive",
+      "name": "Highfive",
+      "rarity": "rare",
+      "seriesId": "messenger-motes",
+      "primaryFamilyId": null,
+      "visualSummary": "Twin hand-shaped sparks.",
+      "palette": [
+        "aqua",
+        "gold"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "highfive.png",
+        "highfive.webp",
+        "thumbnails/highfive.webp"
+      ]
+    },
+    {
+      "id": "echo",
+      "name": "Echo",
+      "rarity": "rare",
+      "seriesId": "messenger-motes",
+      "primaryFamilyId": null,
+      "visualSummary": "Teal ripple mote with paired rings.",
+      "palette": [
+        "teal",
+        "lilac"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "echo.png",
+        "echo.webp",
+        "thumbnails/echo.webp"
+      ]
+    },
+    {
+      "id": "combo",
+      "name": "Combo",
+      "rarity": "rare",
+      "seriesId": "arcade-motes",
+      "primaryFamilyId": null,
+      "visualSummary": "Numbered spark with stacking rings.",
+      "palette": [
+        "orange",
+        "violet"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "combo.png",
+        "combo.webp",
+        "thumbnails/combo.webp"
+      ]
+    },
+    {
+      "id": "puzzle",
+      "name": "Puzzle",
+      "rarity": "rare",
+      "seriesId": "arcade-motes",
+      "primaryFamilyId": null,
+      "visualSummary": "Puzzle-piece mote with glass fins.",
+      "palette": [
+        "cyan",
+        "berry"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "puzzle.png",
+        "puzzle.webp",
+        "thumbnails/puzzle.webp"
+      ]
+    },
+    {
+      "id": "tempo",
+      "name": "Tempo",
+      "rarity": "rare",
+      "seriesId": "arcade-motes",
+      "primaryFamilyId": null,
+      "visualSummary": "Music-beat orb with metronome tail.",
+      "palette": [
+        "indigo",
+        "coral"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "tempo.png",
+        "tempo.webp",
+        "thumbnails/tempo.webp"
+      ]
+    },
+    {
+      "id": "dash",
+      "name": "Dash",
+      "rarity": "rare",
+      "seriesId": "arcade-motes",
+      "primaryFamilyId": null,
+      "visualSummary": "Blue speed spark with checked trail.",
+      "palette": [
+        "electric blue",
+        "white"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "dash.png",
+        "dash.webp",
+        "thumbnails/dash.webp"
+      ]
+    },
+    {
+      "id": "picnic",
+      "name": "Picnic",
+      "rarity": "rare",
+      "seriesId": "mossprout-constellation",
+      "primaryFamilyId": "mossprout",
+      "visualSummary": "Checked blanket parcel with leaf wings.",
+      "palette": [
+        "berry",
+        "grass green"
+      ],
+      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
+      "requiredOutputs": [
+        "picnic.png",
+        "picnic.webp",
+        "thumbnails/picnic.webp"
+      ]
+    }
+  ]
+}

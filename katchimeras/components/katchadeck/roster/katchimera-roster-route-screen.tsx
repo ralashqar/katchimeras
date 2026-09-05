@@ -1,3 +1,6 @@
+import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
+import { useGlowDiscoveryState } from '@/features/onboarding/glow-discovery-runtime';
+import { glowDiscoveryResumeWorld } from '@/features/onboarding/glow-discovery-flow';
 import { useCompanionCameraCover } from '@/hooks/use-companion-camera-cover';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -194,6 +197,9 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
 }) {
   const router = useRouter();
   const ftueRun = useFtueRun();
+  const { run: glowRun, ready: glowReady } = useGlowDiscoveryState();
+  const stepplingLesson = useStepplingGardenLesson();
+  const requiredWorldFamilyId = glowDiscoveryResumeWorld(glowRun) ?? (stepplingLesson.active ? 'mossprout' : null);
   const { transitionTo } = useGameScreenTransition();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const discovery = useCompanionDiscoveryRecords();
@@ -202,9 +208,10 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
   // same initial focus would rebuild the just-mounted grid a second time.
   const [persistentSnapshot, setPersistentSnapshot] = useState(loadRosterPersistentSnapshot);
   const [contentReady, setContentReady] = useState(false);
-  const [activeWorldFamilyId, setActiveWorldFamilyId] = useState<KatchimeraFamilyId | null>(
+  const [selectedWorldFamilyId, setActiveWorldFamilyId] = useState<KatchimeraFamilyId | null>(
     worldSession.activeWorldFamilyId === 'steppling' ? 'mossprout' : worldSession.activeWorldFamilyId ?? (ftueRun?.status === 'active' || interactionRequest ? 'mossprout' : null),
   );
+  const activeWorldFamilyId = requiredWorldFamilyId ?? selectedWorldFamilyId;
   const cameraSnapshotRef = useRef<KingdomCameraSnapshot | null>(worldSession.cameraSnapshot);
   const cameraSnapshotsRef = useRef(worldSession.cameraSnapshots ?? (worldSession.activeWorldFamilyId && worldSession.cameraSnapshot ? { [worldSession.activeWorldFamilyId]: worldSession.cameraSnapshot } : {}));
   const publishedWorldFamilyRef = useRef<KatchimeraFamilyId | null>(worldSession.activeWorldFamilyId);
@@ -354,7 +361,12 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       }];
     });
   }, [discoveryCompanionSlots, mergeWorld, presentationMergeWorld, statusByCreatureId]);
-  const havenNavigationLocked = ftueLocksSurfaceNavigation(ftueRun, 'haven');
+  const havenNavigationLocked = Boolean(requiredWorldFamilyId) || ftueLocksSurfaceNavigation(ftueRun, 'haven');
+  useEffect(() => {
+    if (!requiredWorldFamilyId) return;
+    setActiveWorldFamilyId(requiredWorldFamilyId);
+    publishWorldSession(requiredWorldFamilyId);
+  }, [requiredWorldFamilyId, publishWorldSession]);
   useEffect(() => {
     if (ftueRun?.status !== 'active') return;
     if (
@@ -363,6 +375,7 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       || ftueRun.stepId === 'world.garden_arrival'
       || ftueRun.stepId === 'world.seed_planted'
       || ftueRun.stepId === 'world.garden_handoff'
+      || ftueRun.stepId === 'world.first_bloom_offer'
       || ftueRun.stepId === 'world.first_bloom_restore'
       || ftueRun.stepId === 'world.first_seed_grew'
       || ftueRun.stepId === 'companion.meditating'
@@ -393,7 +406,7 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
   }, [activeWorldFamilyId, closeWorld, havenNavigationLocked]);
   useGameSurfaceReadiness('katchimeras', {
     background: true,
-    data: discovery.ready,
+    data: discovery.ready && glowReady && stepplingLesson.ready,
     foreground: contentReady,
     layout: contentReady,
   });
@@ -443,7 +456,7 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       },
     });
   }, [ftueRun, router, transitionTo]);
-  return discovery.ready && presentationMergeWorld ? (
+  return discovery.ready && glowReady && stepplingLesson.ready && presentationMergeWorld ? (
     <View style={styles.screen}>
       {activeWorldFamilyId === 'mossprout' ? <Suspense fallback={<View style={styles.worldMountFallback} />}><LazyKatchimeraKingdomScreen
           background={background}

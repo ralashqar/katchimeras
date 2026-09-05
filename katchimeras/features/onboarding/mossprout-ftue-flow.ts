@@ -60,7 +60,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
   // Independent from the legacy FTUE schema version. Bumping this lets v39
   // journal runs migrate onto the direct manifest without mutating a release.
-  version: 49,
+  version: 50,
   entryNodeId: 'world.egg_intro',
   metadata: {
     kind: 'ftue' as const,
@@ -121,9 +121,10 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     storyOperations.focusCamera({
       id: 'garden.first-bloom-offer.focus',
       target: MOSSPROUT_GARDEN_FOCUS_TARGET,
-      next: 'world.first_bloom_restore',
+      next: 'world.first_bloom_offer',
       ...MOSSPROUT_GARDEN_FOCUS_CAMERA,
     }),
+    scene('world.first_bloom_offer', 'haven', [{ id: 'world.open_first_bloom_upgrade', next: 'world.first_bloom_restore' }]),
     scene('world.first_bloom_restore', 'haven', [{ id: 'world.restore_with_first_bloom', next: 'garden.first-bloom.focus' }]),
     ...upgradeWorldTargetRecipe({
       id: 'garden.first-bloom',

@@ -1,0 +1,825 @@
+import { Image } from 'expo-image';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+
+import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
+import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { KatchaDeckUI } from '@/constants/theme';
+import type { DayMapNode, DayMapNodePhoto, HomeDayRecord, HomeLocationType, HomeMoment } from '@/types/home';
+import { isPointAtHome, loadHomeAnchor } from '@/utils/home-location';
+
+type DayMapSurfaceProps = {
+  day: HomeDayRecord;
+  accentColor: string;
+  interactive?: boolean;
+  height?: number;
+  style?: StyleProp<ViewStyle>;
+  detailMode?: 'compact' | 'bottom';
+  detailBottomInset?: number;
+  selectedNodeId?: string | null;
+  visibleNodeIds?: ReadonlySet<string>;
+  libraryNodeIds?: ReadonlySet<string>;
+  onNodeSelect?: (nodeId: string | null) => void;
+  mapPadding?: { top: number; right: number; bottom: number; left: number };
+  fullBleed?: boolean;
+};
+
+type NativeMapsModule = typeof import('react-native-maps');
+
+export function DayMapSurface({
+  day,
+  accentColor,
+  interactive = false,
+  height = interactive ? 360 : 220,
+  style,
+  detailMode = 'compact',
+  detailBottomInset = 0,
+  selectedNodeId: controlledSelectedNodeId,
+  visibleNodeIds,
+  libraryNodeIds,
+  onNodeSelect,
+  mapPadding,
+  fullBleed = false,
+}: DayMapSurfaceProps) {
+  const [nativeMaps, setNativeMaps] = useState<NativeMapsModule | null>(null);
+  const [internalSelectedNodeId, setInternalSelectedNodeId] = useState<string | null>(day.dayMap?.primaryLocationId ?? null);
+  // The enlarged viewer holds the whole album it was opened from plus the
+  // current index, so the user can page left/right without closing it.
+  const [expandedAlbum, setExpandedAlbum] = useState<{ uris: string[]; index: number } | null>(null);
+  const ignoreNextMapPressRef = useRef(false);
+  const momentIndex = useMemo(() => new Map(day.moments.map((moment) => [moment.id, moment])), [day.moments]);
+
+  const openExpandedAlbum = (uris: string[], index: number) => {
+    if (uris.length === 0) {
+      return;
+    }
+    setExpandedAlbum({ uris, index: Math.min(Math.max(index, 0), uris.length - 1) });
+  };
+  const stepExpandedAlbum = (delta: number) => {
+    setExpandedAlbum((current) => {
+      if (!current) {
+        return current;
+      }
+      const nextIndex = Math.min(Math.max(current.index + delta, 0), current.uris.length - 1);
+      return nextIndex === current.index ? current : { ...current, index: nextIndex };
+    });
+  };
+
+  useEffect(() => {
+    setInternalSelectedNodeId(day.dayMap?.primaryLocationId ?? null);
+    setExpandedAlbum(null);
+  }, [day.dayMap?.primaryLocationId, day.id]);
+
+  useEffect(() => {
+    if (process.env.EXPO_OS === 'web') {
+      return;
+    }
+
+    let active = true;
+
+    import('react-native-maps').then((module) => {
+      if (active) {
+        setNativeMaps(module);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (!day.dayMap || day.dayMap.nodes.length === 0 || !day.dayMap.viewport) {
+    return (
+      <GlassPanel contentStyle={styles.emptyPanel} fillColor="rgba(18, 27, 47, 0.9)">
+        <ThemedText type="onboardingLabel" style={styles.emptyLabel} lightColor="#D7E4FF" darkColor="#D7E4FF">
+          Day map
+        </ThemedText>
+        <ThemedText style={styles.emptyBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+          No places captured for this day.
+        </ThemedText>
+      </GlassPanel>
+    );
+  }
+
+  if (!nativeMaps) {
+    return (
+      <GlassPanel contentStyle={styles.emptyPanel} fillColor="rgba(18, 27, 47, 0.9)">
+        <ThemedText type="onboardingLabel" style={styles.emptyLabel} lightColor="#D7E4FF" darkColor="#D7E4FF">
+          Day map
+        </ThemedText>
+        <ThemedText style={styles.emptyBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+          Day maps are available in the native app build.
+        </ThemedText>
+      </GlassPanel>
+    );
+  }
+
+  const MapView = nativeMaps.default;
+  const { Marker, Polyline } = nativeMaps;
+  const mapTheme = resolveMapTheme(accentColor);
+  // Re-type any node within the saved home radius as 'home', so the map shows the
+  // home pin (and the detail reads "Home") wherever you actually were home.
+  const homeAnchor = loadHomeAnchor();
+  const allNodes = homeAnchor
+    ? day.dayMap.nodes.map((node) =>
+        node.type !== 'home' && isPointAtHome(node.latitude, node.longitude, homeAnchor)
+          ? { ...node, type: 'home' as const }
+          : node
+      )
+    : day.dayMap.nodes;
+  const nodes = visibleNodeIds ? allNodes.filter((node) => visibleNodeIds.has(node.id)) : allNodes;
+  const selectedNodeId = controlledSelectedNodeId !== undefined ? controlledSelectedNodeId : internalSelectedNodeId;
+  const selectedNode = selectedNodeId
+    ? nodes.find((node) => node.id === selectedNodeId) ?? null
+    : controlledSelectedNodeId !== undefined
+      ? null
+      : nodes.find((node) => node.id === day.dayMap?.primaryLocationId) ?? nodes[0] ?? null;
+  const selectedMoment = selectedNode?.linkedMomentId ? momentIndex.get(selectedNode.linkedMomentId) ?? null : null;
+  const selectedThumbnailUri = selectedMoment?.metadata?.thumbnailUri ?? selectedNode?.photoThumbnailUri ?? null;
+  const selectedAlbum = selectedNode?.photos ?? [];
+  return (
+    <View style={[styles.shell, fullBleed ? styles.fullBleed : null, { minHeight: height }, style]}>
+      <MapView
+        region={day.dayMap.viewport}
+        mapPadding={mapPadding}
+        mapType="mutedStandard"
+        onPress={() => {
+          if (ignoreNextMapPressRef.current) {
+            ignoreNextMapPressRef.current = false;
+            return;
+          }
+          if (interactive) {
+            if (onNodeSelect) onNodeSelect(null);
+            else setInternalSelectedNodeId(null);
+          }
+        }}
+        pitchEnabled={false}
+        rotateEnabled={false}
+        scrollEnabled={interactive}
+        showsCompass={false}
+        showsIndoors={false}
+        showsPointsOfInterest={false}
+        showsScale={false}
+        showsTraffic={false}
+        showsUserLocation={false}
+        style={StyleSheet.absoluteFill}
+        toolbarEnabled={false}
+        userInterfaceStyle="dark"
+        zoomControlEnabled={false}
+        zoomEnabled={interactive}>
+        {day.exactRouteSegments.map((segment) =>
+          segment.coordinates.length > 1 ? (
+            <Polyline
+              coordinates={segment.coordinates.map((coordinate) => ({
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+              }))}
+              key={segment.id}
+              lineCap="round"
+              lineJoin="round"
+              strokeColor={mapTheme.exactRoute}
+              strokeWidth={interactive ? 3 : 2}
+            />
+          ) : null
+        )}
+        {day.dayMap.path.length > 1 ? (
+          <Polyline
+            coordinates={day.dayMap.path}
+            lineCap="round"
+            lineJoin="round"
+            strokeColor={mapTheme.path}
+            strokeWidth={interactive ? 5 : 4}
+          />
+        ) : null}
+        {nodes.map((node) => (
+          <Marker
+            anchor={{ x: 0.5, y: 0.92 }}
+            coordinate={{ latitude: node.latitude, longitude: node.longitude }}
+            key={node.id}
+            tracksViewChanges={Boolean(node.photoThumbnailUri)}
+            onPress={() => {
+              ignoreNextMapPressRef.current = true;
+              if (interactive) {
+                if (onNodeSelect) {
+                  onNodeSelect(node.id);
+                  return;
+                }
+                if (node.photos.length > 0 && selectedNode?.id === node.id) {
+                  const uris = node.photos.map((photo) => photo.thumbnailUri);
+                  const coverIndex = node.photoThumbnailUri ? uris.indexOf(node.photoThumbnailUri) : 0;
+                  openExpandedAlbum(uris, coverIndex < 0 ? 0 : coverIndex);
+                  return;
+                }
+                setInternalSelectedNodeId(node.id);
+              }
+            }}>
+            <MapNodeMarker
+              accentColor={accentColor}
+              isLibraryOnly={libraryNodeIds?.has(node.id) ?? false}
+              node={node}
+            />
+          </Marker>
+        ))}
+      </MapView>
+      {!fullBleed ? <View pointerEvents="none" style={styles.chrome} /> : null}
+      {interactive && selectedNode && !onNodeSelect ? (
+        <View
+          style={[
+            styles.detailWrap,
+            detailMode === 'bottom' ? styles.detailWrapBottom : null,
+            detailMode === 'bottom' ? { bottom: 18 + detailBottomInset } : null,
+          ]}>
+          <GlassPanel contentStyle={styles.detailPanel} fillColor="rgba(10, 15, 28, 0.88)">
+            {detailMode === 'bottom' ? (
+              <View style={styles.memoryCaptionStack}>
+                {selectedAlbum.length > 0 ? (
+                  <ClusterAlbumStrip photos={selectedAlbum} onSelect={openExpandedAlbum} />
+                ) : selectedThumbnailUri ? (
+                  <Pressable onPress={() => openExpandedAlbum([selectedThumbnailUri], 0)} style={styles.thumbnailPressable}>
+                    <Image contentFit="cover" source={selectedThumbnailUri} style={styles.captionThumbnail} />
+                  </Pressable>
+                ) : null}
+                <ThemedText style={styles.memoryCaptionText} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                  {resolveNodeCaption(selectedNode, selectedMoment, day)}
+                </ThemedText>
+                <ThemedText style={styles.memoryCaptionMeta} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                  {formatNodeAlbumMeta(selectedNode)}
+                </ThemedText>
+              </View>
+            ) : (
+              <>
+                <View style={styles.detailHeader}>
+                  <View style={styles.detailCopy}>
+                    <ThemedText type="onboardingLabel" style={styles.detailLabel} lightColor="#FFDCC0" darkColor="#FFDCC0">
+                      {selectedMoment ? selectedMoment.label : resolveNodeLabel(selectedNode)}
+                    </ThemedText>
+                    <ThemedText type="subtitle" style={styles.detailTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                      {selectedMoment?.metadata?.text ?? resolveNodeTitle(selectedNode, selectedMoment)}
+                    </ThemedText>
+                    <ThemedText style={styles.detailMeta} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                      {formatNodeTimeRange(selectedNode)}
+                    </ThemedText>
+                  </View>
+                  {selectedAlbum.length > 0 ? (
+                    <Pressable
+                      onPress={() => openExpandedAlbum(selectedAlbum.map((photo) => photo.thumbnailUri), 0)}
+                      style={styles.thumbnailPressable}>
+                      <Image contentFit="cover" source={selectedAlbum[0].thumbnailUri} style={styles.thumbnail} />
+                    </Pressable>
+                  ) : selectedThumbnailUri ? (
+                    <Pressable onPress={() => openExpandedAlbum([selectedThumbnailUri], 0)} style={styles.thumbnailPressable}>
+                      <Image contentFit="cover" source={selectedThumbnailUri} style={styles.thumbnail} />
+                    </Pressable>
+                  ) : null}
+                </View>
+                <ThemedText style={styles.detailBody} lightColor="#E8EEFF" darkColor="#E8EEFF">
+                  {resolveNodeCaption(selectedNode, selectedMoment, day)}
+                </ThemedText>
+              </>
+            )}
+          </GlassPanel>
+        </View>
+      ) : null}
+      {expandedAlbum ? (
+        <Pressable onPress={() => setExpandedAlbum(null)} style={styles.expandedPhotoOverlay}>
+          <View style={styles.expandedPhotoFrame}>
+            <Image
+              contentFit="contain"
+              source={expandedAlbum.uris[expandedAlbum.index]}
+              style={styles.expandedPhoto}
+              transition={120}
+            />
+          </View>
+          {expandedAlbum.uris.length > 1 ? (
+            <>
+              <Pressable
+                disabled={expandedAlbum.index === 0}
+                hitSlop={12}
+                onPress={() => stepExpandedAlbum(-1)}
+                style={[
+                  styles.expandedNavButton,
+                  styles.expandedNavLeft,
+                  expandedAlbum.index === 0 ? styles.expandedNavDisabled : null,
+                ]}>
+                <IconSymbol color="#F8FBFF" name="chevron.left" size={22} />
+              </Pressable>
+              <Pressable
+                disabled={expandedAlbum.index === expandedAlbum.uris.length - 1}
+                hitSlop={12}
+                onPress={() => stepExpandedAlbum(1)}
+                style={[
+                  styles.expandedNavButton,
+                  styles.expandedNavRight,
+                  expandedAlbum.index === expandedAlbum.uris.length - 1 ? styles.expandedNavDisabled : null,
+                ]}>
+                <IconSymbol color="#F8FBFF" name="chevron.right" size={22} />
+              </Pressable>
+              <View pointerEvents="none" style={styles.expandedCounter}>
+                <ThemedText style={styles.expandedCounterText} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                  {expandedAlbum.index + 1} / {expandedAlbum.uris.length}
+                </ThemedText>
+              </View>
+            </>
+          ) : null}
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+// The cleaned-up mini album for one place cluster: keepers only, in capture
+// order. One photo reads as a single frame; several become a scrollable strip
+// the user can tap through. Tapping any frame opens the full-size overlay.
+function ClusterAlbumStrip({
+  photos,
+  onSelect,
+}: {
+  photos: DayMapNodePhoto[];
+  onSelect: (uris: string[], index: number) => void;
+}) {
+  const uris = photos.map((photo) => photo.thumbnailUri);
+
+  if (photos.length === 1) {
+    return (
+      <Pressable onPress={() => onSelect(uris, 0)} style={styles.thumbnailPressable}>
+        <Image contentFit="cover" source={photos[0].thumbnailUri} style={styles.captionThumbnail} />
+      </Pressable>
+    );
+  }
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.albumStrip}
+      style={styles.albumStripWrap}>
+      {photos.map((photo, index) => (
+        <Pressable key={photo.id} onPress={() => onSelect(uris, index)} style={styles.thumbnailPressable}>
+          <Image contentFit="cover" source={photo.thumbnailUri} style={styles.albumThumbnail} />
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
+const MapNodeMarker = memo(function MapNodeMarker({
+  node,
+  accentColor,
+  isLibraryOnly,
+}: {
+  node: DayMapNode;
+  accentColor: string;
+  isLibraryOnly: boolean;
+}) {
+  const markerTheme = isLibraryOnly ? resolveLibraryNodeTheme() : resolveNodeTheme(node.type, accentColor);
+  const size = 16 + node.importance * 20;
+  const haloSize = size + 18;
+
+  return (
+    <View style={styles.markerWrap}>
+      <View
+        style={[
+          styles.markerHalo,
+          {
+            backgroundColor: markerTheme.halo,
+            height: haloSize,
+            opacity: 0.54,
+            width: haloSize,
+          },
+        ]}
+      />
+      {node.photoThumbnailUri ? (
+        <View
+          style={[
+            styles.photoMarkerFrame,
+            {
+              backgroundColor: markerTheme.photoCore,
+              borderColor: markerTheme.border,
+              height: size + 10,
+              width: size + 10,
+            },
+          ]}>
+          <Image contentFit="cover" source={node.photoThumbnailUri} style={styles.photoMarkerThumb} transition={120} />
+        </View>
+      ) : (
+        <View
+          style={[
+            styles.markerCore,
+            {
+              backgroundColor: node.hasPhoto ? markerTheme.photoCore : markerTheme.core,
+              borderColor: markerTheme.border,
+              height: size,
+              width: size,
+            },
+          ]}
+        />
+      )}
+      <View style={[styles.markerSpark, { backgroundColor: markerTheme.spark }]} />
+      <View style={[styles.markerTail, { backgroundColor: node.photoThumbnailUri ? markerTheme.photoCore : markerTheme.core }]} />
+    </View>
+  );
+}, (previous, next) => (
+  previous.accentColor === next.accentColor
+  && previous.isLibraryOnly === next.isLibraryOnly
+  && previous.node.id === next.node.id
+  && previous.node.type === next.node.type
+  && previous.node.importance === next.node.importance
+  && previous.node.hasPhoto === next.node.hasPhoto
+  && previous.node.photoThumbnailUri === next.node.photoThumbnailUri
+));
+
+function resolveLibraryNodeTheme() {
+  return {
+    halo: 'rgba(78, 143, 151, 0.26)',
+    primaryHalo: 'rgba(78, 143, 151, 0.44)',
+    core: '#4E8F97',
+    photoCore: '#79B9BB',
+    border: '#E7F5EF',
+    spark: '#F6FFFB',
+  };
+}
+
+function resolveNodeTheme(type: HomeLocationType, accentColor: string) {
+  if (type === 'cafe') {
+    return {
+      halo: 'rgba(255, 190, 151, 0.42)',
+      primaryHalo: 'rgba(255, 190, 151, 0.62)',
+      core: '#F6B38F',
+      photoCore: '#FFCCA8',
+      border: '#FBD7BC',
+      spark: '#FFF2E4',
+    };
+  }
+
+  if (type === 'park') {
+    return {
+      halo: 'rgba(154, 225, 188, 0.42)',
+      primaryHalo: 'rgba(154, 225, 188, 0.62)',
+      core: '#8FD8BE',
+      photoCore: '#B8F0D5',
+      border: '#DDF7EB',
+      spark: '#F5FFF9',
+    };
+  }
+
+  if (type === 'home') {
+    return {
+      halo: 'rgba(243, 179, 221, 0.4)',
+      primaryHalo: 'rgba(243, 179, 221, 0.62)',
+      core: '#EAB1D3',
+      photoCore: '#F7CDE4',
+      border: '#FFE7F4',
+      spark: '#FFF6FB',
+    };
+  }
+
+  return {
+    halo: `${accentColor}32`,
+    primaryHalo: `${accentColor}58`,
+    core: `${accentColor}D8`,
+    photoCore: `${accentColor}F2`,
+    border: `${accentColor}AA`,
+    spark: '#FFF8EF',
+  };
+}
+
+function resolveMapTheme(accentColor: string) {
+  return {
+    exactRoute: `${accentColor}52`,
+    path: `${accentColor}B8`,
+  };
+}
+
+function resolveNodeLabel(node: DayMapNode) {
+  if (node.hasPhoto) {
+    return 'Photo memory';
+  }
+
+  if (node.type === 'cafe') {
+    return 'Warm stop';
+  }
+
+  if (node.type === 'park') {
+    return 'Open air';
+  }
+
+  if (node.type === 'home') {
+    return 'Home rhythm';
+  }
+
+  return 'Day trace';
+}
+
+function resolveNodeTitle(node: DayMapNode, moment: HomeMoment | null) {
+  if (moment?.type === 'photo') {
+    return 'A moment the day kept';
+  }
+
+  if (moment?.type === 'new_place') {
+    return 'Somewhere that bent the day';
+  }
+
+  if (node.type === 'cafe') {
+    return 'A softer pocket in the day';
+  }
+
+  if (node.type === 'park') {
+    return 'A little movement stayed visible';
+  }
+
+  if (node.type === 'home') {
+    return 'The day settled here';
+  }
+
+  return 'A place the creature remembered';
+}
+
+function resolveNodeCaption(node: DayMapNode, moment: HomeMoment | null, day: HomeDayRecord) {
+  if (moment?.type === 'photo') {
+    return 'A saved frame made this stop feel worth keeping.';
+  }
+
+  if (moment?.type === 'new_place') {
+    return 'Something about this stop felt new enough to tilt the day.';
+  }
+
+  if (moment?.type === 'coffee') {
+    return 'A warm pause here gave the day a softer middle.';
+  }
+
+  if (moment?.type === 'social') {
+    return 'This was one of the places where the day opened outward a little.';
+  }
+
+  if (day.creature && node.id === day.dayMap?.primaryLocationId) {
+    return `${day.creature.name} seems to have been caught here first, then carried through the rest of the day.`;
+  }
+
+  if (node.type === 'park') {
+    return 'A little open space here kept the day from feeling too closed in.';
+  }
+
+  if (node.type === 'cafe') {
+    return 'This stop reads like a quiet treat the day decided to remember.';
+  }
+
+  if (node.type === 'home') {
+    return 'The day seems to have settled here long enough to leave a trace.';
+  }
+
+  return 'This point stayed in the map as one of the day’s small anchors.';
+}
+
+function formatNodeAlbumMeta(node: DayMapNode) {
+  const timeRange = formatNodeTimeRange(node);
+  const count = node.photos.length;
+  if (count > 1) {
+    return `${count} photos · ${timeRange}`;
+  }
+  return timeRange;
+}
+
+function formatNodeTimeRange(node: DayMapNode) {
+  const start = formatShortTime(node.startedAt);
+  const end = formatShortTime(node.endedAt);
+
+  if (start === end) {
+    return start;
+  }
+
+  return `${start} to ${end}`;
+}
+
+function formatShortTime(value: string) {
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+const styles = StyleSheet.create({
+  shell: {
+    backgroundColor: '#F6F2ED',
+    borderCurve: 'continuous',
+    borderRadius: KatchaDeckUI.radii.lg,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  fullBleed: { borderRadius: 0 },
+  chrome: {
+    borderColor: 'rgba(255, 251, 247, 0.82)',
+    borderRadius: KatchaDeckUI.radii.lg,
+    borderWidth: 1,
+    bottom: 0,
+    left: 0,
+    pointerEvents: 'none',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  emptyPanel: {
+    gap: 8,
+    minHeight: 160,
+    justifyContent: 'center',
+  },
+  emptyLabel: {
+    fontSize: 11,
+  },
+  emptyBody: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  markerWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  markerHalo: {
+    borderRadius: 999,
+    position: 'absolute',
+  },
+  markerCore: {
+    borderRadius: 999,
+    borderWidth: 1.5,
+    boxShadow: '0 6px 18px rgba(20, 20, 34, 0.12)',
+  },
+  photoMarkerFrame: {
+    alignItems: 'center',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1.5,
+    boxShadow: '0 6px 18px rgba(20, 20, 34, 0.14)',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  photoMarkerThumb: {
+    borderRadius: 999,
+    height: '100%',
+    width: '100%',
+  },
+  markerSpark: {
+    borderRadius: 999,
+    height: 5,
+    position: 'absolute',
+    right: 2,
+    top: 2,
+    width: 5,
+  },
+  markerTail: {
+    bottom: -4,
+    height: 11,
+    position: 'absolute',
+    transform: [{ rotate: '45deg' }],
+    width: 11,
+    zIndex: -1,
+  },
+  detailWrap: {
+    bottom: 12,
+    left: 12,
+    position: 'absolute',
+    right: 12,
+  },
+  detailWrapBottom: {
+    bottom: 18,
+    left: 18,
+    right: 18,
+  },
+  detailPanel: {
+    gap: 8,
+  },
+  thumbnailPressable: {
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  memoryCaptionStack: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  memoryCaptionText: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  memoryCaptionMeta: {
+    fontSize: 12,
+    lineHeight: 16,
+    opacity: 0.84,
+    textAlign: 'center',
+  },
+  detailHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  detailCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  detailLabel: {
+    fontSize: 11,
+  },
+  detailTitle: {
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  detailMeta: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  detailBody: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  thumbnail: {
+    borderRadius: 16,
+    height: 58,
+    width: 58,
+  },
+  captionThumbnail: {
+    borderRadius: 18,
+    height: 52,
+    width: 52,
+  },
+  albumStripWrap: {
+    alignSelf: 'stretch',
+    flexGrow: 0,
+  },
+  albumStrip: {
+    gap: 8,
+    justifyContent: 'center',
+    minWidth: '100%',
+    paddingHorizontal: 4,
+  },
+  albumThumbnail: {
+    borderRadius: 16,
+    height: 64,
+    width: 64,
+  },
+  expandedPhotoOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(6, 9, 17, 0.82)',
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    paddingHorizontal: 20,
+    paddingVertical: 32,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  expandedPhotoFrame: {
+    backgroundColor: 'rgba(255, 250, 246, 0.96)',
+    borderColor: 'rgba(255,255,255,0.38)',
+    borderCurve: 'continuous',
+    borderRadius: 28,
+    borderWidth: 1,
+    boxShadow: '0 12px 36px rgba(5, 10, 20, 0.32)',
+    maxHeight: '78%',
+    maxWidth: '92%',
+    overflow: 'hidden',
+    padding: 10,
+    width: '100%',
+  },
+  expandedPhoto: {
+    borderRadius: 20,
+    height: 420,
+    maxHeight: '100%',
+    width: '100%',
+  },
+  expandedNavButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 15, 28, 0.72)',
+    borderColor: 'rgba(215, 228, 255, 0.18)',
+    borderCurve: 'continuous',
+    borderRadius: 24,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: 'center',
+    position: 'absolute',
+    top: '50%',
+    transform: [{ translateY: -24 }],
+    width: 48,
+  },
+  expandedNavLeft: {
+    left: 16,
+  },
+  expandedNavRight: {
+    right: 16,
+  },
+  expandedNavDisabled: {
+    opacity: 0.3,
+  },
+  expandedCounter: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(10, 15, 28, 0.72)',
+    borderRadius: 999,
+    bottom: 36,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    position: 'absolute',
+  },
+  expandedCounterText: {
+    fontSize: 13,
+    letterSpacing: 0.4,
+  },
+});

@@ -1,3 +1,4 @@
+import { prepareStepplingGarden, stepplingGardenDrop, stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
 import { ensureOrdersRequireMerge } from './order-requirements';
 import { ensureCompanionDailyGarden, completeDailyGardenOrder, DAILY_GARDEN_ARC, DAILY_GARDEN_BONUS } from './companion-daily-garden';
 import {
@@ -325,6 +326,10 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
         label: definition.name, theme: 'memory', familyId: item.familyId, chainId: definition.chainIds[0],
         source: 'companion_story', itemDefinitionIds: [], claimedAt: null, seenAt: null,
       }] }, command.now));
+    }
+    case 'prepareStepplingGardenLesson': {
+      const next = prepareStepplingGarden(current, command.now);
+      return next === current ? unchanged(current) : changed(touch(next, command.now));
     }
     case 'ensureCompanionDailyGarden': {
       const next = ensureCompanionDailyGarden(current, command.familyId, command.now);
@@ -841,6 +846,8 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     arrivals: normalizeArrivals(source.arrivals),
     landmarks: normalizeLandmarks(source.landmarks),
     generatorUnlockReceipts: uniqueGeneratorUnlockReceipts(source.generatorUnlockReceipts),
+    stepplingGardenLesson: source.stepplingGardenLesson && Number.isFinite(source.stepplingGardenLesson.preparedAt)
+      ? { preparedAt: source.stepplingGardenLesson.preparedAt, servedAt: source.stepplingGardenLesson.servedAt } : undefined,
     generators: source.generators && typeof source.generators === 'object'
       ? normalizeGenerators(source.generators)
       : fallback.generators,
@@ -1274,7 +1281,10 @@ function normalizeMovementEgg(value: unknown): MergeWorldState['haven']['movemen
 function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string, activityOpportunityId?: string): MergeWorldCommandResult {
   const generator = state.generators[generatorId];
   if (!generator) return unchanged(state, 'That item maker is not available yet.');
-  const tutorialDrop = glowTutorialDrop(state, generatorId);
+  const tutorialDrop = stepplingGardenDrop(state, generatorId) ?? glowTutorialDrop(state, generatorId);
+  if (generatorId === 'journey-locker' && state.stepplingGardenLesson && !stepplingShoeServed(state) && !tutorialDrop) {
+    return unchanged(state, 'Merge your Socks and serve Steppling’s Shoe first.');
+  }
   const opportunity = activityOpportunityId && !tutorialDrop
     ? state.characterActivityOpportunities.find((candidate) => candidate.id === activityOpportunityId)
     : null;
@@ -2148,6 +2158,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
   if (order.id === 'steppling:discovery:first-trail' && next.generators['journey-locker']) {
     next = {
       ...next,
+      stepplingGardenLesson: next.stepplingGardenLesson ? { ...next.stepplingGardenLesson, servedAt: now } : undefined,
       generators: {
         ...next.generators,
         'journey-locker': { ...next.generators['journey-locker'], forcedDropDefinitionId: null },

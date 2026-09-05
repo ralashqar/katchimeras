@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "catalogVersion": 3,
+  "flags": {
+    "economySync": false,
+    "wispShop": false,
+    "visitorChoice": false,
+    "plus": false,
+    "gifting": false,
+    "seasonalTrack": false,
+    "legacyMigration": false
+  },
+  "essence": {
+    "purchasable": false,
+    "duplicateConversion": { "common": 25, "rare": 50, "epic": 90, "legendary": 160 },
+    "avatarPrices": {
+      "body": { "common": 150, "rare": 300, "epic": 500, "legendary": 900 },
+      "face": { "common": 60, "rare": 120, "epic": 240, "legendary": 450 },
+      "hat": { "common": 80, "rare": 160, "epic": 320, "legendary": 600 },
+      "held": { "common": 80, "rare": 160, "epic": 320, "legendary": 600 }
+    },
+    "rewards": {
+      "photo": 5, "voice": 8, "reflection": 4, "place": 6, "newPlaceBonus": 4,
+      "foodOrStudio": 5, "bigMoment": 15, "weeklyRecap": 25, "quest": 12
+    }
+  },
+  "shop": {
+    "freeSlots": 3,
+    "plusSlots": 6,
+    "offers": [
+      { "id": "shop-orbit", "collectibleType": "wisp", "collectibleId": "orbit", "currency": "essence", "price": 800, "enabled": false },
+      { "id": "shop-dewdrop", "collectibleType": "wisp", "collectibleId": "dewdrop", "currency": "essence", "price": 300, "enabled": false },
+      { "id": "shop-bubble", "collectibleType": "wisp", "collectibleId": "bubble", "currency": "essence", "price": 300, "enabled": false },
+      { "id": "shop-quill", "collectibleType": "wisp", "collectibleId": "quill", "currency": "essence", "price": 500, "enabled": false },
+      { "id": "shop-nimbus", "collectibleType": "wisp", "collectibleId": "nimbus", "currency": "essence", "price": 500, "enabled": false },
+      { "id": "shop-clover", "collectibleType": "wisp", "collectibleId": "clover", "currency": "essence", "price": 300, "enabled": false },
+      { "id": "shop-pebble", "collectibleType": "wisp", "collectibleId": "pebble", "currency": "essence", "price": 300, "enabled": false },
+      { "id": "shop-crystal", "collectibleType": "wisp", "collectibleId": "crystal", "currency": "essence", "price": 800, "enabled": false }
+    ]
+  },
+  "visitor": {
+    "daysPerClaim": 7,
+    "choiceCount": 3,
+    "ownedPoolFallbackEssence": 150,
+    "pool": ["dewdrop", "bubble", "nimbus", "clover", "pebble", "crystal"],
+    "enabled": false
+  },
+  "plus": {
+    "entitlementId": "plus",
+    "offeringId": "default",
+    "products": ["katchimeras_plus_monthly", "katchimeras_plus_annual"],
+    "monthlyClaimWispId": "opal",
+    "enabled": false,
+    "capabilities": {
+      "historyDays": null,
+      "premiumAvatarRental": true,
+      "shopSlots": 6,
+      "monthlyWispClaim": true
+    }
+  }
+}

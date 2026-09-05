@@ -3,9 +3,31 @@ import { storyOperations, upgradeWorldTargetRecipe, worldActionScene, type World
 import { STEPPLING_STORY_TARGET } from '@/constants/shared-world';
 import type { ContentFlowRun, ContentFlowSurface } from '@/types/content-flow';
 import type { MergeWorldState } from '@/types/merge-world';
-import type { FtueStepDefinition } from './ftue-types';
+import type { FtueCameraDirective, FtueStepDefinition } from './ftue-types';
 import { mergeLessonRecipe, mergeLessonBoardStep, mergeLessonEvidenceReady, type MergeLessonBeat } from '@/features/content-flow/merge-lesson-recipe';
 import { GLOW_ORDER_IDS, GLOW_ECHO_IDS, GLOW_REPEAT_ECHO_IDS, glowGeneratorRule } from '@/utils/merge-world/glow-discovery-policy';
+
+const MIST_CLOSE_UP = { zoom: 1.2, anchorY: 0.46, durationMs: 900 } as const;
+const MIST_UPGRADE_CAMERA: FtueCameraDirective = {
+  kind: 'focus_target', target: { kind: 'haven_gateway' }, ...MIST_CLOSE_UP,
+};
+
+/** Rebuild framing from the saved checkpoint, without replaying a story action. */
+export function glowDiscoveryResumeCamera(run: Pick<ContentFlowRun, 'nodeId' | 'status'> | null): FtueCameraDirective | null {
+  return run && run.status !== 'completed'
+    && (glowDiscoveryAllowsGarden(run) || ['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy'].includes(run.nodeId))
+    ? MIST_UPGRADE_CAMERA : null;
+}
+
+/** The guided Garden destination remains available while world navigation is locked. */
+export function glowDiscoveryAllowsGarden(run: Pick<ContentFlowRun, 'nodeId' | 'status'> | null): boolean {
+  return Boolean(run && run.status !== 'completed' && (run.nodeId === 'garden.open' || run.nodeId.startsWith('lesson.')));
+}
+
+/** This story continues inside the shared Mossprout map after the original FTUE ends. */
+export function glowDiscoveryResumeWorld(run: Pick<ContentFlowRun, 'status'> | null): 'mossprout' | null {
+  return run && run.status !== 'completed' ? 'mossprout' : null;
+}
 
 export const GLOW_DISCOVERY_RUN_ID = 'story:glow-steppling-v1';
 export const GLOW_LESSON: readonly MergeLessonBeat[] = [
@@ -24,16 +46,18 @@ export const GLOW_REPEAT_LESSON: readonly MergeLessonBeat[] = [
 ];
 export const GLOW_ALL_LESSON_BEATS = [...GLOW_LESSON, ...GLOW_REPEAT_LESSON];
 export const GLOW_DISCOVERY_FLOW = defineStory({
-  id: 'glow-steppling-discovery', version: 5, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
+  id: 'glow-steppling-discovery', version: 7, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
   nodes: [
-    storyOperations.focusCamera({ id: 'gateway.focus', target: STEPPLING_STORY_TARGET, zoom: 1.2, anchorY: 0.46, durationMs: 900, next: 'garden.open' }),
+    storyOperations.focusCamera({ id: 'gateway.focus', target: STEPPLING_STORY_TARGET, ...MIST_CLOSE_UP, next: 'garden.open' }),
     worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.prepare', view: { kind: 'garden', guide: { eyebrow: 'Light a path', title: 'Back to the Garden.', body: 'Complete requests to earn Glow.' }, actionLabel: 'Open Garden' } }),
     story.effect({ id: 'lesson.prepare', capability: 'glow.lesson.prepare', next: 'lesson.spawn' }),
     ...mergeLessonRecipe(GLOW_LESSON, 'lesson.repeat.prepare', 'glow'),
     story.effect({ id: 'lesson.repeat.prepare', capability: 'glow.lesson.prepare', next: 'lesson.repeat.spawn' }),
     ...mergeLessonRecipe(GLOW_REPEAT_LESSON, 'gateway.ready', 'glow'),
-    worldActionScene({ id: 'gateway.ready', actionId: 'return', next: 'gateway.return', view: { kind: 'return', guide: { eyebrow: 'Light a path', title: 'Enough Glow!', body: 'Let’s clear the mist.' }, actionLabel: 'Back to world' } }),
-    storyOperations.focusCamera({ id: 'gateway.return', target: STEPPLING_STORY_TARGET, zoom: 1.2, anchorY: 0.46, next: 'gateway.buy' }),
+    worldActionScene({ id: 'gateway.ready', actionId: 'return', next: 'gateway.offer', view: { kind: 'return', guide: { eyebrow: 'Light a path', title: 'Enough Glow!', body: 'Let’s clear the mist.' }, actionLabel: 'Back to world' } }),
+    // Returning to the world exposes the upgrade immediately. Camera framing
+    // stays at the existing close-up and must never gate this actionable checkpoint.
+    worldActionScene({ id: 'gateway.offer', actionId: 'open_upgrade', next: 'gateway.buy', view: { kind: 'purchase', guide: { eyebrow: 'Misty clearing', title: 'Tap the upgrade bubble.', body: 'Your Glow can clear this mist.' }, actionLabel: 'See upgrade' } }),
     worldActionScene({ id: 'gateway.buy', actionId: 'unlock', next: 'gateway.purchase.focus', view: { kind: 'purchase', guide: { eyebrow: 'Misty clearing', title: 'Let’s clear the mist.', body: 'Your Glow can make room for something new.' }, actionLabel: 'Clear mist' } }),
     ...upgradeWorldTargetRecipe({ id: 'gateway.purchase', target: STEPPLING_STORY_TARGET, toLevel: 1, economy: { mode: 'normal' }, cameraAlreadyFocused: true, presentation: { preset: 'mist-clear', reactionLine: 'A new beginning.', showCoins: true }, next: 'gateway.egg' }),
     worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'egg.enter', view: { kind: 'discovery', guide: { eyebrow: 'A new beginning', title: 'An Egg!', body: 'Someone is stirring inside. Let’s go and say hello.' }, actionLabel: 'Meet the egg' } }),
@@ -41,6 +65,7 @@ export const GLOW_DISCOVERY_FLOW = defineStory({
     story.complete(),
   ],
   migrations: {
+    'gateway.return': 'gateway.offer',
     'gateway.goal': 'garden.open',
     'garden.focus': 'gateway.focus',
     'lesson.repeat': 'lesson.repeat.prepare',
@@ -63,6 +88,7 @@ export function glowDiscoveryLocksCamera(run: Pick<ContentFlowRun, 'nodeId' | 's
 export function glowDiscoveryRevealLocked(run: Pick<ContentFlowRun, 'nodeId' | 'status'> | null): boolean {
   return Boolean(run && run.status !== 'completed' && (
     run.nodeId === 'gateway.return'
+    || run.nodeId === 'gateway.offer'
     || run.nodeId === 'gateway.buy'
     || run.nodeId.startsWith('gateway.purchase.')
     || run.nodeId === 'gateway.egg'

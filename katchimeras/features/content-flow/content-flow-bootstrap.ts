@@ -1,3 +1,7 @@
+import { STEPPLING_GARDEN_FLOW } from '@/features/onboarding/steppling-garden-lesson';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from './steppling-day-one-flow-v2';
+import { completeMossproutHavenUpgrade } from '@/utils/companion-story-storage';
+import { WORLD_UPGRADE_FLOWS } from '@/features/world-upgrades/world-upgrade-flows';
 import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campaign';
 import { registerCompanionJourneyFlows } from '@/features/companion/companion-journey-service';
 import { nextUnearnedMossproutResident } from '@/constants/resident-card-discovery';
@@ -5,13 +9,11 @@ import { MOSSPROUT_FTUE_VARIANTS } from '@/features/onboarding/mossprout-ftue-fl
 import { GLOW_DISCOVERY_FLOW } from '@/features/onboarding/glow-discovery-flow';
 import { STEPPLING_DAY_ONE_FLOW } from './steppling-day-one-flow';
 import { LEGACY_STEPPLING_DAY_ONE_FLOW } from './steppling-day-one-flow-v1';
-import { grantStoredGeneratorParcel } from '@/utils/merge-world/repository';
 import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
-import { applyStoredGlowDiscovery } from '@/utils/merge-world/repository';
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
-import { activateStoredResidentCardDiscovery, ensureStoredFirstFtueMemoryPlacement, grantStoredPlantableMemory, growStoredPlantableMemory, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget } from '@/utils/merge-world/repository';
+import { applyStoredGlowDiscovery, grantStoredGeneratorParcel, reconcileStoredHavenStory, activateStoredResidentCardDiscovery, ensureStoredFirstFtueMemoryPlacement, grantStoredPlantableMemory, growStoredPlantableMemory, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget } from '@/utils/merge-world/repository';
 import { firstFtueMemoryForSource } from '@/utils/merge-world/first-ftue-memory';
 import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
 import { beginKatchimeraMeditation, completeMossproutJourneyResolution, katchimeraMeditationRecord } from '@/game/katchimeras/relationship-progression';
@@ -38,11 +40,14 @@ let bootstrapped = false;
 export function bootstrapContentFlowCatalog() {
   if (bootstrapped) return;
   registerCompanionJourneyFlows();
+  WORLD_UPGRADE_FLOWS.forEach(registerContentFlowDefinition);
   registerStoryVariantSet(MOSSPROUT_FTUE_VARIANTS);
   MOSSPROUT_FTUE_VARIANTS.variants.forEach((variant) => registerContentFlowDefinition(variant.definition));
   registerContentFlowDefinition(GLOW_DISCOVERY_FLOW);
   registerContentFlowDefinition(LEGACY_STEPPLING_DAY_ONE_FLOW);
+  registerContentFlowDefinition(LEGACY_STEPPLING_DAY_ONE_FLOW_V2);
   registerContentFlowDefinition(STEPPLING_DAY_ONE_FLOW);
+  registerContentFlowDefinition(STEPPLING_GARDEN_FLOW);
   registerContentFlowEffect('journey.grant_generator_parcel', async ({ run, payload }) => {
     const generatorId = String(payload.generatorId);
     const rewardId = String(payload.rewardId);
@@ -190,7 +195,15 @@ export function bootstrapContentFlowCatalog() {
   registerContentFlowEffect(STORY_WORLD_UPGRADE_EFFECT, async ({ effectKey, payload }) => {
     const result = await upgradeStoredStoryWorldTarget(effectKey, payload as StoryWorldUpgradeEffectPayload);
     if (!result.storyWorldMutationReceipt) throw new Error(result.message ?? 'The authored world upgrade could not be applied');
-    return result.storyWorldMutationReceipt;
+    // Reconcile on receipt replay too: a crash may happen after spending Glow
+    // but before the completed island tier advances the companion story.
+    const receipt = result.storyWorldMutationReceipt;
+    if (receipt.target.kind === 'haven_nature_island' && receipt.toLevel >= 2
+      && (result.state.haven.tileStages.mossprout ?? 0) >= receipt.toLevel) {
+      const story = completeMossproutHavenUpgrade(receipt.toLevel);
+      await reconcileStoredHavenStory('mossprout', story.currentLevel);
+    }
+    return receipt;
   });
   bootstrapped = true;
 }

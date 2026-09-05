@@ -1,0 +1,32 @@
+[
+  {
+    "stageId": "sprout",
+    "title": "Sprout",
+    "captionPrefix": "First sign",
+    "descriptionModifier": "This is an early-form Katchimera: clearer, smaller, and easier to befriend.",
+    "quoteModifier": "Beginnings count even before they look impressive.",
+    "visualModifier": "simpler silhouette, fewer secondary details, approachable proportions, clear readable shape",
+    "promptModifier": "sprout stage, simpler form, younger and more approachable, cleaner silhouette, restrained detailing",
+    "renderNotes": ["readable at small card size", "minimal ornament", "friendly first-stage energy"]
+  },
+  {
+    "stageId": "shaped",
+    "title": "Shaped",
+    "captionPrefix": "Deepened form",
+    "descriptionModifier": "This line has started to deepen through repetition and stronger behavioral identity.",
+    "quoteModifier": "What repeats begins to define you.",
+    "visualModifier": "clear secondary forms, richer markings, stronger habitat expression, more confident posture",
+    "promptModifier": "shaped stage, evolved secondary form, richer markings, stronger habitat integration, more confident silhouette",
+    "renderNotes": ["stronger pose", "deeper material contrast", "mid-evolution sophistication"]
+  },
+  {
+    "stageId": "ascended",
+    "title": "Ascended",
+    "captionPrefix": "Rare emergence",
+    "descriptionModifier": "This is a mature Katchimera line formed through strong fit, repetition, or unusual conditions.",
+    "quoteModifier": "Depth arrives when pattern turns into identity.",
+    "visualModifier": "majestic silhouette, full aura expression, signature habitat motifs, elevated detailing",
+    "promptModifier": "ascended stage, majestic evolved form, elevated aura, premium detailing, signature habitat motifs fully expressed",
+    "renderNotes": ["hero-quality render", "strong atmosphere", "rarer collectible feel"]
+  }
+]

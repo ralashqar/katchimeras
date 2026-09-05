@@ -1,0 +1,61 @@
+{
+  "environmentId": "feastle_hearth",
+  "stylePrompt": "Match the provided reference image style: premium stylized 3D mobile-game art, soft rounded clay-like forms, cozy handcrafted materials, clean simplified surfaces, readable silhouettes, bright warm lighting, gentle contact shadows, isometric three-quarter top-down camera, square composition.",
+  "basePrompt": "Square isometric cozy feast hall and hearth kitchen, warm stone tile floor, rounded wooden beams, green accents, glowing oven and hearth on the back wall, open floor spaces, empty wall shelves, and clear reserved sockets for later food-themed props. Back and side walls only. Do not add any front wall, front railing, foreground barrier, tall front furniture, or anything blocking the viewer from seeing the floor and prop placement areas. Leave the front edge open like a clean cutaway dollhouse so every object socket is visible. Keep the room polished, readable, uncluttered, square, and prop-ready.",
+  "negativePrompt": "No people, no readable text, no cluttered random food everywhere, no realistic restaurant photography, no flat vector art, no harsh dark shadows, no cropped station sockets, no perspective mismatch, no UI elements.",
+  "propInstructions": "For each prop, use the base image and guide_slots image as references. Generate only the named station prop in the same camera angle and lighting, transparent background, full object visible, baked contact shadow only if it belongs directly under the prop, no background wall or floor rectangle. Preserve the station footprint and anchor from feastle_hearth.json. Each level must keep the same footprint; level 2 and 3 add richness without changing placement.",
+  "props": [
+    {
+      "stationId": "feast_table",
+      "prompt": "A rounded abundant feast table station, same isometric camera, chunky warm wood, plates and serving dishes arranged as a cozy celebration, transparent background. Level 1 simple set table, level 2 fuller meal spread, level 3 generous glowing feast centerpiece."
+    },
+    {
+      "stationId": "spice_rack",
+      "prompt": "A wall-mounted spice rack station, rounded wooden shelf with jars, herbs, small cuisine keepsakes, same wall-facing isometric perspective, transparent background. Level 1 few jars, level 2 more labeled-color jars without readable text, level 3 lush spice and herb collection."
+    },
+    {
+      "stationId": "hearth_pot",
+      "prompt": "A cozy hearth pot station, rounded cauldron/cooking pot with warm steam and a tiny cooking flame motif, transparent background, same floor perspective. Level 1 small pot, level 2 active simmer with utensils, level 3 rich glowing hearth setup."
+    },
+    {
+      "stationId": "market_map",
+      "prompt": "A market map station, small table or wall stand with stylized map, produce pins, travel-food tokens, transparent background, same isometric lighting. Level 1 simple map, level 2 several pins and baskets, level 3 full food journey board."
+    },
+    {
+      "stationId": "photo_menu",
+      "prompt": "A photo menu memory wall station, framed food-photo cards and menu-board shapes with no readable text, warm wood frame, transparent background, same camera. Level 1 a few cards, level 2 expanded board, level 3 abundant curated photo menu wall."
+    },
+    {
+      "stationId": "dessert_case",
+      "prompt": "A rounded dessert display case station with stylized pastries and sweets, glass simplified for mobile readability, transparent background, same floor perspective. Level 1 small case, level 2 more sweets, level 3 glowing celebratory dessert case."
+    },
+    {
+      "stationId": "quest_board",
+      "prompt": "A small quest board station, warm wooden notice board with pinned cards and utensil motif, no readable text, transparent background, same wall/floor camera. Level 1 simple board, level 2 more pinned notes, level 3 decorated board with warm glow."
+    },
+    {
+      "stationId": "trophy_cupboard",
+      "prompt": "A trophy cupboard station for food milestones, warm wooden display cupboard with tiny golden plate trophies and keepsakes, transparent background, same isometric camera. Level 1 one shelf, level 2 more trophies, level 3 full glowing milestone cupboard."
+    }
+  ],
+  "providerNotes": {
+    "preferredFlow": "Use a reference-aware image generation/editing model for base and prop passes, then use background removal/matting for prop PNG/WebP outputs.",
+    "falCandidates": [
+      "fal-ai/flux-pro/kontext",
+      "fal-ai/flux-pro/kontext/max",
+      "fal-ai/flux-2-pro",
+      "fal-ai/gpt-image-1.5",
+      "fal-ai/birefnet"
+    ]
+  },
+  "output": {
+    "base": "assets/images/katchimeras/environments/feastle_hearth/base.png",
+    "foreground": "assets/images/katchimeras/environments/feastle_hearth/foreground.webp",
+    "guide": "assets/images/katchimeras/environments/feastle_hearth/guide_slots.png",
+    "propsDir": "assets/images/katchimeras/environments/feastle_hearth/props",
+    "size": {
+      "width": 1536,
+      "height": 1536
+    }
+  }
+}

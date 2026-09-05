@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "output": {
+    "size": 256,
+    "subjectExtent": 220,
+    "quality": 86,
+    "hardFileLimitBytes": 61440,
+    "gridRows": 4,
+    "gridColumns": 4
+  },
+  "sheets": [{
+    "id": "mossprout-lane",
+    "cells": [
+      { "row": 0, "column": 0, "definitionId": "mossprout:root-memory:returning-seed", "file": "mossprout-root-returning-seed.webp" },
+      { "row": 0, "column": 1, "definitionId": "mossprout:root-memory:rain-kept-acorn", "file": "mossprout-root-rain-kept-acorn.webp" },
+      { "row": 0, "column": 2, "definitionId": "mossprout:root-memory:nursery-keepsake", "file": "mossprout-root-nursery-keepsake.webp" },
+      { "row": 0, "column": 3, "definitionId": "mossprout:root-memory:heartseed", "file": "mossprout-root-heartseed.webp" },
+      { "row": 1, "column": 0, "definitionId": "art:mossprout-fern-nest", "file": "mossprout-fern-wisp-nest.webp" },
+      { "row": 1, "column": 1, "definitionId": "art:grovelight", "file": "mossprout-grovelight-wisp.webp" },
+      { "row": 1, "column": 2, "definitionId": "art:mossprout-grovelight-nest", "file": "mossprout-grovelight-wisp-nest.webp" },
+      { "row": 1, "column": 3, "definitionId": "art:veiled-memory-card", "file": "veiled-memory-card-back.webp" },
+      { "row": 2, "column": 0, "definitionId": "memory-card:rain-on-glass", "file": "memory-card-rain-on-glass.webp" },
+      { "row": 2, "column": 1, "definitionId": "memory-card:first-green-shoot", "file": "memory-card-first-green-shoot.webp" },
+      { "row": 2, "column": 2, "definitionId": "memory-card:path-taken-twice", "file": "memory-card-path-taken-twice.webp" },
+      { "row": 2, "column": 3, "definitionId": "memory-card:cup-after-rain", "file": "memory-card-cup-after-rain.webp" },
+      { "row": 3, "column": 0, "definitionId": "memory-card:light-through-leaves", "file": "memory-card-light-through-leaves.webp" },
+      { "row": 3, "column": 1, "definitionId": "memory-card:something-worth-keeping", "file": "memory-card-something-worth-keeping.webp" },
+      { "row": 3, "column": 2, "definitionId": "art:rare-memory-card-reveal", "file": "rare-memory-card-reveal.webp" },
+      { "row": 3, "column": 3, "definitionId": "art:mossprout-heartwood-landmark", "file": "mossprout-heartwood-landmark.webp" }
+    ]
+  }]
+}

@@ -75,6 +75,7 @@ const BUILT_INS: readonly StoryCapabilityDefinition[] = [
     const view = payload.worldAction as { kind?: string; actionLabel?: string; guide?: { title?: string; body?: string } } | undefined;
     return view && ['goal', 'garden', 'return', 'purchase', 'discovery'].includes(view.kind ?? '') && view.actionLabel && view.guide?.title && view.guide.body ? null : 'World action needs a view, guide and action label';
   } },
+  { id: 'steppling.garden.task', kind: 'task' },
   { id: 'merge.lesson', kind: 'task', validatePayload: (payload) => {
     const beat = payload.beat as Record<string, unknown> | undefined;
     if (!beat || typeof beat.id !== 'string' || !beat.guide) return 'Lesson needs an id and guide';

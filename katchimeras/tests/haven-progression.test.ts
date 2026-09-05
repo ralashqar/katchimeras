@@ -383,7 +383,7 @@ test('Mossprout FTUE turns one Bond answer into a Garden upgrade and an intimate
     assert.deepEqual(preservedRestoreCamera.payload, { operation: 'preserve', holdWorldState: true, lockInput: true });
   }
   assert.equal(mossproutFtueStep('world.garden_handoff')?.actions[0]?.nextStepId, 'merge.seed_drag');
-  assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'world.first_bloom_restore');
+  assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'world.first_bloom_offer');
   assert.equal(mossproutFtueStep('world.first_bloom_restore')?.edges?.[0]?.nextStepId, 'world.first_seed_grew');
   assert.equal(mossproutFtueStep('world.first_seed_grew')?.actions[0]?.nextStepId, 'companion.water_together');
   const firstBloomProjection = mossproutFtueStep('world.first_bloom_restore')?.camera;
@@ -415,13 +415,13 @@ test('FTUE upgrade is explicit and meditation Back exits without reopening Merge
 
   assert.match(rosterRoute, /stepId === 'companion\.meditating'[\s\S]*?completeFtueRun\(\)/);
   assert.match(mergeRoute, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'/);
-  assert.match(mergeRoute, /ftueRun\.stepId !== 'world\.first_bloom_restore'[\s\S]*?announcement: 'Returning to the Garden'[\s\S]*?target: 'katchimeras'[\s\S]*?flushFtuePersistence/);
+  assert.match(mergeRoute, /!\['world\.first_bloom_offer', 'world\.first_bloom_restore'\]\.includes\(ftueRun\.stepId\)[\s\S]*?announcement: 'Returning to the Garden'[\s\S]*?target: 'katchimeras'[\s\S]*?flushFtuePersistence/);
   assert.match(havenScreen, /gardenOrdersInteractive=\{false\}/);
   assert.match(havenScreen, /!interactionCreatureId \|\| !ftueStepId \|\| ftueStepId\.startsWith\('companion\.'\)[\s\S]*?closeResidentInteraction\(\)/);
   assert.match(havenScreen, /!upgradePresentation && !interactionCreatureId && \(ftueStepId === 'haven\.mossprout\.focus'/);
   assert.match(havenScreen, /FIRST_BLOOM_GARDEN_UPGRADE_OFFER[\s\S]*?anchor: \{ x: 0\.5, y: 0\.76 \}[\s\S]*?target: \{ kind: 'haven_structure', structureId: 'mossprout-hex-garden' \}/);
   assert.match(havenScreen, /FIRST_SEED_GARDEN_PLANT_OFFER[\s\S]*?placement: 'below'[\s\S]*?target: \{ kind: 'haven_garden_plot', slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID \}/);
-  assert.match(havenScreen, /tileUpgradeOffer=\{ftueStepId === 'world\.garden_arrival'[\s\S]*?FIRST_SEED_GARDEN_PLANT_OFFER[\s\S]*?ftueStepId === 'world\.first_bloom_restore'[\s\S]*?FIRST_BLOOM_GARDEN_UPGRADE_OFFER/);
+  assert.match(havenScreen, /tileUpgradeOffer=\{ftueStepId === 'world\.garden_arrival'[\s\S]*?FIRST_SEED_GARDEN_PLANT_OFFER[\s\S]*?: null\}/);
   assert.match(canvas, /function TileUpgradeOffer[\s\S]*?worldTileActionFrame\(frame,[\s\S]*?styles\.tileUpgradeOffer,[\s\S]*?actionFrame/);
   assert.match(canvas, /interactionEnabled[\s\S]*?!camera\.isMoving[\s\S]*?!upgradePresentation[\s\S]*?tileUpgradeOffer/);
   assert.match(canvas, /camera\.isMoving \? null : tileUpgradeOfferNodeRef\.current/);

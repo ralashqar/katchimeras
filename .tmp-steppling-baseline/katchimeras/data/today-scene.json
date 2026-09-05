@@ -1,0 +1,81 @@
+{
+  "background": {
+    "_comment": "Today background framing. scale >= 1 zooms the cover-fit image; offsetY in dp shifts it (negative = up). The code clamps offsetY so the image always fills the frame: |offsetY| <= (scale - 1) * screenHeight / 2.",
+    "scale": 1.08,
+    "offsetY": -29
+  },
+  "egg": {
+    "_comment": "Whole egg stage (glow + glass + shell): scale around centre, offsetY in dp (negative = up).",
+    "scale": 1,
+    "offsetY": 8
+  },
+  "membrane": {
+    "_comment": "Glass dome + ripple rings RELATIVE to the egg: scale around centre, offsetY in dp.",
+    "scale": 1,
+    "offsetY": 10
+  },
+  "homeEgg": {
+    "_comment": "Today-only scale and placement relative to the fixed hero stage. Positive vertical values lower the egg without moving its Kingdom environment.",
+    "scale": 1.1,
+    "verticalLowerStageHeightRatio": -0.02
+  },
+  "homeExplorationBackground": {
+    "_comment": "Square Today exploration background. The image fills the phone vertically and pans horizontally. Egg and creature contact points are measured in full-screen height so their visible bases sit on the authored platform.",
+    "eggContactYRatio": 0.592,
+    "eggWidthViewportHeightRatio": 0.15,
+    "eggWidthViewportWidthRatio": 0.32,
+    "creatureContactYRatio": 0.58,
+    "creatureWidthViewportHeightRatio": 0.235,
+    "creatureWidthViewportWidthRatio": 0.49,
+    "overscrollResistance": 0.2,
+    "pageTransitionDurationMs": 260,
+    "quickSwipe": {
+      "minDistance": 40,
+      "minVelocity": 850
+    },
+    "resetSpring": {
+      "damping": 18,
+      "mass": 0.72,
+      "stiffness": 210
+    }
+  },
+  "homeHatchCountdown": {
+    "_comment": "Today-only countdown placement below the egg. Positive values lower the panel relative to the fixed hero stage.",
+    "verticalLowerStageHeightRatio": 0.14
+  },
+  "hexNeighborhood": {
+    "_comment": "Today day-tile world row. Distances use Kingdom's floating-neighborhood-v2 projected neighbour vector. Edge targets cover the visible neighbour and surrounding vertical overscan while leaving the selected hero centre interactive.",
+    "cameraDurationMs": 260,
+    "edgeTapVerticalOverscan": 150,
+    "edgeTapWidth": 118
+  },
+  "homeEnvironment": {
+    "_comment": "Today-only global environment framing. fitToViewport is the compact whole-tile experiment; disable it to restore the close-up zoom camera. The tile remains the anchor for its resident and egg.",
+    "cloudsEnabled": false,
+    "fitHorizontalPadding": 18,
+    "fitScale": 1.15,
+    "fitToViewport": true,
+    "motion": {
+      "hoverDistance": 3,
+      "hoverEnabled": true,
+      "hoverHalfCycleMs": 2100,
+      "explorationMaxPinchScale": 1.6,
+      "explorationPinchSoftLimitRange": 0.2,
+      "maxPinchScale": 2,
+      "neighborPinchStrength": 0.08,
+      "resetSpring": {
+        "damping": 17,
+        "mass": 0.7,
+        "stiffness": 230
+      }
+    },
+    "verticalLowerStageHeightRatio": 0.1,
+    "zoomScale": 1.1
+  },
+  "homeKatchimera": {
+    "_comment": "Home/Today-only framing for hatched Katchimeras. verticalLiftCreatureHeightRatio lifts relative to rendered creature height; nameCardOffsetY moves the title card down in dp; nameCardAdditionalStageHeightRatio adds a responsive offset based on the Today hero stage. Kingdom placement is unchanged.",
+    "verticalLiftCreatureHeightRatio": 0.2,
+    "nameCardOffsetY": 24,
+    "nameCardAdditionalStageHeightRatio": 0.15
+  }
+}

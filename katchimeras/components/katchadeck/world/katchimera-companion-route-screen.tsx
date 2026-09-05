@@ -1,3 +1,5 @@
+import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
+import { StepplingGardenFinale } from '@/components/katchadeck/onboarding/steppling-garden-finale';
 import { useFtueMistHandoff } from '@/features/onboarding/use-ftue-mist-handoff';
 import { isMossproutFirstGrowStep } from '@/features/onboarding/mossprout-first-grow';
 import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
@@ -102,6 +104,17 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const { transitionTo } = useGameScreenTransition();
   const familyId = familyIdFromCompanionId(creatureId);
   const stepplingDayOne = useStepplingDayOne(familyId === 'steppling' && surfaceActive);
+  const stepplingLesson = useStepplingGardenLesson();
+  const stepplingGardenOpening = useRef(false);
+  useEffect(() => {
+    if (!stepplingDayOne.gardenHandoffPending) { stepplingGardenOpening.current = false; return; }
+    if (!surfaceActive || !stepplingDayOne.ready || stepplingDayOne.error || stepplingGardenOpening.current) return;
+    stepplingGardenOpening.current = true;
+    if (onHostedOpenMerge) onHostedOpenMerge(undefined, 'steppling');
+    else transitionTo({ announcement: "Opening Steppling's Garden", target: 'merge', navigate: () => router.push({
+      pathname: '/katchimera/[creatureId]/activity', params: { creatureId: 'companion:mossprout' },
+    }) });
+  }, [creatureId, onHostedOpenMerge, router, stepplingDayOne.error, stepplingDayOne.gardenHandoffPending, stepplingDayOne.ready, surfaceActive, transitionTo]);
   const ftueHandoffRef = useRef(false);
   const [mistHandoffActive, setMistHandoffActive] = useState(false);
   const [mistHandoffError, setMistHandoffError] = useState(false);
@@ -630,6 +643,9 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     return <View style={styles.inactiveScreen} />;
   }
 
+  if (familyId === 'steppling' && stepplingLesson.active && ['closing', 'summary'].includes(stepplingLesson.run?.nodeId ?? '')) {
+    return <StepplingGardenFinale hosted={hostedInHaven} summary={stepplingLesson.run?.nodeId === 'summary'} />;
+  }
   return (
     <KingdomCompanionScreen
       active={surfaceActive}
@@ -697,13 +713,13 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
         navigate: () => router.dismissTo('/(tabs)/katchimeras'),
       }) : router.back();
       }}
-      onOpenMerge={onHostedOpenMerge ?? (familyId === 'mossprout' ? (orderId) => {
+      onOpenMerge={onHostedOpenMerge ?? (familyId === 'mossprout' || familyId === 'steppling' ? (orderId) => {
         transitionTo({
-          announcement: "Opening Mossprout's Garden",
+          announcement: familyId === 'steppling' ? "Opening Steppling's Garden" : "Opening Mossprout's Garden",
           target: 'merge',
           navigate: () => router.push({
             pathname: '/katchimera/[creatureId]/activity',
-            params: { creatureId, ...(orderId ? { focusOrderId: orderId } : {}) },
+            params: { creatureId: familyId === 'steppling' ? 'companion:mossprout' : creatureId, ...(orderId ? { focusOrderId: orderId } : {}) },
           }),
         });
       } : undefined)}

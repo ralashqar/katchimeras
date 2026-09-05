@@ -1,0 +1,1274 @@
+
+> katchimeras@1.0.0 verify:story-flows
+> node ./scripts/verify-story-flows.cjs
+
+TAP version 13
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: Grow moves the whole root left, then its destination in from right; Back reverses both legs
+ok 1 - Grow moves the whole root left, then its destination in from right; Back reverses both legs
+  ---
+  duration_ms: 394.2982
+  ...
+# Subtest: only the originating companion camera retains its covered interaction
+ok 2 - only the originating companion camera retains its covered interaction
+  ---
+  duration_ms: 17.4121
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: camera header stays bounded below the safe area and cancel/complete each pop only the camera
+ok 3 - camera header stays bounded below the safe area and cancel/complete each pop only the camera
+  ---
+  duration_ms: 500.5502
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: shared submenus retain the departing content until Back finishes, including a quick reversal
+ok 4 - shared submenus retain the departing content until Back finishes, including a quick reversal
+  ---
+  duration_ms: 180.1857
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: general destination pages use the latest Back direction for their outgoing page
+ok 5 - general destination pages use the latest Back direction for their outgoing page
+  ---
+  duration_ms: 18.1511
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: row removal retains and animates the measured tray footprint (reduced motion: false)
+ok 6 - row removal retains and animates the measured tray footprint (reduced motion: false)
+  ---
+  duration_ms: 173.9457
+  ...
+# Subtest: row removal retains and animates the measured tray footprint (reduced motion: true)
+ok 7 - row removal retains and animates the measured tray footprint (reduced motion: true)
+  ---
+  duration_ms: 73.5878
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: daily conversation stays through completion/reopening, rotates tomorrow, and carries unfinished work
+ok 8 - daily conversation stays through completion/reopening, rotates tomorrow, and carries unfinished work
+  ---
+  duration_ms: 240.5167
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: water logs on tap, slides out before replacement, persists counts and awards once a day
+ok 9 - water logs on tap, slides out before replacement, persists counts and awards once a day
+  ---
+  duration_ms: 608.4036
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: mossprout: Garden toggles visibility without remounting cards and completed work slides away
+ok 10 - mossprout: Garden toggles visibility without remounting cards and completed work slides away
+  ---
+  duration_ms: 420.1282
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: steppling: Garden toggles visibility without remounting cards and completed work slides away
+ok 11 - steppling: Garden toggles visibility without remounting cards and completed work slides away
+  ---
+  duration_ms: 223.3349
+  ...
+# Subtest: Garden orders are outside the card scroll layout even when taller than the remaining actions
+ok 12 - Garden orders are outside the card scroll layout even when taller than the remaining actions
+  ---
+  duration_ms: 93.0934
+  ...
+# Subtest: mossprout: daily pair is obtainable, substantial, frozen and persists
+ok 13 - mossprout: daily pair is obtainable, substantial, frozen and persists
+  ---
+  duration_ms: 23.1816
+  ...
+# Subtest: steppling: daily pair is obtainable, substantial, frozen and persists
+ok 14 - steppling: daily pair is obtainable, substantial, frozen and persists
+  ---
+  duration_ms: 2.5863
+  ...
+# Subtest: both deliveries consume their full requirements and award the bonus only once
+ok 15 - both deliveries consume their full requirements and award the bonus only once
+  ---
+  duration_ms: 3.8715
+  ...
+# Subtest: same-chain combinations require two distinct items
+ok 16 - same-chain combinations require two distinct items
+  ---
+  duration_ms: 1.2086
+  ...
+# Subtest: midnight expires only optional daily requests, preserving inventory and chapter orders
+ok 17 - midnight expires only optional daily requests, preserving inventory and chapter orders
+  ---
+  duration_ms: 1.6973
+  ...
+# Subtest: saved legacy daily batch survives today and switches tomorrow
+ok 18 - saved legacy daily batch survives today and switches tomorrow
+  ---
+  duration_ms: 1.3013
+  ...
+# Subtest: daily receipts cannot advance story, bank reductions, or settle more than two orders per rest
+ok 19 - daily receipts cannot advance story, bank reductions, or settle more than two orders per rest
+  ---
+  duration_ms: 1.7126
+  ...
+# Subtest: story reconciliation preserves both daily cards and repairs an omitted order shell
+ok 20 - story reconciliation preserves both daily cards and repairs an omitted order shell
+  ---
+  duration_ms: 4.5486
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: return UI blocks the next episode until receipt completion and prevents double submission
+ok 21 - return UI blocks the next episode until receipt completion and prevents double submission
+  ---
+  duration_ms: 709.4394
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: mossprout meditation keeps the compact header and flat companion activities
+ok 22 - mossprout meditation keeps the compact header and flat companion activities
+  ---
+  duration_ms: 347.884
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: steppling meditation keeps the compact header and flat companion activities
+ok 23 - steppling meditation keeps the compact header and flat companion activities
+  ---
+  duration_ms: 195.7962
+  ...
+# Subtest: original request tray preserves its styling and routes to the selected order
+ok 24 - original request tray preserves its styling and routes to the selected order
+  ---
+  duration_ms: 71.2961
+  ...
+# Subtest: natural return is durable and cannot skip meditation or replay a gift claim
+ok 25 - natural return is durable and cannot skip meditation or replay a gift claim
+  ---
+  duration_ms: 5.9698
+  ...
+# Subtest: requests are frozen, exactly once, share existing acceleration cap, and expire
+ok 26 - requests are frozen, exactly once, share existing acceleration cap, and expire
+  ---
+  duration_ms: 1.6007
+  ...
+# Subtest: pending saved requests adopt five minutes without undoing earned reductions
+ok 27 - pending saved requests adopt five minutes without undoing earned reductions
+  ---
+  duration_ms: 0.515
+  ...
+# Subtest: steps count only new increments across source dates and never count twice
+ok 28 - steps count only new increments across source dates and never count twice
+  ---
+  duration_ms: 0.9461
+  ...
+# Subtest: an unknown historical baseline and pre-rest reading cannot fabricate steps
+ok 29 - an unknown historical baseline and pre-rest reading cannot fabricate steps
+  ---
+  duration_ms: 0.3854
+  ...
+# Subtest: adopting FTUE meditation preserves its timer, reductions, and source identity
+ok 30 - adopting FTUE meditation preserves its timer, reductions, and source identity
+  ---
+  duration_ms: 0.5832
+  ...
+# Subtest: families progress independently and a pending return blocks only its family
+ok 31 - families progress independently and a pending return blocks only its family
+  ---
+  duration_ms: 0.4578
+  ...
+# Subtest: every Steppling branch leads to real orders before resolution and meditation
+ok 32 - every Steppling branch leads to real orders before resolution and meditation
+  ---
+  duration_ms: 9.5357
+  ...
+# Subtest: return parcels use stable identities and remain queued without free board cells
+ok 33 - return parcels use stable identities and remain queued without free board cells
+  ---
+  duration_ms: 5.5067
+  ...
+# Subtest: Mossprout resumes an unfinished episode across dates without creating another
+ok 34 - Mossprout resumes an unfinished episode across dates without creating another
+  ---
+  duration_ms: 2.6745
+  ...
+# Subtest: expired meditation orders preserve items, including after a shortened deadline
+ok 35 - expired meditation orders preserve items, including after a shortened deadline
+  ---
+  duration_ms: 3.5461
+  ...
+# Subtest: meditation requests pay Glow once, preserve time receipts, and repair saved zero rewards
+ok 36 - meditation requests pay Glow once, preserve time receipts, and repair saved zero rewards
+  ---
+  duration_ms: 10.9021
+  ...
+# Subtest: every procedural order template carries a positive Glow reward
+ok 37 - every procedural order template carries a positive Glow reward
+  ---
+  duration_ms: 0.3053
+  ...
+# Subtest: reminders follow acceleration, remain unique, and cancel after return
+ok 38 - reminders follow acceleration, remain unique, and cancel after return
+  ---
+  duration_ms: 250.2893
+  ...
+# Subtest: full Steppling chapter: existing Day 1, six cycles, five orders, finale, one gift per ordinary return
+ok 39 - full Steppling chapter: existing Day 1, six cycles, five orders, finale, one gift per ordinary return
+  ---
+  duration_ms: 596.8726
+  ...
+# Subtest: a failed effect after saving a parcel retries without a second parcel or losing the pending return
+ok 40 - a failed effect after saving a parcel retries without a second parcel or losing the pending return
+  ---
+  duration_ms: 228.0581
+  ...
+# Subtest: legacy completed chapter migrates without replaying Day 1 or granting gifts
+ok 41 - legacy completed chapter migrates without replaying Day 1 or granting gifts
+  ---
+  duration_ms: 111.2777
+  ...
+# Subtest: an existing unfinished legacy conversation is preserved before migration
+ok 42 - an existing unfinished legacy conversation is preserved before migration
+  ---
+  duration_ms: 70.5868
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: a daily story habit survives reload, skip, next day and replacement without changing other goals
+ok 43 - a daily story habit survives reload, skip, next day and replacement without changing other goals
+  ---
+  duration_ms: 8.5087
+  ...
+# Subtest: Journal replay is idempotent and preserves edits, notes and removal
+ok 44 - Journal replay is idempotent and preserves edits, notes and removal
+  ---
+  duration_ms: 1.0108
+  ...
+# Subtest: habit receipts prevent replay from resuming a habit the player paused
+ok 45 - habit receipts prevent replay from resuming a habit the player paused
+  ---
+  duration_ms: 228.3014
+  ...
+# Subtest: every Day 1 habit can be accepted or declined and still reaches exactly one parcel
+ok 46 - every Day 1 habit can be accepted or declined and still reaches exactly one parcel
+  ---
+  duration_ms: 0.5076
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: Steppling uses original animated rows, retains its goal through completion and completes directly and separates task selection from merge requests
+ok 47 - Steppling uses original animated rows, retains its goal through completion and completes directly and separates task selection from merge requests
+  ---
+  duration_ms: 1027.3183
+  ...
+# Subtest: task slots sample all added tasks for the family and keep an eligible task stable
+ok 48 - task slots sample all added tasks for the family and keep an eligible task stable
+  ---
+  duration_ms: 1.5807
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: mossprout life-slot completion keeps one receipt and cannot replay its reward or rest reduction
+ok 49 - mossprout life-slot completion keeps one receipt and cannot replay its reward or rest reduction
+  ---
+  duration_ms: 1165.0789
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: steppling life-slot completion keeps one receipt and cannot replay its reward or rest reduction
+ok 50 - steppling life-slot completion keeps one receipt and cannot replay its reward or rest reduction
+  ---
+  duration_ms: 279.4623
+  ...
+# Subtest: both families preserve lane order, identity and day number through rest and return
+ok 51 - both families preserve lane order, identity and day number through rest and return
+  ---
+  duration_ms: 3.5254
+  ...
+# Subtest: new greetings lead to play, while v8 saves retain their intent-specific follow-up
+ok 52 - new greetings lead to play, while v8 saves retain their intent-specific follow-up
+  ---
+  duration_ms: 2.1375
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: native scene keeps an inert rest card, accessible actions, and a scrollable layout
+ok 53 - native scene keeps an inert rest card, accessible actions, and a scrollable layout
+  ---
+  duration_ms: 115.7842
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: post-Bloom calm/demands persists, resumes, and offers only its chosen habit
+ok 54 - post-Bloom calm/demands persists, resumes, and offers only its chosen habit
+  ---
+  duration_ms: 26.1186
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: post-Bloom calm/busy_thoughts persists, resumes, and offers only its chosen habit
+ok 55 - post-Bloom calm/busy_thoughts persists, resumes, and offers only its chosen habit
+  ---
+  duration_ms: 20.6799
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: post-Bloom calm/pause persists, resumes, and offers only its chosen habit
+ok 56 - post-Bloom calm/pause persists, resumes, and offers only its chosen habit
+  ---
+  duration_ms: 41.7563
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: post-Bloom progress/easy_start persists, resumes, and offers only its chosen habit
+ok 57 - post-Bloom progress/easy_start persists, resumes, and offers only its chosen habit
+  ---
+  duration_ms: 20.0459
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: post-Bloom progress/self_care persists, resumes, and offers only its chosen habit
+ok 58 - post-Bloom progress/self_care persists, resumes, and offers only its chosen habit
+  ---
+  duration_ms: 20.9854
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: post-Bloom progress/care persists, resumes, and offers only its chosen habit
+ok 59 - post-Bloom progress/care persists, resumes, and offers only its chosen habit
+  ---
+  duration_ms: 25.2296
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: post-Bloom unsure/peaceful persists, resumes, and offers only its chosen habit
+ok 60 - post-Bloom unsure/peaceful persists, resumes, and offers only its chosen habit
+  ---
+  duration_ms: 21.7715
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: post-Bloom unsure/curious persists, resumes, and offers only its chosen habit
+ok 61 - post-Bloom unsure/curious persists, resumes, and offers only its chosen habit
+  ---
+  duration_ms: 23.9438
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: post-Bloom unsure/company persists, resumes, and offers only its chosen habit
+ok 62 - post-Bloom unsure/company persists, resumes, and offers only its chosen habit
+  ---
+  duration_ms: 23.2362
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: Journey timer stays painted through repeated submenu returns (reduced motion: false)
+ok 63 - Journey timer stays painted through repeated submenu returns (reduced motion: false)
+  ---
+  duration_ms: 109.1118
+  ...
+# Subtest: Journey timer stays painted through repeated submenu returns (reduced motion: true)
+ok 64 - Journey timer stays painted through repeated submenu returns (reduced motion: true)
+  ---
+  duration_ms: 66.9183
+  ...
+# Subtest: foreground stabilization preserves identity, timestamps and revisions at every waiting node
+ok 65 - foreground stabilization preserves identity, timestamps and revisions at every waiting node
+  ---
+  duration_ms: 20.3886
+  ...
+# Subtest: compiler rejects unreachable nodes, dead ends, bad targets, and empty tasks
+ok 66 - compiler rejects unreachable nodes, dead ends, bad targets, and empty tasks
+  ---
+  duration_ms: 0.7224
+  ...
+# Subtest: streamlined introduction resumes at every boundary and hands off to the separate discovery chapter
+ok 67 - streamlined introduction resumes at every boundary and hands off to the separate discovery chapter
+  ---
+  duration_ms: 4.3015
+  ...
+# Subtest: typed story manifests provide shared capabilities, routes, readiness and back policy
+ok 68 - typed story manifests provide shared capabilities, routes, readiness and back policy
+  ---
+  duration_ms: 0.8176
+  ...
+# Subtest: compiler rejects unregistered capabilities and hand-written route mismatches
+ok 69 - compiler rejects unregistered capabilities and hand-written route mismatches
+  ---
+  duration_ms: 0.3797
+  ...
+# Subtest: catalog requires released node migrations when a newer story removes ids
+ok 70 - catalog requires released node migrations when a newer story removes ids
+  ---
+  duration_ms: 1.4776
+  ...
+# Subtest: one interpreter owns input, effects, navigation, correlated objectives, presentation, and completion
+ok 71 - one interpreter owns input, effects, navigation, correlated objectives, presentation, and completion
+  ---
+  duration_ms: 0.9839
+  ...
+# Subtest: duplicate acknowledgements and unrelated commands cannot double-advance a node
+ok 72 - duplicate acknowledgements and unrelated commands cannot double-advance a node
+  ---
+  duration_ms: 0.4528
+  ...
+# Subtest: a run resumes from serialized state at every durable boundary
+ok 73 - a run resumes from serialized state at every durable boundary
+  ---
+  duration_ms: 1.1708
+  ...
+# Subtest: rewarded optional actions compile as independent child flows with durable rewards
+ok 74 - rewarded optional actions compile as independent child flows with durable rewards
+  ---
+  duration_ms: 1.325
+  ...
+# Subtest: all Mossprout Journey days compile as executable, terminal graphs
+ok 75 - all Mossprout Journey days compile as executable, terminal graphs
+  ---
+  duration_ms: 6.153
+  ...
+# Subtest: the shipping FTUE is a direct data-driven Content Flow manifest
+ok 76 - the shipping FTUE is a direct data-driven Content Flow manifest
+  ---
+  duration_ms: 1.5613
+  ...
+# Subtest: Day 1 Content Flow completion durably crosses the relationship effect before Garden
+ok 77 - Day 1 Content Flow completion durably crosses the relationship effect before Garden
+  ---
+  duration_ms: 0.4305
+  ...
+# Subtest: the first memory is planted by its own world action and growth remains visible before companion return
+ok 78 - the first memory is planted by its own world action and growth remains visible before companion return
+  ---
+  duration_ms: 0.4015
+  ...
+# Subtest: world upgrade recipes expand into focus, atomic commit, and receipt-backed reveal
+ok 79 - world upgrade recipes expand into focus, atomic commit, and receipt-backed reveal
+  ---
+  duration_ms: 0.6443
+  ...
+# Subtest: world upgrade authoring rejects unsafe targets, missing economy reasons, and mismatched reveal receipts
+ok 80 - world upgrade authoring rejects unsafe targets, missing economy reasons, and mismatched reveal receipts
+  ---
+  duration_ms: 0.9262
+  ...
+# Subtest: semantic targets wait for layout readiness and stale cleanup cannot remove a newer registration
+ok 81 - semantic targets wait for layout readiness and stale cleanup cannot remove a newer registration
+  ---
+  duration_ms: 1.1342
+  ...
+# Subtest: local story variants select only registered versioned manifests
+ok 82 - local story variants select only registered versioned manifests
+  ---
+  duration_ms: 1.3931
+  ...
+# Subtest: hero copy fits three lines without captions and Haven spotlight retries native layout
+ok 83 - hero copy fits three lines without captions and Haven spotlight retries native layout
+  ---
+  duration_ms: 5.7734
+  ...
+# Subtest: planted Seed highlights top copy and the tray/button cluster as two separate openings
+ok 84 - planted Seed highlights top copy and the tray/button cluster as two separate openings
+  ---
+  duration_ms: 4.5153
+  ...
+# Subtest: all opening answers are inclusive, stable, and produce the correct personal Seed
+ok 85 - all opening answers are inclusive, stable, and produce the correct personal Seed
+  ---
+  duration_ms: 1.3205
+  ...
+# Subtest: v43 migration moves removed checkpoints forward without restarting completed players
+ok 86 - v43 migration moves removed checkpoints forward without restarting completed players
+  ---
+  duration_ms: 0.6076
+  ...
+# Subtest: old Basket checkpoints migrate to the meditation bridge without locking Back
+ok 87 - old Basket checkpoints migrate to the meditation bridge without locking Back
+  ---
+  duration_ms: 2.6276
+  ...
+# Subtest: terminal meditation restores Back and finishes FTUE before exiting interaction
+ok 88 - terminal meditation restores Back and finishes FTUE before exiting interaction
+  ---
+  duration_ms: 1.6424
+  ...
+# Subtest: Mossprout FTUE script has valid transitions and registered handlers
+ok 89 - Mossprout FTUE script has valid transitions and registered handlers
+  ---
+  duration_ms: 2.5023
+  ...
+# Subtest: the Egg asks two meaningful real-life questions before Hatch
+ok 90 - the Egg asks two meaningful real-life questions before Hatch
+  ---
+  duration_ms: 0.7519
+  ...
+# Subtest: Mossprout dialogue FTUE steps own their durable world-camera framing
+ok 91 - Mossprout dialogue FTUE steps own their durable world-camera framing
+  ---
+  duration_ms: 0.9255
+  ...
+# Subtest: local player details stay bounded while the first FTUE resident stays fixed to Petalimp
+ok 92 - local player details stay bounded while the first FTUE resident stays fixed to Petalimp
+  ---
+  duration_ms: 1.4999
+  ...
+# Subtest: the first Bond action turns a soft intention into a Seed direction
+ok 93 - the first Bond action turns a soft intention into a Seed direction
+  ---
+  duration_ms: 0.6376
+  ...
+# Subtest: the Bond choice leads directly into a concise Garden restoration story
+ok 94 - the Bond choice leads directly into a concise Garden restoration story
+  ---
+  duration_ms: 2.7013
+  ...
+# Subtest: every Egg question keeps Home focused and normal Hatch is impossible during discovery FTUE
+ok 95 - every Egg question keeps Home focused and normal Hatch is impossible during discovery FTUE
+  ---
+  duration_ms: 4.811
+  ...
+# Subtest: script migration collapses the mistaken parallel opening into the existing Egg steps
+ok 96 - script migration collapses the mistaken parallel opening into the existing Egg steps
+  ---
+  duration_ms: 3.2713
+  ...
+# Subtest: the current fifth answer stays on Hatch instead of restarting the questionnaire
+ok 97 - the current fifth answer stays on Hatch instead of restarting the questionnaire
+  ---
+  duration_ms: 0.4863
+  ...
+# Subtest: a save already affected by the questionnaire loop recovers directly to Hatch
+ok 98 - a save already affected by the questionnaire loop recovers directly to Hatch
+  ---
+  duration_ms: 1.0188
+  ...
+# Subtest: backend catalog contains only allowlisted privacy-safe action ids
+ok 99 - backend catalog contains only allowlisted privacy-safe action ids
+  ---
+  duration_ms: 0.3561
+  ...
+# Subtest: Supabase receipt allowlist matches every backend FTUE action
+ok 100 - Supabase receipt allowlist matches every backend FTUE action
+  ---
+  duration_ms: 14.2176
+  ...
+# Subtest: Chapter 0 uses four Seeds, two Sprouts, a First Bloom, then one request
+ok 101 - Chapter 0 uses four Seeds, two Sprouts, a First Bloom, then one request
+  ---
+  duration_ms: 1.5277
+  ...
+# Subtest: FTUE step conversion is retired from the Mossprout first session
+ok 102 - FTUE step conversion is retired from the Mossprout first session
+  ---
+  duration_ms: 3.1735
+  ...
+# Subtest: FTUE Energy recovery uses one general reflection with no journal hierarchy
+ok 103 - FTUE Energy recovery uses one general reflection with no journal hierarchy
+  ---
+  duration_ms: 2.2108
+  ...
+# Subtest: Mossprout remembers the day, reflects it back, then offers one narrative Garden objective
+ok 104 - Mossprout remembers the day, reflects it back, then offers one narrative Garden objective
+  ---
+  duration_ms: 3.9819
+  ...
+# Subtest: Merge FTUE never inserts guide panels into the fixed board layout
+ok 105 - Merge FTUE never inserts guide panels into the fixed board layout
+  ---
+  duration_ms: 1.9502
+  ...
+# Subtest: Merge FTUE spotlight uses a lifecycle-safe native rounded cutout
+ok 106 - Merge FTUE spotlight uses a lifecycle-safe native rounded cutout
+  ---
+  duration_ms: 6.4496
+  ...
+# Subtest: post-Garden companion FTUE owns navigation and has a durable resume target
+ok 107 - post-Garden companion FTUE owns navigation and has a durable resume target
+  ---
+  duration_ms: 2.7526
+  ...
+# Subtest: route-changing FTUE actions persist before navigation and owned companion UI fails closed
+ok 108 - route-changing FTUE actions persist before navigation and owned companion UI fails closed
+  ---
+  duration_ms: 6.2792
+  ...
+# Subtest: meditation stays inside companion interaction with compact action-card UI
+ok 109 - meditation stays inside companion interaction with compact action-card UI
+  ---
+  duration_ms: 9.4771
+  ...
+# Subtest: every active FTUE node has a canonical cold-start route
+ok 110 - every active FTUE node has a canonical cold-start route
+  ---
+  duration_ms: 0.8547
+  ...
+# Subtest: global route coordinators navigate across the root Stack and nested Tabs boundary
+ok 111 - global route coordinators navigate across the root Stack and nested Tabs boundary
+  ---
+  duration_ms: 3.3507
+  ...
+# Subtest: resident discovery pauses on one standard Mossprout action card and resumes the exact Merge step
+ok 112 - resident discovery pauses on one standard Mossprout action card and resumes the exact Merge step
+  ---
+  duration_ms: 8.3171
+  ...
+# Subtest: completed FTUE query flags cannot retain companion conversation or resident dashboard ownership
+ok 113 - completed FTUE query flags cannot retain companion conversation or resident dashboard ownership
+  ---
+  duration_ms: 1.1562
+  ...
+# Subtest: a durably earned resident card restores the explicit FTUE match result
+ok 114 - a durably earned resident card restores the explicit FTUE match result
+  ---
+  duration_ms: 0.4378
+  ...
+# Subtest: resident Merge navigation distinguishes handoff, foreground recovery, pause, and completion
+ok 115 - resident Merge navigation distinguishes handoff, foreground recovery, pause, and completion
+  ---
+  duration_ms: 0.9638
+  ...
+# Subtest: FTUE navigation always yields to the four-finger Developer Tools recovery route
+ok 116 - FTUE navigation always yields to the four-finger Developer Tools recovery route
+  ---
+  duration_ms: 0.3664
+  ...
+# Subtest: the first resident Garden handoff uses one shared parcel panel without a second speech bubble
+ok 117 - the first resident Garden handoff uses one shared parcel panel without a second speech bubble
+  ---
+  duration_ms: 3.7763
+  ...
+# Subtest: resident parcel and card guidance swaps only after its newly measured target is ready
+ok 118 - resident parcel and card guidance swaps only after its newly measured target is ready
+  ---
+  duration_ms: 38.7701
+  ...
+# Subtest: resident reveal celebration and dialogue are separate visual phases
+ok 119 - resident reveal celebration and dialogue are separate visual phases
+  ---
+  duration_ms: 27.9016
+  ...
+# Subtest: Merge FTUE updates one persistent finger and spotlight tree for each measured target
+ok 120 - Merge FTUE updates one persistent finger and spotlight tree for each measured target
+  ---
+  duration_ms: 15.8123
+  ...
+# Subtest: Haven keeps one world-map compositor through the Egg to Companion handoff
+ok 121 - Haven keeps one world-map compositor through the Egg to Companion handoff
+  ---
+  duration_ms: 55.2725
+  ...
+# Subtest: FTUE starts a relationship before the Garden, shows First Bloom, and continues through the resident lesson
+ok 122 - FTUE starts a relationship before the Garden, shows First Bloom, and continues through the resident lesson
+  ---
+  duration_ms: 64.9221
+  ...
+# Subtest: companion and Merge FTUE steps never suppress the normal Today action rotation
+ok 123 - companion and Merge FTUE steps never suppress the normal Today action rotation
+  ---
+  duration_ms: 1.5116
+  ...
+# Subtest: the tabless opening uses a centered full-bleed Home camera without scaling its UI
+ok 124 - the tabless opening uses a centered full-bleed Home camera without scaling its UI
+  ---
+  duration_ms: 1.8352
+  ...
+# Subtest: the opening camera pinches in before revealing UI and retreats across five questions
+ok 125 - the opening camera pinches in before revealing UI and retreats across five questions
+  ---
+  duration_ms: 3.6193
+  ...
+# Subtest: each Discovery Egg answer grants the same visual Growth
+ok 126 - each Discovery Egg answer grants the same visual Growth
+  ---
+  duration_ms: 0.4983
+  ...
+# Subtest: the Grove Egg inherits the authored camera retreat across its three feeds
+ok 127 - the Grove Egg inherits the authored camera retreat across its three feeds
+  ---
+  duration_ms: 1.7555
+  ...
+# Subtest: the Grove Egg grows from a larger start across both meaningful feeds
+ok 128 - the Grove Egg grows from a larger start across both meaningful feeds
+  ---
+  duration_ms: 0.7917
+  ...
+# Subtest: scripted Egg faces use the stable image transition instead of animated-style cleanup
+ok 129 - scripted Egg faces use the stable image transition instead of animated-style cleanup
+  ---
+  duration_ms: 0.8367
+  ...
+# Subtest: the first FTUE prompt sleeps, feeds through happy faces, and lifts a small Egg onto its platform
+ok 130 - the first FTUE prompt sleeps, feeds through happy faces, and lifts a small Egg onto its platform
+  ---
+  duration_ms: 2.6037
+  ...
+# Subtest: scripted actions reuse the regular cream action surface and staged row motion
+ok 131 - scripted actions reuse the regular cream action surface and staged row motion
+  ---
+  duration_ms: 0.594
+  ...
+# Subtest: FTUE CTA actions use the shared glowing primary button without a post-hatch handoff
+ok 132 - FTUE CTA actions use the shared glowing primary button without a post-hatch handoff
+  ---
+  duration_ms: 1.6126
+  ...
+# Subtest: opening FTUE removes the white environment fade and introduces UI from below
+ok 133 - opening FTUE removes the white environment fade and introduces UI from below
+  ---
+  duration_ms: 4.7035
+  ...
+# Subtest: the first FTUE feeling beat uses the real Home mood action
+ok 134 - the first FTUE feeling beat uses the real Home mood action
+  ---
+  duration_ms: 3.4226
+  ...
+# Subtest: mood and sleep reuse the compact illustrated answer-card treatment
+ok 135 - mood and sleep reuse the compact illustrated answer-card treatment
+  ---
+  duration_ms: 1.0174
+  ...
+# Subtest: later FTUE choice beats specialize the same inline check-in panel lifecycle
+ok 136 - later FTUE choice beats specialize the same inline check-in panel lifecycle
+  ---
+  duration_ms: 1.6533
+  ...
+# Subtest: sequential FTUE choice panels cannot consume the previous question completion
+ok 137 - sequential FTUE choice panels cannot consume the previous question completion
+  ---
+  duration_ms: 1.0715
+  ...
+# Subtest: Steppling discovery spotlights the exact parcel before any board merge
+ok 138 - Steppling discovery spotlights the exact parcel before any board merge
+  ---
+  duration_ms: 0.4669
+  ...
+# Subtest: FTUE inline questions wrap cleanly and do not expose daily-action skip controls
+ok 139 - FTUE inline questions wrap cleanly and do not expose daily-action skip controls
+  ---
+  duration_ms: 1.5902
+  ...
+# Subtest: FTUE copy uses the shared cozy-game type hierarchy and stays concise
+ok 140 - FTUE copy uses the shared cozy-game type hierarchy and stays concise
+  ---
+  duration_ms: 5.3842
+  ...
+# Subtest: FTUE guide copy groups layered gold and supporting copy on one dark contrast surface
+ok 141 - FTUE guide copy groups layered gold and supporting copy on one dark contrast surface
+  ---
+  duration_ms: 1.6852
+  ...
+# Subtest: Mossprout reveal name sits below the Egg stage and hatch has no redundant interaction dock
+ok 142 - Mossprout reveal name sits below the Egg stage and hatch has no redundant interaction dock
+  ---
+  duration_ms: 2.0779
+  ...
+# Subtest: Discovery Hatch remains inside the forming Home Egg stage
+ok 143 - Discovery Hatch remains inside the forming Home Egg stage
+  ---
+  duration_ms: 2.1254
+  ...
+# Subtest: FTUE Mossprout hatches as the animated hovering hero with Egg celebration rays
+ok 144 - FTUE Mossprout hatches as the animated hovering hero with Egg celebration rays
+  ---
+  duration_ms: 1.8391
+  ...
+# Subtest: Discovery Hatch waits for creature art and fails back to a retryable Egg
+ok 145 - Discovery Hatch waits for creature art and fails back to a retryable Egg
+  ---
+  duration_ms: 0.6593
+  ...
+# Subtest: Discovery Hatch freezes Home motion without resetting its camera values
+ok 146 - Discovery Hatch freezes Home motion without resetting its camera values
+  ---
+  duration_ms: 1.9125
+  ...
+# Subtest: world Garden stays hidden through Mossprout dialogue and Grow, but returns for planting and restoration
+ok 147 - world Garden stays hidden through Mossprout dialogue and Grow, but returns for planting and restoration
+  ---
+  duration_ms: 1.2997
+  ...
+# Subtest: meditation handoff hides normal interaction UI before the durable FTUE step advances
+ok 148 - meditation handoff hides normal interaction UI before the durable FTUE step advances
+  ---
+  duration_ms: 14.7237
+  ...
+# Subtest: enough Glow highlights the HUD with an actionable Egg bubble instead of a banner
+ok 149 - enough Glow highlights the HUD with an actionable Egg bubble instead of a banner
+  ---
+  duration_ms: 58.4032
+  ...
+# Subtest: Egg reveal keeps the camera locked through final Continue and recovery, then releases it
+ok 150 - Egg reveal keeps the camera locked through final Continue and recovery, then releases it
+  ---
+  duration_ms: 2.026
+  ...
+# Subtest: every guided step locks camera input until it advances, with an author opt-out
+ok 151 - every guided step locks camera input until it advances, with an author opt-out
+  ---
+  duration_ms: 2.2272
+  ...
+# Subtest: Glow teaches a repeatable loop, survives every reload, and stops at an unhatched shared-world Egg
+ok 152 - Glow teaches a repeatable loop, survives every reload, and stops at an unhatched shared-world Egg
+  ---
+  duration_ms: 98.6124
+  ...
+# Subtest: tutorial overrides Shell rewards and repairs missing sources without deleting items
+ok 153 - tutorial overrides Shell rewards and repairs missing sources without deleting items
+  ---
+  duration_ms: 18.295
+  ...
+# Subtest: old second-request saves upgrade safely and recover every missing higher-tier source
+ok 154 - old second-request saves upgrade safely and recover every missing higher-tier source
+  ---
+  duration_ms: 38.4411
+  ...
+# Subtest: a full recovery board leaves input available to make room
+ok 155 - a full recovery board leaves input available to make room
+  ---
+  duration_ms: 9.3411
+  ...
+# Subtest: purchase requires restoration and enough Glow; saves keep their existing balance and islands
+ok 156 - purchase requires restoration and enough Glow; saves keep their existing balance and islands
+  ---
+  duration_ms: 9.968
+  ...
+# Subtest: paid mist stays revealed with an Egg despite relationship stage zero or story completion
+ok 157 - paid mist stays revealed with an Egg despite relationship stage zero or story completion
+  ---
+  duration_ms: 10.2037
+  ...
+# Subtest: setup boundaries never fall back to a spawner spotlight
+ok 158 - setup boundaries never fall back to a spawner spotlight
+  ---
+  duration_ms: 32.2877
+  ...
+# Subtest: hosted meditation hands off to the existing map without a transition curtain
+ok 159 - hosted meditation hands off to the existing map without a transition curtain
+  ---
+  duration_ms: 1.0413
+  ...
+# Subtest: locked tutorial matches retain half mist and spotlight cutouts survive measurement
+ok 160 - locked tutorial matches retain half mist and spotlight cutouts survive measurement
+  ---
+  duration_ms: 33.7944
+  ...
+# Subtest: preparing an existing board never replaces occupied cells or duplicates ownership
+ok 161 - preparing an existing board never replaces occupied cells or duplicates ownership
+  ---
+  duration_ms: 7.005
+  ...
+# Subtest: discovery story has valid capabilities and resumes through each persisted boundary
+ok 162 - discovery story has valid capabilities and resumes through each persisted boundary
+  ---
+  duration_ms: 5.4898
+  ...
+# Subtest: a prior unlock carries into the shared reveal for free, even with a different receipt
+ok 163 - a prior unlock carries into the shared reveal for free, even with a different receipt
+  ---
+  duration_ms: 8.317
+  ...
+# Subtest: lesson evidence requires a real spawn and validates authored references
+ok 164 - lesson evidence requires a real spawn and validates authored references
+  ---
+  duration_ms: 1.3111
+  ...
+# Subtest: shared-world tile layout and presentation keep one map and one Egg reveal
+ok 165 - shared-world tile layout and presentation keep one map and one Egg reveal
+  ---
+  duration_ms: 2.3243
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: Meet the egg saves acceptance once and waits for encounter readiness across relaunch
+ok 166 - Meet the egg saves acceptance once and waits for encounter readiness across relaunch
+  ---
+  duration_ms: 4.0084
+  ...
+# Subtest: legacy accepted reveal resumes an unopened egg but never replays a visited or hatched encounter
+ok 167 - legacy accepted reveal resumes an unopened egg but never replays a visited or hatched encounter
+  ---
+  duration_ms: 357.3017
+  ...
+# Subtest: egg handoff waits for the host, opens once, and retries a failed readiness save without replaying entry
+ok 168 - egg handoff waits for the host, opens once, and retries a failed readiness save without replaying entry
+  ---
+  duration_ms: 121.4291
+  ...
+# Subtest: committed Grow checkpoints repair a lagging story journal without replaying player choices
+ok 169 - committed Grow checkpoints repair a lagging story journal without replaying player choices
+  ---
+  duration_ms: 253.9381
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: reopening Mossprout after FTUE does not replay the mist exit from its saved receipt
+ok 170 - reopening Mossprout after FTUE does not replay the mist exit from its saved receipt
+  ---
+  duration_ms: 90.0604
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: completed noticing shows Bond coaching once, persists it, and continues to rest; skipping bypasses it
+ok 171 - completed noticing shows Bond coaching once, persists it, and continues to rest; skipping bypasses it
+  ---
+  duration_ms: 121.3868
+  ...
+# Subtest: shared Bond coachmark sits below its target and protects Continue against duplicate presses and save failures
+ok 172 - shared Bond coachmark sits below its target and protects Continue against duplicate presses and save failures
+  ---
+  duration_ms: 233.7355
+  ...
+# Subtest: nature matching uses confidence and physical subjects, with manual fallback when Vision is missing
+ok 173 - nature matching uses confidence and physical subjects, with manual fallback when Vision is missing
+  ---
+  duration_ms: 88.0707
+  ...
+# Subtest: noticing rotates consistently each calendar day and every choice has a response
+ok 174 - noticing rotates consistently each calendar day and every choice has a response
+  ---
+  duration_ms: 1.5699
+  ...
+# Subtest: activities award independently, retry partial writes once, and keep photos on their capture date
+ok 175 - activities award independently, retry partial writes once, and keep photos on their capture date
+  ---
+  duration_ms: 259.0765
+  ...
+# Subtest: camera cancellation and stale camera returns never complete an activity
+ok 176 - camera cancellation and stale camera returns never complete an activity
+  ---
+  duration_ms: 64.863
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: native menu keeps the main card mounted, completes an option, and handles uncertain photos through dialogue
+ok 177 - native menu keeps the main card mounted, completes an option, and handles uncertain photos through dialogue
+  ---
+  duration_ms: 599.7523
+  ...
+# Subtest: camera integration bypasses Essence Review and generic quest rewards for companion activity captures
+ok 178 - camera integration bypasses Essence Review and generic quest rewards for companion activity captures
+  ---
+  duration_ms: 0.9491
+  ...
+# Subtest: closing an inactive Garden overlay cannot remove the activity destination
+ok 179 - closing an inactive Garden overlay cannot remove the activity destination
+  ---
+  duration_ms: 102.7607
+  ...
+# Subtest: nature captures copy out of camera cache once and discard only owned files
+ok 180 - nature captures copy out of camera cache once and discard only owned files
+  ---
+  duration_ms: 15.3269
+  ...
+# Subtest: photo memory writes preserve capture date, propagate failures and remain idempotent
+ok 181 - photo memory writes preserve capture date, propagate failures and remain idempotent
+  ---
+  duration_ms: 165.7228
+  ...
+# Subtest: profile reset clears noticing, pending captures and notifies mounted menus
+ok 182 - profile reset clears noticing, pending captures and notifies mounted menus
+  ---
+  duration_ms: 52.9872
+  ...
+# Subtest: profile snapshots include activity progress and a fresh profile clears previous completions
+ok 183 - profile snapshots include activity progress and a fresh profile clears previous completions
+  ---
+  duration_ms: 16.8373
+  ...
+# Subtest: reset prevents an in-flight activity from restoring completion or rewards
+ok 184 - reset prevents an in-flight activity from restoring completion or rewards
+  ---
+  duration_ms: 73.3427
+  ...
+# Subtest: first Grow shares the daily noticing receipt, survives interruption, and resets with the activity journal
+ok 185 - first Grow shares the daily noticing receipt, survives interruption, and resets with the activity journal
+  ---
+  duration_ms: 89.4078
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: FTUE opens noticing choices with one action tap, keeps Back hidden, and supports skipping
+ok 186 - FTUE opens noticing choices with one action tap, keeps Back hidden, and supports skipping
+  ---
+  duration_ms: 302.2526
+  ...
+# Subtest: FTUE speech pages preserve the copy within the 120-character limit
+ok 187 - FTUE speech pages preserve the copy within the 120-character limit
+  ---
+  duration_ms: 12.7412
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: Rest follows two Continue beats; failed saves retry the final action without replaying dialogue
+ok 188 - Rest follows two Continue beats; failed saves retry the final action without replaying dialogue
+  ---
+  duration_ms: 16.192
+  ...
+# Subtest: hiding header Back removes the button while preserving the currency header
+ok 189 - hiding header Back removes the button while preserving the currency header
+  ---
+  duration_ms: 38.812
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: Steppling milestones require real progress, pay once in order, grow rewards and reset daily
+ok 190 - Steppling milestones require real progress, pay once in order, grow rewards and reset daily
+  ---
+  duration_ms: 5.6262
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: Steppling keeps the claimed row through its flight, restores Garden navigation and removes completed chats
+ok 191 - Steppling keeps the claimed row through its flight, restores Garden navigation and removes completed chats
+  ---
+  duration_ms: 1017.2302
+  ...
+# Subtest: shared conversation completion awards Steppling once and preserves Mossprout’s deck
+ok 192 - shared conversation completion awards Steppling once and preserves Mossprout’s deck
+  ---
+  duration_ms: 169.7779
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: ready steps wait for a tap, then use the original row reward and exit sequence
+ok 193 - ready steps wait for a tap, then use the original row reward and exit sequence
+  ---
+  duration_ms: 109.7464
+  ...
+# Subtest: every Day 1 path takes exactly a preference and Tend garden; no reply acknowledgement or habit setup
+ok 194 - every Day 1 path takes exactly a preference and Tend garden; no reply acknowledgement or habit setup
+  ---
+  duration_ms: 4.0246
+  ...
+# Subtest: old active sessions preserve answers and accepted habit turns, with no restart or migration of completed sessions
+ok 195 - old active sessions preserve answers and accepted habit turns, with no restart or migration of completed sessions
+  ---
+  duration_ms: 1.741
+  ...
+# Subtest: speech normalizes forced breaks before pagination while preserving punctuation and emoji
+ok 196 - speech normalizes forced breaks before pagination while preserving punctuation and emoji
+  ---
+  duration_ms: 2.3218
+  ...
+# Subtest: a saved final answer settles one parcel and keeps Garden handoff pending until Garden acknowledges
+ok 197 - a saved final answer settles one parcel and keeps Garden handoff pending until Garden acknowledges
+  ---
+  duration_ms: 207.7469
+  ...
+# Subtest: an old unfinished journal follows migrated answers without replaying old habit or reply scenes
+ok 198 - an old unfinished journal follows migrated answers without replaying old habit or reply scenes
+  ---
+  duration_ms: 52.5791
+  ...
+# (node:242112) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: shake haptics stay light and continuous through cracks, then stop before hatch
+ok 199 - shake haptics stay light and continuous through cracks, then stop before hatch
+  ---
+  duration_ms: 8.3448
+  ...
+# Subtest: shake haptics cancel cleanly, restart once, and are bounded if a hatch stalls
+ok 200 - shake haptics cancel cleanly, restart once, and are bounded if a hatch stalls
+  ---
+  duration_ms: 1.505
+  ...
+# Subtest: reduced motion gets one shake cue and retains the hatch and settling cues
+ok 201 - reduced motion gets one shake cue and retains the hatch and settling cues
+  ---
+  duration_ms: 0.6163
+  ...
+# Subtest: waiting Egg rays are mutually exclusive with every hatch phase and resident handoff
+ok 202 - waiting Egg rays are mutually exclusive with every hatch phase and resident handoff
+  ---
+  duration_ms: 1.4747
+  ...
+# Subtest: Steppling uses shared prompt, Bond landing and hatch phase haptics
+ok 203 - Steppling uses shared prompt, Bond landing and hatch phase haptics
+  ---
+  duration_ms: 3.8653
+  ...
+# Subtest: Egg needs revealed mist, has three choices, and cannot hatch from intent alone
+ok 204 - Egg needs revealed mist, has three choices, and cannot hatch from intent alone
+  ---
+  duration_ms: 13.72
+  ...
+# Subtest: invalid saved hatch intent cannot lock an unready Egg
+ok 205 - invalid saved hatch intent cannot lock an unready Egg
+  ---
+  duration_ms: 11.9127
+  ...
+# Subtest: Steppling uses the original full-sized Egg renderer and shared feed/hatch tech
+ok 206 - Steppling uses the original full-sized Egg renderer and shared feed/hatch tech
+  ---
+  duration_ms: 1.6787
+  ...
+# Subtest: both world residents share tile placement, full-size Egg framing and the hosted camera
+ok 207 - both world residents share tile placement, full-size Egg framing and the hosted camera
+  ---
+  duration_ms: 2.5992
+  ...
+# Subtest: Egg question UI is shared, and hatching automatically enters regular resident interaction
+ok 208 - Egg question UI is shared, and hatching automatically enters regular resident interaction
+  ---
+  duration_ms: 3.1138
+  ...
+# Subtest: Day 1 runs through the regular conversation engine for every movement choice
+ok 209 - Day 1 runs through the regular conversation engine for every movement choice
+  ---
+  duration_ms: 3.6958
+  ...
+# Subtest: step feeding is explicit, capped, repeat-safe and bound to the original source day
+ok 210 - step feeding is explicit, capped, repeat-safe and bound to the original source day
+  ---
+  duration_ms: 7.5041
+  ...
+# Subtest: all movement reflections, including rest, hatch without fabricating steps
+ok 211 - all movement reflections, including rest, hatch without fabricating steps
+  ---
+  duration_ms: 11.1451
+  ...
+# Subtest: steps pay one Bond per 300, rounded cumulatively, independently of the hatch threshold
+ok 212 - steps pay one Bond per 300, rounded cumulatively, independently of the hatch threshold
+  ---
+  duration_ms: 4.8969
+  ...
+# Subtest: second Egg beat has only the steps card or automatic shared fallback
+ok 213 - second Egg beat has only the steps card or automatic shared fallback
+  ---
+  duration_ms: 1.3517
+  ...
+# Subtest: steps launch the shared Bond batch from the right-hand reward section into the Egg
+ok 214 - steps launch the shared Bond batch from the right-hand reward section into the Egg
+  ---
+  duration_ms: 2.0619
+  ...
+# Subtest: persisted step rewards reconcile once across partial feeds and retries
+ok 215 - persisted step rewards reconcile once across partial feeds and retries
+  ---
+  duration_ms: 2.1856
+  ...
+# Subtest: parcel persists and remains unopened on a full board; installs only once in empty space
+ok 216 - parcel persists and remains unopened on a full board; installs only once in empty space
+  ---
+  duration_ms: 8.5633
+  ...
+# Subtest: unclaimed generator parcel survives arrival history truncation
+ok 217 - unclaimed generator parcel survives arrival history truncation
+  ---
+  duration_ms: 2.9296
+  ...
+# Subtest: Day 1 is a normal resumable journey; every answer reaches one parcel effect
+ok 218 - Day 1 is a normal resumable journey; every answer reaches one parcel effect
+  ---
+  duration_ms: 2.6013
+  ...
+# Subtest: Steppling sleeps on discovery and entry; successful feeding stays awake across reload
+ok 219 - Steppling sleeps on discovery and entry; successful feeding stays awake across reload
+  ---
+  duration_ms: 0.4151
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: only the next authored level is offered, preserving costs and aggregate Haven progression
+ok 220 - only the next authored level is offered, preserving costs and aggregate Haven progression
+  ---
+  duration_ms: 9.4567
+  ...
+# Subtest: unaffordable spots remain discoverable and distinguish story gates from Glow shortages
+ok 221 - unaffordable spots remain discoverable and distinguish story gates from Glow shortages
+  ---
+  duration_ms: 1.2466
+  ...
+# Subtest: completed mist and max-level islands no longer expose upgrade offers
+ok 222 - completed mist and max-level islands no longer expose upgrade offers
+  ---
+  duration_ms: 1.5475
+  ...
+# Subtest: every upgrade holds the old world before spending and replays its receipt-backed reveal
+ok 223 - every upgrade holds the old world before spending and replays its receipt-backed reveal
+  ---
+  duration_ms: 2.0931
+  ...
+# Subtest: FTUE marker taps open a saved confirmation scene without spending
+ok 224 - FTUE marker taps open a saved confirmation scene without spending
+  ---
+  duration_ms: 0.5378
+  ...
+# Subtest: ordinary purchase deduplicates rapid taps, validates fresh balance, and resumes the existing journal
+ok 225 - ordinary purchase deduplicates rapid taps, validates fresh balance, and resumes the existing journal
+  ---
+  duration_ms: 171.4763
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: shared sheet sends insufficient Glow to Garden, confirms once affordable, and blocks closing while busy
+ok 226 - shared sheet sends insufficient Glow to Garden, confirms once affordable, and blocks closing while busy
+  ---
+  duration_ms: 121.3001
+  ...
+# Subtest: a legacy confirmation checkpoint crosses the new marker scene without replaying spending
+ok 227 - a legacy confirmation checkpoint crosses the new marker scene without replaying spending
+  ---
+  duration_ms: 53.1656
+  ...
+# Subtest: mist upgrade stays available with a lagging FTUE or legacy chapter snapshot
+ok 228 - mist upgrade stays available with a lagging FTUE or legacy chapter snapshot
+  ---
+  duration_ms: 1.21
+  ...
+# Subtest: mist panel opens without buying, then duplicate confirms advance the saved story only once
+ok 229 - mist panel opens without buying, then duplicate confirms advance the saved story only once
+  ---
+  duration_ms: 23.9434
+  ...
+# Subtest: mist retries failed saves and rejects unchanged commands instead of leaving a permanent busy panel
+ok 230 - mist retries failed saves and rejects unchanged commands instead of leaving a permanent busy panel
+  ---
+  duration_ms: 39.188
+  ...
+# Subtest: already paid mist resumes its reveal without another charge; unpaid mist is never auto-purchased
+ok 231 - already paid mist resumes its reveal without another charge; unpaid mist is never auto-purchased
+  ---
+  duration_ms: 16.0151
+  ...
+# Subtest: enough Glow returns straight to an actionable scene with no camera acknowledgement
+ok 232 - enough Glow returns straight to an actionable scene with no camera acknowledgement
+  ---
+  duration_ms: 1.4246
+  ...
+# Subtest: a save stuck in the old return-camera step can open the new panel without a camera callback
+ok 233 - a save stuck in the old return-camera step can open the new panel without a camera callback
+  ---
+  duration_ms: 32.8849
+  ...
+# Subtest: returning to mist exposes the upgrade bubble until tapped, including resumed confirmation
+ok 234 - returning to mist exposes the upgrade bubble until tapped, including resumed confirmation
+  ---
+  duration_ms: 47.4943
+  ...
+# react-test-renderer is deprecated. See https://react.dev/warnings/react-test-renderer
+# Subtest: currency button renders project art and amount, announces cost, and retains cost while loading
+ok 235 - currency button renders project art and amount, announces cost, and retains cost while loading
+  ---
+  duration_ms: 50.5823
+  ...
+# Subtest: legacy Garden restoration and finished mist requests enable the same paid unlock as the panel
+ok 236 - legacy Garden restoration and finished mist requests enable the same paid unlock as the panel
+  ---
+  duration_ms: 2.4315
+  ...
+# Subtest: saved mist checkpoints restore one stable close-up without replaying purchase or egg framing
+ok 237 - saved mist checkpoints restore one stable close-up without replaying purchase or egg framing
+  ---
+  duration_ms: 1.204
+  ...
+# Subtest: unfinished Glow discovery owns the Mossprout map even after the original FTUE completes
+ok 238 - unfinished Glow discovery owns the Mossprout map even after the original FTUE completes
+  ---
+  duration_ms: 0.5015
+  ...
+# Subtest: startup waits for the saved Glow journal before choosing the selector or Mossprout world
+ok 239 - startup waits for the saved Glow journal before choosing the selector or Mossprout world
+  ---
+  duration_ms: 38.0468
+  ...
+1..239
+# tests 239
+# suites 0
+# pass 239
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5263.6308

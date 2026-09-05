@@ -143,7 +143,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 47,
+  version: 48,
   entryStepId: 'world.egg_intro',
   terminalStepId: 'complete',
   steps: [
@@ -230,13 +230,12 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.garden_handoff', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Mossprout’s Garden', title: 'Here is our first order.', body: 'Open the Garden and we’ll grow it together.' },
-      actions: [{ id: 'world.open_garden', title: 'Open Garden', description: 'Enter the Garden and grow Mossprout’s first Plant.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'merge.seed_drag', backendEvent: true }],
+      guide: { eyebrow: 'Mossprout’s Garden', title: 'Let’s earn some Glow.', body: 'Complete requests in the Garden to help restore this place.' },
+      actions: [{ id: 'world.open_garden', title: 'Open Garden', description: 'Enter the Garden and earn Glow for restoration.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'merge.seed_drag', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_garden_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_garden_button', characterId: 'mossprout' } },
       spotlight: {
         targets: [
-          { kind: 'haven_garden_order', characterId: 'mossprout', orderId: 'mossprout:chapter-0:first-sprout' },
           { kind: 'haven_garden_button', characterId: 'mossprout' },
         ],
         grouping: 'bounding_rect',
@@ -323,8 +322,16 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       edges: [{
         event: { type: 'order_served', orderId: 'mossprout:chapter-0:first-sprout' },
         commitActionId: 'merge.serve_sprout',
-        nextStepId: 'world.first_bloom_restore',
+        nextStepId: 'world.first_bloom_offer',
       }],
+    },
+    {
+      id: 'world.first_bloom_offer', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
+      guide: { eyebrow: 'First Glow', title: 'Requests earn Glow.', body: 'Tap the upgrade bubble to restore the Garden.' },
+      actions: [{ id: 'world.open_first_bloom_upgrade', title: 'See upgrade', description: '', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_restore' }],
+      cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
+      spotlight: { targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }], padding: 7, radius: 18, dimOpacity: 0.58 },
+      camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
     },
     {
       id: 'world.first_bloom_restore', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
@@ -812,7 +819,7 @@ export function mossproutFtueAction(stepId: string, actionId: string) { return m
 export function mossproutFtueShowsWorldGarden(stepId: string | null | undefined) {
   return !stepId || stepId === 'complete' || [
     'world.garden_arrival', 'world.seed_planted', 'world.garden_handoff',
-    'world.first_bloom_restore', 'world.first_seed_grew',
+    'world.first_bloom_offer', 'world.first_bloom_restore', 'world.first_seed_grew',
   ].includes(stepId);
 }
 export function mossproutFtueUsesHostedCompanionStage(stepId: string | null | undefined) {

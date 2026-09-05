@@ -1,0 +1,17 @@
+[
+  { "id": "eiffel_tower", "title": "Eiffel Tower", "city": "Paris", "country": "France", "rarity": "landmark" },
+  { "id": "statue_of_liberty", "title": "Statue of Liberty", "city": "New York", "country": "United States", "rarity": "landmark" },
+  { "id": "big_ben", "title": "Big Ben", "city": "London", "country": "United Kingdom", "rarity": "landmark" },
+  { "id": "colosseum", "title": "Colosseum", "city": "Rome", "country": "Italy", "rarity": "landmark" },
+  { "id": "sagrada_familia", "title": "Sagrada Familia", "city": "Barcelona", "country": "Spain", "rarity": "landmark" },
+  { "id": "shibuya_crossing", "title": "Shibuya Crossing", "city": "Tokyo", "country": "Japan", "rarity": "landmark" },
+  { "id": "tokyo_tower", "title": "Tokyo Tower", "city": "Tokyo", "country": "Japan", "rarity": "landmark" },
+  { "id": "golden_gate_bridge", "title": "Golden Gate Bridge", "city": "San Francisco", "country": "United States", "rarity": "landmark" },
+  { "id": "sydney_opera_house", "title": "Sydney Opera House", "city": "Sydney", "country": "Australia", "rarity": "landmark" },
+  { "id": "machu_picchu", "title": "Machu Picchu", "city": "Cusco Region", "country": "Peru", "rarity": "landmark" },
+  { "id": "great_wall", "title": "Great Wall", "city": "Beijing Region", "country": "China", "rarity": "landmark" },
+  { "id": "taj_mahal", "title": "Taj Mahal", "city": "Agra", "country": "India", "rarity": "landmark" },
+  { "id": "christ_the_redeemer", "title": "Christ the Redeemer", "city": "Rio de Janeiro", "country": "Brazil", "rarity": "landmark" },
+  { "id": "burj_khalifa", "title": "Burj Khalifa", "city": "Dubai", "country": "United Arab Emirates", "rarity": "landmark" },
+  { "id": "petra", "title": "Petra", "city": "Ma'an Governorate", "country": "Jordan", "rarity": "landmark" }
+]

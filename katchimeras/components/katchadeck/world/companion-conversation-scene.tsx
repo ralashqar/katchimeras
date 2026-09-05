@@ -257,7 +257,7 @@ export function CompanionConversationScene({
         /> : session.status === 'completed' ? (
           session.preview ? <View style={{ alignItems: 'center', gap: 10, paddingVertical: 6 }}>
             <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Preview complete. Choose another flow below or exit the preview.</ThemedText>
-          </View> : <ConversationCompletion
+          </View> : definition.id === 'steppling:journey:day-one' && definition.version >= 3 ? null : <ConversationCompletion
             label={definition.id === 'mossprout:game:form-finder' ? 'Closest match found' : 'Conversation complete'}
             onContinue={onCompletedExit}
           />

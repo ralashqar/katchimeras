@@ -568,7 +568,8 @@ function advancePastReplyBeforeNextQuestion(
 ): ConversationSession {
   if (session.pendingReply === undefined || !session.pendingNextNodeId) return session;
   const next = conversationNode(definition, session.pendingNextNodeId);
-  if (!next || !['choice', 'poll', 'profile_game', 'insight_game'].includes(next.kind)) return session;
+  const directGardenHandoff = definition.id === 'steppling:journey:day-one' && definition.version >= 3 && next?.kind === 'end' && !session.pendingReply;
+  if (!next || (!directGardenHandoff && !['choice', 'poll', 'profile_game', 'insight_game'].includes(next.kind))) return session;
   return enterNode({
     ...session,
     currentNodeId: next.id,

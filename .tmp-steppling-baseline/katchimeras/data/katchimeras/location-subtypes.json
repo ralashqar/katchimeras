@@ -1,0 +1,170 @@
+[
+  {
+    "id": "park",
+    "category": "green_space",
+    "title": "Park",
+    "description": "Open green public space with casual movement and pause potential.",
+    "inferenceHints": ["park", "green space", "playground", "public garden edge"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "garden",
+    "category": "green_space",
+    "title": "Garden",
+    "description": "Cultivated floral or plant-focused outdoor space.",
+    "inferenceHints": ["botanical garden", "rose garden", "community garden"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "farm",
+    "category": "rural",
+    "title": "Farm",
+    "description": "Agricultural or animal-care space with rustic identity.",
+    "inferenceHints": ["farm", "orchard", "petting farm", "vineyard"],
+    "defaultRarity": "uncommon"
+  },
+  {
+    "id": "forest",
+    "category": "green_space",
+    "title": "Forest",
+    "description": "Woodland or trail-heavy outdoor route.",
+    "inferenceHints": ["forest", "woods", "trail park", "nature reserve"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "beach",
+    "category": "waterside",
+    "title": "Beach",
+    "description": "Open shoreline with sand, water, and wind.",
+    "inferenceHints": ["beach", "shore", "coast", "seafront"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "riverwalk",
+    "category": "waterside",
+    "title": "Riverwalk",
+    "description": "Water-adjacent path or canal-side route.",
+    "inferenceHints": ["riverwalk", "riverside", "canal path", "waterfront path"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "coffee_shop",
+    "category": "food_drink",
+    "title": "Coffee Shop",
+    "description": "Cafe or coffee-focused stop.",
+    "inferenceHints": ["cafe", "coffee shop", "espresso bar"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "bakery",
+    "category": "food_drink",
+    "title": "Bakery",
+    "description": "Bread, pastry, or baked-goods venue.",
+    "inferenceHints": ["bakery", "patisserie", "bread shop"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "pizza_place",
+    "category": "restaurant",
+    "title": "Pizza Place",
+    "description": "Pizza-oriented casual dining venue.",
+    "inferenceHints": ["pizza", "pizzeria"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "sushi_place",
+    "category": "restaurant",
+    "title": "Sushi Place",
+    "description": "Sushi-focused restaurant or takeaway.",
+    "inferenceHints": ["sushi", "omakase", "japanese seafood"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "ramen_place",
+    "category": "restaurant",
+    "title": "Ramen Place",
+    "description": "Ramen or noodle-focused venue.",
+    "inferenceHints": ["ramen", "noodle bar"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "dessert_shop",
+    "category": "food_drink",
+    "title": "Dessert Shop",
+    "description": "Ice cream, dessert cafe, or sweets shop.",
+    "inferenceHints": ["dessert", "ice cream", "gelato", "sweet shop"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "bubble_tea_shop",
+    "category": "food_drink",
+    "title": "Bubble Tea Shop",
+    "description": "Boba or specialty tea venue.",
+    "inferenceHints": ["bubble tea", "boba", "tea shop"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "bookstore",
+    "category": "culture",
+    "title": "Bookstore",
+    "description": "Book retail venue.",
+    "inferenceHints": ["bookstore", "comic shop", "used books"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "library",
+    "category": "culture",
+    "title": "Library",
+    "description": "Public or academic library.",
+    "inferenceHints": ["library", "reading room"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "museum",
+    "category": "culture",
+    "title": "Museum",
+    "description": "Museum or heritage collection venue.",
+    "inferenceHints": ["museum", "exhibit hall", "historical collection"],
+    "defaultRarity": "uncommon"
+  },
+  {
+    "id": "cinema",
+    "category": "entertainment",
+    "title": "Cinema",
+    "description": "Movie theater or screening venue.",
+    "inferenceHints": ["cinema", "movie theater", "screening room"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "mall",
+    "category": "retail",
+    "title": "Mall",
+    "description": "Large shopping center or indoor retail complex.",
+    "inferenceHints": ["mall", "shopping center", "arcade retail"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "grocery",
+    "category": "retail",
+    "title": "Grocery",
+    "description": "Supermarket, grocery store, or produce market.",
+    "inferenceHints": ["grocery", "supermarket", "market hall"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "basketball_court",
+    "category": "sport",
+    "title": "Basketball Court",
+    "description": "Court-based basketball space.",
+    "inferenceHints": ["basketball court", "sports court"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "tennis_court",
+    "category": "sport",
+    "title": "Tennis Court",
+    "description": "Court-based tennis space.",
+    "inferenceHints": ["tennis court", "racquet court"],
+    "defaultRarity": "common"
+  }
+]

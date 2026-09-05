@@ -1,0 +1,39 @@
+{
+  "katchimera": {
+    "globalScale": 2,
+    "horizontalOffsetHexTileWidth": 0,
+    "verticalOffsetHexTileHeight": 0.2
+  },
+  "egg": {
+    "globalScale": 0.35,
+    "horizontalOffsetHexTileWidth": 0,
+    "verticalOffsetHexTileHeight": 0.05
+  },
+  "hexTiles": {
+    "width": 490,
+    "projectionTilt": 0.7,
+    "lipWidthRatio": 0.0975,
+    "layoutProfiles": {
+      "separated-v1": {
+        "horizontalSpacing": 1.08,
+        "verticalSpacing": 1.2096
+      },
+      "connected-floating-v1": {
+        "horizontalSpacing": 0.98,
+        "verticalSpacing": 0.98
+      },
+      "floating-neighborhood-v2": {
+        "horizontalSpacing": 1.02,
+        "verticalSpacing": 1.02
+      },
+      "haven-selector-v1": {
+        "horizontalSpacing": 1.4,
+        "verticalSpacing": 1.4
+      },
+      "organic-islands-v1": {
+        "horizontalSpacing": 1.28,
+        "verticalSpacing": 1.28
+      }
+    }
+  }
+}

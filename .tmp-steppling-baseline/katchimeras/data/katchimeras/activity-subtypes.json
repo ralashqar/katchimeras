@@ -1,0 +1,34 @@
+[
+  {
+    "id": "run_session",
+    "category": "cardio",
+    "title": "Run Session",
+    "description": "A clear run or strong running-like effort.",
+    "intensityBias": ["active", "intense"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "high_steps_day",
+    "category": "movement",
+    "title": "High Steps Day",
+    "description": "A day defined by unusually high overall movement.",
+    "intensityBias": ["steady", "active", "intense"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "night_walk",
+    "category": "movement",
+    "title": "Night Walk",
+    "description": "A day where evening or nighttime walking shaped the main signature.",
+    "timeBias": ["dusk", "night"],
+    "defaultRarity": "common"
+  },
+  {
+    "id": "long_walk",
+    "category": "movement",
+    "title": "Long Walk",
+    "description": "Sustained walking distance without necessarily being a run.",
+    "intensityBias": ["steady", "active"],
+    "defaultRarity": "common"
+  }
+]

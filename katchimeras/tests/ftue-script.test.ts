@@ -64,7 +64,7 @@ test('hero copy fits three lines without captions and Haven spotlight retries na
   assert.doesNotMatch(screen, /cameraSettleRevisionRef.current \+= 1/);
 });
 
-test('planted Seed highlights top copy and the tray/button cluster as two separate openings', () => {
+test('planted Seed highlights top copy and Garden button without the obsolete plant-order tray', () => {
   const step = mossproutFtueStep('world.seed_planted')!;
   assert.deepEqual(step.cue, { kind: 'tap', target: { kind: 'haven_garden_button', characterId: 'mossprout' } });
   assert.deepEqual(step.spotlight?.targets, [{ kind: 'haven_guide' }, { kind: 'haven_garden_cluster', characterId: 'mossprout' }, { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'back-centre' }]);
@@ -77,10 +77,10 @@ test('planted Seed highlights top copy and the tray/button cluster as two separa
   assert.equal(dimmed(260, 600), false);
   assert.equal(dimmed(180, 300), true);
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  const tray = screen.slice(screen.indexOf("{ftueStepId === 'world.seed_planted' && !firstSeedPlacementFailed ? ("), screen.indexOf(") : ftueStepId === 'world.garden_handoff'"));
-  assert.match(tray, /FrozenMergeOrderTrayCard entry=\{gardenHandoffOrder\}/);
+  assert.doesNotMatch(screen, /FrozenMergeOrderTrayCard|gardenHandoffOrder|gardenRequestBubble/);
+  assert.deepEqual(mossproutFtueStep('world.garden_handoff')?.spotlight?.targets,
+    [{ kind: 'haven_garden_button', characterId: 'mossprout' }]);
   assert.doesNotMatch(readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8'), /CHAIR_ART|chairArt|order-chair/);
-  assert.doesNotMatch(tray, /gardenRequestBubble/);
   assert.match(screen, /ref=\{setGardenClusterNode\}/);
 });
 
@@ -400,7 +400,8 @@ test('Chapter 0 uses four Seeds, two Sprouts, a First Bloom, then one request', 
   assert.equal(spawnStep?.edges?.[0]?.requiredCount, undefined);
   assert.equal(pairStep?.edges?.[0]?.event.type, 'dream_echo_cleared');
   assert.equal(pairStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
-  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'world.first_bloom_restore');
+  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'world.first_bloom_offer');
+  assert.equal(mossproutFtueAction('world.first_bloom_offer', 'world.open_first_bloom_upgrade')?.nextStepId, 'world.first_bloom_restore');
   assert.equal(mossproutFtueAction('world.first_bloom_restore', 'world.restore_with_first_bloom')?.nextStepId, 'world.first_bloom_restore');
   assert.equal(mossproutFtueAction('world.first_bloom_restore', 'world.complete_first_bloom_restore')?.nextStepId, 'world.first_seed_grew');
   assert.equal(mossproutFtueAction('world.first_seed_grew', 'world.acknowledge_first_seed_growth')?.nextStepId, 'companion.water_together');
@@ -622,7 +623,7 @@ test('post-Garden companion FTUE owns navigation and has a durable resume target
   assert.match(mergeScreen, /ftueActive = ftueRun\?\.status === 'active'[\s\S]*?disabled=\{ftueActive && !handoffActive\}/);
   assert.match(mergeScreen, /returnToResidentStory[\s\S]*?residentResume: '1'/);
   assert.match(mergeScreen, /BackHandler\.addEventListener\('hardwareBackPress'[\s\S]*?returnToResidentStory\(\)/);
-  assert.match(mergeScreen, /<Stack\.Screen options=\{\{ gestureEnabled: !residentFtueActive \}\}/);
+  assert.match(mergeScreen, /<Stack\.Screen options=\{\{ gestureEnabled: !residentFtueActive && !stepplingLesson.active \}\}/);
   const bondRun = { status: 'active' as const, stepId: 'companion.bond_spotlight' };
   const bondPolicy = activeFtueNavigationPolicy(bondRun);
   assert.deepEqual(bondPolicy?.resume, { kind: 'companion', creatureId: 'companion:mossprout', ftue: '1' });
@@ -1060,7 +1061,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(havenRoute, /worldSubjectPresentation=\{worldSubjectPresentation\}/);
   assert.match(kingdomCanvas, /<RevealedCompanionEgg[\s\S]*?presentation=\{worldSubjectPresentation\}[\s\S]*?targetRef=\{worldEggTargetRef\}/);
   assert.equal(MOSSPROUT_WORLD_EGG_ENTRY_ZOOM, 1.35);
-  assert.match(kingdomScreen, /initialFtueCameraScale = ftueStepId === 'world\.egg_intro'[\s\S]*?tutorialCamera\.target\.kind === 'haven_resident'[\s\S]*?tutorialCamera\.zoom \?\? MOSSPROUT_WORLD_EGG_REST_ZOOM/);
+  assert.match(kingdomScreen, /initialFtueCameraScale = [\s\S]*?ftueStepId === 'world\.egg_intro'[\s\S]*?tutorialCamera\.target\.kind === 'haven_resident'[\s\S]*?tutorialCamera\.zoom \?\? MOSSPROUT_WORLD_EGG_REST_ZOOM/);
   assert.match(kingdomScreen, /initialTutorialCameraScale=\{initialFtueCameraScale\}/);
   assert.match(kingdomCanvas, /initialTutorialFocus = useMemo[\s\S]*?sharedResidentCenterY\(residentAnchor\.y, eggGrowthScale\)[\s\S]*?initialFocus: initialTutorialFocus/);
   assert.match(kingdomCanvas, /durationMs: tutorialCamera\.durationMs[\s\S]*?initialScale: initialTutorialCameraScale[\s\S]*?scale: tutorialCamera\.zoom \?\? initialTutorialCameraScale/);
@@ -1094,7 +1095,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.doesNotMatch(kingdomScreen, /cameraFallbackTimer/);
   assert.match(kingdomScreen, /onResidentFocusComplete=\{completeResidentFocus\}/);
   assert.match(kingdomScreen, /onCameraMotionChange=\{handleCameraMotionChange\}/);
-  assert.match(kingdomScreen, /ftueCameraSettled && !upgradePresentation[\s\S]*?<HavenFtueOverlay/);
+  assert.match(kingdomScreen, /ftueCameraSettled && !sharedUpgrade && !upgradePresentation[\s\S]*?<HavenFtueOverlay/);
   assert.match(kingdomCamera, /Camera limits describe valid destinations and gesture bounds/);
   assert.match(kingdomCamera, /previousGeometry\.sceneWidth === nextGeometry\.sceneWidth[\s\S]*?return;/);
   assert.match(kingdomCamera, /const animateToSnapshot = useCallback[\s\S]*?clampCameraTranslation\(snapshot, cameraViewport, cameraScene, nextScale\)[\s\S]*?withTiming\(nextScale, timing/);
@@ -1209,7 +1210,7 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   const ftueRuntime = readFileSync('features/onboarding/ftue-runtime.ts', 'utf8');
   const contentFlow = readFileSync('features/content-flow/content-flow-bootstrap.ts', 'utf8');
   assert.match(merge, /ftueActive = ftueRun\?\.status === 'active'/);
-  assert.match(merge, /leading=\{<KatchimeraBackButton[\s\S]*?disabled=\{ftueActive && !handoffActive\}/);
+  assert.match(merge, /leading=\{stepplingLesson.active \? <View \/> : <KatchimeraBackButton[\s\S]*?disabled=\{ftueActive && !handoffActive\}/);
   assert.match(merge, /trailing=\{<View collapsable=\{false\} ref=\{coinHudPillRef\}>[\s\S]*?<MergeCoinHud[\s\S]*?hudRef=\{coinHudRef\}/);
   assert.match(merge, /<GameCurrencyHud[\s\S]*?targetRef: hudRef/);
   assert.match(merge, /measureViewInWindow\(coinArtRef\)[\s\S]*?!coinRect[\s\S]*?return false/);

@@ -1,3 +1,4 @@
+import { normalizeSpeechText } from '@/utils/speech-text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { type GestureResponderEvent, type LayoutChangeEvent, Pressable, type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View, type View as ViewType } from 'react-native';
@@ -32,12 +33,7 @@ import {
 import { CompanionHomeEnvironmentStage } from './companion-home-environment-stage';
 
 export function normalizeCompanionSpeechText(text: string | undefined): string {
-  return (text ?? '')
-    .replace(/\r\n?/g, '\n')
-    .replace(/[ \t]*\n[ \t]*/g, '\n')
-    .replace(/\n{2,}/g, '\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
+  return normalizeSpeechText(text);
 }
 
 export function CompanionCinematicStage({

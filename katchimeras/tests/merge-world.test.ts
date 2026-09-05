@@ -1476,7 +1476,7 @@ test('Merge HUD stays board-specific with only back navigation and Coins', () =>
 
   assert.doesNotMatch(screen, /KatchimeraPageHeader/);
   assert.doesNotMatch(screen, /onOpenCards|onOpenTrophies/);
-  assert.match(screen, /leading=\{<KatchimeraBackButton/);
+    assert.match(screen, /leading=\{stepplingLesson.active \? <View \/> : <KatchimeraBackButton/);
   assert.match(screen, /source === 'haven-world'/);
   assert.match(screen, /announcement: "Returning to Mossprout's Haven"[\s\S]*?target: 'katchimeras'[\s\S]*?navigate: \(\) => \{/);
   assert.match(screen, /router\.canGoBack\(\)\) router\.back\(\)/);

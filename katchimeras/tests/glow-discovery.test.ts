@@ -4,10 +4,10 @@ import { readFileSync } from 'node:fs';
 import { SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { mergeLessonEvidenceReady } from '@/features/content-flow/merge-lesson-recipe';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
-import { normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
+import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { GLOW_ECHO_IDS, GLOW_REPEAT_ECHO_IDS, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, glowGatewayState } from '@/utils/merge-world/glow-discovery-policy';
 import type { MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
-import { GLOW_DISCOVERY_FLOW, glowDiscoveryBoardStep, glowDiscoveryLessonReady, glowDiscoveryRevealLocked, glowDiscoveryLocksCamera, GLOW_LESSON, GLOW_REPEAT_LESSON } from '@/features/onboarding/glow-discovery-flow';
+import { GLOW_DISCOVERY_FLOW, glowDiscoveryAllowsGarden, glowDiscoveryBoardStep, glowDiscoveryLessonReady, glowDiscoveryRevealLocked, glowDiscoveryLocksCamera, GLOW_LESSON, GLOW_REPEAT_LESSON } from '@/features/onboarding/glow-discovery-flow';
 import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
 import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import { worldActionScene } from '@/features/content-flow/story-world-operations';
@@ -16,6 +16,22 @@ import { validateContentFlowDefinition } from '@/features/content-flow/content-f
 import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
 
 const NOW = Date.UTC(2026, 8, 3, 12);
+
+test('Glow Garden handoff stays actionable under the world navigation lock, including lesson resume', () => {
+  for (const nodeId of ['garden.open', 'lesson.prepare', 'lesson.spawn', 'lesson.repeat.serve']) {
+    assert.equal(glowDiscoveryLocksCamera({ nodeId, status: 'active' }), true);
+    assert.equal(glowDiscoveryAllowsGarden({ nodeId, status: 'active' }), true);
+    assert.equal(glowDiscoveryAllowsGarden({ nodeId, status: 'failed_recoverable' }), true);
+    assert.equal(glowDiscoveryAllowsGarden({ nodeId, status: 'completed' }), false);
+  }
+  for (const nodeId of ['gateway.focus', 'gateway.offer', 'gateway.buy', 'gateway.egg', 'egg.enter']) {
+    assert.equal(glowDiscoveryAllowsGarden({ nodeId, status: 'active' }), false);
+  }
+  assert.equal(glowDiscoveryAllowsGarden(null), false);
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  assert.match(screen, /disabled=\{navigationLocked && !glowDiscoveryAllowsGarden\(glowRun\)/);
+  assert.match(screen, /if \(!glowReady \|\| !stepplingLesson.ready\) return null;[\s\S]*<KingdomHexCanvas/);
+});
 test('meditation handoff hides normal interaction UI before the durable FTUE step advances', () => {
   const source = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
   assert.match(source, /import \{[^}]*\buseState\b[^}]*\} from 'react';/);
@@ -284,7 +300,9 @@ test('paid mist stays revealed with an Egg despite relationship stage zero or st
   assert.equal(repaired.worldUnlocks?.[GLOW_GATEWAY_ID].paid, 40);
   assert.equal(repaired.worldUnlocks?.[GLOW_GATEWAY_ID].hatchedAt, null);
   assert.equal(reduceMergeWorld(repaired, { type: 'unlockWorldTarget', targetId: GLOW_GATEWAY_ID, receiptId: 'persisted:mist', now: NOW }).changed, false);
-  assert.equal(glowGatewayState({ ...relationshipProjection, worldUnlocks: {}, storyWorldMutationReceipts: [] }), undefined);
+  // The restored Garden structure still makes unpaid mist available even if the relationship projection resets.
+  assert.equal(glowGatewayState({ ...relationshipProjection, worldUnlocks: {}, storyWorldMutationReceipts: [] }), 'locked');
+  assert.equal(glowGatewayState(createInitialMergeWorldState(NOW, ['mossprout'])), undefined);
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   assert.match(screen, /gatewayState = glowGatewayState\(mergeWorld\)/);
   assert.match(screen, /gateway: stepplingEncounter.open \? 'egg' as const : gatewayState/);
@@ -355,7 +373,8 @@ test('discovery story has valid capabilities and resumes through each persisted 
   assert.ok(visited.indexOf('gateway.focus') < visited.indexOf('garden.open'));
   assert.ok(!visited.includes('garden.focus'));
   assert.ok(!visited.includes('gateway.goal'));
-  assert.ok(visited.indexOf('gateway.return') < visited.indexOf('gateway.buy'));
+  assert.ok(!visited.includes('gateway.return'), 'camera completion cannot gate the upgrade');
+  assert.ok(visited.indexOf('gateway.offer') < visited.indexOf('gateway.buy'));
   assert.ok(!visited.some((id) => id.startsWith('steppling.') || id === 'world.choose' || id === 'egg.transfer'));
   assert.ok(visited.includes('lesson.repeat.prepare'));
   assert.ok(visited.includes('lesson.repeat.match-5'));

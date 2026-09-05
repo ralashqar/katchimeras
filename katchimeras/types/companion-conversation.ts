@@ -299,6 +299,8 @@ export type ConversationSession = {
   outcomeIds: string[];
   encounterId?: string;
   exitTransition?: ConversationTransition;
+  /** Acknowledge the explicit Day 1 Garden handoff only after Merge mounts. */
+  gardenHandoffAt?: number;
   encounterTargetTurns?: number;
   encounterTurns?: number;
   /** Development-only dialogue browser session. It cannot write player outcomes. */

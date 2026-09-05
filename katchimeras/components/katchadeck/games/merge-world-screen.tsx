@@ -1,5 +1,8 @@
+import { useStepplingGardenLesson, reconcileStepplingGarden } from '@/features/onboarding/steppling-garden-runtime';
+import { STEPPLING_PARCEL_ID, STEPPLING_SHOE_ORDER_ID, stepplingGardenBoardStep, stepplingGardenCheckpoint } from '@/features/onboarding/steppling-garden-lesson';
+import { acknowledgeStepplingDayOneGarden } from '@/features/companion/use-steppling-day-one';
 import * as Haptics from 'expo-haptics';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
@@ -101,10 +104,20 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   const { width } = useWindowDimensions();
   const { state, loading, error } = useMergeWorldState();
   const { dispatch: send, flush: flushMergeWorld } = useMergeWorldActions();
+  useEffect(() => {
+    if (!active || loading || !state?.arrivals.some((arrival) => arrival.id === 'journey:steppling:day-1:journey-locker')) return;
+    try { acknowledgeStepplingDayOneGarden(); }
+    catch (cause) { console.warn('Could not save the Steppling Garden handoff', cause); }
+  }, [active, loading, state]);
   const ftueRun = useFtueRun();
   const glowRun = useGlowDiscovery();
+  const stepplingLesson = useStepplingGardenLesson();
+  const stepplingReturning = useRef(false);
+  const [stepplingLessonError, setStepplingLessonError] = useState(false);
   const glowScene = glowRun ? glowDiscoveryScene(glowRun.nodeId) : null;
   const navigation = useNavigation();
+  const stepplingBoardLocked = active && stepplingLesson.active && !['closing', 'summary'].includes(stepplingLesson.run?.nodeId ?? '');
+  usePreventRemove(stepplingBoardLocked, () => {});
   const handoffActive = ftueRun?.status === 'active' && ftueRun.stepId.startsWith('merge.handoff.');
   const handoffFeedback = useGameFeedback();
   const handoffWasActive = useRef(false);
@@ -126,6 +139,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   const ftueActive = ftueRun?.status === 'active';
   const ftueNavigationLocked = useFtueNavigationLock(ftueRun, 'merge', active);
   const scriptedFtueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId)
+    : stepplingLesson.active && state && stepplingLesson.run ? stepplingGardenBoardStep(stepplingGardenCheckpoint(state), state)
     : glowRun?.status === 'active' ? glowDiscoveryBoardStep(glowRun.nodeId, state) : null;
   const ftueStep = useMemo(() => mergeFtueStepForBoard(state, scriptedFtueStep), [scriptedFtueStep, state]);
   const residentFtueActive = Boolean(ftueStep?.id.startsWith('merge.resident_'));
@@ -200,6 +214,27 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   }, [active, flushMergeWorld, glowRun?.nodeId, serveFlight, state]);
   const [serveHiddenItemIds, setServeHiddenItemIds] = useState<Set<string>>(() => new Set());
   const [parcelFlight, setParcelFlight] = useState<MergeParcelFlight | null>(null);
+  useEffect(() => {
+    if (!active || !state || !stepplingLesson.active || parcelFlight || serveFlight) return;
+    let live = true;
+    const setup = send({ type: 'prepareStepplingGardenLesson', now: Date.now() });
+    void flushMergeWorld().then(() => { if (live) return reconcileStepplingGarden(setup?.state ?? state); }).catch(() => { if (live) setStepplingLessonError(true); });
+    return () => { live = false; };
+  }, [active, state, stepplingLesson.active, parcelFlight, serveFlight, send, flushMergeWorld]);
+  useEffect(() => {
+    if (!stepplingBoardLocked) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => subscription.remove();
+  }, [stepplingBoardLocked]);
+  useEffect(() => {
+    if (!active || !stepplingLesson.active || !['closing', 'summary'].includes(stepplingLesson.run?.nodeId ?? '') || parcelFlight || serveFlight || stepplingReturning.current) return;
+    stepplingReturning.current = true;
+    void flushMergeWorld().then(() => {
+      transitionTo({ announcement: 'Returning to Steppling', target: 'katchimeras', navigate: () => {
+        if (router.canGoBack()) router.back(); else router.replace('/(tabs)/katchimeras');
+      } });
+    }).catch(() => { stepplingReturning.current = false; setStepplingLessonError(true); });
+  }, [active, stepplingLesson.active, stepplingLesson.run?.nodeId, parcelFlight, serveFlight, flushMergeWorld, router, transitionTo]);
   const [parcelHiddenItemIds, setParcelHiddenItemIds] = useState<Set<string>>(() => new Set());
   const [parcelShakeNonce, setParcelShakeNonce] = useState(0);
   // Only the HUD subscribes; token contacts must not rerender this screen.
@@ -450,7 +485,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   useEffect(() => {
     if (!active
       || ftueRun?.status !== 'active'
-      || ftueRun.stepId !== 'world.first_bloom_restore'
+      || !['world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueRun.stepId)
       || storyNavigationPendingRef.current) return;
     storyNavigationPendingRef.current = true;
     const accepted = transitionTo({
@@ -627,13 +662,19 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     && (arrival.kind === 'discovery_parcel' || arrival.kind === 'root_match_parcel' || arrival.kind === 'resident_card_parcel' || arrival.kind === 'contextual_parcel' || arrival.kind === 'goal_chest')
     && (arrival.itemDefinitionIds.length > 0 || Boolean(arrival.generatorId))
   )).sort((left, right) => left.createdAt - right.createdAt) ?? [], [state?.arrivals]);
-  const pendingParcel = pendingParcels[0] ?? null;
+  const pendingParcel = (stepplingLesson.active ? pendingParcels.find((arrival) => arrival.id === STEPPLING_PARCEL_ID) : pendingParcels[0]) ?? null;
   const pendingMemoryCard = state?.ownedMemoryCards.find((card) => card.revealedAt == null) ?? null;
   const revealedMemoryCard = revealedMemoryCardId ? MEMORY_CARDS_BY_ID.get(revealedMemoryCardId) ?? null : null;
   const memoryCardPresentation = pendingMemoryCard ? MEMORY_CARDS_BY_ID.get(pendingMemoryCard.cardId) ?? null : revealedMemoryCard;
 
   const trayEntries = useMemo<MergeTrayEntry[]>(() => {
     if (!state) return [];
+    if (stepplingLesson.active) {
+      if (pendingParcel) return [{ id: 'parcel-stack', kind: 'parcel', arrival: pendingParcel, count: 1,
+        disabled: !active || Boolean(parcelFlight) || Boolean(serveFlight), shakeNonce: parcelShakeNonce }];
+      const order = state.activeOrders.find((entry) => entry.id === STEPPLING_SHOE_ORDER_ID);
+      return order ? [{ id: order.id, kind: 'order', order, itemReadiness: mergeOrderItemReadiness(state, order), ready: readyOrderIds.has(order.id) }] : [];
+    }
     const chapterZeroOrders = state.activeOrders.filter((order) => order.id.startsWith('mossprout:chapter-0:'));
     const chapterZeroActive = chapterZeroOrders.length > 0;
     const mossproutReturnEntry: MergeTrayEntry = {
@@ -700,7 +741,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     // Midpoint notes sit before the remaining requests so the story beat is
     // immediately visible without replacing or hiding any unserved order.
     return [...parcelEntries, ...returnEntries, ...orderEntries];
-  }, [active, activeResidentDiscovery?.id, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+  }, [stepplingLesson.active, active, activeResidentDiscovery?.id, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
     const state = stateRef.current;
@@ -913,18 +954,24 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   const useGrovelight = useCallback((gateId: string) => { dispatch({ type: 'useGrovelightResonance', gateId, dayId: localDayId(), now: Date.now() }); }, [dispatch]);
   const boardReady = useCallback(() => setBoardVisualReady(true), []);
 
-  if (loading || !state) {
+  if (loading || !state || !stepplingLesson.ready) {
     return <View style={styles.loading}><ActivityIndicator color={Lantern.ember300} size="large" /><ThemedText darkColor="#FFF0CE">Opening the pantry…</ThemedText></View>;
   }
 
   return (
     <View onLayout={() => setScreenLayoutNonce((nonce) => nonce + 1)} ref={screenRef} style={styles.screen}>
-      <Stack.Screen options={{ gestureEnabled: !residentFtueActive }} />
+      <Stack.Screen options={{ gestureEnabled: !residentFtueActive && !stepplingLesson.active }} />
       <MergeCommandFeedback />
+      {stepplingLessonError ? <View style={{ position: 'absolute', top: insets.top + 60, left: 20, right: 20, zIndex: 200 }}>
+        <KatchaButton label="Continue lesson · Try again" onPress={() => {
+          setStepplingLessonError(false);
+          void flushMergeWorld().then(() => reconcileStepplingGarden(state)).catch(() => setStepplingLessonError(true));
+        }} />
+      </View> : null}
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
         <GameHudBar
           density="compact"
-          leading={<KatchimeraBackButton
+          leading={stepplingLesson.active ? <View /> : <KatchimeraBackButton
             accessibilityLabel={source === 'haven-world' ? "Return to Mossprout's Haven" : creatureId ? 'Return to Mossprout' : 'Open legacy games'}
             disabled={ftueActive && !handoffActive}
             onPress={() => handoffActive ? returnFromGarden() : residentFtueActive && creatureId
@@ -1001,7 +1048,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
         }}
       /> : null}
 
-      {active && memoryCardPresentation ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.memoryCardOverlay, { bottom: Math.max(insets.bottom + 20, 28) }]}>
+      {active && !stepplingLesson.active && memoryCardPresentation ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.memoryCardOverlay, { bottom: Math.max(insets.bottom + 20, 28) }]}>
         <View style={styles.memoryCardArtWrap}>
           <Image accessibilityIgnoresInvertColors contentFit="contain" source={RARE_MEMORY_CARD_REVEAL_ART} style={styles.memoryCardGlowArt} transition={0} />
           <Image accessibilityIgnoresInvertColors contentFit="contain" source={pendingMemoryCard ? VEILED_MEMORY_CARD_ART : memoryCardArt(memoryCardPresentation.id)} style={styles.memoryCardArt} transition={180} />
@@ -1040,7 +1087,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
         </View>
       ) : null}
 
-      {active && discoveryFork ? <View style={[styles.discoveryForkOverlay, { bottom: Math.max(insets.bottom + 18, 26) }]}>
+      {active && !stepplingLesson.active && discoveryFork ? <View style={[styles.discoveryForkOverlay, { bottom: Math.max(insets.bottom + 18, 26) }]}>
         <ThemedText style={styles.energyConnectionEyebrow} lightColor="#FFD36A" darkColor="#FFD36A">THE MIST IS LISTENING</ThemedText>
         <ThemedText selectable style={styles.discoveryForkTitle} lightColor="#FFF8E8" darkColor="#FFF8E8">{discoveryFork.candidateIds.length === 1 ? 'One path remains.' : 'Which path should we follow?'}</ThemedText>
         <ThemedText selectable style={styles.discoveryForkBody} lightColor="rgba(255,248,232,0.82)" darkColor="rgba(255,248,232,0.82)">{discoveryFork.candidateIds.length === 1 ? 'Follow it to complete this circle of companions.' : 'The others will return another time.'}</ThemedText>
@@ -1057,12 +1104,12 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       {error ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><KatchaInlineNotice body={error} title="Merge paused" tone="danger" /></View></KatchaSurfaceProvider> : null}
       <MergeServeRewardOverlay flight={serveFlight} onCoinArrive={handleCoinArrive} onEnergyArrive={handleEnergyArrive} onFinish={finishServeAnimation} onItemsArrive={handleServeItemsArrive} />
       <MergeParcelFlightOverlay flight={parcelFlight} onFinish={finishParcelFlight} onItemArrive={handleParcelItemArrive} />
-      {active && pendingResidentDialogue ? <ResidentRevealDialogue
+      {active && !stepplingLesson.active && pendingResidentDialogue ? <ResidentRevealDialogue
         onContinue={() => dispatch({ type: 'ackResidentCardDialogue', discoveryId: pendingResidentDialogue.id, now: Date.now() })}
         residentId={pendingResidentDialogue.residentId}
       /> : null}
       <KatchimeraCardRevealModal
-        cardId={revealedKatchimeraCardId}
+        cardId={stepplingLesson.active ? null : revealedKatchimeraCardId}
         cards={mossproutCards}
         onDone={() => {
           if (residentCardReturnPendingRef.current) return;

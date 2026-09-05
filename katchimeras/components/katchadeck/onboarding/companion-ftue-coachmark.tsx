@@ -1,3 +1,4 @@
+import { normalizeSpeechText } from '@/utils/speech-text';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
@@ -42,6 +43,7 @@ export function CompanionFtueCoachmark({
   placement,
   showFinger = true,
   targetRef,
+  targetRevision = 0,
 }: {
   buttonLabel?: string;
   message: readonly GuideMessagePart[];
@@ -49,6 +51,7 @@ export function CompanionFtueCoachmark({
   placement: 'above' | 'below';
   showFinger?: boolean;
   targetRef: RefObject<ViewType | null>;
+  targetRevision?: number;
 }) {
   const { height, width } = useWindowDimensions();
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
@@ -135,7 +138,7 @@ export function CompanionFtueCoachmark({
       cancelAnimationFrame(frame);
       clearTimeout(settle);
     };
-  }, [height, targetRef, width]);
+  }, [height, targetRef, targetRevision, width]);
 
   if (!focus) return null;
   const calloutWidth = Math.min(326, width - 28);
@@ -206,11 +209,11 @@ export function CompanionFtueCoachmark({
           <ThemedText style={styles.message} lightColor="#35422F" darkColor="#35422F">
             {message.map((part, index) => (
               <ThemedText
-                key={`${index}:${part.text}`}
+                key={`${index}:${normalizeSpeechText(part.text, false)}`}
                 style={[styles.message, part.emphasis && styles.messageEmphasis]}
                 lightColor={part.emphasis ? '#668A49' : '#35422F'}
                 darkColor={part.emphasis ? '#668A49' : '#35422F'}>
-                {part.text}
+                {normalizeSpeechText(part.text, false)}
               </ThemedText>
             ))}
           </ThemedText>

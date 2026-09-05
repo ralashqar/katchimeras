@@ -30,11 +30,21 @@ export function glowTutorialDrop(state: MergeWorldState, generatorId: string) {
 }
 export const WORLD_UNLOCK_CATALOG = Object.fromEntries(SHARED_WORLD_PURCHASES.map((tile) => [tile.unlockId, { ...tile, destination: tile.companion }]));
 
+/** Accept both Garden restoration formats and completed guided mist requests.
+ * Older FTUE saves can have this progress without the companion tile stage.
+ * Use the same prerequisite for the marker, confirmation, and payment.
+ */
+export function glowGatewayAvailable(state: MergeWorldState): boolean {
+  return (state.haven.tileStages.mossprout ?? 0) >= 1
+    || state.haven.structures.mossproutGarden.level >= 1
+    || GLOW_ORDER_IDS.every((id) => state.glowDiscoveryLesson?.servedOrderIds.includes(id));
+}
+
 /** Paid exploration is independent of relationship-based environment stages. */
 export function glowGatewayState(state: MergeWorldState): 'egg' | 'open' | 'locked' | undefined {
   if (state.companionDiscovery.records.some((record) => record.characterId === 'steppling')) return 'open';
   if (state.worldUnlocks?.[GLOW_GATEWAY_ID]) return 'egg';
-  return (state.haven.tileStages.mossprout ?? 0) >= 1 ? 'locked' : undefined;
+  return glowGatewayAvailable(state) ? 'locked' : undefined;
 }
 
 export function glowDiscoveryOrder(index: 0 | 1, now: number): MergeOrder {
@@ -86,7 +96,7 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
     const savedReceipt = command.receiptId ? state.storyWorldMutationReceipts.find((receipt) => receipt.id === command.receiptId) : undefined;
     if (savedReceipt) return { ...no(), storyWorldMutationReceipt: savedReceipt };
     if (existing && !command.receiptId) return no();
-    if ((state.haven.tileStages.mossprout ?? 0) < 1) return no('Restore the Garden first.');
+    if (!glowGatewayAvailable(state)) return no('Restore the Garden first.');
     const owned = state.companionDiscovery.records.some((record) => record.characterId === definition.destination);
     const cost = existing || owned ? 0 : definition.price;
     if (state.coins < cost) return no('Complete requests to earn more Glow.');

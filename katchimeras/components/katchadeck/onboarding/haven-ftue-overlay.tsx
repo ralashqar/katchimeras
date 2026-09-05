@@ -36,12 +36,14 @@ export function havenFtueTargetKey(target: FtueTarget): string | null {
 
 export const HavenFtueOverlay = memo(function HavenFtueOverlay({
   cue,
+  fingerPlacement = 'center',
   screenRef,
   spotlight,
   targetRefs,
   targetRevision,
 }: {
   cue: FtueCueDefinition | null;
+  fingerPlacement?: 'center' | 'below';
   screenRef: RefObject<View | null>;
   spotlight: FtueSpotlightDefinition | null;
   targetRefs: RefObject<Map<string, View>>;
@@ -126,7 +128,7 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
       {layout.focuses.length > 1
         ? <MultipleSpotlights frames={layout.focuses} opacity={spotlight?.dimOpacity ?? 0.62} radius={spotlight?.radius ?? 16} screen={layout.screen} />
         : <Spotlight focus={layout.focus} opacity={spotlight?.dimOpacity ?? 0.62} radius={spotlight?.radius ?? 16} screen={layout.screen} />}
-      {cue?.kind === 'tap' ? <Finger focus={layout.cueFocus ?? layout.focus} resetKey={`${configKey}:${targetRevision}`} /> : null}
+      {cue?.kind === 'tap' ? <Finger focus={layout.cueFocus ?? layout.focus} placement={fingerPlacement} resetKey={`${configKey}:${targetRevision}`} /> : null}
     </Animated.View>
   );
 });
@@ -160,7 +162,7 @@ function Spotlight({ focus, opacity, radius, screen }: { focus: Frame; opacity: 
   );
 }
 
-function Finger({ focus, resetKey }: { focus: Frame; resetKey: string }) {
+function Finger({ focus, resetKey, placement }: { focus: Frame; resetKey: string; placement: 'center' | 'below' }) {
   const reduceMotion = useReducedMotion();
   const press = useSharedValue(0);
   useEffect(() => {
@@ -181,7 +183,7 @@ function Finger({ focus, resetKey }: { focus: Frame; resetKey: string }) {
   }));
   const size = 92;
   return (
-    <Animated.View style={[styles.hand, { height: size, left: focus.x + focus.width / 2 - size * 0.28, top: focus.y + focus.height / 2 - size * 0.2, width: size }, animatedStyle]}>
+    <Animated.View style={[styles.hand, { height: size, left: focus.x + focus.width / 2 - size * 0.28, top: focus.y + (placement === 'below' ? focus.height + 8 : focus.height / 2) - size * 0.2, width: size }, animatedStyle]}>
       <Image contentFit="contain" source={HAND_ART} style={StyleSheet.absoluteFill} />
     </Animated.View>
   );

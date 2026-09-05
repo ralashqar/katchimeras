@@ -1,0 +1,50 @@
+[
+  {
+    "id": "coffee",
+    "title": "Coffee",
+    "motifs": ["foam swirl", "bean shine", "steam ribbon"],
+    "examplePlaces": ["coffee_shop", "espresso bar", "cafe"]
+  },
+  {
+    "id": "bakery",
+    "title": "Bakery",
+    "motifs": ["crumb puff", "butter fold", "glaze glow"],
+    "examplePlaces": ["bakery", "bread shop", "patisserie"]
+  },
+  {
+    "id": "pizza",
+    "title": "Pizza",
+    "motifs": ["crust edge", "cheese stretch", "oven warmth"],
+    "examplePlaces": ["pizza_place", "pizzeria"]
+  },
+  {
+    "id": "sushi",
+    "title": "Sushi",
+    "motifs": ["rice body", "seaweed wrap", "wasabi spark"],
+    "examplePlaces": ["sushi_place", "omakase"]
+  },
+  {
+    "id": "ramen",
+    "title": "Ramen",
+    "motifs": ["noodle curl", "broth glow", "steam ring"],
+    "examplePlaces": ["ramen_place", "noodle bar"]
+  },
+  {
+    "id": "dessert",
+    "title": "Dessert",
+    "motifs": ["cream puff", "sprinkle sparkle", "syrup shine"],
+    "examplePlaces": ["dessert_shop", "gelato", "ice cream"]
+  },
+  {
+    "id": "bubble_tea",
+    "title": "Bubble Tea",
+    "motifs": ["boba pearls", "tea glow", "straw antenna"],
+    "examplePlaces": ["bubble_tea_shop", "tea shop"]
+  },
+  {
+    "id": "produce",
+    "title": "Produce",
+    "motifs": ["leaf tops", "seed shine", "market freshness"],
+    "examplePlaces": ["grocery", "market hall", "produce store"]
+  }
+]

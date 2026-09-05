@@ -1,0 +1,25 @@
+{
+  "timeOfDay": [
+    { "id": "dawn", "captionHint": "dawn-lit", "visualHint": "soft sunrise light" },
+    { "id": "morning", "captionHint": "morning-bright", "visualHint": "clear bright light" },
+    { "id": "midday", "captionHint": "day-marked", "visualHint": "crisp midday lighting" },
+    { "id": "dusk", "captionHint": "dusk-glow", "visualHint": "warm low-angle twilight" },
+    { "id": "night", "captionHint": "night-lit", "visualHint": "cool moonlit glow" }
+  ],
+  "intensity": [
+    { "id": "light", "captionHint": "soft form", "visualHint": "gentle glow and compact posture" },
+    { "id": "steady", "captionHint": "steady form", "visualHint": "balanced poised stance" },
+    { "id": "active", "captionHint": "charged form", "visualHint": "stronger motion traces" },
+    { "id": "intense", "captionHint": "surging form", "visualHint": "brighter aura and dynamic motion" }
+  ],
+  "repeatDepth": [
+    { "id": "first_time", "captionHint": "first encounter", "visualHint": "fresh clean look" },
+    { "id": "familiar", "captionHint": "return form", "visualHint": "more settled details" },
+    { "id": "rooted", "captionHint": "deepened form", "visualHint": "stronger motif integration" }
+  ],
+  "novelty": [
+    { "id": "familiar", "captionHint": "familiar variant" },
+    { "id": "new", "captionHint": "new discovery" },
+    { "id": "rare", "captionHint": "rare emergence" }
+  ]
+}

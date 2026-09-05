@@ -1,0 +1,90 @@
+{
+  "version": 4,
+  "styleReferences": ["artifacts/merge-world-existing-contact.png"],
+  "promptBrief": [
+    "Production 4x4 sprite sheets matching the existing polished, low-detail, rounded 3D Merge World collectibles.",
+    "One centred object per occupied cell on flat #FF00FF, generous safe padding, no text, floor, cast shadow, scenery, grid lines, or cell crossings.",
+    "Each six-tier chain must read as a clear progression from one humble object to a substantial magical collectible at 34-50px."
+  ],
+  "output": { "size": 256, "subjectExtent": 210, "quality": 84, "hardFileLimitBytes": 51200 },
+  "sheets": [
+    { "id": "sheet-c", "cells": [
+      { "row": 0, "column": 0, "definitionId": "food:dessert:1", "file": "food-dessert-1-flour-scoop.webp" },
+      { "row": 0, "column": 1, "definitionId": "food:dessert:2", "file": "food-dessert-2-cake-batter.webp" },
+      { "row": 0, "column": 2, "definitionId": "food:dessert:3", "file": "food-dessert-3-cupcake.webp" },
+      { "row": 0, "column": 3, "definitionId": "food:dessert:4", "file": "food-dessert-4-layer-cake.webp" },
+      { "row": 1, "column": 0, "definitionId": "food:dessert:5", "file": "food-dessert-5-celebration-cake.webp" },
+      { "row": 1, "column": 1, "definitionId": "food:dessert:6", "file": "food-dessert-6-dream-cake.webp" },
+      { "row": 1, "column": 2, "definitionId": "drink:hot:1", "file": "drink-hot-1-tea-leaf.webp" },
+      { "row": 1, "column": 3, "definitionId": "drink:hot:2", "file": "drink-hot-2-tea-cup.webp" },
+      { "row": 2, "column": 0, "definitionId": "drink:hot:3", "file": "drink-hot-3-teapot.webp" },
+      { "row": 2, "column": 1, "definitionId": "drink:hot:4", "file": "drink-hot-4-cocoa-tray.webp" },
+      { "row": 2, "column": 2, "definitionId": "drink:hot:5", "file": "drink-hot-5-cafe-service.webp" },
+      { "row": 2, "column": 3, "definitionId": "drink:hot:6", "file": "drink-hot-6-hearth-ceremony.webp" },
+      { "row": 3, "column": 0, "definitionId": "drink:refresh:1", "file": "drink-refresh-1-berry.webp" },
+      { "row": 3, "column": 1, "definitionId": "drink:refresh:2", "file": "drink-refresh-2-fruit-juice.webp" },
+      { "row": 3, "column": 2, "definitionId": "drink:refresh:3", "file": "drink-refresh-3-smoothie.webp" },
+      { "row": 3, "column": 3, "definitionId": "drink:refresh:4", "file": "drink-refresh-4-lemonade-pitcher.webp" }
+    ]},
+    { "id": "sheet-d", "cells": [
+      { "row": 0, "column": 0, "definitionId": "drink:refresh:5", "file": "drink-refresh-5-garden-drinks-cart.webp" },
+      { "row": 0, "column": 1, "definitionId": "drink:refresh:6", "file": "drink-refresh-6-festival-fountain.webp" },
+      { "row": 0, "column": 2, "definitionId": "adventure:travel:6", "file": "adventure-travel-6-memory-globe.webp" },
+      { "row": 0, "column": 3, "definitionId": "nature:waterside:6", "file": "nature-waterside-6-ocean-sanctuary.webp" },
+      { "row": 1, "column": 0, "definitionId": "comfort:rest:1", "file": "comfort-rest-1-pillow-feather.webp" },
+      { "row": 1, "column": 1, "definitionId": "comfort:rest:2", "file": "comfort-rest-2-cushion.webp" },
+      { "row": 1, "column": 2, "definitionId": "comfort:rest:3", "file": "comfort-rest-3-pillow.webp" },
+      { "row": 1, "column": 3, "definitionId": "comfort:rest:4", "file": "comfort-rest-4-blanket-nest.webp" },
+      { "row": 2, "column": 0, "definitionId": "comfort:rest:5", "file": "comfort-rest-5-cosy-bed.webp" },
+      { "row": 2, "column": 1, "definitionId": "comfort:rest:6", "file": "comfort-rest-6-dream-room.webp" },
+      { "row": 2, "column": 2, "definitionId": "comfort:care:1", "file": "comfort-care-1-bandage.webp" },
+      { "row": 2, "column": 3, "definitionId": "comfort:care:2", "file": "comfort-care-2-care-pouch.webp" },
+      { "row": 3, "column": 0, "definitionId": "comfort:care:3", "file": "comfort-care-3-first-aid-kit.webp" },
+      { "row": 3, "column": 1, "definitionId": "comfort:care:4", "file": "comfort-care-4-comfort-basket.webp" },
+      { "row": 3, "column": 2, "definitionId": "comfort:care:5", "file": "comfort-care-5-healing-cabinet.webp" },
+      { "row": 3, "column": 3, "definitionId": "comfort:care:6", "file": "comfort-care-6-sanctuary-kit.webp" }
+    ]},
+    { "id": "sheet-e", "cells": [
+      { "row": 0, "column": 0, "definitionId": "social:gathering:1", "file": "social-gathering-1-place-card.webp" },
+      { "row": 0, "column": 1, "definitionId": "social:gathering:2", "file": "social-gathering-2-shared-plate.webp" },
+      { "row": 0, "column": 2, "definitionId": "social:gathering:3", "file": "social-gathering-3-picnic-cloth.webp" },
+      { "row": 0, "column": 3, "definitionId": "social:gathering:4", "file": "social-gathering-4-gathering-table.webp" },
+      { "row": 1, "column": 0, "definitionId": "social:gathering:5", "file": "social-gathering-5-community-supper.webp" },
+      { "row": 1, "column": 1, "definitionId": "social:gathering:6", "file": "social-gathering-6-village-festival.webp" },
+      { "row": 1, "column": 2, "definitionId": "social:celebration:1", "file": "social-celebration-1-ribbon.webp" },
+      { "row": 1, "column": 3, "definitionId": "social:celebration:2", "file": "social-celebration-2-wrapped-gift.webp" },
+      { "row": 2, "column": 0, "definitionId": "social:celebration:3", "file": "social-celebration-3-party-hat.webp" },
+      { "row": 2, "column": 1, "definitionId": "social:celebration:4", "file": "social-celebration-4-celebration-hamper.webp" },
+      { "row": 2, "column": 2, "definitionId": "social:celebration:5", "file": "social-celebration-5-joyful-parade.webp" },
+      { "row": 2, "column": 3, "definitionId": "social:celebration:6", "file": "social-celebration-6-grand-jubilee.webp" },
+      { "row": 3, "column": 0, "definitionId": "mind:work:1", "file": "mind-work-1-sticky-note.webp" },
+      { "row": 3, "column": 1, "definitionId": "mind:work:2", "file": "mind-work-2-checklist.webp" },
+      { "row": 3, "column": 2, "definitionId": "mind:work:3", "file": "mind-work-3-planner.webp" },
+      { "row": 3, "column": 3, "definitionId": "mind:work:4", "file": "mind-work-4-tidy-desk.webp" }
+    ]},
+    { "id": "sheet-f", "cells": [
+      { "row": 0, "column": 0, "definitionId": "mind:work:5", "file": "mind-work-5-project-station.webp" },
+      { "row": 0, "column": 1, "definitionId": "mind:work:6", "file": "mind-work-6-calm-command-centre.webp" },
+      { "row": 0, "column": 2, "definitionId": "mind:books:1", "file": "mind-books-1-bookmark.webp" },
+      { "row": 0, "column": 3, "definitionId": "mind:books:2", "file": "mind-books-2-pocket-book.webp" },
+      { "row": 1, "column": 0, "definitionId": "mind:books:3", "file": "mind-books-3-story-stack.webp" },
+      { "row": 1, "column": 1, "definitionId": "mind:books:4", "file": "mind-books-4-reading-nook.webp" },
+      { "row": 1, "column": 2, "definitionId": "mind:books:5", "file": "mind-books-5-library-cart.webp" },
+      { "row": 1, "column": 3, "definitionId": "mind:books:6", "file": "mind-books-6-wonder-library.webp" },
+      { "row": 2, "column": 0, "definitionId": "creative:art:1", "file": "creative-art-1-pencil.webp" },
+      { "row": 2, "column": 1, "definitionId": "creative:art:2", "file": "creative-art-2-sketchbook.webp" },
+      { "row": 2, "column": 2, "definitionId": "creative:art:3", "file": "creative-art-3-paint-set.webp" },
+      { "row": 2, "column": 3, "definitionId": "creative:art:4", "file": "creative-art-4-easel.webp" },
+      { "row": 3, "column": 0, "definitionId": "creative:art:5", "file": "creative-art-5-studio-corner.webp" },
+      { "row": 3, "column": 1, "definitionId": "creative:art:6", "file": "creative-art-6-gallery-of-dreams.webp" },
+      { "row": 3, "column": 2, "definitionId": "creative:screen:1", "file": "creative-screen-1-game-token.webp" },
+      { "row": 3, "column": 3, "definitionId": "creative:screen:2", "file": "creative-screen-2-handheld-game.webp" }
+    ]},
+    { "id": "sheet-g", "cells": [
+      { "row": 0, "column": 0, "definitionId": "creative:screen:3", "file": "creative-screen-3-console.webp" },
+      { "row": 0, "column": 1, "definitionId": "creative:screen:4", "file": "creative-screen-4-cosy-game-setup.webp" },
+      { "row": 0, "column": 2, "definitionId": "creative:screen:5", "file": "creative-screen-5-arcade-corner.webp" },
+      { "row": 0, "column": 3, "definitionId": "creative:screen:6", "file": "creative-screen-6-pixel-palace.webp" }
+    ]}
+  ]
+}

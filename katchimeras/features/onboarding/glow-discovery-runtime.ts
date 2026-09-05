@@ -23,20 +23,26 @@ export function startGlowDiscovery() {
   return pending;
 }
 
-export function useGlowDiscovery() {
-  const [run, setRun] = useState<ContentFlowRun | null>(null);
+export function useGlowDiscoveryState() {
+  const [state, setState] = useState<{ run: ContentFlowRun | null; ready: boolean }>({ run: null, ready: false });
   useEffect(() => {
     let alive = true;
     let revision = 0;
     const refresh = () => {
       const request = ++revision;
-      void loadContentFlowRun(GLOW_DISCOVERY_RUN_ID).then((next) => { if (alive && request === revision) setRun(next); }).catch(() => { /* Keep the last durable view; the next journal event retries. */ });
+      void loadContentFlowRun(GLOW_DISCOVERY_RUN_ID).then((next) => { if (alive && request === revision) setState({ run: next, ready: true }); }).catch(() => {
+        if (alive && request === revision) setState((previous) => ({ ...previous, ready: true }));
+      });
     };
     refresh();
     const unsubscribe = subscribeContentFlowJournal(refresh);
     return () => { alive = false; unsubscribe(); };
   }, []);
-  return run;
+  return state;
+}
+
+export function useGlowDiscovery() {
+  return useGlowDiscoveryState().run;
 }
 
 export async function submitGlowAction(actionId: string) {

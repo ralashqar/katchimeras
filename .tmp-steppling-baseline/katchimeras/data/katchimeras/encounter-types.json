@@ -1,0 +1,37 @@
+[
+  {
+    "id": "location",
+    "title": "Location",
+    "description": "Triggered mostly by where the user went.",
+    "recommendedWeight": 0.7,
+    "examples": ["park", "coffee_shop", "museum", "mall", "basketball_court"]
+  },
+  {
+    "id": "activity",
+    "title": "Activity",
+    "description": "Triggered by what the user did, especially movement intensity or workout type.",
+    "recommendedWeight": 0.15,
+    "examples": ["run_session", "high_steps_day", "night_walk"]
+  },
+  {
+    "id": "landmark",
+    "title": "Landmark",
+    "description": "Triggered by notable rare places, especially globally recognizable landmarks.",
+    "recommendedWeight": 0.1,
+    "examples": ["eiffel_tower", "shibuya_crossing", "golden_gate_bridge"]
+  },
+  {
+    "id": "routine",
+    "title": "Routine",
+    "description": "Triggered by repeated patterns or meaningful loops across days.",
+    "recommendedWeight": 0.05,
+    "examples": ["coffee_commute", "weekly_market_loop", "home_recovery_day"]
+  },
+  {
+    "id": "special",
+    "title": "Special",
+    "description": "Reserved for seasonal events, campaigns, or future one-off unlocks.",
+    "recommendedWeight": 0,
+    "examples": ["spring_event", "festival_day", "holiday_market"]
+  }
+]
