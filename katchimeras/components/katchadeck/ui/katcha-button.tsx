@@ -86,7 +86,7 @@ export function KatchaButton({
             <View style={[styles.labelRow, cost && styles.costRow]}>
               <View style={[styles.labelRow, cost && styles.actionGroup]}>
                 {loading ? <ActivityIndicator color={foreground} size="small" /> : null}
-                {icon && !loading ? <IconSymbol color={foreground} name={icon} size={size === 'compact' ? 15 : 17} /> : null}
+                {icon && icon !== 'sparkles' && !loading ? <IconSymbol color={foreground} name={icon} size={size === 'compact' ? 15 : 17} /> : null}
                 <ThemedText style={[styles.label, size === 'compact' && styles.compactLabel]} lightColor={foreground} darkColor={foreground}>{label}</ThemedText>
               </View>
               {cost ? <View style={styles.currencyGroup}>

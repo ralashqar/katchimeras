@@ -7,7 +7,7 @@ import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-
 const UPGRADE_ART = require('../../../assets/images/katchimeras/world/ui/upgrade-toy-v1.png');
 const CLEAR_MIST_ART = require('../../../assets/images/katchimeras/world/ui/clear-mist-toy-v1.png');
 const MARKER_SIZE = 68;
-const MARKER_TILE_WIDTH_RATIO = 0.18;
+const MARKER_TILE_WIDTH_RATIO = 0.15;
 
 export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY, sceneWidth, sceneHeight, moving, onPress, onTargetChange }: {
   offer: WorldUpgradeOffer; frame: { left: number; top: number; width: number; height: number };
@@ -27,8 +27,8 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   // Keep the overlay above plants, but size its entire visual and hit target in
   // world space so the bubble retains its proportions at every camera zoom.
   const projection = useAnimatedStyle(() => ({ transform: [
-    { translateX: sceneWidth / 2 + cameraX.value + (frame.left + frame.width / 2 - sceneWidth / 2) * cameraScale.value - 34 },
-    { translateY: sceneHeight / 2 + cameraY.value + (frame.top + frame.height * 0.72 - sceneHeight / 2) * cameraScale.value - 34 },
+    { translateX: sceneWidth / 2 + cameraX.value + (frame.left + frame.width / 2 - sceneWidth / 2) * cameraScale.value - MARKER_SIZE / 2 },
+    { translateY: sceneHeight / 2 + cameraY.value + (frame.top + frame.height * 0.72 - sceneHeight / 2) * cameraScale.value - MARKER_SIZE / 2 },
   ] }));
   const motion = useAnimatedStyle(() => ({ transform: [{
     scale: frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value,
@@ -49,7 +49,9 @@ const styles = StyleSheet.create({
   position: { position: 'absolute', left: 0, top: 0, width: 68, height: 68, zIndex: 18 },
   bubble: { width: 68, minHeight: 68, alignItems: 'center', justifyContent: 'center', padding: 2, borderRadius: 18,
     backgroundColor: '#FFF3D0', borderWidth: 2, borderColor: '#D6AF62', boxShadow: '0 3px 5px rgba(67,43,18,0.24), inset 0 2px 0 #FFFBEF' },
-  tail: { position: 'absolute', top: -6, left: 28, width: 12, height: 12, transform: [{ rotate: '45deg' }], backgroundColor: '#FFF3D0', borderTopWidth: 2, borderLeftWidth: 2, borderColor: '#D6AF62' },
-  icon: { width: 60, height: 60 },
+  // Absolute offsets originate inside the 2px rim. Center the diamond on the
+  // top border so its lower half covers the seam and its upper edges join it.
+  tail: { position: 'absolute', top: -8, left: '50%', marginLeft: -6, width: 12, height: 12, transform: [{ rotate: '45deg' }], backgroundColor: '#FFF3D0', borderTopWidth: 2, borderLeftWidth: 2, borderColor: '#D6AF62' },
+  icon: { width: 50, height: 50 },
   pressed: { transform: [{ scale: 0.96 }] },
 });

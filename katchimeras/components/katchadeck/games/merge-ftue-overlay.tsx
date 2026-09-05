@@ -261,10 +261,6 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
     <View
       pointerEvents="box-none"
       style={styles.overlay}>
-      {practice && guideKey ? <Pressable accessibilityRole="button" accessibilityLabel="Show merge hint"
-        onPress={() => setHintKey(guideKey)} style={styles.hintButton}>
-        <ThemedText style={styles.hintLabel}>Show hint</ThemedText>
-      </Pressable> : null}
       {!spotlightDismissed ? (
         <FtueSpotlight
           frames={showSpotlight ? currentLayout?.spotlightFrames ?? [] : []}
@@ -819,8 +815,6 @@ function measureView(view: View | null): Promise<Frame | null> {
 }
 
 const styles = StyleSheet.create({
-  hintButton: { position: 'absolute', top: 64, right: 16, minHeight: 44, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 16, backgroundColor: '#FFF9E9', zIndex: 3 },
-  hintLabel: { color: '#35422F', fontSize: 14, fontWeight: '700' },
   overlay: { ...StyleSheet.absoluteFillObject, zIndex: 250 },
   guideDismissLayer: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
   hand: { position: 'absolute', zIndex: 4 },

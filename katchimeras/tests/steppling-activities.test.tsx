@@ -181,6 +181,7 @@ test('ready steps wait for a tap, then use the original row reward and exit sequ
   let began = 0;
   let rewards = 0;
   let finished = 0;
+  let removalSignals = 0;
   let arrive = () => {};
   const module = loadNativeModule('components/katchadeck/ui/day-action-goal-row.tsx', {
     'react-native': { ...nativeViews, Pressable: 'Pressable' },
@@ -189,6 +190,7 @@ test('ready steps wait for a tap, then use the original row reward and exit sequ
     '@/components/katchadeck/goals/goal-completion-celebration': { GoalCompletionCelebration: 'Celebration' },
     './day-action-card': { DayActionCardSurface: 'Card', DayActionCompletedTick: 'Tick' },
     './day-action-row': { DayActionActiveRow: 'ActiveRow' },
+    '@/hooks/use-companion-stack-layout': { useCompanionStackRemoval: () => () => { removalSignals++; } },
   }, { process: { env: { EXPO_OS: 'web' } }, setTimeout: (callback: () => void, delay: number) => { timers.set(++timerId, { callback, delay }); return timerId; }, clearTimeout: (id: number) => timers.delete(id) });
   const Row = module.DayActionGoalRow as React.ComponentType<Record<string, unknown>>;
   const props = { animateLayout: true, entryDelayMs: 0, artwork: null, title: 'Walk 500 steps', label: 'Walk 500 steps', hideCompletionControl: true,
@@ -206,8 +208,10 @@ test('ready steps wait for a tap, then use the original row reward and exit sequ
   await act(async () => { [...timers.values()].find((timer) => timer.delay === 190)!.callback(); motion.advance(1000); });
   assert.equal(rewards, 1);
   assert.equal(finished, 0, 'replacement waits for the reward arrival');
+  assert.equal(removalSignals, 0, 'the stack is not armed during the reward flight');
   await act(async () => arrive());
   assert.equal(finished, 1);
+  assert.equal(removalSignals, 1, 'goal completion arms reflow immediately before removing the card');
   await act(async () => tree!.unmount());
   await act(async () => { tree = create(<Row {...props} completeOnPress
     onCompletionRequest={(_source: unknown, _arrive: () => void, fail: () => void) => fail()} />); });
@@ -216,6 +220,7 @@ test('ready steps wait for a tap, then use the original row reward and exit sequ
   assert.equal(timers.size, 0, 'failed saves cancel the success watchdog');
   await act(async () => motion.advance(4000));
   assert.equal(finished, 1, 'a failed save never finishes the completion presentation');
+  assert.equal(removalSignals, 1, 'failed completion cannot arm a later page transition');
   assert.equal(tree!.root.findByType('Pressable' as React.ElementType).props.disabled, false, 'the same action can be retried');
   await act(async () => tree!.unmount());
 });

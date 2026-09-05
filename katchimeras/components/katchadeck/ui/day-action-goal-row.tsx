@@ -17,6 +17,7 @@ import { GoalCompletionCelebration } from '@/components/katchadeck/goals/goal-co
 
 import { DayActionCardSurface, DayActionCompletedTick } from './day-action-card';
 import { DayActionActiveRow, type DayActionSourceRect } from './day-action-row';
+import { useCompanionStackRemoval } from '@/hooks/use-companion-stack-layout';
 
 const REWARD_REQUEST_DELAY_MS = 190;
 const COMPLETION_WATCHDOG_MS = 3_200;
@@ -65,6 +66,8 @@ export function DayActionGoalRow({
   subtitle?: string;
 }) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  // DayActionActiveRow registers this card; this hook only signals its removal.
+  const prepareRemoval = useCompanionStackRemoval(false);
   const reduceMotion = useReducedMotion();
   const rewardRef = useRef<ViewType | null>(null);
   const completionControlRef = useRef<ViewType | null>(null);
@@ -112,8 +115,9 @@ export function DayActionGoalRow({
   const finishIfReady = useCallback(() => {
     if (finishedRef.current || !exitFinishedRef.current || !rewardArrivedRef.current) return;
     finishedRef.current = true;
+    if (animateLayout) prepareRemoval?.();
     onFinishedRef.current?.();
-  }, []);
+  }, [animateLayout, prepareRemoval]);
   const markExitFinished = useCallback(() => {
     exitFinishedRef.current = true;
     finishIfReady();

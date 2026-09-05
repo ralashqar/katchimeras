@@ -194,8 +194,8 @@ for (const reducedMotion of [false, true]) {
     const Host = overlay.CompanionSceneOverlayHost as React.ComponentType<{ children: React.ReactNode }>;
     const Overlay = overlay.CompanionSceneOverlay as React.ComponentType<{ visible: boolean; children: React.ReactNode }>;
     const render = (removed: boolean) => <Host>
-      <RemovalSignal index={0} />{React.createElement('SurvivingCard')}{removed ? null : React.createElement('ExitingCard')}
-      <Overlay visible><RemovalSignal index={1} />{React.createElement('GrowCards')}{removed ? null : React.createElement('ExitingGrowCard')}</Overlay>
+      <RemovalSignal index={0} />{React.createElement('SurvivingCard')}{removed ? null : <><RemovalSignal index={2} />{React.createElement('ExitingCard')}</>}
+      <Overlay visible><RemovalSignal index={1} />{React.createElement('GrowCards')}{removed ? null : <><RemovalSignal index={3} />{React.createElement('ExitingGrowCard')}</>}</Overlay>
     </Host>;
     let tree: ReactTestRenderer;
     await act(async () => { tree = create(render(false)); });
@@ -236,22 +236,31 @@ for (const reducedMotion of [false, true]) {
     assert.equal(tree!.root.findByType('GrowCards' as React.ElementType), grow);
 
     await act(async () => { removals[0](); measure(0, 180); });
-    await act(async () => clock.advance(duration / 2));
-    assert.equal(footprint(0), 200);
-    await act(async () => { removals[0](); measure(0, 140); });
-    assert.equal(footprint(0), 200, 'a second removal starts from the visible height');
-    await act(async () => clock.advance(duration));
+    assert.equal(footprint(0), 180, 'a signal without a removed card must not animate unrelated layout');
+    await act(async () => measure(0, 140));
     assert.equal(footprint(0), 140);
     await act(async () => measure(0, 140));
     assert.equal(footprint(0), 140, 'equal-sized replacements leave the footprint stable');
     await act(async () => measure(0, 250));
     assert.equal(footprint(0), 250, 'opening a new panel uses its final height immediately');
+    await act(async () => {
+      removals[0]();
+      tree!.update(<Host>{React.createElement('ContinueCta')}</Host>);
+    });
     await act(async () => measure(0, 64));
     assert.equal(footprint(0), 64, 'switching to Continue does not slide down from the previous panel height');
+    await act(async () => {
+      tree!.update(<Host><RemovalSignal key="old-page" index={0} /></Host>);
+    });
+    await act(async () => measure(0, 200));
+    await act(async () => {
+      removals[0]();
+      tree!.update(<Host><RemovalSignal key="new-page" index={0} /></Host>);
+    });
+    await act(async () => measure(0, 100));
+    assert.equal(footprint(0), 100, 'new page cards never inherit the old page’s removal animation');
     await act(async () => measure(0, 180, 500));
     assert.equal(footprint(0), 180, 'orientation changes lay out at the new width immediately');
-    await act(async () => measure(1, 0));
-    assert.equal(footprint(1), 0, 'a dismissed submenu does not leave a shrinking empty overlay');
     await act(async () => tree!.unmount());
   });
 }

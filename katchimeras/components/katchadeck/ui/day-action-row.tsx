@@ -122,6 +122,9 @@ export function DayActionActiveRow({
   onSkip?: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  const prepareRemoval = useCompanionStackRemoval();
+  // The stack owns removal reflow; native row transitions also animate
+  // unrelated page measurements and can double the parent's motion.
   const entryAnimation = !enteringEnabled
     ? undefined
     : reduceMotion
@@ -132,13 +135,13 @@ export function DayActionActiveRow({
       disabled={disabled}
       externalGesture={externalGesture}
       label={label}
-      onDismiss={onSkip}>
+      onDismiss={() => { if (animateLayout) prepareRemoval?.(); onSkip(); }}>
       {children}
     </DayActionSwipeShell>
   ) : children;
 
   return (
-    <Animated.View layout={animateLayout ? LinearTransition.duration(reduceMotion ? 100 : DAY_ACTION_MOTION.layoutDurationMs).easing(Easing.inOut(Easing.cubic)) : undefined}>
+    <Animated.View layout={animateLayout && !prepareRemoval ? LinearTransition.duration(reduceMotion ? 100 : DAY_ACTION_MOTION.layoutDurationMs).easing(Easing.inOut(Easing.cubic)) : undefined}>
       <Animated.View entering={entryAnimation}>
         {content}
       </Animated.View>
@@ -393,7 +396,7 @@ export function DayActionCompletedRow({
   return (
     <Animated.View
       entering={entryAnimation}
-      layout={animateLayout ? LinearTransition.duration(reduceMotion ? 100 : DAY_ACTION_MOTION.layoutDurationMs).easing(Easing.inOut(Easing.cubic)) : undefined}
+      layout={animateLayout && !prepareRemoval ? LinearTransition.duration(reduceMotion ? 100 : DAY_ACTION_MOTION.layoutDurationMs).easing(Easing.inOut(Easing.cubic)) : undefined}
       style={[styles.motionViewport, motionViewportStyle]}>
       <Animated.View style={[styles.completedRow, rowStyle]}>
         <DayActionCardSurface

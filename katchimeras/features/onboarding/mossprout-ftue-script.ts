@@ -149,14 +149,14 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   steps: [
     {
       id: 'world.egg_intro', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Meet Mossprout', title: COPY.opening, body: '' },
+      guide: { eyebrow: 'A new friend', title: COPY.opening, body: '' },
       actions: [{ id: 'world.inspect_mossprout_egg', title: 'Say hello', description: 'Move closer and see how the Egg responds.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'egg.opening' }],
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM, anchorY: 0.5, durationMs: 3_900 },
     },
     ...openingQuestionSteps,
     {
       id: 'egg.ready', surface: 'haven',
-      guide: { eyebrow: 'Meet Mossprout', title: 'Someone’s waking up.', body: '' },
+      guide: { eyebrow: 'A new friend', title: 'Someone’s waking up.', body: '' },
       actions: [{ id: 'egg.hatch', title: 'Meet your Katchimera', description: 'Meet the Katchimera inside.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'discovery_hatch', nextStepId: 'companion.first_meeting', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.ready'), anchorY: 0.5, durationMs: 520 },
