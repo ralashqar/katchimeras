@@ -50,6 +50,7 @@ export function useCompanionConversationFlow({
   const automatedRef = useRef(new Set<string>());
   const node = definition && session ? conversationNode(definition, session.currentNodeId) : null;
   const journeyNarrative = definition?.purpose === 'journey' && definition.format === 'narrative';
+  const trailChat = Boolean(definition?.id.startsWith('steppling:trail-chat:'));
   const directResidentParcelHandoff = definition?.id === 'mossprout:game:form-finder'
     && !session?.preview;
   const journeyNarrativeAdvanceReady = Boolean(
@@ -102,13 +103,13 @@ export function useCompanionConversationFlow({
   }, [directResidentParcelHandoff, node, onContinue, session]);
 
   useLayoutEffect(() => {
-    if (!skipCompletedTransition || (screenReaderEnabled && !directResidentParcelHandoff) || !session || !definition || session.outcomePresentation) return;
+    if (!(skipCompletedTransition || trailChat) || (screenReaderEnabled && !directResidentParcelHandoff && !trailChat) || !session || !definition || session.outcomePresentation) return;
     if (session.status !== 'completed') return;
     const key = `${session.id}:complete`;
     if (automatedRef.current.has(key)) return;
     automatedRef.current.add(key);
     onComplete();
-  }, [definition, directResidentParcelHandoff, node?.kind, onComplete, screenReaderEnabled, session, skipCompletedTransition]);
+  }, [definition, directResidentParcelHandoff, node?.kind, onComplete, screenReaderEnabled, session, skipCompletedTransition, trailChat]);
 
   useEffect(() => {
     if (!session || !definition || session.preview) return;
@@ -134,7 +135,7 @@ export function useCompanionConversationFlow({
     }
 
     if (session.outcomePresentation) {
-      if (screenReaderEnabled || outcomeRequiresManualAdvance) return;
+      if (screenReaderEnabled || outcomeRequiresManualAdvance || trailChat) return;
       const copy = `${session.outcomePresentation.title} ${session.outcomePresentation.message}`;
       const timer = setTimeout(
         onDismissOutcome,
@@ -182,7 +183,7 @@ export function useCompanionConversationFlow({
       }, reduceMotion ? 0 : 360);
       return () => clearTimeout(timer);
     }
-  }, [definition, directResidentParcelHandoff, journeyNarrative, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, outcomeAutoAdvanceMs, outcomeRequiresManualAdvance, reduceMotion, screenReaderEnabled, session, skipCompletedTransition]);
+  }, [definition, directResidentParcelHandoff, journeyNarrative, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, outcomeAutoAdvanceMs, outcomeRequiresManualAdvance, reduceMotion, screenReaderEnabled, session, skipCompletedTransition, trailChat]);
 
   const advance = useCallback(() => {
     if (!session || !definition) return;
@@ -209,6 +210,6 @@ export function useCompanionConversationFlow({
   return {
     advance,
     phase,
-    requiresManualAdvance: (screenReaderEnabled || journeyNarrativeAdvanceReady || (outcomeRequiresManualAdvance && Boolean(session?.outcomePresentation))) && phase !== 'awaiting_choice' && phase !== 'committing',
+    requiresManualAdvance: (screenReaderEnabled || journeyNarrativeAdvanceReady || ((outcomeRequiresManualAdvance || trailChat) && Boolean(session?.outcomePresentation))) && phase !== 'awaiting_choice' && phase !== 'committing',
   };
 }

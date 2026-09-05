@@ -50,6 +50,7 @@ import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-
 import { buildMossproutHexNeighborhoodScene, mossproutGardenPlantSlotFrame, MOSSPROUT_GARDEN_PLANT_SLOT_IDS, type MossproutGardenSceneState } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
 import { SeamlessWorldImage, worldImageSourceKey } from '@/components/katchadeck/world/seamless-world-image';
 import { CreatureAnimatedArt } from '@/components/katchadeck/world/creature-animated-art';
+import { CompanionStepsValue } from '@/components/katchadeck/world/companion-steps-value';
 import { worldEggReadyEffectsVisible, type WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
@@ -795,7 +796,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         }
       : undefined,
     minimumScale: focusedMossproutWorld ? 0.28 : undefined,
-    maximumScale: cameraMaximumScale,
+    maximumScale: selectedUpgradeOffer && !preserveUpgradeCamera || upgradePresentation
+      ? Math.max(cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale, 3)
+      : cameraMaximumScale,
     onSnapshotChange: onCameraSnapshotChange,
     onMotionChange: onCameraMotionChange,
     scene,
@@ -953,7 +956,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       upgradeCameraCommitted.current = false;
       upgradeFocusId.current = selectedUpgradeOffer.id;
       const frame = storyTargetFrame(selectedUpgradeOffer.visualTarget);
-      if (frame) focusInteractionTile(frame, { durationMs: reduceMotion ? 80 : 440, horizontalPadding: 48, verticalPadding: 150, screenCenterY: viewport.height * 0.3 });
+      if (frame) focusInteractionTile(frame, {
+        durationMs: reduceMotion ? 80 : 440,
+        horizontalPadding: 16,
+        verticalPadding: 56,
+        screenCenterY: viewport.height / 2,
+      });
     } else if (upgradeFocusId.current) {
       const origin = upgradeOrigin.current;
       if (origin && !upgradeCameraCommitted.current) animateToCameraSnapshot(origin, reduceMotion ? 80 : 440);
@@ -2736,6 +2744,7 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
               />
             </Animated.View>
           ) : null}
+          {creature.visualKey === 'steppling' ? <CompanionStepsValue /> : null}
         </Animated.View>
       </Animated.View>
     </Animated.View>

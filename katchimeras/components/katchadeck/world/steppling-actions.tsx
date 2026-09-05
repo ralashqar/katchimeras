@@ -8,17 +8,16 @@ import { claimActionPresentation, dismissActionPresentation } from '@/game/katch
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
 import { loadCompanionContentState } from '@/utils/companion-content-storage';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
-import { Pedometer } from 'expo-sensors';
+import { useCompanionSteps } from '@/hooks/use-companion-steps';
 import type { GestureType } from 'react-native-gesture-handler';
 import { DayActionCardSurface, DayActionRewardChip } from '@/components/katchadeck/ui/day-action-card';
 import { DayActionGoalRow } from '@/components/katchadeck/ui/day-action-goal-row';
 import { DayActionActiveRow, DayActionCompletedRow, DayActionReplacementSlot, DAY_ACTION_MOTION, type DayActionSourceRect } from '@/components/katchadeck/ui/day-action-row';
 import { katchimeraActionArt } from '@/constants/katchimera-action-art';
 import { STEPPLING_TRAIL_CHATS } from '@/constants/steppling-activities';
-import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
 import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { loadCompanionLife } from '@/utils/companion-life-storage';
@@ -27,11 +26,6 @@ import { localDayId } from '@/utils/world-identity';
 import { type CompanionMergeRequest } from './companion-merge-request-tray';
 
 const chatId = (chat: typeof STEPPLING_TRAIL_CHATS[number]) => `steppling:trail-chat:${chat.id}`;
-function todaySteps(dayId: string) {
-  const home = homeRepository.load();
-  const day = home && [home.today, ...home.archivedDays].find((item) => (item.stepsCountDayId ?? item.isoDate) === dayId);
-  return Math.max(0, day?.stepsCount ?? 0);
-}
 export function StepplingActions({ onReaction, onOpenConversation, requests, onOpenMerge, onSubmenuChange, onStory, storyLabel, onBondRewardRequest, externalGesture }: {
   onReaction?: (text: string) => void;
   onOpenConversation?: (definitionId: string, origin: KatchimeraActionOrigin) => void;
@@ -40,47 +34,14 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
   onBondRewardRequest?: (source: DayActionSourceRect, onArrive: () => void, receipt?: CompanionBondAwardReceipt) => void;
   externalGesture?: GestureType;
 }) {
-  const [dayId, setDayId] = useState(localDayId);
-  const [reading, setReading] = useState(() => ({ dayId: localDayId(), steps: todaySteps(localDayId()) }));
+  const { dayId, steps, refresh: syncSteps } = useCompanionSteps();
   const [bond, setBond] = useState(loadCompanionBondState);
   const relationships = useRelationshipProgression();
   const [completing, setCompleting] = useState<{ dayId: string; steps: number; bond: number } | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const syncing = useRef(false);
   const claimedSteps = useRef<number | null>(null);
-  const mounted = useRef(true);
-  const syncSteps = useCallback(async () => {
-    if (syncing.current) return;
-    syncing.current = true;
-    const day = localDayId();
-    setDayId(day);
-    let steps = todaySteps(day);
-    try {
-      const available = await Pedometer.isAvailableAsync();
-      const permission = available ? await Pedometer.getPermissionsAsync() : null;
-      if (permission?.granted) {
-        const start = new Date(); start.setHours(0, 0, 0, 0);
-        steps = Math.max(steps, (await Pedometer.getStepCountAsync(start, new Date())).steps);
-      }
-    } catch { /* Keep the latest stored reading when the pedometer is unavailable. */ }
-    finally {
-      if (mounted.current && day === localDayId()) {
-        setReading((old) => ({ dayId: day, steps: Math.max(steps, old.dayId === day ? old.steps : 0) }));
-      }
-      syncing.current = false;
-    }
-  }, []);
-  useEffect(() => {
-    mounted.current = true;
-    void syncSteps();
-    const home = homeRepository.subscribe(() => { void syncSteps(); });
-    const bonds = subscribeCompanionBondState(() => setBond(loadCompanionBondState()));
-    const app = AppState.addEventListener('change', (state) => { if (state === 'active') void syncSteps(); });
-    const timer = setInterval(() => { if (AppState.currentState === 'active') void syncSteps(); }, 30000);
-    return () => { mounted.current = false; home(); bonds(); app.remove(); clearInterval(timer); };
-  }, [syncSteps]);
+  useEffect(() => subscribeCompanionBondState(() => setBond(loadCompanionBondState())), []);
   const goal = completing ?? nextStepplingMilestone(bond, dayId);
-  const steps = reading.dayId === dayId ? reading.steps : 0;
   const ready = Boolean(goal && steps >= goal.steps);
   const content = loadCompanionContentState();
   // Respect the previous release's saved answers without maintaining a second chat engine.

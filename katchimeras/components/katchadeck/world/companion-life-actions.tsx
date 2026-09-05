@@ -1,4 +1,5 @@
 import { CompanionSceneOverlayHost, CompanionSlidingSubmenu } from './companion-scene-overlay';
+import { CompanionStepsValue } from './companion-steps-value';
 import { chooseCompanionTask } from '@/utils/companion-task-slot';
 import type { CompanionQuickGoal } from '@/utils/companion-quick-goals';
 import { Image } from 'expo-image';
@@ -100,6 +101,7 @@ function CompanionJournalSheet({ familyId, onClose, onVisitSeed }: { familyId: L
       </View>
       <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, gap: 16 }}>
         {error ? <JournalCopy>{error}</JournalCopy> : null}
+        {filter === 'all' || filter === 'mossprout' ? <CompanionStepsValue journal /> : null}
         {!entries.length ? <JournalCopy>Our story starts with the little things you share. They’ll be here to revisit.</JournalCopy> : null}
         {entries.map((entry) => <View key={entry.id} style={{ padding: 16, gap: 10, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#F4ECD9' }}>
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: expanded === entry.id }} onPress={() => { setExpanded(expanded === entry.id ? null : entry.id); setEditing(null); }} style={{ gap: 7, minHeight: 48 }}>

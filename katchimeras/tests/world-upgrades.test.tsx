@@ -156,6 +156,8 @@ test('completed mist and max-level islands no longer expose upgrade offers', () 
 test('every upgrade holds the old world before spending and replays its receipt-backed reveal', () => {
   for (const flow of WORLD_UPGRADE_FLOWS) {
     assert.deepEqual(validateContentFlowDefinition(flow), [], flow.id);
+    const approach = flow.nodes.find((node) => node.id === 'approach')!;
+    assert.equal(approach.kind === 'presentation' && approach.payload?.operation, 'preserve', 'confirmation keeps the marker close-up');
     const hold = flow.nodes.find((node) => node.id === 'upgrade.focus')!;
     assert.equal(hold.kind === 'presentation' && hold.payload?.holdWorldState, true);
     const commit = flow.nodes.find((node) => node.id === 'upgrade.commit')!;

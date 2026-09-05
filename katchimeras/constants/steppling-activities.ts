@@ -1,7 +1,7 @@
 import type { ConversationDefinition } from '@/types/companion-conversation';
 export const STEPPLING_STEP_MILESTONES = [
-  { steps: 500, bond: 5 }, { steps: 2000, bond: 8 }, { steps: 4000, bond: 12 },
-  { steps: 6000, bond: 16 }, { steps: 10000, bond: 20 },
+  { steps: 500, bond: 1 }, { steps: 2000, bond: 2 }, { steps: 4000, bond: 3 },
+  { steps: 6000, bond: 4 }, { steps: 10000, bond: 5 },
 ] as const;
 
 export const STEPPLING_TRAIL_CHATS = [

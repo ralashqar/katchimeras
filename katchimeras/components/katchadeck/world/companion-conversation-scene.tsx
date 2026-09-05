@@ -182,6 +182,8 @@ export function CompanionConversationScene({
     safeAreaTop: insets.top,
     viewportHeight: height,
   });
+  const singleResultCard = Boolean(session.outcomePresentation && definition.id.startsWith('steppling:trail-chat:'));
+  const NarrativeContainer = singleResultCard ? View : CompanionNarrativePanel;
   const standaloneContinue = !session.outcomePresentation && !developerContent && (
     (session.status === 'completed' && !session.preview)
     || (session.pendingReply !== undefined && journeyNarrative)
@@ -216,15 +218,15 @@ export function CompanionConversationScene({
       <View accessibilityElementsHidden pointerEvents="none" style={{ flex: 1, minHeight: 120 }} />
 
       {standaloneContinue ? (session.status === 'completed'
-        ? definition.id === 'steppling:journey:day-one' && definition.version >= 3 ? null
+        ? (definition.id === 'steppling:journey:day-one' && definition.version >= 3) || definition.id.startsWith('steppling:trail-chat:') ? null
           : <PrimaryAction label="Continue" onPress={onCompletedExit} />
         : requiresManualAdvance ? <PrimaryAction
         label={node?.kind === 'end' && journeyNarrative ? 'Finish Journey' : 'Continue'}
-        onPress={onAdvance} /> : null) : <CompanionNarrativePanel
+        onPress={onAdvance} /> : null) : <NarrativeContainer
         accessibilityLabel={`Conversation ${flowPhase.replace('_', ' ')}`}
         style={{
           height: adaptivePanel.panelHeight,
-          paddingTop: showConversationProgress ? 12 : 8,
+          paddingTop: singleResultCard ? 0 : showConversationProgress ? 12 : 8,
         }}>
         {showConversationProgress ? <>
           <View style={{ alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' }}>
@@ -253,6 +255,7 @@ export function CompanionConversationScene({
           style={{ flex: 1, minHeight: 0 }}>
         {session.outcomePresentation ? (
           <ConversationOutcomeCard
+            inlineContinue={definition.id.startsWith('steppling:trail-chat:')}
             outcome={session.outcomePresentation}
             onAdvance={onAdvance}
             requiresManualAdvance={requiresManualAdvance}
@@ -352,7 +355,7 @@ export function CompanionConversationScene({
         ) : null}
         {developerContent}
         </ScrollView>
-      </CompanionNarrativePanel>}
+      </NarrativeContainer>}
     </View>
   );
 }
@@ -410,10 +413,11 @@ function conversationPrompt(
   return prompt.replace('{answer}', answer ?? 'that');
 }
 
-function ConversationOutcomeCard({ outcome, onAdvance, requiresManualAdvance }: {
+function ConversationOutcomeCard({ outcome, onAdvance, requiresManualAdvance, inlineContinue = false }: {
   outcome: ConversationOutcomePresentation;
   onAdvance: () => void;
   requiresManualAdvance: boolean;
+  inlineContinue?: boolean;
 }) {
   return <Animated.View entering={FadeInUp.duration(240)} style={{ gap: 11 }}>
     <View style={{ backgroundColor: KatchaUI.companionScenePanel.cardBackground, borderColor: 'rgba(168,117,47,0.34)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, boxShadow: '0 9px 24px rgba(112,76,30,0.13)', gap: 8, padding: 17 }}>
@@ -429,8 +433,9 @@ function ConversationOutcomeCard({ outcome, onAdvance, requiresManualAdvance }: 
         <IconSymbol color="#6F7E3E" name="checkmark.circle.fill" size={17} />
         <ThemedText selectable style={{ flex: 1, fontSize: 13, fontWeight: '800', lineHeight: 18 }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{item}</ThemedText>
       </View>)}
+      {requiresManualAdvance && inlineContinue ? <PrimaryAction label="Continue" onPress={onAdvance} /> : null}
     </View>
-    {requiresManualAdvance ? <PrimaryAction label="Continue" onPress={onAdvance} /> : null}
+    {requiresManualAdvance && !inlineContinue ? <PrimaryAction label="Continue" onPress={onAdvance} /> : null}
   </Animated.View>;
 }
 

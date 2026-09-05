@@ -22,7 +22,7 @@ test('Steppling milestones require real progress, pay once in order, grow reward
   for (const goal of STEPPLING_STEP_MILESTONES) {
     assert.equal(nextStepplingMilestone(state, '2026-09-04')?.steps, goal.steps);
     const result = claimStepplingMilestone(state, '2026-09-04', goal.steps, 10000)!;
-    assert.ok(result.awarded); assert.ok(result.points > previousReward);
+    assert.ok(result.awarded); assert.equal(result.points, previousReward + 1);
     previousReward = result.points; state = result.state;
     assert.equal(claimStepplingMilestone(state, '2026-09-04', goal.steps, 10000), null);
   }
@@ -61,6 +61,10 @@ test('Steppling keeps the claimed row through its flight, restores Garden naviga
     '@/utils/companion-life-storage': { loadCompanionLife: () => ({ entries: [] }) },
     '@/utils/companion-content-storage': { loadCompanionContentState: () => ({ conversationSessions: sessions }) },
     '@/hooks/use-relationship-progression': { useRelationshipProgression: () => relationships },
+    '@/hooks/use-companion-steps': { useCompanionSteps: () => {
+      const [current, setCurrent] = React.useState(steps);
+      return { dayId: '2026-09-04', steps: current, available: true, refresh: async () => setCurrent(steps) };
+    } },
     '@/storage/repositories/relationship-progression-repository': { relationshipProgressionRepository: { update: (work: (state: typeof relationships) => typeof relationships) => { relationships = work(relationships); } } },
     '@/utils/world-identity': { localDayId: () => '2026-09-04' },
     './companion-garden-action': { CompanionGardenAction: ({ children, ...props }: { children: (card: React.ReactNode) => React.ReactNode }) => children(React.createElement('GardenCard', props)) },
@@ -70,7 +74,7 @@ test('Steppling keeps the claimed row through its flight, restores Garden naviga
   const Cards = module.StepplingActions as React.ComponentType<Record<string, unknown>>;
   let tree: ReactTestRenderer;
   let reaction = '';
-  const props = { onReaction: (text: string) => { reaction = text; }, onOpenConversation: (id: string, actionOrigin: KatchimeraActionOrigin) => { definitionId = id; origin = actionOrigin; }, requests: [{ id: 'order-one', title: 'A garden path', definitionIds: ['trail'], badge: '+8 Glow · 5 min sooner' }], onOpenMerge: (id: string) => opened.push(id), onBondRewardRequest: (_source: unknown, arrive: () => void, receipt: { points: number }) => { flights++; assert.ok([5, 8].includes(receipt.points)); finishFlight = arrive; } };
+  const props = { onReaction: (text: string) => { reaction = text; }, onOpenConversation: (id: string, actionOrigin: KatchimeraActionOrigin) => { definitionId = id; origin = actionOrigin; }, requests: [{ id: 'order-one', title: 'A garden path', definitionIds: ['trail'], badge: '+8 Glow · 5 min sooner' }], onOpenMerge: (id: string) => opened.push(id), onBondRewardRequest: (_source: unknown, arrive: () => void, receipt: { points: number }) => { flights++; assert.ok([1, 8].includes(receipt.points)); finishFlight = arrive; } };
   await act(async () => { tree = create(<Cards {...props} />); });
   const row = () => tree!.root.findByType('GoalRow' as React.ElementType);
   const press = async (label: string) => act(async () => { tree!.root.findAllByType('Pressable' as React.ElementType).find((item) => item.props.accessibilityLabel === label)!.props.onPress(); });
@@ -96,7 +100,7 @@ test('Steppling keeps the claimed row through its flight, restores Garden naviga
   assert.equal(arrived, 1);
   assert.match(reaction, /500 steps!/);
   assert.equal(row().props.title, 'Walk 2,000 steps');
-  assert.equal(row().props.reward.props.reward.amount, 8);
+  assert.equal(row().props.reward.props.reward.amount, 2);
   const garden = tree!.root.findByType('GardenCard' as React.ElementType);
   assert.equal(garden.props.familyId, 'steppling');
   assert.equal(garden.props.storyRequests[0].id, 'order-one');

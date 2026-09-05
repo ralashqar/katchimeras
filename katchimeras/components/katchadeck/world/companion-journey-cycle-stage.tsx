@@ -122,7 +122,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   const narration = error ?? reaction ?? (!initialized ? 'Finding our place…' : pending
     ? ready ? journeyReturnLine(cycle)
       : checkInOpen ? 'What have you made room for since we paused?'
-        : familyId === 'steppling' ? 'Steppling is resting. Your steps and small moments still count. The Garden is open.' : 'Mossprout is resting. Your day and the Garden are still open. Requests are optional; your gift is already earned.'
+        : familyId === 'steppling' ? 'Steppling is resting. Your steps and small moments still count. The Garden is open.' : 'Mossprout is resting. A little quiet, a little growing.'
     : (node?.kind === 'scene' || node?.kind === 'task') && node.payload?.text ? String(node.payload.text)
       : day ? 'Journey Day ' + day.number + ': ' + day.title + '. ' + STEPPLING_CHAPTER_PURPOSE
         : mossChapter?.purpose ?? 'Our chapter is remembered. There is still more to share.');

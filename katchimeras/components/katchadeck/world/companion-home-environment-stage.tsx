@@ -14,6 +14,7 @@ import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunbur
 import { resolveCreatureMeditationArtSource } from '@/utils/creature-art';
 
 import { CreatureAnimatedArt } from './creature-animated-art';
+import { CompanionStepsValue } from './companion-steps-value';
 
 const REWARD_GLOW_NATIVE_SURFACE_SCALE = 2;
 
@@ -192,6 +193,7 @@ export const CompanionHomeEnvironmentStage = memo(
                 />
               </Animated.View>
             ) : null}
+            {visualKey === 'steppling' ? <CompanionStepsValue /> : null}
           </Animated.View>
         </Animated.View> : null}
       </View>
