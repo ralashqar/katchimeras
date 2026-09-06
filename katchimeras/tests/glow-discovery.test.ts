@@ -346,7 +346,7 @@ test('shared-world tile layout and presentation keep one map and one Egg reveal'
   assert.equal(SHARED_WORLD_TILES['steppling-home'].residentVisible, false);
   assert.deepEqual(SHARED_WORLD_TILES['mossprout-home'].coord, { q: 0, r: 1 });
   const scene = readFileSync('components/katchadeck/world/mossprout-hex-neighborhood-scene.ts', 'utf8');
-  assert.match(scene, /boundsLayers = \[\.\.\.rawLayers, lockedSteppling, revealedSteppling\]/);
+  assert.match(scene, /boundsLayers = \[\.\.\.rawLayers, lockedSteppling, revealedSteppling, \.\.\.natureBoundsLayers\]/);
   assert.match(scene, /'residentVisible' in entry && !entry.residentVisible/);
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   assert.match(canvas, /tutorialCameraReady && storyOperationsEnabled/);

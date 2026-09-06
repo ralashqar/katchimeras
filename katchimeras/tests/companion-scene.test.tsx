@@ -20,6 +20,7 @@ for (const familyId of ['mossprout', 'steppling'] as const) {
     }));
     let flights = 0;
     const loaded = loadNativeModule('components/katchadeck/world/companion-life-actions.tsx', {
+      './companion-steps-value': { CompanionStepsValue: 'StepsValue' },
       './companion-scene-overlay': loadCompanionOverlay(),
       'react-native': { ...nativeViews, Pressable: 'Pressable', ScrollView: 'ScrollView', Modal: 'Modal', TextInput: 'TextInput' },
       'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },

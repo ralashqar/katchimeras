@@ -17,6 +17,9 @@ function naturePhoto(match: MossproutNaturePhoto['match'] = 'ready'): MossproutN
   return { uri: 'file:///nature.jpg', capturedAt: now, memory: data.memory, evidence: data.evidence, vision: null, match };
 }
 function storageHarness(memoryGate?: Promise<void>) {
+  // Match the calendar-day hook below; wall-clock saves otherwise land on a
+  // different day and make completed activities appear unfinished in this test.
+  class ActivityDate extends Date { static now() { return now; } }
   const disk = new Map<string, unknown>();
   let bond = emptyCompanionBondState();
   let failActivityWrite = false;
@@ -36,7 +39,7 @@ function storageHarness(memoryGate?: Promise<void>) {
     './mossprout-life-activities': { MOSSPROUT_LIFE_TITLES: { photo: 'Photo', notice: 'Notice' }, mossproutLifeActivityId },
     './mossprout-photo-memory': { saveMossproutPhotoMemory: async (entry: MossproutLifeCompletion) => { if (memoryGate) await memoryGate; if (failMemory) throw new Error('memory'); memories.set(entry.id, entry.photo); } },
     './mossprout-nature-capture': { discardMossproutNaturePhoto() {} },
-  });
+  }, { Date: ActivityDate });
   return { module, memories, journal, bond: () => bond,
     failMemory: (value: boolean) => { failMemory = value; },
     failAfterAward: () => { failAfterAward = true; },

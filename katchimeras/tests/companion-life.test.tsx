@@ -84,7 +84,8 @@ test('Steppling uses original animated rows, retains its goal through completion
   let pickerOpens = 0;
   const entry = { ...moment, goalId: goalState.goals[0].id };
   const component = loadNativeModule('components/katchadeck/world/companion-life-actions.tsx', {
-      './companion-scene-overlay': loadCompanionOverlay(),
+    './companion-steps-value': { CompanionStepsValue: 'StepsValue' },
+    './companion-scene-overlay': loadCompanionOverlay(),
     'react-native': { ...nativeViews, Pressable: 'Pressable', ScrollView: 'ScrollView', Modal: 'Modal', TextInput: 'TextInput' },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     'expo-image': { Image: 'Image' },

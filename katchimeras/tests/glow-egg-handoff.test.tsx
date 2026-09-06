@@ -181,6 +181,7 @@ test('completed noticing shows Bond coaching once, persists it, and continues to
 test('shared Bond coachmark sits below its target and protects Continue against duplicate presses and save failures', async () => {
   const motion = nativeMotionHarness();
   const module = loadNativeModule('components/katchadeck/onboarding/companion-ftue-coachmark.tsx', {
+    '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
     'react-native': { ...nativeViews, Pressable: 'Pressable' },
     'react-native-reanimated': { ...motion.animated, FadeOut: motion.animated.FadeIn },
     'expo-image': { Image: 'Image' },
@@ -199,15 +200,15 @@ test('shared Bond coachmark sits below its target and protects Continue against 
   await act(async () => { tree = create(<Coach buttonLabel="Continue" message={[{ text: 'Your Bond grew.' }]} onContinue={onContinue} placement="below" targetRef={targetRef} />); });
   const callout = tree!.root.findByProps({ accessibilityLiveRegion: 'polite' });
   assert.ok(callout.props.style[1].top > 108, 'explanation is below the Bond bar');
-  const press = tree!.root.findByType('Pressable' as React.ElementType).props.onPress;
+  const press = tree!.root.findByType('Button' as React.ElementType).props.onPress;
   let pending: Promise<void>;
   await act(async () => { pending = press(); void press(); });
   assert.equal(attempts, 1);
-  assert.equal(tree!.root.findByType('Pressable' as React.ElementType).props.disabled, true);
+  assert.equal(tree!.root.findByType('Button' as React.ElementType).props.disabled, true);
   await act(async () => { rejectSave(new Error('disk')); await pending; });
-  assert.equal(tree!.root.findAllByType('Text' as React.ElementType).some((text) => text.props.children === 'Try again'), true);
-  await act(async () => tree!.root.findByType('Pressable' as React.ElementType).props.onPress());
+  assert.equal(tree!.root.findByType('Button' as React.ElementType).props.label, 'Try again');
+  await act(async () => tree!.root.findByType('Button' as React.ElementType).props.onPress());
   assert.equal(attempts, 2);
-  assert.equal(tree!.root.findByType('Pressable' as React.ElementType).props.disabled, false);
+  assert.equal(tree!.root.findByType('Button' as React.ElementType).props.disabled, false);
   await act(async () => tree!.unmount());
 });

@@ -532,7 +532,7 @@ test('Mossprout remembers the day, reflects it back, then offers one narrative G
   assert.match(mossproutStage, /mode === 'intro_action'[\s\S]*?style=\{styles\.plainActionStage\}/);
   assert.match(mossproutStage, /plainActionStage: \{ gap: 7 \}/);
   assert.match(mossproutStage, /mode === 'bond_choice'[\s\S]*?MOSSPROUT_BOND_SHARE_PROMPTS\[0\]\.options\.map/);
-  assert.match(mossproutStage, /mode === 'garden_intro'[\s\S]*?<DayActionCardSurface[\s\S]*?eyebrow="YOUR MEMORY SEED"/);
+  assert.match(mossproutStage, /mode === 'garden_intro'[\s\S]*?<DayActionCardSurface[\s\S]*?eyebrow="MEMORY SEED"/);
   assert.doesNotMatch(mossproutStage, /seedName:|seedDescription:|seedEyebrow:/);
   assert.match(mossproutStage, /onContinue\?\.\(`\$\{MOSSPROUT_BOND_SHARE_PROMPTS\[0\]\.id\}:\$\{option\.id\}`\)/);
   assert.match(bondShare, /What would help most right now\?/);
@@ -1088,8 +1088,8 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomScreen, /gardenWorldBottomCtaActive[\s\S]*?bottom: Math\.max\(insets\.bottom, 12\) \+ 22[\s\S]*?justifyContent: 'space-between'[\s\S]*?top: insets\.top \+ 18/);
   assert.match(kingdomScreen, /function FtueOpeningFade\(\)[\s\S]*?opacity\.value = withDelay\([\s\S]*?duration: reduceMotion \? 140 : 1_350/);
   assert.match(kingdomScreen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
-  assert.match(nurture, /<EggHeroGuide guide=\{onboardingGuide\} topInset=\{topInset\} topHudVisible=\{onboardingTopHudVisible\}/);
-  assert.match(readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8'), /top: topInset \+ \(topHudVisible \? 82 : 22\)/);
+  assert.match(nurture, /<EggHeroGuide guide=\{onboardingGuide\} topInset=\{topInset\}/);
+  assert.match(readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8'), /top: topInset \+ topOffset/);
   assert.match(kingdomScreen, /!upgradePresentation && \(!ftueStepId \|\| ftueStepId === 'companion\.meditating'\)/);
   assert.match(kingdomScreen, /onPress=\{stepplingEncounter.open \? stepplingEncounter.close : interactionCreatureId \? requestResidentInteractionExit : onBackToHavenSelector\}/);
   assert.doesNotMatch(kingdomScreen, /cameraFallbackTimer/);
@@ -1524,7 +1524,7 @@ test('FTUE CTA actions use the shared glowing primary button without a post-hatc
   const actions = readFileSync('components/katchadeck/onboarding/scripted-action-list.tsx', 'utf8');
   const route = readFileSync('app/(tabs)/today.tsx', 'utf8');
   assert.match(actions, /action\.presentation === 'cta_action'/);
-  assert.match(actions, /<KatchaButton[\s\S]*?fullWidth[\s\S]*?glow[\s\S]*?label=\{action\.title\}[\s\S]*?labelStyle=\{KatchaDeckUI\.typography\.ftuePanelTitle\}/);
+  assert.match(actions, /<KatchaButton[\s\S]*?fullWidth[\s\S]*?glow[\s\S]*?label=\{action\.title\}/);
   assert.doesNotMatch(route, /Talk to Mossprout/);
 });
 
@@ -1659,7 +1659,7 @@ test('Mossprout reveal name sits below the Egg stage and hatch has no redundant 
   assert.match(egg, /discoveryName: \{ \.\.\.KatchaDeckUI\.typography\.ftueHeroTitle/);
   assert.doesNotMatch(egg, /Math\.min\(TODAY_KINGDOM_STAGE_HEIGHT - 36/);
   assert.doesNotMatch(route, /label="Talk to Mossprout"/);
-  assert.match(button, /labelStyle\?: StyleProp<TextStyle>/);
+  assert.match(button, /label: \{ \.\.\.GAME_CTA\.label/);
 });
 
 test('Discovery Hatch remains inside the forming Home Egg stage', () => {
