@@ -1,11 +1,12 @@
 import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
 import { advanceGlowUpgrade, recoverPaidGlowUpgrade } from '@/features/onboarding/glow-upgrade-runtime';
 import { worldUpgradeRunId } from '@/features/world-upgrades/world-upgrade-flows';
-import { visibleWorldUpgradeOffers, worldUpgradeOffers, type WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
+import { visibleWorldUpgradeOffers, worldUpgradeOffers, worldUpgradeArchiveOffer, type WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { purchaseWorldUpgrade, useWorldUpgradeRun } from '@/features/world-upgrades/world-upgrade-runtime';
 import { dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
-import { WorldUpgradeSheet } from '@/components/katchadeck/world/world-upgrade-sheet';
-import { worldUpgradePreview } from '@/components/katchadeck/world/world-upgrade-preview';
+import { WorldUpgradePanel } from '@/components/katchadeck/world/world-upgrade-panel';
+import { WorldUpgradeReward } from '@/components/katchadeck/world/world-upgrade-reward';
+import { worldUpgradeStory } from '@/features/world-upgrades/world-upgrade-stories';
 import { useGlowEggHandoff } from '@/features/onboarding/use-glow-egg-handoff';
 import { CompanionJournalButton } from '@/components/katchadeck/world/companion-life-actions';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
@@ -63,7 +64,7 @@ import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import type { MergeCharacterId, MergeWorldState, MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel, StoryWorldMutationReceipt } from '@/types/merge-world';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { HAVEN_ENVIRONMENTS, type HavenStage } from '@/constants/haven-catalog';
-import { ensureStoredFirstFtueMemoryPlacement } from '@/utils/merge-world/repository';
+import { ensureStoredFirstFtueMemoryPlacement, saveUpgradeStoryRead } from '@/utils/merge-world/repository';
 import { mossproutNatureIslandById, mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
 import { havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
 import type { HavenTileUpgradePresentation } from '@/utils/haven-upgrade-presentation';
@@ -207,11 +208,14 @@ export function KatchimeraKingdomScreen({
   const [upgradeCommitted, setUpgradeCommitted] = useState(false);
   const upgradePressBusy = useRef(false);
   const upgradeActionRef = useRef<View>(null);
+  const pendingUpgradeReward = useRef<string | null>(null);
+  const [upgradeReward, setUpgradeReward] = useState<string | null>(null);
+  const upgradeDismiss = useRef<(() => void) | null>(null);
+  const registerUpgradeDismiss = useCallback((dismiss: (() => void) | null) => { upgradeDismiss.current = dismiss; }, []);
   const activeFtueRunId = loadFtueRun()?.runId ?? null;
   const ordinaryUpgradeRun = useWorldUpgradeRun();
   const ftueUpgradeRun = useWorldUpgradeRun(activeFtueRunId ? `flow:${activeFtueRunId}` : 'no-ftue-upgrade');
   const sharedUpgrade = selectedUpgrade ? upgradeOffers.find((offer) => offer.id === selectedUpgrade.id && offer.nextLevel === selectedUpgrade.nextLevel) ?? selectedUpgrade : null;
-  const sharedUpgradePreview = useMemo(() => sharedUpgrade ? worldUpgradePreview(sharedUpgrade, mergeWorld, companionSlots) : {}, [sharedUpgrade, mergeWorld, companionSlots]);
   const ftueGardenUpgradeActive = ftueStepId === 'world.first_bloom_offer' || ftueStepId === 'world.first_bloom_restore';
   const coachedUpgrade = ftueGardenUpgradeActive || mistUpgradeActive;
   useEffect(() => {
@@ -582,6 +586,7 @@ export function KatchimeraKingdomScreen({
   }, screenFocused && !activeInteractionResidentId && !interactionExiting);
 
   const completeUpgradePresentation = useCallback((presentation: HavenTileUpgradePresentation) => {
+    if (pendingUpgradeReward.current) { setUpgradeReward(pendingUpgradeReward.current); pendingUpgradeReward.current = null; }
     if (presentation.storyPresentationKey) {
       const resolve = storyUpgradeResolversRef.current.get(presentation.storyPresentationKey);
       storyUpgradeResolversRef.current.delete(presentation.storyPresentationKey);
@@ -876,6 +881,9 @@ export function KatchimeraKingdomScreen({
   const confirmWorldUpgrade = useCallback(async () => {
     if (!sharedUpgrade || upgradePressBusy.current || (upgradeCommitted && !upgradeError)) return;
     upgradePressBusy.current = true; setUpgradePurchasing(true); setUpgradeCommitted(true); setUpgradeError(null);
+    const reward = worldUpgradeStory(sharedUpgrade.id, sharedUpgrade.nextLevel)?.rewardSkinId;
+    pendingUpgradeReward.current = reward && !Object.values(mergeWorldRef.current.upgradeSkinGrants ?? {}).some((grant) => grant.skinId === reward)
+      && !mergeWorldRef.current.ownedKatchimeraCards.some((card) => card.cardId === reward) ? reward : null;
     try {
       if (sharedUpgrade.id === 'mist:steppling-home' && glowRun && glowRun.status !== 'completed') {
         const run = await advanceGlowUpgrade('confirm');
@@ -899,7 +907,7 @@ export function KatchimeraKingdomScreen({
     <View collapsable={false} onLayout={onContentReady} ref={screenRef} style={styles.screen}>
       <KingdomHexCanvas
         background={background}
-        cameraLocked={ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active}
+        cameraLocked={ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || Boolean(selectedUpgrade)}
         discoveredEggInteraction={stepplingEncounter.open}
         discoveredEggPresentation={stepplingEncounter.presentation}
         discoveredEggTargetRef={stepplingEncounter.feedController.eggTargetRef}
@@ -933,6 +941,13 @@ export function KatchimeraKingdomScreen({
         onTileUpgradeOfferPress={beginFirstSeedPlanting}
         upgradeOffers={screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingEggOpen && !ordinaryUpgradeRun ? visibleUpgradeOffers : []}
         selectedUpgradeOffer={selectedUpgrade}
+        onDismissUpgrade={() => upgradeDismiss.current?.()}
+        upgradePanel={screenFocused && sharedUpgrade && !upgradePresentation && !activeInteractionResidentId ? <WorldUpgradePanel
+          offer={sharedUpgrade} world={mergeWorld} busy={upgradePurchasing || (upgradeCommitted && !upgradeError)}
+          saveRead={saveUpgradeStoryRead}
+          error={upgradeError} coached={coachedUpgrade} actionRef={upgradeActionRef} registerDismiss={registerUpgradeDismiss}
+          onClose={() => { pendingUpgradeReward.current = null; setSelectedUpgrade(null); setUpgradeError(null); }} onConfirm={() => { void confirmWorldUpgrade(); }}
+          onGarden={() => { setSelectedUpgrade(null); setUpgradeError(null); openGarden(); }} /> : null}
         preserveUpgradeCamera={ftueGardenUpgradeActive || (selectedUpgrade?.id === 'mist:steppling-home' && Boolean(glowRun && glowRun.status !== 'completed'))}
         upgradeSelectionCommitted={upgradeCommitted}
         upgradeFailed={Boolean(upgradeError)}
@@ -949,7 +964,7 @@ export function KatchimeraKingdomScreen({
           setNatureUpgradeError(null);
           const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${islandId}`);
           if (offer) void openUpgradeOffer(offer);
-          else setSelectedNatureIslandId(islandId);
+          else { const archive = worldUpgradeArchiveOffer(mergeWorld, `nature:${islandId}`); if (archive) setSelectedUpgrade(archive); }
         }}
         onSelectMemoryPlant={setSelectedMemoryPlantId}
         onGatewayTargetChange={setGatewayNode}
@@ -1096,11 +1111,7 @@ export function KatchimeraKingdomScreen({
         onClose={() => setGlowPanelOpen(false)}
         onOpenMerge={() => openGarden()}
       /> : null}
-      {screenFocused && sharedUpgrade && !upgradePresentation && !activeInteractionResidentId ? <WorldUpgradeSheet
-        offer={sharedUpgrade} balance={mergeWorld.coins} {...sharedUpgradePreview} busy={upgradePurchasing || (upgradeCommitted && !upgradeError)}
-        error={upgradeError} coached={coachedUpgrade} actionRef={upgradeActionRef}
-        onClose={() => { setSelectedUpgrade(null); setUpgradeError(null); }} onConfirm={() => { void confirmWorldUpgrade(); }}
-        onGarden={() => { setSelectedUpgrade(null); setUpgradeError(null); openGarden(); }} /> : null}
+      {screenFocused && upgradeReward && !sharedUpgrade && !upgradePresentation ? <WorldUpgradeReward skinId={upgradeReward} onClose={() => setUpgradeReward(null)} /> : null}
       {screenFocused && mistUpgradeActive && !sharedUpgrade && !upgradePresentation && !activeInteractionResidentId && !stepplingEggOpen ? (
         <HavenFtueOverlay
           cue={{ kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'steppling' } }}
@@ -1229,6 +1240,14 @@ export function KatchimeraKingdomScreen({
               />
             </View> : null}
             {ftueStepId !== 'haven.mossprout.restore' ? <KatchaButton fullWidth label={`Visit ${slot.creature.name}`} onPress={() => selectResident(slot.creature.creatureId)} variant="secondary" /> : null}
+            {characterId === 'mossprout' && currentStage >= 1 && !ftueStepId ? <KatchaButton fullWidth label="Garden story & history" variant="secondary" onPress={() => {
+              const archive = worldUpgradeArchiveOffer(mergeWorld, 'haven:mossprout');
+              if (archive) { setDetailCreatureId(null); setSelectedUpgrade({ ...archive, currentLevel: currentStage }); }
+            }} /> : null}
+            {characterId === 'steppling' && mergeWorld.worldUnlocks?.['mossprout:overgrown-trail'] && !ftueStepId ? <KatchaButton fullWidth label="Clearing story & history" variant="secondary" onPress={() => {
+              const archive = worldUpgradeArchiveOffer(mergeWorld, 'mist:steppling-home');
+              if (archive) { setDetailCreatureId(null); setSelectedUpgrade(archive); }
+            }} /> : null}
           </View>}
           header={{ eyebrow: `${slot.creature.name.toUpperCase()} · HAVEN LV${currentStage}`, title: current?.name ?? `${slot.creature.name}’s Haven`, subtitle: current?.narrative ?? 'A home with room to grow.' }}
           onRequestClose={() => { if (ftueStepId !== 'haven.mossprout.restore') setDetailCreatureId(null); }}

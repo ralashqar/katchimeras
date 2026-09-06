@@ -1,5 +1,6 @@
 import {createHexTileRenderer} from '@incubator/environments/hex-tile';
 import { WorldUpgradeMarker } from './world-upgrade-marker';
+import { WorldUpgradeAnchor } from './world-upgrade-anchor';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { useFocusEffect } from '@react-navigation/native';
@@ -151,6 +152,8 @@ type Props = {
   onOpenGarden?: (orderId?: string | null) => void;
   upgradeOffers?: readonly WorldUpgradeOffer[];
   selectedUpgradeOffer?: WorldUpgradeOffer | null;
+  upgradePanel?: ReactNode;
+  onDismissUpgrade?: () => void;
   preserveUpgradeCamera?: boolean;
   upgradeSelectionCommitted?: boolean;
   upgradeFailed?: boolean;
@@ -406,6 +409,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onOpenGarden,
   upgradeOffers = [],
   selectedUpgradeOffer = null,
+  upgradePanel,
+  onDismissUpgrade,
   preserveUpgradeCamera = false,
   upgradeSelectionCommitted = false,
   upgradeFailed = false,
@@ -961,8 +966,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       if (frame) focusInteractionTile(frame, {
         durationMs: reduceMotion ? 80 : 440,
         horizontalPadding: 16,
-        verticalPadding: 56,
-        screenCenterY: viewport.height / 2,
+        verticalPadding: 96,
+        screenCenterY: viewport.height * 0.60,
       });
     } else if (upgradeFocusId.current) {
       const origin = upgradeOrigin.current;
@@ -1704,17 +1709,31 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           visualKey={plant.visualKey}
         />
       ))}
-      {!upgradePresentation && !selectedUpgradeOffer && interactionEnabled && onUpgradeOfferPress ? upgradeOffers.map((offer) => {
+      {!upgradePresentation && interactionEnabled && onUpgradeOfferPress ? upgradeOffers.map((offer) => {
         // Anchor to the painted stairs, not the island's larger touch target.
         const target = offer.visualTarget;
         const frame = target.kind === 'haven_nature_island'
           ? scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame
           : storyTargetFrame(target);
         return frame ? <WorldUpgradeMarker key={offer.id} offer={offer} frame={frame}
+          hidden={Boolean(selectedUpgradeOffer)}
+          selected={selectedUpgradeOffer?.id === offer.id}
           cameraScale={camera.scaleValue} cameraX={camera.translationXValue} cameraY={camera.translationYValue}
           sceneWidth={scene.width} sceneHeight={scene.height} moving={camera.isMoving}
           onPress={onUpgradeOfferPress} onTargetChange={onUpgradeOfferTargetChange} /> : null;
       }) : null}
+      {selectedUpgradeOffer && upgradePanel && !upgradePresentation ? <>
+        <Pressable style={[StyleSheet.absoluteFill, { zIndex: 31 }]} accessibilityRole="button" accessibilityLabel="Close upgrade" onPress={onDismissUpgrade} />
+        {(() => {
+          const target = selectedUpgradeOffer.visualTarget;
+          const frame = target.kind === 'haven_nature_island' ? scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame : storyTargetFrame(target);
+          return frame ? <WorldUpgradeAnchor key={`${selectedUpgradeOffer.id}:${selectedUpgradeOffer.nextLevel}`} frame={frame}
+            cameraScale={camera.scaleValue} cameraX={camera.translationXValue} cameraY={camera.translationYValue}
+            sceneWidth={scene.width} sceneHeight={scene.height} viewportWidth={viewport.width} viewportHeight={viewport.height} moving={camera.isMoving}>
+            {upgradePanel}
+          </WorldUpgradeAnchor> : null;
+        })()}
+      </> : null}
       {!upgradePresentation && interactionEnabled && !cameraLocked && !storyCameraInputLocked ? (
         <Pressable
           accessibilityRole="button"

@@ -1,5 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
+import { HavenCharacterPortrait } from './haven-character-portrait';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type ImageSourcePropType, type LayoutChangeEvent } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
@@ -184,16 +185,7 @@ const HavenSelectorWorldMarker = memo(function HavenSelectorWorldMarker({
         !marker.enterable && styles.markerUnavailable,
       ]}>
       <View style={styles.portraitStage}>
-        <View pointerEvents="none" style={styles.portraitBackdrop} />
-        <Image
-          accessibilityIgnoresInvertColors
-          allowDownscaling
-          cachePolicy="memory-disk"
-          contentFit="contain"
-          source={marker.portraitSource}
-          style={styles.portraitArt}
-          transition={0}
-        />
+        <HavenCharacterPortrait source={marker.portraitSource} />
         {marker.notification ? (
           <View style={[styles.notification, marker.notification === 'ready' && styles.notificationReady]}>
             <Text style={styles.notificationText}>{notificationLabel}</Text>
@@ -225,21 +217,6 @@ const styles = StyleSheet.create({
     width: 156,
     zIndex: 2,
   },
-  portraitBackdrop: {
-    backgroundColor: '#EAF6D2',
-    borderColor: '#FFF6D8',
-    borderCurve: 'continuous',
-    borderRadius: 56,
-    borderWidth: 7,
-    boxShadow: '0 7px 16px rgba(35,44,25,0.34)',
-    height: 112,
-    left: 22,
-    position: 'absolute',
-    top: 20,
-    width: 112,
-    zIndex: 1,
-  },
-  portraitArt: { height: 156, left: 0, position: 'absolute', top: 0, width: 156, zIndex: 2 },
   notification: {
     alignItems: 'center',
     backgroundColor: '#E95045',

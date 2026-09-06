@@ -468,6 +468,9 @@ export type StoryWorldMutationReceipt = {
 };
 
 export type MergeWorldState = {
+  /** Reading is independent of purchase flow runs; cursors count revealed lines. */
+  upgradeStoryRead?: Record<string, number>;
+  upgradeSkinGrants?: Record<string, { skinId: string; grantedAt: number }>;
   stepplingEgg?: import('@/features/onboarding/steppling-egg-policy').StepplingEggProgress;
   worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
   glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 };

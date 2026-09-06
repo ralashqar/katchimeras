@@ -76,9 +76,11 @@ case and reducer action instead.
 
 ## Component choices
 
-- World upgrades use `WorldUpgradeSheet` with the shared sheet's `game`
-  appearance: cream surface, gold rim, Fredoka title, a compact art/level row,
-  and the shared currency CTA. Show shortage and failure messages only when
+- World upgrades use `WorldUpgradePanel` in the canvas's `WorldUpgradeAnchor`:
+  cream surface, gold rim, title and current/max level, an expanded character conversation,
+  and the shared Glow CTA. There is no result-art preview. The panel follows the
+  tile at a readable screen size; opening and closing retain animated exits.
+  Show shortage and failure messages only when
   needed. Purchases require Glow and the next sequential level; story chapters,
   friendship, and resident discovery are not purchase prerequisites. Tutorial
   guidance still controls which action is presented during the guided lesson.

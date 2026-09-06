@@ -3,6 +3,8 @@ import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
 import { SHARED_WORLD_PURCHASES } from '@/constants/shared-world';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import type { StoryWorldUpgradeEffectPayload, StoryTarget } from '@/types/content-flow';
+import { worldUpgradeStory } from './world-upgrade-stories';
+import { upgradeCompletedLevel } from './world-upgrade-progress';
 
 export type WorldUpgradeDefinition = {
   id: string;
@@ -18,6 +20,8 @@ export type WorldUpgradeDefinition = {
 };
 export type WorldUpgradeOffer = WorldUpgradeDefinition & {
   currentLevel: number;
+  maxLevel: number;
+  storyId?: string;
   eligible: boolean;
   affordable: boolean;
   missingGlow: number;
@@ -55,9 +59,24 @@ export function worldUpgradeOffers(world: MergeWorldState): WorldUpgradeOffer[] 
       : world.worldUnlocks?.[definition.unlockId!] ? 1 : 0;
     if (currentLevel + 1 !== definition.nextLevel) return [];
     // Authored next levels are available independently of story/companion progress.
-    return [{ ...definition, currentLevel, eligible: true,
+    return [{ ...definition, currentLevel, maxLevel: worldUpgradeMaxLevel(definition), storyId: worldUpgradeStory(definition.id, definition.nextLevel)?.id, eligible: true,
       affordable: world.coins >= definition.cost, missingGlow: Math.max(0, definition.cost - world.coins) }];
   });
+}
+
+export function worldUpgradeMaxLevel(definition: WorldUpgradeDefinition): number {
+  const target = definition.target;
+  if (target.kind === 'haven_tile') return Math.max(...(HAVEN_ENVIRONMENTS[target.familyId as MergeCharacterId]?.stages.map((stage) => stage.stage) ?? [definition.nextLevel]));
+  return Math.max(...WORLD_UPGRADE_DEFINITIONS.filter((item) => item.id === definition.id).map((item) => item.nextLevel));
+}
+
+/** A completed tile can still open its story archive without offering a purchase. */
+export function worldUpgradeArchiveOffer(world: MergeWorldState, id: string): WorldUpgradeOffer | null {
+  const currentLevel = upgradeCompletedLevel(world, id);
+  const definition = WORLD_UPGRADE_DEFINITIONS.filter((item) => item.id === id && item.nextLevel <= currentLevel).at(-1);
+  if (!definition) return null;
+  return { ...definition, currentLevel, maxLevel: worldUpgradeMaxLevel(definition),
+    eligible: false, affordable: false, missingGlow: 0, storyId: worldUpgradeStory(id, definition.nextLevel)?.id };
 }
 
 

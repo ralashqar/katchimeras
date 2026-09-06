@@ -1,4 +1,5 @@
 import { acceptDailyStoryHabit } from '@/utils/companion-life-storage';
+import { useUpgradeSkinGrants } from '@/hooks/use-upgrade-skin-grants';
 import { lifeConversationEntryId } from '@/utils/companion-life-recording';
 import * as Haptics from 'expo-haptics';
 import { useIsFocused } from '@react-navigation/native';
@@ -335,14 +336,15 @@ export function KingdomCompanionScreen({
     [],
   );
 
+  const upgradeSkinIds = useUpgradeSkinGrants();
   const ownedSkinIds = useMemo(
     () =>
       new Set<KatchimeraSkinId>(
-        kingdom.creatures.flatMap((creature) =>
+        [...upgradeSkinIds, ...kingdom.creatures.flatMap((creature) =>
           creature.skinId ? [creature.skinId] : []
-        )
+        )]
       ),
-    [kingdom.creatures]
+    [kingdom.creatures, upgradeSkinIds]
   );
 
   const hatches = useMemo<HatchRecord[]>(

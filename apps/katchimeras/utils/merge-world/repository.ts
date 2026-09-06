@@ -1,4 +1,6 @@
 import * as SQLite from 'expo-sqlite';
+import { WORLD_UPGRADE_STORIES } from '@/features/world-upgrades/world-upgrade-stories';
+import { upgradeCompletedLevel } from '@/features/world-upgrades/world-upgrade-progress';
 import { measureMergeWork } from './performance';
 
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
@@ -167,6 +169,20 @@ async function reduceStoredMergeWorld(
   });
   if (result.changed && generation === resetGeneration && !resetInProgress) publishSnapshot(result.state);
   return result;
+}
+
+export function saveUpgradeStoryRead(storyId: string, count: number, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => {
+    const story = WORLD_UPGRADE_STORIES.find((item) => item.id === storyId);
+    if (!story || !Number.isFinite(count)) return { state, changed: false, message: '' };
+    const level = upgradeCompletedLevel(state, story.offerId);
+    if (story.level > level + 1) return { state, changed: false, message: '' };
+    const available = story.before.length + (level >= story.level ? story.after.length : 0);
+    const next = Math.max(state.upgradeStoryRead?.[storyId] ?? 0, Math.min(available, Math.floor(count)));
+    if (next === (state.upgradeStoryRead?.[storyId] ?? 0)) return { state, changed: false, message: '' };
+    return { state: { ...state, revision: state.revision + 1, updatedAt: now,
+      upgradeStoryRead: { ...state.upgradeStoryRead, [storyId]: next } }, changed: true, message: '' };
+  }, now);
 }
 
 /** Pays the authored journal reward through the normal daily journal receipt. */

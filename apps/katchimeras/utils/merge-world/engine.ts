@@ -1,4 +1,5 @@
 import { createOrderQueries } from '@incubator/merge/orders';
+import { reconcileUpgradeProgress } from '@/features/world-upgrades/world-upgrade-progress';
 const { mergeOrderReady, mergeOrderRequirementReadiness, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds, boardItemCounts } = createOrderQueries();
 export { mergeOrderReady, mergeOrderRequirementReadiness, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds };
 import { prepareStepplingGarden, stepplingGardenDrop, stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
@@ -913,7 +914,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
   // Version 3's five single-chain generators migrate into the shared eight.
   normalized = ensureProceduralOrders(normalized, now);
-  return ensureOrdersRequireMerge(refreshTime(normalized, now));
+  return reconcileUpgradeProgress(ensureOrdersRequireMerge(refreshTime(normalized, now)));
 }
 
 function upgradeHavenTile(
@@ -1065,7 +1066,7 @@ function upgradeMossproutNatureIsland(
     },
   }, now);
   return {
-    state: next,
+    state: reconcileUpgradeProgress(next),
     changed: true,
     message: `${island.name} grew into ${definition.name}.`,
     natureIslandUpgrade: { islandId, level: requestedLevel, coinCost, completedTier },
@@ -2887,7 +2888,8 @@ function purchaseKatchimeraCard(
   if (familyId === 'mossprout' && MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT.has(cardId)) {
     return unchanged(state, 'Meet this resident through its veiled garden card.');
   }
-  if (state.ownedKatchimeraCards.some((card) => card.cardId === cardId || card.sourceReceiptId === purchaseId)) {
+  if (Object.values(state.upgradeSkinGrants ?? {}).some((grant) => grant.skinId === cardId)
+    || state.ownedKatchimeraCards.some((card) => card.cardId === cardId || card.sourceReceiptId === purchaseId)) {
     return unchanged(state, 'That card is already in your collection.');
   }
   const familyCollectionOpen = state.ownedKatchimeraCards.some((card) => card.familyId === familyId && card.acquisition === 'journey_match');

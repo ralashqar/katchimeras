@@ -1,7 +1,7 @@
 import { STEPPLING_GARDEN_FLOW } from '@/features/onboarding/steppling-garden-lesson';
 import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from './steppling-day-one-flow-v2';
 import { completeMossproutHavenUpgrade } from '@/utils/companion-story-storage';
-import { WORLD_UPGRADE_FLOWS } from '@/features/world-upgrades/world-upgrade-flows';
+import { LEGACY_WORLD_UPGRADE_FLOWS, WORLD_UPGRADE_FLOWS } from '@/features/world-upgrades/world-upgrade-flows';
 import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campaign';
 import { registerCompanionJourneyFlows } from '@/features/companion/companion-journey-service';
 import { nextUnearnedMossproutResident } from '@/constants/resident-card-discovery';
@@ -40,7 +40,7 @@ let bootstrapped = false;
 export function bootstrapContentFlowCatalog() {
   if (bootstrapped) return;
   registerCompanionJourneyFlows();
-  WORLD_UPGRADE_FLOWS.forEach(registerContentFlowDefinition);
+  [...LEGACY_WORLD_UPGRADE_FLOWS, ...WORLD_UPGRADE_FLOWS].forEach(registerContentFlowDefinition);
   registerStoryVariantSet(MOSSPROUT_FTUE_VARIANTS);
   MOSSPROUT_FTUE_VARIANTS.variants.forEach((variant) => registerContentFlowDefinition(variant.definition));
   registerContentFlowDefinition(GLOW_DISCOVERY_FLOW);

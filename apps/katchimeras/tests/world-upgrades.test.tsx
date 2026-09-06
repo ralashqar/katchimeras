@@ -196,48 +196,6 @@ test('ordinary purchase deduplicates rapid taps, validates fresh balance, and re
   await runtime.purchaseWorldUpgrade(offer); assert.equal(retries, 1); assert.equal(starts, 1);
 });
 
-test('shared sheet sends insufficient Glow to Garden, confirms once affordable, and blocks closing while busy', async () => {
-  const host = (name: string) => name as unknown as React.ComponentType<Record<string, unknown>>;
-  const module = loadNativeModule('components/katchadeck/world/world-upgrade-sheet.tsx', {
-    'react-native': nativeViews, 'expo-image': { Image: host('Image') },
-    '@/components/katchadeck/ui/katcha-sheet': { KatchaSheet: host('Sheet') },
-    '@/components/katchadeck/ui/katcha-button': { KatchaButton: host('Button') },
-    '@/components/themed-text': { ThemedText: host('Text') },
-    '@/constants/game-currency-art': { GAME_CURRENCY_ART: { coins: 1 } },
-    '@/constants/theme': { AppFontFamilies: { fredokaBold: 'Fredoka', manrope: 'Manrope' } },
-    '@/constants/game-ui': loadNativeModule('constants/game-ui.ts', {
-      '@/constants/theme': { AppFontFamilies: { fredokaBold: 'Fredoka', manrope: 'Manrope' } },
-    }),
-    '@/components/katchadeck/onboarding/companion-ftue-coachmark': { CompanionFtueCoachmark: host('Coachmark') },
-  }, { setTimeout, clearTimeout });
-  const Sheet = module.WorldUpgradeSheet as React.ComponentType<Record<string, unknown>>;
-  let confirms = 0; let gardens = 0; let closes = 0;
-  const props = { offer: worldUpgradeOffers(world())[0], balance: 0, busy: false, actionRef: { current: null },
-    onConfirm: () => confirms++, onGarden: () => gardens++, onClose: () => closes++ };
-  let tree: ReactTestRenderer;
-  await act(async () => { tree = create(<Sheet {...props} />); });
-  assert.equal(tree!.root.findByType(host('Sheet')).props.appearance, 'game');
-  assert.equal(tree!.root.findByType(host('Sheet')).props.header.titleVariant, 'strong');
-  assert.equal(tree!.root.findByType(host('Sheet')).props.header.eyebrow, undefined);
-  const copy = tree!.root.findAllByType(host('Text')).map((node) => node.props.children).flat().join(' ');
-  assert.doesNotMatch(copy, /Continue Mossprout|You have|Help Mossprout/);
-  let button = tree!.root.findByType(host('Button'));
-  assert.equal(button.props.cost, undefined);
-  assert.equal(button.props.label, 'Tend garden'); await act(async () => button.props.onPress());
-  assert.equal(gardens, 1); assert.equal(confirms, 0);
-  await act(async () => tree!.update(<Sheet {...props} balance={20} />));
-  button = tree!.root.findByType(host('Button'));
-  assert.equal(button.props.cost.currency, 'coins');
-  assert.equal(button.props.cost.amount, 20);
-  assert.equal(button.props.label, 'Restore'); await act(async () => button.props.onPress());
-  assert.equal(confirms, 1);
-  await act(async () => tree!.update(<Sheet {...props} balance={20} busy />));
-  assert.equal(tree!.root.findByType(host('Button')).props.disabled, true);
-  tree!.root.findByType(host('Sheet')).props.onRequestClose(); assert.equal(closes, 0);
-  await act(async () => tree!.unmount());
-});
-
-
 test('a legacy confirmation checkpoint crosses the new marker scene without replaying spending', async () => {
   let run = { runId: 'flow:old-ftue', definitionId: MOSSPROUT_FTUE_FLOW.id, definitionVersion: MOSSPROUT_FTUE_FLOW.version,
     nodeId: 'world.first_bloom_offer', status: 'active', phase: 'awaiting_scene' };

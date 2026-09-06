@@ -434,9 +434,7 @@ test('Haven uses the hex selector as its top level and lazy-mounts only implemen
   assert.match(selector, /HavenSelectorWorldMarker/);
   assert.match(selector, /left: x - 116,[\s\S]*?top: y - 25/);
   assert.match(selector, /restorationStage/);
-  assert.match(selector, /portraitStage[\s\S]*?width: 156[\s\S]*?portraitArt/);
-  assert.match(selector, /portraitBackdrop[\s\S]*?borderRadius: 56[\s\S]*?top: 20[\s\S]*?zIndex: 1/);
-  assert.match(selector, /portraitArt: \{ height: 156, left: 0, position: 'absolute', top: 0/);
+  assert.match(selector, /<HavenCharacterPortrait source=\{marker.portraitSource\}/);
   assert.match(selector, /markerPlaque[\s\S]*?backgroundColor: '#2A3022'[\s\S]*?zIndex: 4/);
   assert.doesNotMatch(selector, /portraitFrame|portraitBleedClip|portraitTopBleed/);
   assert.match(rosterRoute, /readyMergeOrderIds/);

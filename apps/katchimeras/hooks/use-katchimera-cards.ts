@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useUpgradeSkinGrants } from './use-upgrade-skin-grants';
 
 import { katchimeraSkins } from '@/constants/katchimera-skins';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
@@ -20,6 +21,7 @@ export type KatchimeraCardOption = {
 };
 
 export function useKatchimeraCards(familyId: KatchimeraFamilyId | null) {
+  const upgradeSkins = useUpgradeSkinGrants();
   const [snapshot, setSnapshot] = useState<{ coins: number; cards: OwnedKatchimeraCard[] } | null>(null);
 
   useEffect(() => {
@@ -45,10 +47,10 @@ export function useKatchimeraCards(familyId: KatchimeraFamilyId | null) {
       familyId: skin.familyId,
       visualKey: skin.visualKey,
       artReady: Boolean(skin.visualKey),
-      owned: owned.has(skin.id),
+      owned: owned.has(skin.id) || upgradeSkins.includes(skin.id),
       acquisition: owned.get(skin.id)?.acquisition ?? null,
     }));
-  }, [familyId, snapshot?.cards]);
+  }, [familyId, snapshot?.cards, upgradeSkins]);
 
   const collectionOpen = cards.some((card) => card.owned && card.id !== familyId);
   const purchase = useCallback(async (cardId: KatchimeraSkinId) => {
