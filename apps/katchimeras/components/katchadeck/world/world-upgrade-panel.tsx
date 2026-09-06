@@ -95,8 +95,9 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
           const current = chapter.id === nextChapter?.id && index === lines.length - 1;
           const dialogue = <Dialogue line={upgradeSpeaker(line, introduced)} current={current} />;
           return <Animated.View key={line.id} entering={reduced ? FadeIn.duration(100) : FadeInDown.duration(180)}>
-            {current ? <Pressable accessibilityRole="button" accessibilityLabel="Continue dialogue" accessibilityHint="Shows the next message" disabled={busy || closing}
-              onPress={advance} style={({ pressed }) => pressed && styles.messagePressed}>{dialogue}</Pressable> : dialogue}
+            <Pressable accessibilityRole={current ? 'button' : undefined} accessibilityLabel={current ? 'Continue dialogue' : undefined}
+              accessibilityHint={current ? `${upgradeSpeaker(line, introduced).text} Tap to show the next message.` : undefined} disabled={!current || busy || closing}
+              onPress={advance} style={({ pressed }) => pressed && styles.messagePressed}>{dialogue}</Pressable>
           </Animated.View>;
         })}
       </View>;
