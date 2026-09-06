@@ -10,6 +10,7 @@ export const KATCHIMERA_ACTION_ART = {
   'today:place': DASHBOARD_STAT_ART.places,
   'today:quest': TODAY_CARE_ART.quest,
   'today:reflection': TODAY_CARE_ART.reflection,
+  'mossprout:water': require('@/assets/images/katchimeras/action-icons/mossprout/water-glass-v1.png'),
   'mossprout:cloud-job': require('@/assets/images/katchimeras/action-icons/mossprout/cloud-job.png'),
   'mossprout:garden-guest': require('@/assets/images/katchimeras/action-icons/mossprout/garden-guest.png'),
   'mossprout:garden-rules': require('@/assets/images/katchimeras/action-icons/mossprout/garden-rules.png'),
@@ -30,4 +31,3 @@ export const KATCHIMERA_ACTION_ART = {
 export function katchimeraActionArt(key?: KatchimeraActionArtKey | null): ImageSourcePropType | null {
   return key ? KATCHIMERA_ACTION_ART[key] ?? null : null;
 }
-

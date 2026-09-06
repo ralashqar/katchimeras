@@ -58,6 +58,7 @@ export type KatchimeraActionArtKey =
   | 'today:place'
   | 'today:quest'
   | 'today:reflection'
+  | 'mossprout:water'
   | 'mossprout:cloud-job'
   | 'mossprout:garden-guest'
   | 'mossprout:garden-rules'

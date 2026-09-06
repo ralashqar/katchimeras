@@ -1,5 +1,6 @@
 import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-storage';
 import { resetEggAvatarSelection } from '@/utils/egg-avatar-storage';
+import { resetCompanionWaterCounts } from '@/utils/companion-water-storage';
 
 const ONBOARDING_STORAGE_KEY = 'katchadeck.onboarding-profile';
 
@@ -82,6 +83,7 @@ export function sanitizePlayerNickname(value: string): string | null {
 }
 
 export function resetOnboardingProfile() {
+  resetCompanionWaterCounts();
   removeStoredValue(ONBOARDING_STORAGE_KEY);
   resetEggAvatarSelection();
 }

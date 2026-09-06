@@ -6,6 +6,8 @@ export const KINGDOM_HEX_TILE_ALPHA_BOUNDS = {
   'default_hex_tile.webp': { left: 15, top: 148, right: 1009, bottom: 875 },
   'dream_mist_locked_hex_tile_v1.webp': { left: 40, top: 144, right: 984, bottom: 945 },
   'dream_mist_locked_hex_tile_v2.webp': { left: 38, top: 51, right: 983, bottom: 952 },
+  'dream_mist_locked_hex_tile_v3.webp': { left: 29, top: 134, right: 996, bottom: 957 },
+  'dream_mist_locked_hex_tile_v4.webp': { left: 22, top: 114, right: 1002, bottom: 972 },
   'egg_hex_tile.webp': { left: 15, top: 145, right: 1010, bottom: 878 },
   'egg_hex_tile_v2.webp': { left: 26, top: 157, right: 1002, bottom: 888 },
   'egg_home_hex_tile.webp': { left: 14, top: 95, right: 1010, bottom: 929 },

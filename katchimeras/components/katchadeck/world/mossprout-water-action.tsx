@@ -43,7 +43,7 @@ function WaterDayAction({ onBondRewardRequest, onError, dayId, enteringEnabled =
     if (!completion) return;
     relationshipProgressionRepository.update((state) => settleCompanionWaterBreak(state, completion.goalId, completion.id, completion.completedAt));
   }, [completion]);
-  const art = <Image source={katchimeraActionArt('today:reflection')} contentFit="contain" style={{ width: 48, height: 48 }} />;
+  const art = <Image source={katchimeraActionArt('mossprout:water')} contentFit="contain" transition={0} style={{ width: 48, height: 48 }} />;
   return <DayActionGoalRow disabled={disabled} onBeginCompletion={() => onBusyChange?.(true)} enteringEnabled={enteringEnabled || count !== initialCount.current} animateLayout entryDelayMs={0} key={`${dayId}:${count}`} label="Log a glass of water" title="Log a glass of water"
       subtitle={count ? `${count} ${count === 1 ? 'glass' : 'glasses'} logged today` : 'Tap after you’ve had some water'} artwork={art}
       reward={count === 0 ? <DayActionRewardChip reward={{ kind: 'bond', amount: COMPANION_BOND_REWARDS.quick_goal_completed }} /> : undefined}

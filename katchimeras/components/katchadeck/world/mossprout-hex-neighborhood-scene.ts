@@ -101,11 +101,11 @@ const MEMORY_PLANT_ART_CONTACT_Y = 366 / 384;
 export const MOSSPROUT_GARDEN_PLANT_SLOT_IDS = Object.keys(GARDEN_PLANT_SLOT_POSITIONS) as MossproutGardenPlantSlotId[];
 
 const DREAM_MIST_LOCKED_NATURE_SOURCES: TileSources = {
-  full: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v2.webp'),
-  medium: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v2_512.webp'),
-  thumb: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v2_256.webp'),
+  full: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v4.webp'),
+  medium: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v4_512.webp'),
+  thumb: require('../../../assets/images/katchimeras/world/hex/dream_mist_locked_hex_tile_v4_256.webp'),
 };
-const DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['dream_mist_locked_hex_tile_v2.webp'];
+const DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['dream_mist_locked_hex_tile_v4.webp'];
 
 // Each island's existing art is the fallback for every unlocked level.
 // Add a levelArt entry with bundled LODs and measured bounds when bespoke art exists.

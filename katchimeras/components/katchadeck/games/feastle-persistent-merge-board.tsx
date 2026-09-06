@@ -1841,9 +1841,6 @@ function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion, staticFr
     opacity: staticFrame ? 1 : visibility.value * interpolate(pulse.value, [0, 1], [0.96, 1]),
     transform: [{ scale: staticFrame ? 1 : dropScale.value * interpolate(pulse.value, [0, 1], [1, 1.045]) }],
   }));
-  const cornerSize = Math.max(14, geometry.cellSize * 0.29);
-  const arm = Math.max(4, geometry.cellSize * 0.075);
-  const cornerRadius = Math.max(6, arm * 1.65);
   const outset = Math.max(1.5, geometry.cellSize * 0.04);
   return <Animated.View
     accessibilityElementsHidden
@@ -1854,19 +1851,12 @@ function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion, staticFr
       { height: frame.bounds.height + outset * 2, left: frame.bounds.left - outset, top: frame.bounds.top - outset, width: frame.bounds.width + outset * 2 },
       animatedStyle,
     ]}>
-    {(['topLeft', 'topRight', 'bottomLeft', 'bottomRight'] as const).map((position) => <View
-      key={position}
-      style={[
-        styles.selectionCorner,
-        { height: cornerSize, width: cornerSize },
-        position === 'topLeft' && styles.selectionCornerTopLeft,
-        position === 'topRight' && styles.selectionCornerTopRight,
-        position === 'bottomLeft' && styles.selectionCornerBottomLeft,
-        position === 'bottomRight' && styles.selectionCornerBottomRight,
-      ]}>
-      <View style={[styles.selectionCornerOutline, { borderLeftWidth: arm + 2, borderTopLeftRadius: cornerRadius + 1, borderTopWidth: arm + 2 }]} />
-      <View style={[styles.selectionCornerFill, { borderLeftWidth: arm, borderTopLeftRadius: cornerRadius, borderTopWidth: arm }]} />
-    </View>)}
+    <Image
+      source={require('@/assets/images/katchimeras/merge-world/ui/selection-corners-v1.png')}
+      style={StyleSheet.absoluteFillObject}
+      contentFit="fill"
+      transition={0}
+    />
   </Animated.View>;
 }
 
@@ -2015,13 +2005,6 @@ const styles = StyleSheet.create({
   spriteArtSurface: { position: 'absolute' },
   matchHint: { alignItems: 'center', justifyContent: 'center' },
   selectedCorners: { position: 'absolute', zIndex: 1300 },
-  selectionCorner: { position: 'absolute' },
-  selectionCornerOutline: { ...StyleSheet.absoluteFillObject, borderColor: '#075B69', borderCurve: 'continuous' },
-  selectionCornerFill: { borderColor: '#18D5E6', borderCurve: 'continuous', bottom: 1, left: 1, position: 'absolute', right: 1, top: 1 },
-  selectionCornerTopLeft: { left: 0, top: 0 },
-  selectionCornerTopRight: { right: 0, top: 0, transform: [{ rotate: '90deg' }] },
-  selectionCornerBottomLeft: { bottom: 0, left: 0, transform: [{ rotate: '-90deg' }] },
-  selectionCornerBottomRight: { bottom: 0, right: 0, transform: [{ rotate: '180deg' }] },
   familyArt: { alignItems: 'center', justifyContent: 'center' },
   familyDisc: { alignItems: 'center', borderColor: 'rgba(255,244,213,0.65)', borderRadius: 16, borderWidth: 2, boxShadow: '0 3px 8px rgba(38,19,11,0.32)', height: '76%', justifyContent: 'center', width: '76%' },
   dreamEchoArt: { alignItems: 'center', justifyContent: 'center', position: 'relative' },

@@ -1,0 +1,3 @@
+Built-in imagegen edit; reference: dream_mist_locked_hex_tile_v3.webp.
+
+Keep the image the same, only correct the art style: cozy 3D toy diorama, soft cushiony shapes and soft bevels, very low texture detail, smooth simple materials.
