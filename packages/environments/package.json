@@ -1,0 +1,27 @@
+{
+  "name": "@incubator/environments",
+  "version": "0.1.0",
+  "private": false,
+  "exports": {
+    "./cinematic-gesture": "./src/cinematic-gesture.ts",
+    "./cinematic": "./src/cinematic.tsx",
+    "./hex-tile": "./src/hex-tile.tsx",
+    "./hex": "./src/hex.ts",
+    "./image-resolution": "./src/image-resolution.ts",
+    "./progression-context": "./src/progression-context.tsx",
+    "./seamless-image": "./src/seamless-image.tsx",
+    "./upgrade-effects": "./src/upgrade-effects.tsx",
+    "./upgrade-presentation": "./src/upgrade-presentation.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "expo-image": "~3.0.11",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
+    "expo-linear-gradient": "~15.0.8"
+  }
+}

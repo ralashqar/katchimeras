@@ -1,0 +1,40 @@
+/** @type {import('@bacons/apple-targets').Config} */
+module.exports = {
+  type: 'widget',
+  name: 'KatchimeraWidget',
+  displayName: 'Katchimeras',
+  deploymentTarget: '17.0',
+  bundleIdentifier: '.widget',
+  colors: {
+    $accent: '#FFC36B',
+    ink: '#0C0A14',
+  },
+  images: {
+    "egg": "../../../../art/assets/images/katchimeras/cutouts/egg-base.png",
+    "voltstep": "../../../../art/assets/images/katchimeras/cutouts/voltstep.png",
+    "hearthsip": "../../../../art/assets/images/katchimeras/cutouts/hearthsip.png",
+    "glimmuse": "../../../../art/assets/images/katchimeras/cutouts/glimmuse.png",
+    "skysette": "../../../../art/assets/images/katchimeras/cutouts/skysette.png",
+    "creamalume": "../../../../art/assets/images/katchimeras/cutouts/creamalume.png",
+    "gatherglow": "../../../../art/assets/images/katchimeras/cutouts/gatherglow.png",
+    "mossprout": "../../../../art/assets/images/katchimeras/cutouts/mossprout.png",
+    "lattelet": "../../../../art/assets/images/katchimeras/cutouts/lattelet.png",
+    "sprintail": "../../../../art/assets/images/katchimeras/cutouts/sprintail.png",
+    "neonpoko": "../../../../art/assets/images/katchimeras/cutouts/neonpoko.png",
+    "crumbun": "../../../../art/assets/images/katchimeras/cutouts/crumbun.png",
+    "hayhorn": "../../../../art/assets/images/katchimeras/cutouts/hayhorn.png",
+    "ironette": "../../../../art/assets/images/katchimeras/cutouts/ironette.png",
+    "bedrotte": "../../../../art/assets/images/katchimeras/cutouts/bedrotte.png",
+    "steppling": "../../../../art/assets/images/katchimeras/cutouts/steppling.png",
+    "errandimp": "../../../../art/assets/images/katchimeras/cutouts/errandimp.png",
+    "quietome": "../../../../art/assets/images/katchimeras/cutouts/quietome.png",
+    "relicoon": "../../../../art/assets/images/katchimeras/cutouts/relicoon.png",
+    "shellio": "../../../../art/assets/images/katchimeras/cutouts/shellio.png",
+    "flickerbun": "../../../../art/assets/images/katchimeras/cutouts/flickerbun.png",
+    "baristabbit": "../../../../art/assets/images/katchimeras/cutouts/baristabbit.png",
+    "pulsepounce": "../../../../art/assets/images/katchimeras/cutouts/hayhorn.png"
+},
+  entitlements: {
+    'com.apple.security.application-groups': ['group.com.daruk.katchimeras'],
+  },
+};

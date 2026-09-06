@@ -1,0 +1,20 @@
+{
+  "name": "@incubator/game-ui",
+  "version": "0.1.0",
+  "exports": {
+    "./contracts": "./src/contracts.ts",
+    "./currency": "./src/currency.ts",
+    "./game-primitives": "./src/game-primitives.tsx",
+    "./game-surface": "./src/game-surface.tsx",
+    "./theme": "./src/theme.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "expo-image": "~3.0.11",
+    "expo-linear-gradient": "~15.0.8"
+  }
+}

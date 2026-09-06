@@ -1,0 +1,6 @@
+{
+  "name": "@incubator/art-pipeline",
+  "version": "0.1.0",
+  "files": ["scripts/*.py", "scripts/*.json", "scripts/*.cjs", "context.cjs", "incubator_context.py"],
+  "exports": { "./context": "./context.cjs", "./scripts/*": "./scripts/*" }
+}

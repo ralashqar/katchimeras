@@ -1,0 +1,26 @@
+{
+  "name": "@incubator/world-editor",
+  "version": "0.1.0",
+  "files": [
+    "src",
+    "lib",
+    "index.html",
+    "vite.config.mjs",
+    "server.cjs",
+    "check.cjs"
+  ],
+  "exports": {
+    "./server": "./server.cjs",
+    "./check": "./check.cjs"
+  },
+  "dependencies": {
+    "@incubator/art-pipeline": "0.1.0"
+  },
+  "peerDependencies": {
+    "express": "^5.2.1",
+    "vite": "^6.4.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  }
+}

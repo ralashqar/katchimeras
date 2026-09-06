@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "output": {
+    "size": 256,
+    "subjectExtent": 210,
+    "quality": 84,
+    "hardFileLimitBytes": 51200,
+    "gridRows": 4,
+    "gridColumns": 4
+  },
+  "sheets": [{
+    "id": "mossprout-progression",
+    "cells": [
+      { "row": 0, "column": 0, "definitionId": "nature:keepsake:1", "file": "nature-keepsake-1-dew-bead.webp" },
+      { "row": 0, "column": 1, "definitionId": "nature:keepsake:2", "file": "nature-keepsake-2-pressed-leaf.webp" },
+      { "row": 0, "column": 2, "definitionId": "nature:keepsake:3", "file": "nature-keepsake-3-memory-sprig.webp" },
+      { "row": 0, "column": 3, "definitionId": "nature:keepsake:4", "file": "nature-keepsake-4-field-journal.webp" },
+      { "row": 1, "column": 0, "definitionId": "nature:keepsake:5", "file": "nature-keepsake-5-memory-terrarium.webp" },
+      { "row": 1, "column": 1, "definitionId": "nature:keepsake:6", "file": "nature-keepsake-6-living-archive.webp" },
+      { "row": 1, "column": 2, "definitionId": "hybrid:memory-bloom", "file": "hybrid-memory-bloom.webp" },
+      { "row": 1, "column": 3, "definitionId": "hybrid:rain-mirror", "file": "hybrid-rain-mirror.webp" },
+      { "row": 2, "column": 0, "definitionId": "hybrid:heartwood-sanctuary", "file": "hybrid-heartwood-sanctuary.webp" },
+      { "row": 2, "column": 1, "definitionId": "art:memory-nursery-1", "file": "memory-nursery-stage-1.webp" },
+      { "row": 2, "column": 2, "definitionId": "art:memory-nursery-2", "file": "memory-nursery-stage-2.webp" },
+      { "row": 2, "column": 3, "definitionId": "art:memory-nursery-3", "file": "memory-nursery-stage-3.webp" },
+      { "row": 3, "column": 0, "definitionId": "art:wild-garden-2", "file": "wild-garden-stage-2.webp" },
+      { "row": 3, "column": 1, "definitionId": "art:wild-garden-3", "file": "wild-garden-stage-3.webp" },
+      { "row": 3, "column": 2, "definitionId": "art:root-parcel-closed", "file": "root-match-parcel-closed.webp" },
+      { "row": 3, "column": 3, "definitionId": "art:root-parcel-open", "file": "root-match-parcel-open.webp" }
+    ]
+  }]
+}

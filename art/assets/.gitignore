@@ -1,0 +1,6 @@
+# Preserve the existing policy for local working PNGs in the moved art tree.
+*.orig.*
+/images/katchimeras/merge-world/ui/*.png
+!/images/katchimeras/merge-world/ui/selection-corners-v1.png
+!/images/katchimeras/merge-world/ui/glow.png
+!/images/katchimeras/merge-world/ui/glow-swirl-v3.png

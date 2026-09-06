@@ -1,0 +1,15 @@
+{
+  "name": "@incubator/merge",
+  "version": "0.1.0",
+  "exports": {
+    "./board-geometry": "./src/board-geometry.ts",
+    "./order-window": "./src/order-window.ts",
+    "./orders": "./src/orders.ts",
+    "./save-deadline": "./src/save-deadline.ts",
+    "./serial-work-queue": "./src/serial-work-queue.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {}
+}

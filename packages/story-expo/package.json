@@ -1,0 +1,23 @@
+{
+  "name": "@incubator/story-expo",
+  "version": "0.1.0",
+  "private": false,
+  "exports": {
+    "./navigation": "./src/navigation.tsx",
+    "./repository": "./src/repository.ts",
+    "./surface-host": "./src/surface-host.tsx",
+    "./surface": "./src/surface.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "expo-sqlite": "~16.0.10",
+    "react": "19.1.0",
+    "expo-router": "~6.0.23"
+  },
+  "dependencies": {
+    "@incubator/story": "0.1.0",
+    "@incubator/presentation": "0.1.0"
+  }
+}

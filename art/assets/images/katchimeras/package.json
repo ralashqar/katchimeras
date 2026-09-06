@@ -1,0 +1,14 @@
+{
+  "name": "@incubator/art-characters",
+  "version": "0.1.0",
+  "exports": {
+    "./*": "./*"
+  },
+  "files": [
+    "*.png",
+    "*.webp",
+    "*.jpg",
+    "*.jpeg",
+    "*.json"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "atlasSize": 1024,
+  "contentSize": 128,
+  "slotPitch": 144,
+  "pages": [
+    {
+      "id": "core",
+      "file": "mossprout-merge-core-atlas.webp",
+      "entries": [
+        ["item:nature:garden:1", "items/nature-garden-1-seed.webp"],
+        ["item:nature:garden:2", "items/nature-garden-2-sprout.webp"],
+        ["item:nature:garden:3", "items/nature-garden-3-plant.webp"],
+        ["item:nature:garden:4", "items/nature-garden-4-flower.webp"],
+        ["item:nature:garden:5", "items/nature-garden-5-rare-flower.webp"],
+        ["item:nature:garden:6", "items/nature-garden-6-magical-plant.webp"],
+        ["item:nature:garden:7", "items/nature-garden-7-ancient-tree.webp"],
+        ["item:nature:waterside:1", "items/nature-waterside-1-pebble.webp"],
+        ["item:nature:waterside:2", "items/nature-waterside-2-shell.webp"],
+        ["item:nature:waterside:3", "items/nature-waterside-3-tidepool.webp"],
+        ["item:nature:waterside:4", "items/nature-waterside-4-water-lily.webp"],
+        ["item:nature:waterside:5", "items/nature-waterside-5-moonlit-cove.webp"],
+        ["item:nature:waterside:6", "items/nature-waterside-6-ocean-sanctuary.webp"],
+        ["generator:wild-garden:1", "generators/wild-garden.webp"],
+        ["generator:wild-garden:2", "items/wild-garden-stage-2.webp"],
+        ["generator:wild-garden:3", "items/wild-garden-stage-3.webp"],
+        ["generator:wild-garden:ftue", "generators/mossprout-sprouting-pot.webp"]
+      ]
+    },
+    {
+      "id": "progression",
+      "file": "mossprout-merge-progression-atlas.webp",
+      "entries": [
+        ["item:nature:keepsake:1", "items/nature-keepsake-1-dew-bead.webp"],
+        ["item:nature:keepsake:2", "items/nature-keepsake-2-pressed-leaf.webp"],
+        ["item:nature:keepsake:3", "items/nature-keepsake-3-memory-sprig.webp"],
+        ["item:nature:keepsake:4", "items/nature-keepsake-4-field-journal.webp"],
+        ["item:nature:keepsake:5", "items/nature-keepsake-5-memory-terrarium.webp"],
+        ["item:nature:keepsake:6", "items/nature-keepsake-6-living-archive.webp"],
+        ["item:hybrid:memory-bloom", "items/hybrid-memory-bloom.webp"],
+        ["item:hybrid:rain-mirror", "items/hybrid-rain-mirror.webp"],
+        ["item:hybrid:heartwood-sanctuary", "items/hybrid-heartwood-sanctuary.webp"],
+        ["generator:memory-nursery:1", "items/memory-nursery-stage-1.webp"],
+        ["generator:memory-nursery:2", "items/memory-nursery-stage-2.webp"],
+        ["generator:memory-nursery:3", "items/memory-nursery-stage-3.webp"],
+        ["reward:mossprout-root-returning-seed", "items/mossprout-root-returning-seed.webp"],
+        ["reward:mossprout-root-rain-kept-acorn", "items/mossprout-root-rain-kept-acorn.webp"],
+        ["reward:mossprout-root-nursery-keepsake", "items/mossprout-root-nursery-keepsake.webp"],
+        ["reward:mossprout-root-heartseed", "items/mossprout-root-heartseed.webp"],
+        ["reward:root-match-parcel-closed", "items/root-match-parcel-closed.webp"],
+        ["reward:root-match-parcel-open", "items/root-match-parcel-open.webp"],
+        ["reward:mossprout-fern-wisp-nest", "items/mossprout-fern-wisp-nest.webp"],
+        ["reward:mossprout-grovelight-wisp-nest", "items/mossprout-grovelight-wisp-nest.webp"],
+        ["reward:mossprout-heartwood-landmark", "items/mossprout-heartwood-landmark.webp"]
+      ]
+    }
+  ]
+}

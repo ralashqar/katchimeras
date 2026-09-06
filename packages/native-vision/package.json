@@ -1,0 +1,19 @@
+{
+  "name": "@incubator/native-vision",
+  "version": "0.1.0",
+  "main": "index.ts",
+  "files": [
+    "index.ts",
+    "src",
+    "ios",
+    "android",
+    "expo-module.config.json"
+  ],
+  "peerDependencies": {
+    "expo-modules-core": "3.0.29"
+  },
+  "exports": {
+    ".": "./index.ts",
+    "./KatchimeraVision": "./src/KatchimeraVision.ts"
+  }
+}

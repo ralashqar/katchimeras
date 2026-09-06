@@ -1,0 +1,17 @@
+{
+  "name": "@incubator/avatar",
+  "version": "0.1.0",
+  "exports": {
+    "./expressions": "./src/expressions.ts",
+    "./layered-avatar": "./src/layered-avatar.tsx",
+    "./layout": "./src/layout.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "expo-image": "~3.0.11"
+  }
+}

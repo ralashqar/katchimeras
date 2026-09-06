@@ -1,0 +1,17 @@
+{
+  "name": "@incubator/art-achievements",
+  "version": "0.1.0",
+  "exports": {
+    "./*": "./*"
+  },
+  "files": [
+    "**/*.webp",
+    "**/*.png",
+    "**/*.jpg",
+    "**/*.jpeg",
+    "**/*.ttf",
+    "**/*.otf",
+    "**/*.riv",
+    "**/*.json"
+  ]
+}

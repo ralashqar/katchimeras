@@ -1,0 +1,34 @@
+{
+  "name": "game-incubator",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tooling/*",
+    "art/assets/images/katchimeras",
+    "art/assets/images/katchimeras/*",
+    "art/assets/fonts",
+    "art/assets/images"
+  ],
+  "scripts": {
+    "start": "npm run start --workspace=katchimeras --",
+    "start:dev-client": "npm run start:dev-client --workspace=katchimeras --",
+    "typecheck": "npm run typecheck --workspace=katchimeras && tsc --noEmit -p tsconfig.packages.json",
+    "lint": "npm run lint --workspace=katchimeras && npm run lint:shared",
+    "check": "npm run check:boundaries && npm run check --workspace=katchimeras && npm run test:packages",
+    "check:boundaries": "node tooling/workspace/check-boundaries.cjs",
+    "test:packages": "tsx --test tests/packages/*.test.ts",
+    "verify:consumer": "node tooling/workspace/verify-consumer.cjs",
+    "build:ios:preview": "npm run build:ios:preview --workspace=katchimeras",
+    "lint:shared": "eslint packages tests/packages",
+    "test:game": "node tooling/workspace/test-game.cjs",
+    "release:pack": "node tooling/workspace/pack-shared.cjs",
+    "verify:workspace": "npm run check:boundaries && npm run typecheck && npm run lint:shared && npm run test:packages && npm run verify:consumer"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2",
+    "tsx": "^4.23.0",
+    "@types/react": "~19.1.0"
+  }
+}

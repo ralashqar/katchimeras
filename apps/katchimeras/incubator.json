@@ -1,0 +1,67 @@
+{
+  "id": "katchimeras",
+  "contentRoots": {
+    "assets": "../../art/assets",
+    "design": "../../art-source/katchimeras",
+    "modules/katchimera-foundation": "../../packages/native-foundation",
+    "modules/katchimera-health-routes": "../../packages/native-health-routes",
+    "modules/katchimera-map-search": "../../packages/native-map-search",
+    "modules/katchimera-semantic": "../../packages/native-semantic",
+    "modules/katchimera-speech": "../../packages/native-speech",
+    "modules/katchimera-vision": "../../packages/native-vision"
+  },
+  "verificationSources": {
+    "components/katchadeck/ui/game-surface.tsx": [
+      "@incubator/game-ui/game-surface"
+    ],
+    "components/katchadeck/ui/game-primitives.tsx": [
+      "@incubator/game-ui/game-primitives"
+    ],
+    "components/katchadeck/egg-avatar/egg-avatar-artwork.tsx": [
+      "@incubator/avatar/layered-avatar",
+      "@incubator/avatar/layout"
+    ],
+    "components/katchadeck/egg-avatar/use-egg-expression-player.ts": [
+      "@incubator/avatar/expressions"
+    ],
+    "components/katchadeck/home/today-exploration-background.tsx": [
+      "@incubator/environments/cinematic"
+    ],
+    "components/katchadeck/world/kingdom-hex-canvas.tsx": [
+      "@incubator/environments/hex-tile"
+    ],
+    "components/katchadeck/world/seamless-world-image.tsx": [
+      "@incubator/environments/seamless-image"
+    ],
+    "components/katchadeck/world/haven-upgrade-effects.tsx": [
+      "@incubator/environments/upgrade-effects"
+    ],
+    "features/navigation/game-screen-transition.tsx": [
+      "@incubator/presentation/screen-transition"
+    ],
+    "features/content-flow/content-flow-director.ts": [
+      "@incubator/story/director"
+    ],
+    "features/content-flow/content-flow-repository.ts": [
+      "@incubator/story-expo/repository"
+    ],
+    "features/content-flow/content-flow-navigation-coordinator.tsx": [
+      "@incubator/story-expo/navigation"
+    ],
+    "features/content-flow/use-content-flow-surface.ts": [
+      "@incubator/story-expo/surface"
+    ],
+    "constants/game-ui.ts": [
+      "@incubator/game-ui/theme"
+    ],
+    "utils/world-hex.ts": [
+      "@incubator/environments/hex"
+    ],
+    "utils/merge-world/engine.ts": [
+      "@incubator/merge/orders"
+    ],
+    "utils/merge-world/board-geometry.ts": [
+      "@incubator/merge/board-geometry"
+    ]
+  }
+}

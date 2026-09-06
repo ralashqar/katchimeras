@@ -1,0 +1,144 @@
+{
+  "packages": [
+    {
+      "name": "@incubator/art-achievements",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/achievements"
+    },
+    {
+      "name": "@incubator/art-action-icons",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/action-icons"
+    },
+    {
+      "name": "@incubator/art-animations",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/animations"
+    },
+    {
+      "name": "@incubator/art-app-icons",
+      "version": "0.1.0",
+      "directory": "art/assets/images"
+    },
+    {
+      "name": "@incubator/art-atmosphere",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/atmosphere"
+    },
+    {
+      "name": "@incubator/art-card-glyphs",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/card-glyphs"
+    },
+    {
+      "name": "@incubator/art-card-icons",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/card-icons"
+    },
+    {
+      "name": "@incubator/art-cards",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/cards"
+    },
+    {
+      "name": "@incubator/art-characters",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras"
+    },
+    {
+      "name": "@incubator/art-cutouts",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/cutouts"
+    },
+    {
+      "name": "@incubator/art-cutouts-lod",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/cutouts_lod"
+    },
+    {
+      "name": "@incubator/art-egg-avatars",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/egg-avatars"
+    },
+    {
+      "name": "@incubator/art-environments",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/environments"
+    },
+    {
+      "name": "@incubator/art-evolution-grids",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/evolution-grids"
+    },
+    {
+      "name": "@incubator/art-fonts",
+      "version": "0.1.0",
+      "directory": "art/assets/fonts"
+    },
+    {
+      "name": "@incubator/art-game-hub",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/game-hub"
+    },
+    {
+      "name": "@incubator/art-hatchlings",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/hatchlings"
+    },
+    {
+      "name": "@incubator/art-hatchlings-lod",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/hatchlings_lod"
+    },
+    {
+      "name": "@incubator/art-manual-journal",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/manual-journal"
+    },
+    {
+      "name": "@incubator/art-merge-world",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/merge-world"
+    },
+    {
+      "name": "@incubator/art-navigation",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/navigation"
+    },
+    {
+      "name": "@incubator/art-quests",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/quests"
+    },
+    {
+      "name": "@incubator/art-today-icons",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/today-icons"
+    },
+    {
+      "name": "@incubator/art-ui",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/ui"
+    },
+    {
+      "name": "@incubator/art-variant-grids",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/variant-grids"
+    },
+    {
+      "name": "@incubator/art-wisps",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/wisps"
+    },
+    {
+      "name": "@incubator/art-world",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/world"
+    },
+    {
+      "name": "@incubator/art-zodiac",
+      "version": "0.1.0",
+      "directory": "art/assets/images/katchimeras/zodiac"
+    }
+  ]
+}

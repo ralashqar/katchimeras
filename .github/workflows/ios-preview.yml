@@ -22,7 +22,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: katchimeras
+        working-directory: apps/katchimeras
 
     steps:
       - name: Check out selected branch
@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: 22.14.0
           cache: npm
-          cache-dependency-path: katchimeras/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -50,7 +50,12 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies
+        working-directory: .
         run: npm ci
+
+      - name: Verify shared packages and game compilation
+        working-directory: .
+        run: npm run verify:workspace
 
       - name: Run preview preflight
         run: npm run build:ios:preview:check

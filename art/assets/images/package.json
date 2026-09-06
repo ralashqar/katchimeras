@@ -1,0 +1,14 @@
+{
+  "name": "@incubator/art-app-icons",
+  "version": "0.1.0",
+  "exports": {
+    "./*": "./*"
+  },
+  "files": [
+    "*.png",
+    "*.webp",
+    "*.jpg",
+    "*.jpeg",
+    "*.json"
+  ]
+}

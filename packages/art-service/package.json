@@ -1,0 +1,18 @@
+{
+  "name": "@incubator/art-service",
+  "version": "0.1.0",
+  "files": [
+    "src",
+    "deno.json"
+  ],
+  "exports": {
+    "./generate-asset": "./src/generate-asset.ts",
+    "./generate-katchimera-art": "./src/generate-katchimera-art.ts",
+    "./remove-image-background": "./src/remove-image-background.ts",
+    "./generate-katchimera-idle": "./src/generate-katchimera-idle.ts",
+    "./generate-player-avatar": "./src/generate-player-avatar.ts"
+  },
+  "incubator": {
+    "runtime": "deno"
+  }
+}

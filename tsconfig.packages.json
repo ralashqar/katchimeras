@@ -1,0 +1,6 @@
+{
+  "extends": "./apps/katchimeras/tsconfig.json",
+  "compilerOptions": { "paths": {}, "noEmit": true },
+  "include": ["packages/**/*.ts", "packages/**/*.tsx", "tests/packages/**/*.ts"],
+  "exclude": ["node_modules", "**/node_modules", "packages/art-service/**"]
+}
