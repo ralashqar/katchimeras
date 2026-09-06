@@ -2,7 +2,9 @@
 # This is the authoritative upload policy for local and GitHub Actions builds.
 
 # EAS defaults
-.git/
+# EAS explicitly tests ignores('.git') after cloning. A trailing slash does
+# not match that check and leaves the repository's packed art blobs in upload.
+.git
 node_modules/
 
 # Repository-local caches and generated output

@@ -17,7 +17,8 @@ Source masters, obsolete art and experiments remain available locally/in Git
 but unused assets are omitted from EAS. Required PNGs, fonts and animation
 resources remain included; WebP is not a safe blanket file-type filter.
 
-The archive check uses the installed EAS copy implementation, verifies every
+The archive check uses the installed EAS Git client (shallow clone followed by
+filtered working-tree copy), verifies every
 required asset survives, rejects known development directories, creates a
 compressed tar archive and enforces a 1 GiB budget below EAS's 2 GB limit.
 Its temporary copy and archive are removed afterward. It does not submit a
@@ -27,7 +28,17 @@ See `eas-asset-audit.md` for the current required/excluded totals. To retire
 additional legacy runtime art, remove its obsolete code/catalogue references
 first, regenerate this audit, and verify native exports before deleting masters.
 
-Verified on 2026-09-06: 178.4 MiB compressed, 4,179 archived files and 2,647
-required assets retained. The refreshed asset exclusions remove 900.9 MiB of
-unused assets in addition to source design folders. Both iOS and Android Expo
-exports completed successfully. CI measures each new archive independently.
+The root policy must contain `.git` without a trailing slash. EAS's Git client
+checks `ignore.ignores('.git')` explicitly before deleting its cloned database.
+`.git/` does not match that literal check: source-art blobs remain in the Git
+object packs even though their working files were correctly excluded.
+
+The original 178.4 MiB measurement checked only the filtered working files and
+missed this extra database. The strengthened check rejects that rule error
+before cloning and verifies the resulting clone has no `.git` at all.
+The refreshed asset exclusions remove 900.9 MiB of unused assets in addition
+to source design folders. Both iOS and Android Expo exports pass, and CI now
+measures the Git-backed archive rather than a file-copy approximation.
+
+Full EAS Git-client verification after the fix: 178.4 MiB compressed, 4,179
+files, all 2,647 required assets present, and no `.git` database in the archive.

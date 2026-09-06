@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /* global __dirname */
 
-// Use the installed EAS copy implementation, not a second interpretation of
+// Use the installed EAS Git implementation, not a second interpretation of
 // ignore patterns. No credentials, provisioning, or build submission is needed.
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { makeShallowCopyAsync } = require('eas-cli/build/vcs/local');
+const { Ignore } = require('eas-cli/build/vcs/local');
+const GitClient = require('eas-cli/build/vcs/clients/git').default;
 
 const projectRoot = path.resolve(__dirname, '..');
 const repositoryRoot = path.resolve(projectRoot, '..');
@@ -17,12 +18,19 @@ async function main() {
   if (!fs.existsSync(path.join(repositoryRoot, '.easignore'))) {
     throw new Error('Missing repository-root .easignore; nested app exclusions are not sufficient.');
   }
+  const ignore = await Ignore.createForCheckingAsync(repositoryRoot);
+  if (!ignore.ignores('.git')) {
+    throw new Error('Root .easignore must exclude the literal .git path (without trailing slash), otherwise EAS uploads Git object packs.');
+  }
   const requiredPath = path.join(projectRoot, 'dist/asset-audit/required-assets.json');
   if (!fs.existsSync(requiredPath)) throw new Error('Run npm run assets:audit:write before checking the archive.');
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'katchimeras-eas-archive-'));
   try {
     const stage = path.join(work, 'project');
-    await makeShallowCopyAsync(repositoryRoot, stage);
+    console.log('Preparing archive through EAS Git clone and working-tree copy...');
+    const vcs = new GitClient({ requireCommit: false, maybeCwdOverride: projectRoot });
+    await vcs.makeShallowCopyAsync(stage);
+    if (fs.existsSync(path.join(stage, '.git'))) throw new Error('Git database leaked into EAS archive.');
     const required = JSON.parse(fs.readFileSync(requiredPath, 'utf8'));
     for (const asset of required) {
       if (!fs.existsSync(path.join(stage, 'katchimeras', asset))) {
