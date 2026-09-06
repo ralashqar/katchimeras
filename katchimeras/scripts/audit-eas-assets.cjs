@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global __dirname */
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -8,7 +9,8 @@ const { spawnSync } = require('node:child_process');
 const projectRoot = path.resolve(__dirname, '..');
 const assetsRoot = path.join(projectRoot, 'assets');
 const auditRoot = path.join(projectRoot, 'dist', 'asset-audit');
-const easIgnorePath = path.join(projectRoot, '.easignore');
+const repositoryRoot = path.resolve(projectRoot, '..');
+const easIgnorePath = path.join(repositoryRoot, '.easignore');
 const reportPath = path.join(projectRoot, 'docs', 'eas-asset-audit.md');
 const startMarker = '# BEGIN GENERATED UNUSED ASSETS';
 const endMarker = '# END GENERATED UNUSED ASSETS';
@@ -31,17 +33,18 @@ function walkFiles(directory) {
 }
 
 function runExport(platform) {
+  console.log(`Exporting ${platform} runtime asset inventory...`);
   const output = path.join(auditRoot, platform);
   fs.rmSync(output, { recursive: true, force: true });
   const expoCli = path.join(projectRoot, 'node_modules', 'expo', 'bin', 'cli');
   const result = spawnSync(
     process.execPath,
-    [expoCli, 'export', '--platform', platform, '--output-dir', output, '--dump-assetmap'],
+    [expoCli, 'export', '--platform', platform, '--output-dir', output, '--dump-assetmap', '--max-workers', '2'],
     {
       cwd: projectRoot,
       encoding: 'utf8',
       maxBuffer: 50 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'inherit', 'inherit'],
     },
   );
   if (result.status !== 0) {
@@ -206,7 +209,7 @@ function buildManagedSection(unused) {
   return [
     startMarker,
     '# Generated from the union of iOS/Android Metro assets plus native config assets.',
-    ...unused.map((item) => `/${projectRelative(item.absolute)}`),
+    ...unused.map((item) => `/${slash(path.relative(repositoryRoot, item.absolute))}`),
     endMarker,
   ].join('\n');
 }
@@ -285,6 +288,8 @@ function main() {
     return ![...itemReasons].some((reason) => reason.startsWith('Metro '));
   });
   const unused = allAssets.filter((item) => !required.has(item.relative));
+  fs.mkdirSync(auditRoot, { recursive: true });
+  fs.writeFileSync(path.join(auditRoot, 'required-assets.json'), JSON.stringify([...required].sort(), null, 2));
   const managed = buildManagedSection(unused);
   const currentIgnore = fs.readFileSync(easIgnorePath, 'utf8');
   const nextIgnore = replaceManagedSection(currentIgnore, managed);

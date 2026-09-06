@@ -97,6 +97,7 @@
     "assets:audit": "node scripts/audit-eas-assets.cjs",
     "assets:audit:check": "node scripts/audit-eas-assets.cjs --check",
     "assets:audit:write": "node scripts/audit-eas-assets.cjs --write",
+    "build:archive:check": "node scripts/check-eas-archive.cjs",
     "local-env:guide": "python scripts/generate-local-environment-guide.py",
     "local-env:placeholders": "python scripts/generate-local-environment-placeholders.py",
     "eas:login": "eas login",

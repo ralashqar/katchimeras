@@ -58,6 +58,12 @@ jobs:
       - name: Verify story flows
         run: npm run verify:story-flows
 
+      - name: Refresh runtime asset exclusions
+        run: npm run assets:audit:write
+
+      - name: Verify upload contents and archive size
+        run: npm run build:archive:check
+
       - name: Build iOS preview
         env:
           REFRESH_DEVICES: ${{ inputs.refresh_devices }}
