@@ -19,7 +19,8 @@ resources remain included; WebP is not a safe blanket file-type filter.
 
 The archive check uses the installed EAS Git client (shallow clone followed by
 filtered working-tree copy), verifies every
-required asset survives, rejects known development directories, creates a
+required asset survives, verifies all tracked local module and target files
+byte-for-byte, rejects known development/generated app directories, creates a
 compressed tar archive and enforces a 1 GiB budget below EAS's 2 GB limit.
 Its temporary copy and archive are removed afterward. It does not submit a
 build or touch signing credentials. Preview CI runs both commands before EAS.
@@ -40,5 +41,9 @@ The refreshed asset exclusions remove 900.9 MiB of unused assets in addition
 to source design folders. Both iOS and Android Expo exports pass, and CI now
 measures the Git-backed archive rather than a file-copy approximation.
 
-Full EAS Git-client verification after the fix: 178.4 MiB compressed, 4,179
-files, all 2,647 required assets present, and no `.git` database in the archive.
+The generated native project exclusions must be anchored to `/katchimeras/ios/`
+and `/katchimeras/android/`. An unanchored `ios/` rule also strips the local
+modules' podspecs and Swift sources, causing `pod install` to fail. Those sources
+are not represented in Metro's asset map, so the archive check separately
+enumerates tracked files under `modules/` and `targets/`, checks the ignore policy
+before cloning, and verifies their contents in the staged archive.

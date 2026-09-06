@@ -22,6 +22,18 @@ async function main() {
   if (!ignore.ignores('.git')) {
     throw new Error('Root .easignore must exclude the literal .git path (without trailing slash), otherwise EAS uploads Git object packs.');
   }
+  // Metro's asset map does not include Swift, podspecs, or extension sources.
+  // Check every tracked local module/target file before cloning and in the copy.
+  const nativeListing = spawnSync('git', ['ls-files', '-z', '--', 'katchimeras/modules', 'katchimeras/targets'], {
+    cwd: repositoryRoot, encoding: 'utf8',
+  });
+  if (nativeListing.error) throw nativeListing.error;
+  if (nativeListing.status !== 0) throw new Error('Could not enumerate required native module and target files.');
+  const nativeFiles = nativeListing.stdout.split('\0').filter(Boolean);
+  if (!nativeFiles.some((file) => file.endsWith('.podspec'))) throw new Error('No local module podspecs found for archive verification.');
+  for (const file of nativeFiles) {
+    if (ignore.ignores(file)) throw new Error(`Archive excludes required native module/target source: ${file}`);
+  }
   const requiredPath = path.join(projectRoot, 'dist/asset-audit/required-assets.json');
   if (!fs.existsSync(requiredPath)) throw new Error('Run npm run assets:audit:write before checking the archive.');
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'katchimeras-eas-archive-'));
@@ -31,6 +43,12 @@ async function main() {
     const vcs = new GitClient({ requireCommit: false, maybeCwdOverride: projectRoot });
     await vcs.makeShallowCopyAsync(stage);
     if (fs.existsSync(path.join(stage, '.git'))) throw new Error('Git database leaked into EAS archive.');
+    for (const file of nativeFiles) {
+      const copied = path.join(stage, file);
+      if (!fs.existsSync(copied) || !fs.readFileSync(copied).equals(fs.readFileSync(path.join(repositoryRoot, file)))) {
+        throw new Error(`Archive is missing or changed required native module/target source: ${file}`);
+      }
+    }
     const required = JSON.parse(fs.readFileSync(requiredPath, 'utf8'));
     for (const asset of required) {
       if (!fs.existsSync(path.join(stage, 'katchimeras', asset))) {
@@ -48,7 +66,7 @@ async function main() {
     walk(stage);
     // Directory-only ignore rules may leave empty directories in EAS's copy.
     // Reject leaked contents rather than harmless empty directory entries.
-    for (const forbidden of ['design', '.tmp-steppling-baseline', 'katchimeras/design', 'katchimeras/artifacts', 'katchimeras/node_modules', 'katchimeras/dist']) {
+    for (const forbidden of ['design', '.tmp-steppling-baseline', 'katchimeras/design', 'katchimeras/artifacts', 'katchimeras/node_modules', 'katchimeras/dist', 'katchimeras/ios', 'katchimeras/android']) {
       if (files.some((file) => file.path.split(path.sep).join('/').startsWith(`${forbidden}/`))) {
         throw new Error(`Development-only files leaked into archive: ${forbidden}`);
       }
@@ -59,6 +77,7 @@ async function main() {
     if (result.status !== 0) throw new Error('Could not package archive for size verification.');
     const size = fs.statSync(archive).size;
     console.log(`Archive: ${(size / 1048576).toFixed(1)} MiB compressed; ${files.length} files; ${required.length} required assets verified.`);
+    console.log(`${nativeFiles.length} native module/target files verified byte-for-byte (including podspecs and Swift sources).`);
     console.log('Largest included files:');
     for (const file of files.sort((a, b) => b.bytes - a.bytes).slice(0, 10)) console.log(`  ${(file.bytes / 1048576).toFixed(1)} MiB  ${file.path}`);
     if (size > limit) throw new Error('Archive exceeds the 1 GiB project budget. Refresh exclusions or optimize the largest runtime assets.');

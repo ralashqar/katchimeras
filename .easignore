@@ -22,9 +22,9 @@ expo-env.d.ts
 .tmp/
 tmp/
 
-# Generated native projects (EAS runs Expo prebuild)
-ios/
-android/
+# Generated app projects only; modules/*/ios contains required native sources.
+/katchimeras/ios/
+/katchimeras/android/
 .kotlin/
 *.orig.*
 *.jks
