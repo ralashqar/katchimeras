@@ -85,12 +85,14 @@ test('read cursors clamp to available dialogue and do not mutate currency or til
 test('panel waits for exit animation, keeps shortage explicit, and reading never buys', async () => {
   const motion = nativeMotionHarness(); const host = (name: string) => name as unknown as React.ComponentType<Record<string, unknown>>;
   const readCalls: unknown[] = [];
+  const frames: (() => void)[] = [];
   const module = loadNativeModule('components/katchadeck/world/world-upgrade-panel.tsx', {
     'react-native': { ...nativeViews, Pressable: 'Pressable', Text: 'Text', Modal: 'Modal', ScrollView: 'ScrollView', AccessibilityInfo: { setAccessibilityFocus() {} }, findNodeHandle: () => null, BackHandler: { addEventListener: () => ({ remove() {} }) } },
     'react-native-reanimated': { ...motion.animated, withSpring: (to: number) => motion.animated.withTiming(to, { duration: 300 }) },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     'expo-image': { Image: host('Image') },
-    './haven-character-portrait': { HavenCharacterPortrait: host('Portrait') },
+    './world-upgrade-narrative': { WorldUpgradeNarrative: host('Narrative') },
+    '@/constants/game-currency-art': { GAME_CURRENCY_ART: { coins: 42 } },
     '@/constants/katcha-ui': { KatchaUI: { type: { companionCardTitle: { fontFamily: 'Fredoka' }, companionDisplay: { fontFamily: 'Fredoka' }, companionBody: { fontFamily: 'Manrope' } } } },
     '@/constants/theme': { AppFontFamilies: { fredokaBold: 'Fredoka' } },
     '@/components/katchadeck/ui/katcha-button': { KatchaButton: host('Button') },
@@ -100,29 +102,53 @@ test('panel waits for exit animation, keeps shortage explicit, and reading never
     '@/features/world-upgrades/world-upgrade-progress': { upgradeCompletedLevel: () => 0 },
     '@/utils/merge-world/repository': { saveUpgradeStoryRead: async (...args: unknown[]) => { readCalls.push(args); } },
     '@/components/katchadeck/onboarding/companion-ftue-coachmark': { CompanionFtueCoachmark: host('Coachmark') },
-  }, { setTimeout, clearTimeout });
+  }, { setTimeout, clearTimeout, requestAnimationFrame: (callback: () => void) => { frames.push(callback); return frames.length; }, cancelAnimationFrame() {} });
   const Panel = module.WorldUpgradePanel as React.ComponentType<Record<string, unknown>>;
   let closes = 0; let purchases = 0;
   const world = { ...initial(), coins: 0 };
   const props = { world, offer: worldUpgradeOffers(world)[0], busy: false, actionRef: { current: null }, onClose: () => closes++, onConfirm: () => purchases++, onGarden() {}, saveRead: async (...args: unknown[]) => { readCalls.push(args); } };
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<Panel {...props} />); motion.advance(400); });
+  const panelMotion = () => tree!.root.findByType(host('AnimatedView')).props.style[2].read();
+  assert.equal(panelMotion().opacity, 0, 'cold mount is invisible until native layout completes');
+  assert.equal(panelMotion().transform[0].scale, 1, 'first scroll measurement happens at full scale');
+  const scroller = tree!.root.findByType(host('ScrollView'));
+  assert.equal(scroller.props.removeClippedSubviews, false);
+  await act(async () => scroller.props.onLayout({ nativeEvent: { layout: { width: 0, height: 0 } } }));
+  assert.equal(frames.length, 0, 'empty native layout cannot begin the entrance');
+  const measuredViews = tree!.root.findAllByType(host('View')).filter((node) => node.props.onLayout);
+  await act(async () => {
+    measuredViews[0].props.onLayout({ nativeEvent: { layout: { height: 650 } } });
+    measuredViews[1].props.onLayout({ nativeEvent: { layout: { height: 86 } } });
+    scroller.props.onContentSizeChange(332, 440);
+  });
+  assert.equal(tree!.root.findByType(host('AnimatedView')).props.style[1].height, 530, 'card fits complete content instead of stopping at 480');
+  await act(async () => scroller.props.onLayout({ nativeEvent: { layout: { width: 332, height: 440 } } }));
+  assert.equal(panelMotion().opacity, 0, 'valid layout still waits for a frame');
+  await act(async () => { frames.splice(0).forEach((frame) => frame()); motion.advance(300); });
+  assert.equal(panelMotion().opacity, 1); assert.equal(panelMotion().transform[0].scale, 1);
+  await act(async () => scroller.props.onLayout({ nativeEvent: { layout: { width: 332, height: 440 } } }));
+  assert.equal(frames.length, 0, 'later content layouts do not restart the entrance');
+  assert.equal(scroller.props.scrollEnabled, false, 'no scrolling when the complete content fits');
+  await act(async () => scroller.props.onContentSizeChange(332, 700));
+  assert.equal(tree!.root.findByType(host('AnimatedView')).props.style[1].height, 650, 'larger content uses all space below the stable top');
+  await act(async () => scroller.props.onLayout({ nativeEvent: { layout: { width: 332, height: 560 } } }));
+  assert.equal(scroller.props.scrollEnabled, true, 'scroll only when content exceeds the screen');
+  await act(async () => scroller.props.onContentSizeChange(332, 440));
+  await act(async () => scroller.props.onLayout({ nativeEvent: { layout: { width: 332, height: 440 } } }));
+  assert.equal(tree!.root.findByType(host('AnimatedView')).props.style[1].height, 530);
+  assert.equal(frames.length, 0, 'resizing does not replay the bounce');
   const buy = tree!.root.findAllByType(host('Button')).find((node) => node.props.label === 'Restore')!;
   assert.equal(buy.props.disabled, true); assert.equal(buy.props.cost.amount, 20);
-  assert.equal(tree!.root.findByType(host('Modal')).props.visible, false, 'dialogue is expanded in the tile panel, not gated by a modal');
-  assert.ok(tree!.root.findAllByType(host('Text')).some((node) => node.props.children === WORLD_UPGRADE_STORIES[0].before[0].text), 'first dialogue is visible immediately');
-  assert.ok(tree!.root.findAllByType(host('Portrait')).length > 0, 'uses the shared world-selector portrait');
-  assert.equal(readCalls.length, 1, 'opening records the automatically visible first line');
-  const next = tree!.root.findAllByType(host('Pressable')).find((node) => node.props.accessibilityLabel === 'Continue dialogue')!;
-  await act(async () => next.props.onPress());
-  assert.equal(readCalls.length, 2); assert.equal(purchases, 0);
-  assert.ok(tree!.root.findAllByType(host('Text')).some((node) => node.props.children === WORLD_UPGRADE_STORIES[0].before[1].text));
+  assert.equal(tree!.root.findAllByType(host('Narrative')).length, 0);
+  assert.ok(!tree!.root.findAllByType(host('Text')).some((node) => node.props.children === WORLD_UPGRADE_STORIES[0].before[0].text), 'base info contains no dialogue');
+  assert.equal(readCalls.length, 0, 'opening base info does not mark story read');
   const storyButton = tree!.root.findAllByType(host('Pressable')).find((node) => node.props.accessibilityLabel === 'Expand story history')!;
   await act(async () => storyButton.props.onPress());
-  assert.equal(tree!.root.findByType(host('Modal')).props.visible, true);
-  await act(async () => tree!.root.findByType(host('Modal')).props.onRequestClose());
-  assert.equal(tree!.root.findByType(host('Modal')).props.visible, false);
-  assert.equal(readCalls.length, 2, 'expanding and closing history does not advance dialogue');
+  assert.equal(tree!.root.findAllByType(host('Narrative')).length, 1);
+  await act(async () => tree!.root.findByType(host('Narrative')).props.onClose());
+  assert.equal(tree!.root.findAllByType(host('Narrative')).length, 0);
+  assert.equal(readCalls.length, 0); assert.equal(purchases, 0);
   const close = tree!.root.findAllByType(host('Pressable')).find((node) => node.props.accessibilityLabel === 'Close upgrade')!;
   await act(async () => { close.props.onPress(); close.props.onPress(); motion.advance(139); });
   assert.equal(closes, 0);
@@ -146,11 +172,6 @@ test('panel waits for exit animation, keeps shortage explicit, and reading never
   const beforeResume = readCalls.length;
   await act(async () => { tree = create(<Panel {...props} world={saved} />); });
   assert.equal(readCalls.length, beforeResume, 'resuming does not reset the saved cursor');
-  const visibleText = tree!.root.findAllByType(host('Text')).map((node) => node.props.children);
-  assert.ok(visibleText.includes(WORLD_UPGRADE_STORIES[0].before[1].text));
-  assert.ok(!visibleText.includes(WORLD_UPGRADE_STORIES[0].before[2].text), 'unread next line waits for a tap');
-  const storyScroll = tree!.root.findAllByType(host('ScrollView'))[0];
-  await act(async () => storyScroll.props.onScroll({ nativeEvent: { contentOffset: { y: 0 }, layoutMeasurement: { height: 100 }, contentSize: { height: 400 } } }));
-  assert.equal(readCalls.length, beforeResume, 'scrolling history never advances dialogue');
+  assert.equal(tree!.root.findAllByType(host('Narrative')).length, 0, 'saved progress never puts dialogue in the base card');
   await act(async () => tree!.unmount());
 });

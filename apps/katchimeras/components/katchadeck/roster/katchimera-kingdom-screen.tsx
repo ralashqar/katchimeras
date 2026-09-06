@@ -1,9 +1,10 @@
 import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
 import { advanceGlowUpgrade, recoverPaidGlowUpgrade } from '@/features/onboarding/glow-upgrade-runtime';
 import { worldUpgradeRunId } from '@/features/world-upgrades/world-upgrade-flows';
-import { visibleWorldUpgradeOffers, worldUpgradeOffers, worldUpgradeArchiveOffer, type WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
+import { WORLD_UPGRADE_DEFINITIONS, worldUpgradeMaxLevel, visibleWorldUpgradeOffers, worldUpgradeOffers, worldUpgradeArchiveOffer, type WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { purchaseWorldUpgrade, useWorldUpgradeRun } from '@/features/world-upgrades/world-upgrade-runtime';
 import { dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
+import { WorldUpgradeNarrative } from '@/components/katchadeck/world/world-upgrade-narrative';
 import { WorldUpgradePanel } from '@/components/katchadeck/world/world-upgrade-panel';
 import { WorldUpgradeReward } from '@/components/katchadeck/world/world-upgrade-reward';
 import { worldUpgradeStory } from '@/features/world-upgrades/world-upgrade-stories';
@@ -198,9 +199,10 @@ export function KatchimeraKingdomScreen({
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradePresentation, setUpgradePresentation] = useState<HavenTileUpgradePresentation | null>(null);
+  const [requiredUpgradeStory, setRequiredUpgradeStory] = useState<{ offer: WorldUpgradeOffer; presentation: HavenTileUpgradePresentation } | null>(null);
   const prepareEggEntry = useCallback(() => { setFtueCameraSettled(false); setGlowPanelOpen(false); }, []);
   const eggHandoff = useGlowEggHandoff({ run: glowRun, world: mergeWorld, focused: screenFocused,
-    available: !interactionCreatureId && !upgradePresentation, open: stepplingEggOpen,
+    available: !interactionCreatureId && !upgradePresentation && !requiredUpgradeStory, open: stepplingEggOpen,
     enter: stepplingEncounter.enter, onOpening: prepareEggEntry });
   const upgradeOffers = useMemo(() => worldUpgradeOffers(mergeWorld), [mergeWorld]);
   const [selectedUpgrade, setSelectedUpgrade] = useState<WorldUpgradeOffer | null>(null);
@@ -208,6 +210,7 @@ export function KatchimeraKingdomScreen({
   const [upgradeCommitted, setUpgradeCommitted] = useState(false);
   const upgradePressBusy = useRef(false);
   const upgradeActionRef = useRef<View>(null);
+  const revealedUpgradeRef = useRef<number | null>(null);
   const pendingUpgradeReward = useRef<string | null>(null);
   const [upgradeReward, setUpgradeReward] = useState<string | null>(null);
   const upgradeDismiss = useRef<(() => void) | null>(null);
@@ -570,6 +573,11 @@ export function KatchimeraKingdomScreen({
       };
     }
 
+    // The authored conversation is shown after the crossblend, not as a caption over it.
+    const offerId = presentation.natureIslandId ? `nature:${presentation.natureIslandId}`
+      : receipt.target.kind === 'haven_structure' ? `mist:${receipt.target.structureId}` : `haven:${presentation.characterId}`;
+    if (worldUpgradeStory(offerId, receipt.toLevel)) presentation.reactionLine = '';
+    revealedUpgradeRef.current = null;
     setUpgrading(true);
     setDetailCreatureId(null);
     setSelectedNatureIslandId(null);
@@ -579,13 +587,15 @@ export function KatchimeraKingdomScreen({
       signal.addEventListener('abort', () => {
         storyUpgradeResolversRef.current.delete(work.key);
         setUpgradePresentation((current) => current?.storyPresentationKey === work.key ? null : current);
+        setRequiredUpgradeStory((current) => current?.presentation.storyPresentationKey === work.key ? null : current);
         setUpgrading(false);
         resolve();
       }, { once: true });
     });
   }, screenFocused && !activeInteractionResidentId && !interactionExiting);
 
-  const completeUpgradePresentation = useCallback((presentation: HavenTileUpgradePresentation) => {
+  const finishUpgradePresentation = useCallback((presentation: HavenTileUpgradePresentation) => {
+    setRequiredUpgradeStory(null);
     if (pendingUpgradeReward.current) { setUpgradeReward(pendingUpgradeReward.current); pendingUpgradeReward.current = null; }
     if (presentation.storyPresentationKey) {
       const resolve = storyUpgradeResolversRef.current.get(presentation.storyPresentationKey);
@@ -615,6 +625,25 @@ export function KatchimeraKingdomScreen({
       onFtueRestore?.();
     }
   }, [ftueStepId, onFtueRestore]);
+
+  const completeUpgradePresentation = useCallback((presentation: HavenTileUpgradePresentation) => {
+    // The canvas may report completion more than once; a single story owns the ack.
+    if (revealedUpgradeRef.current === presentation.nonce) return;
+    revealedUpgradeRef.current = presentation.nonce;
+    const id = presentation.natureIslandId ? `nature:${presentation.natureIslandId}`
+      : presentation.visualTarget?.kind === 'haven_structure' && presentation.visualTarget.structureId === 'steppling-home'
+        ? 'mist:steppling-home' : `haven:${presentation.characterId}`;
+    const definition = WORLD_UPGRADE_DEFINITIONS.find((item) => item.id === id && item.nextLevel === presentation.toStage);
+    if (definition && worldUpgradeStory(id, presentation.toStage)) {
+      setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
+      setRequiredUpgradeStory({ presentation, offer: { ...definition, currentLevel: presentation.toStage,
+        maxLevel: worldUpgradeMaxLevel(definition), eligible: false, affordable: false, missingGlow: 0 } });
+      // Do not resolve the durable reveal yet. On interruption the same paid
+      // receipt replays its reveal and resumes the saved dialogue cursor.
+      return;
+    }
+    finishUpgradePresentation(presentation);
+  }, [finishUpgradePresentation]);
 
   const beginFirstSeedPlanting = useCallback(() => {
     if (ftueStepId !== 'world.garden_arrival' || firstSeedPlantStartedRef.current) return;
@@ -907,7 +936,7 @@ export function KatchimeraKingdomScreen({
     <View collapsable={false} onLayout={onContentReady} ref={screenRef} style={styles.screen}>
       <KingdomHexCanvas
         background={background}
-        cameraLocked={ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || Boolean(selectedUpgrade)}
+        cameraLocked={ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || Boolean(selectedUpgrade) || Boolean(requiredUpgradeStory)}
         discoveredEggInteraction={stepplingEncounter.open}
         discoveredEggPresentation={stepplingEncounter.presentation}
         discoveredEggTargetRef={stepplingEncounter.feedController.eggTargetRef}
@@ -1111,7 +1140,10 @@ export function KatchimeraKingdomScreen({
         onClose={() => setGlowPanelOpen(false)}
         onOpenMerge={() => openGarden()}
       /> : null}
-      {screenFocused && upgradeReward && !sharedUpgrade && !upgradePresentation ? <WorldUpgradeReward skinId={upgradeReward} onClose={() => setUpgradeReward(null)} /> : null}
+      {screenFocused && requiredUpgradeStory ? <WorldUpgradeNarrative key={requiredUpgradeStory.presentation.storyPresentationKey ?? requiredUpgradeStory.presentation.nonce}
+        offer={requiredUpgradeStory.offer} world={mergeWorld} required saveRead={saveUpgradeStoryRead}
+        onClose={() => finishUpgradePresentation(requiredUpgradeStory.presentation)} /> : null}
+      {screenFocused && upgradeReward && !sharedUpgrade && !upgradePresentation && !requiredUpgradeStory ? <WorldUpgradeReward skinId={upgradeReward} onClose={() => setUpgradeReward(null)} /> : null}
       {screenFocused && mistUpgradeActive && !sharedUpgrade && !upgradePresentation && !activeInteractionResidentId && !stepplingEggOpen ? (
         <HavenFtueOverlay
           cue={{ kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'steppling' } }}

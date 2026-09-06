@@ -12,8 +12,12 @@ export function WorldUpgradeAnchor({ frame, cameraScale, cameraX, cameraY, scene
 }) {
   const insets = useSafeAreaInsets();
   const width = Math.min(336, viewportWidth - 24);
-  const maxHeight = Math.max(120, viewportHeight - insets.top - insets.bottom - 32);
-  const [height, setHeight] = useState(360);
+  // Reserve the navigation/currency chrome as well as the device safe area.
+  // The explicit available bounds let the panel measure its natural content
+  // height without moving the top edge or exceeding the screen bottom.
+  const topBoundary = insets.top + 80;
+  const availableHeight = Math.max(1, viewportHeight - topBoundary - insets.bottom - 20);
+  const referenceHeight = Math.min(480, availableHeight);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     if (moving || ready) return;
@@ -23,11 +27,13 @@ export function WorldUpgradeAnchor({ frame, cameraScale, cameraX, cameraY, scene
   const position = useAnimatedStyle(() => {
     const x = sceneWidth / 2 + cameraX.value + (frame.left + frame.width / 2 - sceneWidth / 2) * cameraScale.value;
     const y = sceneHeight / 2 + cameraY.value + (frame.top + frame.height * 0.48 - sceneHeight / 2) * cameraScale.value;
-    return { transform: [
+    // Position uses the original reference height, never the changing content height.
+    const top = Math.max(topBoundary, Math.min(viewportHeight - insets.bottom - referenceHeight - 20, y - referenceHeight * 0.75));
+    return { height: Math.max(1, viewportHeight - insets.bottom - 20 - top), transform: [
       { translateX: Math.max(12, Math.min(viewportWidth - width - 12, x - width / 2)) },
-      { translateY: Math.max(insets.top + 12, Math.min(viewportHeight - insets.bottom - height - 12, y - height * 0.75)) },
+      { translateY: top },
     ] };
   });
-  return ready ? <Animated.View onLayout={(event) => setHeight(event.nativeEvent.layout.height)} style={[styles.anchor, { width, maxHeight }, position]}>{children}</Animated.View> : null;
+  return ready ? <Animated.View pointerEvents="box-none" style={[styles.anchor, { width, height: availableHeight }, position]}>{children}</Animated.View> : null;
 }
 const styles = StyleSheet.create({ anchor: { position: 'absolute', left: 0, top: 0, zIndex: 32 } });

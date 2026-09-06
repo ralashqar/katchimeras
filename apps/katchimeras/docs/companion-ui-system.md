@@ -77,8 +77,10 @@ case and reducer action instead.
 ## Component choices
 
 - World upgrades use `WorldUpgradePanel` in the canvas's `WorldUpgradeAnchor`:
-  cream surface, gold rim, title and current/max level, an expanded character conversation,
-  and the shared Glow CTA. There is no result-art preview. The panel follows the
+  cream surface, gold rim, title and current/max level, required Glow and unlock details,
+  and the shared Glow CTA. A top-left speech button opens the separate full-screen
+  `WorldUpgradeNarrative` ribbon splash, with alternating portraits and speech tails.
+  The same splash is required after the art reveal, before the flow continues. There is no result-art preview. The panel follows the
   tile at a readable screen size; opening and closing retain animated exits.
   Show shortage and failure messages only when
   needed. Purchases require Glow and the next sequential level; story chapters,
