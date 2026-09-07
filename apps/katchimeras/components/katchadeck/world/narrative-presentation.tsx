@@ -36,7 +36,7 @@ export const narrativeStyles = StyleSheet.create({
   nameBadge: { position: 'absolute', bottom: 0, minWidth: 84, maxWidth: 100, paddingHorizontal: 4, paddingVertical: 4, borderRadius: 8, borderWidth: 2, borderColor: '#FFF1CB' },
   speaker: { ...KatchaUI.type.companionCardTitle, fontSize: 13, lineHeight: 17, color: '#243B46', textAlign: 'center' },
   words: { flex: 1, borderWidth: 3, borderRadius: 22, paddingHorizontal: 13, paddingVertical: 14, boxShadow: '0 4px 0 rgba(0,0,0,0.16)' },
-  tail: { position: 'absolute', top: '50%', width: 14, height: 14, transform: [{ rotate: '45deg' }] },
+  tail: { position: 'absolute', top: '50%', marginTop: -7, width: 14, height: 14, transform: [{ rotate: '45deg' }] },
   tailLeft: { left: -9, borderLeftWidth: 3, borderBottomWidth: 3 }, tailRight: { right: -9, borderRightWidth: 3, borderTopWidth: 3 },
   dialogueText: { ...KatchaUI.type.companionDisplay, fontSize: 18, lineHeight: 24, letterSpacing: 0 },
   tapHint: { ...KatchaUI.type.companionBody, fontSize: 11, lineHeight: 16, color: '#64767C', textAlign: 'right', marginTop: 8 },

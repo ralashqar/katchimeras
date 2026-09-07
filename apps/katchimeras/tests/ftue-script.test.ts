@@ -246,7 +246,7 @@ test('the Bond choice leads directly into a concise Garden restoration story', (
   assert.match(interaction, /ftueProfileStep === 'garden_intro'[\s\S]*?mossproutSeedIntroduction/);
   assert.doesNotMatch(interaction, /ftueGardenStoryBeatIndex/);
   assert.match(interaction, /ftueProfileStep === 'garden_intro'[\s\S]*?props\.onFtueOpenMerge/);
-  assert.match(stage, /gardenStoryActionLabel[\s\S]*?<PrimaryAction icon=\{gardenStoryActionIcon\} label=\{gardenStoryActionLabel\}/);
+  assert.match(stage, /mode === 'garden_intro'\) return <GardenPlantingHandoff onContinue=\{onContinue\}/);
   assert.match(orders, /title: 'The First Bloom'[\s\S]*?description: 'Merge two Sprouts to grow a Plant for the Garden\.'/);
 });
 
@@ -532,7 +532,7 @@ test('Mossprout remembers the day, reflects it back, then offers one narrative G
   assert.match(mossproutStage, /mode === 'intro_action'[\s\S]*?style=\{styles\.plainActionStage\}/);
   assert.match(mossproutStage, /plainActionStage: \{ gap: 7 \}/);
   assert.match(mossproutStage, /mode === 'bond_choice'[\s\S]*?<FtueBondNarrative/);
-  assert.match(mossproutStage, /mode === 'garden_intro'[\s\S]*?<DayActionCardSurface[\s\S]*?eyebrow="MEMORY SEED"/);
+  assert.doesNotMatch(mossproutStage, /eyebrow="MEMORY SEED"|accessibilityLabel="Your memory seed"/);
   assert.doesNotMatch(mossproutStage, /seedName:|seedDescription:|seedEyebrow:/);
   assert.match(mossproutStage, /onContinue=\{\(id\) => onContinue\?\.\(id\)\}/);
   assert.match(bondShare, /What would help most right now\?/);
@@ -942,7 +942,7 @@ test('the first resident Garden handoff uses one shared parcel panel without a s
   const conversation = readFileSync('constants/mossprout-story-conversations.ts', 'utf8');
   const conversationFlow = readFileSync('features/companion/use-companion-conversation-flow.ts', 'utf8');
   assert.match(interaction, /residentParcelGardenPanelActive = props\.ftueResidentHandoffActive[\s\S]*?!props\.ftueResidentStoryResume/);
-  assert.match(interaction, /showSpeechBubble=\{!narrativeOverlayVisible[\s\S]*?&& props\.ftueProfileStep !== 'bond_choice' && props\.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && \(Boolean\(companionSpeechTitle\) \|\| !residentParcelGardenPanelActive\)\}/);
+  assert.match(interaction, /showSpeechBubble=\{ftueHasIntentionalSpeech && !narrativeOverlayVisible[\s\S]*?&& props\.ftueProfileStep !== 'bond_choice' && props\.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && \(Boolean\(companionSpeechTitle\) \|\| !residentParcelGardenPanelActive\)\}/);
   assert.match(interaction, /residentParcelHandoffActive=\{residentParcelGardenPanelActive\}/);
   assert.match(stage, /residentParcelHandoffActive \? <View[\s\S]*?<MossproutJourneyRequestPanel/);
   assert.match(stage, /actionLabel="Go to the Garden"[\s\S]*?eyebrow="GARDEN PARCEL"/);

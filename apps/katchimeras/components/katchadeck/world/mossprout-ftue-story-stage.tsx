@@ -1,10 +1,10 @@
+import { GardenPlantingHandoff } from './garden-planting-handoff';
 import { loadFtueNarrativeHistory } from '@/features/onboarding/ftue-narrative-history';
 import { FtueBondNarrative } from './ftue-bond-narrative';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { MossproutFtueRestAction } from './mossprout-ftue-rest-action';
 import { MossproutFirstGrowStage } from './mossprout-first-grow-stage';
 import { useEffect, useState } from 'react';
-import { Image } from 'expo-image';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -31,13 +31,11 @@ import {
   MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW,
   MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW,
   mossproutBondShareSelection,
-  mossproutFirstSeedForIntent,
 } from '@/features/onboarding/mossprout-bond-share';
-import { mossproutMemoryPlantById } from '@/constants/mossprout-memory-plants';
 
 const INTRODUCTION_REWARD = { amount: MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW, kind: 'bond' as const };
 
-export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActionIcon = 'leaf.fill', gardenStoryActionLabel = 'Show me the Garden', mode = 'garden', nickname, onNarration, onBondRewardRequest, onContinue, onOpenMerge, pendingBondCelebration }: {
+export function MossproutFtueStoryStage({ actionStackTargetRef, mode = 'garden', nickname, onNarration, onBondRewardRequest, onContinue, onOpenMerge, pendingBondCelebration }: {
   actionStackTargetRef?: RefObject<ViewType | null>;
   activeBondQuestionId?: string | null;
   gardenStoryActionIcon?: string;
@@ -61,8 +59,6 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
         : null),
   );
   const selectedSupportStyleId = ftueRun?.answers['companion.choose_support_style']?.optionId ?? null;
-  const firstSeed = mossproutFirstSeedForIntent(selectedBondShare?.id);
-  const firstSeedDefinition = mossproutMemoryPlantById.get(firstSeed.id);
   const completedBondShareReward = {
     amount: pendingBondCelebration?.points ?? MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW,
     kind: 'bond' as const,
@@ -192,19 +188,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
     </Animated.View>
   );
 
-  if (mode === 'garden_intro') return (
-    <View accessibilityLabel="Your memory seed" style={styles.seedReveal}>
-      {firstSeedDefinition ? <DayActionCardSurface
-        artwork={<Image contentFit="contain" source={firstSeedDefinition.art.seed} style={styles.seedArt} />}
-        eyebrow="MEMORY SEED"
-        style={styles.seedRewardCard}
-        subtitle={firstSeed.message}
-        title={firstSeedDefinition.name}
-        trailing={<View />}
-      /> : null}
-      <PrimaryAction icon={gardenStoryActionIcon} label={gardenStoryActionLabel} onPress={() => onContinue?.()} />
-    </View>
-  );
+  if (mode === 'garden_intro') return <GardenPlantingHandoff onContinue={onContinue} />;
 
   if (mode === 'water_together' || mode === 'first_grow') {
     return <MossproutFirstGrowStage onNarration={onNarration} onBondRewardRequest={onBondRewardRequest} />;
@@ -288,8 +272,5 @@ const styles = StyleSheet.create({
   input: { backgroundColor: KatchaUI.companionScenePanel.optionBackground, borderColor: KatchaUI.companionScenePanel.optionBorder, borderRadius: 14, borderWidth: 1, color: KatchaUI.companionScenePanel.optionInk, fontSize: 17, fontWeight: '700', minHeight: 50, paddingHorizontal: 13 },
   privateNote: { fontSize: 12, lineHeight: 17 },
   resultEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.1, paddingHorizontal: 4, paddingTop: 2 },
-  seedArt: { height: 66, width: 66 },
-  seedReveal: { gap: 12, backgroundColor: 'transparent' },
-  seedRewardCard: { minHeight: 82 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

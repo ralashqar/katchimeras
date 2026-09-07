@@ -1499,6 +1499,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   // speech bubble while the meditating artwork remains in the world.
   const meditationDashboardActive = Boolean((!props.ftueCompanionSurfaceOwned || props.ftueProfileStep === 'meditating') && !quickGoalPickerOpen && !unifiedJourneyActive && meditation && route.kind !== 'conversation' && route.kind !== 'visit');
   const companionSpeechTitle = dashboardRouteActive && actionNarration ? actionNarration : dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration ? journeyNarration : meditationDashboardActive ? MOSSPROUT_FTUE_COPY.meditation : mossproutFtueSpeechTitle;
+  // FTUE handoffs have no default greeting. Only fresh stage narration or
+  // the explicit meditation state can bring speech back after an overlay.
+  const ftueHasIntentionalSpeech = !props.ftueCompanionSurfaceOwned && !props.ftueProfileStep
+    || meditationDashboardActive
+    || Boolean(dashboardRouteActive && (actionNarration || (!quickGoalPickerOpen && unifiedJourneyActive && journeyNarration)))
+    || ['intro_action', 'nickname', 'bond', 'first_insight', 'resident_result'].includes(props.ftueProfileStep ?? '');
   const ftueActionDockVisible = dashboardRouteActive && props.familyId === 'mossprout'
     && Boolean(props.ftueProfileStep && props.onFtueProfileContinue)
     && !meditation && !quickGoalPickerOpen && !questionnaireExperience && !activeAttemptId;
@@ -1564,7 +1570,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               && conversationFlow.phase !== 'committing'
               ? conversationFlow.advance
               : undefined}
-            showSpeechBubble={!narrativeOverlayVisible
+            showSpeechBubble={ftueHasIntentionalSpeech && !narrativeOverlayVisible
               && props.ftueProfileStep !== 'garden_intro'
               && !(conversationExperience?.definition.id.startsWith('mossprout:ftue:first-meeting:') && conversationExperience.session.status === 'completed' && (route.kind === 'conversation' || route.kind === 'visit'))
               && props.ftueProfileStep !== 'bond_choice' && props.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && (Boolean(companionSpeechTitle) || !residentParcelGardenPanelActive)}

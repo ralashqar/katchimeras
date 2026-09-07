@@ -284,14 +284,13 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     }
     if (run?.stepId === 'companion.first_meeting') {
       // The Seed invitation has already been read in the narrative. Prepare the
-      // Garden before advancing either checkpoint, then consume its old intro
-      // acknowledgement without asking the player to read the same beat again.
+      // Garden before advancing. The silent Garden checkpoint then opens planting
+      // without asking the player to read the same beat again.
       if (!run.mergeInstalled) {
         await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run), { preserveHaven: true });
         updateFtueRun({ mergeInstalled: true });
       }
       await advanceFtueActionDurably({ expectedStepId: 'companion.first_meeting', actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
-      await advanceFtueActionDurably({ expectedStepId: 'companion.garden_intro', actionId: 'companion.continue_to_planting', evidenceRef: 'first-meeting:seed-invitation' });
       await flushFtuePersistence();
       return;
     }
@@ -542,7 +541,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     } catch (error) {
       ftueHandoffRef.current = false;
       console.warn('Could not prepare Mossprout Garden handoff', error);
-      return;
+      return false;
     }
     ftueHandoffRef.current = false;
   }, []);
