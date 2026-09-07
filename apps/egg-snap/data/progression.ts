@@ -1,12 +1,15 @@
-import { DEFAULT_LADDER, planBeat, type Progression } from '@incubator/tile-match/engine';
+import type { Progression } from '@incubator/tile-match/engine';
 
-/** Preserve the source ramp, but authored by beat number so mistakes cannot change the deal. */
+/** Authored by beat number: the shared deal stays fair without rolling away the variety. */
 export function snapLadder(startWithTwo = false): Progression {
-  return {kind: 'stream', loop: false, turns: Array.from({length: 64}, (_, index) => {
-    const plan = planBeat(DEFAULT_LADDER, index, index, (0x9e3779b9 ^ Math.imul(index + 1, 2654435761)) >>> 0);
-    const fuse = plan.varieties.some(v => v.id === 'fuse');
-    return {slots: fuse ? 1 : startWithTwo && index === 0 ? 2 : plan.slots,
-      varieties: plan.varieties, ...(fuse ? {minShapeHeight: 2} : {})};
+  const rotation = ['drift', 'armour', 'bomb', 'fuse'] as const;
+  return {kind: 'stream', loop: true, turns: Array.from({length: 64}, (_, index) => {
+    if (index < 4) return {slots: index === 0 && !startWithTwo ? 1 : 2, varieties: []};
+    const id = rotation[(index - 4) % rotation.length];
+    const fuse = id === 'fuse';
+    return {slots: fuse || index === 4 ? 1 : 2,
+      varieties: [{id, strength: id === 'drift' ? Math.min(.8, .55 + (index - 4) * .015) : .35}],
+      ...(fuse ? {minShapeHeight: 2} : {})};
   })};
 }
 

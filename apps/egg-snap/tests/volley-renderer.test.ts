@@ -15,7 +15,7 @@ const require = createRequire(import.meta.url);
 const {act,create} = require('react-test-renderer');
 Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
 
-test('the actual volley renderer publishes visible flight frames, then collision particles and clears', async () => {
+for (const spriteSize of [64, 128]) test(`the actual ${spriteSize}px volley renderer publishes visible flight frames, then collision particles and clears`, async () => {
   const reactions = new Set<() => void>();
   type Sprite = {scale:number; x:number; y:number; alpha:number};
   const canvas = (draws: Sprite[]) => ({
@@ -47,6 +47,7 @@ test('the actual volley renderer publishes visible flight frames, then collision
     '@shopify/react-native-skia':{Skia,Canvas:'Canvas',Picture:'Picture',PaintStyle:{Stroke:1,Fill:0},TileMode:{Clamp:0},BlendMode:{Modulate:1},
       createPicture:(draw:(c:ReturnType<typeof canvas>)=>void)=>{const draws:Sprite[]=[];draw(canvas(draws));return{draws};}},
     '../data/tile-theme':{TILE_COLORS},'../game/volley-presentation':timing,
+    '@incubator/tile-match/theme':{useTileAppearance:()=>spriteSize === 128 ? {atlas:image,spriteSize} : undefined},
     '@incubator/tile-match/timing':slotTiming,'../game/effect-commands':commands,
   };
   const source=readFileSync(new URL('../components/combat-volley.tsx',import.meta.url),'utf8');
@@ -65,7 +66,7 @@ test('the actual volley renderer publishes visible flight frames, then collision
   await act(()=>root.update(React.createElement(output.exports.CombatVolleys,{...props,volleys:[volley]})));
   const frame=(at:number)=>{clock.value=at;for(const run of reactions)run();return root.root.findByType('Picture').props.picture.value.draws as Sprite[];};
   const start=frame(100);
-  assert.equal(start.filter(s=>s.scale===.5).length,2,'both original cells are drawn on the handoff frame');
+  assert.equal(start.filter(s=>s.scale===32/spriteSize).length,2,'both original cells are drawn on the handoff frame');
   const flight=frame(280);
   assert.ok(flight.some(s=>s.y<400 && s.y>100),'actual submitted canvas transforms move up the screen');
   const frozen=JSON.stringify(flight);assert.equal(JSON.stringify(frame(280)),frozen,'a paused clock holds positions');

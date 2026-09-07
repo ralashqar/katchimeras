@@ -57,6 +57,8 @@ import {
   type SkPaint,
 } from '@shopify/react-native-skia';
 import { memo, useEffect, useMemo, useRef } from 'react';
+import { Text, View } from 'react-native';
+import { useTileAppearance } from '../../../../ui/theme';
 import {
   Easing,
   cancelAnimation,
@@ -118,7 +120,7 @@ const DOT = 0.3;
  */
 const markerStroke = (cell: number): number => Math.max(1.5, cell * 0.05);
 
-function makeBombPaints(cell: number): {
+function makeBombPaints(cell: number, soft: boolean): {
   live: SkPaint;
   glow: SkPaint;
   dead: SkPaint;
@@ -142,14 +144,14 @@ function makeBombPaints(cell: number): {
   glow.setAntiAlias(true);
   glow.setStyle(PaintStyle.Fill);
   glow.setColor(Skia.Color(semantic.sabotageAxis));
-  glow.setMaskFilter(Skia.MaskFilter.MakeBlur(BlurStyle.Normal, radius * 0.8, false));
+  if (!soft) glow.setMaskFilter(Skia.MaskFilter.MakeBlur(BlurStyle.Normal, radius * 0.8, false));
 
   // Disarmed: the same marker with the light off. An outline rather than a fill, so it reads as spent.
   const dead = Skia.Paint();
   dead.setAntiAlias(true);
   dead.setStyle(PaintStyle.Stroke);
   dead.setStrokeWidth(markerStroke(cell));
-  dead.setColor(Skia.Color(alpha(palette.textFaint, 0.5)));
+  dead.setColor(Skia.Color(soft ? '#B5E59B' : alpha(palette.textFaint, 0.5)));
 
   /**
    * The ring thrown outward as the bomb goes out.
@@ -166,7 +168,7 @@ function makeBombPaints(cell: number): {
   discharge.setAntiAlias(true);
   discharge.setStyle(PaintStyle.Stroke);
   discharge.setColor(Skia.Color(semantic.sabotageAxis));
-  discharge.setMaskFilter(Skia.MaskFilter.MakeBlur(BlurStyle.Normal, radius * 0.22, false));
+  if (!soft) discharge.setMaskFilter(Skia.MaskFilter.MakeBlur(BlurStyle.Normal, radius * 0.22, false));
 
   return { live, glow, dead, discharge };
 }
@@ -176,10 +178,12 @@ export const BombLayer = memo(function BombLayer({
   beat,
   reduceMotion,
 }: VarietyLayerProps) {
+  const appearance = useTileAppearance();
+  const soft = !!appearance;
   const { width, height, cell } = metrics;
   const data = varietyData<BombData>(beat, BOMB_VARIETY.id);
-  const paints = useMemo(() => makeBombPaints(cell), [cell]);
-  const radius = cell * DOT;
+  const paints = useMemo(() => makeBombPaints(cell, soft), [cell, soft]);
+  const radius = cell * (soft ? .15 : DOT);
   /**
    * The marker's line weight, read **once here** rather than inside the picture.
    *
@@ -356,11 +360,15 @@ export const BombLayer = memo(function BombLayer({
   if (!data?.pieceId) return null;
 
   return (
-    <Canvas
+    <><Canvas
       style={{ position: 'absolute', left: 0, top: 0, width, height }}
       pointerEvents="none"
     >
       <Picture picture={picture} />
     </Canvas>
+    {soft && flat.length > 0 && <View pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min(width - 64, flat[0] - 20)), top: flat[1] - cell / 2 - 21,
+      width: 64, paddingVertical: 2, borderRadius: 8, backgroundColor: '#233A2FF2', borderWidth: 1, borderColor: live ? '#EC9994' : '#B5E59B', alignItems: 'center'}}>
+      <Text style={{fontSize: 10, lineHeight: 14, fontWeight: '700', color: live ? '#FFC5BD' : '#CEEBB7'}}>{live ? '! RIGGED' : '✓ SAFE'}</Text>
+    </View>}</>
   );
 });

@@ -7,7 +7,7 @@ import { MOVES, DEFAULT_ARENA_AI } from "../data/campaign";
 import { Button, Copy, Heading, styles } from "../components/ui";
 import { Scene } from "../components/scene";
 export default function Arena() {
-  const [mechanic, setMechanic] = useState("tap");
+  const [mechanic, setMechanic] = useState("mixed");
   const [strength, setStrength] = useState("0.25");
   const [seed, setSeed] = useState("egg-snap-lab");
   const [speed, setSpeed] = useState(String(DEFAULT_ARENA_AI.actionMs));
@@ -33,11 +33,13 @@ export default function Arena() {
           ‹ World
         </Button>
         <Heading>Mechanics arena</Heading>
+        <Button secondary onPress={() => router.push({pathname: '/duel', params: {appearance: '1'}})}>Piece appearance workshop</Button>
         <Button secondary onPress={() => router.push({pathname: '/duel', params: {
           mechanic: 'tap', strength: '1', seed: 'egg-perf-v1', speed: '600', accuracy: '.92', stress: '1',
         }})}>Performance stress duel</Button>
         <Copy>Practice has no campaign rewards.</Copy>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          <Button secondary={mechanic !== 'mixed'} onPress={() => setMechanic('mixed')}>Mixed mechanics</Button>
           {Object.values(MOVES).map((m) => (
             <Button
               key={m.id}

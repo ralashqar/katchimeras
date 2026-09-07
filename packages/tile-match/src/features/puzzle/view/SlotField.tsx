@@ -1,4 +1,5 @@
-import { useTileColors, type TileColors } from '../../../ui/theme';
+import { useTileColors, useTileAppearance, type TileColors } from '../../../ui/theme';
+import { footprintGlow } from './footprint-glow';
 /**
  * The slot field: the target footprints drawn around the car, and the drop feedback over them.
  *
@@ -32,6 +33,7 @@ import { useTileColors, type TileColors } from '../../../ui/theme';
 
 import {
   Canvas,
+  Group,
   Picture,
   Skia,
   createPicture,
@@ -39,9 +41,10 @@ import {
   type SkCanvas,
 } from '@shopify/react-native-skia';
 import { memo, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import {
   Easing,
+  makeMutable,
   cancelAnimation,
   useDerivedValue,
   useSharedValue,
@@ -171,6 +174,8 @@ export type SlotFieldProps = {
    */
   arrival?: SlotArrival;
   reduceMotion?: boolean;
+  /** Use one colour-family badge for a distant opponent footprint. */
+  miniature?: boolean;
 };
 
 /** One cell of a drop ghost. */
@@ -188,6 +193,7 @@ export const SlotField = memo(function SlotField({
   hoverCells,
   arrival,
   reduceMotion = false,
+  miniature = false,
 }: SlotFieldProps) {
   const arrivalId = arrival?.id;
   const arrivalCells = arrival?.cells;
@@ -196,6 +202,8 @@ export const SlotField = memo(function SlotField({
   const radius = wellRadius(cell);
   const innerRadius = faceRadius(cell);
   const colors = useTileColors();
+  const appearance = useTileAppearance();
+  const imagePaint = useMemo(() => Skia.Paint(), []);
   const paints = useMemo(() => makeSlotPaints(cell, colors), [cell, colors]);
 
   /**
@@ -247,14 +255,16 @@ export const SlotField = memo(function SlotField({
     return values;
   }, [groups, grid.cols, metrics, arrivalCells]);
 
-  const cells = useSharedValue<number[]>(flat);
+  // A new beat owns fresh render buffers immediately, before layout/passive effects run.
+  // Reusing the previous beat's buffers can expose its settled picture for one frame.
+  const cells = useMemo(() => makeMutable<number[]>([]), [generation]);
   useLayoutEffect(() => {
     cells.value = flat;
   }, [cells, flat]);
 
   // Mirrored into a shared value rather than branching in render, so hiding costs a redraw of one
   // picture instead of tearing down and rebuilding the canvas.
-  const hiddenSV = useSharedValue(hidden);
+  const hiddenSV = useMemo(() => makeMutable(true), [generation]);
   useLayoutEffect(() => {
     hiddenSV.value = hidden;
   }, [hidden, hiddenSV]);
@@ -287,7 +297,15 @@ export const SlotField = memo(function SlotField({
 
   /** One driver for the whole entrance; each group remaps its own window out of it. */
   const span = Math.max(1, (groups.length - 1) * SLOT_INTRO_STEP_MS + SLOT_INTRO_MS);
-  const intro = useSharedValue(reduceMotion ? 1 : 0);
+  const intro = useMemo(() => makeMutable(reduceMotion ? 1 : 0), [generation, reduceMotion]);
+  const borderIntro = useMemo(() => makeMutable(0), [generation, reduceMotion]);
+
+  // Let the light gather gently, independently of the quicker cell entrance.
+  // Opacity-only motion also remains comfortable with reduced motion enabled.
+  useEffect(() => {
+    borderIntro.value = withTiming(1, {duration: reduceMotion ? 140 : 450, easing: Easing.linear});
+    return () => cancelAnimation(borderIntro);
+  }, [borderIntro, reduceMotion]);
 
   useEffect(() => {
     if (reduceMotion) {
@@ -297,9 +315,7 @@ export const SlotField = memo(function SlotField({
     intro.value = 0;
     intro.value = withTiming(1, { duration: span, easing: Easing.linear });
     return () => cancelAnimation(intro);
-    // `generation` is in here on purpose: the parent keys this component on it, so this normally
-    // runs on mount — but if that key is ever dropped, a new beat must still replay the entrance
-    // rather than silently inheriting a finished one.
+    // The render-time reset above prevents a settled frame before this effect starts the tween.
   }, [intro, reduceMotion, span, generation]);
 
   const drawCells = useCallback((canvas: SkCanvas, data: number[], progress: number, arrivalProgress: number) => {
@@ -356,7 +372,15 @@ export const SlotField = memo(function SlotField({
         if (scale !== 1) canvas.scale(scale, scale);
         canvas.translate(-cell / 2, -cell / 2);
 
-        if (isFilled) {
+        if (appearance) {
+          const size = appearance.spriteSize;
+          if (isFilled || !miniature) {
+            imagePaint.setAlphaf(isFilled ? 1 : appearance.highReadability ? .8 : .4);
+            canvas.drawImageRect(appearance.atlas, Skia.XYWHRect(isFilled ? 0 : size*3, colour*size, size, size),
+              Skia.XYWHRect(0, 0, cell, cell), imagePaint);
+            imagePaint.setAlphaf(1);
+          }
+        } else if (isFilled) {
           // Under the block, so it reads as light escaping from behind the cell rather than as a ring
           // drawn on top of it.
           if (arrivalGlow > 0.01) {
@@ -405,7 +429,7 @@ export const SlotField = memo(function SlotField({
 
         canvas.restore();
       }
-  }, [cell, span, paints, radius, innerRadius, face, shine, rimInset, arrivalSpanSV]);
+  }, [cell, span, paints, radius, innerRadius, face, shine, rimInset, arrivalSpanSV, appearance, imagePaint, miniature]);
   // Settled cells are recorded once per placement, independently of the active landing pop.
   const base = useMemo(() => flat.filter((_, i) => {
     const offset = Math.floor(i / STRIDE) * STRIDE;
@@ -418,8 +442,25 @@ export const SlotField = memo(function SlotField({
   const emptyPicture = useMemo(() => createPicture(() => {}), []);
   const settledPicture = useMemo(() => createPicture(canvas => drawCells(canvas, flat, 1, 1)), [flat, drawCells]);
   const basePicture = useMemo(() => createPicture(canvas => drawCells(canvas, base, 1, 1)), [base, drawCells]);
+  // Filled-cell changes and fresh group objects do not invalidate the baked contour.
+  const contourKey = appearance ? JSON.stringify(groups.map(g => ({cells: g.cells, color: colors[g.colorId].bright}))) : '';
+  const clearContour = appearance?.highReadability === true;
+  const contourImage = useMemo(() => contourKey ? footprintGlow(JSON.parse(contourKey), metrics, clearContour, miniature) : null,
+    [contourKey, metrics, clearContour, miniature]);
+  const contourPicture = useMemo(() => createPicture(canvas => {
+    if (contourImage) canvas.drawImage(contourImage, 0, 0);
+  }), [contourImage]);
+  const badgePicture = useMemo(() => createPicture(canvas => {
+    if (!appearance || !miniature) return;
+    for (const group of groups) {
+      if (miniature && group.cells.length) {
+        const first = Math.min(...group.cells), p=cellOrigin(metrics,Math.floor(first/grid.cols),first%grid.cols), size=appearance.spriteSize;
+        canvas.drawImageRect(appearance.atlas,Skia.XYWHRect(size*3+size*.28,BLOCK_COLOR_IDS.indexOf(group.colorId)*size+size*.28,size*.44,size*.44),Skia.XYWHRect(p.x,p.y-9,8,8),imagePaint);
+      }
+    }
+  }), [appearance, groups, miniature, grid.cols, metrics, imagePaint]);
   const picture = useDerivedValue(() => {
-    if (hiddenSV.value) return emptyPicture;
+    if (hidden || hiddenSV.value) return emptyPicture;
     if (intro.value >= 1 && arrive.value >= 1) return settledPicture;
     return createPicture(canvas => {
       if (intro.value < 1) drawCells(canvas, cells.value, intro.value, arrive.value);
@@ -429,10 +470,19 @@ export const SlotField = memo(function SlotField({
       }
     });
   });
+  const decorationOpacity = useDerivedValue(() => {
+    if (hidden || hiddenSV.value) return 0;
+    const t = borderIntro.value;
+    return t * t * (3 - 2 * t);
+  });
 
   return (
     <View style={{ width, height }} pointerEvents="none">
       <Canvas style={{ position: 'absolute', left: 0, top: 0, width, height }}>
+        {!hidden && <Group opacity={decorationOpacity}>
+          <Picture picture={contourPicture} />
+          {miniature && <Picture picture={badgePicture} />}
+        </Group>}
         <Picture picture={picture} />
       </Canvas>
 
@@ -447,6 +497,7 @@ export const SlotField = memo(function SlotField({
               key={ordinal}
               index={ghost.index}
               onTarget={ghost.onTarget}
+              tint={colors[groups.find(g => g.cells.includes(ghost.index))?.colorId ?? groups[0]?.colorId ?? BLOCK_COLOR_IDS[0]].bright}
               grid={grid}
               metrics={metrics}
             />
@@ -466,13 +517,16 @@ const HoverCell = memo(function HoverCell({
   grid,
   metrics,
   onTarget = false,
+  tint,
 }: {
   index: number;
   grid: BoardSpec;
   metrics: BoardMetrics;
   onTarget?: boolean;
+  tint?: string;
 }) {
   const { x, y } = cellOrigin(metrics, Math.floor(index / grid.cols), index % grid.cols);
+  const appearance = useTileAppearance();
   return (
     <View
       style={[
@@ -482,13 +536,13 @@ const HoverCell = memo(function HoverCell({
           top: y,
           width: metrics.cell,
           height: metrics.cell,
-          borderRadius: wellRadius(metrics.cell),
-          borderColor: onTarget ? palette.greenHot : palette.redHot,
-          backgroundColor: onTarget ? semantic.valid : semantic.invalid,
-          opacity: onTarget ? 0.55 : 0.34,
+          borderRadius: appearance ? metrics.cell * appearance.radius : wellRadius(metrics.cell),
+          borderColor: onTarget ? (appearance ? tint : palette.greenHot) : palette.redHot,
+          backgroundColor: appearance ? (onTarget ? `${tint}35` : '#751C2850') : onTarget ? semantic.valid : semantic.invalid,
+          opacity: appearance ? 1 : onTarget ? 0.55 : 0.34,
         },
       ]}
-    />
+    >{appearance && <Text style={{color:onTarget ? "#FFF9E3" : "#FFB6BA",fontSize:Math.max(12,metrics.cell*.42),textAlign:"center",lineHeight:metrics.cell-3,fontWeight:"700"}}>{onTarget ? "✓" : "×"}</Text>}</View>
   );
 });
 

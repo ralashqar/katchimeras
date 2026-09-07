@@ -103,4 +103,8 @@ test("independent sound and haptic preferences survive relaunch and old saves", 
   await repo.preferences({ haptics: false });
   await repo.preferences({ sound: true });
   assert.deepEqual((await createProfileRepository(storage).load()).preferences, { sound: true, haptics: false });
+  await repo.preferences({ highReadability: true });
+  assert.deepEqual((await createProfileRepository(storage).load()).preferences, { sound: true, haptics: false, highReadability: true });
+  await repo.preferences({ sound: false });
+  assert.equal((await createProfileRepository(storage).load()).preferences?.highReadability, true);
 });

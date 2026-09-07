@@ -2,11 +2,12 @@ import { PerformancePanel } from "./performance-panel";
 import { ARENA_ENABLED } from "../game/dev-tools";
 import { CombatVolleys, type CombatVolleyData, type CombatBurstData } from "./combat-volley";
 import { CELL_STAGGER_MS } from "../game/volley-presentation";
-import { TileMatchTheme } from "@incubator/tile-match/theme";
-import { TILE_COLORS } from "../data/tile-theme";
+import { TileArtTheme } from "./tile-art-theme";
+import { AppearanceGallery } from "./appearance-gallery";
+import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { Modal, Pressable, View, useWindowDimensions } from "react-native";
+import { Modal, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -22,7 +23,7 @@ import {
 } from "@incubator/tile-match/native";
 import { NO_CELL, type DropRelease } from "@incubator/tile-match/engine";
 import { buildSlotBurst } from "@incubator/tile-match/timing";
-import { MECHANIC_LESSONS } from "../data/progression";
+import { MECHANIC_LESSONS, snapLadder } from "../data/progression";
 import { impulseStrength } from "@incubator/tile-match/feedback";
 import { CombatCallout } from "./combat-callout";
 import { DUELS, getDuel, MOVES, mechanicSequence, DEFAULT_ARENA_AI } from "../data/campaign";
@@ -45,8 +46,11 @@ import { Egg } from "./egg";
 import { Button, Copy, styles } from "./ui";
 import { Dialogue } from "./dialogue";
 const trayStyle = {
-  backgroundColor: "rgba(15, 25, 20, 0.91)",
-  borderColor: "#E4D3A740",
+  backgroundColor: "rgba(26, 46, 37, 0.94)",
+  borderColor: "#E4D3A778",
+  borderTopWidth: 2,
+  borderBottomWidth: 4,
+  borderRadius: 28,
 } as const;
 function Meter({
   fraction,
@@ -84,6 +88,7 @@ export default function BattleRoute() {
     speed?: string;
     accuracy?: string;
     stress?: string;
+    appearance?: string;
   }>();
   const { profile } = useProfile();
   const practice = ARENA_ENABLED && !!params.mechanic;
@@ -95,10 +100,12 @@ export default function BattleRoute() {
     const speed = Math.max(100, Math.min(10000, Number(params.speed) || DEFAULT_ARENA_AI.actionMs));
     const accuracy = params.accuracy === undefined || !Number.isFinite(Number(params.accuracy)) ? DEFAULT_ARENA_AI.accuracy : Math.max(0, Math.min(1, Number(params.accuracy)));
     return {...base, id: 'practice', name: 'Mechanics arena', health: params.stress ? 1000000 : 400,
-      progression: mechanicSequence(params.stress ? ['tap', 'drift', 'armour', 'bomb', 'fuse', 'crossed', 'hues'] : [mechanic], 2, strength),
+      progression: params.mechanic === 'mixed' && !params.stress ? snapLadder(true)
+        : mechanicSequence(params.stress ? ['tap', 'drift', 'armour', 'bomb', 'fuse', 'crossed', 'hues'] : [mechanic], 2, strength),
       ai: {minActionMs: Math.round(speed * .85), maxActionMs: Math.round(speed * 1.15), accuracy}};
   }, [params.level, params.mechanic, params.strength, params.speed, params.accuracy, params.stress, practice]);
   if (!profile) return null;
+  if (ARENA_ENABLED && params.appearance) return <AppearanceGallery />;
   if (!practice && !canPlay(profile, definition.id))
     return (
       <Scene>
@@ -109,7 +116,7 @@ export default function BattleRoute() {
       </Scene>
     );
   return (
-    <TileMatchTheme colors={TILE_COLORS}>
+    <TileArtTheme clear={profile.preferences?.highReadability === true}>
       <Battle
         key={`${definition.id}:${params.mechanic}:${params.seed}:${params.speed}:${params.accuracy}`}
         definition={definition}
@@ -117,7 +124,7 @@ export default function BattleRoute() {
         practice={practice}
         stress={practice && !!params.stress}
       />
-    </TileMatchTheme>
+    </TileArtTheme>
   );
 }
 function Battle({
@@ -385,9 +392,9 @@ function Battle({
           accessibilityRole="button"
           accessibilityLabel="Pause duel"
           onPress={() => setPaused(true)}
-          style={{ padding: 12 }}
+          style={{ minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' }}
         >
-          <Copy>Ⅱ</Copy>
+          <Ionicons name="pause" size={22} color="#FFF1CA" />
         </Pressable>
         {layout.stage && height < 700 ? <View style={{width: 150, gap: 2}}>
           <Health presentation={presentation} side="opponent" max={definition.health} name={definition.rival} />
@@ -396,9 +403,9 @@ function Battle({
           accessibilityRole="button"
           accessibilityLabel={muted ? "Enable sound" : "Mute sound"}
           onPress={() => void act(() => repository.preferences({ sound: muted }))}
-          style={{ padding: 12 }}
+          style={{ minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' }}
         >
-          <Copy>{muted ? "♪ off" : "♪"}</Copy>
+          <Ionicons name={muted ? "volume-mute" : "volume-medium"} size={22} color="#FFF1CA" />
         </Pressable>
       </View>
       <View
@@ -528,9 +535,7 @@ function Battle({
           height: layout.trayHeight,
         }}
       >
-        {layout.stage && <View pointerEvents="none" style={{ position: 'absolute', top: -22, left: 0, right: 0, zIndex: 1 }}>
-          <Copy style={{ textAlign: 'center', fontSize: 10, color: '#FFF1CA', letterSpacing: 2, textShadowColor: '#182B20', textShadowRadius: 4 }}>DRAG PIECES</Copy>
-        </View>}
+        {layout.stage && <TrayHint placements={run.piecesPlaced} aiming={!!hoverTarget} suspended={suspended || resolved} />}
         <Tray
           style={trayStyle}
           pieces={run.tray}
@@ -588,12 +593,14 @@ function Battle({
           if (!error) setPaused(false);
         }}
       >
-        <View
-          style={{
-            flex: 1,
+        <ScrollView
+          style={{backgroundColor: '#092018ED'}}
+          contentContainerStyle={{
+            flexGrow: 1,
             justifyContent: "center",
-            backgroundColor: "#092018DD",
             padding: 30,
+            paddingTop: Math.max(30, insets.top + 12),
+            paddingBottom: Math.max(30, insets.bottom + 12),
             gap: 16,
           }}
         >
@@ -617,6 +624,9 @@ function Battle({
               <Button secondary onPress={() => void act(() => repository.preferences({ haptics: !hapticsEnabled }))}>
                 Haptics: {hapticsEnabled ? "on" : "off"}
               </Button>
+              <Button secondary onPress={() => void act(() => repository.preferences({ highReadability: !profile?.preferences?.highReadability }))}>
+                High readability: {profile?.preferences?.highReadability ? "on" : "off"}
+              </Button>
               <Button
                 secondary
                 onPress={() => router.replace(practice ? "/arena" : "/")}
@@ -628,18 +638,35 @@ function Battle({
               </Copy>
             </>
           )}
-        </View>
+        </ScrollView>
       </Modal>
     </Scene>
   );
+}
+
+/** Idle guidance has its own one-shot timer; it never repaints the combat screen. */
+function TrayHint({placements, aiming, suspended}: {placements: number; aiming: boolean; suspended: boolean}) {
+  const [idle, setIdle] = useState(false);
+  useEffect(() => {
+    setIdle(false);
+    if (aiming || suspended) return;
+    const timer = setTimeout(() => setIdle(true), 6000);
+    return () => clearTimeout(timer);
+  }, [placements, aiming, suspended]);
+  if (aiming || suspended || (placements >= 2 && !idle)) return null;
+  return <View pointerEvents="none" style={{position: 'absolute', top: -22, left: 0, right: 0}}>
+    <Copy style={{textAlign: 'center', fontSize: 10, color: '#FFF1CA', letterSpacing: 2, textShadowColor: '#182B20', textShadowRadius: 4}}>DRAG PIECES</Copy>
+  </View>;
 }
 
 function Health({presentation, side, max, name, compact = false}: {
   presentation: CombatPresentation; side: 'player' | 'opponent'; max: number; name?: string; compact?: boolean;
 }) {
   const hp = useSyncExternalStore(presentation.subscribe, side === 'player' ? presentation.playerHp : presentation.opponentHp);
-  return <View accessible accessibilityLabel={`Health ${hp} of ${max}`}>
+  return <View accessible accessibilityLabel={`Health ${hp} of ${max}`} style={compact ? {flexDirection: 'row', alignItems: 'center', gap: 8} : undefined}>
     {!compact && <Copy style={{fontSize: 11, textAlign: 'center'}}>{name ? `${name} · ` : ''}{hp} / {max}</Copy>}
-    <Meter fraction={hp / max} color={side === 'opponent' ? '#EDC377' : '#B5E59B'} />
+    {compact && <Ionicons name="heart" size={14} color="#EBAAAB" />}
+    <View style={compact ? {flex: 1} : undefined}><Meter fraction={hp / max} color={side === 'opponent' ? '#EDC377' : '#B5E59B'} /></View>
+    {compact && <Copy style={{fontSize: 11, fontVariant: ['tabular-nums'], textShadowColor: '#10251E', textShadowRadius: 3}}>{hp} / {max}</Copy>}
   </View>;
 }

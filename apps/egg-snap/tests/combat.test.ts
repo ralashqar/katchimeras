@@ -29,6 +29,28 @@ function solve(s: CombatState, perDrop = 750) {
 }
 const slowAi = {minActionMs: 100000, maxActionMs: 100000, accuracy: 1};
 
+test('opening campaigns deliver the complete mechanic rotation even when the player misses', () => {
+  for (const definition of DUELS.slice(0, 2)) {
+    let s = createCombat({...definition, health: 100000, ai: slowAi}, 'variety', 'variety');
+    const seen: string[] = [];
+    for (let index = 0; index < 12; index++) {
+      assert.equal(s.run.beat.index, index);
+      if (index < 4) assert.equal(s.run.beat.varieties.length, 0);
+      else {
+        const expected = ['drift', 'armour', 'bomb', 'fuse'][(index - 4) % 4];
+        assert.equal(s.run.beat.varieties[0]?.id, expected, `${definition.id} turn ${index + 1}`);
+        seen.push(expected);
+        if (expected === 'armour') assert.ok(varietyData(s.run.beat, 'armour'));
+        if (expected === 'bomb') assert.equal(varietyData<{variant: string}>(s.run.beat, 'bomb')?.variant, 'defuse');
+        if (expected === 'fuse') assert.equal(s.run.tray.length, 2, 'jigsaw retains both playable halves');
+      }
+      for (const piece of s.run.tray) s = placeCombat(s, {pieceId: piece.id, discard: true}, s.elapsed + 10);
+      s = tickCombat(s, s.nextBeatAt);
+    }
+    assert.equal(new Set(seen).size, 4);
+  }
+});
+
 test('campaign uses symmetric health and valid beat-indexed sequences', () => {
   validateCampaign();
   for (const d of DUELS) {

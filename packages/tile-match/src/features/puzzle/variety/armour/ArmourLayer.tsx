@@ -39,6 +39,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { GameText } from '../../../../ui/text';
+import { useTileAppearance } from '../../../../ui/theme';
 import { alpha } from '../../../../ui/color';
 import { palette, radius, semantic } from '../../../../ui/tokens';
 import { cellOrigin } from '../../view/metrics';
@@ -100,6 +101,7 @@ export const ArmourLayer = memo(function ArmourLayer({
   beat,
   reduceMotion,
 }: VarietyLayerProps) {
+  const appearance = useTileAppearance();
   const data = varietyData<ArmourData>(beat, ARMOUR_VARIETY.id);
 
   /**
@@ -139,7 +141,7 @@ export const ArmourLayer = memo(function ArmourLayer({
     borderColor: interpolateColor(
       flash.value,
       [0, 1],
-      [semantic.sabotageAxis, palette.text],
+      [appearance ? '#CDBE98' : semantic.sabotageAxis, palette.text],
     ),
     transform: [
       { translateX: Math.sin(flash.value * Math.PI * 2 * RATTLE_CYCLES) * RATTLE },
@@ -176,13 +178,14 @@ export const ArmourLayer = memo(function ArmourLayer({
             exiting={reduceMotion ? undefined : cleared}
             style={[
               styles.plate,
+              appearance && {backgroundColor: '#E5D7BEEE', borderRadius: metrics.cell * appearance.radius, borderBottomWidth: 4},
               { left: x + INSET, top: y + INSET, width: size, height: size },
               hit,
             ]}
           >
             {/* Drops remaining, not hit points — see `armourDropsLeft`. The two differ by the placement that
                 actually fills the cell, and printing the raw points promised one drop where two were needed. */}
-            <GameText style={[styles.points, { fontSize: Math.max(11, size * 0.44) }]}>
+            <GameText style={[styles.points, { fontSize: Math.max(11, size * 0.44) }, appearance && {color: '#4D493B', fontFamily: undefined}]}>
               {armourDropsLeft(points)}
             </GameText>
           </Animated.View>

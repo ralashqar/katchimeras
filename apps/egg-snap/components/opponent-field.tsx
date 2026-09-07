@@ -19,7 +19,7 @@ export const OpponentField = memo(function OpponentField({fighter, layout, dy, c
   ]}>
     {!resolved && varietyBackLayers.map(({id, Layer}) => <Layer key={id} {...layerProps} />)}
     <SlotField grid={run.grid} metrics={layout.metrics} groups={run.beat.groups} generation={run.trayGeneration}
-      hidden={resolved} arrival={arrival} reduceMotion={reduced} />
+      hidden={resolved} arrival={arrival} reduceMotion={reduced} miniature />
     {!resolved && varietyFieldLayers.map(({id, Layer}) => <Layer key={id} {...layerProps} />)}
 
   </Animated.View>;

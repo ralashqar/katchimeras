@@ -120,7 +120,7 @@ export default function Results() {
             </Button>
           )}
           <Button
-            secondary={!!r.won && next?.regionId === duel?.regionId}
+            secondary={!r.won || (!!r.won && next?.regionId === duel?.regionId && !r.practice)}
             disabled={busy}
             onPress={() => void go("world")}
           >

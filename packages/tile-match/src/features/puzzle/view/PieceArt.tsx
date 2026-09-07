@@ -1,4 +1,4 @@
-import { useTileColors } from '../../../ui/theme';
+import { useTileColors, useTileAppearance } from '../../../ui/theme';
 /**
  * A puzzle piece, drawn as gradient Views.
  *
@@ -16,7 +16,7 @@ import { useTileColors } from '../../../ui/theme';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { cellsExtent } from '../engine/board';
 import type { BlockColorId, Cell } from '../engine/types';
@@ -40,6 +40,7 @@ export const PieceArt = memo(function PieceArt({
   style,
 }: PieceArtProps) {
   const { height, width } = cellsExtent(cells);
+  const appearance = useTileAppearance();
   const swatch = useTileColors()[colorId];
   const resolvedGap = gap ?? Math.max(1.5, cell * 0.08);
   const pitch = cell + resolvedGap;
@@ -52,7 +53,8 @@ export const PieceArt = memo(function PieceArt({
         style,
       ]}
     >
-      {cells.map((position, index) => (
+      {cells.map((position, index) => appearance ? <Image key={index} source={appearance.cells[colorId]} resizeMode="stretch"
+        style={{position:"absolute",left:position.column*pitch,top:position.row*pitch,width:cell,height:cell}} /> : (
         <LinearGradient
           key={index}
           colors={[swatch.bright, swatch.mid, swatch.deep]}

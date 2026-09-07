@@ -15,25 +15,28 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 /** Render the real field and React effects; replace only native drawing/animation drivers. */
 function fieldFixture() {
   const animations: number[] = [];
+  const derived: unknown[] = [];
   const native = {
+    makeMutable(value: unknown) { return {value}; },
     useSharedValue(value: unknown) { return React.useRef({ value }).current; },
-    useDerivedValue() { return { value: null }; },
+    useDerivedValue(compute: () => unknown) { const value = compute(); derived.push(value); return { value }; },
     withTiming(_to: number, options: { duration: number }) { animations.push(options.duration); return 1; },
     cancelAnimation() {},
     Easing: { linear: (n: number) => n },
   };
-  const colors = {};
+  const colors = {coral: {bright: '#FFAABB'}};
   const modules: Record<string, unknown> = {
     react: React,
     'react/jsx-runtime': require('react/jsx-runtime'),
     'react-native': { View: 'View', StyleSheet: { create: (styles: unknown) => styles } },
     'react-native-reanimated': native,
-    '@shopify/react-native-skia': { Canvas: 'Canvas', Picture: 'Picture', createPicture: () => ({}) },
-    '../../../ui/theme': { useTileColors: () => colors },
+    '@shopify/react-native-skia': { Canvas: 'Canvas', Group: 'Group', Picture: 'Picture', createPicture: () => ({}), Skia: {Paint: () => ({})} },
+    '../../../ui/theme': { useTileColors: () => colors, useTileAppearance: () => undefined },
     '../../../ui/tokens': { palette: {}, semantic: {} },
     '../engine/types': { BLOCK_COLOR_IDS: ['coral'] },
     './metrics': { cellOrigin: () => ({ x: 0, y: 0 }) },
     './slot-metrics': timing,
+    './footprint-glow': {footprintGlow: () => null},
     './block-cell': Object.fromEntries([
       'blockFacePaints', 'blockFaceRect', 'blockGlowPaints', 'blockRimPaints',
       'blockShinePaint', 'blockShineRect', 'faceRadius', 'rimWidth', 'wellRadius', 'blockWellPaints',
@@ -53,7 +56,7 @@ function fieldFixture() {
     grid: { cols: 9, rows: 9 }, metrics: { width: 390, height: 300, cell: 36 }, generation: 1,
     groups: [{ colorId: 'coral', cells: [0, 1], filled: [0, 1] }, { colorId: 'coral', cells: [2, 3], filled: [] }],
   };
-  return { Field: output.exports.SlotField, props, animations };
+  return { Field: output.exports.SlotField, props, animations, derived };
 }
 
 test('dragging the second piece does not replay the first placement glow', async () => {
@@ -64,7 +67,7 @@ test('dragging the second piece does not replay the first placement glow', async
   let root: ReturnType<typeof create>;
   await act(() => { root = create(render(1, 2)); });
   const initial = animations.length;
-  assert.equal(initial, 2, 'one field entrance and one landing');
+  assert.equal(initial, 3, 'one field entrance, one border fade and one landing');
   for (const cell of [3, 4, 5, 6, 2]) await act(() => root.update(render(1, cell)));
   assert.equal(animations.length, initial, 'fresh arrival objects and cells during hover are not new drops');
   await act(() => root.update(render(2, 2)));
@@ -76,8 +79,28 @@ test('reduced motion and empty placements do not start a landing animation', asy
   const { Field, props, animations } = fieldFixture();
   let root: ReturnType<typeof create>;
   await act(() => { root = create(React.createElement(Field, { ...props, arrival: { id: 1, cells: [] } })); });
-  assert.equal(animations.length, 1, 'only the field entrance');
+  assert.equal(animations.length, 2, 'only the field entrance and border fade');
   await act(() => root.update(React.createElement(Field, { ...props, reduceMotion: true, arrival: { id: 2, cells: [0, 1] } })));
-  assert.equal(animations.length, 1);
+  assert.equal(animations.length, 3, 'reduced motion uses a short opacity-only border fade, with no landing pop');
+  assert.equal(animations.at(-1), 140);
+  await act(() => root.unmount());
+});
+
+test('new beats start empty before effects run, without flashing settled cells or full-size borders', async () => {
+  const {Field, props, derived} = fieldFixture();
+  let root: ReturnType<typeof create>;
+  await act(() => { root = create(React.createElement(Field, props)); });
+  const emptyPicture = derived[0];
+  assert.equal(derived[1], 0, 'border starts invisible');
+  await act(() => root.update(React.createElement(Field, {...props, hoverCells: []})));
+  assert.notEqual(derived.at(-2), emptyPicture, 'previous beat reached its fully drawn state');
+  assert.equal(derived.at(-1), 1);
+  await act(() => root.update(React.createElement(Field, {...props, hidden: true})));
+  assert.equal(derived.at(-2), emptyPicture, 'launch hides cells in the render itself');
+  await act(() => root.update(React.createElement(Field, {...props, generation: 2, groups: [{...props.groups[0], cells: [4,5], filled: []}]})));
+  assert.equal(derived.at(-2), emptyPicture, 'the first new-beat render cannot reuse the old settled picture');
+  assert.equal(derived.at(-1), 0, 'cached border cannot flash before the new entrance');
+  await act(() => root.update(React.createElement(Field, {...props, generation: 2, hoverCells: []})));
+  assert.notEqual(derived.at(-2), emptyPicture, 'the new field becomes visible after entrance');
   await act(() => root.unmount());
 });

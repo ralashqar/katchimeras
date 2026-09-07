@@ -3,7 +3,7 @@ import type { DuelResult } from "../game/types";
 
 export type Profile = {
   version: 1;
-  preferences?: { sound: boolean; haptics: boolean };
+  preferences?: { sound: boolean; haptics: boolean; highReadability?: boolean };
   coins: number;
   completed: string[];
   regions: string[];
@@ -115,7 +115,7 @@ export function createProfileRepository(storage: ProfileStorage) {
   return {
     load: () => update((p) => p),
     update,
-    preferences: (preferences: Partial<{ sound: boolean; haptics: boolean }>) =>
+    preferences: (preferences: Partial<{ sound: boolean; haptics: boolean; highReadability?: boolean }>) =>
       update((p) => ({ ...p, preferences: { sound: true, haptics: true, ...p.preferences, ...preferences } })),
     result: (r: DuelResult) => update((p) => grantResult(p, r)),
     purchase: (id: string) => update((p) => purchase(p, id)),

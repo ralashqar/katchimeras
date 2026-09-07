@@ -1,3 +1,4 @@
+import { useTileAppearance } from '@incubator/tile-match/theme';
 import { memo, useLayoutEffect, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Picture, Canvas, Skia, PaintStyle, TileMode, BlendMode, createPicture, type SkImage } from '@shopify/react-native-skia';
@@ -47,7 +48,10 @@ export const CombatVolleys = memo(function CombatVolleys({ volleys, bursts, cloc
   volleys: readonly CombatVolleyData[]; bursts: readonly CombatBurstData[]; clock: SharedValue<number>; endedAt?: number; reduced: boolean;
   onDone: (id: number) => void;
 }) {
-  const image = useMemo(atlasTexture, []);
+  const appearance = useTileAppearance();
+  const fallback = useMemo(() => appearance ? null : atlasTexture(), [appearance]);
+  const image = appearance?.atlas ?? fallback!;
+  const tileSize = appearance?.spriteSize ?? TILE;
   const emptyPicture = useMemo(() => createPicture(() => {}), []);
   const picture = useSharedValue(emptyPicture);
   // Atlas tint multiplication and canvas compositing need different blend modes.
@@ -58,9 +62,9 @@ export const CombatVolleys = memo(function CombatVolleys({ volleys, bursts, cloc
   const capacity = effectCapacity(commands.length);
   const buffers = useMemo(() => ({
     transforms: makeMutable(Array.from({length: capacity}, () => Skia.RSXform(0, 0, 0, 0))),
-    sprites: makeMutable(Array.from({length: capacity}, () => Skia.XYWHRect(0, 0, TILE, TILE))),
+    sprites: makeMutable(Array.from({length: capacity}, () => Skia.XYWHRect(0, 0, tileSize, tileSize))),
     colors: makeMutable(Array.from({length: capacity}, () => Skia.Color('white'))),
-  }), [capacity]);
+  }), [capacity, tileSize]);
   const data = useSharedValue(commands);
   const deadlines = useSharedValue<{id: number; at: number}[]>([]);
   const drawn = useSharedValue(0);
@@ -77,9 +81,9 @@ export const CombatVolleys = memo(function CombatVolleys({ volleys, bursts, cloc
     let n = 0, decoration = 0;
     const transforms = buffers.transforms.value, sprites = buffers.sprites.value, colors = buffers.colors.value;
     const draw = (x: number, y: number, size: number, sprite: number, colour: number, alpha: number, rotation = 0) => {
-      const scale = size / TILE, c = Math.cos(rotation) * scale, s = Math.sin(rotation) * scale;
-      transforms[n].set(c, s, x - 32*c + 32*s, y - 32*s - 32*c);
-      sprites[n].setXYWH(sprite * TILE, colour * TILE, TILE, TILE);
+      const scale = size / tileSize, c = Math.cos(rotation) * scale, s = Math.sin(rotation) * scale;
+      transforms[n].set(c, s, x - tileSize/2*c + tileSize/2*s, y - tileSize/2*s - tileSize/2*c);
+      sprites[n].setXYWH(sprite * tileSize, colour * tileSize, tileSize, tileSize);
       colors[n][3] = alpha;
       n++;
     };
