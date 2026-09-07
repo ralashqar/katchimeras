@@ -5,7 +5,11 @@
   "exports": {
     "./presented-asset-readiness": "./src/presented-asset-readiness.ts",
     "./screen-transition": "./src/screen-transition.tsx",
-    "./spotlight-geometry": "./src/spotlight-geometry.ts"
+    "./spotlight-geometry": "./src/spotlight-geometry.ts",
+    "./drag-guide": "./src/drag-guide.tsx",
+    "./pending-visual-completion": "./src/pending-visual-completion.ts",
+    "./app-foreground": "./src/app-foreground.ts",
+    "./spotlight": "./src/spotlight.tsx"
   },
   "files": [
     "src"
@@ -16,6 +20,7 @@
     "expo-linear-gradient": "~15.0.8",
     "expo-router": "~6.0.23",
     "expo-status-bar": "~3.0.9",
-    "react-native-reanimated": "~4.1.1"
+    "react-native-reanimated": "~4.1.1",
+    "expo-image": "~3.0.11"
   }
 }

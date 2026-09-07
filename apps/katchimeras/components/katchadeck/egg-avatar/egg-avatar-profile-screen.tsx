@@ -1,3 +1,4 @@
+import { AvatarCategoryTabs, AvatarOptionCard } from '@incubator/avatar/customizer';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { FlashList } from '@shopify/flash-list';
@@ -36,9 +37,6 @@ type GridItem =
   | { key: string; kind: 'wisp'; wisp: (typeof READY_WISPS)[number] }
   | { key: string; kind: 'scene'; scene: (typeof SCENE_CATALOG)[number] };
 
-const CATEGORIES: readonly { id: Category; label: string }[] = [
-  { id: 'body', label: 'Body' }, { id: 'face', label: 'Face' }, { id: 'hat', label: 'Hats' }, { id: 'held', label: 'Held' },
-];
 const WISP_FILTERS: readonly { id: WispFilter; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'life', label: 'Life' }, { id: 'achieve', label: 'Achieve' }, { id: 'special', label: 'Special' },
 ];
@@ -130,10 +128,10 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
           })}
         </View>
 
-        {mode !== 'scenes' ? <View accessibilityRole="tablist" style={styles.tabs}>
-          {(mode === 'egg' ? CATEGORIES : WISP_FILTERS).map((item) => {
-            const active = mode === 'egg' ? category === item.id : wispFilter === item.id;
-            return <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} key={item.id} onPress={() => mode === 'egg' ? setCategory(item.id as Category) : setWispFilter(item.id as WispFilter)} style={[styles.tab, active && styles.tabActive]}>
+        {mode === 'egg' ? <AvatarCategoryTabs category={category} onCategory={id => setCategory(id as Category)} /> : mode !== 'scenes' ? <View accessibilityRole="tablist" style={styles.tabs}>
+          {WISP_FILTERS.map((item) => {
+            const active = wispFilter === item.id;
+            return <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} key={item.id} onPress={() => setWispFilter(item.id as WispFilter)} style={[styles.tab, active && styles.tabActive]}>
               <ThemedText style={[styles.tabLabel, active && styles.tabLabelActive]} lightColor={Meadow.ink} darkColor={Meadow.ink}>{item.label}</ThemedText>
             </Pressable>;
           })}
@@ -154,15 +152,15 @@ export function EggAvatarProfileScreen({ bottomInset = 0, days }: { bottomInset?
             const catalogItem = option.id == null ? null : (category === 'body' ? EGG_AVATAR_SKINS : category === 'face' ? EGG_AVATAR_FACES : category === 'hat' ? EGG_AVATAR_HATS : EGG_AVATAR_HELD_ACCESSORIES).find((entry) => entry.id === option.id);
             const access = catalogItem ? economy.avatarAccess({ category, itemId: option.id!, rarity: catalogItem.rarity, access: catalogItem.access }) : null;
             const owned = access?.hasAccess ?? true;
-              return <Pressable accessibilityLabel={`${option.name}${selected ? ', selected' : ''}${owned ? '' : ', locked'}`} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => selectEgg(option.id)} style={({ pressed }) => [styles.item, { width: cellWidth }, !owned && styles.itemLocked, selected && { borderColor: avatar.equippedSkin.accent, borderWidth: 2 }, pressed && styles.itemPressed]}>
-              <View style={[styles.itemPreview, { height: cellWidth - 12, backgroundColor: `${avatar.equippedSkin.accent}1C` }]}>
+              return <AvatarOptionCard name={option.name} selected={selected} owned={owned} onPress={() => selectEgg(option.id)} style={({ pressed }) => [styles.item, { width: cellWidth }, !owned && styles.itemLocked, selected && { borderColor: avatar.equippedSkin.accent, borderWidth: 2 }, pressed && styles.itemPressed]}
+                preview={<View style={[styles.itemPreview, { height: cellWidth - 12, backgroundColor: `${avatar.equippedSkin.accent}1C` }]}>
                 {option.id == null ? <IconSymbol color={Meadow.inkSoft} name="nosign" size={24} /> : <EggAvatar presentation="grid" size={cellWidth - 18} {...previewProps} />}
                 {selected ? <View style={[styles.check, { backgroundColor: avatar.equippedSkin.accent }]}><IconSymbol color="#FFF9EC" name="checkmark" size={11} /></View> : null}
                 {!owned ? <View style={styles.lock}><IconSymbol color="#FFF9EC" name="lock.fill" size={10} /></View> : null}
                 {!owned && access ? <View style={styles.priceBadge}><ThemedText style={styles.priceText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{access.source === 'locked-plus' ? 'PLUS' : `✦ ${access.price}`}</ThemedText></View> : null}
-              </View>
-              <ThemedText selectable numberOfLines={1} style={styles.itemLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{option.name}</ThemedText>
-            </Pressable>;
+              </View>}
+                label={<ThemedText selectable numberOfLines={1} style={styles.itemLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{option.name}</ThemedText>}
+              />;
             }
             if (item.kind === 'scene') {
               const owned = scenes.isOwned(item.scene.id);

@@ -39,11 +39,13 @@ function aliases(s: CombatState): CombatState {
   const {run, beatStartedAt, lastDropAt, nextBeatAt, exactBeats, totalBeats} = s.player;
   return {...s, run, beatStartedAt, lastDropAt, nextBeatAt, exactBeats, totalBeats};
 }
-/** A deal depends only on the puzzle seed and index, never either combatant's actions. */
+/** Ordinary deals depend only on seed/index; the opening lesson repeats until learned. */
 function deal(s: CombatState, fighter: CombatantState) {
   const index = fighter.run.beat.index + 1;
   const rng = seedNumber(`${s.seed}:puzzle:${index}`);
-  const plan = planBeat(s.definition.progression, index, 0, rng);
+  const plan = s.definition.openingGate && fighter === s.player && fighter.exactBeats < s.definition.openingGate
+    ? { ...planBeat(s.definition.progression, 0, 0, rng), slots: 1, varieties: [] }
+    : planBeat(s.definition.progression, index, 0, rng);
   const next = dealBeat(fighter.run.grid, rng, index, index, plan);
   return {...fighter, beatStartedAt: s.elapsed, lastDropAt: s.elapsed,
     run: {...fighter.run, ...next, trayGeneration: index, lastResolution: null,
@@ -55,7 +57,7 @@ export function createCombat(definition: DuelDefinition, attemptId: string, seed
   const [delay, aiSeed] = actionDelay(definition.ai, seedNumber(`${seed}:ai`));
   return aliases({definition, attemptId, seed, practice, player: fighter, opponent: {...fighter},
     run, beatStartedAt: 0, lastDropAt: 0, nextBeatAt: Infinity, exactBeats: 0, totalBeats: 0,
-    elapsed: 0, playerHp: definition.health, opponentHp: definition.health,
+    elapsed: 0, playerHp: definition.health, opponentHp: definition.opponentHealth ?? definition.health,
     aiSeed, aiAt: delay, aiAccurate: null, aiRoll: 0, impacts: [], eventSequence: 0, events: [], outcome: null});
 }
 function emit(s: CombatState, event: Omit<CombatEvent, 'id' | 'at'>): CombatState {
@@ -149,6 +151,8 @@ function deadline(f: CombatantState) {
 /** Process deadlines at their authored time, not the render frame that happens to notice them. */
 export function tickCombat(s: CombatState, now: number): CombatState {
   if (s.outcome || !Number.isFinite(now) || now < s.elapsed) return s;
+  const gated = (s.definition.openingGate ?? 0) > s.player.exactBeats;
+  if (gated) s = {...s, aiAt: now + s.definition.ai.maxActionMs};
   while (!s.outcome) {
     const at = Math.min(deadline(s.player), deadline(s.opponent), s.aiAt, s.impacts[0]?.at ?? Infinity);
     if (at > now) break;

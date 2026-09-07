@@ -28,6 +28,7 @@ test("SQLite commits the campaign, purchases and receipts together and recovers 
   };
   try {
     let repository = open();
+    await repository.update(p => ({ ...p, adventure: { ...p.adventure!, legacy: true } }));
     const result = (levelId: string): DuelResult => ({
       attemptId: levelId,
       levelId,

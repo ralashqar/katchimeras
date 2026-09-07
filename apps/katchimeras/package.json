@@ -216,7 +216,8 @@
     "@incubator/native-semantic": "0.1.0",
     "@incubator/native-speech": "0.1.0",
     "@incubator/native-vision": "0.1.0",
-    "@incubator/world-editor": "0.1.0"
+    "@incubator/world-editor": "0.1.0",
+    "@incubator/profile": "0.1.0"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",

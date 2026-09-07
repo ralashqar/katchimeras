@@ -1,3 +1,4 @@
+import { TRAY_DRAG_GAIN, trayFingerLift } from '../engine/slot-drop';
 /**
  * The piece tray and the drag interaction.
  *
@@ -19,8 +20,8 @@
  * rather than immediately on top of it: `GAIN_Y`, `trayCell` and `fingerLift`. See each below.
  */
 
-import { memo, useCallback, useEffect, useMemo, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { Pressable, StyleSheet, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -84,8 +85,8 @@ export type DropOutcome = 'consumed' | 'returned' | 'rejected';
  * travel, and one row still costs ~33pt — well clear of finger tremor. Raising `fingerLift` below is
  * what pays for most of the reach, and it costs no precision at all.
  */
-const GAIN_X = 1.35;
-const GAIN_Y = 1.25;
+const GAIN_X = TRAY_DRAG_GAIN.x;
+const GAIN_Y = TRAY_DRAG_GAIN.y;
 
 /** Delay before a *refilled* tray animates in, so the clear that emptied it lands first. */
 const REFILL_SETTLE = 220;
@@ -135,6 +136,7 @@ export type TrayProps = {
    */
   driftY?: Readonly<SharedValue<number>>;
   onSelect?: (pieceId: string | null) => void;
+  onPieceAnchor?: (pieceId: string, point: { x: number; y: number }) => void;
   onPickUp?: (pieceId: string) => void;
   /**
    * The piece crossed into a different cell, or `NO_CELL` when it left the field or the drag ended.
@@ -178,6 +180,7 @@ export const Tray = memo(function Tray({
   driftY,
   onSelect,
   onPickUp,
+  onPieceAnchor,
   onCell,
   onDropAt,
   onInvalid,
@@ -222,6 +225,7 @@ export const Tray = memo(function Tray({
                 driftY={driftY}
                 onSelect={onSelect}
                 onPickUp={onPickUp}
+                onPieceAnchor={onPieceAnchor}
                 onCell={onCell}
                 onDropAt={onDropAt}
                 onInvalid={onInvalid}
@@ -307,6 +311,7 @@ const DraggablePiece = memo(function DraggablePiece({
   driftY,
   onSelect,
   onPickUp,
+  onPieceAnchor,
   onCell,
   onDropAt,
   onInvalid,
@@ -320,6 +325,7 @@ const DraggablePiece = memo(function DraggablePiece({
   dropFrame?: DropFrame;
   driftY?: Readonly<SharedValue<number>>;
   onSelect?: (pieceId: string | null) => void;
+  onPieceAnchor?: (pieceId: string, point: { x: number; y: number }) => void;
   onPickUp?: (pieceId: string) => void;
   onCell?: (pieceId: string, cellIndex: number) => void;
   onDropAt?: (pieceId: string, release: DropRelease) => DropOutcome;
@@ -337,6 +343,21 @@ const DraggablePiece = memo(function DraggablePiece({
   const trayCell = restingCellSize ?? clamp(metrics.cell * 0.62, 14, 26);
   const trayGap = (trayCell * metrics.gap) / metrics.cell;
 
+  const artRef = useRef<View>(null);
+  const viewport = useWindowDimensions();
+  useEffect(() => {
+    if (!onPieceAnchor) return;
+    let active = true;
+    const measure = () => artRef.current?.measureInWindow((x, y, width, height) => {
+      if (!active || !width || !height) return;
+      const cell = piece.cells[0];
+      onPieceAnchor(piece.id, { x: x + cell.column * (trayCell + trayGap) + trayCell / 2, y: y + cell.row * (trayCell + trayGap) + trayCell / 2 });
+    });
+    // Measure after the tray refill animation has settled, including its stagger.
+    const timer = setTimeout(measure, REFILL_SETTLE + REFILL_DURATION + 3 * REFILL_STAGGER + 40);
+    return () => { active = false; clearTimeout(timer); };
+  }, [onPieceAnchor, piece.id, piece.cells, trayCell, trayGap, viewport.width, viewport.height]);
+
   const extent = cellsExtent(piece.cells);
   const pieceHeight = extent.height * metrics.pitch - metrics.gap;
 
@@ -353,7 +374,7 @@ const DraggablePiece = memo(function DraggablePiece({
    * did on a board: the drop is graded on being exact, so covering the target with your own hand is
    * the difference between a perfect and a miss.
    */
-  const fingerLift = clamp(pieceHeight / 2 + 30, 76, 104);
+  const fingerLift = trayFingerLift(pieceHeight);
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -676,7 +697,7 @@ const DraggablePiece = memo(function DraggablePiece({
             translated,
           ]}
         >
-          <Animated.View style={scaled}>
+          <Animated.View ref={artRef} collapsable={false} style={scaled}>
             <PieceArt cells={piece.cells} colorId={piece.colorId} cell={trayCell} gap={trayGap} />
           </Animated.View>
           {selected ? <View style={styles.selectedRing} /> : null}

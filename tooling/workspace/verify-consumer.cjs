@@ -13,7 +13,7 @@ function run(args, cwd) {
   if(result.status!==0) throw new Error(result.stderr || result.stdout);
   return result.stdout;
 }
-const directories=['packages/story','packages/environments','packages/avatar','packages/merge','tooling/art-pipeline','art/assets/images/katchimeras/game-hub'];
+const directories=['packages/story','packages/presentation','packages/profile','packages/environments','packages/avatar','packages/merge','tooling/art-pipeline','art/assets/images/katchimeras/game-hub'];
 const archives=directories.map(directory=> {
   const packed=JSON.parse(run(['pack','--json','--ignore-scripts','--pack-destination',releases],path.join(root,directory)));
   return path.join(releases,packed[0].filename);
@@ -28,6 +28,7 @@ import {createContentFlowCompiler} from '@incubator/story/compiler';
 import {createContentFlowRun} from '@incubator/story/interpreter';
 import {createHexProjection} from '@incubator/environments/hex';
 import {havenUpgradePhaseAt} from '@incubator/environments/upgrade-presentation';
+import {createVersionedProfileRepository} from '@incubator/profile/repository';
 import {composeLayerPresentation} from '@incubator/avatar/layout';
 const compiler=createContentFlowCompiler({validateStoryNodeCapability:()=>null,isRegisteredStoryRoute:target=>target.id==='workshop'});
 const story=compiler.defineContentFlow({id:'other-game',version:1,entryNodeId:'done',nodes:[{id:'done',kind:'complete'}]});
@@ -35,6 +36,10 @@ assert.equal(createContentFlowRun(story,{runId:'other-game-run',now:1}).status,'
 assert.equal(createHexProjection({width:100,projectionTilt:0.5,lipWidthRatio:0.1,layoutProfiles:{board:{horizontalSpacing:1,verticalSpacing:1}}},'board').hexRing(1).length,6);
 assert.equal(havenUpgradePhaseAt(700,false),'reveal');
 assert.equal(composeLayerPresentation({scale:1,offsetX:0,offsetY:0},{scale:0.9,offsetX:0,offsetY:0}).scale,0.9);
+let stored=null;
+const profiles=createVersionedProfileRepository({storage:{read:async()=>stored,write:async value=>{stored=value;}},fresh:()=>({coins:0}),migrate:value=>value});
+await profiles.update(value=>({...value,coins:value.coins+10}));
+assert.equal((await profiles.load()).coins,10);
 const require=createRequire(import.meta.url);
 const manifest=JSON.parse(readFileSync(require.resolve('@incubator/art-game-hub/package.json'),'utf8'));
 assert.equal(manifest.name,'@incubator/art-game-hub');

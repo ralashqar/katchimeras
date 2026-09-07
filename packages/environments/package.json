@@ -12,7 +12,15 @@
     "./progression-context": "./src/progression-context.tsx",
     "./seamless-image": "./src/seamless-image.tsx",
     "./upgrade-effects": "./src/upgrade-effects.tsx",
-    "./upgrade-presentation": "./src/upgrade-presentation.ts"
+    "./upgrade-presentation": "./src/upgrade-presentation.ts",
+    "./mossprout-preset": "./src/mossprout-preset.ts",
+    "./neighborhood": "./src/neighborhood.tsx",
+    "./world-tile-transition": "./src/world-tile-transition.tsx",
+    "./world-sky": "./src/world-sky.tsx",
+    "./sky-motion": "./src/sky-motion.ts",
+    "./hex-camera": "./src/hex-camera.ts",
+    "./hex-camera-math": "./src/hex-camera-math.ts",
+    "./mossprout-layout": "./src/mossprout-layout.ts"
   },
   "files": [
     "src"
@@ -23,6 +31,15 @@
     "expo-image": "~3.0.11",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-reanimated": "~4.1.1",
-    "expo-linear-gradient": "~15.0.8"
+    "expo-linear-gradient": "~15.0.8",
+    "@incubator/art-world": "0.1.0"
+  },
+  "dependencies": {
+    "@incubator/presentation": "0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@incubator/art-world": {
+      "optional": true
+    }
   }
 }

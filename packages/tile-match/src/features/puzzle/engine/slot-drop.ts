@@ -312,3 +312,13 @@ export function scorePlacement(
     ),
   };
 }
+
+/** Shared by the actual tray and interaction guides so a hand lands the lifted piece. */
+export const TRAY_DRAG_GAIN = { x: 1.35, y: 1.25 } as const;
+export function trayFingerLift(pieceHeight: number) {
+  'worklet';
+  return Math.max(76, Math.min(104, pieceHeight / 2 + 30));
+}
+export function trayGuideDestination(from: { x: number; y: number }, target: { x: number; y: number }, pieceHeight: number) {
+  return { x: from.x + (target.x - from.x) / TRAY_DRAG_GAIN.x, y: from.y + (target.y - from.y + trayFingerLift(pieceHeight)) / TRAY_DRAG_GAIN.y };
+}

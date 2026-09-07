@@ -7,7 +7,8 @@
     "./layout": "./src/layout.ts",
     "./energy": "./src/energy.tsx",
     "./feed-motion": "./src/feed-motion.ts",
-    "./motion-timing": "./src/motion-timing.ts"
+    "./motion-timing": "./src/motion-timing.ts",
+    "./customizer": "./src/customizer.tsx"
   },
   "files": [
     "src"

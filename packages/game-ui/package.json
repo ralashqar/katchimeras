@@ -7,7 +7,10 @@
     "./game-primitives": "./src/game-primitives.tsx",
     "./game-surface": "./src/game-surface.tsx",
     "./theme": "./src/theme.ts",
-    "./reward-token-flight": "./src/reward-token-flight.tsx"
+    "./reward-token-flight": "./src/reward-token-flight.tsx",
+    "./narrative-panel": "./src/narrative-panel.tsx",
+    "./developer-profile-panel": "./src/developer-profile-panel.tsx",
+    "./speech-tooltip": "./src/speech-tooltip.tsx"
   },
   "files": [
     "src"

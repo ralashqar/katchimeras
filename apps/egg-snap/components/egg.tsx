@@ -1,3 +1,4 @@
+import { HATS, HELD } from "../data/accessories";
 import { memo, useEffect, useState } from "react";
 import { LayeredAvatar } from "@incubator/avatar/layered-avatar";
 import { EggEnergy } from "@incubator/avatar/energy";
@@ -11,6 +12,7 @@ import { BODIES, FACES, WISP } from "../data/art";
 
 export const Egg = memo(function Egg({
   skin = "classic",
+  hat, held,
   streak = 0,
   size = 160,
   face,
@@ -28,6 +30,8 @@ export const Egg = memo(function Egg({
   clock,
 }: {
   skin?: string;
+  hat?: string | null;
+  held?: string | null;
   streak?: number;
   size?: number;
   face?: string;
@@ -96,6 +100,9 @@ export const Egg = memo(function Egg({
           bodySource={body.source}
           faceSource={(FACES[expression.faceId] ?? FACES.sleepy).source}
           bodyPresentation={body.presentation}
+          hat={hat ? HATS[hat]?.source : null}
+          heldAccessory={held ? HELD[held]?.source : null}
+          heldPresentation={{ scale: 1, offsetX: 0, offsetY: 0 }}
           hatPresentation={{ scale: 1, offsetX: 0, offsetY: 0 }}
           faceTransitionDuration={expression.transitionMs}
           bodyOverlay={health && <Animated.View style={[StyleSheet.absoluteFill, crackStyle]}>

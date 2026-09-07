@@ -1,0 +1,12 @@
+{
+  "name": "@incubator/profile",
+  "version": "0.1.0",
+  "exports": {
+    "./repository": "./src/repository.ts",
+    "./snapshots": "./src/snapshots.ts",
+    "./domains": "./src/domains.ts"
+  },
+  "files": [
+    "src"
+  ]
+}

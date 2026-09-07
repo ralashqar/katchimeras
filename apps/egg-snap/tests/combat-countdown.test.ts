@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 const {act, create} = require('react-test-renderer');
 Object.assign(globalThis, {IS_REACT_ACT_ENVIRONMENT: true});
 
-test('countdown freezes before ready and during pause, starts combat once on GO and stops its frame callback', async () => {
+test('countdown freezes before ready and during pause, starts combat once after GO clears and stops its frame callback', async () => {
   const reactions = new Set<() => void>();
   let frame: (v: {timeSincePreviousFrame: number}) => void = () => {};
   let active = false, starts = 0;
@@ -54,7 +54,11 @@ test('countdown freezes before ready and during pause, starts combat once on GO 
   assert.equal(starts, 0); assert.equal(sounds.length, 2);
   await act(() => root.update(element(false)));
   for (let i = 0; i < 20; i++) await step();
-  assert.equal(starts, 1); assert.deepEqual(sounds, ['count3', 'count2', 'count1', 'go']);
+  assert.equal(starts, 0); assert.deepEqual(sounds, ['count3', 'count2', 'count1', 'go']);
+  for (let i = 0; i < 6; i++) await step();
+  assert.equal(starts, 0);
+  await step();
+  assert.equal(starts, 1); assert.equal(active, false);
   for (let i = 0; i < 20; i++) await step();
   assert.equal(starts, 1); assert.equal(active, false);
   await act(() => root.unmount()); assert.equal(reactions.size, 0);

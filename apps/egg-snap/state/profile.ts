@@ -1,8 +1,11 @@
+import { createVersionedProfileRepository } from "@incubator/profile/repository";
+import { advanceAdventure, freshAdventure, migrateProfile, type Adventure } from "./adventure";
 import { COLLECTION, getDuel, getRegion } from "../data/campaign";
 import type { DuelResult } from "../game/types";
 
 export type Profile = {
-  version: 1;
+  version: 1 | 2;
+  adventure?: Adventure;
   preferences?: { sound: boolean; haptics: boolean; highReadability?: boolean };
   coins: number;
   completed: string[];
@@ -16,7 +19,8 @@ export type Profile = {
   pendingResult: DuelResult | null;
 };
 export const freshProfile = (): Profile => ({
-  version: 1,
+  version: 2,
+  adventure: freshAdventure(),
   coins: 0,
   completed: [],
   regions: ["glade"],
@@ -29,6 +33,14 @@ export const freshProfile = (): Profile => ({
   pendingResult: null,
 });
 export function canPlay(p: Profile, levelId: string) {
+  if (p.adventure && !p.adventure.legacy) {
+    const a = p.adventure;
+    if (levelId === "glade-1") return true;
+    if (levelId === "glade-2") return a.revealed.includes("trail");
+    if (levelId === "glade-3") return a.claims.includes("chest");
+    if (levelId === "glade-6") return a.eggs.includes("pollen");
+    if (!a.fragments.includes("captain")) return false;
+  }
   const d = getDuel(levelId);
   const r = getRegion(d.regionId);
   const index = r.levels.indexOf(levelId);
@@ -46,9 +58,10 @@ export function grantResult(p: Profile, result: DuelResult): Profile {
   const duel = getDuel(result.levelId);
   const first = !p.completed.includes(duel.id);
   const coins = result.won ? (first ? duel.reward : 20) : 0;
-  const receipt = { ...result, coins };
+  const receipt = { ...result, coins, firstWin: first && result.won };
   return {
     ...p,
+    adventure: advanceAdventure(p, result),
     coins: p.coins + coins,
     completed: result.won && first ? [...p.completed, duel.id] : p.completed,
     skins:
@@ -60,6 +73,7 @@ export function grantResult(p: Profile, result: DuelResult): Profile {
   };
 }
 export function purchase(p: Profile, id: string): Profile {
+  if (p.adventure && p.adventure.nestLevel === 0 && !p.adventure.legacy) throw new Error("Repair your nest first");
   const item = COLLECTION.find((i) => i.id === id);
   if (item) {
     const list = item.kind === "skin" ? p.skins : p.wisps;
@@ -91,6 +105,10 @@ export function equip(
     throw new Error("Skin not owned");
   if (kind === "wisp" && id && !p.wisps.includes(id))
     throw new Error("Wisp not owned");
+  if (kind === 'skin' && p.adventure) {
+    const a = p.adventure;
+    return { ...p, skin: id!, adventure: { ...a, appearances: { ...a.appearances, [a.activeEgg]: { ...a.appearances[a.activeEgg], skin: id! } } } };
+  }
   return kind === "skin" ? { ...p, skin: id! } : { ...p, wisp: id };
 }
 
@@ -100,20 +118,10 @@ export interface ProfileStorage {
 }
 /** One serial service owns all profile changes; a single durable write includes every reward receipt. */
 export function createProfileRepository(storage: ProfileStorage) {
-  let queue: Promise<unknown> = Promise.resolve();
-  const update = (change: (p: Profile) => Profile) => {
-    const work = queue.then(async () => {
-      const p = (await storage.read()) ?? freshProfile();
-      if (p.version !== 1) throw new Error("Unsupported save version");
-      const next = change(p);
-      if (next !== p) await storage.write(next);
-      return next;
-    });
-    queue = work.catch(() => {});
-    return work;
-  };
+  const core = createVersionedProfileRepository({ storage, fresh: freshProfile, migrate: migrateProfile });
+  const { update } = core;
   return {
-    load: () => update((p) => p),
+    ...core,
     update,
     preferences: (preferences: Partial<{ sound: boolean; haptics: boolean; highReadability?: boolean }>) =>
       update((p) => ({ ...p, preferences: { sound: true, haptics: true, ...p.preferences, ...preferences } })),

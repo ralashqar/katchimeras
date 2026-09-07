@@ -402,7 +402,7 @@ test('Kingdom uses the resolved Today sky plate without legacy clouds or atmosph
     'utf8',
   );
   const cameraSource = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'use-kingdom-hex-camera.ts'),
+    path.join(process.cwd(), '..', '..', 'packages', 'environments', 'src', 'hex-camera.ts'),
     'utf8',
   );
 
@@ -728,7 +728,7 @@ test('only Garden order buttons navigate while the dedicated route retains the f
     'utf8',
   );
   const camera = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'use-kingdom-hex-camera.ts'),
+    path.join(process.cwd(), '..', '..', 'packages', 'environments', 'src', 'hex-camera.ts'),
     'utf8',
   );
   const surface = fs.readFileSync(
@@ -856,7 +856,7 @@ test('Haven camera accepts and publishes a settled world snapshot', () => {
     'utf8',
   );
   const camera = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'use-kingdom-hex-camera.ts'),
+    path.join(process.cwd(), '..', '..', 'packages', 'environments', 'src', 'hex-camera.ts'),
     'utf8',
   );
   assert.match(canvas, /initialSnapshot: initialCameraSnapshot/);

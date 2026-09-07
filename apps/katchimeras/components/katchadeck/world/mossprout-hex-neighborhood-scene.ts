@@ -1,3 +1,4 @@
+import { MOSSPROUT_PRESET } from '@incubator/environments/mossprout-preset';
 import type { ImageSourcePropType } from 'react-native';
 import { sharedResidentAnchor } from './shared-resident-presentation';
 
@@ -38,7 +39,7 @@ const MAIN: ArtSpec = {
   coord: SHARED_WORLD_TILES['mossprout-home'].coord,
   sources: {
     full: require('@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp'),
-    medium: require('@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile_512.webp'),
+    medium: MOSSPROUT_PRESET.home.source,
     thumb: require('@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile_256.webp'),
   },
 };
@@ -49,7 +50,7 @@ const GARDEN_LEVELS: Record<0 | 1 | 2, ArtSpec> = {
   coord: { q: 0, r: 2 },
   sources: {
     full: require('@incubator/art-world/hex/mossprout_memory_garden_level_0.webp'),
-    medium: require('@incubator/art-world/hex/mossprout_memory_garden_level_0_512.webp'),
+    medium: MOSSPROUT_PRESET.garden.levels[0],
     thumb: require('@incubator/art-world/hex/mossprout_memory_garden_level_0_256.webp'),
   },
   },
@@ -58,7 +59,7 @@ const GARDEN_LEVELS: Record<0 | 1 | 2, ArtSpec> = {
     coord: { q: 0, r: 2 },
     sources: {
       full: require('@incubator/art-world/hex/mossprout_memory_garden_level_1.webp'),
-      medium: require('@incubator/art-world/hex/mossprout_memory_garden_level_1_512.webp'),
+      medium: MOSSPROUT_PRESET.garden.levels[1],
       thumb: require('@incubator/art-world/hex/mossprout_memory_garden_level_1_256.webp'),
     },
   },
@@ -67,7 +68,7 @@ const GARDEN_LEVELS: Record<0 | 1 | 2, ArtSpec> = {
     coord: { q: 0, r: 2 },
     sources: {
       full: require('@incubator/art-world/hex/mossprout_memory_garden_level_2.webp'),
-      medium: require('@incubator/art-world/hex/mossprout_memory_garden_level_2_512.webp'),
+      medium: MOSSPROUT_PRESET.garden.levels[2],
       thumb: require('@incubator/art-world/hex/mossprout_memory_garden_level_2_256.webp'),
     },
   },
@@ -102,7 +103,7 @@ export const MOSSPROUT_GARDEN_PLANT_SLOT_IDS = Object.keys(GARDEN_PLANT_SLOT_POS
 
 const DREAM_MIST_LOCKED_NATURE_SOURCES: TileSources = {
   full: require('@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp'),
-  medium: require('@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_512.webp'),
+  medium: MOSSPROUT_PRESET.mist,
   thumb: require('@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp'),
 };
 const DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['dream_mist_locked_hex_tile_v4.webp'];

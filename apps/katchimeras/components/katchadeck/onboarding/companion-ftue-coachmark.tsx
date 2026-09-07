@@ -1,3 +1,5 @@
+import { Spotlight } from '@incubator/presentation/spotlight';
+import { SpeechTooltip } from '@incubator/game-ui/speech-tooltip';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { normalizeSpeechText } from '@/utils/speech-text';
 import { useEffect, useRef, useState, type RefObject } from 'react';
@@ -158,7 +160,6 @@ export function CompanionFtueCoachmark({
   const calloutLeft = Math.max(14, Math.min(width - calloutWidth - 14, focus.x + focus.width / 2 - calloutWidth / 2));
   const tailLeft = Math.max(38, Math.min(calloutWidth - 34, focus.x + focus.width / 2 - calloutLeft - 10));
   const spotlightRadius = Math.min(26, focus.height / 2);
-  const spotlightSpread = Math.max(1, Math.hypot(width, height));
   const fingerLeft = Math.max(4, Math.min(width - HAND_SIZE - 4, focus.x + focus.width / 2 - HAND_SIZE * HAND_TIP_X));
   const fingerTop = Math.max(4, Math.min(height - HAND_SIZE - 4, focus.y + focus.height / 2 - HAND_SIZE * HAND_TIP_Y));
 
@@ -170,31 +171,9 @@ export function CompanionFtueCoachmark({
       pointerEvents={buttonLabel ? 'auto' : 'box-none'}
       style={styles.root}>
       <View pointerEvents="none" style={styles.spotlightLayer}>
-        <View style={[styles.roundedCutout, {
-          borderRadius: spotlightRadius,
-          boxShadow: `0 0 0 ${spotlightSpread}px rgba(16,24,17,0.62)`,
-          height: focus.height,
-          left: focus.x,
-          top: focus.y,
-          width: focus.width,
-        }]} />
-        <View style={[styles.ring, {
-          borderRadius: spotlightRadius,
-          height: focus.height,
-          left: focus.x,
-          top: focus.y,
-          width: focus.width,
-        }]} />
+        <Spotlight focus={focus} opacity={.62} radius={spotlightRadius} screen={{ x: 0, y: 0, width, height }} />
       </View>
-      <View
-        accessibilityLiveRegion="polite"
-        pointerEvents={buttonLabel ? 'auto' : 'none'}
-        style={[styles.callout, { left: calloutLeft, top: calloutTop, width: calloutWidth }]}>
-        <View pointerEvents="none" style={[
-          styles.speechTail,
-          calloutBelow ? styles.speechTailAbove : styles.speechTailBelow,
-          { left: tailLeft },
-        ]} />
+      <SpeechTooltip left={calloutLeft} top={calloutTop} width={calloutWidth} tailLeft={tailLeft} below={calloutBelow} interactive={Boolean(buttonLabel)}>
         <Animated.View
           accessibilityLabel="Your Egg is showing you around"
           pointerEvents="none"
@@ -222,7 +201,7 @@ export function CompanionFtueCoachmark({
             <KatchaButton disabled={continuing} onPress={continueStep} icon="arrow.right" loading={continuing} style={{alignSelf: 'stretch', marginTop: 5}} label={(continueFailed ? 'Try again' : buttonLabel)} />
           ) : null}
         </View>
-      </View>
+      </SpeechTooltip>
       {showFinger ? (
         <Animated.View
           entering={FadeIn.delay(100).duration(180)}
@@ -243,57 +222,7 @@ export function CompanionFtueCoachmark({
 const styles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject, zIndex: 90 },
   spotlightLayer: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
-  roundedCutout: {
-    backgroundColor: 'transparent',
-    borderCurve: 'continuous',
-    position: 'absolute',
-  },
-  ring: {
-    borderColor: 'rgba(221,255,184,0.98)',
-    borderCurve: 'continuous',
-    borderWidth: 2,
-    boxShadow: '0 0 18px rgba(167,231,103,0.92)',
-    position: 'absolute',
-  },
   hand: { position: 'absolute', zIndex: 4 },
-  callout: {
-    alignItems: 'center',
-    backgroundColor: '#FFF9E8',
-    borderColor: 'rgba(124,151,83,0.42)',
-    borderCurve: 'continuous',
-    borderRadius: 22,
-    borderWidth: 1,
-    boxShadow: '0 12px 30px rgba(25,42,25,0.28)',
-    flexDirection: 'row',
-    gap: 9,
-    minHeight: 96,
-    paddingHorizontal: 11,
-    paddingVertical: 9,
-    position: 'absolute',
-    zIndex: 2,
-  },
-  speechTail: {
-    backgroundColor: '#FFF9E8',
-    height: 20,
-    position: 'absolute',
-    transform: [{ rotate: '45deg' }],
-    width: 20,
-    zIndex: 0,
-  },
-  speechTailAbove: {
-    borderLeftColor: 'rgba(124,151,83,0.42)',
-    borderLeftWidth: 1,
-    borderTopColor: 'rgba(124,151,83,0.42)',
-    borderTopWidth: 1,
-    top: -10,
-  },
-  speechTailBelow: {
-    borderBottomColor: 'rgba(124,151,83,0.42)',
-    borderBottomWidth: 1,
-    borderRightColor: 'rgba(124,151,83,0.42)',
-    borderRightWidth: 1,
-    bottom: -10,
-  },
   guideAvatar: { flexShrink: 0, height: 76, width: 76, zIndex: 1 },
   calloutContent: { flex: 1, gap: 8, zIndex: 1 },
   message: {

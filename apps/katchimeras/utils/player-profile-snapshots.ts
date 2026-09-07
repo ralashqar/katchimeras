@@ -1,3 +1,4 @@
+import { installProfileDomains } from '@incubator/profile/domains';
 import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { flushFtuePersistence } from '@/features/onboarding/ftue-runtime';
 import type { PlayerProfileSnapshot, PlayerProfileSnapshotValidation } from '@/types/player-profile-snapshot';
@@ -110,10 +111,12 @@ export function validatePlayerProfileSnapshot(snapshot: unknown): PlayerProfileS
 
 async function installSnapshot(snapshot: PlayerProfileSnapshot) {
   setJourneyQuickModeEnabled(false);
-  replaceKeyValueProfileDomain(snapshot.domains.keyValue.values);
-  relationshipProgressionRepository.reloadFromStorageForDebug();
-  await installMergeWorldStateForDebug(snapshot.domains.mergeWorld.state);
-  await installContentFlowJournalForDebug(snapshot.domains.contentFlow ?? { schemaVersion: 1, runs: [] });
+  await installProfileDomains([
+    { validate: () => { const result = validatePlayerProfileSnapshot(snapshot); if (!result.ok) throw new Error(result.errors.join('\n')); },
+      install: () => { replaceKeyValueProfileDomain(snapshot.domains.keyValue.values); relationshipProgressionRepository.reloadFromStorageForDebug(); } },
+    { validate: () => {}, install: () => installMergeWorldStateForDebug(snapshot.domains.mergeWorld.state) },
+    { validate: () => {}, install: () => installContentFlowJournalForDebug(snapshot.domains.contentFlow ?? { schemaVersion: 1, runs: [] }) },
+  ]);
 }
 
 export async function replacePlayerProfileSnapshot(snapshot: PlayerProfileSnapshot, options: { createRollback?: boolean } = {}): Promise<void> {

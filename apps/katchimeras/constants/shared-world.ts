@@ -1,3 +1,4 @@
+import { MOSSPROUT_LAYOUT } from '@incubator/environments/mossprout-layout';
 import { GLOW } from './glow';
 import type { MergeCharacterId } from '@/types/merge-world';
 
@@ -5,10 +6,10 @@ export type SharedWorldPurchase = { tileId: string; unlockId: string; companion:
 
 /** Stable world objects, independent of companion ownership or story checkpoints. */
 export const SHARED_WORLD_TILES = {
-  'mossprout-home': { companion: 'mossprout', coord: { q: 0, r: 1 } },
+  'mossprout-home': { companion: 'mossprout', coord: MOSSPROUT_LAYOUT.home.coord },
   'steppling-home': {
     residentVisible: false,
-    companion: 'steppling', coord: { q: 0, r: 0 },
+    companion: 'steppling', coord: MOSSPROUT_LAYOUT.gate.coord,
     unlockId: 'mossprout:overgrown-trail', price: GLOW.mistUnlockCost,
     name: 'Misty clearing', revealPreset: 'mist-clear',
   },

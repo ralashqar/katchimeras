@@ -568,6 +568,7 @@ test('Merge FTUE never inserts guide panels into the fixed board layout', () => 
 test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   const havenOverlay = readFileSync('components/katchadeck/onboarding/haven-ftue-overlay.tsx', 'utf8');
+  const sharedSpotlight = readFileSync(require.resolve('@incubator/presentation/spotlight'), 'utf8');
   const kingdomScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.match(overlay, /StyleSheet\.absoluteFillObject/);
@@ -583,10 +584,10 @@ test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   assert.doesNotMatch(overlay, /SpotlightCornerFillers|spotlightCornerFiller/);
   assert.match(overlay, /<NativeSpotlightRing slot=\{slot0\}/);
   assert.doesNotMatch(overlay, /@shopify\/react-native-skia|<Canvas|usePathValue|BlurMask/);
-  assert.match(havenOverlay, /cornerRadius = Math\.min\(radius, focus\.width \/ 2, focus\.height \/ 2\)/);
-  assert.match(havenOverlay, /Math\.hypot\(screen\.width, screen\.height\)/);
-  assert.match(havenOverlay, /boxShadow: `0 0 0 \$\{spreadRadius\}px rgba\(11,9,24,\$\{opacity\}\)`/);
-  assert.match(havenOverlay, /dimMask: \{[\s\S]*?borderCurve: 'continuous'/);
+  assert.match(sharedSpotlight, /cornerRadius = Math\.min\(radius, focus\.width \/ 2, focus\.height \/ 2\)/);
+  assert.match(sharedSpotlight, /Math\.hypot\(screen\.width, screen\.height\)/);
+  assert.match(sharedSpotlight, /boxShadow: `0 0 0 \$\{spreadRadius\}px rgba\(11,9,24,\$\{opacity\}\)`/);
+  assert.match(sharedSpotlight, /dimMask: \{[\s\S]*?borderCurve: 'continuous'/);
   assert.match(havenOverlay, /const cueFrame = cue\?\.kind === 'tap'[\s\S]*?<Finger focus=\{layout\.cueFocus \?\? layout\.focus\}/);
   assert.match(havenOverlay, /target\.kind === 'haven_guide'\) return 'haven-guide'/);
   assert.match(kingdomScreen, /collapsable=\{false\}[\s\S]*?ref=\{setHavenGuideNode\}[\s\S]*?<FtueGuideCopy/);
@@ -1005,7 +1006,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   const todayRoute = readFileSync('app/(tabs)/today.tsx', 'utf8');
   const mossproutOpening = readFileSync('components/katchadeck/world/mossprout-egg-ftue-surface.tsx', 'utf8');
   const kingdomCanvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
-  const kingdomCamera = readFileSync('components/katchadeck/world/use-kingdom-hex-camera.ts', 'utf8');
+  const kingdomCamera = readFileSync(require.resolve('@incubator/environments/hex-camera'), 'utf8');
   const kingdomScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const nurture = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
   const companionStage = readFileSync('components/katchadeck/world/companion-cinematic-stage.tsx', 'utf8');
@@ -1200,6 +1201,7 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   const companion = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
   const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
   const coachmark = readFileSync('components/katchadeck/onboarding/companion-ftue-coachmark.tsx', 'utf8');
+  const sharedBubble = readFileSync(require.resolve('@incubator/game-ui/speech-tooltip'), 'utf8');
   const kingdom = readFileSync('components/katchadeck/world/kingdom-companion-screen.tsx', 'utf8');
   const mossproutFtueStage = readFileSync('components/katchadeck/world/mossprout-ftue-story-stage.tsx', 'utf8');
   const mossproutStage = readFileSync('components/katchadeck/world/mossprout-story-stage.tsx', 'utf8');
@@ -1284,10 +1286,10 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.doesNotMatch(bondCelebration, /journeyBondRatio|journeyProgressCard|receipt\.points|COMPANION_RELATIONSHIP_STAGES|journeyStageNode/);
   assert.match(bondCelebration, /accessibilityLabel=\{`Journey Day \$\{journeyHandoff\.dayNumber\} timeline`\}[\s\S]*?styles\.timelineLockedMarker/);
   assert.match(coachmark, /useEggAvatar\(\)[\s\S]*?<EggAvatar/);
-  assert.match(coachmark, /styles\.speechTail[\s\S]*?styles\.guideAvatar[\s\S]*?<EggAvatar/);
+  assert.match(coachmark, /<SpeechTooltip[\s\S]*?styles\.guideAvatar[\s\S]*?<EggAvatar/);
   assert.doesNotMatch(coachmark, /avatarBadge(?:Background|Ring)?/);
-  assert.ok(coachmark.indexOf('style={[styles.callout') < coachmark.indexOf('{showFinger ? ('), 'the companion finger must render above the unified Egg bubble');
-  assert.match(coachmark, /roundedCutout[\s\S]*?boxShadow: `0 0 0 \$\{spotlightSpread\}px[\s\S]*?borderRadius: spotlightRadius/);
+  assert.ok(coachmark.indexOf('<SpeechTooltip') < coachmark.indexOf('{showFinger ? ('), 'the companion finger must render above the unified Egg bubble');
+  assert.match(coachmark, /<Spotlight focus=\{focus\} opacity=\{.62\} radius=\{spotlightRadius\}/);
   assert.match(coachmark, /ftue-hand\.webp[\s\S]*?HAND_TIP_X[\s\S]*?HAND_TIP_Y[\s\S]*?<Image/);
   assert.match(coachmark, /showFinger = true[\s\S]*?\{showFinger \? \(/);
   assert.match(interaction, /emphasis: true, text: 'one card'[\s\S]*?showFinger=\{false\}/);
@@ -1297,7 +1299,9 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(coachmark, /clearTimeout\(reactionTimer\)[\s\S]*?clearTimeout\(restoreTimer\)[\s\S]*?cancelAnimation\(avatarWobble\)/);
   assert.match(coachmark, /size=\{76\}/);
   assert.match(coachmark, /translateY: -2/);
-  assert.match(coachmark, /callout: \{[\s\S]*?flexDirection: 'row'[\s\S]*?guideAvatar: \{ flexShrink: 0/);
+  assert.match(sharedBubble, /styles\.speechTail/);
+  assert.match(sharedBubble, /callout: \{[\s\S]*?flexDirection: 'row'/);
+  assert.match(coachmark, /guideAvatar: \{ flexShrink: 0/);
   assert.doesNotMatch(coachmark, /styles\.(eyebrow|title|body)/);
   assert.match(interaction, /message=\{[\s\S]*?emphasis: true, text: 'Bond\.'[\s\S]*?emphasis: true, text: 'one card'/);
   assert.match(today, /resolveMossproutJourneyHandoff[\s\S]*?companionJourneyHook=\{mossproutJourneyHandoff\}[\s\S]*?onOpenCompanionJourney=\{openMossproutJourney\}/);
@@ -1413,7 +1417,7 @@ test('each Discovery Egg answer grants the same visual Growth', () => {
 
 test('the Grove Egg inherits the authored camera retreat across its three feeds', () => {
   const grove = readFileSync('components/katchadeck/world/mossprout-egg-ftue-surface.tsx', 'utf8');
-  const camera = readFileSync('components/katchadeck/world/use-kingdom-hex-camera.ts', 'utf8');
+  const camera = readFileSync(require.resolve('@incubator/environments/hex-camera'), 'utf8');
   const openingScale = mossproutGroveEggCameraPinchTarget('egg.opening', 2)!;
   const contextScale = mossproutGroveEggCameraPinchTarget('egg.context', 2)!;
   const mindScale = mossproutGroveEggCameraPinchTarget('egg.mind', 2)!;

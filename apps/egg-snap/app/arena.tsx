@@ -16,7 +16,7 @@ export default function Arena() {
   if (!ARENA_ENABLED)
     return (
       <Scene>
-        <Button onPress={() => router.replace("/")}>Return to world</Button>
+        <Button onPress={() => router.dismissTo("/")}>Return to world</Button>
       </Scene>
     );
   return (
@@ -29,7 +29,7 @@ export default function Arena() {
           paddingBottom: 35,
         }}
       >
-        <Button secondary onPress={() => router.replace("/")}>
+        <Button secondary onPress={() => router.dismissTo("/")}>
           ‹ World
         </Button>
         <Heading>Mechanics arena</Heading>

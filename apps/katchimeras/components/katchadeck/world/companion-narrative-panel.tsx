@@ -1,10 +1,11 @@
 import type { ComponentProps } from 'react';
 import Animated from 'react-native-reanimated';
+import { NarrativePanel } from '@incubator/game-ui/narrative-panel';
 import { KatchaUI } from '@/constants/katcha-ui';
 
 /** The shared conversation surface, also used by short companion activities. */
 export function CompanionNarrativePanel({ style, ...props }: ComponentProps<typeof Animated.View>) {
-  return <Animated.View {...props} style={[{
+  return <NarrativePanel {...props} style={[{
     backgroundColor: KatchaUI.companionScenePanel.background,
     borderColor: KatchaUI.companionScenePanel.border,
     borderCurve: 'continuous', borderRadius: 30, borderWidth: 1,

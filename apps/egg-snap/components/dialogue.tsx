@@ -1,3 +1,4 @@
+import { NarrativePanel } from '@incubator/game-ui/narrative-panel';
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal, View } from "react-native";
 import {
@@ -103,7 +104,7 @@ export function Dialogue({
           backgroundColor: "rgba(9,23,19,0.45)",
         }}
       >
-        <View style={[styles.panel, { paddingBottom: 40 }]}>
+        <NarrativePanel style={[styles.panel, { paddingBottom: 40 }]}>
           <Copy style={styles.muted}>A LITTLE STORY</Copy>
           <Heading small>{title}</Heading>
           <Copy style={{ fontSize: 17, lineHeight: 27 }}>
@@ -123,7 +124,7 @@ export function Dialogue({
                 ? "Let’s go"
                 : "Continue"}
           </Button>
-        </View>
+        </NarrativePanel>
       </View>
     </Modal>
   );

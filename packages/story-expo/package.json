@@ -6,7 +6,8 @@
     "./navigation": "./src/navigation.tsx",
     "./repository": "./src/repository.ts",
     "./surface-host": "./src/surface-host.tsx",
-    "./surface": "./src/surface.ts"
+    "./surface": "./src/surface.ts",
+    "./key-value-repository": "./src/key-value-repository.ts"
   },
   "files": [
     "src"

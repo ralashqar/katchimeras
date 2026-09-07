@@ -126,6 +126,7 @@ export function validateCampaign() {
   }
 }
 export function validateDuel(d: DuelDefinition) {
+  if (d.opponentHealth !== undefined && (!Number.isFinite(d.opponentHealth) || d.opponentHealth <= 0)) throw new Error('Invalid opponent health');
   if (!Number.isFinite(d.health) || d.health <= 0 || d.ai.minActionMs < 100 || !Number.isFinite(d.ai.minActionMs) || !Number.isFinite(d.ai.maxActionMs) || d.ai.maxActionMs < d.ai.minActionMs || !Number.isFinite(d.ai.accuracy) || d.ai.accuracy < 0 || d.ai.accuracy > 1) throw new Error('Invalid duel');
   if (d.progression.kind !== 'stream' || !d.progression.turns.length) throw new Error('Duels require a beat-indexed sequence');
   for (const turn of d.progression.turns) {

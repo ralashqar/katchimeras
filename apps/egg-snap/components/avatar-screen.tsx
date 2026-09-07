@@ -1,0 +1,38 @@
+import { useState } from 'react';
+import { router } from 'expo-router';
+import { View, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AvatarCustomizer } from '@incubator/avatar/customizer';
+import { useProfile } from '../state/provider';
+import { repository } from '../state/repository';
+import { customize, EGGS, selectEgg } from '../state/adventure';
+import { BODIES, FACES } from '../data/art';
+import { HATS, HELD } from '../data/accessories';
+import { Scene } from './scene';
+import { Egg } from './egg';
+import { Button, Copy, Heading } from './ui';
+
+export default function AvatarScreen() {
+  const { profile: p, act, error } = useProfile();
+  const [category, setCategory] = useState('body');
+  const [busy, setBusy] = useState(false);
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  if (!p?.adventure) return null;
+  const a = p.adventure;
+  const outfit = a.appearances[a.activeEgg];
+  const egg = EGGS.find(e => e.id === a.activeEgg)!;
+  const options = category === 'body' ? Object.entries(BODIES).map(([id, body]) => ({ id, name: body.name, owned: p.skins.includes(id) || id === egg.skin, preview: <Egg skin={id} size={48} paused /> }))
+    : category === 'face' ? Object.entries(FACES).map(([id, face]) => ({ id, name: id, owned: true, preview: <Image source={face.source} style={{ width: 48, height: 48 }} contentFit="contain" /> }))
+    : [{ id: null, name: 'None', owned: true, preview: undefined }, ...Object.entries(category === 'hat' ? HATS : HELD).map(([id, item]) => ({ id, name: item.name, owned: id !== 'tiny-golden-crown' || a.fragments.includes('captain'), preview: <Image source={item.source} style={{ width: 48, height: 48 }} contentFit="contain" /> }))];
+  const change = async (work: () => ReturnType<typeof repository.load>) => { if (busy) return; setBusy(true); try { await act(work); } catch {} finally { setBusy(false); } };
+  return <Scene><View style={{ flex: 1, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 12, paddingHorizontal: 18, gap: 12 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Heading small>Your eggs</Heading><Button secondary onPress={() => router.back()}>Done</Button></View>
+    <View style={{ alignItems: 'center' }}><Egg size={Math.min(210, height * .24)} skin={outfit.skin} face={outfit.face} hat={outfit.hat} held={outfit.held} /><Heading small>{egg.name}</Heading><Copy>{egg.line}</Copy></View>
+    <View style={{ flexDirection: 'row', gap: 10 }}>{EGGS.filter(e => a.eggs.includes(e.id)).map(e => <Button key={e.id} secondary={e.id !== a.activeEgg} disabled={busy} onPress={() => void change(() => repository.update(value => selectEgg(value, e.id)))}>{e.name}</Button>)}</View>
+    {!!error && <Copy accessibilityRole="alert">{error}</Copy>}
+    <View pointerEvents={busy ? 'none' : 'auto'} style={{ flex: 1, padding: 14, backgroundColor: '#FFF8E9', borderRadius: 26 }}><AvatarCustomizer category={category} onCategory={setCategory} selected={category === 'body' ? outfit.skin : category === 'face' ? outfit.face : category === 'hat' ? outfit.hat : outfit.held} options={options} onSelect={id => void change(() => repository.update(value => customize(value, { [category === 'body' ? 'skin' : category]: id })))} /></View>
+    <Button secondary onPress={() => router.push('/collection')}>Shells & companions</Button>
+  </View></Scene>;
+}

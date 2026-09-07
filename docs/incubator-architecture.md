@@ -62,3 +62,7 @@ Runtime imports use static package paths, such as `require('@incubator/art-merge
 5. **Further domain extraction:** deliberately incremental. The large merge engine, FTUE experience panels, kingdom scene orchestration and game-specific UI still live in Katchimeras. Extract another mechanism when a second game's requirements establish its contract; do not move game policy into shared packages merely because it is large.
 
 The packages currently export TypeScript/TSX source for Expo/Metro and TypeScript-aware consumers. They are not a compiled CommonJS SDK. Story/surface IDs use augmentable type registries; typecheck each game separately so its registry declarations do not collide with another game's declarations.
+
+## Egg Snap FTUE reuse
+
+Egg Snap now consumes the shared Katchimeras hex camera, sky, Mossprout preset and upgrade presentation through `@incubator/environments`. `@incubator/profile` supplies versioned local saves and recoverable multi-domain developer snapshots. Both games consume shared avatar tabs/option cards and the narrative panel while keeping their catalogs, economy and content policy in their apps. Egg Snap uses its own shared-story director/surface instances and saves; no Katchimeras profile data is read or reset. See [the implementation notes](../apps/egg-snap/docs/ftue.md).

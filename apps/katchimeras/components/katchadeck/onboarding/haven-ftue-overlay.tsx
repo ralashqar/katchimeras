@@ -15,7 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { FtueCueDefinition, FtueSpotlightDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
-import { roundedMultiCutoutSegments } from '@/features/onboarding/spotlight-geometry';
+import { Spotlight, MultipleSpotlights } from '@incubator/presentation/spotlight';
 
 const HAND_ART = require('@incubator/art-merge-world/ui/ftue-hand.webp');
 type Frame = { height: number; width: number; x: number; y: number };
@@ -134,35 +134,6 @@ export const HavenFtueOverlay = memo(function HavenFtueOverlay({
   );
 });
 
-function MultipleSpotlights({ frames, opacity, radius, screen }: { frames: Frame[]; opacity: number; radius: number; screen: Frame }) {
-  const segments = useMemo(() => roundedMultiCutoutSegments(frames, radius, screen), [frames, radius, screen]);
-  return <View style={StyleSheet.absoluteFill}>
-    {segments.map((segment, index) => <View key={index} style={{ position: 'absolute', left: segment.x, top: segment.y, width: segment.width, height: segment.height, backgroundColor: `rgba(11,9,24,${opacity})` }} />)}
-    {frames.map((frame, index) => <View key={index} style={[styles.ring, { left: frame.x, top: frame.y, width: frame.width, height: frame.height, borderRadius: Math.min(radius, frame.width / 2, frame.height / 2) }]} />)}
-  </View>;
-}
-
-function Spotlight({ focus, opacity, radius, screen }: { focus: Frame; opacity: number; radius: number; screen: Frame }) {
-  const cornerRadius = Math.min(radius, focus.width / 2, focus.height / 2);
-  const spreadRadius = Math.max(1, Math.hypot(screen.width, screen.height));
-  return (
-    <View style={StyleSheet.absoluteFill}>
-      <View style={[
-        styles.dimMask,
-        {
-          borderRadius: cornerRadius,
-          boxShadow: `0 0 0 ${spreadRadius}px rgba(11,9,24,${opacity})`,
-          height: focus.height,
-          left: focus.x,
-          top: focus.y,
-          width: focus.width,
-        },
-      ]} />
-      <View style={[styles.ring, { borderRadius: cornerRadius, height: focus.height, left: focus.x, top: focus.y, width: focus.width }]} />
-    </View>
-  );
-}
-
 function Finger({ focus, resetKey, placement }: { focus: Frame; resetKey: string; placement: 'center' | 'below' }) {
   const reduceMotion = useReducedMotion();
   const press = useSharedValue(0);
@@ -204,17 +175,5 @@ function measure(view: View | null): Promise<Frame | null> {
 
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, overflow: 'hidden', zIndex: FTUE_SCENE_LAYERS.spotlight },
-  dimMask: {
-    backgroundColor: 'transparent',
-    borderCurve: 'continuous',
-    position: 'absolute',
-  },
-  ring: {
-    borderColor: 'rgba(214,255,190,0.96)',
-    borderCurve: 'continuous',
-    borderWidth: 2,
-    boxShadow: '0 0 18px rgba(154,239,112,0.9)',
-    position: 'absolute',
-  },
   hand: { position: 'absolute' },
 });

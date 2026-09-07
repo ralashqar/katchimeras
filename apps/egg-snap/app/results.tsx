@@ -28,10 +28,12 @@ export default function Results() {
     return (
       <Scene>
         <View style={{ flex: 1, justifyContent: "center", padding: 30 }}>
-          <Button onPress={() => router.replace("/")}>Return to world</Button>
+          <Button onPress={() => router.dismissTo("/")}>Return to world</Button>
         </View>
       </Scene>
     );
+  const adventure = profile?.adventure;
+  const guided = !!adventure && !adventure.legacy && !r.practice;
   const duel = r.practice ? null : getDuel(r.levelId);
   const index = DUELS.findIndex((d) => d.id === r.levelId);
   const next = DUELS[index + 1];
@@ -48,7 +50,7 @@ export default function Results() {
         );
       else if (destination === "next" && next)
         router.replace({ pathname: "/duel", params: { level: next.id } });
-      else router.replace(r.practice ? "/arena" : "/");
+      else router.dismissTo(r.practice ? "/arena" : "/");
     } catch {
       setBusy(false);
     }
@@ -79,13 +81,15 @@ export default function Results() {
                 : "EVERY SPARK STARTS SOMEWHERE"}
           </Copy>
           <Heading>
-            {draw ? "Two bright sparks." : r.won ? "You found your spark." : "Rest. Then rise."}
+            {draw ? "Two bright sparks." : r.won ? "CRACKED!" : "Rest. Then rise."}
           </Heading>
           <Egg
             skin={profile!.skin}
             size={Math.min(230, height * 0.29)}
             streak={r.won ? 10 : 0}
             face={r.won ? "grin" : "sleepy"}
+            hat={adventure?.appearances[adventure.activeEgg]?.hat}
+            held={adventure?.appearances[adventure.activeEgg]?.held}
             wisp={!!profile!.wisp}
           />
           <Copy
@@ -97,19 +101,22 @@ export default function Results() {
             {Math.round(r.accuracy * 100)}% perfect beats · Best streak{" "}
             {r.bestStreak}
           </Copy>
-          {r.won && duel?.boss && (
+          {r.won && guided && r.firstWin !== false && r.levelId === 'glade-1' && <Copy>Golden Shell Fragment! Pip: “Uh… I don’t think that belonged to him.”</Copy>}
+          {r.won && guided && r.firstWin !== false && r.levelId === 'glade-3' && <Copy>New egg discovered: Pollen! “About time. That banner was clashing with my shell.”</Copy>}
+          {r.won && guided && r.firstWin !== false && duel?.boss && <Copy>Second Golden Shell Fragment · Golden crown · Nest upgrade gift. Captain: “This hat is clearly defective.”</Copy>}
+          {r.won && !guided && duel?.boss && (
             <Copy>The Keeper shell is yours. A new region awaits.</Copy>
           )}
-          {r.won && r.levelId === "glade-2" && (
+          {r.won && !guided && r.levelId === "glade-2" && (
             <Copy>Moss shell discovered in your collection.</Copy>
           )}
-          {r.won && r.levelId === "glade-3" && (
+          {r.won && !guided && r.levelId === "glade-3" && (
             <Copy>A Glade wisp is waiting in your collection.</Copy>
           )}
         </View>
         <View style={{ alignSelf: "stretch", gap: 12 }}>
           {!!error && <Copy accessibilityRole="alert">{error}</Copy>}
-          {r.won && next?.regionId === duel?.regionId && !r.practice && (
+          {r.won && !guided && next?.regionId === duel?.regionId && !r.practice && (
             <Button disabled={busy} onPress={() => void go("next")}>
               Next duel
             </Button>
@@ -128,7 +135,7 @@ export default function Results() {
               ? "Back to arena"
               : r.won && duel?.boss
                 ? "Discover the path ahead"
-                : "Back to world"}
+                : guided && r.levelId === "glade-1" ? "Home to the nest" : "Back to world"}
           </Button>
         </View>
       </View>

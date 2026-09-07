@@ -1,3 +1,8 @@
+import { varietyData } from '@incubator/tile-match/varieties';
+import { MultipleSpotlights } from '@incubator/presentation/spotlight';
+import { SpeechTooltip } from '@incubator/game-ui/speech-tooltip';
+import { DragGuide } from '@incubator/presentation/drag-guide';
+import { ftueEncounter } from "../data/ftue-encounters";
 import { PerformancePanel } from "./performance-panel";
 import { ARENA_ENABLED } from "../game/dev-tools";
 import { CombatVolleys, type CombatVolleyData, type CombatBurstData } from "./combat-volley";
@@ -39,7 +44,7 @@ import { StageGuides } from "./stage-guides";
 import { OpponentField } from "./opponent-field";
 import { GroundedEgg } from "./grounded-egg";
 import { battleLayout, opponentFieldLayout } from "../game/layout";
-import { dropPreview, shouldCancelDrop } from "../game/drop-target";
+import { assistOpeningDrop, dropPreview, shouldCancelDrop } from "../game/drop-target";
 import { useCombatOffset } from "../game/use-combat-offset";
 import { useCombat } from "../game/use-combat";
 import { useFeedback } from "../game/feedback";
@@ -72,7 +77,7 @@ export default function BattleRoute() {
   const practice = ARENA_ENABLED && !!params.mechanic;
   const definition = useMemo(() => {
     const base = DUELS.find((d) => d.id === params.level) ?? getDuel("glade-1");
-    if (!practice) return base;
+    if (!practice) return profile ? ftueEncounter(base, profile) : base;
     const mechanic = MOVES[params.mechanic!] ? params.mechanic! : "tap";
     const strength = Math.max(0, Math.min(1, Number(params.strength) || 0.25));
     const speed = Math.max(100, Math.min(10000, Number(params.speed) || DEFAULT_ARENA_AI.actionMs));
@@ -81,7 +86,7 @@ export default function BattleRoute() {
       progression: params.mechanic === 'mixed' && !params.stress ? snapLadder(true)
         : mechanicSequence(params.stress ? ['tap', 'drift', 'armour', 'bomb', 'fuse', 'crossed', 'hues'] : [mechanic], 2, strength),
       ai: {minActionMs: Math.round(speed * .85), maxActionMs: Math.round(speed * 1.15), accuracy}};
-  }, [params.level, params.mechanic, params.strength, params.speed, params.accuracy, params.stress, practice]);
+  }, [params.level, params.mechanic, params.strength, params.speed, params.accuracy, params.stress, practice, profile]);
   if (!profile) return null;
   if (ARENA_ENABLED && params.appearance) return <AppearanceGallery />;
   if (!practice && !canPlay(profile, definition.id))
@@ -89,7 +94,7 @@ export default function BattleRoute() {
       <Scene>
         <View style={{ padding: 35, marginTop: 120, gap: 20 }}>
           <Copy>This duel is still beyond the mist.</Copy>
-          <Button onPress={() => router.replace("/")}>Return to world</Button>
+          <Button onPress={() => router.dismissTo("/")}>Return to world</Button>
         </View>
       </Scene>
     );
@@ -125,22 +130,51 @@ function Battle({
   const startCombat = useCallback(() => setStarted(true), []);
   const muted = profile?.preferences?.sound === false;
   const hapticsEnabled = profile?.preferences?.haptics !== false;
+  const [coach, setCoach] = useState<'snap' | 'bomb-notice' | 'bomb-safe' | 'bomb-clear' | 'armour' | null>(null);
+  const coached = useRef(new Set(profile?.seen ?? []));
+  const coachStartBeats = useRef(0);
+  const [pieceAnchors, setPieceAnchors] = useState<Record<string, { x: number; y: number }>>({});
+  const onPieceAnchor = useCallback((id: string, point: { x: number; y: number }) => {
+    setPieceAnchors(current => current[id]?.x === point.x && current[id]?.y === point.y ? current : { ...current, [id]: point });
+  }, []);
   const [lesson, setLesson] = useState<string | null>(null);
   const [story, setStory] = useState(
-    !practice && !profile!.seen.includes(`duel:${definition.id}`),
+    !definition.guided && !practice && !profile!.seen.includes(`duel:${definition.id}`),
   );
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const suspended = paused || story || !!lesson || !ready || !started;
+  const baseSuspended = paused || story || !!lesson || !ready || !started;
+  const suspended = baseSuspended || coach === 'bomb-notice';
   const game = useCombat(definition, seed, suspended, practice, stress);
   const { state, ref, clock, drop, backgrounded, presentation } = game;
   useLayoutEffect(() => { if (practice) presentation.performance.commits++; });
   const run = state.run;
   useEffect(() => {
-    if (practice || story || lesson || state.outcome || run.beat.status !== "placing") return;
+    if (!started || definition.guided || practice || story || lesson || state.outcome || run.beat.status !== "placing") return;
     const unseen = run.beat.varieties.find(v => MECHANIC_LESSONS[v.id] && !profile!.seen.includes(`mechanic:${v.id}`));
     if (unseen) setLesson(unseen.id);
-  }, [practice, story, lesson, state.outcome, run.beat, profile]);
+  }, [started, definition.guided, practice, story, lesson, state.outcome, run.beat, profile]);
+  const bombData = varietyData<{ pieceId: string | null; armed: boolean }>(run.beat, 'bomb');
+  useEffect(() => {
+    if (!definition.guided || baseSuspended) return;
+    if (coach) {
+      if (coach === 'bomb-safe' && bombData && !bombData.armed) setCoach('bomb-clear');
+      if (state.exactBeats > coachStartBeats.current) {
+        const id = coach.startsWith('bomb') ? 'mechanic:bomb' : coach === 'armour' ? 'mechanic:armour' : 'mechanic:tap';
+        coached.current.add(id);
+        setCoach(null);
+        void act(() => repository.seen(id)).catch(() => {});
+      }
+      return;
+    }
+    if (state.outcome || run.beat.status !== 'placing') return;
+    const next = bombData ? 'bomb-notice' : run.beat.varieties.some(v => v.id === 'armour') ? 'armour' : 'snap';
+    const id = next === 'bomb-notice' ? 'mechanic:bomb' : next === 'armour' ? 'mechanic:armour' : 'mechanic:tap';
+    if (!coached.current.has(id)) {
+      coachStartBeats.current = state.exactBeats;
+      setCoach(next);
+    }
+  }, [act, baseSuspended, bombData, coach, definition.guided, run.beat, state.exactBeats, state.outcome]);
   const reduced = useReducedMotion();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -184,11 +218,11 @@ function Battle({
   useLayoutEffect(() => {
     const update = () => {
       playerHealth.value = withTiming(presentation.current.playerHp / definition.health, {duration: 180});
-      opponentHealth.value = withTiming(presentation.current.opponentHp / definition.health, {duration: 180});
+      opponentHealth.value = withTiming(presentation.current.opponentHp / (definition.opponentHealth ?? definition.health), {duration: 180});
     };
     update();
     return presentation.subscribe(update);
-  }, [presentation, definition.health, playerHealth, opponentHealth]);
+  }, [presentation, definition.health, definition.opponentHealth, playerHealth, opponentHealth]);
   const playerHatchAt = state.outcome && state.playerHp === 0 ? state.elapsed : undefined;
   const opponentHatchAt = state.outcome && state.opponentHp === 0 ? state.elapsed : undefined;
   const [hatchFinished, setHatchFinished] = useState(false);
@@ -299,8 +333,12 @@ function Battle({
   }, []);
   const onDrop = useCallback(
     (pieceId: string, release: DropRelease): DropOutcome => {
+      if (suspended || backgrounded) return "returned";
       const { layout: l } = viewRef.current;
       const before = ref.current.run;
+      if (definition.openingGate && ref.current.player.exactBeats < definition.openingGate) {
+        release = assistOpeningDrop(before, pieceId, release, l.dropFrame);
+      }
       setHoverTarget((current) =>
         current?.pieceId === pieceId ? null : current,
       );
@@ -339,7 +377,7 @@ function Battle({
       if (!next.run.beat.voided) feedbackRef.current.cue(placement?.filled.length ? "place" : "miss");
       return "consumed";
     },
-    [drop, ref, presentation],
+    [drop, ref, presentation, definition.openingGate, suspended, backgrounded],
   );
   const resolved = run.beat.status === "resolved";
   const lines = useMemo(
@@ -368,6 +406,32 @@ function Battle({
         : last?.refused === "colour"
           ? "Match the colour, too"
           : "";
+  const riggedGroup = run.beat.groups.find(group => group.pieceId === bombData?.pieceId);
+  const safeGroup = run.beat.groups.find(group => group.pieceId !== bombData?.pieceId && run.tray.some(piece => piece.id === group.pieceId && !piece.used));
+  const guideGroup = coach === 'bomb-notice' || coach === 'bomb-clear' ? riggedGroup : coach === 'bomb-safe' ? safeGroup : run.beat.groups.find(group => run.tray.some(piece => piece.id === group.pieceId && !piece.used));
+  const guidePiece = run.tray.find(piece => piece.id === guideGroup?.pieceId);
+  const guideFrom = guidePiece ? pieceAnchors[guidePiece.id] : undefined;
+  const frameFor = (group: (typeof run.beat.groups)[number]) => {
+    const rows = group.cells.map(cell => Math.floor(cell / run.grid.cols));
+    const columns = group.cells.map(cell => cell % run.grid.cols);
+    return { x: layout.dropFrame.anchorX + Math.min(...columns) * layout.metrics.pitch - layout.metrics.cell / 2 - 8,
+      y: layout.dropFrame.anchorY + Math.min(...rows) * layout.metrics.pitch - layout.metrics.cell / 2 - 8,
+      width: (Math.max(...columns) - Math.min(...columns)) * layout.metrics.pitch + layout.metrics.cell + 16,
+      height: (Math.max(...rows) - Math.min(...rows)) * layout.metrics.pitch + layout.metrics.cell + 16 };
+  };
+  const ghostFrame = guideGroup ? frameFor(guideGroup) : { x: 0, y: 0, width: 0, height: 0 };
+  const guideTarget = guideGroup && guidePiece ? {
+    x: layout.dropFrame.anchorX + (guideGroup.origin.column + guidePiece.cells[0].column) * layout.metrics.pitch,
+    y: layout.dropFrame.anchorY + (guideGroup.origin.row + guidePiece.cells[0].row) * layout.metrics.pitch,
+  } : { x: 0, y: 0 };
+  const tutorialVisible = !!coach && !state.outcome && !baseSuspended && !backgrounded && !resolved && !!guidePiece;
+  const tutorialFrames = coach?.startsWith('bomb') ? run.beat.groups.map(frameFor) : [ghostFrame];
+  const bubbleHeight = coach === 'bomb-notice' ? 146 : 96;
+  const rivalBottom = layout.stage ? layout.stage.rival.visible.y + layout.stage.rival.visible.height : layout.opponentY + layout.opponentSize;
+  const bubbleWidth = Math.min(250, width - 28);
+  const bubbleLeft = Math.max(14, Math.min(width - bubbleWidth - 14, guideTarget.x - bubbleWidth / 2));
+  const bubbleBelow = ghostFrame.y - bubbleHeight - 16 < rivalBottom + 12;
+  const bubbleTop = bubbleBelow ? ghostFrame.y + ghostFrame.height + 16 : ghostFrame.y - bubbleHeight - 16;
   return (
     <Scene
       environment={
@@ -377,6 +441,20 @@ function Battle({
       onReady={setReady}
       impulse={suspended ? undefined : impulse}
     >
+      {tutorialVisible && <>
+        <View pointerEvents="none" style={{ position: 'absolute', inset: 0, zIndex: 70, overflow: 'hidden' }}>
+          <MultipleSpotlights frames={[...tutorialFrames, { x: layout.frame.x + 12, y: layout.trayY, width: layout.frame.width - 24, height: layout.trayHeight }]} opacity={.58} radius={18} screen={{ x: 0, y: 0, width, height }} />
+        </View>
+        <SpeechTooltip left={bubbleLeft} top={bubbleTop} width={bubbleWidth} tailLeft={Math.max(18, Math.min(bubbleWidth - 34, guideTarget.x - bubbleLeft - 10))} below={bubbleBelow} interactive={coach === 'bomb-notice'} style={{ zIndex: 80, minHeight: bubbleHeight }}>
+          <View style={{ flex: 1, paddingHorizontal: 8, gap: 10 }}>
+            <Copy style={{ color: '#35422F', fontFamily: 'EggDisplay', fontSize: 17, lineHeight: 23 }}>
+              {coach === 'bomb-notice' ? 'This one is rigged! Don’t snap it yet.' : coach === 'bomb-safe' ? 'Snap this unmarked shape first to defuse it.' : coach === 'bomb-clear' ? 'Safe now! Snap the remaining shape.' : coach === 'armour' ? 'Chip this armoured shape, then snap again!' : 'Drag this block to its matching target.'}
+            </Copy>
+            {coach === 'bomb-notice' && <Button onPress={() => setCoach('bomb-safe')}>Show me how</Button>}
+          </View>
+        </SpeechTooltip>
+        {guideFrom && coach !== 'bomb-notice' && <DragGuide hand={require('@incubator/art-merge-world/ui/ftue-hand.webp')} showHand from={guideFrom} to={guideTarget} />}
+      </>}
       <View pointerEvents="box-none" style={{position: 'absolute', top: insets.top + 10,
         left: layout.frame.x + 12, right: width - layout.frame.x - layout.frame.width + 12,
         flexDirection: 'row', justifyContent: 'space-between', zIndex: 10}}>
@@ -387,7 +465,7 @@ function Battle({
         left: width / 2 - Math.min(236, layout.frame.width - 136) / 2,
         width: Math.min(236, layout.frame.width - 136)}}>
         <ShellHealth presentation={presentation} side="opponent" name={definition.rival}
-          max={definition.health} compact={height < 700} reduced={reduced} />
+          max={definition.opponentHealth ?? definition.health} compact={height < 700} reduced={reduced} />
       </View>
       {!layout.stage && <View pointerEvents="none" style={{position: "absolute", left: (width-layout.opponentSize)/2, top: layout.opponentY}}><Egg
           skin={definition.skin}
@@ -397,13 +475,13 @@ function Battle({
           health={opponentHealth} hatchAt={opponentHatchAt} clock={clock}
           paused={suspended}
         /></View>}
-      <OpponentField fighter={state.opponent} layout={rivalLayout} dy={rivalOffset.dy} clock={clock}
-        reduced={reduced} paused={suspended || backgrounded} hidden={!!state.outcome} />
+      {started && <OpponentField fighter={state.opponent} layout={rivalLayout} dy={rivalOffset.dy} clock={clock}
+        reduced={reduced} paused={suspended || backgrounded} hidden={!!state.outcome} />}
       {layout.stage ? <>
         <GroundedEgg placement={layout.stage.rival} skin={definition.skin}
           health={opponentHealth} hatchAt={opponentHatchAt} clock={clock}
           face={state.outcome === "won" || state.outcome === "draw" ? "surprise" : undefined} streak={state.opponent.run.combo} pulse={state.opponent.run.piecesPlaced} feedKey={opponentFireKey} hitSignal={opponentHitSignal} paused={suspended} />
-        <GroundedEgg placement={layout.stage.player} skin={profile!.skin} streak={run.combo}
+        <GroundedEgg placement={layout.stage.player} skin={profile!.skin} hat={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.hat} held={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.held} face={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.face} streak={run.combo}
           health={playerHealth} hatchAt={playerHatchAt} clock={clock}
           pulse={run.piecesPlaced} feedKey={fireKey} hitSignal={playerHitSignal} dizzySignal={playerDizzySignal} wisp={!!profile!.wisp} paused={suspended} />
       </> : (      <View
@@ -415,7 +493,7 @@ function Battle({
         }}
       >
         <Egg
-          skin={profile!.skin}
+          skin={profile!.skin} hat={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.hat} held={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.held} face={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.face}
           streak={run.combo}
           pulse={run.piecesPlaced}
           feedKey={fireKey}
@@ -429,7 +507,8 @@ function Battle({
         />
       </View>
 )}
-      <Animated.View
+      {/* Mount after GO clears so the shared footprint entrance plays after the countdown. */}
+      {started && <Animated.View
         pointerEvents="none"
         style={[
           {
@@ -476,7 +555,7 @@ function Battle({
             />
           ))}
 
-      </Animated.View>
+      </Animated.View>}
       <View
         pointerEvents="none"
         style={{
@@ -518,6 +597,7 @@ function Battle({
           dropFrame={layout.dropFrame}
           driftY={offset.dy}
           onPickUp={onPickUp}
+          onPieceAnchor={coach ? onPieceAnchor : undefined}
           onCell={onCell}
           onDropAt={onDrop}
           disabled={suspended || !!state.outcome || resolved}
@@ -534,7 +614,7 @@ function Battle({
 
         }}
       >
-        <ShellHealth presentation={presentation} max={definition.health} compact={height < 700} reduced={reduced} />
+        <ShellHealth presentation={presentation} name={profile!.adventure?.activeEgg === 'pollen' ? 'Pollen' : 'Pip'} max={definition.health} compact={height < 700} reduced={reduced} />
       </View>
       {__DEV__ && guides && layout.stage && <StageGuides layout={layout} />}
       <CombatVolleys volleys={volleys} bursts={bursts} clock={clock} endedAt={state.outcome ? state.elapsed : undefined} reduced={reduced} onDone={retire} />
@@ -595,6 +675,7 @@ function Battle({
           ) : (
             <>
               <Button onPress={() => setPaused(false)}>Resume duel</Button>
+              {__DEV__ && <Button secondary onPress={() => router.replace("/dev")}>Developer profiles</Button>}
               {__DEV__ && layout.stage && <Button secondary onPress={() => setGuides(v => !v)}>Stage guides: {guides ? 'on' : 'off'}</Button>}
               <Button secondary onPress={() => void act(() => repository.preferences({ sound: muted }))}>
                 Sound: {muted ? "off" : "on"}
@@ -607,7 +688,7 @@ function Battle({
               </Button>
               <Button
                 secondary
-                onPress={() => router.replace(practice ? "/arena" : "/")}
+                onPress={() => router.dismissTo(practice ? "/arena" : "/")}
               >
                 Leave duel
               </Button>

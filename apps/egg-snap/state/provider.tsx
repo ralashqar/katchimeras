@@ -25,8 +25,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     await act(repository.load);
   }, [act]);
+  useEffect(() => repository.subscribe(setProfile), []);
   useEffect(() => {
-    void refresh().catch(() => {});
+    void (async () => {
+      if (__DEV__) { const { snapshots } = await import('./dev-profiles'); await snapshots.recover(); }
+      await refresh();
+    })().catch(e => setError(e instanceof Error ? e.message : 'Unable to open profile'));
   }, [refresh]);
   return (
     <Context.Provider value={{ profile, error, refresh, act }}>

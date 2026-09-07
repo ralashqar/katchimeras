@@ -32,7 +32,7 @@ test('draw receipts persist without granting coins or unlocking content; old rec
   assert.equal(grantResult(saved, win('glade-1', 'old-format')).coins, 40);
 });
 test("whole campaign funds both cosmetics and next region, and replay rewards remain available", () => {
-  let p = freshProfile();
+  let p: Profile = { ...freshProfile(), adventure: undefined };
   assert.throws(() => purchase(p, "cheerlet"));
   assert.throws(() => grantResult(p, win("glade-6")));
   for (const d of DUELS.slice(0, 6)) {
@@ -51,7 +51,7 @@ test("whole campaign funds both cosmetics and next region, and replay rewards re
   assert.equal(grantResult(p, win("glade-1", "replay")), p);
 });
 test("serialized concurrent grants and purchases survive recreation without duplicates", async () => {
-  let durable: Profile | null = null;
+  let durable: Profile | null = { ...freshProfile(), version: 1, adventure: undefined, completed: ["legacy-marker"] };
   const storage = {
     read: async () => structuredClone(durable),
     write: async (p: Profile) => {

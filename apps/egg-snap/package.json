@@ -57,6 +57,7 @@
     "@incubator/art-world": "0.1.0",
     "@incubator/art-wisps": "0.1.0",
     "@incubator/art-fonts": "0.1.0",
-    "canvaskit-wasm": "0.40.0"
+    "canvaskit-wasm": "0.40.0",
+    "@incubator/profile": "0.1.0"
   }
 }

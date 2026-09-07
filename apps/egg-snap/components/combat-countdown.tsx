@@ -28,7 +28,7 @@ export function CombatCountdown({paused, reduced, muted, haptics, onStart}: {
   }, [frameCallback, paused, beat]);
   const announce = (next: number) => {
     setBeat(next);
-    if (next === 3) start.current();
+    if (next === 4) start.current();
     if (next > 3) return;
     audio.play((['count3', 'count2', 'count1', 'go'] as const)[next]);
     if (haptics) void Haptics.impactAsync(next === 3 ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Medium).catch(() => {});

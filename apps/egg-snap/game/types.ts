@@ -20,12 +20,15 @@ export type OpponentMoveDefinition = {
 };
 export type AiProfile = { minActionMs: number; maxActionMs: number; accuracy: number };
 export type DuelDefinition = {
+  guided?: boolean;
+  openingGate?: number;
   id: string;
   regionId: string;
   name: string;
   rival: string;
   skin: string;
   health: number;
+  opponentHealth?: number;
   progression: Progression;
   ai: AiProfile;
   reward: number;
@@ -39,6 +42,7 @@ export type DuelResult = {
   won: boolean;
   /** Older receipts contain only `won`. */
   outcome?: 'won' | 'lost' | 'draw';
+  firstWin?: boolean;
   accuracy: number;
   bestStreak: number;
   durationMs: number;

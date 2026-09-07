@@ -8,6 +8,26 @@ import { absorbDrop, eligibleGroups } from "@incubator/tile-match/varieties";
 
 export type TrayBounds = { width: number; trayY: number; trayHeight: number; frame?: { x: number; width: number } };
 
+/** Opening-only magnetism, measured from the dragged piece rather than the finger. */
+export function assistOpeningDrop(
+  run: SlotRunState,
+  pieceId: string,
+  release: DropRelease,
+  frame: { anchorX: number; anchorY: number; pitch: number },
+): DropRelease {
+  if (run.beat.varieties.length) return release;
+  const piece = run.tray.find(p => p.id === pieceId && !p.used);
+  const group = run.beat.groups.find(g => g.pieceId === pieceId);
+  if (!piece || !group) return release;
+  const centerX = frame.anchorX + (group.origin.column + Math.max(...piece.cells.map(c => c.column)) / 2) * frame.pitch;
+  const centerY = frame.anchorY + (group.origin.row + Math.max(...piece.cells.map(c => c.row)) / 2) * frame.pitch;
+  if (Math.hypot(release.centerX - centerX, release.centerY - centerY) > frame.pitch) return release;
+  const cellIndex = group.origin.row * run.grid.cols + group.origin.column;
+  const preview = dropPreview(run, pieceId, cellIndex);
+  if (!preview.length || preview.some(cell => !cell.onTarget)) return release;
+  return { ...release, cellIndex, centerX, centerY };
+}
+
 /** Use the reducer's attribution rules for the preview, including filled cells and modifier gates. */
 export function dropPreview(
   run: SlotRunState,
