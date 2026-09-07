@@ -1,12 +1,43 @@
-"""Deterministic low-detail toy material. Requires Pillow; no downloaded/generated texture."""
+"""Package imagegen masters into aligned sprites and the existing runtime atlas.
+
+Only alpha extraction, normalization and readability adjustment happen here;
+the tile material/symbol artwork comes from sources/, never procedural repainting.
+"""
 from pathlib import Path
 import math
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageChops, ImageEnhance
 
 OUT = Path(__file__).resolve().parents[1] / 'assets' / 'blocks'
 OUT.mkdir(parents=True, exist_ok=True)
 SIZE = 128
-PALETTE = [('ignition','#AA91E8','star'),('turbo','#F4BE62','sun'),('coolant','#76A9EF','drop'),('nitro','#E58DB7','heart'),('grip','#70CFB5','leaf')]
+PALETTE = [('ignition','#B185EA','star'),('turbo','#F8C43B','sun'),('coolant','#39BBF2','drop'),('nitro','#F370A2','heart'),('grip','#93DB3A','leaf')]
+
+def packaged_tile(name):
+    source = Image.open(OUT/'sources'/f'{name}.png').convert('RGBA')
+    # Some imagegen masters contain a neutral checkerboard despite requesting
+    # transparency. Extract the connected chromatic tile, preserving enclosed
+    # white highlights; the outside neutral background is never shipped.
+    red, green, blue, alpha = source.split()
+    chroma = ImageChops.subtract(ImageChops.lighter(ImageChops.lighter(red,green),blue),
+                                ImageChops.darker(ImageChops.darker(red,green),blue))
+    mask = ImageChops.multiply(chroma.point(lambda p:255 if p>25 else 0),
+                              alpha.point(lambda p:255 if p>128 else 0))
+    ImageDraw.floodfill(mask, (source.width//2, source.height//2), 128)
+    mask = mask.point(lambda p:255 if p==128 else 0)
+    ImageDraw.floodfill(mask,(0,0),128)
+    mask = mask.point(lambda p:0 if p==128 else 255)
+    mask = mask.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(.6))
+    bounds = mask.point(lambda p:255 if p>128 else 0).getbbox()
+    if not bounds or bounds[2]-bounds[0] < source.width*.65:
+        raise ValueError(f'{name}: incomplete silhouette; inspect source before packaging')
+    source.putalpha(mask)
+    tile = Image.new('RGBA',(SIZE,SIZE))
+    # One-pixel sampling gutter keeps neighbours close without atlas bleed.
+    tile.alpha_composite(source.crop(bounds).resize((126,126),Image.Resampling.LANCZOS),(1,1))
+    assert tile.getpixel((0,0))[3] == 0
+    return tile
+
+TILES = {name:packaged_tile(name) for name,_,_ in PALETTE}
 def rgb(h): return tuple(bytes.fromhex(h[1:]))
 def mix(c, target, t): return tuple(round(v+(target-v)*t) for v in c)
 def glyph(symbol):
@@ -28,19 +59,12 @@ def glyph(symbol):
 for strong in [False, True]:
     atlas=Image.new('RGBA',(SIZE*6,SIZE*5))
     for row,(name,hexcolor,symbol) in enumerate(PALETTE):
-        c=rgb(hexcolor);tile=Image.new('RGBA',(SIZE,SIZE));d=ImageDraw.Draw(tile)
-        d.rounded_rectangle((3,6,125,126),radius=26,fill=(*mix(c,0,.40),220))
-        face=Image.new('RGBA',(SIZE,SIZE));fd=ImageDraw.Draw(face)
-        for y in range(SIZE):
-            t=max(0,min(1,(y-5)/115));shade=mix(c,255,.32*(1-t/.6)) if t<.6 else mix(c,0,(t-.6)*.34)
-            fd.line((0,y,SIZE,y),fill=(*shade,255))
-        mask=Image.new('L',(SIZE,SIZE));ImageDraw.Draw(mask).rounded_rectangle((4,3,124,119),radius=25,fill=255)
-        tile.alpha_composite(Image.composite(face,Image.new('RGBA',(SIZE,SIZE)),mask))
-        sheen=Image.new('RGBA',(SIZE,SIZE));sd=ImageDraw.Draw(sheen);sd.rounded_rectangle((17,11,109,32),radius=13,fill=(255,255,255,46));tile.alpha_composite(sheen.filter(ImageFilter.GaussianBlur(3)))
+        c=rgb(hexcolor);tile=TILES[name].copy()
+        if strong:
+            a=tile.getchannel('A')
+            tile=ImageEnhance.Contrast(tile).enhance(1.25)
+            tile.putalpha(a)
         gm=glyph(symbol)
-        shadow=Image.new('RGBA',(SIZE,SIZE),(*mix(c,0,.57),0));shadow.putalpha(gm.point(lambda p:round(p*(.90 if strong else .40))))
-        highlight=Image.new('RGBA',(SIZE,SIZE),(255,255,255,0));highlight.putalpha(gm.point(lambda p:round(p*.42)))
-        tile.alpha_composite(highlight,(0,2));tile.alpha_composite(shadow)
         suffix='-clear' if strong else ''
         tile.save(OUT/f'{name}{suffix}.png');atlas.alpha_composite(tile,(0,row*SIZE))
         ring=Image.new('RGBA',(SIZE,SIZE));ImageDraw.Draw(ring).ellipse((9,9,119,119),outline=(*mix(c,255,.55),240),width=5);atlas.alpha_composite(ring,(SIZE,row*SIZE))
@@ -52,4 +76,4 @@ for strong in [False, True]:
         badge.putalpha(gm.point(lambda p:round(p*(.95 if strong else .58))));socket.alpha_composite(badge)
         atlas.alpha_composite(socket,(SIZE*4,row*SIZE))
     atlas.save(OUT/('atlas-clear.png' if strong else 'atlas.png'))
-print('Toy block assets generated:',OUT)
+print('Imagegen toy block assets packaged:',OUT)

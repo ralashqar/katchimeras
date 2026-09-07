@@ -1,17 +1,31 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { coverProjection, projectStagePoint, groundedSprite } from '@incubator/environments/stage-projection';
-import { battleLayout } from '../game/layout';
+import { battleLayout, opponentFieldLayout } from '../game/layout';
 import { MOSSPROUT_DUEL } from '../data/duel-stages';
 import ground from '../data/egg-ground.json';
 import { slotPlayRect } from '@incubator/tile-match/timing';
-import { firstCellCenter } from '@incubator/tile-match/geometry';
+import { firstCellCenter, boardMetricsForCell, cellOrigin } from '@incubator/tile-match/geometry';
 import { createCombat } from '../game/combat';
 import { DUELS } from '../data/campaign';
 import { dropPreview, shouldCancelDrop } from '../game/drop-target';
 
 const screens = [[320, 568], [375, 667], [390, 844], [430, 932], [768, 1024]];
 const close = (a: number, b: number) => assert.ok(Math.abs(a - b) < .001, `${a} != ${b}`);
+
+test('tight cell seams share the same pitch for targeting, tray scaling and opponent cells', () => {
+  assert.equal(boardMetricsForCell({rows: 3, cols: 3}, 32).gap, 3, 'other games retain their original spacing');
+  for (const [width, height] of screens) {
+    const layout = battleLayout(width,height,24,20,MOSSPROUT_DUEL);
+    for (const metrics of [layout.metrics, opponentFieldLayout(layout).metrics]) {
+      assert.equal(metrics.gap, 1);
+      const a=cellOrigin(metrics,0,0), b=cellOrigin(metrics,0,1);
+      close(b.x-a.x,metrics.cell+1);
+      close(metrics.width,metrics.outer*2+metrics.cols*metrics.cell+(metrics.cols-1));
+      assert.ok(metrics.gap+metrics.cell*2/128<1.7,'packed artwork leaves only a narrow visible seam');
+    }
+  }
+});
 
 test('cover projection uses the same centre crop as the plate and anchors', () => {
   const rect = coverProjection({ width: 100, height: 200 }, { x: 20, y: 0, width: 200, height: 300 });
@@ -23,9 +37,9 @@ test('all skins stand on the projected platforms across phone crops and tablet m
   for (const [width, height] of screens) for (const skin of Object.keys(ground)) {
     const l = battleLayout(width, height, 24, 20, MOSSPROUT_DUEL, skin, skin);
     const stage = l.stage!;
-    close(stage.player.contact.y, l.trayY - 42);
+    close(stage.player.contact.y, l.playerHudY - 14);
     assert.ok(stage.projection.y <= .001 && stage.projection.y + stage.projection.height >= height - .001);
-    assert.ok(l.playerHudY >= l.trayY && l.playerHudY + 8 <= l.trayY + l.trayHeight);
+    close(l.playerHudY + l.playerHudHeight + 8, l.trayY);
     for (const subject of [stage.player, stage.rival]) {
       close(subject.sprite.x + subject.anchor.x * subject.sprite.width, subject.contact.x);
       close(subject.sprite.y + subject.anchor.y * subject.sprite.height, subject.contact.y);

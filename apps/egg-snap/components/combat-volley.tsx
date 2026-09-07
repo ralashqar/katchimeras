@@ -52,6 +52,7 @@ export const CombatVolleys = memo(function CombatVolleys({ volleys, bursts, cloc
   const fallback = useMemo(() => appearance ? null : atlasTexture(), [appearance]);
   const image = appearance?.atlas ?? fallback!;
   const tileSize = appearance?.spriteSize ?? TILE;
+  const bombColumn = appearance?.bombProjectileColumn;
   const emptyPicture = useMemo(() => createPicture(() => {}), []);
   const picture = useSharedValue(emptyPicture);
   // Atlas tint multiplication and canvas compositing need different blend modes.
@@ -116,8 +117,14 @@ export const CombatVolleys = memo(function CombatVolleys({ volleys, bursts, cloc
       if (age < CELL_FLIGHT_MS) {
         const t = 1-Math.pow(1-Math.max(0,age/CELL_FLIGHT_MS),1.5);
         const shake = !reduced && b.shakeMs > 0 && now < b.shakeStart + b.shakeMs ? Math.sin((now-b.shakeStart)*.12)*3 : 0;
-        draw(b.x + shake + (reduced ? 0 : 2*(1-t)*t*b.outward+t*t*b.dx), b.y + (reduced ? 0 : b.dy*t),
-          b.size*(reduced ? 1 : 1-t*.55), 0, b.colour, 1);
+        const x = b.x + shake + (reduced ? 0 : 2*(1-t)*t*b.outward+t*t*b.dx);
+        const y = b.y + (reduced ? 0 : b.dy*t);
+        const size = b.size*(reduced ? 1 : 1-t*.55);
+        // Hold the original shell while waiting/shaking; the bomb egg takes over
+        // on the launch frame. Normal and safely defused shots always stay square.
+        const sprite = age >= 0 && b.kind === 'volley' && b.projectile === 'bomb'
+          ? bombColumn ?? 0 : 0;
+        draw(x, y, size, sprite, b.colour, 1);
         if (age >= 0 && age < CELL_LAUNCH_MS) {
           const t = age / CELL_LAUNCH_MS;
           draw(b.x, b.y, b.size * (reduced ? 1 : .75 + t * .95), 1, b.colour, (1-t)*.8);

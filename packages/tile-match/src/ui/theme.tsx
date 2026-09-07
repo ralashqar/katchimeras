@@ -7,6 +7,15 @@ export type TileAppearance = {
   /** Atlas rows follow BLOCK_COLOR_IDS; columns: cell, ring, shard, glyph, socket, miniature socket. */
   id: string; radius: number; spriteSize: number; atlas: SkImage;
   highReadability: boolean;
+  /** Host-loaded display face for readable modifier counters. */
+  displayFontFamily?: string;
+  /** Transparent armour overlay; shares the regular sprite's dimensions and gutter. */
+  shieldCell?: ImageSourcePropType;
+  shieldNumberColor?: string;
+  bombOverlay?: SkImage;
+  /** Optional appended atlas column for rigged backfire only. */
+  bombProjectileColumn?: number;
+
   cells: Record<BlockPaletteId, ImageSourcePropType>;
   symbols: Record<BlockPaletteId, ImageSourcePropType>;
 };

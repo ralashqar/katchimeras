@@ -27,7 +27,8 @@
  */
 
 import { memo, useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   Easing,
   Keyframe,
@@ -81,6 +82,17 @@ const RATTLE_CYCLES = 3;
  * simply blinked out of existence, which made the moment the mechanic pays off the one moment it showed nothing.
  */
 const CLEAR_MS = 260;
+
+// Separate entrance wrapper keeps the bounce independent of the chip's rattle.
+const arriving = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: 0.55 }] },
+  65: { opacity: 1, transform: [{ scale: 1.07 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }] },
+}).duration(360);
+const arrivingReduced = new Keyframe({
+  0: { opacity: 0 },
+  100: { opacity: 1 },
+}).duration(120);
 
 /**
  * The exit itself, built once at module scope.
@@ -141,7 +153,7 @@ export const ArmourLayer = memo(function ArmourLayer({
     borderColor: interpolateColor(
       flash.value,
       [0, 1],
-      [appearance ? '#CDBE98' : semantic.sabotageAxis, palette.text],
+      [appearance ? '#E3D499' : semantic.sabotageAxis, palette.text],
     ),
     transform: [
       { translateX: Math.sin(flash.value * Math.PI * 2 * RATTLE_CYCLES) * RATTLE },
@@ -170,24 +182,37 @@ export const ArmourLayer = memo(function ArmourLayer({
         if (points <= 0) return null;
 
         const { x, y } = cellOrigin(metrics, Math.floor(index / metrics.cols), index % metrics.cols);
-        const size = metrics.cell - INSET * 2;
+        const inset = appearance?.shieldCell ? 0 : INSET;
+        const size = metrics.cell - inset * 2;
 
         return (
           <Animated.View
-            key={index}
+            key={`${beat.index}:${index}`}
+            entering={reduceMotion ? arrivingReduced : arriving}
             exiting={reduceMotion ? undefined : cleared}
+            style={{ position: 'absolute', left: x + inset, top: y + inset, width: size, height: size }}
+          >
+          <Animated.View
             style={[
               styles.plate,
-              appearance && {backgroundColor: '#E5D7BEEE', borderRadius: metrics.cell * appearance.radius, borderBottomWidth: 4},
-              { left: x + INSET, top: y + INSET, width: size, height: size },
+              StyleSheet.absoluteFill,
+              { width: size, height: size },
+              appearance && {backgroundColor: '#254F4A', borderTopLeftRadius: size * .2, borderTopRightRadius: size * .2, borderBottomLeftRadius: size * .36, borderBottomRightRadius: size * .36, borderBottomWidth: 3, overflow: 'hidden'},
               hit,
+              !!appearance?.shieldCell && { backgroundColor: 'transparent', borderWidth: 0, borderBottomWidth: 0, borderRadius: 0, overflow: 'visible' },
             ]}
           >
+            {appearance?.shieldCell ? <Image source={appearance.shieldCell} resizeMode="stretch" fadeDuration={0} style={{position: 'absolute', left: 0, top: 0, width: size, height: size}} /> : appearance && <>
+              <LinearGradient pointerEvents="none" colors={['#79C9BD', '#347E78', '#194D50']} locations={[0, .38, 1]} style={StyleSheet.absoluteFill} />
+              <View style={{position: 'absolute', top: 2, left: 2, right: 2, bottom: 2, borderWidth: 1, borderColor: '#C4F5DE70', borderTopLeftRadius: size * .13, borderTopRightRadius: size * .13, borderBottomLeftRadius: size * .29, borderBottomRightRadius: size * .29}} />
+              <View style={{position: 'absolute', top: 1, left: '48%', width: 1, bottom: 3, backgroundColor: '#E3FFEC24'}} />
+            </>}
             {/* Drops remaining, not hit points — see `armourDropsLeft`. The two differ by the placement that
                 actually fills the cell, and printing the raw points promised one drop where two were needed. */}
-            <GameText style={[styles.points, { fontSize: Math.max(11, size * 0.44) }, appearance && {color: '#4D493B', fontFamily: undefined}]}>
+            <GameText allowFontScaling={false} style={[styles.points, { fontSize: Math.max(11, size * 0.51), lineHeight: size * .72, includeFontPadding: false }, appearance && {color: appearance.shieldNumberColor ?? '#FFF5CE', fontFamily: appearance.displayFontFamily, fontWeight: appearance.displayFontFamily ? 'normal' : '800', textShadowColor: appearance.shieldNumberColor ? '#FFFFFF80' : '#153F43', textShadowOffset: {width: 0, height: 1}, textShadowRadius: 1}]}>
               {armourDropsLeft(points)}
             </GameText>
+          </Animated.View>
           </Animated.View>
         );
       })}

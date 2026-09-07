@@ -42,7 +42,7 @@ import {
   type SkPicture,
 } from '@shopify/react-native-skia';
 import { memo, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import {
   Easing,
   makeMutable,
@@ -376,12 +376,12 @@ export const SlotField = memo(function SlotField({
 
         if (appearance) {
           const size = appearance.spriteSize;
-          if (isFilled || !miniature) {
-            imagePaint.setAlphaf(isFilled ? 1 : appearance.highReadability ? .8 : .4);
-            canvas.drawImageRect(appearance.atlas, Skia.XYWHRect(isFilled ? 0 : size*3, colour*size, size, size),
-              Skia.XYWHRect(0, 0, cell, cell), imagePaint);
-            imagePaint.setAlphaf(1);
-          }
+          // The exact same cell sprite and destination as a placed tile: its embossed
+          // symbol stays centered through both eggs' footprint entrance transforms.
+          imagePaint.setAlphaf(isFilled ? 1 : appearance.highReadability ? .32 : .18);
+          canvas.drawImageRect(appearance.atlas, Skia.XYWHRect(0, colour * size, size, size),
+            Skia.XYWHRect(0, 0, cell, cell), imagePaint);
+          imagePaint.setAlphaf(1);
         } else if (isFilled) {
           // Under the block, so it reads as light escaping from behind the cell rather than as a ring
           // drawn on top of it.
@@ -431,7 +431,7 @@ export const SlotField = memo(function SlotField({
 
         canvas.restore();
       }
-  }, [cell, span, paints, radius, innerRadius, face, shine, rimInset, arrivalSpanSV, appearance, imagePaint, miniature]);
+  }, [cell, span, paints, radius, innerRadius, face, shine, rimInset, arrivalSpanSV, appearance, imagePaint]);
   // Settled cells are recorded once per placement, independently of the active landing pop.
   const base = useMemo(() => flat.filter((_, i) => {
     const offset = Math.floor(i / STRIDE) * STRIDE;
@@ -452,15 +452,6 @@ export const SlotField = memo(function SlotField({
   const contourPicture = useMemo(() => createPicture(canvas => {
     if (contourImage) canvas.drawImage(contourImage, 0, 0);
   }), [contourImage]);
-  const badgePicture = useMemo(() => createPicture(canvas => {
-    if (!appearance || !miniature) return;
-    for (const group of groups) {
-      if (miniature && group.cells.length) {
-        const first = Math.min(...group.cells), p=cellOrigin(metrics,Math.floor(first/grid.cols),first%grid.cols), size=appearance.spriteSize;
-        canvas.drawImageRect(appearance.atlas,Skia.XYWHRect(size*3+size*.28,BLOCK_COLOR_IDS.indexOf(group.colorId)*size+size*.28,size*.44,size*.44),Skia.XYWHRect(p.x,p.y-9,8,8),imagePaint);
-      }
-    }
-  }), [appearance, groups, miniature, grid.cols, metrics, imagePaint]);
   const picture = useDerivedValue(() => {
     if (hidden || hiddenSV.value) return emptyPicture;
     if (intro.value >= 1 && arrive.value >= 1) return settledPicture;
@@ -489,10 +480,9 @@ export const SlotField = memo(function SlotField({
       <Canvas style={{ position: 'absolute', left: 0, top: 0, width, height }}>
         {appearance ? !hidden && footprints.map((bounds, index) => <FootprintEntrance key={bounds.id}
           bounds={bounds} index={index} count={footprints.length} progress={borderIntro} reduced={reduceMotion}
-          contour={contourPicture} badge={miniature ? badgePicture : undefined} cells={picture} />) : <>
+          contour={contourPicture} cells={picture} />) : <>
         {!hidden && <Group opacity={decorationOpacity}>
           <Picture picture={contourPicture} />
-          {miniature && <Picture picture={badgePicture} />}
         </Group>}
         <Picture picture={picture} />
         </>}
@@ -519,9 +509,9 @@ export const SlotField = memo(function SlotField({
 });
 
 /** Both eggs use the same local-centre entrance. Cached art moves as one object. */
-function FootprintEntrance({bounds, index, count, progress, reduced, contour, badge, cells}: {
+function FootprintEntrance({bounds, index, count, progress, reduced, contour, cells}: {
   bounds: {x: number; y: number; width: number; height: number}; index: number; count: number;
-  progress: SharedValue<number>; reduced: boolean; contour: SkPicture; badge?: SkPicture; cells: SharedValue<SkPicture>;
+  progress: SharedValue<number>; reduced: boolean; contour: SkPicture; cells: SharedValue<SkPicture>;
 }) {
   const phase = useDerivedValue(() => reduced ? progress.value : Math.max(0, Math.min(1, (progress.value * (450 + (count - 1) * 70) - index * 70) / 450)));
   const opacity = useDerivedValue(() => {
@@ -538,7 +528,6 @@ function FootprintEntrance({bounds, index, count, progress, reduced, contour, ba
   return <Group origin={{x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2}} transform={transform} opacity={opacity}>
     <Group clip={{x: bounds.x - 10, y: bounds.y - 12, width: bounds.width + 20, height: bounds.height + 24}}>
       <Picture picture={contour} />
-      {badge && <Picture picture={badge} />}
       <Picture picture={cells} />
     </Group>
   </Group>;
@@ -580,7 +569,7 @@ const HoverCell = memo(function HoverCell({
           opacity: appearance ? 1 : onTarget ? 0.55 : 0.34,
         },
       ]}
-    >{appearance && <Text style={{color:onTarget ? "#FFF9E3" : "#FFB6BA",fontSize:Math.max(12,metrics.cell*.42),textAlign:"center",lineHeight:metrics.cell-3,fontWeight:"700"}}>{onTarget ? "✓" : "×"}</Text>}</View>
+    />
   );
 });
 

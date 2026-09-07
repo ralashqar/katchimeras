@@ -17,11 +17,11 @@ Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
 
 for (const spriteSize of [64, 128]) test(`the actual ${spriteSize}px volley renderer publishes visible flight frames, then collision particles and clears`, async () => {
   const reactions = new Set<() => void>();
-  type Sprite = {scale:number; x:number; y:number; alpha:number};
+  type Sprite = {scale:number; x:number; y:number; alpha:number; column:number};
   const canvas = (draws: Sprite[]) => ({
     clear() {}, drawRRect() {}, drawCircle() {},
-    drawAtlas(_image: unknown, _rects: unknown, transforms: {scos:number;tx:number;ty:number}[], _paint: unknown, _blend: unknown, colors: number[][]) {
-      transforms.forEach((t,i)=>{if(t.scos) draws.push({scale:t.scos,x:t.tx,y:t.ty,alpha:colors[i][3]});});
+    drawAtlas(_image: unknown, rects: {x:number}[], transforms: {scos:number;tx:number;ty:number}[], _paint: unknown, _blend: unknown, colors: number[][]) {
+      transforms.forEach((t,i)=>{if(t.scos) draws.push({scale:t.scos,x:t.tx,y:t.ty,alpha:colors[i][3],column:rects[i].x/spriteSize});});
     },
   });
   const noop = () => {};
@@ -30,7 +30,7 @@ for (const spriteSize of [64, 128]) test(`the actual ${spriteSize}px volley rend
     Surface:{MakeOffscreen:()=>({getCanvas:()=>canvas([]),flush:noop,dispose:noop,makeImageSnapshot:()=>image})},
     Paint:()=>({setAntiAlias:noop,setColor:noop,setShader:noop,setAlphaf:noop,setStyle:noop,setStrokeWidth:noop}),
     Color:()=>[1,1,1,1], Shader:{MakeLinearGradient:noop}, RRectXY:noop,
-    XYWHRect:(x:number,y:number,width:number,height:number)=>({x,y,width,height,setXYWH:noop}),
+    XYWHRect:(x:number,y:number,width:number,height:number)=>({x,y,width,height,setXYWH(x:number,y:number,width:number,height:number){Object.assign(this,{x,y,width,height});}}),
     RSXform:(scos:number,ssin:number,tx:number,ty:number)=>({scos,ssin,tx,ty,set(c:number,s:number,x:number,y:number){this.scos=c;this.ssin=s;this.tx=x;this.ty=y;}}),
   };
   const modules: Record<string,unknown> = {
@@ -47,7 +47,7 @@ for (const spriteSize of [64, 128]) test(`the actual ${spriteSize}px volley rend
     '@shopify/react-native-skia':{Skia,Canvas:'Canvas',Picture:'Picture',PaintStyle:{Stroke:1,Fill:0},TileMode:{Clamp:0},BlendMode:{Modulate:1},
       createPicture:(draw:(c:ReturnType<typeof canvas>)=>void)=>{const draws:Sprite[]=[];draw(canvas(draws));return{draws};}},
     '../data/tile-theme':{TILE_COLORS},'../game/volley-presentation':timing,
-    '@incubator/tile-match/theme':{useTileAppearance:()=>spriteSize === 128 ? {atlas:image,spriteSize} : undefined},
+    '@incubator/tile-match/theme':{useTileAppearance:()=>spriteSize === 128 ? {atlas:image,spriteSize,bombProjectileColumn:7} : undefined},
     '@incubator/tile-match/timing':slotTiming,'../game/effect-commands':commands,
   };
   const source=readFileSync(new URL('../components/combat-volley.tsx',import.meta.url),'utf8');
@@ -67,6 +67,11 @@ for (const spriteSize of [64, 128]) test(`the actual ${spriteSize}px volley rend
   const frame=(at:number)=>{clock.value=at;for(const run of reactions)run();return root.root.findByType('Picture').props.picture.value.draws as Sprite[];};
   const start=frame(100);
   assert.equal(start.filter(s=>s.scale===32/spriteSize).length,2,'both original cells are drawn on the handoff frame');
+  for(let age=0;age<360;age+=8){
+    const bodies=frame(100+age).filter(s=>s.column===0);
+    assert.ok(bodies.length>0 && bodies.every(s=>s.alpha===1),'square shell bodies stay opaque throughout flight');
+    assert.ok(frame(100+age).every(s=>s.column<6),'egg projectile columns are never submitted');
+  }
   const flight=frame(280);
   assert.ok(flight.some(s=>s.y<400 && s.y>100),'actual submitted canvas transforms move up the screen');
   const frozen=JSON.stringify(flight);assert.equal(JSON.stringify(frame(280)),frozen,'a paused clock holds positions');
@@ -78,7 +83,7 @@ for (const spriteSize of [64, 128]) test(`the actual ${spriteSize}px volley rend
   const incoming={...volley,id:2,startAt:1000,target:{x:200,y:600},bullets:volley.bullets.map(b=>({...b,y:100}))};
   await act(()=>root.update(React.createElement(output.exports.CombatVolleys,{...props,volleys:[incoming]})));
   assert.ok(frame(1180).some(s=>s.y>200 && s.y<600),'opponent cells visibly fly down toward the player');
-  const backfire = {...volley, id:3, startAt:2000, shakeMs:240, target:{x:200,y:600},
+  const backfire = {...volley, id:3, startAt:2000, projectile: 'bomb' as const, shakeMs:240, target:{x:200,y:600},
     bullets:volley.bullets.map(b=>({...b, delay:b.delay+240}))};
   await act(()=>root.update(React.createElement(output.exports.CombatVolleys,{...props,volleys:[backfire]})));
   const held = frame(2000), shaken = frame(2040);
@@ -86,5 +91,10 @@ for (const spriteSize of [64, 128]) test(`the actual ${spriteSize}px volley rend
   assert.equal(shaken[0].y, held[0].y, 'shake holds cells at their footprint height');
   assert.notEqual(shaken[0].x, held[0].x, 'rigged cells visibly shake before launch');
   assert.ok(frame(2420).some(s=>s.y>500 && s.y<600), 'backfire cells fly toward the player after the shake');
+  assert.ok(held.every(s=>s.column===0),'backfire holds original shells before launch');
+  assert.ok(frame(2240).some(s=>s.column===(spriteSize===128?7:0) && s.alpha===1),'bomb art appears on launch without an invisible frame');
+  assert.ok(frame(2420).some(s=>s.column===(spriteSize===128?7:0) && s.alpha===1),'only backfire uses bomb egg art, with square fallback');
+  await act(()=>root.update(React.createElement(output.exports.CombatVolleys,{...props,reduced:true,volleys:[{...volley,id:4,startAt:3000}]})));
+  assert.ok(frame(3045).some(s=>s.alpha>=.5),'reduced motion retains visible shells');
   await act(()=>root.unmount());assert.equal(reactions.size,0);
 });

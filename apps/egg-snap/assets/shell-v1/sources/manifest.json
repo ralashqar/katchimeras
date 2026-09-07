@@ -1,0 +1,25 @@
+{
+  "version": "shell-v1",
+  "tiles": {
+    "ignition": {
+      "prompt": "ONE isolated production sprite of a lavender purple EGGSHELL TETRIS BLOCK. Straight-on orthographic, softly rounded square silhouette, cushiony bevel, subtle bottom thickness. Material is dyed natural eggshell like a cute speckled egg compressed into a square: 8 to 12 irregular flat darker lavender purple shell markings, mixed small/medium soft oval flecks, organic sparse distribution. Mostly smooth shell, NO NOISE, no pores or tiny grain. Broad satin light top left, shaded bottom edge. NO SYMBOL, NO ICON, NO EMBOSS EMBLEM, NO FACE, NO CRACKS, NO cheese holes. Tile fills 90% of square canvas, no detached shadow, NO setting, NO grid. TRUE TRANSPARENT ALPHA OUTSIDE TILE, do not draw checkerboard. Cozy toy diorama 3D, clean mobile game art readable at 32 pixels.",
+      "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-66b6a7c0-0a31-4b7a-bd2e-7c31d6309b06.png"
+    },
+    "turbo": {
+      "prompt": "ONE isolated production sprite of a golden honey yellow EGGSHELL TETRIS BLOCK. Straight-on orthographic, softly rounded square silhouette, cushiony bevel, subtle bottom thickness. Material is dyed natural eggshell like a cute speckled egg compressed into a square: 8 to 12 irregular flat darker golden honey yellow shell markings, mixed small/medium soft oval flecks, organic sparse distribution. Mostly smooth shell, NO NOISE, no pores or tiny grain. Broad satin light top left, shaded bottom edge. NO SYMBOL, NO ICON, NO EMBOSS EMBLEM, NO FACE, NO CRACKS, NO cheese holes. Tile fills 90% of square canvas, no detached shadow, NO setting, NO grid. TRUE TRANSPARENT ALPHA OUTSIDE TILE, do not draw checkerboard. Cozy toy diorama 3D, clean mobile game art readable at 32 pixels.",
+      "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-8a2d3338-fde9-4f9b-9676-d5074e98ed8b.png"
+    },
+    "coolant": {
+      "prompt": "ONE isolated production sprite of a pastel sky blue EGGSHELL TETRIS BLOCK. Straight-on orthographic, softly rounded square silhouette, cushiony bevel, subtle bottom thickness. Material is dyed natural eggshell like a cute speckled egg compressed into a square: 8 to 12 irregular flat darker pastel sky blue shell markings, mixed small/medium soft oval flecks, organic sparse distribution. Mostly smooth shell, NO NOISE, no pores or tiny grain. Broad satin light top left, shaded bottom edge. NO SYMBOL, NO ICON, NO EMBOSS EMBLEM, NO FACE, NO CRACKS, NO cheese holes. Tile fills 90% of square canvas, no detached shadow, NO setting, NO grid. TRUE TRANSPARENT ALPHA OUTSIDE TILE, do not draw checkerboard. Cozy toy diorama 3D, clean mobile game art readable at 32 pixels.",
+      "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-7bb0748d-d1a6-4f68-980f-5e7b0ba1e2ed.png"
+    },
+    "nitro": {
+      "prompt": "ONE isolated production sprite of a warm rose pink EGGSHELL TETRIS BLOCK. Straight-on orthographic, softly rounded square silhouette, cushiony bevel, subtle bottom thickness. Material is dyed natural eggshell like a cute speckled egg compressed into a square: 8 to 12 irregular flat darker warm rose pink shell markings, mixed small/medium soft oval flecks, organic sparse distribution. Mostly smooth shell, NO NOISE, no pores or tiny grain. Broad satin light top left, shaded bottom edge. NO SYMBOL, NO ICON, NO EMBOSS EMBLEM, NO FACE, NO CRACKS, NO cheese holes. Tile fills 90% of square canvas, no detached shadow, NO setting, NO grid. TRUE TRANSPARENT ALPHA OUTSIDE TILE, do not draw checkerboard. Cozy toy diorama 3D, clean mobile game art readable at 32 pixels.",
+      "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-0c8868a7-b26f-41f8-91cb-5c6359de2d8a.png"
+    },
+    "grip": {
+      "prompt": "ONE isolated production sprite of a soft spring green EGGSHELL TETRIS BLOCK. Straight-on orthographic, softly rounded square silhouette, cushiony bevel, subtle bottom thickness. Material is dyed natural eggshell like a cute speckled egg compressed into a square: 8 to 12 irregular flat darker soft spring green shell markings, mixed small/medium soft oval flecks, organic sparse distribution. Mostly smooth shell, NO NOISE, no pores or tiny grain. Broad satin light top left, shaded bottom edge. NO SYMBOL, NO ICON, NO EMBOSS EMBLEM, NO FACE, NO CRACKS, NO cheese holes. Tile fills 90% of square canvas, no detached shadow, NO setting, NO grid. TRUE TRANSPARENT ALPHA OUTSIDE TILE, do not draw checkerboard. Cozy toy diorama 3D, clean mobile game art readable at 32 pixels.",
+      "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-8cf544ed-bb39-477a-8915-30c9ede085e1.png"
+    }
+  }
+}

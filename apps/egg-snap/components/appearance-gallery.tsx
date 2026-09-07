@@ -10,6 +10,7 @@ import { TileArtTheme } from './tile-art-theme';
 import { Button, Copy, Heading } from './ui';
 import { battleLayout, opponentFieldLayout } from '../game/layout';
 import { MOSSPROUT_DUEL } from '../data/duel-stages';
+import {trayCellSize} from '../game/tray-layout';
 
 const shape = [{row: 0, column: 0}, {row: 1, column: 0}, {row: 1, column: 1}];
 const grid = {cols: 2, rows: 2};
@@ -23,7 +24,7 @@ export function AppearanceGallery() {
   const insets = useSafeAreaInsets();
   const layout = battleLayout(width, height, insets.top, insets.bottom, environment === 'mossprout' ? MOSSPROUT_DUEL : undefined);
   const cell = layout.metrics.cell;
-  const trayCell = Math.max(14, Math.min(26, cell * .62));
+  const trayCell = trayCellSize([{cells: shape}, {cells: shape}], cell, layout.metrics.gap, layout.frame.width - 24, layout.trayHeight);
   return <TileArtTheme clear={clear}><Scene environment={environment} stage={layout.stage}>
     <ScrollView contentContainerStyle={{padding: 20, paddingTop: insets.top + 20, gap: 16, paddingBottom: 35}}>
       <Button secondary onPress={() => router.replace('/arena')}>Back to arena</Button>
@@ -36,10 +37,10 @@ export function AppearanceGallery() {
         return <View key={colorId} style={{padding: 14, borderRadius: 24, backgroundColor: '#1A2E25DD', borderWidth: 1, borderColor: '#E4D3A760', gap: 12}}>
           <Copy>{names[i]}</Copy>
           <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-            <PieceArt cells={shape} colorId={colorId} cell={trayCell} gap={trayCell * 3 / cell} />
-            <SlotField grid={grid} metrics={boardMetricsForCell(grid, cell)} groups={[group]} generation={1} reduceMotion
+            <PieceArt cells={shape} colorId={colorId} cell={trayCell} gap={trayCell * layout.metrics.gap / cell} />
+            <SlotField grid={grid} metrics={boardMetricsForCell(grid, cell, layout.metrics.gap)} groups={[group]} generation={1} reduceMotion
               hoverCells={i === 2 ? [{index: 0, onTarget: true}] : i === 4 ? [{index: 0, onTarget: true}, {index: 1, onTarget: false}] : undefined} />
-            <SlotField grid={grid} metrics={boardMetricsForCell(grid, opponentFieldLayout(layout).metrics.cell)} groups={[group]} generation={1} reduceMotion miniature />
+            <SlotField grid={grid} metrics={boardMetricsForCell(grid, opponentFieldLayout(layout).metrics.cell, layout.metrics.gap)} groups={[group]} generation={1} reduceMotion miniature />
           </View>
           {(i === 2 || i === 4) && <Copy style={{fontSize: 11}}>{i === 2 ? 'Valid aim: matching rim and check' : 'Partial aim: checked cells count; crossed cells miss'}</Copy>}
         </View>;

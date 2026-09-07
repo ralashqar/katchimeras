@@ -98,6 +98,10 @@ export type TrayProps = {
   pieces: readonly Piece[];
   metrics: BoardMetrics;
   height: number;
+  /** Optional game-fitted resting size; dragging still uses metrics.cell. */
+  restingCellSize?: number;
+  /** Games with their own panel artwork can omit the default top sheen. */
+  showSheen?: boolean;
   disabled?: boolean;
   selectedPieceId?: string | null;
   reduceMotion?: boolean;
@@ -164,6 +168,8 @@ export const Tray = memo(function Tray({
   pieces,
   metrics,
   height,
+  restingCellSize,
+  showSheen = true,
   disabled,
   selectedPieceId,
   reduceMotion = false,
@@ -183,7 +189,7 @@ export const Tray = memo(function Tray({
   return (
     // Keyed on the generation so every slot remounts when the tray refills.
     <View key={trayGeneration} style={[styles.tray, { height }, style]}>
-      <View pointerEvents="none" style={styles.traySheen} />
+      {showSheen && <View pointerEvents="none" style={styles.traySheen} />}
 
       {/* One slot per piece, rather than a hardcoded three.
           `slot` is `flex: 1` and centres its contents, so a single-piece tray centres that piece
@@ -208,6 +214,7 @@ export const Tray = memo(function Tray({
               <DraggablePiece
                 piece={piece}
                 metrics={metrics}
+                restingCellSize={restingCellSize}
                 disabled={disabled}
                 selected={selected}
                 reduceMotion={reduceMotion}
@@ -292,6 +299,7 @@ function TraySlot({
 const DraggablePiece = memo(function DraggablePiece({
   piece,
   metrics,
+  restingCellSize,
   disabled,
   selected,
   reduceMotion,
@@ -305,6 +313,7 @@ const DraggablePiece = memo(function DraggablePiece({
 }: {
   piece: Piece;
   metrics: BoardMetrics;
+  restingCellSize?: number;
   disabled?: boolean;
   selected: boolean;
   reduceMotion: boolean;
@@ -325,7 +334,7 @@ const DraggablePiece = memo(function DraggablePiece({
    * piece surface now, its zone grew from 84 to 132pt, and the shape is what the player has to match
    * against a footprint a third of a screen away. So it is drawn nearer to half size than a third.
    */
-  const trayCell = clamp(metrics.cell * 0.62, 14, 26);
+  const trayCell = restingCellSize ?? clamp(metrics.cell * 0.62, 14, 26);
   const trayGap = (trayCell * metrics.gap) / metrics.cell;
 
   const extent = cellsExtent(piece.cells);
@@ -642,7 +651,7 @@ const DraggablePiece = memo(function DraggablePiece({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${piece.cells.length} block piece`}
-        accessibilityHint="Drag anywhere in this tray section onto its slot around the car"
+        accessibilityHint="Drag anywhere in this tray section onto its matching target"
         accessibilityState={{ selected, disabled: !!disabled }}
         disabled={disabled}
         onLayout={(event) => {

@@ -1,0 +1,34 @@
+{
+  "egg-ignition": {
+    "prompt": "ONE isolated lavender purple egg projectile game sprite. Upright egg silhouette, narrow rounded top broad lower half, centered straight-on, fills 90% height of square canvas. Smooth cushiony cozy toy 3D shell with 8 sparse flat irregular darker shell spots, clean satin lighting top left. NO FACE, NO SYMBOLS, no fine noise, no text, no trails, no detached shadows, no floor, no backdrop. Unbroken shell, no cracks. True transparent alpha outside egg, no checkerboard background. Production sprite.",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-9b35e218-331e-4ccb-a817-63abfafe9a6c.png"
+  },
+  "egg-turbo": {
+    "prompt": "ONE isolated honey yellow egg projectile game sprite. Upright egg silhouette, narrow rounded top broad lower half, centered straight-on, fills 90% height of square canvas. Smooth cushiony cozy toy 3D shell with 8 sparse flat irregular darker shell spots, clean satin lighting top left. NO FACE, NO SYMBOLS, no fine noise, no text, no trails, no detached shadows, no floor, no backdrop. Unbroken shell, no cracks. True transparent alpha outside egg, no checkerboard background. Production sprite.",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-e4f9a79e-d7d4-40aa-9415-77b030ec2c21.png"
+  },
+  "egg-coolant": {
+    "prompt": "ONE isolated pastel sky blue egg projectile game sprite. Upright egg silhouette, narrow rounded top broad lower half, centered straight-on, fills 90% height of square canvas. Smooth cushiony cozy toy 3D shell with 8 sparse flat irregular darker shell spots, clean satin lighting top left. NO FACE, NO SYMBOLS, no fine noise, no text, no trails, no detached shadows, no floor, no backdrop. Unbroken shell, no cracks. True transparent alpha outside egg, no checkerboard background. Production sprite.",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-1eae37c0-18f4-4b9a-8c52-ccd3424bee0c.png"
+  },
+  "egg-nitro": {
+    "prompt": "ONE isolated rose pink egg projectile game sprite. Upright egg silhouette, narrow rounded top broad lower half, centered straight-on, fills 90% height of square canvas. Smooth cushiony cozy toy 3D shell with 8 sparse flat irregular darker shell spots, clean satin lighting top left. NO FACE, NO SYMBOLS, no fine noise, no text, no trails, no detached shadows, no floor, no backdrop. Unbroken shell, no cracks. True transparent alpha outside egg, no checkerboard background. Production sprite.",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-4641a8ed-df51-4745-9bac-4d32ef73fb59.png"
+  },
+  "egg-grip": {
+    "prompt": "ONE isolated spring green egg projectile game sprite. Upright egg silhouette, narrow rounded top broad lower half, centered straight-on, fills 90% height of square canvas. Smooth cushiony cozy toy 3D shell with 8 sparse flat irregular darker shell spots, clean satin lighting top left. NO FACE, NO SYMBOLS, no fine noise, no text, no trails, no detached shadows, no floor, no backdrop. Unbroken shell, no cracks. True transparent alpha outside egg, no checkerboard background. Production sprite.",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-4a302f41-6424-40b3-9949-400734868e7d.png"
+  },
+  "egg-bomb": {
+    "prompt": "ONE isolated warm coral red egg projectile game sprite. Upright egg silhouette, narrow rounded top broad lower half, centered straight-on, fills 90% height of square canvas. Smooth cushiony cozy toy 3D shell with 8 sparse flat irregular darker shell spots, clean satin lighting top left. NO FACE, NO SYMBOLS, no fine noise, no text, no trails, no detached shadows, no floor, no backdrop. Short curled fuse from top with tiny warm spark; subtle small star-shaped glowing crack on front to read as an egg bomb. True transparent alpha outside egg, no checkerboard background. Production sprite.",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-f3e29b8f-970c-4ea1-af1c-d3899899c005.png"
+  },
+  "shield-overlay": {
+    "prompt": "ONE transparent game overlay sprite for a single square ghost tile. A small glossy blue EGG resting inside a cracked ivory lower shell cup that curves up either side like protective armour. Center of blue egg has a broad plain dark-blue recess with thin ivory rim reserved for a large LIVE NUMBER; leave it BLANK. Delicate cyan glow, no extra icon. Central emblem occupies 60% width and 75% height. Narrow rounded-square cyan light outline near canvas perimeter. All space between emblem and outline is completely transparent alpha, NO panel fill. Straight-on front view, cozy cushiony 3D toy eggshell, low detail clean satin material, NO TEXT OR NUMBERS, no scene, no checkerboard, no floor, no grid.",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-01727223-43c6-42b8-ac7e-89a835ce40e1.png"
+  },
+  "bomb-overlay": {
+    "prompt": "ONE transparent game overlay sprite for a single square ghost tile. A small coral red speckled EGG bomb with a short curled fuse and tiny gold spark. Small glowing star-shaped opening on front. Soft red warning halo. Central emblem occupies 60% width and 75% height. Narrow rounded-square red light outline near canvas perimeter. All space between emblem and outline is completely transparent alpha, NO panel fill. Straight-on front view, cozy cushiony 3D toy eggshell, low detail clean satin material, NO TEXT OR NUMBERS, no scene, no checkerboard, no floor, no grid.",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a078d6-eafc-7f21-a470-dcd2a202864e\\exec-4f5d4194-c80c-408f-bf23-d8e32d0131b2.png"
+  }
+}

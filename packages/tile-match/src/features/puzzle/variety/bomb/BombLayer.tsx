@@ -59,8 +59,9 @@ import {
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { Text, View } from 'react-native';
 import { useTileAppearance } from '../../../../ui/theme';
-import {
+import Animated, {
   Easing,
+  Keyframe,
   cancelAnimation,
   useDerivedValue,
   useSharedValue,
@@ -78,6 +79,12 @@ import { BOMB_VARIETY, type BombData } from './bomb';
 
 /** One full pulse of a live bomb, milliseconds. */
 const PULSE_MS = 620;
+const overlayEntrance = new Keyframe({
+  0: { opacity: 0, transform: [{ scale: .55 }] },
+  65: { opacity: 1, transform: [{ scale: 1.06 }] },
+  100: { opacity: 1, transform: [{ scale: 1 }] },
+}).duration(360);
+const overlayFade = new Keyframe({0: {opacity: 0}, 100: {opacity: 1}}).duration(120);
 
 /**
  * The two transitions, and they are deliberately different lengths. See the header.
@@ -179,6 +186,8 @@ export const BombLayer = memo(function BombLayer({
   reduceMotion,
 }: VarietyLayerProps) {
   const appearance = useTileAppearance();
+  const overlay = appearance?.bombOverlay;
+  const imagePaint = useMemo(() => Skia.Paint(), []);
   const soft = !!appearance;
   const { width, height, cell } = metrics;
   const data = varietyData<BombData>(beat, BOMB_VARIETY.id);
@@ -314,7 +323,12 @@ export const BombLayer = memo(function BombLayer({
         const x = data2[i * STRIDE];
         const y = data2[i * STRIDE + 1];
 
-        if (lit > 0.01) {
+        if (overlay && lit > 0.01) {
+          const size = cell * (1 + .025 * beat2);
+          imagePaint.setAlphaf(lit * (.82 + .18 * beat2));
+          canvas.drawImageRect(overlay, Skia.XYWHRect(0, 0, overlay.width(), overlay.height()),
+            Skia.XYWHRect(x - size / 2, y - size / 2, size, size), imagePaint);
+        } else if (!overlay && lit > 0.01) {
           /**
            * Grows and brightens together, so the pulse reads as one gesture rather than two.
            *
@@ -329,7 +343,8 @@ export const BombLayer = memo(function BombLayer({
           canvas.drawCircle(x, y, radius * swell, paints.live);
         }
 
-        if (lit < 0.99) {
+        // The SAFE label is sufficient; leave Egg Snap ghost cells unobstructed.
+        if (!soft && lit < 0.99) {
           /**
            * The dead outline **contracts** to rest as the light dies.
            *
@@ -360,15 +375,16 @@ export const BombLayer = memo(function BombLayer({
   if (!data?.pieceId) return null;
 
   return (
-    <><Canvas
+    <><Animated.View key={beat.index} pointerEvents="none" entering={reduceMotion ? overlayFade : overlayEntrance}
+      style={{position: 'absolute', left: 0, top: 0, width, height}}><Canvas
       style={{ position: 'absolute', left: 0, top: 0, width, height }}
       pointerEvents="none"
     >
       <Picture picture={picture} />
-    </Canvas>
+    </Canvas></Animated.View>
     {soft && flat.length > 0 && <View pointerEvents="none" style={{position: 'absolute', left: Math.max(0, Math.min(width - 64, flat[0] - 20)), top: flat[1] - cell / 2 - 21,
       width: 64, paddingVertical: 2, borderRadius: 8, backgroundColor: '#233A2FF2', borderWidth: 1, borderColor: live ? '#EC9994' : '#B5E59B', alignItems: 'center'}}>
-      <Text style={{fontSize: 10, lineHeight: 14, fontWeight: '700', color: live ? '#FFC5BD' : '#CEEBB7'}}>{live ? '! RIGGED' : '✓ SAFE'}</Text>
+      <Text style={{fontSize: 10, lineHeight: 14, fontFamily: appearance?.displayFontFamily, fontWeight: appearance?.displayFontFamily ? 'normal' : '700', color: live ? '#FFC5BD' : '#CEEBB7'}}>{live ? '! RIGGED' : '✓ SAFE'}</Text>
     </View>}</>
   );
 });

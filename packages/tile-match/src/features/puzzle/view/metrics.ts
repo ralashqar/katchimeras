@@ -41,14 +41,14 @@ export function boardHeightForCell(spec: BoardSpec, cell: number): number {
   return BOARD_OUTER * 2 + spec.rows * cell + BOARD_GAP * (spec.rows - 1);
 }
 
-export function boardMetricsForCell(spec: BoardSpec, cell: number): BoardMetrics {
+export function boardMetricsForCell(spec: BoardSpec, cell: number, gap = BOARD_GAP): BoardMetrics {
   return {
-    width: BOARD_OUTER * 2 + spec.cols * cell + BOARD_GAP * (spec.cols - 1),
-    height: boardHeightForCell(spec, cell),
+    width: BOARD_OUTER * 2 + spec.cols * cell + gap * (spec.cols - 1),
+    height: BOARD_OUTER * 2 + spec.rows * cell + gap * (spec.rows - 1),
     outer: BOARD_OUTER,
-    gap: BOARD_GAP,
+    gap,
     cell,
-    pitch: cell + BOARD_GAP,
+    pitch: cell + gap,
     rows: spec.rows,
     cols: spec.cols,
   };

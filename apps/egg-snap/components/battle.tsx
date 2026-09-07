@@ -5,11 +5,14 @@ import { CELL_STAGGER_MS } from "../game/volley-presentation";
 import { TileArtTheme } from "./tile-art-theme";
 import { DuelHatchRewards } from './duel-hatch-rewards';
 import { CombatCountdown } from './combat-countdown';
+import { CombatTraySurface } from './combat-tray-surface';
+import { ShellHealth } from './shell-health';
+import { trayCellSize } from '../game/tray-layout';
 import { AppearanceGallery } from "./appearance-gallery";
-import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { CombatArtButton } from "./combat-art-button";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { Modal, Pressable, ScrollView, View, useWindowDimensions } from "react-native";
+import { Modal, ScrollView, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
@@ -30,7 +33,6 @@ import { MECHANIC_LESSONS, snapLadder } from "../data/progression";
 import { impulseStrength } from "@incubator/tile-match/feedback";
 import { CombatCallout } from "./combat-callout";
 import { DUELS, getDuel, MOVES, mechanicSequence, DEFAULT_ARENA_AI } from "../data/campaign";
-import type { CombatPresentation } from "../game/combat-presentation";
 import { resultFor, riggedCells, BACKFIRE } from "../game/combat";
 import { MOSSPROUT_DUEL } from "../data/duel-stages";
 import { StageGuides } from "./stage-guides";
@@ -49,39 +51,12 @@ import { Egg } from "./egg";
 import { Button, Copy, styles } from "./ui";
 import { Dialogue } from "./dialogue";
 const trayStyle = {
-  backgroundColor: "rgba(26, 46, 37, 0.94)",
-  borderColor: "#E4D3A778",
-  borderTopWidth: 2,
-  borderBottomWidth: 4,
+  backgroundColor: "transparent",
+  borderWidth: 0,
+  paddingHorizontal: 12,
+  boxShadow: 'none',
   borderRadius: 28,
 } as const;
-function Meter({
-  fraction,
-  color = "#B5E59B",
-}: {
-  fraction: number;
-  color?: string;
-}) {
-  return (
-    <View
-      style={{
-        height: 7,
-        backgroundColor: "#FFFFFF25",
-        borderRadius: 6,
-        overflow: "hidden",
-      }}
-    >
-      <View
-        style={{
-          height: 7,
-          width: `${Math.max(0, Math.min(1, fraction)) * 100}%`,
-          backgroundColor: color,
-          borderRadius: 6,
-        }}
-      />
-    </View>
-  );
-}
 export default function BattleRoute() {
   const params = useLocalSearchParams<{
     level?: string;
@@ -143,6 +118,7 @@ function Battle({
 }) {
   const { profile, act } = useProfile();
   const [paused, setPaused] = useState(false);
+  const [menuMode, setMenuMode] = useState<"pause" | "settings">("pause");
   const [guides, setGuides] = useState(false);
   const [ready, setReady] = useState(false);
   const [started, setStarted] = useState(false);
@@ -255,7 +231,7 @@ function Battle({
           {x: width / 2, y: hitsPlayer ? layout.eggY + layout.eggSize * .52 : layout.opponentY + layout.opponentSize * .52};
         const bullets = cells.map((c, i) => ({x: source.field.x + c.x + source.metrics.cell/2,
           y: source.field.y + dy + c.y + source.metrics.cell/2, colorId: c.colorId, size: source.metrics.cell, delay: (backfire ? BACKFIRE.shakeMs : 0) + i * CELL_STAGGER_MS}));
-        setVolleys(v => [...v, {id: event.id, target, bullets, startAt: event.at, damage: event.damage ?? 0, shakeMs: backfire ? BACKFIRE.shakeMs : 0, quality: presentation.quality.current,
+        setVolleys(v => [...v, {id: event.id, target, bullets, projectile: backfire ? 'bomb' : 'shell', startAt: event.at, damage: event.damage ?? 0, shakeMs: backfire ? BACKFIRE.shakeMs : 0, quality: presentation.quality.current,
           opponentWidth: targetBounds?.width ?? (hitsPlayer ? layout.eggSize : layout.opponentSize) * .6}]);
         if (backfire) continue;
         if (incoming) setOpponentFireKey(event.id);
@@ -401,54 +377,17 @@ function Battle({
       onReady={setReady}
       impulse={suspended ? undefined : impulse}
     >
-      <View
-        style={{
-          position: "absolute",
-          top: insets.top + 10,
-          left: layout.frame.x + 14,
-          width: layout.frame.width - 28,
-          backgroundColor: "#102016B8",
-          borderRadius: 18,
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Pause duel"
-          onPress={() => setPaused(true)}
-          style={{ minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' }}
-        >
-          <Ionicons name="pause" size={22} color="#FFF1CA" />
-        </Pressable>
-        {layout.stage && height < 700 ? <View style={{width: 150, gap: 2}}>
-          <Health presentation={presentation} side="opponent" max={definition.health} name={definition.rival} />
-        </View> : <Copy style={{ fontSize: 12 }}>{definition.name}</Copy>}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={muted ? "Enable sound" : "Mute sound"}
-          onPress={() => void act(() => repository.preferences({ sound: muted }))}
-          style={{ minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' }}
-        >
-          <Ionicons name={muted ? "volume-mute" : "volume-medium"} size={22} color="#FFF1CA" />
-        </Pressable>
+      <View pointerEvents="box-none" style={{position: 'absolute', top: insets.top + 10,
+        left: layout.frame.x + 12, right: width - layout.frame.x - layout.frame.width + 12,
+        flexDirection: 'row', justifyContent: 'space-between', zIndex: 10}}>
+        <CombatArtButton kind="pause" onPress={() => {setMenuMode('pause'); setPaused(true);}} />
+        <CombatArtButton kind="settings" onPress={() => {setMenuMode('settings'); setPaused(true);}} />
       </View>
-      <View
-        style={{
-          position: "absolute",
-          top: layout.opponentHudY,
-          display: layout.stage && height < 700 ? 'none' : 'flex',
-          left: layout.stage && height < 700 ? layout.frame.x + 12 : width / 2 - 85,
-          alignItems: "center",
-          width: layout.stage && height < 700 ? 96 : 170,
-          ...(layout.stage ? { padding: 6, borderRadius: 12, backgroundColor: '#101B13CC', borderWidth: 1, borderColor: '#E7D9A328' } : {}),
-        }}
-      >
-        <Copy style={{ fontWeight: "800" }}>{definition.rival}</Copy>
-        <View style={{ width: 140, marginTop: 3 }}>
-          <Health presentation={presentation} side="opponent" max={definition.health} />
-        </View>
+      <View pointerEvents="none" style={{position: 'absolute', top: layout.opponentHudY,
+        left: width / 2 - Math.min(236, layout.frame.width - 136) / 2,
+        width: Math.min(236, layout.frame.width - 136)}}>
+        <ShellHealth presentation={presentation} side="opponent" name={definition.rival}
+          max={definition.health} compact={height < 700} reduced={reduced} />
       </View>
       {!layout.stage && <View pointerEvents="none" style={{position: "absolute", left: (width-layout.opponentSize)/2, top: layout.opponentY}}><Egg
           skin={definition.skin}
@@ -561,18 +500,20 @@ function Battle({
       <View
         style={{
           position: "absolute",
-          left: layout.frame.x,
-          width: layout.frame.width,
+          left: layout.frame.x + 12,
+          width: layout.frame.width - 24,
           top: layout.trayY,
           height: layout.trayHeight,
         }}
       >
-        {layout.stage && <TrayHint placements={run.piecesPlaced} aiming={!!hoverTarget} suspended={suspended || resolved} />}
+        <CombatTraySurface />
         <Tray
+          showSheen={false}
           style={trayStyle}
           pieces={run.tray}
           metrics={layout.metrics}
           height={layout.trayHeight}
+          restingCellSize={trayCellSize(run.tray, layout.metrics.cell, layout.metrics.gap, layout.frame.width - 24, layout.trayHeight)}
           trayGeneration={run.trayGeneration}
           dropFrame={layout.dropFrame}
           driftY={offset.dy}
@@ -587,13 +528,13 @@ function Battle({
         style={{
           position: "absolute",
           top: layout.playerHudY,
-          left: layout.frame.x + 24,
-          width: layout.frame.width - 48,
+          left: layout.frame.x + 12,
+          width: layout.frame.width - 24,
           gap: 4,
 
         }}
       >
-        <Health presentation={presentation} side="player" max={definition.health} compact={!!layout.stage} />
+        <ShellHealth presentation={presentation} max={definition.health} compact={height < 700} reduced={reduced} />
       </View>
       {__DEV__ && guides && layout.stage && <StageGuides layout={layout} />}
       <CombatVolleys volleys={volleys} bursts={bursts} clock={clock} endedAt={state.outcome ? state.elapsed : undefined} reduced={reduced} onDone={retire} />
@@ -642,7 +583,7 @@ function Battle({
           }}
         >
           <Copy style={{ fontFamily: "EggDisplay", fontSize: 38 }}>
-            {error ? "Keep your spark" : "Take a breath"}
+            {error ? "Keep your spark" : menuMode === "settings" ? "Duel settings" : "Take a breath"}
           </Copy>
           {error ? (
             <>
@@ -679,31 +620,4 @@ function Battle({
       </Modal>
     </Scene>
   );
-}
-
-/** Idle guidance has its own one-shot timer; it never repaints the combat screen. */
-function TrayHint({placements, aiming, suspended}: {placements: number; aiming: boolean; suspended: boolean}) {
-  const [idle, setIdle] = useState(false);
-  useEffect(() => {
-    setIdle(false);
-    if (aiming || suspended) return;
-    const timer = setTimeout(() => setIdle(true), 6000);
-    return () => clearTimeout(timer);
-  }, [placements, aiming, suspended]);
-  if (aiming || suspended || (placements >= 2 && !idle)) return null;
-  return <View pointerEvents="none" style={{position: 'absolute', top: -22, left: 0, right: 0}}>
-    <Copy style={{textAlign: 'center', fontSize: 10, color: '#FFF1CA', letterSpacing: 2, textShadowColor: '#182B20', textShadowRadius: 4}}>DRAG PIECES</Copy>
-  </View>;
-}
-
-function Health({presentation, side, max, name, compact = false}: {
-  presentation: CombatPresentation; side: 'player' | 'opponent'; max: number; name?: string; compact?: boolean;
-}) {
-  const hp = useSyncExternalStore(presentation.subscribe, side === 'player' ? presentation.playerHp : presentation.opponentHp);
-  return <View accessible accessibilityLabel={`Health ${hp} of ${max}`} style={compact ? {flexDirection: 'row', alignItems: 'center', gap: 8} : undefined}>
-    {!compact && <Copy style={{fontSize: 11, textAlign: 'center'}}>{name ? `${name} · ` : ''}{hp} / {max}</Copy>}
-    {compact && <Ionicons name="heart" size={14} color="#EBAAAB" />}
-    <View style={compact ? {flex: 1} : undefined}><Meter fraction={hp / max} color={side === 'opponent' ? '#EDC377' : '#B5E59B'} /></View>
-    {compact && <Copy style={{fontSize: 11, fontVariant: ['tabular-nums'], textShadowColor: '#10251E', textShadowRadius: 3}}>{hp} / {max}</Copy>}
-  </View>;
 }
