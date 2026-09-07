@@ -5,6 +5,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
 import Animated, { useSharedValue, useAnimatedStyle, useReducedMotion, withSequence, withTiming, cancelAnimation } from 'react-native-reanimated';
 import { BACKGROUNDS } from "../data/art";
+import type { StagePlacement } from '../game/layout';
+import { DuelBackdrop } from './duel-backdrop';
 
 const { TodayExplorationBackground } = createCinematicEnvironment({
   backgrounds: BACKGROUNDS,
@@ -31,12 +33,14 @@ export function Scene({
   onReady,
   impact = false,
   impulse,
+  stage,
 }: {
   environment?: keyof typeof BACKGROUNDS;
   children: ReactNode;
   onReady?: (ready: boolean) => void;
   impact?: boolean;
   impulse?: { id: number; strength: number };
+  stage?: StagePlacement;
 }) {
   const recoil = useSharedValue(0);
   const reduced = useReducedMotion();
@@ -61,7 +65,8 @@ export function Scene({
   }, [onReady, readiness.ready]);
   return (
     <View style={{ flex: 1, backgroundColor: "#132B25" }}>
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, recoilStyle]}>
+      {stage ? <DuelBackdrop stage={stage} onDisplay={readiness.onDisplay} onError={readiness.onError}
+        impactKey={impact ? -1 : impulseId ?? 0} /> : <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, recoilStyle]}>
         <TodayExplorationBackground
           backgroundKey={environment}
           imageSize={Math.max(height, width)}
@@ -69,10 +74,10 @@ export function Scene({
           onDisplay={readiness.onDisplay}
           onError={readiness.onError}
         />
-      </Animated.View>
+      </Animated.View>}
       <LinearGradient
         pointerEvents="none"
-        colors={[
+        colors={stage ? ['rgba(9,18,11,0.35)', 'rgba(9,18,11,0)', 'rgba(9,18,11,0.58)'] : [
           "rgba(9,28,24,0.58)",
           "rgba(9,28,24,0.06)",
           "rgba(9,28,24,0.94)",

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 852 1846">
+  <image href="two-platform-master-v1.png" width="852" height="1846"/>
+  <g fill="none" stroke-width="3">
+    <rect x="324" y="432" width="222" height="72" stroke="#ffce68"/>
+    <rect x="89" y="1058" width="673" height="299" stroke="#ffce68"/>
+    <rect x="30" y="720" width="185" height="443" stroke="#76eaff"/>
+    <rect x="637" y="720" width="185" height="443" stroke="#76eaff"/>
+    <rect x="28" y="1468" width="796" height="295" stroke="#bb99ff"/>
+    <circle cx="432" cy="469" r="10" stroke="#ff5f90"/>
+    <circle cx="429" cy="1209" r="10" stroke="#ff5f90"/>
+  </g>
+  <g font-family="sans-serif" font-size="21" fill="white" stroke="black" stroke-width="3" paint-order="stroke">
+    <text x="298" y="415">RIVAL: ground contact (0.507, 0.254)</text>
+    <text x="89" y="1034">PLAYER: ground contact (0.503, 0.655)</text>
+    <text x="36" y="747">LEFT TARGETS</text><text x="640" y="747">RIGHT TARGETS</text>
+    <text x="40" y="1502">TRAY / HEALTH: calm ground, no painted UI</text>
+    <text x="42" y="74">TWO-PLATFORM MASTER · 852 × 1846</text>
+  </g>
+</svg>

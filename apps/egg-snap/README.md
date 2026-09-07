@@ -29,6 +29,8 @@ In development, **Mechanics arena** selects modifier, strength, attack strength 
 
 ## Ownership and extension points
 
+Mossprout battles use a dedicated cinematic two-platform plate. See the [art master, prompts and derivation guide](../../art/assets/images/katchimeras/world/backgrounds/duel-stages/README.md). Platform contacts are projected with the image crop, and every equipped egg is aligned using calibrated visible-body bounds. Growth pivots at the feet. Pause → **Stage guides** shows the development calibration overlay. Short phones use a compact HUD, while tablets centre the portrait battle area. Cheerlet and non-battle scenes retain their existing backgrounds.
+
 - `data/campaign.ts`: regions, duels, moves, tutorials, rewards and content validation.
 - `game/combat.ts`: pure combat session, damage tuning and sequenced presentation events. Damage is committed on beat resolution, never by animation callbacks. A lethal placement at the attack deadline cancels the attack.
 - `game/layout.ts`: shared visual/drop geometry and viewport bounds.

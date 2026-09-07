@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "exports": {
+    "./stage-projection": "./src/stage-projection.ts",
     "./cinematic-gesture": "./src/cinematic-gesture.ts",
     "./cinematic": "./src/cinematic.tsx",
     "./hex-tile": "./src/hex-tile.tsx",

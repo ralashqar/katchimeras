@@ -6,7 +6,7 @@ import {
 } from "@incubator/tile-match/engine";
 import { absorbDrop, eligibleGroups } from "@incubator/tile-match/varieties";
 
-export type TrayBounds = { width: number; trayY: number; trayHeight: number };
+export type TrayBounds = { width: number; trayY: number; trayHeight: number; frame?: { x: number; width: number } };
 
 /** Use the reducer's attribution rules for the preview, including filled cells and modifier gates. */
 export function dropPreview(
@@ -45,8 +45,8 @@ export function shouldCancelDrop(
   )
     return false;
   return (
-    release.fingerX >= 0 &&
-    release.fingerX <= tray.width &&
+    release.fingerX >= (tray.frame?.x ?? 0) &&
+    release.fingerX <= (tray.frame ? tray.frame.x + tray.frame.width : tray.width) &&
     release.fingerY >= tray.trayY &&
     release.fingerY <= tray.trayY + tray.trayHeight
   );

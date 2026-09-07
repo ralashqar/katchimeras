@@ -29,6 +29,12 @@ export const FACES: Record<string, typeof sleepy> = {
   grin,
 };
 export const WISP = require("@incubator/art-wisps/fern.webp");
+export const DUEL_BACKGROUNDS = {
+  'mossprout-duel-v2': {
+    full: require('@incubator/art-world/backgrounds/duel-stages/mossprout-duel-v2-full.webp'),
+    medium: require('@incubator/art-world/backgrounds/duel-stages/mossprout-duel-v2-medium.webp'),
+  },
+};
 export const BACKGROUNDS = {
   mossprout: {
     source: require("@incubator/art-world/backgrounds/mossprout-exploration-v1.png"),

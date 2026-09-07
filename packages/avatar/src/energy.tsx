@@ -18,6 +18,8 @@ export type EggEnergyProps = {
   reduceMotion?: boolean;
   color?: string;
   paused?: boolean;
+  /** Normalized anchor in the avatar container; existing consumers default to its centre. */
+  anchor?: { x: number; y: number };
 };
 /** Passive, host-driven energy. No FTUE interaction, persistence, or app policy. */
 export function EggEnergy({
@@ -28,6 +30,7 @@ export function EggEnergy({
   reduceMotion = false,
   color = "#FFE599",
   paused = false,
+  anchor,
 }: EggEnergyProps) {
   const breathe = useSharedValue(0);
   const pulse = useSharedValue(0);
@@ -76,7 +79,7 @@ export function EggEnergy({
     transform: [{ scale: 0.85 + breathe.value * 0.08 }],
   }));
   return (
-    <Animated.View style={[styles.root, style]}>
+    <Animated.View style={[styles.root, anchor && { transformOrigin: [`${anchor.x * 100}%`, `${anchor.y * 100}%`, 0] }, style]}>
       <Animated.View
         pointerEvents="none"
         style={[

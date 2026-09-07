@@ -15,6 +15,7 @@ export function Egg({
   hurt = false,
   wisp = false,
   paused = false,
+  anchor,
 }: {
   skin?: string;
   streak?: number;
@@ -24,6 +25,7 @@ export function Egg({
   hurt?: boolean;
   wisp?: boolean;
   paused?: boolean;
+  anchor?: { x: number; y: number };
 }) {
   const body = BODIES[skin] ?? BODIES.classic;
   const baseFaceId = hurt
@@ -49,6 +51,7 @@ export function Egg({
         hurt={hurt}
         reduceMotion={reduceMotion}
         paused={paused}
+        anchor={anchor}
       >
         <LayeredAvatar
           bodySource={body.source}
