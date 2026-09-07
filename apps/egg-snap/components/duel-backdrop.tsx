@@ -20,7 +20,7 @@ export function DuelBackdrop({ stage, onDisplay, onError, impactKey }: {
   }, [impactKey, reduced, light]);
   const glow = useAnimatedStyle(() => ({ opacity: light.value }));
   return <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-    <Image source={sources.medium} contentFit="cover" blurRadius={30} style={[StyleSheet.absoluteFill, { opacity: .35 }]} />
+    {frame.x > 0 && <Image source={sources.medium} contentFit="cover" blurRadius={30} style={[StyleSheet.absoluteFill, { opacity: .35 }]} />}
     <View style={{ position: 'absolute', width: frame.width, height: frame.height, left: frame.x, top: frame.y, overflow: 'hidden' }}>
       <Image source={source} contentFit="fill" onDisplay={onDisplay} onError={onError}
         style={{ position: 'absolute', left: projection.x - frame.x, top: projection.y - frame.y,

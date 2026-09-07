@@ -36,8 +36,9 @@ import {
   Skia,
   createPicture,
   type SkPaint,
+  type SkCanvas,
 } from '@shopify/react-native-skia';
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
   Easing,
@@ -204,8 +205,8 @@ export const SlotField = memo(function SlotField({
    * loop below captures plain numbers. Shared with `ClearBurstSkia` through `block-cell.ts`, which is
    * what stops the two drifting apart on the frame the burst takes a cell over.
    */
-  const face = blockFaceRect(cell);
-  const shine = blockShineRect(cell);
+  const face = useMemo(() => blockFaceRect(cell), [cell]);
+  const shine = useMemo(() => blockShineRect(cell), [cell]);
   /**
    * Half the rim's stroke, so the rim sits *inside* the cell rather than straddling its edge — which would
    * make adjacent cells in one footprint read as a single thick line.
@@ -247,14 +248,14 @@ export const SlotField = memo(function SlotField({
   }, [groups, grid.cols, metrics, arrivalCells]);
 
   const cells = useSharedValue<number[]>(flat);
-  useEffect(() => {
+  useLayoutEffect(() => {
     cells.value = flat;
   }, [cells, flat]);
 
   // Mirrored into a shared value rather than branching in render, so hiding costs a redraw of one
   // picture instead of tearing down and rebuilding the canvas.
   const hiddenSV = useSharedValue(hidden);
-  useEffect(() => {
+  useLayoutEffect(() => {
     hiddenSV.value = hidden;
   }, [hidden, hiddenSV]);
 
@@ -301,13 +302,8 @@ export const SlotField = memo(function SlotField({
     // rather than silently inheriting a finished one.
   }, [intro, reduceMotion, span, generation]);
 
-  const picture = useDerivedValue(() =>
-    createPicture((canvas) => {
-      if (hiddenSV.value) return;
-
-      const data = cells.value;
-      const progress = intro.value;
-      const arrivalProgress = arrive.value;
+  const drawCells = useCallback((canvas: SkCanvas, data: number[], progress: number, arrivalProgress: number) => {
+    'worklet';
       const count = Math.floor(data.length / STRIDE);
 
       for (let i = 0; i < count; i += 1) {
@@ -409,8 +405,30 @@ export const SlotField = memo(function SlotField({
 
         canvas.restore();
       }
-    }),
-  );
+  }, [cell, span, paints, radius, innerRadius, face, shine, rimInset, arrivalSpanSV]);
+  // Settled cells are recorded once per placement, independently of the active landing pop.
+  const base = useMemo(() => flat.filter((_, i) => {
+    const offset = Math.floor(i / STRIDE) * STRIDE;
+    return !(flat[offset + 4] === 1 && flat[offset + 5] >= 0);
+  }), [flat]);
+  const arriving = useMemo(() => flat.filter((_, i) => {
+    const offset = Math.floor(i / STRIDE) * STRIDE;
+    return flat[offset + 4] === 1 && flat[offset + 5] >= 0;
+  }), [flat]);
+  const emptyPicture = useMemo(() => createPicture(() => {}), []);
+  const settledPicture = useMemo(() => createPicture(canvas => drawCells(canvas, flat, 1, 1)), [flat, drawCells]);
+  const basePicture = useMemo(() => createPicture(canvas => drawCells(canvas, base, 1, 1)), [base, drawCells]);
+  const picture = useDerivedValue(() => {
+    if (hiddenSV.value) return emptyPicture;
+    if (intro.value >= 1 && arrive.value >= 1) return settledPicture;
+    return createPicture(canvas => {
+      if (intro.value < 1) drawCells(canvas, cells.value, intro.value, arrive.value);
+      else {
+        canvas.drawPicture(basePicture);
+        drawCells(canvas, arriving, 1, arrive.value);
+      }
+    });
+  });
 
   return (
     <View style={{ width, height }} pointerEvents="none">

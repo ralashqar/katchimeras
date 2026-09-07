@@ -1,43 +1,40 @@
-import { CombatVolley, type CombatVolleyData } from "./combat-volley";
-import { cellDamage } from "../game/volley-presentation";
+import { PerformancePanel } from "./performance-panel";
+import { ARENA_ENABLED } from "../game/dev-tools";
+import { CombatVolleys, type CombatVolleyData, type CombatBurstData } from "./combat-volley";
+import { CELL_STAGGER_MS } from "../game/volley-presentation";
 import { TileMatchTheme } from "@incubator/tile-match/theme";
 import { TILE_COLORS } from "../data/tile-theme";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { Modal, Pressable, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
-  type SharedValue,
+  useSharedValue,
 } from "react-native-reanimated";
 import {
   Tray,
   SlotField,
-  useVarietyOffset,
   varietyFieldLayers,
   varietyBackLayers,
   type DropOutcome,
 } from "@incubator/tile-match/native";
 import { NO_CELL, type DropRelease } from "@incubator/tile-match/engine";
 import { buildSlotBurst } from "@incubator/tile-match/timing";
-import {
-  buildVolley,
-  SlotBlastSkia,
-  SlotMissSkia,
-  type MissCell,
-} from "@incubator/tile-match/effects";
-import { cellOrigin } from "@incubator/tile-match/geometry";
 import { MECHANIC_LESSONS } from "../data/progression";
 import { impulseStrength } from "@incubator/tile-match/feedback";
 import { CombatCallout } from "./combat-callout";
-import { DUELS, getDuel, MOVES } from "../data/campaign";
-import { currentMove, resultFor } from "../game/combat";
+import { DUELS, getDuel, MOVES, mechanicSequence, DEFAULT_ARENA_AI } from "../data/campaign";
+import type { CombatPresentation } from "../game/combat-presentation";
+import { resultFor } from "../game/combat";
 import { MOSSPROUT_DUEL } from "../data/duel-stages";
 import { StageGuides } from "./stage-guides";
+import { OpponentField } from "./opponent-field";
 import { GroundedEgg } from "./grounded-egg";
-import { battleLayout } from "../game/layout";
+import { battleLayout, opponentFieldLayout } from "../game/layout";
 import { dropPreview, shouldCancelDrop } from "../game/drop-target";
+import { useCombatOffset } from "../game/use-combat-offset";
 import { useCombat } from "../game/use-combat";
 import { useFeedback } from "../game/feedback";
 import { repository } from "../state/repository";
@@ -78,70 +75,29 @@ function Meter({
     </View>
   );
 }
-function AttackClock({
-  clock,
-  deadline,
-  duration,
-}: {
-  clock: SharedValue<number>;
-  deadline: number;
-  duration: number;
-}) {
-  const bar = useAnimatedStyle(() => ({
-    width:
-      `${Math.max(0, Math.min(1, (deadline - clock.value) / duration)) * 100}%` as `${number}%`,
-  }));
-  return (
-    <View
-      style={{
-        height: 4,
-        backgroundColor: "#FFFFFF20",
-        overflow: "hidden",
-        borderRadius: 4,
-      }}
-    >
-      <Animated.View style={[{ height: 4, backgroundColor: "#F5BF7C" }, bar]} />
-    </View>
-  );
-}
 export default function BattleRoute() {
   const params = useLocalSearchParams<{
     level?: string;
     mechanic?: string;
     strength?: string;
     seed?: string;
-    attack?: string;
+    speed?: string;
+    accuracy?: string;
+    stress?: string;
   }>();
   const { profile } = useProfile();
-  const practice = __DEV__ && !!params.mechanic;
+  const practice = ARENA_ENABLED && !!params.mechanic;
   const definition = useMemo(() => {
     const base = DUELS.find((d) => d.id === params.level) ?? getDuel("glade-1");
     if (!practice) return base;
     const mechanic = MOVES[params.mechanic!] ? params.mechanic! : "tap";
     const strength = Math.max(0, Math.min(1, Number(params.strength) || 0.25));
-    const move = {
-      ...MOVES[mechanic],
-      damage: params.attack === "gentle" ? 5 : 20,
-      varieties: MOVES[mechanic].varieties.map((v) => ({ ...v, strength })),
-    };
-    return {
-      ...base,
-      id: "practice",
-      name: "Mechanics arena",
-      health: 400,
-      progression: {
-        kind: "stream" as const,
-        loop: true,
-        turns: [
-          {
-            slots: mechanic === "fuse" || mechanic === "hues" ? 1 : 2,
-            varieties: [],
-          },
-        ],
-      },
-      moves: [move],
-    };
-  }, [params.level, params.mechanic, params.strength, params.attack, practice]);
+    const speed = Math.max(100, Math.min(10000, Number(params.speed) || DEFAULT_ARENA_AI.actionMs));
+    const accuracy = params.accuracy === undefined || !Number.isFinite(Number(params.accuracy)) ? DEFAULT_ARENA_AI.accuracy : Math.max(0, Math.min(1, Number(params.accuracy)));
+    return {...base, id: 'practice', name: 'Mechanics arena', health: params.stress ? 1000000 : 400,
+      progression: mechanicSequence(params.stress ? ['tap', 'drift', 'armour', 'bomb', 'fuse', 'crossed', 'hues'] : [mechanic], 2, strength),
+      ai: {minActionMs: Math.round(speed * .85), maxActionMs: Math.round(speed * 1.15), accuracy}};
+  }, [params.level, params.mechanic, params.strength, params.speed, params.accuracy, params.stress, practice]);
   if (!profile) return null;
   if (!practice && !canPlay(profile, definition.id))
     return (
@@ -155,10 +111,11 @@ export default function BattleRoute() {
   return (
     <TileMatchTheme colors={TILE_COLORS}>
       <Battle
-        key={`${definition.id}:${params.mechanic}:${params.seed}`}
+        key={`${definition.id}:${params.mechanic}:${params.seed}:${params.speed}:${params.accuracy}`}
         definition={definition}
         seed={params.seed ?? `${definition.id}:${Date.now()}`}
         practice={practice}
+        stress={practice && !!params.stress}
       />
     </TileMatchTheme>
   );
@@ -167,10 +124,12 @@ function Battle({
   definition,
   seed,
   practice,
+  stress,
 }: {
   definition: ReturnType<typeof getDuel>;
   seed: string;
   practice: boolean;
+  stress: boolean;
 }) {
   const { profile, act } = useProfile();
   const [paused, setPaused] = useState(false);
@@ -185,8 +144,9 @@ function Battle({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const suspended = paused || story || !!lesson || !ready;
-  const game = useCombat(definition, seed, suspended, practice);
-  const { state, ref, clock, drop, backgrounded } = game;
+  const game = useCombat(definition, seed, suspended, practice, stress);
+  const { state, ref, clock, drop, backgrounded, presentation } = game;
+  useLayoutEffect(() => { if (practice) presentation.performance.commits++; });
   const run = state.run;
   useEffect(() => {
     if (practice || story || lesson || state.outcome || run.beat.status !== "placing") return;
@@ -200,11 +160,9 @@ function Battle({
     () => battleLayout(width, height, insets.top, insets.bottom, definition.regionId === "glade" ? MOSSPROUT_DUEL : undefined, profile?.skin, definition.skin),
     [width, height, insets.top, insets.bottom, definition.regionId, definition.skin, profile?.skin],
   );
-  const offset = useVarietyOffset(run.beat, {
-    driftAmplitude: layout.driftAmplitude,
-    reduceMotion: reduced,
-    paused: suspended,
-  });
+  const offset = useCombatOffset(run.beat, clock, state.beatStartedAt, layout.driftAmplitude, reduced);
+  const rivalLayout = useMemo(() => opponentFieldLayout(layout), [layout]);
+  const rivalOffset = useCombatOffset(state.opponent.run.beat, clock, state.opponent.beatStartedAt, rivalLayout.driftAmplitude, reduced);
   const fieldStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: offset.dx.value },
@@ -224,30 +182,21 @@ function Battle({
         : [],
     [run, hoverTarget],
   );
-  const [miss, setMiss] = useState<{ id: number; cells: MissCell[] } | null>(
-    null,
-  );
+  const [bursts, setBursts] = useState<CombatBurstData[]>([]);
+  const burstSequence = useRef(-1);
   const [volleys, setVolleys] = useState<CombatVolleyData[]>([]);
-  const [displayHp, setDisplayHp] = useState(definition.health);
+
   const [fireKey, setFireKey] = useState(0);
-  const [opponentHitKey, setOpponentHitKey] = useState(0);
-  const deliveredImpacts = useRef(new Set<string>());
-  const impact = useCallback((id: number, index: number, damage: number, count: number) => {
-    const key = id + ':' + index;
-    if (deliveredImpacts.current.has(key)) return;
-    deliveredImpacts.current.add(key);
-    setDisplayHp(hp => Math.max(0, hp - cellDamage(damage, count, index)));
-    setOpponentHitKey(k => k + 1);
-    feedbackRef.current.cue('cell-impact');
-  }, []);
-  const [hurt, setHurt] = useState(false);
+  const [opponentFireKey, setOpponentFireKey] = useState(0);
+  const opponentHitSignal = useSharedValue(0);
+  const playerHitSignal = useSharedValue(0);
   const [impulse, setImpulse] = useState<{ id: number; strength: number }>();
   const feedback = useFeedback(muted, hapticsEnabled, suspended || backgrounded);
   const feedbackRef = useRef(feedback);
   feedbackRef.current = feedback;
   const viewRef = useRef({ layout, offset });
   viewRef.current = { layout, offset };
-  const seenEvent = useRef(0);
+
   const completion = useRef(false);
   useEffect(() => {
     if (backgrounded) {
@@ -256,65 +205,57 @@ function Battle({
     }
   }, [backgrounded, game]);
   const retire = useCallback(
-    (id: number) => setVolleys((all) => all.filter((v) => v.id !== id)),
+    (id: number) => {
+      if (id < 0) setBursts(all => all.filter(v => v.id !== id));
+      else setVolleys(all => all.filter(v => v.id !== id));
+    },
     [],
   );
   // SlotField hides resolved cells in this commit. Mount their flying replacements
   // before paint as well: a passive effect leaves a blank frame between the two.
-  useLayoutEffect(() => {
-    const events = state.events.filter((e) => e.id > seenEvent.current);
-    seenEvent.current = state.eventSequence;
+  useLayoutEffect(() => presentation.subscribeEvents(events => {
     for (const event of events) {
-      if (event.type === "volley" && event.run?.lastResolution) {
-        const cells = buildSlotBurst(
-          event.run.grid,
-          layout.metrics,
-          event.run.lastResolution.clearedCells,
-          event.run.lastGroupSizes,
-        );
-        const volley = buildVolley({
-          id: event.id,
-          cells,
-          boardOrigin: {
-            x: layout.field.x,
-            y: layout.field.y + offset.dy.value,
-          },
-          cellSize: layout.metrics.cell,
-          target: {
-            x: layout.stage?.rival.contact.x ?? width / 2,
-            y: layout.stage ? layout.stage.rival.visible.y + layout.stage.rival.visible.height * .5 : layout.opponentY + layout.opponentSize * 0.52,
-          },
-        });
-        volley.bullets = cells.map((c, i) => ({ x: layout.field.x + c.x + layout.metrics.cell/2, y: layout.field.y + offset.dy.value + c.y + layout.metrics.cell/2, colorId: c.colorId, size: layout.metrics.cell, delay: i * 48 }));
-        setVolleys(v => [...v, { ...volley, damage: event.damage ?? 0,
-          opponentWidth: layout.stage?.rival.visible.width ?? layout.opponentSize * .6 }]);
-        setFireKey(event.id);
-        if (event.run.combo > 0 || event.run.lastGroupCount >= 2)
-          setImpulse({ id: event.id, strength: impulseStrength(event.run.lastGroupCount, event.run.combo,
-            event.run.beat.varieties.some(v => v.id === 'drift')) });
-        feedbackRef.current.volley(cells.map(c => c.delayMs), event.run.lastGroupCount,
-          event.run.lastBeatGrade === "perfect" ? event.run.combo : 0, event.run.lastBeatPace === "late");
+      if (event.type === 'volley' && event.run?.lastResolution) {
+        const incoming = event.side === 'opponent';
+        const source = incoming ? rivalLayout : layout;
+        const dy = incoming ? rivalOffset.dy.value : offset.dy.value;
+        const cells = buildSlotBurst(event.run.grid, source.metrics, event.run.lastResolution.clearedCells, event.run.lastGroupSizes);
+        const targetBounds = incoming ? layout.stage?.player.visible : layout.stage?.rival.visible;
+        const target = targetBounds ? {x: targetBounds.x + targetBounds.width / 2, y: targetBounds.y + targetBounds.height * .5} :
+          {x: width / 2, y: incoming ? layout.eggY + layout.eggSize * .52 : layout.opponentY + layout.opponentSize * .52};
+        const bullets = cells.map((c, i) => ({x: source.field.x + c.x + source.metrics.cell/2,
+          y: source.field.y + dy + c.y + source.metrics.cell/2, colorId: c.colorId, size: source.metrics.cell, delay: i * CELL_STAGGER_MS}));
+        setVolleys(v => [...v, {id: event.id, target, bullets, startAt: event.at, damage: event.damage ?? 0, quality: presentation.quality.current,
+          opponentWidth: targetBounds?.width ?? (incoming ? layout.eggSize : layout.opponentSize) * .6}]);
+        if (incoming) setOpponentFireKey(event.id);
+        else {
+          setFireKey(event.id);
+          if (event.run.combo > 0 || event.run.lastGroupCount >= 2) setImpulse({id: event.id,
+            strength: impulseStrength(event.run.lastGroupCount, event.run.combo, event.run.beat.varieties.some(v => v.id === 'drift'))});
+          feedbackRef.current.volley(cells.map(c => c.delayMs), event.run.lastGroupCount,
+            event.run.lastBeatGrade === 'perfect' ? event.run.combo : 0, event.run.lastBeatPace === 'late');
+        }
       }
-      if (event.type === "hit") {
-        setHurt(true);
-        feedbackRef.current.cue("hit");
+      if (event.type === 'impact') {
+        if (event.side === 'player') opponentHitSignal.value = event.id;
+        else playerHitSignal.value = event.id;
+        feedbackRef.current.cue('cell-impact');
       }
-      if (event.type === "blast") feedbackRef.current.cue("blast");
-      if (event.type === "interrupt") feedbackRef.current.cue("interrupt");
-
-      if (event.type === "chip") feedbackRef.current.cue("chip");
+      if (event.type === 'blast' && event.run) {
+        const source = event.side === 'opponent' ? rivalLayout : layout;
+        const dy = event.side === 'opponent' ? rivalOffset.dy.value : offset.dy.value;
+        const cells = event.run.beat.groups.flatMap(g => g.cells.map(i => ({
+          x: source.field.x + source.metrics.outer + (i % event.run!.grid.cols)*source.metrics.pitch,
+          y: source.field.y + dy + source.metrics.outer + Math.floor(i / event.run!.grid.cols)*source.metrics.pitch, colorId: g.colorId,
+        })));
+        const burstId = burstSequence.current--;
+        setBursts(all => [...all, {id: burstId, kind: 'blast', startAt: event.at,
+          cell: source.metrics.cell, cells, quality: presentation.quality.current}]);
+        if (event.side === 'player') feedbackRef.current.cue('blast');
+      }
+      if (event.side === 'player' && event.type === 'chip') feedbackRef.current.cue('chip');
     }
-  }, [state.eventSequence, state.events, state.outcome, layout, offset.dy, reduced, width]);
-  useEffect(() => {
-    if (!hurt) return;
-    const timer = setTimeout(() => setHurt(false), 420);
-    return () => clearTimeout(timer);
-  }, [hurt]);
-  useEffect(() => {
-    if (!miss) return;
-    const timer = setTimeout(() => setMiss(null), 750);
-    return () => clearTimeout(timer);
-  }, [miss]);
+  }), [presentation, layout, rivalLayout, offset.dy, rivalOffset.dy, width, playerHitSignal, opponentHitSignal]);
   const save = useCallback(async () => {
     if (completion.current || !ref.current.outcome) return;
     completion.current = true;
@@ -331,11 +272,11 @@ function Battle({
     }
   }, [act, ref]);
   useEffect(() => {
-    if (!state.outcome || volleys.length || suspended || backgrounded) return;
-    feedbackRef.current.end(state.outcome === "won");
+    if (!state.outcome || volleys.length || bursts.length || suspended || backgrounded) return;
+    if (state.outcome !== "draw") feedbackRef.current.end(state.outcome === "won");
     const timer = setTimeout(() => void save(), 350);
     return () => clearTimeout(timer);
-  }, [state.outcome, save, volleys.length, suspended, backgrounded]);
+  }, [state.outcome, save, volleys.length, bursts.length, suspended, backgrounded]);
   const onPickUp = useCallback(() => feedbackRef.current.cue("pickup"), []);
   const onCell = useCallback((pieceId: string, index: number) => {
     if (index !== NO_CELL) feedbackRef.current.cue("snap");
@@ -382,31 +323,16 @@ function Battle({
           y: release.centerY + (c.row - (rows - 1) / 2) * l.metrics.pitch - l.metrics.cell / 2,
           colorId: piece.colorId,
         }));
-        setMiss({ id: Date.now(), cells });
+        const burstId = burstSequence.current--;
+        setBursts(all => [...all, {id: burstId, startAt: ref.current.elapsed,
+          kind: 'miss', cells, cell: l.metrics.cell, quality: presentation.quality.current}]);
       }
       if (!next.run.beat.voided) feedbackRef.current.cue(placement?.filled.length ? "place" : "miss");
       return "consumed";
     },
-    [drop, ref],
+    [drop, ref, presentation],
   );
   const resolved = run.beat.status === "resolved";
-  const move = currentMove(state);
-  const blasted = useMemo(
-    () =>
-      run.beat.voided
-        ? run.beat.groups.flatMap((g) =>
-            g.cells.map((index) => ({
-              ...cellOrigin(
-                layout.metrics,
-                Math.floor(index / run.grid.cols),
-                index % run.grid.cols,
-              ),
-              colorId: g.colorId,
-            })),
-          )
-        : [],
-    [run.beat, run.grid.cols, layout.metrics],
-  );
   const lines = useMemo(
     () => [...definition.dialogue, definition.tutorial],
     [definition],
@@ -432,9 +358,7 @@ function Battle({
         ? "Shield chipped · try again"
         : last?.refused === "colour"
           ? "Match the colour, too"
-          : state.events.at(-1)?.type === "interrupt"
-            ? "Interrupted!"
-            : "";
+          : "";
   return (
     <Scene
       environment={
@@ -442,7 +366,6 @@ function Battle({
       }
       stage={layout.stage}
       onReady={setReady}
-      impact={hurt && !suspended}
       impulse={suspended ? undefined : impulse}
     >
       <View
@@ -466,7 +389,9 @@ function Battle({
         >
           <Copy>Ⅱ</Copy>
         </Pressable>
-        <Copy style={{ fontSize: 12 }}>{definition.name}</Copy>
+        {layout.stage && height < 700 ? <View style={{width: 150, gap: 2}}>
+          <Health presentation={presentation} side="opponent" max={definition.health} name={definition.rival} />
+        </View> : <Copy style={{ fontSize: 12 }}>{definition.name}</Copy>}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={muted ? "Enable sound" : "Mute sound"}
@@ -480,6 +405,7 @@ function Battle({
         style={{
           position: "absolute",
           top: layout.opponentHudY,
+          display: layout.stage && height < 700 ? 'none' : 'flex',
           left: layout.stage && height < 700 ? layout.frame.x + 12 : width / 2 - 85,
           alignItems: "center",
           width: layout.stage && height < 700 ? 96 : 170,
@@ -487,52 +413,24 @@ function Battle({
         }}
       >
         <Copy style={{ fontWeight: "800" }}>{definition.rival}</Copy>
-        <View style={{ width: layout.stage && height < 700 ? 80 : 140, marginTop: 3 }}>
-          <Meter
-            fraction={displayHp / definition.health}
-            color="#EDC377"
-          />
+        <View style={{ width: 140, marginTop: 3 }}>
+          <Health presentation={presentation} side="opponent" max={definition.health} />
         </View>
-        {!layout.stage && (        <Egg
+      </View>
+      {!layout.stage && <View pointerEvents="none" style={{position: "absolute", left: (width-layout.opponentSize)/2, top: layout.opponentY}}><Egg
           skin={definition.skin}
-          face={displayHp === 0 ? "surprise" : "determined"}
+          face={state.outcome === "won" || state.outcome === "draw" ? "surprise" : undefined} streak={state.opponent.run.combo} pulse={state.opponent.run.piecesPlaced} feedKey={opponentFireKey}
           size={layout.opponentSize}
-          hitKey={opponentHitKey}
+          hitSignal={opponentHitSignal}
           paused={suspended}
-        />)}
-        <Copy style={{ fontSize: 11 }}>
-          {displayHp} / {definition.health}
-        </Copy>
-      </View>
-      <View
-        style={{
-          position: "absolute",
-          top: layout.warningY,
-          display: layout.stage && state.phase !== "warning" ? "none" : "flex",
-          left: layout.frame.x + 38,
-          width: layout.frame.width - 76,
-          gap: 5,
-          ...(layout.stage ? { padding: height < 700 ? 6 : 8, borderRadius: 12, backgroundColor: '#111C15B8' } : {}),
-        }}
-      >
-        <Copy style={{ textAlign: "center", color: "#FFE0A0", fontSize: layout.stage && height < 700 ? 10 : 12 }}>
-          {state.phase === "warning" && !state.outcome
-            ? `${move.name} · ${Math.max(0, move.perfects - state.perfects)} Perfect${move.perfects - state.perfects === 1 ? "" : "s"} to interrupt`
-            : "A moment to shine"}
-        </Copy>
-        {state.phase === "warning" && !state.outcome && (
-          <AttackClock
-            clock={clock}
-            deadline={state.attackAt}
-            duration={move.warningMs}
-          />
-        )}
-      </View>
+        /></View>}
+      <OpponentField fighter={state.opponent} layout={rivalLayout} dy={rivalOffset.dy} clock={clock}
+        reduced={reduced} paused={suspended || backgrounded} />
       {layout.stage ? <>
         <GroundedEgg placement={layout.stage.rival} skin={definition.skin}
-          face={displayHp === 0 ? "surprise" : "determined"} hitKey={opponentHitKey} paused={suspended} />
+          face={state.outcome === "won" || state.outcome === "draw" ? "surprise" : undefined} streak={state.opponent.run.combo} pulse={state.opponent.run.piecesPlaced} feedKey={opponentFireKey} hitSignal={opponentHitSignal} paused={suspended} />
         <GroundedEgg placement={layout.stage.player} skin={profile!.skin} streak={run.combo}
-          pulse={run.piecesPlaced} feedKey={fireKey} hurt={hurt} wisp={!!profile!.wisp} paused={suspended} />
+          pulse={run.piecesPlaced} feedKey={fireKey} hitSignal={playerHitSignal} wisp={!!profile!.wisp} paused={suspended} />
       </> : (      <View
         pointerEvents="none"
         style={{
@@ -546,7 +444,8 @@ function Battle({
           streak={run.combo}
           pulse={run.piecesPlaced}
           feedKey={fireKey}
-          hurt={hurt}
+          hitSignal={playerHitSignal}
+
           wisp={!!profile!.wisp}
           size={layout.eggSize}
           paused={suspended}
@@ -598,16 +497,7 @@ function Battle({
               reduceMotion={reduced || suspended}
             />
           ))}
-        {resolved && run.beat.voided ? (
-          <SlotBlastSkia
-            key={`blast-${run.eventSequence}`}
-            cells={blasted}
-            width={layout.metrics.width}
-            height={layout.metrics.height}
-            cell={layout.metrics.cell}
-            reduceMotion={reduced}
-          />
-        ) : null}
+
       </Animated.View>
       <View
         pointerEvents="none"
@@ -666,32 +556,11 @@ function Battle({
 
         }}
       >
-        {!layout.stage && <View style={styles.row}>
-          <Copy style={{ fontSize: 10 }}>YOUR SPARK</Copy>
-          <Copy style={{ fontSize: 10 }}>
-            {state.playerHp} / {definition.playerHealth}
-          </Copy>
-        </View>}
-        <View accessible accessibilityLabel={`Health ${state.playerHp} of ${definition.playerHealth}`}>
-          <Meter fraction={state.playerHp / definition.playerHealth} />
-        </View>
+        <Health presentation={presentation} side="player" max={definition.health} compact={!!layout.stage} />
       </View>
       {__DEV__ && guides && layout.stage && <StageGuides layout={layout} />}
-      {miss && (
-        <View pointerEvents="none" style={{ position: "absolute", inset: 0 }}>
-          <SlotMissSkia
-            key={miss.id}
-            cells={miss.cells}
-            width={width}
-            height={height}
-            cell={layout.metrics.cell}
-            reduceMotion={reduced}
-          />
-        </View>
-      )}
-      {volleys.map((v) => (
-        <CombatVolley key={v.id} volley={v} paused={suspended || backgrounded} reduced={reduced} onImpact={impact} onDone={retire} />
-      ))}
+      <CombatVolleys volleys={volleys} bursts={bursts} clock={clock} endedAt={state.outcome ? state.elapsed : undefined} reduced={reduced} onDone={retire} />
+      {practice && <PerformancePanel presentation={presentation} volleys={volleys} bursts={bursts} paused={suspended} />}
       {story && (
         <Dialogue
           id={`duel:${definition.id}`}
@@ -763,4 +632,14 @@ function Battle({
       </Modal>
     </Scene>
   );
+}
+
+function Health({presentation, side, max, name, compact = false}: {
+  presentation: CombatPresentation; side: 'player' | 'opponent'; max: number; name?: string; compact?: boolean;
+}) {
+  const hp = useSyncExternalStore(presentation.subscribe, side === 'player' ? presentation.playerHp : presentation.opponentHp);
+  return <View accessible accessibilityLabel={`Health ${hp} of ${max}`}>
+    {!compact && <Copy style={{fontSize: 11, textAlign: 'center'}}>{name ? `${name} · ` : ''}{hp} / {max}</Copy>}
+    <Meter fraction={hp / max} color={side === 'opponent' ? '#EDC377' : '#B5E59B'} />
+  </View>;
 }

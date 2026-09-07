@@ -1,11 +1,11 @@
 import { View } from 'react-native';
-import type { ComponentProps } from 'react';
+import { memo, type ComponentProps } from 'react';
 import type { StagePlacement } from '../game/layout';
 import { Egg } from './egg';
 import { Image } from 'expo-image';
 import { WISP } from '../data/art';
 
-export function GroundedEgg({ placement, wisp, ...props }: Omit<ComponentProps<typeof Egg>, 'size' | 'anchor'> & {
+export const GroundedEgg = memo(function GroundedEgg({ placement, wisp, ...props }: Omit<ComponentProps<typeof Egg>, 'size' | 'anchor'> & {
   placement: StagePlacement['player'];
 }) {
   const { contact, sprite, visible, anchor } = placement;
@@ -21,4 +21,4 @@ export function GroundedEgg({ placement, wisp, ...props }: Omit<ComponentProps<t
       left: contact.x + visible.width * .3, top: contact.y - visible.height * .18,
       width: visible.width * .24, height: visible.width * .24 }} />}
   </View>;
-}
+});

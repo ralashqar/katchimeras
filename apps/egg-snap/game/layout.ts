@@ -7,6 +7,16 @@ import {
   firstCellCenter,
 } from "@incubator/tile-match/geometry";
 import { slotPlayRect } from "@incubator/tile-match/timing";
+
+/** A miniature copy of the same grid, with enough centre space for the rival's aura. */
+export function opponentFieldLayout(layout: ReturnType<typeof battleLayout>) {
+  const visible = layout.stage?.rival.visible ?? {x: layout.width / 2 - layout.opponentSize * .3,
+    y: layout.opponentY, width: layout.opponentSize * .6, height: layout.opponentSize};
+  const cell = Math.max(10, Math.round(layout.metrics.cell * .5), Math.ceil(visible.width * 1.12 / 5) - 3);
+  const metrics = boardMetricsForCell(SLOT_GRID, cell), play = slotPlayRect(metrics);
+  return {metrics, field: {x: layout.width / 2 - metrics.width / 2,
+    y: visible.y + visible.height * .55 - play.height / 2 - play.y}, driftAmplitude: layout.driftAmplitude * cell / layout.metrics.cell};
+}
 function legacyBattleLayout(
   width: number,
   height: number,
@@ -32,7 +42,7 @@ function legacyBattleLayout(
     eggSize,
     eggY: y + play.y + play.height / 2 - eggSize / 2,
     opponentSize: Math.min(145, height * 0.19, Math.max(72, y + play.y - (top + 62) - 72)),
-    opponentY: top + 62,
+    opponentY: top + 110,
     driftAmplitude: Math.max(0, Math.min(42, y + play.y - (top + 252))),
     dropFrame: {
       anchorX: x + first.x,
@@ -56,7 +66,7 @@ export function battleLayout(width: number, height: number, top: number, bottom:
   definition?: DuelStageDefinition, playerSkin = 'classic', rivalSkin = 'moss') {
   const legacy = legacyBattleLayout(width, height, top, bottom);
   const result = { ...legacy, frame: { x: 0, y: 0, width, height },
-    opponentHudY: legacy.opponentY - 12, warningY: legacy.opponentY + legacy.opponentSize + 37,
+    opponentHudY: legacy.opponentY - 52,
     playerHudY: height - bottom - 33, stage: undefined as StagePlacement | undefined };
   if (!definition) return result;
   const frameWidth = Math.min(width, 480, height * .54);
@@ -96,7 +106,7 @@ export function battleLayout(width: number, height: number, top: number, bottom:
     rival: { contact: rivalContact, sprite: rivalSprite, platform: projectStageRect(projection, definition.rival.platform), anchor: r.anchor, visible: rivalVisible } };
   return { ...result, frame, stage, metrics, field: { x, y }, trayY, trayHeight, driftAmplitude,
     eggSize: playerSize, eggY: playerSprite.y, opponentSize: rivalSize, opponentY: rivalSprite.y,
-    opponentHudY: height < 700 ? Math.max(top + 54, rivalVisible.y) : Math.max(top + 54, rivalVisible.y - 57), warningY: rivalContact.y + 14,
+    opponentHudY: height < 700 ? Math.max(top + 54, rivalVisible.y) : Math.max(top + 54, rivalVisible.y - 57),
     playerHudY: trayY + trayHeight - 10,
     dropFrame: { ...legacy.dropFrame, anchorX: x + first.x, anchorY: y + first.y, pitch: metrics.pitch } };
 }

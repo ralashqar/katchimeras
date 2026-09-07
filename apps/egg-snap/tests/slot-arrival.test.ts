@@ -28,7 +28,7 @@ function fieldFixture() {
     'react/jsx-runtime': require('react/jsx-runtime'),
     'react-native': { View: 'View', StyleSheet: { create: (styles: unknown) => styles } },
     'react-native-reanimated': native,
-    '@shopify/react-native-skia': { Canvas: 'Canvas', Picture: 'Picture' },
+    '@shopify/react-native-skia': { Canvas: 'Canvas', Picture: 'Picture', createPicture: () => ({}) },
     '../../../ui/theme': { useTileColors: () => colors },
     '../../../ui/tokens': { palette: {}, semantic: {} },
     '../engine/types': { BLOCK_COLOR_IDS: ['coral'] },

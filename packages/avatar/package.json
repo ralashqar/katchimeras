@@ -6,7 +6,8 @@
     "./layered-avatar": "./src/layered-avatar.tsx",
     "./layout": "./src/layout.ts",
     "./energy": "./src/energy.tsx",
-    "./feed-motion": "./src/feed-motion.ts"
+    "./feed-motion": "./src/feed-motion.ts",
+    "./motion-timing": "./src/motion-timing.ts"
   },
   "files": [
     "src"

@@ -1,11 +1,12 @@
 import { cancelAnimation, Easing, type SharedValue, withDelay, withSequence, withTiming } from 'react-native-reanimated';
+import { EGG_FEED_MS } from './motion-timing';
 
 /** Katchimeras LanternEgg answer absorption, shared verbatim with combat firing. */
 export function runEggFeedMotion(absorb: SharedValue<number>, shake: SharedValue<number>, ripple: SharedValue<number>, reduced = false) {
   [absorb, shake, ripple].forEach(cancelAnimation);
   absorb.value = withSequence(
     withTiming(1, { duration: 200, easing: Easing.out(Easing.cubic) }),
-    withTiming(0, { duration: 680, easing: Easing.out(Easing.cubic) }),
+    withTiming(0, { duration: EGG_FEED_MS - 200, easing: Easing.out(Easing.cubic) }),
   );
   shake.value = 0;
   if (!reduced) shake.value = withSequence(
@@ -17,5 +18,5 @@ export function runEggFeedMotion(absorb: SharedValue<number>, shake: SharedValue
     withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) }),
   );
   ripple.value = 0;
-  ripple.value = withDelay(160, withTiming(1, { duration: 720, easing: Easing.out(Easing.cubic) }));
+  ripple.value = withDelay(160, withTiming(1, { duration: EGG_FEED_MS - 160, easing: Easing.out(Easing.cubic) }));
 }

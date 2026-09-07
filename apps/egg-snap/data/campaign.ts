@@ -1,200 +1,49 @@
-import type { Progression } from "@incubator/tile-match/engine";
-import { isVarietyId } from "@incubator/tile-match/varieties";
+import type { Progression } from '@incubator/tile-match/engine';
+import { isVarietyId } from '@incubator/tile-match/varieties';
 import { snapLadder } from './progression';
-import type {
-  DuelDefinition,
-  OpponentMoveDefinition,
-  RegionDefinition,
-} from "../game/types";
+import type { AiProfile, DuelDefinition, OpponentMoveDefinition, RegionDefinition } from '../game/types';
 
-const stream = (slots: number): Progression => ({
-  kind: "stream",
-  loop: true,
-  turns: [{ slots, varieties: [] }],
-});
+/** Puzzle mechanics only. Opponents no longer have timed attacks or fixed damage. */
 export const MOVES: Record<string, OpponentMoveDefinition> = {
-  tap: {
-    id: "tap",
-    name: "Shell tap",
-    warningMs: 5200,
-    perfects: 1,
-    damage: 18,
-    recoveryMs: 2200,
-    varieties: [],
-  },
-  drift: {
-    id: "drift",
-    name: "Forest gust",
-    warningMs: 6500,
-    perfects: 1,
-    damage: 20,
-    recoveryMs: 2200,
-    varieties: [{ id: "drift", strength: 0.45 }],
-  },
-  armour: {
-    id: "armour",
-    name: "Shell shield",
-    warningMs: 8500,
-    perfects: 1,
-    damage: 22,
-    recoveryMs: 2200,
-    varieties: [{ id: "armour", strength: 0.25 }],
-  },
-  bomb: {
-    id: "bomb",
-    name: "Seed trap",
-    warningMs: 7000,
-    perfects: 1,
-    damage: 23,
-    recoveryMs: 2200,
-    varieties: [{ id: "bomb", strength: 0.25 }],
-  },
-  fuse: {
-    id: "fuse",
-    name: "Puzzle spell",
-    warningMs: 7000,
-    perfects: 1,
-    damage: 22,
-    recoveryMs: 2200,
-    varieties: [{ id: "fuse", strength: 0.4 }],
-  },
-  crossed: {
-    id: "crossed",
-    name: "Cross-up",
-    warningMs: 6500,
-    perfects: 1,
-    damage: 20,
-    recoveryMs: 2200,
-    varieties: [{ id: "crossed", strength: 0.5 }],
-  },
-  hues: {
-    id: "hues",
-    name: "Colour shift",
-    warningMs: 8500,
-    perfects: 1,
-    damage: 20,
-    recoveryMs: 2200,
-    varieties: [{ id: "hues", strength: 0.45 }],
-  },
+  tap: {id: 'tap', name: 'Simple shapes', varieties: []},
+  drift: {id: 'drift', name: 'Forest gust', varieties: [{id: 'drift', strength: .45}]},
+  armour: {id: 'armour', name: 'Shell shield', varieties: [{id: 'armour', strength: .25}]},
+  bomb: {id: 'bomb', name: 'Seed trap', varieties: [{id: 'bomb', strength: .25}]},
+  fuse: {id: 'fuse', name: 'Puzzle spell', varieties: [{id: 'fuse', strength: .4}]},
+  crossed: {id: 'crossed', name: 'Cross-up', varieties: [{id: 'crossed', strength: .5}]},
+  hues: {id: 'hues', name: 'Colour shift', varieties: [{id: 'hues', strength: .45}]},
 };
-const duel = (
-  id: string,
-  name: string,
-  rival: string,
-  skin: string,
-  health: number,
-  slots: number,
-  move: string,
-  tutorial: string,
-): DuelDefinition => ({
-  id,
-  name,
-  rival,
-  skin,
-  health,
-  playerHealth: 100,
-  regionId: "glade",
-  progression: stream(slots),
-  moves: [MOVES[move]],
-  reward: 40,
-  dialogue: [
-    `${rival}: A little spark has wandered into our glade.`,
-    "Show me what that sleepy shell can do.",
-  ],
-  tutorial,
+export function mechanicSequence(mechanics: readonly string[], slots = 2, strength?: number): Progression {
+  return {kind: 'stream', loop: true, turns: mechanics.map(id => ({
+    slots: id === 'fuse' || id === 'hues' ? 1 : slots,
+    ...(id === 'fuse' ? {minShapeHeight: 2} : {}),
+    varieties: MOVES[id].varieties.map(v => ({...v, strength: strength ?? v.strength})),
+  }))};
+}
+export const DEFAULT_ARENA_AI = {actionMs: 1500, accuracy: .85} as const;
+
+const ai = (minActionMs: number, maxActionMs: number, accuracy: number): AiProfile => ({minActionMs, maxActionMs, accuracy});
+const duel = (id: string, name: string, rival: string, skin: string, health: number, opponent: AiProfile, progression: Progression, tutorial: string): DuelDefinition => ({
+  id, name, rival, skin, health, ai: opponent, progression, regionId: 'glade', reward: 40,
+  dialogue: [`${rival}: A little spark has wandered into our glade.`, 'The same shapes, two little sparks. Let us play!'], tutorial,
 });
 export const DUELS: readonly DuelDefinition[] = [
-  { ...duel(
-    "glade-1",
-    "A little spark",
-    "Pip",
-    "moss",
-    300,
-    1,
-    "tap",
-    "Match the outline to earn a Perfect and open two pieces. Keep the streak going to wake gusts, shields and other surprises. Perfects interrupt attacks!",
-  ), progression: snapLadder() },
-  { ...duel(
-    "glade-2",
-    "Both sides now",
-    "Pollen",
-    "honeycomb",
-    370,
-    2,
-    "tap",
-    "Start with both shapes. Keep your streak to bring back the glade’s puzzle tricks. Every completed beat sends your charged cells flying.",
-  ), progression: snapLadder(true) },
-  duel(
-    "glade-3",
-    "Catch the breeze",
-    "Fern",
-    "moss",
-    330,
-    1,
-    "drift",
-    "A forest gust moves the outlines. Aim where they are now. Being slow keeps an exact streak; missing a cell breaks it.",
-  ),
-  duel(
-    "glade-4",
-    "Under the shell",
-    "Pebble",
-    "frost",
-    380,
-    2,
-    "armour",
-    "A shielded outline needs extra drops. Chip its shield, then place the returned piece again. Chipping never breaks your streak.",
-  ),
-  duel(
-    "glade-5",
-    "A tricky seed",
-    "Bramble",
-    "sunset",
-    400,
-    2,
-    "bomb",
-    "The glowing red marker is a trap. Place the OTHER piece first to disarm it. Triggering a live trap destroys the whole beat.",
-  ),
-  {
-    ...duel(
-      "glade-6",
-      "Keeper of the glade",
-      "Elder Moss",
-      "starglow",
-      720,
-      2,
-      "tap",
-      "The keeper mixes gusts, shields and traps. Complete TWO Perfect beats during each warning to interrupt.",
-    ),
-    boss: true,
-    reward: 100,
-    moves: ["drift", "armour", "bomb"].map((id) => ({
-      ...MOVES[id],
-      perfects: 2,
-      warningMs: 10500,
-      damage: 26,
-    })),
-    dialogue: [
-      "Elder Moss: You have brought a little light to every corner of this glade.",
-      "One last dance, little spark. Then the path beyond is yours.",
-    ],
-  },
-  {
-    ...duel(
-      "cheerlet-1",
-      "Better together",
-      "Jig",
-      "tide",
-      380,
-      1,
-      "fuse",
-      "Two pieces make one big shape. Match the top and bottom halves by shape. Neither piece rotates.",
-    ),
-    regionId: "cheerlet",
-    dialogue: [
-      "Jig: Welcome to the Playfields! We like our puzzles in pieces.",
-      "Let us put something wonderful together.",
-    ],
-  },
+  duel('glade-1', 'A little spark', 'Pip', 'moss', 300, ai(1530,2070,.75), snapLadder(),
+    'We get the same shapes in the same order. Match the first outline; two pieces arrive next. Completed cells fly at your rival. Play accurately to build a stronger streak!'),
+  duel('glade-2', 'Both sides now', 'Pollen', 'honeycomb', 370, ai(1350,1890,.81), snapLadder(true),
+    'Both eggs play at their own pace. Fill your shapes to send cells flying. Watch your rival’s little outlines charging too.'),
+  duel('glade-3', 'Catch the breeze', 'Fern', 'moss', 330, ai(1260,1800,.85), mechanicSequence(['drift'],1),
+    'The same breeze visits each egg’s puzzle. Aim where your outlines are now. Exact matches keep your streak, even when you take your time.'),
+  duel('glade-4', 'Under the shell', 'Pebble', 'frost', 380, ai(1170,1710,.89), mechanicSequence(['armour']),
+    'We both chip our shields before filling the shapes. The piece returns for another try; chipping never breaks your streak.'),
+  duel('glade-5', 'A tricky seed', 'Bramble', 'sunset', 400, ai(1080,1620,.92), mechanicSequence(['bomb']),
+    'Play the OTHER piece first to disarm the red-marked trap. Either egg can make a mistake: triggering a trap destroys that whole volley.'),
+  {...duel('glade-6', 'Keeper of the glade', 'Elder Moss', 'starglow', 720, ai(765,1215,.97), mechanicSequence(['drift','armour','bomb']),
+    'The keeper plays quickly and carefully. You share the same gusts, shields and traps. Keep your aim steady and your streak bright.'), boss: true, reward: 100,
+    dialogue: ['Elder Moss: You have brought a little light to every corner of this glade.', 'One last dance, little spark. Then the path beyond is yours.']},
+  {...duel('cheerlet-1', 'Better together', 'Jig', 'tide', 380, ai(1125,1665,.90), mechanicSequence(['fuse']),
+    'Two pieces make one big shape. Both eggs assemble the same puzzle. Match both halves before your cells fly.'), regionId: 'cheerlet',
+    dialogue: ['Jig: Welcome to the Playfields! We like our puzzles in pieces.', 'Let us put something wonderful together.']},
 ];
 export const REGIONS: readonly RegionDefinition[] = [
   {
@@ -277,34 +126,13 @@ export function validateCampaign() {
   }
 }
 export function validateDuel(d: DuelDefinition) {
-  if (!d.moves.length || d.health <= 0 || d.playerHealth <= 0)
-    throw new Error("Invalid duel");
-  for (const move of d.moves) {
-    if (
-      !Number.isInteger(move.perfects) ||
-      move.perfects < 1 ||
-      move.perfects > 3 ||
-      move.damage < 0 ||
-      move.warningMs <= 0 ||
-      move.recoveryMs < 0
-    )
-      throw new Error("Invalid move");
-    if (new Set(move.varieties.map((v) => v.id)).size !== move.varieties.length)
-      throw new Error("Duplicate variety");
-    const ids = move.varieties.map((v) => v.id);
-    if (ids.includes("hues") && ids.includes("fuse"))
-      throw new Error("Colour shift and jigsaw must be taught separately");
-    if (d.progression.kind === "stream")
-      for (const turn of d.progression.turns) {
-        if ((ids.includes("hues") || ids.includes("fuse")) && turn.slots !== 1)
-          throw new Error(
-            "Colour shift and jigsaw need a single initial footprint",
-          );
-        if (ids.includes("bomb") && turn.slots < 2)
-          throw new Error("Bomb encounters need a safe second piece");
-      }
-    for (const v of move.varieties)
-      if (!isVarietyId(v.id) || v.strength < 0 || v.strength > 1)
-        throw new Error("Invalid variety");
+  if (!Number.isFinite(d.health) || d.health <= 0 || d.ai.minActionMs < 100 || !Number.isFinite(d.ai.minActionMs) || !Number.isFinite(d.ai.maxActionMs) || d.ai.maxActionMs < d.ai.minActionMs || !Number.isFinite(d.ai.accuracy) || d.ai.accuracy < 0 || d.ai.accuracy > 1) throw new Error('Invalid duel');
+  if (d.progression.kind !== 'stream' || !d.progression.turns.length) throw new Error('Duels require a beat-indexed sequence');
+  for (const turn of d.progression.turns) {
+    const ids = turn.varieties.map(v => v.id);
+    if (new Set(ids).size !== ids.length) throw new Error('Duplicate variety');
+    if (ids.includes('hues') && (ids.includes('fuse') || ids.includes('crossed'))) throw new Error('Colour shift must be taught separately');
+    if ((ids.includes('hues') || ids.includes('fuse')) && turn.slots !== 1) throw new Error('Colour shift and jigsaw need a single initial footprint');
+    for (const v of turn.varieties) if (!isVarietyId(v.id) || !Number.isFinite(v.strength) || v.strength < 0 || v.strength > 1) throw new Error('Invalid variety');
   }
 }

@@ -54,3 +54,16 @@ test('duel completion overrides a same-frame placement and cancels pending feedb
   h.place(); h.cascade([0, 32], 1, true); h.end(true); advance(1000);
   assert.deepEqual(pulses.map(p => p.type), ['light', 'success']);
 });
+
+test('coincident launch and impact pulses share the motor guard without losing later cells', () => {
+  const {h,pulses,advance} = fixture();
+  h.cascade([0,48,96],2,true);
+  advance(20); h.place(); // Coincident first launch and incoming impact.
+  assert.equal(pulses.length,1);
+  advance(48); h.place();
+  assert.equal(pulses.length,2);
+  advance(80); h.place();
+  assert.equal(pulses.at(-1)?.type,'light');
+  advance(300);
+  assert.equal(pulses.at(-1)?.type,'success');
+});

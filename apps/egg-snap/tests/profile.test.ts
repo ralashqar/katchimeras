@@ -19,6 +19,18 @@ const win = (id: string, attemptId = id) => ({
   coins: 999999,
   practice: false,
 });
+
+test('draw receipts persist without granting coins or unlocking content; old receipts remain compatible', () => {
+  const fresh = freshProfile();
+  const draw = {...win('glade-1', 'draw'), outcome: 'draw' as const};
+  const saved = grantResult(fresh, draw);
+  assert.equal(saved.coins, 0);
+  assert.deepEqual(saved.completed, []);
+  assert.equal(saved.pendingResult?.won, false);
+  assert.equal(saved.pendingResult?.outcome, 'draw');
+  assert.deepEqual(grantResult(JSON.parse(JSON.stringify(saved)), draw), saved);
+  assert.equal(grantResult(saved, win('glade-1', 'old-format')).coins, 40);
+});
 test("whole campaign funds both cosmetics and next region, and replay rewards remain available", () => {
   let p = freshProfile();
   assert.throws(() => purchase(p, "cheerlet"));

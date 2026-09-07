@@ -1,12 +1,13 @@
+import { memo } from "react";
 import { LayeredAvatar } from "@incubator/avatar/layered-avatar";
 import { EggEnergy } from "@incubator/avatar/energy";
 import { useEggExpressionPlayer } from "@incubator/avatar/expressions";
 import { Image } from "expo-image";
 import { View } from "react-native";
-import { useReducedMotion } from "react-native-reanimated";
+import { useReducedMotion, type SharedValue } from "react-native-reanimated";
 import { BODIES, FACES, WISP } from "../data/art";
 
-export function Egg({
+export const Egg = memo(function Egg({
   skin = "classic",
   streak = 0,
   size = 160,
@@ -14,6 +15,7 @@ export function Egg({
   pulse = 0,
   feedKey = 0,
   hitKey = 0,
+  hitSignal,
   hurt = false,
   wisp = false,
   paused = false,
@@ -26,6 +28,7 @@ export function Egg({
   pulse?: number;
   feedKey?: number;
   hitKey?: number;
+  hitSignal?: SharedValue<number>;
   hurt?: boolean;
   wisp?: boolean;
   paused?: boolean;
@@ -54,6 +57,9 @@ export function Egg({
         pulseKey={pulse}
         feedKey={feedKey}
         hitKey={hitKey}
+        hitSignal={hitSignal}
+        glowTexture={require("../assets/effects/egg-aura.png")}
+        rimTexture={require("../assets/effects/egg-rim.png")}
         hurt={hurt}
         reduceMotion={reduceMotion}
         paused={paused}
@@ -82,4 +88,4 @@ export function Egg({
       )}
     </View>
   );
-}
+});

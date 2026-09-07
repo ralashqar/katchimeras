@@ -39,6 +39,8 @@ export function canPlay(p: Profile, levelId: string) {
 }
 export function grantResult(p: Profile, result: DuelResult): Profile {
   if (p.receipts[result.attemptId]) return p;
+  const outcome = result.outcome ?? (result.won ? 'won' : 'lost');
+  result = { ...result, outcome, won: outcome === 'won' };
   if (result.practice) return { ...p, pendingResult: { ...result, coins: 0 } };
   if (!canPlay(p, result.levelId)) throw new Error("This duel is locked");
   const duel = getDuel(result.levelId);

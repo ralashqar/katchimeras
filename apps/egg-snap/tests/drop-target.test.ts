@@ -37,7 +37,8 @@ test("a green target wins over finger-in-tray cancellation and resolves damage",
     900,
   );
   assert.equal(next.run.lastBeatGrade, "perfect");
-  assert.ok(next.opponentHp < s.opponentHp);
+  assert.equal(next.opponentHp, s.opponentHp);
+  assert.ok(tickCombat(next, Math.max(...next.impacts.map(i => i.at))).opponentHp < s.opponentHp);
 });
 
 test("returning to the tray away from targets still cancels, including empty captured grid cells", () => {
@@ -138,7 +139,7 @@ test("wrong colours and already-filled cells never produce a green preview", () 
 });
 
 test("the same held-cell preview follows a colour shift without moving the pointer", () => {
-  let s = createCombat({ ...DUELS[0], progression: { kind: "stream", turns: [{ slots: 1, varieties: [] }], loop: true }, moves: [MOVES.hues] }, "hues", "hues");
+  let s = createCombat({ ...DUELS[0], progression: { kind: "stream", turns: [{ slots: 1, varieties: MOVES.hues.varieties }], loop: true } }, "hues", "hues");
   const tray = battleLayout(390, 844, 0, 0);
   const p = s.run.tray[0];
   const release = targetRelease(s, p.id, tray);

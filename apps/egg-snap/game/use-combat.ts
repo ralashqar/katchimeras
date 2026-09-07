@@ -1,4 +1,7 @@
+import { useFrameQuality } from "./use-frame-quality";
+import { choosePlacement } from "./opponent";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CombatPresentation } from "./combat-presentation";
 import { AppState } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import {
@@ -14,6 +17,7 @@ export function useCombat(
   seed: string,
   paused: boolean,
   practice: boolean,
+  stress = false,
 ) {
   const [state, setState] = useState(() =>
     createCombat(
@@ -23,25 +27,33 @@ export function useCombat(
       practice,
     ),
   );
+  const [presentation] = useState(() => new CombatPresentation(state));
   const ref = useRef(state);
   const pauseRef = useRef(paused);
   pauseRef.current = paused;
+  const autoAt = useRef(600);
   const foreground = useRef(AppState.currentState === "active");
   const [backgrounded, setBackgrounded] = useState(false);
   const clock = useSharedValue(0);
+  useFrameQuality(presentation, !paused && !backgrounded && !state.outcome, practice);
   const commit = useCallback(
     (next: CombatState) => {
       const old = ref.current;
-      ref.current = next;
+      // Consume this frame's event batch once. The pure engine retains history for tests/replays;
+      // a live duel need not copy 256 past events for every new cell collision.
+      const snapshot = next.events.length ? {...next, events: []} : next;
+      ref.current = snapshot;
+      presentation.commit(next);
+      presentation.current = snapshot;
       clock.value = next.elapsed;
       if (
-        old.run !== next.run ||
-        old.eventSequence !== next.eventSequence ||
-        old.phase !== next.phase
+        old.player.run !== next.player.run ||
+        old.opponent.run !== next.opponent.run ||
+        old.outcome !== next.outcome
       )
-        setState(next);
+        setState(snapshot);
     },
-    [clock],
+    [clock, presentation],
   );
   useEffect(() => {
     const sub = AppState.addEventListener("change", (status) => {
@@ -52,17 +64,35 @@ export function useCombat(
     let previous = 0;
     const step = (now: number) => {
       frame = requestAnimationFrame(step);
-      const delta = previous ? Math.min(80, now - previous) : 0;
+      const interval = previous ? now - previous : 0;
+      const delta = Math.min(80, interval);
       previous = now;
-      if (!pauseRef.current && foreground.current && !ref.current.outcome)
-        commit(tickCombat(ref.current, ref.current.elapsed + delta));
+      const active = !pauseRef.current && foreground.current;
+      if (practice && active && !ref.current.outcome) presentation.performance.frame(interval);
+      if (active) {
+        if (!ref.current.outcome) {
+          const start = practice ? performance.now() : 0;
+          const target = ref.current.elapsed + delta;
+          if (stress) while (autoAt.current <= target && !ref.current.outcome) {
+            commit(tickCombat(ref.current, autoAt.current));
+            const current = ref.current;
+            const action = choosePlacement(current.run, true, current.elapsed-current.lastDropAt, .5);
+            if (action?.type === 'place' || action?.type === 'discard') commit(placeCombat(current,
+              action.type === 'place' ? action : {pieceId: action.pieceId, discard: true}, current.elapsed));
+            autoAt.current += 600;
+          }
+          commit(tickCombat(ref.current, target));
+          if (practice) presentation.performance.simulation(performance.now() - start);
+        }
+        else clock.value += delta; // Let terminal impact particles settle before results.
+      }
     };
     frame = requestAnimationFrame(step);
     return () => {
       cancelAnimationFrame(frame);
       sub.remove();
     };
-  }, [commit]);
+  }, [commit, clock, presentation, practice, stress]);
   const drop = useCallback(
     (input: Parameters<typeof placeCombat>[1]) => {
       if (pauseRef.current || !foreground.current) return ref.current;
@@ -74,6 +104,7 @@ export function useCombat(
   );
   return {
     state,
+    presentation,
     ref,
     clock,
     drop,

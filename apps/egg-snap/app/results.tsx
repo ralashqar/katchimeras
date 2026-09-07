@@ -20,9 +20,10 @@ export default function Results() {
   const feedback = useFeedback(profile?.preferences?.sound === false, false);
   const attemptId = r?.attemptId;
   const won = r?.won;
+  const draw = r?.outcome === "draw";
   useEffect(() => {
-    if (attemptId) feedback.result(!!won);
-  }, [attemptId, won, feedback]);
+    if (attemptId && !draw) feedback.result(!!won);
+  }, [attemptId, won, draw, feedback]);
   if (!r)
     return (
       <Scene>
@@ -78,7 +79,7 @@ export default function Results() {
                 : "EVERY SPARK STARTS SOMEWHERE"}
           </Copy>
           <Heading>
-            {r.won ? "You found your spark." : "Rest. Then rise."}
+            {draw ? "Two bright sparks." : r.won ? "You found your spark." : "Rest. Then rise."}
           </Heading>
           <Egg
             skin={profile!.skin}
@@ -90,7 +91,7 @@ export default function Results() {
           <Copy
             style={{ fontFamily: "EggDisplay", fontSize: 36, color: "#F4D688" }}
           >
-            {r.won ? `+${r.coins} coins` : "A fresh try is waiting"}
+            {draw ? "A draw · free retry" : r.won ? `+${r.coins} coins` : "A fresh try is waiting"}
           </Copy>
           <Copy>
             {Math.round(r.accuracy * 100)}% perfect beats · Best streak{" "}

@@ -16,12 +16,9 @@ export type RegionDefinition = {
 export type OpponentMoveDefinition = {
   id: string;
   name: string;
-  warningMs: number;
-  perfects: number;
-  damage: number;
-  recoveryMs: number;
   varieties: readonly VarietyRequest[];
 };
+export type AiProfile = { minActionMs: number; maxActionMs: number; accuracy: number };
 export type DuelDefinition = {
   id: string;
   regionId: string;
@@ -29,9 +26,8 @@ export type DuelDefinition = {
   rival: string;
   skin: string;
   health: number;
-  playerHealth: number;
   progression: Progression;
-  moves: readonly OpponentMoveDefinition[];
+  ai: AiProfile;
   reward: number;
   boss?: boolean;
   dialogue: readonly string[];
@@ -41,6 +37,8 @@ export type DuelResult = {
   attemptId: string;
   levelId: string;
   won: boolean;
+  /** Older receipts contain only `won`. */
+  outcome?: 'won' | 'lost' | 'draw';
   accuracy: number;
   bestStreak: number;
   durationMs: number;

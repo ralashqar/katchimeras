@@ -1,6 +1,7 @@
 export const CELL_FLIGHT_MS = 360;
 export const CELL_IMPACT_MS = 280;
 export const CELL_LAUNCH_MS = 190;
+export const CELL_STAGGER_MS = 48;
 
 /** Keep each launch flank on that side of the shell, safely inside its silhouette. */
 export function cellImpactTarget(sourceX: number, target: { x: number; y: number }, opponentWidth: number) {
@@ -16,7 +17,7 @@ export function flightOffset(dx: number, dy: number, progress: number) {
   return { x: 2 * (1-t) * t * outward + t*t*dx, y: dy*t, scale: 1-t*.55 };
 }
 
-/** Presentation only: distribute the already-resolved damage without rounding losses. */
+/** Shared by simulation and presentation: split a beat's damage without rounding losses. */
 export function cellDamage(total: number, count: number, index: number) {
   return Math.floor(total * (index + 1) / count) - Math.floor(total * index / count);
 }

@@ -24,7 +24,7 @@ export function useFeedback(muted: boolean, hapticsEnabled = true, paused = fals
   }, [audio, haptics, muted, hapticsEnabled, paused]);
   useEffect(() => () => { audio.dispose(); haptics.cancel(); }, [audio, haptics]);
   return useMemo(() => ({
-    cue(type: 'pickup' | 'snap' | 'place' | 'cell-impact' | 'chip' | 'miss' | 'hit' | 'blast' | 'interrupt') {
+    cue(type: 'pickup' | 'snap' | 'place' | 'cell-impact' | 'chip' | 'miss' | 'hit' | 'blast') {
       if (suspended.current) return;
       switch (type) {
         case 'pickup': haptics.pickUp(); break;
@@ -35,7 +35,6 @@ export function useFeedback(muted: boolean, hapticsEnabled = true, paused = fals
         case 'miss': haptics.reject(); audio.play('missed'); break;
         case 'hit': haptics.hit(); audio.play('hit'); break;
         case 'blast': haptics.detonate(SLOT_BLAST_SHAKE_MS); audio.play('hit'); break;
-        case 'interrupt': haptics.interrupt(); break;
       }
     },
     volley(delays: readonly number[], groups: number, streak: number, late: boolean) {

@@ -23,7 +23,7 @@ export function createHapticFeedback(driver: (pulse: HapticPulse) => void, clock
     driver(type);
   }
   function later(type: HapticPulse, ms: number) {
-    const token = clock.later(() => { timers.delete(token); if (enabled) driver(type); }, ms);
+    const token = clock.later(() => { timers.delete(token); pulse(type); }, ms);
     timers.add(token);
   }
   return {
