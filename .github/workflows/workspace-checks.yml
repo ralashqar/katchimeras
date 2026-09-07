@@ -22,6 +22,8 @@ jobs:
           python-version: "3.12"
       - run: npm ci
       - run: npm run verify:workspace
+      - name: Export Egg Snap on every target
+        run: npm run export --workspace=egg-snap
       - run: npm run verify:story-flows --workspace=katchimeras
       - name: Verify native presentation ownership and handoffs
         working-directory: apps/katchimeras

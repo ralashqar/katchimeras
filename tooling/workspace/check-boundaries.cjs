@@ -49,5 +49,30 @@ function checkCycles(name, chain = []) {
   for (const child of graph.get(name) ?? []) checkCycles(child, [...chain, name]);
 }
 for (const name of graph.keys()) checkCycles(name);
+// Apps compose packages, never each other. Resolve relative paths as well as
+// workspace package names so renaming an import cannot evade the boundary.
+const appsRoot = path.join(root, 'apps');
+const apps = fs.readdirSync(appsRoot, {withFileTypes:true}).filter(e => e.isDirectory()).map(e => {
+  const directory = path.join(appsRoot, e.name);
+  const filename = path.join(directory, 'package.json');
+  return {directory, name:fs.existsSync(filename) ? JSON.parse(fs.readFileSync(filename, 'utf8')).name : e.name};
+});
+for (const app of apps) {
+  for (const file of walk(app.directory).filter(f => /\.[cm]?[jt]sx?$/.test(f) && !/[\\/](dist|\.expo|\.tmp)[\\/]/.test(f))) {
+    const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+    function inspect(node) {
+      let value;
+      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) value = node.moduleSpecifier.text;
+      if (ts.isCallExpression(node) && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && (node.expression.getText(source) === 'require' || node.expression.kind === ts.SyntaxKind.ImportKeyword)) value = node.arguments[0].text;
+      if (value) for (const other of apps) {
+        if (other === app) continue;
+        const resolved = value.startsWith('.') ? path.resolve(path.dirname(file), value) : value;
+        if (resolved === other.directory || resolved.startsWith(other.directory + path.sep) || value === other.name || value.startsWith(other.name + '/') || value.includes('/apps/' + path.basename(other.directory) + '/')) failures.push(`${path.relative(root,file)}: cross-app import ${value}`);
+      }
+      ts.forEachChild(node, inspect);
+    }
+    inspect(source);
+  }
+}
 if (failures.length) { console.error(failures.join('\n')); process.exitCode = 1; }
 else console.log(`Verified exports, dependency declarations and one-way boundaries for ${manifests.length} packages.`);

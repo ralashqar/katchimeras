@@ -2,8 +2,11 @@
 
 Katchimeras is the only shipping game. Its Expo app, rules, authored stories, progression, save data adapters, routes and backend configuration live in [`apps/katchimeras`](apps/katchimeras). Reusable runtime code, native integrations and authoring tools are separate npm packages. Games select the art packs they use.
 
+[Egg Snap](apps/egg-snap/README.md) is an independent first playable: puzzle duels, a seven-level campaign, region discovery and cosmetic rewards. Start it with `npm run start:egg-snap`; validate it with `npm run check:egg-snap`. It shares the incubator art and runtime packages and owns its saves and app identity.
+
 ```text
 apps/katchimeras/       Game composition, content, routes, saves and deployment
+apps/egg-snap/          Egg puzzle duels, campaigns, discovery and cosmetic saves
 packages/              Shared story, presentation, environments, avatar, UI,
                        merge helpers, native integrations and art service
 tooling/art-pipeline/   Shared generation, processing, validation and promotion

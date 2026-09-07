@@ -14,7 +14,7 @@
   "scripts": {
     "start": "npm run start --workspace=katchimeras --",
     "start:dev-client": "npm run start:dev-client --workspace=katchimeras --",
-    "typecheck": "npm run typecheck --workspace=katchimeras && tsc --noEmit -p tsconfig.packages.json",
+    "typecheck": "npm run typecheck --workspace=katchimeras && tsc --noEmit -p tsconfig.packages.json && npm run typecheck --workspace=egg-snap",
     "lint": "npm run lint --workspace=katchimeras && npm run lint:shared",
     "check": "npm run check:boundaries && npm run check --workspace=katchimeras && npm run test:packages",
     "check:boundaries": "node tooling/workspace/check-boundaries.cjs",
@@ -24,7 +24,10 @@
     "lint:shared": "eslint packages tests/packages",
     "test:game": "node tooling/workspace/test-game.cjs",
     "release:pack": "node tooling/workspace/pack-shared.cjs",
-    "verify:workspace": "npm run check:boundaries && npm run typecheck && npm run lint:shared && npm run test:packages && npm run verify:consumer"
+    "verify:workspace": "npm run check:boundaries && npm run typecheck && npm run lint:shared && npm run test:packages && npm run verify:consumer && npm run test:tile-match && npm run check:egg-snap && node tooling/art-pipeline/scripts/generate-shared-egg-catalog.cjs --check",
+    "start:egg-snap": "npm run start --workspace=egg-snap --",
+    "test:tile-match": "node tooling/workspace/test-tile-match.cjs",
+    "check:egg-snap": "npm run check --workspace=egg-snap"
   },
   "devDependencies": {
     "typescript": "~5.9.2",

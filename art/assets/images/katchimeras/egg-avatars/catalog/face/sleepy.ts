@@ -1,0 +1,8 @@
+// Generated art metadata. Ownership and prices belong to each game.
+export default {
+  id: "sleepy", name: "Sleepy",
+  source: require('../../faces/sleepy.webp'),
+  thumbnail: require('../../faces/thumbnails/sleepy.webp'),
+  presentation: {"scale":1,"offsetX":0,"offsetY":0},
+  layoutVersion: 1,
+};

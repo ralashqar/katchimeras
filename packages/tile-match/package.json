@@ -1,0 +1,30 @@
+{
+  "name": "@incubator/tile-match",
+  "version": "0.1.0",
+  "exports": {
+    "./engine": "./src/engine.ts",
+    "./varieties": "./src/varieties.ts",
+    "./native": "./src/native.ts",
+    "./effects": "./src/effects.ts",
+    "./geometry": "./src/features/puzzle/view/metrics.ts",
+    "./timing": "./src/features/puzzle/view/slot-metrics.ts",
+    "./theme": "./src/ui/theme.tsx",
+    "./feedback": "./src/feedback.ts",
+    "./audio/*": "./assets/audio/*"
+  },
+  "files": [
+    "src",
+    "NOTICE.md",
+    "LICENSE",
+    "assets"
+  ],
+  "peerDependencies": {
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-worklets": "0.5.1",
+    "@shopify/react-native-skia": "2.3.14",
+    "expo-linear-gradient": "~15.0.8"
+  }
+}

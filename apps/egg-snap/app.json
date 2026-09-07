@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Egg Snap",
+    "slug": "egg-snap",
+    "version": "0.1.0",
+    "scheme": "eggsnap",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.incubator.eggsnap"
+    },
+    "android": {
+      "package": "com.incubator.eggsnap"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-sqlite"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

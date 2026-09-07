@@ -6,7 +6,8 @@
     "./currency": "./src/currency.ts",
     "./game-primitives": "./src/game-primitives.tsx",
     "./game-surface": "./src/game-surface.tsx",
-    "./theme": "./src/theme.ts"
+    "./theme": "./src/theme.ts",
+    "./reward-token-flight": "./src/reward-token-flight.tsx"
   },
   "files": [
     "src"
@@ -15,6 +16,7 @@
     "react": "19.1.0",
     "react-native": "0.81.5",
     "expo-image": "~3.0.11",
-    "expo-linear-gradient": "~15.0.8"
+    "expo-linear-gradient": "~15.0.8",
+    "react-native-reanimated": "~4.1.1"
   }
 }

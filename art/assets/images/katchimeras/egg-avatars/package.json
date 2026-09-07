@@ -2,7 +2,8 @@
   "name": "@incubator/art-egg-avatars",
   "version": "0.1.0",
   "exports": {
-    "./*": "./*"
+    "./*": "./*",
+    "./catalog/*": "./catalog/*.ts"
   },
   "files": [
     "**/*.webp",
@@ -12,6 +13,7 @@
     "**/*.ttf",
     "**/*.otf",
     "**/*.riv",
-    "**/*.json"
+    "**/*.json",
+    "catalog/**/*.ts"
   ]
 }

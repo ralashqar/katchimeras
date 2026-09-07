@@ -1,0 +1,7 @@
+{
+  "id": "egg-snap",
+  "contentRoots": {
+    "assets": "../../art/assets",
+    "design": "../../art-source/egg-snap"
+  }
+}
