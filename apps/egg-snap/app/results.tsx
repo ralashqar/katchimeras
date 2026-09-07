@@ -80,11 +80,12 @@ export default function Results() {
                 ? "A LITTLE MORE LIGHT"
                 : "EVERY SPARK STARTS SOMEWHERE"}
           </Copy>
+          {!!r.won && !!duel?.victoryDialogue && <Copy>{duel.victoryDialogue}</Copy>}
           <Heading>
             {draw ? "Two bright sparks." : r.won ? "CRACKED!" : "Rest. Then rise."}
           </Heading>
           <Egg
-            skin={profile!.skin}
+            skin={profile!.skin} characterId={adventure?.activeEgg === 'pip' ? undefined : adventure?.activeEgg}
             size={Math.min(230, height * 0.29)}
             streak={r.won ? 10 : 0}
             face={r.won ? "grin" : "sleepy"}
@@ -102,7 +103,7 @@ export default function Results() {
             {r.bestStreak}
           </Copy>
           {r.won && guided && r.firstWin !== false && r.levelId === 'glade-1' && <Copy>Golden Shell Fragment! Pip: “Uh… I don’t think that belonged to him.”</Copy>}
-          {r.won && guided && r.firstWin !== false && r.levelId === 'glade-3' && <Copy>New egg discovered: Pollen! “About time. That banner was clashing with my shell.”</Copy>}
+          {r.won && guided && r.firstWin !== false && r.levelId === 'glade-4' && <Copy>New egg discovered: Pollen! “About time. That banner was clashing with my shell.”</Copy>}
           {r.won && guided && r.firstWin !== false && duel?.boss && <Copy>Second Golden Shell Fragment · Golden crown · Nest upgrade gift. Captain: “This hat is clearly defective.”</Copy>}
           {r.won && !guided && duel?.boss && (
             <Copy>The Keeper shell is yours. A new region awaits.</Copy>

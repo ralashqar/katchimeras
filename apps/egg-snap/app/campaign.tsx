@@ -1,6 +1,2 @@
-import LegacyWorld from '../components/legacy-world';
-import { FocusedScreen } from '../components/focused-screen';
-
-export default function Campaign() {
-  return <FocusedScreen><LegacyWorld /></FocusedScreen>;
-}
+import { Redirect } from 'expo-router';
+export default function Campaign() { return <Redirect href="/" />; }

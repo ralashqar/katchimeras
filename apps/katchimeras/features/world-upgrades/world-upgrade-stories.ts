@@ -6,6 +6,12 @@ export type WorldUpgradeStory = {
   before: readonly UpgradeDialogueLine[]; after: readonly UpgradeDialogueLine[];
   rewardSkinId?: KatchimeraSkinId;
 };
+
+/** These saved tutorial flows already narrate their first clearing and handoff. */
+export function upgradeUsesTutorialNarrative(offerId: string, level: number, definitionId: string): boolean {
+  return level === 1 && ((offerId === 'haven:mossprout' && definitionId === 'mossprout-first-session')
+    || (offerId === 'mist:steppling-home' && definitionId === 'glow-steppling-discovery'));
+}
 type Beat = readonly [string, string, string, string];
 const stories: WorldUpgradeStory[] = [];
 function chapter(offerId: string, beats: readonly Beat[], guest: KatchimeraSkinId = 'mossprout', rewardSkinId?: KatchimeraSkinId) {

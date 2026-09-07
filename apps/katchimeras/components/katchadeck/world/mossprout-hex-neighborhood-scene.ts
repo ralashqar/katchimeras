@@ -1,3 +1,4 @@
+import { mossproutHexPoint, mossproutLayerGeometry, mossproutSceneEnvelope } from '@incubator/environments/mossprout-layout';
 import { MOSSPROUT_PRESET } from '@incubator/environments/mossprout-preset';
 import type { ImageSourcePropType } from 'react-native';
 import { sharedResidentAnchor } from './shared-resident-presentation';
@@ -9,17 +10,12 @@ import { STEPPLING_TILE, SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants/mossprout-memory-plants';
 import type { MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel, PlantableMemoryInstance } from '@/types/merge-world';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
-import { kingdomTileArtFrame } from '@/utils/kingdom-tile-alignment';
-import { hexDrawDepth, hexToWorld, type HexCoord } from '@/utils/world-hex';
-import { tileVisibleBounds } from '@/components/katchadeck/world/kingdom-hex-scene';
+import { hexDrawDepth, type HexCoord } from '@/utils/world-hex';
 import { GARDEN_PLANT_SLOT_POSITIONS, MOSSPROUT_FIRST_MEMORY_SLOT_ID, mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
 
 export { mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
 
 const SOURCE_SIZE = { height: 1024, width: 1024 } as const;
-const LAYOUT_PROFILE = 'floating-neighborhood-v2' as const;
-const NEIGHBORHOOD_SPACING_SCALE = 1.1;
-const SCENE_PADDING = 96;
 const MAIN_RESIDENT_SOURCE = require('@incubator/art-world/square/mossprout-standing-resident-512.webp');
 
 type TileSources = {
@@ -170,16 +166,6 @@ export const MOSSPROUT_NATURE_ISLAND_ART: Record<MossproutNatureIslandId, Nature
   },
 };
 
-const REFERENCE_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['floating_neighborhood_v2_neutral_hex_tile.webp'];
-
-function mossproutHexPoint(coord: HexCoord) {
-  const point = hexToWorld(coord, LAYOUT_PROFILE);
-  return {
-    x: point.x * NEIGHBORHOOD_SPACING_SCALE,
-    y: point.y * NEIGHBORHOOD_SPACING_SCALE,
-  };
-}
-
 function layerFor(
   id: string,
   kind: KingdomTileArtLayer['kind'],
@@ -187,13 +173,7 @@ function layerFor(
   layoutBounds = spec.alphaBounds,
 ): KingdomTileArtLayer {
   const point = mossproutHexPoint(spec.coord);
-  const target = tileVisibleBounds(point.x, point.y);
-  const frame = kingdomTileArtFrame({
-    alignmentMode: 'ground-bottom',
-    assetBounds: layoutBounds,
-    referenceBounds: REFERENCE_BOUNDS,
-    target,
-  });
+  const { frame, interactionFrame } = mossproutLayerGeometry(spec.coord, layoutBounds);
   return {
     alphaBounds: spec.alphaBounds,
     coord: spec.coord,
@@ -201,12 +181,7 @@ function layerFor(
     depth: hexDrawDepth(point),
     fallbackSource: null,
     frame,
-    interactionFrame: {
-      height: target.bottom - target.top,
-      left: target.left,
-      top: target.top,
-      width: target.right - target.left,
-    },
+    interactionFrame,
     id,
     kind,
     source: spec.sources.full,
@@ -321,12 +296,7 @@ export function buildMossproutHexNeighborhoodScene(
   const natureBoundsLayers = MOSSPROUT_NATURE_ISLANDS.flatMap((island) =>
     [natureLayerFor(island.id, 0), ...island.levels.map((level) => natureLayerFor(island.id, level.level))]);
   const boundsLayers = [...rawLayers, lockedSteppling, revealedSteppling, ...natureBoundsLayers];
-  const left = Math.min(...boundsLayers.map((layer) => layer.frame.left));
-  const top = Math.min(...boundsLayers.map((layer) => layer.frame.top));
-  const right = Math.max(...boundsLayers.map((layer) => layer.frame.left + layer.frame.width));
-  const bottom = Math.max(...boundsLayers.map((layer) => layer.frame.top + layer.frame.height));
-  const dx = SCENE_PADDING - left;
-  const dy = SCENE_PADDING - top;
+  const { dx, dy, width, height } = mossproutSceneEnvelope(boundsLayers.map(layer => layer.frame));
   const layers = rawLayers.map((layer) => shiftLayer(layer, dx, dy)).sort((a, b) => a.depth - b.depth);
   const mainPoint = mossproutHexPoint(MAIN.coord);
   const centerTile: KingdomTileRender = {
@@ -350,10 +320,10 @@ export function buildMossproutHexNeighborhoodScene(
   const tiles = [centerTile, ...residentTiles];
   return {
     centerTile,
-    height: Math.ceil(bottom - top + SCENE_PADDING * 2),
+    height,
     tileArtLayers: layers,
     tileById: new Map(tiles.map((tile) => [tile.id, tile])),
     tiles,
-    width: Math.ceil(right - left + SCENE_PADDING * 2),
+    width,
   };
 }

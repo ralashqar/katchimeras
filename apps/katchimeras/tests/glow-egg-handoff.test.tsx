@@ -197,7 +197,7 @@ test('shared Bond coachmark sits below its target and protects Continue against 
   const onContinue = () => { attempts++; return attempts === 1 ? new Promise<void>((_resolve, reject) => { rejectSave = reject; }) : Promise.resolve(); };
   const targetRef = { current: { measureInWindow: (cb: (...args: number[]) => void) => cb(40, 60, 240, 48) } };
   let tree: ReactTestRenderer;
-  await act(async () => { tree = create(<Coach buttonLabel="Continue" message={[{ text: 'Your Bond grew.' }]} onContinue={onContinue} placement="below" targetRef={targetRef} />); });
+  await act(async () => { tree = create(<Coach buttonLabel="Continue" message={[{ text: 'Your Bond grew.' }]} onContinue={onContinue} placement="below" targetRef={targetRef} />, { createNodeMock: () => ({ measureInWindow: (cb: (...args: number[]) => void) => cb(0, 0, 400, 800) }) }); });
   const callout = tree!.root.findByProps({ accessibilityLiveRegion: 'polite' });
   assert.ok(callout.props.style[1].top > 108, 'explanation is below the Bond bar');
   const press = tree!.root.findByType('Button' as React.ElementType).props.onPress;

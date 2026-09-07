@@ -1,3 +1,4 @@
+import characterGeometry from '../data/character-geometry.gen.json';
 import { coverProjection, projectStagePoint, projectStageRect, groundedSprite, type Rect } from '@incubator/environments/stage-projection';
 import type { DuelStageDefinition } from '../data/duel-stages';
 import ground from '../data/egg-ground.json';
@@ -89,7 +90,7 @@ export function battleLayout(width: number, height: number, top: number, bottom:
   projection.y += desiredContactY - (projection.y + projection.height * definition.player.contact.y);
   const playerContact = projectStagePoint(projection, definition.player.contact);
   const rivalContact = projectStagePoint(projection, definition.rival.contact);
-  const contactFor = (skin: string) => ground[skin as keyof typeof ground] ?? ground.classic;
+  const contactFor = (skin: string) => (characterGeometry as Record<string, typeof ground.classic>)[skin] ?? ground[skin as keyof typeof ground] ?? ground.classic;
   const p = contactFor(playerSkin), r = contactFor(rivalSkin);
   const cell = Math.max(24, Math.min(42, Math.floor((frameWidth - 32 - 8 * COMBAT_CELL_GAP) / 9)));
   const metrics = boardMetricsForCell(SLOT_GRID, cell, COMBAT_CELL_GAP), play = slotPlayRect(metrics);

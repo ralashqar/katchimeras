@@ -1,5 +1,5 @@
 import { createVersionedProfileRepository } from "@incubator/profile/repository";
-import { advanceAdventure, freshAdventure, migrateProfile, type Adventure } from "./adventure";
+import { advanceAdventure, freshAdventure, migrateProfile, worldAction, type Adventure } from "./adventure";
 import { COLLECTION, getDuel, getRegion } from "../data/campaign";
 import type { DuelResult } from "../game/types";
 
@@ -35,11 +35,16 @@ export const freshProfile = (): Profile => ({
 export function canPlay(p: Profile, levelId: string) {
   if (p.adventure && !p.adventure.legacy) {
     const a = p.adventure;
-    if (levelId === "glade-1") return true;
-    if (levelId === "glade-2") return a.revealed.includes("trail");
-    if (levelId === "glade-3") return a.claims.includes("chest");
-    if (levelId === "glade-6") return a.eggs.includes("pollen");
-    if (!a.fragments.includes("captain")) return false;
+    if (p.completed.includes(levelId)) return true;
+    if (levelId === 'glade-1') return true;
+    if (levelId === 'glade-2') return a.nestLevel > 0 && p.completed.includes('glade-1');
+    if (levelId === 'glade-3') return p.completed.includes('glade-2');
+    if (['glade-4', 'glade-5', 'glade-6'].includes(levelId)) {
+      if (!a.revealed.includes('trail')) return false;
+      return levelId === 'glade-4' || a.fragments.includes('captain')
+        || p.completed.includes(levelId === 'glade-5' ? 'glade-4' : 'glade-5');
+    }
+    if (levelId.startsWith('cheerlet-')) return a.revealed.includes('beyond') && (levelId === 'cheerlet-1' || p.completed.includes(levelId === 'cheerlet-2' ? 'cheerlet-1' : 'cheerlet-2'));
   }
   const d = getDuel(levelId);
   const r = getRegion(d.regionId);
@@ -74,6 +79,8 @@ export function grantResult(p: Profile, result: DuelResult): Profile {
 }
 export function purchase(p: Profile, id: string): Profile {
   if (p.adventure && p.adventure.nestLevel === 0 && !p.adventure.legacy) throw new Error("Repair your nest first");
+  if (p.adventure && !p.adventure.legacy && !p.adventure.revealed.includes('trail')) throw new Error('Save your coins for the first Dream Mist reveal');
+  if (p.adventure && id === 'cheerlet') return worldAction(p, 'reveal-beyond');
   const item = COLLECTION.find((i) => i.id === id);
   if (item) {
     const list = item.kind === "skin" ? p.skins : p.wisps;

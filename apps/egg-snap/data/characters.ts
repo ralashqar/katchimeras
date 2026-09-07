@@ -1,0 +1,98 @@
+// Authored character identities shared by campaign, collection and art tooling.
+export const CHARACTERS = [
+  {
+    "id": "tuck",
+    "name": "Tuck",
+    "title": "Acorn Tollkeeper",
+    "design": "cream speckled egg, oversized brown acorn cap with stem, green leaf vest, tiny wooden stamp",
+    "encounter": "glade-1",
+    "before": "Road toll! One shiny thing. Or a sandwich.",
+    "after": "That badge was doing most of the work."
+  },
+  {
+    "id": "bramble",
+    "name": "Bramble",
+    "title": "Fox Courier",
+    "design": "tangerine egg shell, cream belly, large fox ears, curled orange tail, small green satchel",
+    "encounter": "glade-2",
+    "before": "Express delivery! Unfortunately, it is another toll.",
+    "after": "I may have delivered that to myself."
+  },
+  {
+    "id": "morel",
+    "name": "Morel",
+    "title": "Mushroom Bandit",
+    "design": "cream egg, russet mushroom cap, black cloth eye mask, red scarf, tiny seed pouch",
+    "encounter": "glade-3",
+    "before": "Those traps are decorative gardening.",
+    "after": "Fine. Aggressively decorative."
+  },
+  {
+    "id": "pollen",
+    "name": "Pollen",
+    "title": "Pocket Gardener",
+    "design": "cream egg, moss curls around face, tiny flowers, leafy mitts, sprouting crown",
+    "encounter": "glade-4",
+    "before": "They charged my flowers a shade tax!",
+    "after": "Let us grow something better than toll booths."
+  },
+  {
+    "id": "hoot",
+    "name": "Sir Hoot",
+    "title": "Permit Inspector",
+    "design": "tawny owl egg, sculpted feather brows and winglets, small orange beak, tiny brass badge",
+    "encounter": "glade-4",
+    "before": "Do you have a permit for that shell?",
+    "after": "I appear to have filed my dignity incorrectly."
+  },
+  {
+    "id": "boggle",
+    "name": "Boggle",
+    "title": "Bog Bailiff",
+    "design": "olive frog egg, raised eye bumps, lily leaf collar, tiny muddy boots",
+    "encounter": "glade-5",
+    "before": "This puddle is private property.",
+    "after": "You may keep the puddle. It leaks."
+  },
+  {
+    "id": "captain-crack",
+    "name": "Captain Crack",
+    "title": "Acorn Admiral",
+    "design": "broad walnut armoured egg, enormous acorn helmet, green leaf cape, polished golden shell badge",
+    "encounter": "glade-6",
+    "before": "By the authority of my extremely important hat!",
+    "after": "I thought it said Golden Sheriff."
+  },
+  {
+    "id": "pipistrelle",
+    "name": "Pipistrelle",
+    "title": "Night Post",
+    "design": "plum bat egg, huge purple ears, compact folded bat wings, moon shaped mail clasp",
+    "encounter": "cheerlet-1",
+    "before": "Urgent warning! Dated yesterday.",
+    "after": "Please sign here to confirm you already knew."
+  },
+  {
+    "id": "cinder",
+    "name": "Cinder",
+    "title": "Campfire Cook",
+    "design": "charcoal egg with glowing warm orange ember seams, tiny stone hands and feet, soot stained small apron",
+    "encounter": "cheerlet-2",
+    "before": "Would you like your picnic toasted or geological?",
+    "after": "Next time I will try a smaller volcano."
+  },
+  {
+    "id": "prism",
+    "name": "Prism",
+    "title": "Crystal Surveyor",
+    "design": "pale lavender stone egg, chunky amethyst growths, crooked small surveyor sash",
+    "encounter": "cheerlet-3",
+    "before": "According to my map, your garden belongs to me.",
+    "after": "Oh. I was holding the map upside down."
+  }
+] as const;
+export type CharacterId = (typeof CHARACTERS)[number]["id"];
+export const characterById = (id: string) => CHARACTERS.find(c => c.id === id);
+export const characterForEncounter = (id: string) => CHARACTERS.find(c => c.encounter === id && c.id !== "pollen");
+export const EXPRESSIONS = ["neutral", "half-blink", "closed-blink", "determined", "attack", "hurt", "surprised", "happy", "defeated", "talking"] as const;
+export type CharacterExpression = typeof EXPRESSIONS[number];

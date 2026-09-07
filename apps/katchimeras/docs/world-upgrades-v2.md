@@ -13,6 +13,13 @@ selection so their exit and return can animate. Purchase confirmation waits for
 the panel's 140ms exit before invoking the existing purchase or tutorial handler.
 The transparent outside target consumes the tap; it never passes it to a tile.
 
+The upgrade tutorial coachmark is owned by the screen overlay, outside the
+card's transform and clipping. The card publishes readiness and layout/scroll
+revisions, hides the guide during history or purchase, and scrolls the tutorial
+action into view on short screens. Coachmarks convert target window coordinates
+to their overlay's coordinates and measure the speech bubble before positioning
+it above/below the target; the upgrade action remains tappable.
+
 ## Content
 
 `features/world-upgrades/world-upgrade-stories.ts` contains all 26 current steps,
@@ -37,7 +44,9 @@ X/outside/Back cannot skip it. Each advance saves the cursor before revealing th
 next line. Failed writes retain the gate with Retry. Tutorial handoffs and reward
 toasts wait for completion. If interrupted, the existing receipt-backed reveal
 replays without charging again, then resumes the saved cursor and requires the
-final Continue. This also applies to the Garden and mist tutorial reveals.
+final Continue. The first Garden restoration in `mossprout-first-session` and Steppling clearing
+in `glow-steppling-discovery` skip this extra splash and immediately continue
+their existing FTUE dialogue after the reveal. Ordinary purchases retain it.
 
 Portraits reuse `HavenCharacterPortrait` from the top-level world selector: a
 cream-rimmed green circle with character art overlapping it. Speech bubbles use
@@ -80,3 +89,8 @@ previews. Native visual verification is required before treating layout as appro
 The two supplied reference images guide the split between the requirements card
 and the separate ribbon-and-dialogue splash. The implementation keeps the game's
 existing fonts, circular portraits, Glow art and shared CTA.
+
+Tutorial marker spotlights measure a separate camera-scaled visual envelope,
+including the badge's intrinsic height, percentage, tail, rim and maximum pulse.
+The 68-point tap target stays independent. Layout changes invalidate the saved
+spotlight measurement; hidden markers unregister their targets.

@@ -57,6 +57,9 @@ export function CompanionFtueCoachmark({
   targetRevision?: number;
 }) {
   const { height, width } = useWindowDimensions();
+  const rootRef = useRef<ViewType>(null);
+  const [viewport, setViewport] = useState({ width, height });
+  const [calloutHeight, setCalloutHeight] = useState(0);
   const { equippedFaceId, equippedSkinId } = useEggAvatar();
   const reduceMotion = useReducedMotion();
   const continuingRef = useRef(false);
@@ -124,14 +127,18 @@ export function CompanionFtueCoachmark({
 
   useEffect(() => {
     let cancelled = false;
-    const measure = () => targetRef.current?.measureInWindow((x, y, targetWidth, targetHeight) => {
-      if (cancelled || targetWidth <= 0 || targetHeight <= 0) return;
-      const padding = 7;
-      setFocus({
-        x: Math.max(8, x - padding),
-        y: Math.max(8, y - padding),
-        width: Math.min(width - 16, targetWidth + padding * 2),
-        height: targetHeight + padding * 2,
+    const measure = () => rootRef.current?.measureInWindow((rootX, rootY, rootWidth, rootHeight) => {
+      if (cancelled || rootWidth <= 0 || rootHeight <= 0) return;
+      setViewport({ width: rootWidth, height: rootHeight });
+      targetRef.current?.measureInWindow((x, y, targetWidth, targetHeight) => {
+        if (cancelled || targetWidth <= 0 || targetHeight <= 0) return;
+        const padding = 7;
+        setFocus({
+          x: Math.max(8, x - rootX - padding),
+          y: Math.max(8, y - rootY - padding),
+          width: Math.min(rootWidth - 16, targetWidth + padding * 2),
+          height: targetHeight + padding * 2,
+        });
       });
     });
     const frame = requestAnimationFrame(measure);
@@ -143,37 +150,40 @@ export function CompanionFtueCoachmark({
     };
   }, [height, targetRef, targetRevision, width]);
 
-  if (!focus) return null;
-  const calloutWidth = Math.min(326, width - 28);
-  const estimatedHeight = buttonLabel ? 170 : 96;
+  if (!focus) return <View ref={rootRef} collapsable={false} pointerEvents="none" style={styles.root} />;
+  const screenWidth = viewport.width; const screenHeight = viewport.height;
+  const calloutWidth = Math.min(326, screenWidth - 28);
+  const estimatedHeight = calloutHeight || (buttonLabel ? 170 : 96);
   const belowTop = focus.y + focus.height + 14;
   const aboveTop = focus.y - estimatedHeight - 14;
-  const canFitBelow = belowTop + estimatedHeight <= height - 18;
+  const canFitBelow = belowTop + estimatedHeight <= screenHeight - 18;
   const canFitAbove = aboveTop >= 18;
   const calloutBelow = placement === 'below'
     ? canFitBelow || !canFitAbove
     : !(canFitAbove || !canFitBelow);
   const calloutTop = Math.max(18, Math.min(
-    height - estimatedHeight - 18,
+    screenHeight - estimatedHeight - 18,
     calloutBelow ? belowTop : aboveTop,
   ));
-  const calloutLeft = Math.max(14, Math.min(width - calloutWidth - 14, focus.x + focus.width / 2 - calloutWidth / 2));
+  const calloutLeft = Math.max(14, Math.min(screenWidth - calloutWidth - 14, focus.x + focus.width / 2 - calloutWidth / 2));
   const tailLeft = Math.max(38, Math.min(calloutWidth - 34, focus.x + focus.width / 2 - calloutLeft - 10));
   const spotlightRadius = Math.min(26, focus.height / 2);
-  const fingerLeft = Math.max(4, Math.min(width - HAND_SIZE - 4, focus.x + focus.width / 2 - HAND_SIZE * HAND_TIP_X));
-  const fingerTop = Math.max(4, Math.min(height - HAND_SIZE - 4, focus.y + focus.height / 2 - HAND_SIZE * HAND_TIP_Y));
+  const fingerLeft = Math.max(4, Math.min(screenWidth - HAND_SIZE - 4, focus.x + focus.width / 2 - HAND_SIZE * HAND_TIP_X));
+  const fingerTop = Math.max(4, Math.min(screenHeight - HAND_SIZE - 4, focus.y + focus.height / 2 - HAND_SIZE * HAND_TIP_Y));
 
   return (
     <Animated.View
+      ref={rootRef}
+      collapsable={false}
       accessibilityViewIsModal={Boolean(buttonLabel)}
       entering={FadeIn.duration(180)}
       exiting={FadeOut.duration(130)}
       pointerEvents={buttonLabel ? 'auto' : 'box-none'}
       style={styles.root}>
       <View pointerEvents="none" style={styles.spotlightLayer}>
-        <Spotlight focus={focus} opacity={.62} radius={spotlightRadius} screen={{ x: 0, y: 0, width, height }} />
+        <Spotlight focus={focus} opacity={.62} radius={spotlightRadius} screen={{ x: 0, y: 0, width: screenWidth, height: screenHeight }} />
       </View>
-      <SpeechTooltip left={calloutLeft} top={calloutTop} width={calloutWidth} tailLeft={tailLeft} below={calloutBelow} interactive={Boolean(buttonLabel)}>
+      <SpeechTooltip onLayout={(event) => setCalloutHeight(event.nativeEvent.layout.height)} left={calloutLeft} top={calloutTop} width={calloutWidth} tailLeft={tailLeft} below={calloutBelow} interactive={Boolean(buttonLabel)}>
         <Animated.View
           accessibilityLabel="Your Egg is showing you around"
           pointerEvents="none"

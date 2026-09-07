@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 
 /** Katchimeras FTUE bubble shell. Host supplies its text/avatar and measured placement. */
-export function SpeechTooltip({ children, left, top, width, tailLeft, below, interactive = false, style }: {
+export function SpeechTooltip({ children, left, top, width, tailLeft, below, interactive = false, style, onLayout }: {
   children: ReactNode; left: number; top: number; width: number;
   tailLeft: number; below: boolean; interactive?: boolean; style?: StyleProp<ViewStyle>;
+  onLayout?: (event: LayoutChangeEvent) => void;
 }) {
-  return <View accessibilityLiveRegion="polite" pointerEvents={interactive ? 'auto' : 'none'} style={[styles.callout, { left, top, width }, style]}>
+  return <View onLayout={onLayout} accessibilityLiveRegion="polite" pointerEvents={interactive ? 'auto' : 'none'} style={[styles.callout, { left, top, width }, style]}>
     <View pointerEvents="none" style={[styles.speechTail, below ? styles.speechTailAbove : styles.speechTailBelow, { left: tailLeft }]} />
     {children}
   </View>;

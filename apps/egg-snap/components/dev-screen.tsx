@@ -21,6 +21,7 @@ export default function DevScreen() {
   if (!__DEV__) return <Scene><Button onPress={() => router.dismissTo('/')}>Return home</Button></Scene>;
   return <Scene><View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}><DeveloperProfilePanel enabled={__DEV__} title="Egg Snap · Developer" diagnostics={JSON.stringify({ coins: profile?.coins, world: profile?.adventure, pendingResult: profile?.pendingResult }, null, 2)} actions={[
     { label: 'Return to game', run: async () => { router.dismissTo('/'); } },
+    { label: 'Character gallery', run: async () => { router.replace('/character-gallery'); } },
     { label: 'Mechanics arena', run: async () => { router.replace('/arena'); } },
     { label: 'Capture profile', run: async () => { await devStorage.write('snapshot', JSON.stringify(await snapshots.capture())); } },
     { label: 'Restore captured profile', run: async () => { const value = await devStorage.read('snapshot'); if (!value) throw new Error('Capture a profile first'); await restore(JSON.parse(value)); } },

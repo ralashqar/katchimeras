@@ -104,11 +104,11 @@ test('panel waits for exit animation, keeps shortage explicit, and reading never
     '@/components/katchadeck/onboarding/companion-ftue-coachmark': { CompanionFtueCoachmark: host('Coachmark') },
   }, { setTimeout, clearTimeout, requestAnimationFrame: (callback: () => void) => { frames.push(callback); return frames.length; }, cancelAnimationFrame() {} });
   const Panel = module.WorldUpgradePanel as React.ComponentType<Record<string, unknown>>;
-  let closes = 0; let purchases = 0;
+  let closes = 0; let purchases = 0; let scrollsToAction = 0;
   const world = { ...initial(), coins: 0 };
   const props = { world, offer: worldUpgradeOffers(world)[0], busy: false, actionRef: { current: null }, onClose: () => closes++, onConfirm: () => purchases++, onGarden() {}, saveRead: async (...args: unknown[]) => { readCalls.push(args); } };
   let tree: ReactTestRenderer;
-  await act(async () => { tree = create(<Panel {...props} />); motion.advance(400); });
+  await act(async () => { tree = create(<Panel {...props} />, { createNodeMock: (element) => element.type === 'ScrollView' ? { scrollToEnd: () => scrollsToAction++ } : null }); motion.advance(400); });
   const panelMotion = () => tree!.root.findByType(host('AnimatedView')).props.style[2].read();
   assert.equal(panelMotion().opacity, 0, 'cold mount is invisible until native layout completes');
   assert.equal(panelMotion().transform[0].scale, 1, 'first scroll measurement happens at full scale');
@@ -138,6 +138,24 @@ test('panel waits for exit animation, keeps shortage explicit, and reading never
   await act(async () => scroller.props.onLayout({ nativeEvent: { layout: { width: 332, height: 440 } } }));
   assert.equal(tree!.root.findByType(host('AnimatedView')).props.style[1].height, 530);
   assert.equal(frames.length, 0, 'resizing does not replay the bounce');
+  const coachStates: { visible: boolean; revision: number }[] = [];
+  const onCoachmarkChange = (state: { visible: boolean; revision: number }) => coachStates.push(state);
+  await act(async () => tree!.update(<Panel {...props} world={{ ...world, coins: 20 }} coached onCoachmarkChange={onCoachmarkChange} />));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 430)); });
+  assert.equal(coachStates.at(-1)?.visible, true, 'settled affordable tutorial publishes a screen-level guide');
+  assert.equal(tree!.root.findAllByType(host('Coachmark')).length, 0, 'guide is never nested inside the clipped popup');
+  assert.ok(scrollsToAction > 0, 'tutorial brings the upgrade action into view');
+  await act(async () => scroller.props.onContentSizeChange(332, 700));
+  await act(async () => scroller.props.onLayout({ nativeEvent: { layout: { width: 332, height: 560 } } }));
+  assert.equal(coachStates.at(-1)?.visible, false, 'offscreen action is not spotlighted');
+  await act(async () => scroller.props.onScroll({ nativeEvent: { contentOffset: { y: 140 } } }));
+  assert.equal(coachStates.at(-1)?.visible, true, 'guide follows the visible scrolled action');
+  await act(async () => tree!.root.findAllByType(host('Pressable')).find((node) => node.props.accessibilityLabel === 'Expand story history')!.props.onPress());
+  assert.equal(coachStates.at(-1)?.visible, false, 'history hides the upgrade guide');
+  await act(async () => tree!.root.findByType(host('Narrative')).props.onClose());
+  assert.equal(coachStates.at(-1)?.visible, true);
+  await act(async () => tree!.update(<Panel {...props} onCoachmarkChange={onCoachmarkChange} />));
+  assert.equal(coachStates.at(-1)?.visible, false, 'shortage hides the purchase guide');
   const buy = tree!.root.findAllByType(host('Button')).find((node) => node.props.label === 'Restore')!;
   assert.equal(buy.props.disabled, true); assert.equal(buy.props.cost.amount, 20);
   assert.equal(tree!.root.findAllByType(host('Narrative')).length, 0);

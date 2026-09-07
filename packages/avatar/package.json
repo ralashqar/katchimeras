@@ -8,7 +8,8 @@
     "./energy": "./src/energy.tsx",
     "./feed-motion": "./src/feed-motion.ts",
     "./motion-timing": "./src/motion-timing.ts",
-    "./customizer": "./src/customizer.tsx"
+    "./customizer": "./src/customizer.tsx",
+    "./character-expressions": "./src/character-expressions.ts"
   },
   "files": [
     "src"

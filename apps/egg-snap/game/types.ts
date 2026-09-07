@@ -27,6 +27,8 @@ export type DuelDefinition = {
   name: string;
   rival: string;
   skin: string;
+  characterId?: string;
+  victoryDialogue?: string;
   health: number;
   opponentHealth?: number;
   progression: Progression;

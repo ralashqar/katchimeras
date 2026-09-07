@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, findNodeHandle, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withSequence, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
@@ -21,27 +21,29 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   const visibility = useSharedValue(0);
   const wasSelected = useRef(false);
   const node = useRef<View | null>(null);
+  const button = useRef<View | null>(null);
+  const [bubbleHeight, setBubbleHeight] = useState(MARKER_SIZE);
   useEffect(() => {
     visibility.value = hidden ? withTiming(0, { duration: reduced ? 80 : 140 })
       : reduced ? withTiming(1, { duration: 100 }) : withSpring(1, { damping: 12, stiffness: 220, mass: 0.7 });
     if (selected) wasSelected.current = true;
     if (!hidden && wasSelected.current) {
       wasSelected.current = false;
-      const timer = setTimeout(() => { const handle = findNodeHandle(node.current); if (handle) AccessibilityInfo.setAccessibilityFocus(handle); }, reduced ? 100 : 300);
+      const timer = setTimeout(() => { const handle = findNodeHandle(button.current); if (handle) AccessibilityInfo.setAccessibilityFocus(handle); }, reduced ? 100 : 300);
       return () => clearTimeout(timer);
     }
   }, [hidden, selected, reduced, visibility]);
   const glowProgress = offer.cost > 0 ? Math.max(0, Math.min(offer.cost, offer.cost - offer.missingGlow)) : 1;
   const glowTotal = Math.max(1, offer.cost);
-  const target = useCallback((view: View | null) => { node.current = view; onTargetChange?.(offer.id, moving ? null : view); }, [moving, offer.id, onTargetChange]);
-  useEffect(() => { onTargetChange?.(offer.id, moving ? null : node.current); return () => onTargetChange?.(offer.id, null); }, [moving, offer.id, onTargetChange]);
+  const target = useCallback((view: View | null) => { node.current = view; onTargetChange?.(offer.id, moving || hidden ? null : view); }, [moving, hidden, offer.id, onTargetChange]);
+  useEffect(() => { onTargetChange?.(offer.id, moving || hidden ? null : node.current); return () => onTargetChange?.(offer.id, null); }, [moving, hidden, offer.id, onTargetChange]);
   useEffect(() => {
     pulse.value = offer.affordable && !reduced ? withRepeat(withSequence(withTiming(1.045, { duration: 850 }), withTiming(1, { duration: 850 })), -1) : 1;
     return () => cancelAnimation(pulse);
   }, [offer.affordable, pulse, reduced]);
   // Center the bubble just above the stairs in the lower part of the tile.
   // Artwork scales with the world; the screen-space hit target remains usable
-  // when zoomed out and also gives coachmarks a stable accessible target.
+  // when zoomed out. Tutorial measurement separately covers the painted badge.
   const projection = useAnimatedStyle(() => ({ transform: [
     { translateX: sceneWidth / 2 + cameraX.value + (frame.left + frame.width / 2 - sceneWidth / 2) * cameraScale.value - MARKER_SIZE / 2 },
     { translateY: sceneHeight / 2 + cameraY.value + (frame.top + frame.height * 0.62 - sceneHeight / 2) * cameraScale.value - MARKER_SIZE / 2 },
@@ -49,12 +51,23 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   const motion = useAnimatedStyle(() => ({ opacity: visibility.value, transform: [{
     scale: frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value * (reduced ? 1 : visibility.value),
   }] }));
+  // Stable envelope at the maximum pulse, independent of the entrance scale.
+  // Include the intrinsic percentage row, top tail, rim and shadow. Measuring
+  // the 68px press target clipped these whenever the world camera zoomed in.
+  const spotlightBounds = useAnimatedStyle(() => {
+    const scale = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * 1.08;
+    return { width: (MARKER_SIZE + 8) * scale, height: (bubbleHeight + 18) * scale,
+      left: MARKER_SIZE / 2 - (MARKER_SIZE / 2 + 4) * scale,
+      top: MARKER_SIZE / 2 - (bubbleHeight / 2 + 12) * scale };
+  });
   return <Animated.View pointerEvents={hidden ? 'none' : 'box-none'} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} style={[styles.position, projection]}>
-      <Pressable ref={target} collapsable={false} accessibilityRole="button" accessibilityLabel={`${offer.action} ${offer.name}, ${offer.cost} Glow`}
+      <Animated.View ref={target} collapsable={false} pointerEvents="none" accessible={false}
+        onLayout={() => { onTargetChange?.(offer.id, null); if (!moving && !hidden) onTargetChange?.(offer.id, node.current); }} style={[styles.spotlightTarget, spotlightBounds]} />
+      <Pressable ref={button} collapsable={false} accessibilityRole="button" accessibilityLabel={`${offer.action} ${offer.name}, ${offer.cost} Glow`}
         accessibilityValue={{ min: 0, max: glowTotal, now: glowProgress, text: offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
         accessibilityHint={offer.affordable ? 'Opens upgrade details' : `${offer.missingGlow} more Glow needed. Opens upgrade details.`}
         disabled={moving || hidden} onPress={() => onPress(offer)} style={styles.hitTarget}>
-      <Animated.View pointerEvents="none" style={[styles.bubble, motion]}>
+      <Animated.View pointerEvents="none" onLayout={(event) => setBubbleHeight(event.nativeEvent.layout.height)} style={[styles.bubble, motion]}>
         <Image source={offer.action === 'Clear mist' ? CLEAR_MIST_ART : UPGRADE_ART}
           style={styles.icon} contentFit="contain" transition={0} accessible={false} />
         <View pointerEvents="none" style={styles.progress}>
@@ -67,6 +80,7 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   </Animated.View>;
 }
 const styles = StyleSheet.create({
+  spotlightTarget: { position: 'absolute' },
   position: { position: 'absolute', left: 0, top: 0, width: 68, height: 68, zIndex: 18 },
   hitTarget: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center' },
   bubble: { width: 68, minHeight: 68, alignItems: 'center', justifyContent: 'center', padding: 2, borderRadius: 18,

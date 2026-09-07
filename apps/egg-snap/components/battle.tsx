@@ -178,9 +178,10 @@ function Battle({
   const reduced = useReducedMotion();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const playerArtId = profile?.adventure?.activeEgg && profile.adventure.activeEgg !== 'pip' ? profile.adventure.activeEgg : profile?.skin;
   const layout = useMemo(
-    () => battleLayout(width, height, insets.top, insets.bottom, definition.regionId === "glade" ? MOSSPROUT_DUEL : undefined, profile?.skin, definition.skin),
-    [width, height, insets.top, insets.bottom, definition.regionId, definition.skin, profile?.skin],
+    () => battleLayout(width, height, insets.top, insets.bottom, definition.regionId === "glade" ? MOSSPROUT_DUEL : undefined, playerArtId, definition.characterId ?? definition.skin),
+    [width, height, insets.top, insets.bottom, definition.regionId, definition.skin, definition.characterId, playerArtId],
   );
   const offset = useCombatOffset(run.beat, clock, state.beatStartedAt, layout.driftAmplitude, reduced);
   const rivalLayout = useMemo(() => opponentFieldLayout(layout), [layout]);
@@ -468,7 +469,7 @@ function Battle({
           max={definition.opponentHealth ?? definition.health} compact={height < 700} reduced={reduced} />
       </View>
       {!layout.stage && <View pointerEvents="none" style={{position: "absolute", left: (width-layout.opponentSize)/2, top: layout.opponentY}}><Egg
-          skin={definition.skin}
+          skin={definition.skin} characterId={definition.characterId}
           face={state.outcome === "won" || state.outcome === "draw" ? "surprise" : undefined} streak={state.opponent.run.combo} pulse={state.opponent.run.piecesPlaced} feedKey={opponentFireKey}
           size={layout.opponentSize}
           hitSignal={opponentHitSignal}
@@ -478,10 +479,10 @@ function Battle({
       {started && <OpponentField fighter={state.opponent} layout={rivalLayout} dy={rivalOffset.dy} clock={clock}
         reduced={reduced} paused={suspended || backgrounded} hidden={!!state.outcome} />}
       {layout.stage ? <>
-        <GroundedEgg placement={layout.stage.rival} skin={definition.skin}
+        <GroundedEgg placement={layout.stage.rival} skin={definition.skin} characterId={definition.characterId}
           health={opponentHealth} hatchAt={opponentHatchAt} clock={clock}
           face={state.outcome === "won" || state.outcome === "draw" ? "surprise" : undefined} streak={state.opponent.run.combo} pulse={state.opponent.run.piecesPlaced} feedKey={opponentFireKey} hitSignal={opponentHitSignal} paused={suspended} />
-        <GroundedEgg placement={layout.stage.player} skin={profile!.skin} hat={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.hat} held={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.held} face={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.face} streak={run.combo}
+        <GroundedEgg placement={layout.stage.player} skin={profile!.skin} characterId={profile!.adventure?.activeEgg === 'pip' ? undefined : profile!.adventure?.activeEgg} hat={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.hat} held={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.held} face={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.face} streak={run.combo}
           health={playerHealth} hatchAt={playerHatchAt} clock={clock}
           pulse={run.piecesPlaced} feedKey={fireKey} hitSignal={playerHitSignal} dizzySignal={playerDizzySignal} wisp={!!profile!.wisp} paused={suspended} />
       </> : (      <View
@@ -493,7 +494,7 @@ function Battle({
         }}
       >
         <Egg
-          skin={profile!.skin} hat={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.hat} held={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.held} face={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.face}
+          skin={profile!.skin} characterId={profile!.adventure?.activeEgg === 'pip' ? undefined : profile!.adventure?.activeEgg} hat={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.hat} held={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.held} face={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.face}
           streak={run.combo}
           pulse={run.piecesPlaced}
           feedKey={fireKey}

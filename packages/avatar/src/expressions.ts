@@ -18,6 +18,7 @@ type UseEggExpressionPlayerOptions<FaceId extends string = string> = {
   baseTransitionMs?: number;
   sequence?: readonly EggExpressionCue<FaceId>[];
   sequenceKey?: string | number;
+  paused?: boolean;
 };
 
 /**
@@ -33,6 +34,7 @@ export function useEggExpressionPlayer<FaceId extends string>({
   baseTransitionMs = 180,
   sequence,
   sequenceKey,
+  paused = false,
 }: UseEggExpressionPlayerOptions<FaceId>): EggExpressionPresentation<FaceId> {
   const [presentation, setPresentation] = useState<EggExpressionPresentation<FaceId>>({
     faceId: baseFaceId,
@@ -40,6 +42,7 @@ export function useEggExpressionPlayer<FaceId extends string>({
   });
 
   useEffect(() => {
+    if (paused) return;
     if (!sequence?.length) {
       setPresentation((current) => current.faceId === baseFaceId
         ? current
@@ -52,7 +55,7 @@ export function useEggExpressionPlayer<FaceId extends string>({
     }, cue.atMs));
 
     return () => timers.forEach(clearTimeout);
-  }, [baseFaceId, baseTransitionMs, sequence, sequenceKey]);
+  }, [baseFaceId, baseTransitionMs, sequence, sequenceKey, paused]);
 
   return presentation;
 }

@@ -12,11 +12,12 @@ import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { worldUpgradeStory } from '@/features/world-upgrades/world-upgrade-stories';
 import type { MergeWorldState } from '@/types/merge-world';
-import { CompanionFtueCoachmark } from '@/components/katchadeck/onboarding/companion-ftue-coachmark';
+export type UpgradeCoachmarkState = { visible: boolean; revision: number };
 
-export function WorldUpgradePanel({ offer, world, busy, error, coached = false, actionRef, onClose, onConfirm, onGarden, registerDismiss, saveRead }: {
+export function WorldUpgradePanel({ offer, world, busy, error, coached = false, actionRef, onClose, onConfirm, onGarden, registerDismiss, saveRead, onCoachmarkChange }: {
   offer: WorldUpgradeOffer; world: MergeWorldState; busy: boolean; error?: string | null; coached?: boolean;
   actionRef: RefObject<View | null>; onClose: () => void; onConfirm: () => void; onGarden: () => void;
+  onCoachmarkChange?: (state: UpgradeCoachmarkState) => void;
   registerDismiss?: (dismiss: (() => void) | null) => void;
   saveRead: (storyId: string, count: number) => Promise<unknown>;
 }) {
@@ -25,6 +26,8 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   const [availableHeight, setAvailableHeight] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const [scrollY, setScrollY] = useState(0);
   const [scrollHeight, setScrollHeight] = useState(0);
   const measured = availableHeight > 0 && headerHeight > 0 && contentHeight > 0;
   const panelHeight = measured ? Math.min(availableHeight, Math.ceil(headerHeight + contentHeight + 4)) : availableHeight;
@@ -35,6 +38,16 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   const closeRef = useRef<View>(null); const closeGuard = useRef(false);
   const affordable = world.coins >= offer.cost;
   const story = worldUpgradeStory(offer.id, offer.nextLevel);
+  const coachVisible = settled && layoutReady && coached && affordable && !busy && !closing && !history
+    && scrollY >= contentHeight - scrollHeight - 1;
+  useEffect(() => {
+    if (settled && layoutReady && coached && affordable && !history) scrollRef.current?.scrollToEnd({ animated: false });
+  }, [settled, layoutReady, coached, affordable, history, contentHeight, scrollHeight]);
+  useEffect(() => {
+    onCoachmarkChange?.({ visible: coachVisible, revision: panelHeight + scrollY });
+  }, [coachVisible, onCoachmarkChange, panelHeight, scrollY]);
+  useEffect(() => () => onCoachmarkChange?.({ visible: false, revision: 0 }), [onCoachmarkChange]);
+
   useEffect(() => {
     if (!entranceReady) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -87,7 +100,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
         <View style={styles.heading}><Text style={styles.title}>{offer.name}</Text><Text style={styles.level}>Level {offer.currentLevel} / {offer.maxLevel}</Text></View>
         <Pressable ref={closeRef} accessibilityRole="button" accessibilityLabel="Close upgrade" disabled={busy || closing} onPress={dismiss} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
       </View>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.baseInfo} showsVerticalScrollIndicator removeClippedSubviews={false}
+      <ScrollView ref={scrollRef} onScroll={(event) => setScrollY(event.nativeEvent.contentOffset.y)} scrollEventThrottle={32} style={styles.scroll} contentContainerStyle={styles.baseInfo} showsVerticalScrollIndicator removeClippedSubviews={false}
         onContentSizeChange={(_width, height) => setContentHeight(height)}
         onLayout={(event) => setScrollHeight(event.nativeEvent.layout.width > 0 ? event.nativeEvent.layout.height : 0)} scrollEnabled={!measured || contentHeight > scrollHeight + 1}>
         <Text style={styles.sectionTitle}>Required</Text>
@@ -99,8 +112,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
         </View>
         {controls(true)}
       </ScrollView>
-      {settled && coached && affordable && !busy && !closing && !history ? <CompanionFtueCoachmark targetRef={actionRef} placement="above" showFinger
-        message={[{ text: `Use ${offer.cost} ` }, { emphasis: true, text: 'Glow' }, { text: offer.action === 'Clear mist' ? ' to clear this mist.' : ' to restore the Garden.' }]} /> : null}
+
     </Animated.View>
     </View>
     {history ? <WorldUpgradeNarrative offer={offer} world={world} saveRead={saveRead} onClose={dismissHistory} /> : null}

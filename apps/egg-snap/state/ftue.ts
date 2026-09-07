@@ -19,8 +19,12 @@ export function reconcileFtue(profile: Profile): Promise<ContentFlowRun> {
     let run = await storyRepository.loadContentFlowRun(FTUE_ID) ?? await ftueDirector.startContentFlow(FTUE, { runId: FTUE_ID });
     const a = profile.adventure!;
     const done: Record<string, boolean> = {
-      battle: a.fragments.includes('road'), repair: a.nestLevel > 0, mist: a.revealed.includes('trail'),
-      trail: profile.completed.includes('glade-2'), chest: a.claims.includes('chest'), rescue: a.eggs.includes('pollen'), boss: a.fragments.includes('captain'),
+      battle: a.fragments.includes('road'),
+      repair: a.nestLevel > 0 && a.pendingPresentation?.action !== 'repair',
+      'home-two': profile.completed.includes('glade-2') || a.revealed.includes('trail'),
+      'home-three': profile.completed.includes('glade-3') || a.revealed.includes('trail'),
+      mist: a.revealed.includes('trail') && a.pendingPresentation?.action !== 'clear-mist',
+      rescue: a.eggs.includes('pollen'), guard: profile.completed.includes('glade-5') || a.fragments.includes('captain'), boss: a.fragments.includes('captain'),
     };
     while (run.status !== 'completed' && done[run.nodeId]) {
       const next = await ftueDirector.dispatchContentFlowCommand(FTUE_ID, { type: 'record_event', event: {

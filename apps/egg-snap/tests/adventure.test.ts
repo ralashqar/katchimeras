@@ -2,7 +2,7 @@ import { planBeat } from '@incubator/tile-match/engine';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { freshProfile, grantResult, canPlay, createProfileRepository, type Profile } from '../state/profile';
-import { worldAction, migrateProfile, selectEgg, customize } from '../state/adventure';
+import { worldAction, finishWorldPresentation, migrateProfile, selectEgg, customize } from '../state/adventure';
 import { createKeyValueStoryRepository } from '@incubator/story-expo/key-value-repository';
 import { createContentFlowCatalog } from '@incubator/story/catalog';
 import { createContentFlowEffects } from '@incubator/story/effects';
@@ -54,21 +54,28 @@ test('first session gates, repairs, rescue and boss rewards commit once without 
   p = worldAction(p, 'repair');
   assert.equal(p.coins, 0);
   assert.equal(worldAction(p, 'repair'), p);
-  p = worldAction(p, 'clear-mist');
+  p = finishWorldPresentation(p, 'world:repair');
   assert.ok(canPlay(p, 'glade-2'));
-  assert.throws(() => worldAction(p, 'chest'));
+  assert.throws(() => worldAction(p, 'clear-mist'));
   p = grantResult(p, win('glade-2'));
-  p = worldAction(p, 'chest');
-  assert.equal(worldAction(p, 'chest'), p);
   p = grantResult(p, win('glade-3'));
+  assert.equal(p.coins, 80);
+  assert.equal(canPlay(p, 'glade-4'), false);
+  p = worldAction(p, 'clear-mist');
+  assert.equal(p.coins, 0);
+  assert.equal(worldAction(p, 'clear-mist'), p);
+  p = finishWorldPresentation(p, 'world:clear-mist');
+  p = grantResult(p, win('glade-4'));
+  p = grantResult(p, win('glade-5'));
   assert.ok(canPlay(p, 'glade-6'));
   p = selectEgg(p, 'pollen');
-  p = customize(p, { face: 'grin', hat: 'party-cone' });
+  assert.throws(() => customize(p, {hat: 'party-cone'}));
+  p = customize(p, {face: 'happy'});
   p = selectEgg(p, 'pip');
   assert.equal(p.adventure!.appearances.pip.hat, null);
   p = selectEgg(p, 'pollen');
-  assert.equal(p.skin, 'honeycomb');
-  assert.equal(p.adventure!.appearances.pollen.hat, 'party-cone');
+  assert.equal(p.skin, 'pollen');
+  assert.equal(p.adventure!.appearances.pollen.face, 'happy');
   p = grantResult(p, win('glade-6'));
   p = grantResult(p, win('glade-6', 'replay'));
   assert.deepEqual(p.adventure!.fragments, ['road', 'captain']);
@@ -133,7 +140,7 @@ test('snapshot restore resumes after interruption and rejects cross-game snapsho
 
 test('opening opponent waits for the first successful snap; later fights keep standard damage', () => {
   const p = freshProfile();
-  for (const id of ['glade-1', 'glade-2', 'glade-3', 'glade-6']) validateDuel(ftueEncounter(getDuel(id), p));
+  for (const id of ['glade-1', 'glade-2', 'glade-3', 'glade-4', 'glade-5', 'glade-6']) validateDuel(ftueEncounter(getDuel(id), p));
   const definition = ftueEncounter(getDuel('glade-1'), p);
   let s = tickCombat(createCombat(definition, 'opening', 'opening'), 120000);
   assert.equal(s.playerHp, definition.health);
@@ -180,7 +187,7 @@ test('early opponents have short health budgets and the first fight stays basic 
 
 test('FTUE mixes favour standard doubles, introduce mechanics once, and never loop a special', () => {
   const p = freshProfile();
-  for (const id of ['glade-1', 'glade-2', 'glade-3', 'glade-6']) {
+  for (const id of ['glade-1', 'glade-2', 'glade-3', 'glade-4', 'glade-5', 'glade-6']) {
     const definition = ftueEncounter(getDuel(id), p);
     const plans = Array.from({ length: 30 }, (_, index) => planBeat(definition.progression, index, 0, 123));
     assert.equal(plans[0].varieties.length, 0);

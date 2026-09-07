@@ -20,7 +20,11 @@
     "./sky-motion": "./src/sky-motion.ts",
     "./hex-camera": "./src/hex-camera.ts",
     "./hex-camera-math": "./src/hex-camera-math.ts",
-    "./mossprout-layout": "./src/mossprout-layout.ts"
+    "./mossprout-layout": "./src/mossprout-layout.ts",
+    "./upgrade-sequence": "./src/upgrade-sequence.ts",
+    "./mossprout-scene": "./src/mossprout-scene.ts",
+    "./tile-alignment": "./src/tile-alignment.ts",
+    "./resident-presentation": "./src/resident-presentation.ts"
   },
   "files": [
     "src"

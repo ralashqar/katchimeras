@@ -16,11 +16,16 @@ export function ftueEncounter(base: DuelDefinition, profile: Profile): DuelDefin
   if (!profile.adventure || profile.adventure.legacy || profile.completed.includes(base.id)) return base;
   const common = { ...base, guided: true, ai: { minActionMs: 4400, maxActionMs: 6000, accuracy: .68 } };
   switch (base.id) {
-    case 'glade-1': return { ...common, rival: 'Roadblock', name: 'Fresh shell', openingGate: 1, opponentHealth: 36,
-      progression: encounterMix(['tap', 'tap', 'drift', 'tap', 'tap', 'tap'], true), dialogue: ['Fresh shell? This’ll be over easy.'] };
-    case 'glade-2': return { ...common, opponentHealth: 60, rival: 'Sir Omelette', name: 'A rigged road', progression: encounterMix(['tap', 'bomb', 'tap', 'tap', 'drift', 'tap', 'tap', 'tap']), dialogue: ['Mind the explosive decoration.'] };
-    case 'glade-3': return { ...common, opponentHealth: 64, rival: 'Banner Bandit', name: 'A friend in a flap', progression: encounterMix(['tap', 'armour', 'tap', 'tap', 'drift', 'tap', 'tap', 'tap']), dialogue: ['This banner is absolutely regulation size.'] };
-    case 'glade-6': return { ...common, opponentHealth: 120, rival: 'Captain Crack', name: 'The captain', ai: { minActionMs: 2600, maxActionMs: 3600, accuracy: .78 }, progression: encounterMix(['tap', 'bomb', 'tap', 'tap', 'armour', 'tap', 'drift', 'tap', 'tap', 'tap']), dialogue: ['Nobody gets past my incredibly important hat.'] };
+    case 'glade-1': return { ...common, openingGate: 1, opponentHealth: 36,
+      progression: encounterMix(['tap', 'tap', 'drift', 'tap', 'tap', 'tap'], true) };
+    case 'glade-3': return { ...common, opponentHealth: 64, progression: encounterMix(['tap', 'bomb', 'tap', 'tap', 'drift', 'tap', 'tap', 'tap']) };
+    case 'glade-4': return { ...common, opponentHealth: 64, progression: encounterMix(['tap', 'armour', 'tap', 'tap', 'drift', 'tap', 'tap', 'tap']) };
+    case 'glade-2': return { ...common, opponentHealth: 60, progression: encounterMix(['tap', 'tap', 'drift', 'tap', 'tap', 'tap']) };
+    case 'glade-5': return { ...common, opponentHealth: 80, progression: encounterMix(['tap', 'bomb', 'tap', 'tap', 'armour', 'tap', 'drift', 'tap']) };
+    case 'glade-6': return { ...common, opponentHealth: 120, ai: { minActionMs: 2600, maxActionMs: 3600, accuracy: .78 }, progression: encounterMix(['tap', 'bomb', 'tap', 'tap', 'armour', 'tap', 'drift', 'tap', 'tap', 'tap']) };
+    case 'cheerlet-1': return {...common, opponentHealth: 90};
+    case 'cheerlet-2': return {...common, opponentHealth: 100};
+    case 'cheerlet-3': return {...common, opponentHealth: 140};
     default: return base;
   }
 }

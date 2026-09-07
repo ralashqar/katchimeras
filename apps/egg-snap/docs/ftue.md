@@ -1,6 +1,6 @@
 # Egg Snap first-session implementation
 
-Fresh profile → guided road battle → repair Training Nest → clear Dream Mist → bomb battle → chest → armour/rescue Pollen → Captain Crack → nest upgrade gift and campaign expansion.
+Fresh profile → short opening battle → repair the central nest (40 coins) → two more home battles → unveil the neighboring Dream Mist hex (80 coins) → three-battle campaign with Pollen rescue and Captain Crack → nest upgrade gift and paid expansion.
 
 ## Shared technology
 
@@ -18,25 +18,27 @@ Katchimeras retains compatibility adapters and its inventory/economy, virtualize
 
 ## Gameplay adaptation
 
-The tutorial uses the mechanics already implemented by the shared engine: order bombs must be made safe before the rigged piece, and armour requires repeated matching placements. They are not an offensive Eggsplosive or a defensive Hard-Boiled shield. The first enemy waits for the first successful snap; the opening moves from one guided piece to standard doubles with one gentle breeze round, and near-correct initial drops magnetize within one cell pitch. Early opponents use 36/60/64/120 HP while player health stays unchanged; damage and outcomes remain honest. The opening teaches snapping with a brief late breeze, the road fight introduces defusing bombs, and the rescue introduces armour. Standard two-piece rounds are the default in all of them. Specials occur once in each authored sequence; prolonged fights continue on standard doubles rather than looping specials. There is no forced boss comeback.
+The tutorial uses the mechanics already implemented by the shared engine: order bombs must be made safe before the rigged piece, and armour requires repeated matching placements. They are not an offensive Eggsplosive or a defensive Hard-Boiled shield. The first enemy waits for the first successful snap; the opening moves from one guided piece to standard doubles with one gentle breeze round, and near-correct initial drops magnetize within one cell pitch. Early opponents use 36/60/64/64/80/120 HP while player health stays unchanged; damage and outcomes remain honest. The opening teaches snapping with a brief late breeze, the third home fight introduces defusing bombs, and the rescue introduces armour. Standard two-piece rounds are the default in all of them. Specials occur once in each authored sequence; prolonged fights continue on standard doubles rather than looping specials. There is no forced boss comeback.
 
 The original projectile, crack, hatch and impact presentations remain. Each mechanic gets one saved lesson, dismissed after its first successful beat. The bomb notice pauses combat until the player taps “Show me how”, then pointers guide the safe shape and the defused shape. Existing currency and first-win rewards fund the first repair; no XP, energy, new currency or stat economy was added. Pip and Pollen have equal combat rules and separate body/face/hat/held selections. The captain unlocks a crown and one nest upgrade token.
 
-The map progressively exposes nearby tiles, retains the nest in the same camera scene, and changes tile art, flags and paths as milestones complete. Camera/upgrade presentation is disposable: committed progress remains valid after interruption. This is a working adaptation using existing art, not bespoke cinematic choreography for every beat in the original narrative spec.
+The sole world view uses the shared Mossprout seven-hex scene: central nest plus six Dream Mist neighbors. The first three battles belong to the home tile; the second clearing contains battles four through six. The initial 40-coin reward funds repair, and two further 40-coin first-win rewards fund the 80-coin reveal. Optional purchases are gated until this reveal. The second campaign funds the 180-coin next-region reveal. Each tile has one compact campaign card with progress, replay and next-battle controls.
+
+Both games use the extracted ground-bottom geometry, scene envelope and camera-settled upgrade phase controller. Egg Snap uses the existing tile crossfade renderer and currency/particle effects. A saved presentation receipt retains outgoing art until the camera, timeline and paint-ready crossfade finish. Interrupted presentations replay without spending again; matching acknowledgement clears the receipt. Inactive world/avatar screens remain unmounted, and presentation timers cancel on unmount. This is a working adaptation using existing art, not bespoke cinematic choreography for every beat in the original narrative spec.
 
 ## Persistence and reset
 
-`state/adventure.ts` owns migration and pure progression commands. Version-one saves preserve coins, equipment, receipts and completed encounters; returning players receive free nest repair access. Version-two profiles persist nest level, revealed areas, fragments, reward claims, rescued eggs and per-egg appearances.
+`state/adventure.ts` owns migration and pure progression commands. Version-one saves preserve coins, equipment, receipts and completed encounters; returning players receive free nest repair access. Version-two profiles now include nested world version 2 and pending presentation receipts. Migration preserves prior revealed tiles and earned rewards. Profiles persist nest level, revealed areas, fragments, reward claims, rescued eggs and per-egg appearances.
 
 Economic commands serialize through the profile repository and publish only after a successful write. Battle receipts and world claims prevent duplicate rewards. The FTUE director catches up from those durable domain facts on return to the world; restarting between an economic commit and a story event does not require replaying the payment. Web story updates serialize run and event records in one journal.
 
-Development builds expose **Dev** on the map and in battle pause controls. The panel supports capture, restore, rollback, fresh reset, mechanics arena and eight checkpoints through region completion. Profile and story domains restore together under a durable recovery journal; an interrupted restore resumes on boot. Cross-game snapshots are rejected. Controls are gated by `__DEV__`.
+Development builds expose **Dev** on the map and in battle pause controls. The panel supports capture, restore, rollback, fresh reset, mechanics arena and nine checkpoints through region completion. Profile and story domains restore together under a durable recovery journal; an interrupted restore resumes on boot. Cross-game snapshots are rejected. Controls are gated by `__DEV__`.
 
 ## Verification
 
 Automated coverage includes the complete economic progression, duplicate/concurrent claims, failed writes, legacy migration, per-egg appearance isolation, interrupted restore recovery, cross-game rejection, web event deduplication, every released FTUE graph stage after repository recreation, initial AI gating and near-drop assistance.
 
-Browser checks at a 390×844 viewport covered immediate battle entry, a real guided drag and projectile damage, nest repair, mist reveal/reload persistence, checkpoint restore, Pollen customization, region completion, gift upgrade and fresh reset. No browser console errors were observed during the final first-snap check.
+Current browser checkpoint checks covered the central six-mist layout, 40-coin repair, camera settling, 80-coin reveal and the second tile’s three-battle card. Automated checks pass 78 Egg Snap tests and 121 focused Katchimeras rendering/FTUE tests, plus both application and shared package typechecks and dependency boundaries. Shared lint has five existing warnings outside this change. Earlier battle/drag validation is recorded below; a new physical-device full-session pass remains outstanding.
 
 Run from the repository root:
 

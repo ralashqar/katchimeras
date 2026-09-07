@@ -1,3 +1,4 @@
+import { characterForEncounter } from './characters';
 import type { Progression } from '@incubator/tile-match/engine';
 import { isVarietyId } from '@incubator/tile-match/varieties';
 import { snapLadder } from './progression';
@@ -27,7 +28,7 @@ const duel = (id: string, name: string, rival: string, skin: string, health: num
   id, name, rival, skin, health, ai: opponent, progression, regionId: 'glade', reward: 40,
   dialogue: [`${rival}: A little spark has wandered into our glade.`, 'The same shapes, two little sparks. Let us play!'], tutorial,
 });
-export const DUELS: readonly DuelDefinition[] = [
+const ORIGINAL_DUELS: readonly DuelDefinition[] = [
   duel('glade-1', 'A little spark', 'Pip', 'moss', 300, ai(1530,2070,.75), snapLadder(),
     'We get the same shapes in the same order. Match the first outline; two pieces arrive next. Completed cells fly at your rival. Play accurately to build a stronger streak!'),
   duel('glade-2', 'Both sides now', 'Pollen', 'honeycomb', 370, ai(1350,1890,.81), snapLadder(true),
@@ -45,6 +46,14 @@ export const DUELS: readonly DuelDefinition[] = [
     'Two pieces make one big shape. Both eggs assemble the same puzzle. Match both halves before your cells fly.'), regionId: 'cheerlet',
     dialogue: ['Jig: Welcome to the Playfields! We like our puzzles in pieces.', 'Let us put something wonderful together.']},
 ];
+export const DUELS: readonly DuelDefinition[] = [...ORIGINAL_DUELS,
+  {...duel('cheerlet-2', 'Picnic emergency', 'Cinder', 'sunset', 300, ai(2300,3300,.78), mechanicSequence(['tap','bomb','tap','tap','drift','tap']), 'Clear the safe shape before the rigged shape.'), regionId: 'cheerlet', reward: 60},
+  {...duel('cheerlet-3', 'A crooked boundary', 'Prism', 'frost', 300, ai(2200,3200,.8), mechanicSequence(['tap','armour','tap','bomb','tap','drift','tap']), 'Use the mechanics you already know.'), regionId: 'cheerlet', boss: true, reward: 100},
+].map(d => {
+  if (d.id === 'cheerlet-1') d = {...d, health: 300, ai: ai(2400,3400,.78), progression: mechanicSequence(['tap','drift','tap','tap','armour','tap']), tutorial: 'Watch the moving outline and keep your aim steady.'};
+  const c = characterForEncounter(d.id);
+  return c ? {...d, characterId: c.id, rival: c.name, name: c.title, dialogue: [c.before], victoryDialogue: c.after} : d;
+});
 export const REGIONS: readonly RegionDefinition[] = [
   {
     id: "glade",
@@ -67,7 +76,7 @@ export const REGIONS: readonly RegionDefinition[] = [
     q: 1,
     r: 0,
     environment: "cheerlet",
-    levels: ["cheerlet-1"],
+    levels: ["cheerlet-1", "cheerlet-2", "cheerlet-3"],
     prerequisite: "glade-6",
     price: 180,
     story: [

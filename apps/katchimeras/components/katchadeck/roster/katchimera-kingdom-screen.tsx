@@ -5,9 +5,10 @@ import { WORLD_UPGRADE_DEFINITIONS, worldUpgradeMaxLevel, visibleWorldUpgradeOff
 import { purchaseWorldUpgrade, useWorldUpgradeRun } from '@/features/world-upgrades/world-upgrade-runtime';
 import { dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
 import { WorldUpgradeNarrative } from '@/components/katchadeck/world/world-upgrade-narrative';
-import { WorldUpgradePanel } from '@/components/katchadeck/world/world-upgrade-panel';
+import { CompanionFtueCoachmark } from '@/components/katchadeck/onboarding/companion-ftue-coachmark';
+import { WorldUpgradePanel, type UpgradeCoachmarkState } from '@/components/katchadeck/world/world-upgrade-panel';
 import { WorldUpgradeReward } from '@/components/katchadeck/world/world-upgrade-reward';
-import { worldUpgradeStory } from '@/features/world-upgrades/world-upgrade-stories';
+import { worldUpgradeStory, upgradeUsesTutorialNarrative } from '@/features/world-upgrades/world-upgrade-stories';
 import { useGlowEggHandoff } from '@/features/onboarding/use-glow-egg-handoff';
 import { CompanionJournalButton } from '@/components/katchadeck/world/companion-life-actions';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
@@ -209,7 +210,9 @@ export function KatchimeraKingdomScreen({
   const [upgradePurchasing, setUpgradePurchasing] = useState(false);
   const [upgradeCommitted, setUpgradeCommitted] = useState(false);
   const upgradePressBusy = useRef(false);
+  const [upgradeCoachmark, setUpgradeCoachmark] = useState<UpgradeCoachmarkState>({ visible: false, revision: 0 });
   const upgradeActionRef = useRef<View>(null);
+  const tutorialUpgradeNonceRef = useRef<number | null>(null);
   const revealedUpgradeRef = useRef<number | null>(null);
   const pendingUpgradeReward = useRef<string | null>(null);
   const [upgradeReward, setUpgradeReward] = useState<string | null>(null);
@@ -577,6 +580,7 @@ export function KatchimeraKingdomScreen({
     const offerId = presentation.natureIslandId ? `nature:${presentation.natureIslandId}`
       : receipt.target.kind === 'haven_structure' ? `mist:${receipt.target.structureId}` : `haven:${presentation.characterId}`;
     if (worldUpgradeStory(offerId, receipt.toLevel)) presentation.reactionLine = '';
+    tutorialUpgradeNonceRef.current = upgradeUsesTutorialNarrative(offerId, receipt.toLevel, run.definitionId) ? presentation.nonce : null;
     revealedUpgradeRef.current = null;
     setUpgrading(true);
     setDetailCreatureId(null);
@@ -630,6 +634,10 @@ export function KatchimeraKingdomScreen({
     // The canvas may report completion more than once; a single story owns the ack.
     if (revealedUpgradeRef.current === presentation.nonce) return;
     revealedUpgradeRef.current = presentation.nonce;
+    if (tutorialUpgradeNonceRef.current === presentation.nonce) {
+      finishUpgradePresentation(presentation);
+      return;
+    }
     const id = presentation.natureIslandId ? `nature:${presentation.natureIslandId}`
       : presentation.visualTarget?.kind === 'haven_structure' && presentation.visualTarget.structureId === 'steppling-home'
         ? 'mist:steppling-home' : `haven:${presentation.characterId}`;
@@ -974,7 +982,7 @@ export function KatchimeraKingdomScreen({
         upgradePanel={screenFocused && sharedUpgrade && !upgradePresentation && !activeInteractionResidentId ? <WorldUpgradePanel
           offer={sharedUpgrade} world={mergeWorld} busy={upgradePurchasing || (upgradeCommitted && !upgradeError)}
           saveRead={saveUpgradeStoryRead}
-          error={upgradeError} coached={coachedUpgrade} actionRef={upgradeActionRef} registerDismiss={registerUpgradeDismiss}
+          onCoachmarkChange={setUpgradeCoachmark} error={upgradeError} coached={coachedUpgrade} actionRef={upgradeActionRef} registerDismiss={registerUpgradeDismiss}
           onClose={() => { pendingUpgradeReward.current = null; setSelectedUpgrade(null); setUpgradeError(null); }} onConfirm={() => { void confirmWorldUpgrade(); }}
           onGarden={() => { setSelectedUpgrade(null); setUpgradeError(null); openGarden(); }} /> : null}
         preserveUpgradeCamera={ftueGardenUpgradeActive || (selectedUpgrade?.id === 'mist:steppling-home' && Boolean(glowRun && glowRun.status !== 'completed'))}
@@ -1140,6 +1148,9 @@ export function KatchimeraKingdomScreen({
         onClose={() => setGlowPanelOpen(false)}
         onOpenMerge={() => openGarden()}
       /> : null}
+      {screenFocused && sharedUpgrade && upgradeCoachmark.visible && !upgradePresentation && !requiredUpgradeStory && !activeInteractionResidentId ? <CompanionFtueCoachmark
+        targetRef={upgradeActionRef} targetRevision={upgradeCoachmark.revision} placement="above" showFinger
+        message={[{ text: `Use ${sharedUpgrade.cost} ` }, { emphasis: true, text: 'Glow' }, { text: sharedUpgrade.action === 'Clear mist' ? ' to clear this mist.' : ' to restore the Garden.' }]} /> : null}
       {screenFocused && requiredUpgradeStory ? <WorldUpgradeNarrative key={requiredUpgradeStory.presentation.storyPresentationKey ?? requiredUpgradeStory.presentation.nonce}
         offer={requiredUpgradeStory.offer} world={mergeWorld} required saveRead={saveUpgradeStoryRead}
         onClose={() => finishUpgradePresentation(requiredUpgradeStory.presentation)} /> : null}

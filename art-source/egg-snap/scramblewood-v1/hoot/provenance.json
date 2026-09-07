@@ -1,0 +1,74 @@
+{
+  "master": {
+    "sha256": "4f1d79fb885d317b6405db3037acbd8777f5089810e059effaf309cd8d10d38d",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-b8fff793-0c33-499b-973a-619221f13cb1.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "body": {
+    "sha256": "9c313816e442f2c04263270b778842b28cd218da3c7a6576ec9aae0ed49eb2a9",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-39ae0faf-bf20-4e5c-bd2c-a9dd9806e113.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "neutral": {
+    "sha256": "bc7179db7719633e8bc06801c3aae8a0b6f0ffed1c183770fc299796efec1494",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-69471884-1030-4ec7-9908-3cd48b49bb7f.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "half-blink": {
+    "sha256": "892c68fe9d772b82e7b7728e33f1e6260e65164ba30851c04a7fbf494bb35459",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-ff2097bf-c64e-4288-8c50-ffc7fba621f2.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "closed-blink": {
+    "sha256": "02dc6329b03b3397f40600ee47df734a1e6a76643879813895c050389aa0ba3f",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-d4356bed-8184-4f0f-b6bf-5a8d4aa825a4.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "determined": {
+    "sha256": "a95696da08ec37edc33c4edfd3cad2821ad932db3ae2996afab56944ed4f2d8e",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-b07e6cfc-6131-4b2b-ac6d-b62f0b42cb16.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "attack": {
+    "sha256": "b1a4f982fe9848efe21c79142840394de57b7d8f9f49b41a588fdbef65af791e",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-8990e1db-490a-4432-ba9d-8d71bd4c83c2.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "hurt": {
+    "sha256": "0c4c720543e592d1c4fd84964f6372a08931cd646d8e7dd311d233a5ea814a8a",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-21282326-4e1f-438e-9348-33f3a0c5fa60.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "surprised": {
+    "sha256": "da41ff22c5f5529a27da04c50440a383a380317f054be6f812185c490e742803",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-594ccf52-1f1b-435c-b257-3f340e2da779.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "happy": {
+    "sha256": "10d1e5bc7c4255ca395ff1067aa1c9388e2c755660a3730481c1dcb6d54cecbc",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-030298b2-6d13-4dd1-99d4-35b871120f8e.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "defeated": {
+    "sha256": "ed4bb332dbcf96b9282095a2ad45641fda8d551f60167ad978c6ae54c43fddcf",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-b54de4a0-97fb-447b-adda-615a37512093.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "talking": {
+    "sha256": "f9a17e03f8d9605db56ad04c7097435d21b5f3927c27e2cac3bc775ecbeb0c96",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-2ab1008c-8c76-48c6-8376-92e90f520071.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  }
+}

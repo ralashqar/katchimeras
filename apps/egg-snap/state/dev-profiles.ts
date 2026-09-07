@@ -3,7 +3,7 @@ import type { ContentFlowRun } from '@incubator/story/types';
 import { repository } from './repository';
 import { storyRepository } from './story-repository';
 import { freshProfile, grantResult, type Profile } from './profile';
-import { migrateProfile, worldAction } from './adventure';
+import { migrateProfile, worldAction, finishWorldPresentation } from './adventure';
 import { devStorage } from './dev-storage';
 import { flushFtue } from './ftue';
 
@@ -30,17 +30,19 @@ export const snapshots = createProfileSnapshots({
   saveRollback: value => devStorage.write('rollback', JSON.stringify(value)),
 });
 
-export const CHECKPOINTS = ['Fresh', 'First victory', 'Nest repaired', 'Map revealed', 'Chest ready', 'Rescue ready', 'Boss ready', 'Region complete'] as const;
+export const CHECKPOINTS = ['Fresh', 'First victory', 'Nest repaired', 'Home battle two won', 'Reveal ready', 'Second tile revealed', 'Pollen rescued', 'Boss ready', 'Region complete'] as const;
 export function checkpointProfile(index: number): Profile {
   let p = freshProfile();
   const win = (levelId: string) => { p = grantResult(p, { attemptId: `fixture:${levelId}`, levelId, won: true, outcome: 'won', accuracy: 1, bestStreak: 3, durationMs: 45000, coins: 0, practice: false }); p = { ...p, pendingResult: null }; };
+  const action = (id: 'repair' | 'clear-mist') => { p = worldAction(p, id); p = finishWorldPresentation(p, p.adventure!.pendingPresentation!.id); };
   if (index >= 1) win('glade-1');
-  if (index >= 2) p = worldAction(p, 'repair');
-  if (index >= 3) p = worldAction(p, 'clear-mist');
-  if (index >= 4) win('glade-2');
-  if (index >= 5) p = worldAction(p, 'chest');
-  if (index >= 6) win('glade-3');
-  if (index >= 7) win('glade-6');
+  if (index >= 2) action('repair');
+  if (index >= 3) win('glade-2');
+  if (index >= 4) win('glade-3');
+  if (index >= 5) action('clear-mist');
+  if (index >= 6) win('glade-4');
+  if (index >= 7) win('glade-5');
+  if (index >= 8) win('glade-6');
   return p;
 }
 export function checkpointSnapshot(index: number): ProfileSnapshot {

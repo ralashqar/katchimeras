@@ -54,21 +54,22 @@ test('new restorations cannot inherit the previous receipt’s complete or revea
 
 test('upgrade art has one forward-only crossfade owned by the presentation renderer', () => {
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
+  const renderer = readFileSync(require.resolve('@incubator/environments/hex-tile'), 'utf8');
 
   assert.match(canvas, /upgradeOwnsLayer[\s\S]*?havenUpgradeLayerArtChanges/);
   assert.match(canvas, /<KingdomTileArt[\s\S]*?settlingOwnsLayer[\s\S]*?finishSettlingUpgrade/);
   assert.match(canvas, /setSettlingUpgrade\(\{ layers, nonce: presentation\.nonce \}\)/);
   assert.match(canvas, /phase=\{upgradeOwnsLayer \? upgradePhase : 'complete'\}/);
-  assert.match(canvas, /const revealProgress = useSharedValue\(phase === 'complete' \? 1 : 0\)/);
+  assert.match(renderer, /const localRevealProgress = useSharedValue\(phase === 'complete' \? 1 : 0\)/);
   assert.match(canvas, /key=\{`upgrade:\$\{upgradeOwnsLayer \? upgradePresentation\?\.nonce : settlingUpgrade\?\.nonce\}`\}/);
-  assert.match(canvas, /opacity: 1 - revealProgress\.value[\s\S]*?opacity: revealProgress\.value/);
+  assert.match(renderer, /opacity: 1 - revealProgress\.value[\s\S]*?opacity: revealProgress\.value/);
   // The persistent from-state image must not remain opaque underneath the
   // outgoing crossfade layer (especially visible around the larger mist art).
   assert.match(canvas, /<KingdomTileArt\s+hidden=\{transitionHasPainted\}/);
-  assert.match(canvas, /!targetReady \|\| !outgoingReady \|\| !takeoverConfirmed/);
+  assert.match(renderer, /!targetReady \|\| !outgoingReady \|\| !takeoverConfirmed/);
   assert.doesNotMatch(canvas, /settlingUpgradeTimerRef|setTimeout\(\(\) => finishSettlingUpgrade/);
   assert.match(canvas, /onSettled=\{settlingOwnsLayer[\s\S]*?!havenUpgradeLayerArtChanges\(layer, settlingUpgrade.layers.toLayer/);
-  assert.match(canvas, /function KingdomTileArt[\s\S]*?hidden && \{ opacity: 0 \}/);
-  assert.doesNotMatch(canvas, /oldOpacity\.value = withTiming\(0/);
-  assert.doesNotMatch(canvas, /newOpacity\.value = withTiming\(1/);
+  assert.match(renderer, /function KingdomTileArt[\s\S]*?hidden && \{ opacity: 0 \}/);
+  assert.doesNotMatch(renderer, /oldOpacity\.value = withTiming\(0/);
+  assert.doesNotMatch(renderer, /newOpacity\.value = withTiming\(1/);
 });

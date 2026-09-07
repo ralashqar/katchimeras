@@ -1,0 +1,44 @@
+{
+  "master": {
+    "sha256": "c49c2fab9901d04d5b00149d01a70ecc9b4e2e5f4e6ab45ef61ea8258fda60c4",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-385316b9-aace-4387-837a-54d65528c145.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "neutral": {
+    "sha256": "6a01d42f4c5beb2829cad514394ff90b0a14d91c07d0d4fb0682db994b7879b4",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-7d1f8b3d-952c-4952-8c9e-4396db10990c.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "half-blink": {
+    "sha256": "7fade8fe891f3a707100b4a65426c7029ec0cf17f997456c3e58f9767ffb6ccc",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-ab653729-6f2e-45dd-80d2-d75fea4372f7.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "closed-blink": {
+    "sha256": "3d51585debdafa23f46be7e91dee8a49d6663298bb4ab77a3460b85bb63474ce",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-3c09b12a-a96d-4fbb-9ab9-dc799dbfc704.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "body": {
+    "sha256": "20a17265a5664360e0d74c6866fa129b82a0ee8f0a5efbb3b0ce7f2961e12361",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-c23a5bd6-2bb5-469c-af6b-0a5812eaa71d.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "determined": {
+    "sha256": "670a18b2f613a7954e68183a098706f4d51156ebc6ea145034e0a85e25673043",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-af6c2e4e-aa9c-4478-b13d-5b4b703bbad6.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  },
+  "attack": {
+    "sha256": "d2e1da7a2639fdb40f4c4e3fdfc8633e7db9e606060f0d622e4ce0cbf4763b10",
+    "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a07c52-442a-7981-9bff-0c84e1d5d82c\\exec-e4a99810-c675-40ef-a398-c166e3ad3ff4.png",
+    "generator": "imagegen",
+    "style": "scramblewood-toy-v1"
+  }
+}

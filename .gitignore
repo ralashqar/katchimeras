@@ -10,3 +10,4 @@ dist/
 *.tsbuildinfo
 .tmp-*.log
 .tmp-*.json
+.tmp-egg-v3-artifact/

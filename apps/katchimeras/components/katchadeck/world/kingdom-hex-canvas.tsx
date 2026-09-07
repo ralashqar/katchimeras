@@ -1,3 +1,4 @@
+import { playUpgradeSequence } from '@incubator/environments/upgrade-sequence';
 import {createHexTileRenderer} from '@incubator/environments/hex-tile';
 import { WorldUpgradeMarker } from './world-upgrade-marker';
 import { WorldUpgradeAnchor } from './world-upgrade-anchor';
@@ -86,8 +87,6 @@ import { eggVisualGrowthForEnergyRatio } from '@/utils/today-growth';
 import type { TodayHatchPhase } from '@/utils/today-hatch-presentation';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
 import {
-  HAVEN_UPGRADE_REDUCED_TIMING,
-  HAVEN_UPGRADE_TIMING,
   havenUpgradePhaseForPresentation,
   type HavenUpgradePhaseState,
   type HavenTileUpgradePresentation,
@@ -1167,13 +1166,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     let cancelled = false;
     const blend = { nonce: presentation.nonce, complete: !havenUpgradeLayerArtChanges(layers.fromLayer, layers.toLayer, sceneTileImageLod), finish: null as (() => void) | null };
     upgradeBlendRef.current = blend;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const schedule = (callback: () => void, delay: number) => {
-      timers.push(setTimeout(() => {
-        if (!cancelled) callback();
-      }, delay));
-    };
     const finish = () => {
+      if (cancelled) return;
       if (!blend.complete) {
         blend.finish = finish;
         return;
@@ -1190,35 +1184,22 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       );
       upgradeCompletionRef.current?.(presentation);
     };
-    const afterFocus = () => {
-      if (cancelled) return;
-      if (motionReduced) {
-        setUpgradePhase('focus');
-        schedule(() => setUpgradePhase('reveal'), HAVEN_UPGRADE_REDUCED_TIMING.revealAtMs);
-        schedule(() => setUpgradePhase('react'), HAVEN_UPGRADE_REDUCED_TIMING.reactAtMs);
-        schedule(finish, HAVEN_UPGRADE_REDUCED_TIMING.completeAtMs);
-        return;
-      }
-      setUpgradePhase('payment');
-      schedule(() => {
-        setUpgradePhase('cover');
-        if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }, HAVEN_UPGRADE_TIMING.coverAtMs);
-      schedule(() => setUpgradePhase('reveal'), HAVEN_UPGRADE_TIMING.revealAtMs);
-      schedule(() => {
-        setUpgradePhase('react');
-        if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }, HAVEN_UPGRADE_TIMING.reactAtMs);
-      schedule(finish, HAVEN_UPGRADE_TIMING.completeAtMs);
-    };
-
-    setUpgradePhase('focus');
-    if (presentation.cameraAlreadyFocused) afterFocus();
-    else upgradeFocusRef.current(layers.tile.cx, layers.tile.cy, motionReduced, afterFocus);
+    const cancelSequence = playUpgradeSequence({
+      reduced: motionReduced,
+      focus: settled => presentation.cameraAlreadyFocused ? settled() : upgradeFocusRef.current(layers.tile.cx, layers.tile.cy, motionReduced, settled),
+      onPhase: phase => {
+        setUpgradePhase(phase);
+        if (process.env.EXPO_OS === 'ios' && !motionReduced) {
+          if (phase === 'cover') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          if (phase === 'react') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      },
+      onComplete: finish,
+    });
     return () => {
       cancelled = true;
       if (upgradeBlendRef.current === blend) upgradeBlendRef.current = null;
-      timers.forEach(clearTimeout);
+      cancelSequence();
     };
   }, [sceneTileImageLod, upgradePresentation?.nonce, upgradePresentation?.status]);
 
