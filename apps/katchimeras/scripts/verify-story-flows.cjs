@@ -26,6 +26,7 @@ const result = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', [
   'tests/mossprout-life-activities.test.tsx',
   'tests/companion-action-navigation.test.tsx',
   'tests/steppling-activities.test.tsx',
+  'tests/steppling-trail-result.test.tsx',
 ], { cwd: process.cwd(), shell: process.platform === 'win32', stdio: 'inherit' });
 
 if (result.error) throw result.error;

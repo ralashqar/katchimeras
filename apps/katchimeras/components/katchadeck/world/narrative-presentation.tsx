@@ -1,21 +1,32 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { KatchaUI } from '@/constants/katcha-ui';
 
-export function NarrativeDialogue({ name, text, portrait, right = false, current = false }: {
-  name: string; text: string; portrait: ReactNode; right?: boolean; current?: boolean;
+export function NarrativeDialogue({ name, text, portrait, right = false, current = false, onContinue }: {
+  name: string; text: string; portrait: ReactNode; right?: boolean; current?: boolean; onContinue?: () => void;
 }) {
   const accent = right ? '#ED9F4D' : '#69BBDD';
-  return <View style={[narrativeStyles.dialogue, right && narrativeStyles.dialogueRight]}>
-    <View style={narrativeStyles.portraitSlot}>
-      {portrait}
-      <View style={[narrativeStyles.nameBadge, { backgroundColor: accent }]}><Text style={narrativeStyles.speaker}>{name}</Text></View>
+  const bubbleFill = right ? '#FFF7E8' : '#EEF9FD';
+  const bubble = <>
+    <View pointerEvents="none" style={[narrativeStyles.tail, right ? narrativeStyles.tailRight : narrativeStyles.tailLeft,
+      { borderColor: accent, backgroundColor: bubbleFill }]} />
+    <Text selectable={!onContinue} style={[narrativeStyles.dialogueText, { color: right ? '#92602B' : '#205779' }]}>{text}</Text>
+  </>;
+  const bubbleStyle = [narrativeStyles.words, { borderColor: accent, backgroundColor: bubbleFill }];
+  return <View style={narrativeStyles.dialogueBlock}>
+    <View style={[narrativeStyles.dialogue, right && narrativeStyles.dialogueRight]}>
+      <View style={narrativeStyles.portraitSlot}>
+        {portrait}
+        <View style={[narrativeStyles.nameBadge, { backgroundColor: accent }]}><Text style={narrativeStyles.speaker}>{name}</Text></View>
+      </View>
+      <View style={bubbleStyle}>{bubble}</View>
     </View>
-    <View style={[narrativeStyles.words, { borderColor: accent, backgroundColor: right ? '#FFF7E8' : '#EEF9FD' }]}>
-      <View pointerEvents="none" style={[narrativeStyles.tail, right ? narrativeStyles.tailRight : narrativeStyles.tailLeft, { borderColor: accent, backgroundColor: right ? '#FFF7E8' : '#EEF9FD' }]} />
-      <Text style={[narrativeStyles.dialogueText, { color: right ? '#92602B' : '#205779' }]}>{text}</Text>
-      {current ? <Text style={narrativeStyles.tapHint}>Tap to continue ▾</Text> : null}
-    </View>
+    {current ? onContinue
+      ? <Pressable accessibilityRole="button" accessibilityLabel="Continue dialogue" accessibilityHint="Shows the next part of the conversation" hitSlop={8} onPress={onContinue} style={narrativeStyles.continueRow}>
+          <Text style={narrativeStyles.tapHint}>Tap to continue</Text>
+        </Pressable>
+      : <View style={narrativeStyles.continueRow}><Text style={narrativeStyles.tapHint}>Tap to continue</Text></View>
+      : null}
   </View>;
 }
 export const narrativeStyles = StyleSheet.create({
@@ -31,6 +42,7 @@ export const narrativeStyles = StyleSheet.create({
   closeText: { ...KatchaUI.type.companionCardTitle, color: '#FFF', fontSize: 32, lineHeight: 35 },
   scroll: { flex: 1, marginTop: 20 }, transcript: { paddingTop: 4, paddingBottom: 22, paddingHorizontal: 4, gap: 24 }, chapter: { gap: 24 },
   chapterTitle: { ...KatchaUI.type.companionBody, color: '#E7DBC5', textAlign: 'center', fontSize: 12 },
+  dialogueBlock: { gap: 4 },
   dialogue: { flexDirection: 'row', alignItems: 'center', gap: 12 }, dialogueRight: { flexDirection: 'row-reverse' },
   portraitSlot: { width: 84, minHeight: 98, alignItems: 'center', justifyContent: 'center', paddingBottom: 22 },
   nameBadge: { position: 'absolute', bottom: 0, minWidth: 84, maxWidth: 100, paddingHorizontal: 4, paddingVertical: 4, borderRadius: 8, borderWidth: 2, borderColor: '#FFF1CB' },
@@ -39,6 +51,7 @@ export const narrativeStyles = StyleSheet.create({
   tail: { position: 'absolute', top: '50%', marginTop: -7, width: 14, height: 14, transform: [{ rotate: '45deg' }] },
   tailLeft: { left: -9, borderLeftWidth: 3, borderBottomWidth: 3 }, tailRight: { right: -9, borderRightWidth: 3, borderTopWidth: 3 },
   dialogueText: { ...KatchaUI.type.companionDisplay, fontSize: 18, lineHeight: 24, letterSpacing: 0 },
-  tapHint: { ...KatchaUI.type.companionBody, fontSize: 11, lineHeight: 16, color: '#64767C', textAlign: 'right', marginTop: 8 },
+  continueRow: { minHeight: 28, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, paddingVertical: 4 },
+  tapHint: { ...KatchaUI.type.companionDisplay, fontSize: 11, lineHeight: 15, color: '#D9E6E6', textAlign: 'center' },
   footer: { paddingTop: 12, paddingHorizontal: 28 }, error: { ...KatchaUI.type.companionBody, color: '#FFF1CB', textAlign: 'center', paddingTop: 8 },
 });

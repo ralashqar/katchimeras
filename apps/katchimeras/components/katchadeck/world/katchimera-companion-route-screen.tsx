@@ -104,16 +104,28 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const { transitionTo } = useGameScreenTransition();
   const familyId = familyIdFromCompanionId(creatureId);
   const stepplingDayOne = useStepplingDayOne(familyId === 'steppling' && surfaceActive);
+  const completeStepplingDayOne = stepplingDayOne.complete;
   const stepplingLesson = useStepplingGardenLesson();
   const stepplingGardenOpening = useRef(false);
+  // Narrative completion can update its durable session before the FTUE graph
+  // or navigation curtain has taken ownership. Keep the companion presentation
+  // empty across that gap so its dashboard, speech bubble, and action dock never
+  // get a chance to enter and then be cut off by the destination.
+  const [narrativeHandoffActive, setNarrativeHandoffActive] = useState(false);
   useEffect(() => {
     if (!stepplingDayOne.gardenHandoffPending) { stepplingGardenOpening.current = false; return; }
     if (!surfaceActive || !stepplingDayOne.ready || stepplingDayOne.error || stepplingGardenOpening.current) return;
     stepplingGardenOpening.current = true;
     if (onHostedOpenMerge) onHostedOpenMerge(undefined, 'steppling');
-    else transitionTo({ announcement: "Opening Steppling's Garden", target: 'merge', navigate: () => router.push({
-      pathname: '/katchimera/[creatureId]/activity', params: { creatureId: 'companion:mossprout' },
-    }) });
+    else {
+      const accepted = transitionTo({ announcement: "Opening Steppling's Garden", target: 'merge', navigate: () => router.push({
+        pathname: '/katchimera/[creatureId]/activity', params: { creatureId: 'companion:mossprout' },
+      }) });
+      if (!accepted) {
+        stepplingGardenOpening.current = false;
+        setNarrativeHandoffActive(false);
+      }
+    }
   }, [creatureId, onHostedOpenMerge, router, stepplingDayOne.error, stepplingDayOne.gardenHandoffPending, stepplingDayOne.ready, surfaceActive, transitionTo]);
   const ftueHandoffRef = useRef(false);
   const [mistHandoffActive, setMistHandoffActive] = useState(false);
@@ -278,20 +290,35 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const completeFtueConversation = useCallback(async () => {
     const run = loadFtueRun();
     if (run?.stepId === 'companion.garden_intro') {
-      await advanceFtueActionDurably({ expectedStepId: 'companion.garden_intro', actionId: 'companion.continue_to_planting', evidenceRef: 'first-meeting:seed-invitation' });
-      await flushFtuePersistence();
+      setNarrativeHandoffActive(true);
+      try {
+        await advanceFtueActionDurably({ expectedStepId: 'companion.garden_intro', actionId: 'companion.continue_to_planting', evidenceRef: 'first-meeting:seed-invitation' });
+        await flushFtuePersistence();
+      } catch (error) {
+        setNarrativeHandoffActive(false);
+        throw error;
+      }
       return;
     }
     if (run?.stepId === 'companion.first_meeting') {
       // The Seed invitation has already been read in the narrative. Prepare the
-      // Garden before advancing. The silent Garden checkpoint then opens planting
-      // without asking the player to read the same beat again.
-      if (!run.mergeInstalled) {
-        await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run), { preserveHaven: true });
-        updateFtueRun({ mergeInstalled: true });
+      // Garden before advancing. Commit the silent checkpoint in the same handoff
+      // so there is no intermediate companion render before the world pans to it.
+      setNarrativeHandoffActive(true);
+      try {
+        if (!run.mergeInstalled) {
+          await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run), { preserveHaven: true });
+          updateFtueRun({ mergeInstalled: true });
+        }
+        const meetingResult = await advanceFtueActionDurably({ expectedStepId: 'companion.first_meeting', actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
+        if (meetingResult.run?.stepId !== 'companion.garden_intro') throw new Error('Mossprout did not accept the Seed handoff');
+        const gardenResult = await advanceFtueActionDurably({ expectedStepId: 'companion.garden_intro', actionId: 'companion.continue_to_planting', evidenceRef: 'first-meeting:seed-invitation' });
+        if (gardenResult.run?.stepId !== 'world.garden_arrival') throw new Error('Mossprout world did not accept the planting handoff');
+        await flushFtuePersistence();
+      } catch (error) {
+        setNarrativeHandoffActive(false);
+        throw error;
       }
-      await advanceFtueActionDurably({ expectedStepId: 'companion.first_meeting', actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
-      await flushFtuePersistence();
       return;
     }
     if (run?.stepId === 'companion.chapter_zero_return') {
@@ -352,6 +379,16 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       await completeResidentResultExit('mossprout:ftue:resident-match-result');
     }
   }, [completeResidentResultExit, ftueConversationDefinitionId]);
+  const completeStepplingNarrative = useCallback(async () => {
+    setNarrativeHandoffActive(true);
+    try {
+      const completed = await completeStepplingDayOne();
+      if (!completed) setNarrativeHandoffActive(false);
+    } catch (error) {
+      setNarrativeHandoffActive(false);
+      throw error;
+    }
+  }, [completeStepplingDayOne]);
   const continueToMist = useCallback(async () => {
     if (ftueHandoffRef.current) return;
     ftueHandoffRef.current = true;
@@ -638,7 +675,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   // animation worklets behind Today, Merge, or a quest. All durable companion
   // progress already lives in the repositories and is rehydrated on focus.
   // A camera opened here retains this subtree so its Back restores the same menu.
-  if (mistHandoffActive || pendingMistExit) return <View pointerEvents="box-none" style={styles.inactiveScreen}>
+  if (narrativeHandoffActive || stepplingDayOne.gardenHandoffPending || mistHandoffActive || pendingMistExit) return <View pointerEvents="box-none" style={styles.inactiveScreen}>
     {mistHandoffError ? <View style={{ position: 'absolute', bottom: 40, left: 24, right: 24 }}>
       <KatchaButton label="Explore the mist · Try again" onPress={() => void continueToMist()} />
     </View> : null}
@@ -667,11 +704,16 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       initialConversationDefinitionId={!residentStoryResumeActive && navigationFtueRun?.status === 'active' && navigationFtueRun.stepId === 'companion.resident_affinity'
         ? 'mossprout:game:form-finder'
         : journeyReturnConversationDefinitionId ?? stepplingDayOne.definitionId}
-      onInitialConversationComplete={familyId === 'steppling' ? async () => { await stepplingDayOne.complete(); } : undefined}
+      onInitialConversationComplete={familyId === 'steppling' ? completeStepplingNarrative : undefined}
       discoveryRecords={discovery.records}
       onFtueConversationComplete={activeFtueConversationDefinitionId || residentFtueGraphActive ? completeFtueConversation : undefined}
-      onCompletedConversationExit={async (definitionId) => definitionId === STEPPLING_DAY_ONE_CONVERSATION_ID
-        ? stepplingDayOne.complete() : completeResidentResultExit(definitionId)}
+      onCompletedConversationExit={async (definitionId) => {
+        if (definitionId === STEPPLING_DAY_ONE_CONVERSATION_ID) {
+          await completeStepplingNarrative();
+          return true;
+        }
+        return completeResidentResultExit(definitionId);
+      }}
       ftueOrderPreviewActive={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.order_preview'}
       ftueProfileStep={ftueRun?.status === 'active' && ftueRun.stepId === 'companion.intro_action'
         ? 'intro_action'

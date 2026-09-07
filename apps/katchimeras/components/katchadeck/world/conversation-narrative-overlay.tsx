@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NarrativeDialogue, narrativeStyles as styles } from './narrative-presentation';
@@ -11,13 +11,12 @@ import { getCreatureVisual } from '@/game/days/visuals';
 import type { ConversationTranscriptEntry } from '@/types/companion-conversation';
 
 /** Presentation only: callers retain ownership of saves, handoffs and rewards. */
-export function ConversationNarrativeOverlay({ title, entries, checkpoint, required = false, inline = false, onClose, children }: {
+export function ConversationNarrativeOverlay({ title, entries, checkpoint, required = false, inline = false, paced = false, initiallyRevealedCount = 0, onClose, children }: {
   title: string; entries: readonly ConversationTranscriptEntry[]; checkpoint: string;
-  required?: boolean; inline?: boolean; onClose: () => void;
+  required?: boolean; inline?: boolean; paced?: boolean; initiallyRevealedCount?: number; onClose: () => void;
   children: (perform: (action: () => unknown, exit?: boolean) => void) => ReactNode;
 }) {
   const compactComparison = typeof __DEV__ !== 'undefined' && __DEV__ && process.env.EXPO_PUBLIC_CONVERSATION_LAYOUT === 'compact';
-  const visibleEntries = compactComparison ? entries.slice(-1) : entries;
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
   const avatar = useEggAvatar();
@@ -27,17 +26,35 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [visible, setVisible] = useState(true);
+  const [revealStep, setRevealStep] = useState(() => paced
+    ? Math.min(entries.length, Math.max(1, initiallyRevealedCount + 1))
+    : entries.length + 1);
   const afterDismiss = useRef<(() => void) | null>(null);
+  const priorCheckpoint = useRef(checkpoint);
   const locked = useRef(false);
   const mounted = useRef(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const entrance = useSharedValue(0);
   useEffect(() => {
     mounted.current = true;
     entrance.value = reduced ? withTiming(1, { duration: 100 }) : withSpring(1, { damping: 17, stiffness: 190 });
-    return () => { mounted.current = false; if (timer.current) clearTimeout(timer.current); };
+    return () => {
+      mounted.current = false;
+      if (timer.current) clearTimeout(timer.current);
+      if (revealTimer.current) clearTimeout(revealTimer.current);
+    };
   }, [entrance, reduced]);
   useEffect(() => { locked.current = false; setBusy(false); }, [checkpoint]);
+  useEffect(() => {
+    if (!paced) { setRevealStep(entries.length + 1); priorCheckpoint.current = checkpoint; return; }
+    if (priorCheckpoint.current !== checkpoint) {
+      priorCheckpoint.current = checkpoint;
+      setRevealStep((current) => Math.min(current, entries.length));
+    } else {
+      setRevealStep((current) => Math.min(current, entries.length + 1));
+    }
+  }, [checkpoint, entries.length, paced]);
   useEffect(() => {
     if (!visible && afterDismiss.current) {
       const complete = afterDismiss.current;
@@ -47,6 +64,25 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
   }, [visible]);
   const scrimMotion = useAnimatedStyle(() => ({ opacity: entrance.value }));
   const motion = useAnimatedStyle(() => ({ opacity: entrance.value, transform: [{ scale: reduced ? 1 : 0.92 + entrance.value * 0.08 }] }));
+  const controlsVisible = !paced || (priorCheckpoint.current === checkpoint && revealStep > entries.length);
+  const stagedEntries = paced ? entries.slice(0, Math.min(revealStep, entries.length)) : entries;
+  const visibleEntries = compactComparison ? stagedEntries.slice(-1) : stagedEntries;
+  const revealNext = useCallback(() => {
+    if (!paced || controlsVisible) return;
+    if (revealTimer.current) { clearTimeout(revealTimer.current); revealTimer.current = null; }
+    nearBottom.current = true;
+    setRevealStep((current) => Math.min(entries.length + 1, current + 1));
+  }, [controlsVisible, entries.length, paced]);
+  useEffect(() => {
+    if (!paced || controlsVisible || busy || !visibleEntries.length) return;
+    const current = visibleEntries.at(-1);
+    const readingDelay = Math.min(5000, Math.max(2200, 1500 + (current?.text.length ?? 0) * 24));
+    revealTimer.current = setTimeout(revealNext, readingDelay);
+    return () => {
+      if (revealTimer.current) clearTimeout(revealTimer.current);
+      revealTimer.current = null;
+    };
+  }, [busy, checkpoint, controlsVisible, paced, revealNext, revealStep, visibleEntries]);
   const perform = (action: () => unknown, exit = false) => {
     if (locked.current) return;
     locked.current = true; setBusy(true); setError(false);
@@ -86,21 +122,25 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
             const player = entry.speaker === 'player';
             const skin = player ? null : katchimeraSkinById.get(entry.speaker);
             const visual = skin?.visualKey ? getCreatureVisual(skin.visualKey, 'grown') : null;
+            const current = paced && !controlsVisible && index === visibleEntries.length - 1;
             return <Animated.View key={entry.id} entering={reduced ? undefined : FadeInDown.duration(220).delay(index === visibleEntries.length - 1 && !player ? 100 : 0)}>
               <NarrativeDialogue right={player} name={player ? 'You' : skin?.displayName ?? title} text={entry.text}
+                current={current}
                 portrait={player ? <View style={{ borderRadius: 42, backgroundColor: '#FFF6D8', borderWidth: 3, borderColor: '#ED9F4D' }}><EggAvatar skinId={avatar.equippedSkinId} faceId={avatar.equippedFaceId} hatId={avatar.equippedHatId} heldAccessoryId={avatar.equippedHeldAccessoryId} size={78} /></View> : visual ? <HavenCharacterPortrait source={visual.source} size={84} /> : null} />
             </Animated.View>;
           })}
-          <View collapsable={false} pointerEvents={busy ? 'none' : 'auto'} accessibilityState={{ busy }}>
-            <Animated.View key={checkpoint} entering={reduced ? undefined : FadeInDown.duration(220)} style={{ gap: 10 }}>
-              {children(perform)}
-            </Animated.View>
-          </View>
+          {controlsVisible ? <View collapsable={false} pointerEvents={busy ? 'none' : 'auto'} accessibilityState={{ busy }}>
+              <Animated.View key={checkpoint} entering={reduced ? undefined : FadeInDown.duration(220)} style={{ gap: 10 }}>
+                {children(perform)}
+              </Animated.View>
+            </View> : null}
           {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>Could not save. Please try again.</Text> : null}
         </ScrollView>
         {latest ? <Pressable accessibilityRole="button" onPress={() => { nearBottom.current = true; scroll.current?.scrollToEnd({ animated: !reduced }); }}><Text style={styles.error}>Latest ↓</Text></Pressable> : null}
 
       </Animated.View>
+      {paced && !controlsVisible && !busy ? <Pressable accessibilityRole="button" accessibilityLabel="Continue dialogue"
+        accessibilityHint="Shows the next part of the conversation" onPress={revealNext} style={[StyleSheet.absoluteFill, { zIndex: 1000 }]} /> : null}
     </Animated.View>
   </Modal>;
 }

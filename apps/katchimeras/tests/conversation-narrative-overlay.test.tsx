@@ -59,11 +59,29 @@ test('overlay keeps FTUE modal, uses player portrait, guards taps and finishes e
   assert.equal(tree.root.findAllByType(host('Modal')).length, 0, 'one-off messages never mount a narrative modal');
   assert.equal(tree.root.findAllByType(host('Dialogue')).length, 0, 'the stage owns overhead speech for inline interactions');
   await act(async () => tree.unmount());
+
+  await act(async () => { tree = create(<Overlay {...props} paced />); });
+  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 1, 'paced narrative starts with one speech bubble');
+  assert.equal(tree.root.findAllByType(host('ResultCard')).length, 0, 'the result or choices wait behind the dialogue');
+  const advanceTimer = async () => {
+    const callback = [...timers.values()].at(-1);
+    assert.ok(callback, 'paced dialogue schedules an automatic reading fallback');
+    timers.clear();
+    await act(async () => callback());
+  };
+  await advanceTimer();
+  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 2);
+  assert.equal(tree.root.findAllByType(host('ResultCard')).length, 0);
+  await advanceTimer();
+  assert.equal(tree.root.findAllByType(host('ResultCard')).length, 1, 'controls animate in after the final reading beat');
+  await act(async () => tree.unmount());
+  assert.equal(timers.size, 0);
 });
 
 
 test('chained FTUE choices remain pressable through the real overlay and choice list', async () => {
   const motion = nativeMotionHarness();
+  const timers = new Map<number, () => void>(); let serial = 0;
   const native = { ...nativeViews, Modal: 'Modal', Text: 'Text', ScrollView: 'ScrollView', Pressable: 'Pressable', useWindowDimensions: () => ({ width: 390 }) };
   const overlay = loadNativeModule('components/katchadeck/world/conversation-narrative-overlay.tsx', {
     'react-native': native,
@@ -75,7 +93,7 @@ test('chained FTUE choices remain pressable through the real overlay and choice 
     '@/features/egg-avatar/egg-avatar-provider': { useEggAvatar: () => ({}) },
     '@/constants/katchimera-skins': { katchimeraSkinById: new Map() },
     '@/game/days/visuals': { getCreatureVisual: () => null },
-  });
+  }, { setTimeout: (fn: () => void) => { timers.set(++serial, fn); return serial; }, clearTimeout: (id: number) => timers.delete(id) });
   const choices = loadNativeModule('components/katchadeck/world/companion-choice-list.tsx', {
     'react-native': native,
     '@/components/themed-text': { ThemedText: host('Label') },
@@ -100,6 +118,17 @@ test('chained FTUE choices remain pressable through the real overlay and choice 
     nextDialogue: { id: 'first-notice', prompt: 'What catches your attention?', choices: [{ id: 'light', label: 'Some light', reply: 'Well noticed.' }] }, onFinish: async () => {} };
   let tree!: ReactTestRenderer;
   await act(async () => { tree = create(<Grow {...props} />); });
+  const revealUntil = async (controlIsVisible: () => boolean) => {
+    for (let attempt = 0; attempt < 12 && !controlIsVisible(); attempt++) {
+      const screenTap = tree.root.findAllByProps({ accessibilityLabel: 'Continue dialogue' })[0];
+      assert.ok(screenTap, 'the full narrative surface advances the paced FTUE');
+      await act(async () => screenTap.props.onPress());
+    }
+    assert.ok(controlIsVisible(), 'the next control appears after the dialogue beats');
+  };
+  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 1, 'the first FTUE beat appears on its own');
+  assert.equal(tree.root.findAllByProps({ accessibilityRole: 'radio' }).length, 0, 'choices wait for the prompt');
+  await revealUntil(() => tree.root.findAllByProps({ accessibilityRole: 'radio' }).length > 0);
   const pressChoice = async () => {
     const radio = tree.root.findByProps({ accessibilityRole: 'radio' });
     assert.equal(radio.props.disabled, false);
@@ -110,6 +139,7 @@ test('chained FTUE choices remain pressable through the real overlay and choice 
     await act(async () => radio.props.onPress());
   };
   await pressChoice();
+  await revealUntil(() => tree.root.findAllByProps({ accessibilityRole: 'radio' }).length > 0);
   assert.equal(tree.root.findByType(host('Label')).props.children, 'Some light');
   failSave = true;
   await pressChoice();
@@ -117,23 +147,33 @@ test('chained FTUE choices remain pressable through the real overlay and choice 
   failSave = false;
   await pressChoice();
   assert.equal(tree.root.findAllByProps({ accessibilityRole: 'radio' }).length, 0);
+  await revealUntil(() => tree.root.findAllByType(host('Button')).length > 0);
   assert.ok(tree.root.findAllByType(host('Dialogue')).some((node) => node.props.text === 'Well noticed.'));
   assert.equal(tree.root.findByType(host('Button')).props.label, 'Continue');
   await act(async () => tree.unmount());
   await act(async () => { tree = create(<Grow {...props} />); });
+  await revealUntil(() => tree.root.findAllByType(host('Button')).length > 0);
   assert.equal(tree.root.findByType(host('Button')).props.label, 'Continue', 'saved noticing answer resumes without another choice');
   await act(async () => tree.unmount());
+  assert.equal(timers.size, 0, 'paced reveal timers are cancelled when the overlay closes');
 });
 
 
 test('Seed reveal uses the selected intention and keeps its celebration behind the card', async () => {
   const motion = nativeMotionHarness();
   let intent = 'calm';
+  class TestKeyframe {
+    frames: Record<number, unknown>;
+    durationMs = 0;
+    constructor(frames: Record<number, unknown>) { this.frames = frames; }
+    duration(durationMs: number) { this.durationMs = durationMs; return this; }
+  }
   const module = loadNativeModule('components/katchadeck/world/mossprout-seed-narrative-reward.tsx', {
     'react-native': nativeViews,
     'expo-image': { Image: host('Image') },
-    'react-native-reanimated': { ...motion.animated, useReducedMotion: () => true },
+    'react-native-reanimated': { ...motion.animated, Keyframe: TestKeyframe, useReducedMotion: () => false },
     '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: host('Card') },
+    '@/components/katchadeck/ui/radial-sunburst': { RotatingRadialSunburst: host('Rays') },
     '@/constants/mossprout-memory-plants': { mossproutMemoryPlantById: new Map(['calm', 'progress', 'unsure'].map((id) => [id, { name: `Seed ${id}`, art: { seed: id } }])) },
     '@/features/onboarding/mossprout-bond-share': { mossproutFirstSeedForIntent: (id: string) => ({ id, message: 'A beginning.' }) },
     '@/utils/onboarding-state': { loadOnboardingProfile: () => ({ mossproutAnswers: { growthIntentId: intent } }) },
@@ -146,7 +186,12 @@ test('Seed reveal uses the selected intention and keeps its celebration behind t
     const card = tree.root.findByType(host('Card'));
     assert.equal(card.props.title, `Seed ${intent}`);
     assert.match(card.props.subtitle, /Ready to plant in the Garden/);
-    assert.equal(card.props.artwork.props.source, intent);
+    const artwork = React.Children.toArray(card.props.artwork.props.children) as React.ReactElement<Record<string, unknown>>[];
+    assert.equal(artwork[1].props.source, intent);
+    assert.equal(artwork[0].props.rotationDurationMs, 24_000);
+    const entrance = card.parent!.props.entering as TestKeyframe;
+    assert.deepEqual(Object.keys(entrance.frames), ['0', '68', '100'], 'the seed performs one overshoot before settling');
+    assert.equal(entrance.durationMs, 440);
     assert.equal(tree.root.findByType(host('Particles')).props.layerStyle.zIndex, 0);
     assert.equal(card.parent!.props.style.zIndex, 1);
     await act(async () => tree.unmount());

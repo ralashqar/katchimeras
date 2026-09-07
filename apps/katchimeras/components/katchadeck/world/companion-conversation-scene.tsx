@@ -1,3 +1,4 @@
+import { useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MossproutSeedNarrativeReward } from './mossprout-seed-narrative-reward';
 import { conversationUsesNarrativeOverlay } from '@/utils/conversation-presentation';
 import { ConversationNarrativeOverlay } from './conversation-narrative-overlay';
@@ -133,25 +134,31 @@ export function CompanionConversationScene({
   journalMergeEnergyPreview: number;
   navigationLocked?: boolean;
 }) {
+  const ftueRun = useFtueRun();
   const node = conversationNode(definition, session.currentNodeId);
   const journeyNarrative = definition.purpose === 'journey' && definition.format === 'narrative';
   const activeGameQuestion = node?.kind === 'profile_game' || node?.kind === 'insight_game'
     ? conversationGameQuestion(node, session) : null;
   const history = conversationTranscript(session, definition);
   const line = conversationSpeechLine(session, definition);
-  const entries = history.at(-1)?.text === line ? history : [...history, {
+  const entries = session.outcomePresentation || history.at(-1)?.text === line ? history : [...history, {
     id: node?.kind === 'choice' || node?.kind === 'poll' || activeGameQuestion
       ? `conversation-turn:${session.id}:${session.turns.length + 1}:prompt`
-      : `${session.id}:${session.currentNodeId}:${session.outcomePresentation?.id ?? ''}:current`,
+      : `${session.id}:${session.currentNodeId}:current`,
     speaker: session.formId, text: line,
   }];
   const terminal = !session.preview && ((session.pendingReply !== undefined && !session.pendingNextNodeId) || (session.pendingReply === undefined && (node?.kind === 'end' || session.status === 'completed' || session.outcomeCompletionPending)))
     && !(definition.isOpener && session.exitTransition && session.exitTransition.kind !== 'continuation');
+  const actionOutcome = Boolean(session.actionOrigin && session.outcomePresentation && !session.preview);
+  const finishActionOutcome = onAdvanceAction;
   return <ConversationNarrativeOverlay inline={!conversationUsesNarrativeOverlay(definition)} title={name} entries={entries}
     checkpoint={`${session.id}:${session.updatedAt}:${session.currentNodeId}:${session.pendingReply ?? ''}`}
-    required={navigationLocked} onClose={onClose}>
+    paced={ftueRun?.status === 'active'} initiallyRevealedCount={history.length}
+    required={navigationLocked || ftueRun?.status === 'active'} onClose={actionOutcome ? finishActionOutcome : onClose}>
     {(perform) => {
-      const onAdvance = () => perform(onAdvanceAction, terminal);
+      const onAdvance = () => actionOutcome
+        ? perform(finishActionOutcome, true)
+        : perform(onAdvanceAction, terminal);
       const onCompletedExit = () => perform(onCompletedExitAction, true);
       const answer = (id: string) => perform(() => onAnswerAction(id));
       const onGoalDecision: typeof onGoalDecisionAction = (...args) => perform(() => onGoalDecisionAction(...args));

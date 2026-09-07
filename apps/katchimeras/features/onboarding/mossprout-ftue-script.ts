@@ -343,10 +343,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
       spotlight: {
-        targets: [
-          { kind: 'haven_guide' },
-          { kind: 'haven_upgrade_button', characterId: 'mossprout' },
-        ],
+        targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }],
         grouping: 'bounding_rect',
         padding: 7,
         radius: 22,

@@ -696,6 +696,9 @@ test('route-changing FTUE actions persist before navigation and owned companion 
   assert.match(kingdomCompanion, /!ftueConversationDefinitionId && !forceMossproutAvailable/);
   assert.match(companion, /openFtueGarden = useCallback\(async \(\) => \{[\s\S]*?installMossproutOnboardingMergeWorld[\s\S]*?advanceFtueActionDurably[\s\S]*?result\.run\?\.stepId !== 'world\.garden_arrival'[\s\S]*?flushFtuePersistence/);
   assert.doesNotMatch(companion, /Could not prepare Mossprout Garden handoff'[\s\S]{0,120}?throw error/);
+  assert.match(companion, /run\?\.stepId === 'companion\.first_meeting'[\s\S]*?setNarrativeHandoffActive\(true\)[\s\S]*?actionId: 'companion\.complete_first_meeting'[\s\S]*?actionId: 'companion\.continue_to_planting'[\s\S]*?world\.garden_arrival/);
+  assert.match(companion, /completeStepplingNarrative = useCallback[\s\S]*?setNarrativeHandoffActive\(true\)[\s\S]*?completeStepplingDayOne/);
+  assert.match(companion, /if \(narrativeHandoffActive \|\| stepplingDayOne\.gardenHandoffPending \|\| mistHandoffActive \|\| pendingMistExit\) return/);
   assert.match(roster, /openFtueGarden = useCallback\(async \(\) => \{[\s\S]*?transitionTo\(\{[\s\S]*?target: 'merge'[\s\S]*?advanceFtueActionDurably[\s\S]*?result\.step\?\.surface !== 'merge'[\s\S]*?router\.push/);
   assert.doesNotMatch(roster, /continueFirstBloomToResident|haven\.continue_to_resident/);
   assert.match(companion, /run\?\.stepId === 'companion\.chapter_zero_return'[\s\S]*?nextStepId: 'companion\.water_together'/);

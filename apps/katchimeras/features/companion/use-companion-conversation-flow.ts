@@ -104,6 +104,19 @@ export function useCompanionConversationFlow({
     onContinue();
   }, [manualDialogue, directResidentParcelHandoff, node, onContinue, session]);
 
+  // Action-card insight conversations use one result surface. Resolve the
+  // authored insight boundary before paint so it cannot flash a first card
+  // before the shared outcome card. The outcome remains pending until the
+  // overlay has animated out, which keeps reward ownership with the card.
+  useLayoutEffect(() => {
+    if (!manualDialogue || !session?.actionOrigin || session.preview
+      || node?.kind !== 'insight_reveal' || !session.insightResult) return;
+    const key = `${session.id}:${node.id}:action-insight`;
+    if (automatedRef.current.has(key)) return;
+    automatedRef.current.add(key);
+    onCommitInsight(node);
+  }, [manualDialogue, node, onCommitInsight, session]);
+
   useLayoutEffect(() => {
     if ((manualDialogue && !session?.dialogueAcknowledgedAt) || !(skipCompletedTransition || trailChat) || (screenReaderEnabled && !directResidentParcelHandoff && !trailChat) || !session || !definition || session.outcomePresentation) return;
     if (session.status !== 'completed') return;
@@ -199,6 +212,13 @@ export function useCompanionConversationFlow({
     if (!session || !definition) return;
     if (session.outcomePresentation) {
       onDismissOutcome();
+      if (manualDialogue && session.actionOrigin && !session.preview) {
+        // Action cards return to their board as one transaction. Mark this
+        // before the synchronous save rerenders the completed session so the
+        // completion effect cannot issue a second route exit.
+        automatedRef.current.add(`${session.id}:complete`);
+        onComplete();
+      }
       return;
     }
     if (session.pendingReply !== undefined || node?.kind === 'form_reveal') {

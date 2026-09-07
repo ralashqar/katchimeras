@@ -30,7 +30,7 @@ export function FtueBondNarrative({ runId, selectedGrowthId, onContinue }: {
     ] };
   });
   const save = (next: Checkpoint) => { setStoredJson(key, next); saveFtueNarrativeHistory(runId, next.entries); setState(next); };
-  return <ConversationNarrativeOverlay title="A little room to grow" entries={state.entries} checkpoint={state.phase} required onClose={() => undefined}>
+  return <ConversationNarrativeOverlay title="A little room to grow" entries={state.entries} checkpoint={state.phase} required paced onClose={() => undefined}>
     {(perform) => state.phase === 'growth' ? <CompanionChoiceList presentation="single-column" options={prompt.options}
       onSelect={(id) => perform(async () => {
         const option = prompt.options.find((candidate) => candidate.id === id)!;

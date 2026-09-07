@@ -1090,7 +1090,7 @@ export function KatchimeraKingdomScreen({
           <View style={styles.gardenButton}>
             <Pressable
               accessibilityHint="Opens the dedicated Merge Garden"
-              accessibilityLabel="Open Garden"
+              accessibilityLabel="Open Merge"
               accessibilityRole="button"
               disabled={navigationLocked && !glowDiscoveryAllowsGarden(glowRun) && !['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '')}
               onPress={['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '') ? onFtueOpenGarden : () => {
@@ -1112,7 +1112,6 @@ export function KatchimeraKingdomScreen({
                 style={StyleSheet.absoluteFill}
                 transition={0}
               />
-              <ThemedText style={styles.gardenButtonLabel} lightColor="#5B3514" darkColor="#5B3514">Garden</ThemedText>
             </Pressable>
           </View>
         </Animated.View>
@@ -1218,7 +1217,7 @@ export function KatchimeraKingdomScreen({
           </View>
         </KatchaSheet>
       ) : null}
-      {havenOpeningActive && ftueStep && !activeInteractionResidentId ? (
+      {havenOpeningActive && ftueStep && !activeInteractionResidentId && ftueStepId !== 'world.first_bloom_restore' ? (
         <View
           pointerEvents="box-none"
           style={[
@@ -1336,7 +1335,7 @@ export function KatchimeraKingdomScreen({
         <View collapsable={false} ref={setHavenGuideNode} pointerEvents="none" style={{ position: 'absolute', right: 148, bottom: Math.max(insets.bottom, 12) + 30, width: Math.min(250, window.width - 164), zIndex: 85 }}>
           <MergeFtueEggGuide hideAvatar inlineWidth={Math.min(250, window.width - 164)}
             anchor={{ x: 0, y: 0, width: 0, height: 0 }} screen={window}
-            guide={{ eyebrow: '', title: 'Tap Garden.', body: 'Merge to earn Glow and clear the mist!' }} />
+            guide={{ eyebrow: '', title: 'Tap Merge.', body: 'Merge to earn Glow and clear the mist!' }} />
         </View>
       ) : null}
       {screenFocused && ftueCameraSettled && glowRun?.status === 'active' && !sharedUpgrade && !['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy'].includes(glowRun.nodeId) && glowPanelOpen && glowWorldTarget && !activeInteractionResidentId && !upgradePresentation ? <HavenFtueOverlay
@@ -1392,13 +1391,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   gardenButtonPressed: { opacity: 0.9, transform: [{ scale: 0.96 }] },
-  gardenButtonLabel: {
-    fontFamily: AppFontFamilies.fredokaBold,
-    fontSize: 19,
-    lineHeight: 23,
-    marginTop: 33,
-    textAlign: 'center',
-  },
   discoveryHint: {
     backgroundColor: 'rgba(214,203,242,0.09)',
     borderColor: 'rgba(214,203,242,0.2)',

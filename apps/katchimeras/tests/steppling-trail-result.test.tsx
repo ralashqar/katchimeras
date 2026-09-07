@@ -21,8 +21,9 @@ test('trail insight waits for Continue and returns home once without a timed com
     let dismissals = 0;
     let flow: { advance: () => void; requiresManualAdvance: boolean };
     function Harness() {
-      const [session, setSession] = React.useState({ id: 'trail', status: 'active', currentNodeId: 'finish', outcomePresentation: { id: 'insight', title: 'Treasure', message: 'A small discovery.' } as object | undefined });
-      flow = module.useCompanionConversationFlow({ definition, session, reduceMotion,
+      const [session, setSession] = React.useState({ id: 'trail', status: 'active', currentNodeId: 'finish',
+        actionOrigin: { actionId: definition.id }, outcomePresentation: { id: 'insight', title: 'Treasure', message: 'A small discovery.' } as object | undefined });
+      flow = module.useCompanionConversationFlow({ definition, session, reduceMotion, manualDialogue: true,
         onCommitInsight() {}, onCommitMemory() {}, onContinue() { assert.fail('no extra end beat'); },
         onComplete() { exits++; }, onDismissOutcome() {
           dismissals++;
@@ -38,8 +39,43 @@ test('trail insight waits for Continue and returns home once without a timed com
     assert.equal(exits, 0);
     await act(async () => flow!.advance());
     assert.equal(dismissals, 1);
-    assert.equal(exits, 1, 'completion returns straight to the dashboard');
+    assert.equal(exits, 1, 'the same acknowledgement returns straight to the dashboard');
     assert.equal(timers.size, 0);
     await act(async () => tree!.unmount());
   }
+});
+
+test('action-card insights resolve directly to one final outcome panel', async () => {
+  const definition = STEPPLING_TRAIL_CONVERSATIONS.find((item) => item.id.endsWith('trail-treasure'))!;
+  const insight = definition.nodes.find((node) => node.kind === 'insight_reveal')!;
+  const module = loadNativeModule('features/companion/use-companion-conversation-flow.ts', {
+    'react-native': { AccessibilityInfo: { isScreenReaderEnabled: async () => false, addEventListener: () => ({ remove() {} }) } },
+    '@/constants/katchimera-skins': { katchimeraSkinById: new Map() },
+    '@/utils/companion-conversation': { conversationNode: (candidate: typeof definition, id: string) => candidate.nodes.find((node) => node.id === id) },
+  });
+  let commits = 0;
+  let flow: { phase: string };
+  function Harness() {
+    const [session, setSession] = React.useState({
+      id: 'trail-action', status: 'active', currentNodeId: insight.id, preview: false,
+      actionOrigin: { actionId: definition.id }, insightResult: { resultId: 'notice' },
+      outcomePresentation: undefined as object | undefined,
+    });
+    flow = module.useCompanionConversationFlow({
+      definition, session, reduceMotion: true, manualDialogue: true,
+      onCommitInsight() {
+        commits++;
+        setSession((current) => ({ ...current, outcomePresentation: { id: 'outcome', title: 'Trail treasure', message: 'Saved.' } }));
+      },
+      onCommitMemory() {}, onContinue() {}, onComplete() {}, onDismissOutcome() {},
+    });
+    return null;
+  }
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Harness />); });
+  assert.equal(commits, 1, 'the intermediate insight panel is resolved once before paint');
+  assert.equal(flow!.phase, 'revealing', 'only the shared final outcome remains');
+  await act(async () => tree!.update(<Harness />));
+  assert.equal(commits, 1, 'rerenders cannot create a second outcome');
+  await act(async () => tree!.unmount());
 });

@@ -478,7 +478,9 @@ test('the shared Haven keeps its authored neighborhood art and adds only owned r
   assert.match(screen, /familyId === 'mossprout'/);
   assert.doesNotMatch(screen, /YOUR HAVEN|Tap a home or a mist tile|Open World and Board Lab/);
   assert.match(screen, /<GameHudBar[\s\S]*?<GameCurrencyHud[\s\S]*?GAME_CURRENCY_ART\.coins/);
-  assert.match(screen, /accessibilityLabel="Open Garden"/);
+  assert.match(screen, /accessibilityLabel="Open Merge"/);
+  assert.match(screen, /mossprout-garden-button-v1-256\.webp/);
+  assert.doesNotMatch(screen, />Garden<|gardenButtonLabel/);
   assert.match(screen, /source: 'haven-world'/);
   assert.match(screen, /useGameScreenTransition\(\)/);
   assert.match(screen, /announcement: "Opening Mossprout's Garden"[\s\S]*?target: 'merge'[\s\S]*?onCovered: closeResidentInteraction[\s\S]*?router\.push/);

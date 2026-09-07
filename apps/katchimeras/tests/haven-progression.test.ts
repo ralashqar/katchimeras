@@ -388,7 +388,6 @@ test('Mossprout FTUE turns one Bond answer into a Garden upgrade and an intimate
   const firstBloomProjection = mossproutFtueStep('world.first_bloom_restore')?.camera;
   assert.equal(firstBloomProjection?.kind === 'focus_target' ? firstBloomProjection.projectionOnly : false, true);
   assert.deepEqual(mossproutFtueStep('world.first_bloom_restore')?.spotlight?.targets, [
-    { kind: 'haven_guide' },
     { kind: 'haven_upgrade_button', characterId: 'mossprout' },
   ]);
   assert.equal(mossproutFtueStep('companion.chapter_zero_return')?.actions[0]?.nextStepId, 'companion.water_together');
@@ -416,6 +415,7 @@ test('FTUE upgrade is explicit and meditation Back exits without reopening Merge
   assert.match(mergeRoute, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'/);
   assert.match(mergeRoute, /!\['world\.first_bloom_offer', 'world\.first_bloom_restore'\]\.includes\(ftueRun\.stepId\)[\s\S]*?announcement: 'Returning to the Garden'[\s\S]*?target: 'katchimeras'[\s\S]*?flushFtuePersistence/);
   assert.match(havenScreen, /gardenOrdersInteractive=\{false\}/);
+  assert.match(havenScreen, /havenOpeningActive && ftueStep && !activeInteractionResidentId && ftueStepId !== 'world\.first_bloom_restore'/);
   assert.match(havenScreen, /!interactionCreatureId \|\| !ftueStepId \|\| ftueStepId\.startsWith\('companion\.'\)[\s\S]*?closeResidentInteraction\(\)/);
   assert.match(havenScreen, /!upgradePresentation && !interactionCreatureId && \(ftueStepId === 'haven\.mossprout\.focus'/);
   assert.match(havenScreen, /FIRST_BLOOM_GARDEN_UPGRADE_OFFER[\s\S]*?anchor: \{ x: 0\.5, y: 0\.76 \}[\s\S]*?target: \{ kind: 'haven_structure', structureId: 'mossprout-hex-garden' \}/);

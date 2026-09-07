@@ -31,7 +31,9 @@ export function FtueGrowDialogue({ runId, id, prompt, choices, invitation, nextD
       { id: `${id}:reply`, speaker: 'mossprout', text: selected.reply });
     if (invitation) entries.push({ id: `${id}:invitation`, speaker: 'mossprout', text: invitation });
   }
-  return <ConversationNarrativeOverlay title="Mossprout" entries={[...history.entries.filter((entry) => !entries.some((current) => current.id === entry.id)), ...entries]} checkpoint={`${id}:${activeChoiceId ?? "question"}`} required onClose={() => undefined}>
+  const priorEntries = history.entries.filter((entry) => !entries.some((current) => current.id === entry.id));
+  return <ConversationNarrativeOverlay title="Mossprout" entries={[...priorEntries, ...entries]} checkpoint={`${id}:${activeChoiceId ?? "question"}`}
+    required paced initiallyRevealedCount={priorEntries.length} onClose={() => undefined}>
     {(perform) => selected ? <KatchaButton fullWidth label="Continue" onPress={() => perform(() => { saveFtueNarrativeHistory(runId, entries, { id, value: selected.id }); return onFinish(selected.id, initialChoiceId ?? undefined); }, true)} />
       : <CompanionChoiceList presentation="single-column" options={choices} onSelect={(choiceId) => perform(() => {
         const choice = choices.find((candidate) => candidate.id === choiceId)!;
