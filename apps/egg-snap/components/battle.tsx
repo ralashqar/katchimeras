@@ -4,6 +4,7 @@ import { CombatVolleys, type CombatVolleyData, type CombatBurstData } from "./co
 import { CELL_STAGGER_MS } from "../game/volley-presentation";
 import { TileArtTheme } from "./tile-art-theme";
 import { DuelHatchRewards } from './duel-hatch-rewards';
+import { CombatCountdown } from './combat-countdown';
 import { AppearanceGallery } from "./appearance-gallery";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -144,6 +145,8 @@ function Battle({
   const [paused, setPaused] = useState(false);
   const [guides, setGuides] = useState(false);
   const [ready, setReady] = useState(false);
+  const [started, setStarted] = useState(false);
+  const startCombat = useCallback(() => setStarted(true), []);
   const muted = profile?.preferences?.sound === false;
   const hapticsEnabled = profile?.preferences?.haptics !== false;
   const [lesson, setLesson] = useState<string | null>(null);
@@ -152,7 +155,7 @@ function Battle({
   );
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const suspended = paused || story || !!lesson || !ready;
+  const suspended = paused || story || !!lesson || !ready || !started;
   const game = useCombat(definition, seed, suspended, practice, stress);
   const { state, ref, clock, drop, backgrounded, presentation } = game;
   useLayoutEffect(() => { if (practice) presentation.performance.commits++; });
@@ -598,6 +601,8 @@ function Battle({
         from={layout.stage ? {x: layout.stage.rival.visible.x + layout.stage.rival.visible.width/2, y: layout.stage.rival.visible.y + layout.stage.rival.visible.height/2} : {x: width/2, y: layout.opponentY + layout.opponentSize/2}}
         to={layout.stage ? {x: layout.stage.player.visible.x + layout.stage.player.visible.width/2, y: layout.stage.player.visible.y + layout.stage.player.visible.height/2} : {x: width/2, y: layout.eggY + layout.eggSize/2}} />}
       {practice && <PerformancePanel presentation={presentation} volleys={volleys} bursts={bursts} paused={suspended} />}
+      <CombatCountdown paused={paused || story || !!lesson || !ready || backgrounded} reduced={reduced}
+        muted={muted} haptics={hapticsEnabled} onStart={startCombat} />
       {story && (
         <Dialogue
           id={`duel:${definition.id}`}

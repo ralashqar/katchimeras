@@ -1,6 +1,10 @@
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 
 const SOURCES = {
+  count3: require('@incubator/tile-match/audio/countdown-3.mp3'),
+  count2: require('@incubator/tile-match/audio/countdown-2.mp3'),
+  count1: require('@incubator/tile-match/audio/countdown-1.mp3'),
+  go: require('@incubator/tile-match/audio/go.mp3'),
   place: require('@incubator/tile-match/audio/block-place.mp3'),
   good: require('@incubator/tile-match/audio/good-sfx.mp3'),
   late: require('@incubator/tile-match/audio/late-sfx.mp3'),
@@ -10,7 +14,7 @@ const SOURCES = {
   hit: require('../assets/hit.wav'),
 };
 type Sound = keyof typeof SOURCES;
-const VOLUME: Record<Sound, number> = { place: .45, good: .55, late: .5, missed: .5, win: .6, lose: .5, hit: .25 };
+const VOLUME: Record<Sound, number> = { count3: .55, count2: .55, count1: .55, go: .6, place: .45, good: .55, late: .5, missed: .5, win: .6, lose: .5, hit: .25 };
 
 /** Separate voices let rapid two-piece placements overlap without cutting off. */
 export function createGameAudio() {
