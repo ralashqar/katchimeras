@@ -1,3 +1,4 @@
+import { conversationUsesNarrativeOverlay } from '@/utils/conversation-presentation';
 import { ftueDialoguePages } from '@/features/onboarding/ftue-dialogue-pages';
 import { useCompanionDestinationMotion } from '@/hooks/use-companion-destination-motion';
 import { CompanionEnvironmentGestureContext } from './companion-environment-gesture-context';
@@ -657,6 +658,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     && !props.ftueResidentStoryResume;
   const initialConversationHandoffPending = Boolean(
     props.initialConversationDefinitionId
+    && !initialConversationObservedActiveRef.current
+    && !(props.conversationSession?.definitionId === props.initialConversationDefinitionId && props.conversationSession.status === 'completed')
     && (!initialConversationContentReady || route.kind !== 'conversation')
   );
   const requestStoryConversation = useCallback((definitionId: string, actionOrigin?: KatchimeraActionOrigin) => {
@@ -763,6 +766,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     const session = props.conversationSession;
     if (!session || !companionInitialConversationCompletionReady(session, definitionId)) return;
     if (props.ftueResidentMatchResultActive) return;
+    if (session.dialoguePresentation && !session.dialogueAcknowledgedAt) return;
     if (completedInitialConversationRef.current === session.id) return;
     completedInitialConversationRef.current = session.id;
     void Promise.resolve(onInitialConversationComplete?.())
@@ -1189,6 +1193,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const conversationExperience = props.conversationSession && props.conversationDefinition
     ? { session: props.conversationSession, definition: props.conversationDefinition }
     : null;
+  // A retained session is not a visible conversation. Dashboard feedback must
+  // remain available after returning from a multi-choice interaction.
+  const narrativeOverlayVisible = Boolean(conversationExperience
+    && (route.kind === 'visit' || route.kind === 'conversation')
+    && !residentFtueDashboard && !initialConversationHandoffPending
+    && props.active !== false
+    && conversationUsesNarrativeOverlay(conversationExperience.definition));
   const feastleFirstMeetingActive = conversationExperience?.definition.id === FEASTLE_FIRST_MEETING_DEFINITION_ID;
   const baristabbitFirstMeetingActive = conversationExperience?.definition.id === BARISTABBIT_FIRST_MEETING_DEFINITION_ID;
   const journeyCohortFirstMeetingActive = conversationExperience?.definition.id === STEPPLING_FIRST_MEETING_DEFINITION_ID
@@ -1227,8 +1238,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   }, [onInsightConversationDecision]);
   const dismissConversationOutcome = useCallback(() => {
     onDismissConversationOutcome();
-    if (props.familyId === 'mossprout') showFeastleStoryHome();
-  }, [onDismissConversationOutcome, props.familyId, showFeastleStoryHome]);
+  }, [onDismissConversationOutcome]);
   const conversationFamilyId = props.familyId;
   const openConversationMerge = props.onOpenMerge;
   const completeConversation = useCallback(() => {
@@ -1292,6 +1302,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     showFeastleStoryHome();
   }, [completedConversationDefinitionId, completedConversationSessionId, completedConversationStatus, onCompletedConversationExit, onInitialConversationComplete, showFeastleStoryHome]);
   const conversationFlow = useCompanionConversationFlow({
+    manualDialogue: true,
     definition: conversationExperience?.definition ?? null,
     onCommitInsight: commitConversationInsight,
     onCommitMemory: commitConversationMemory,
@@ -1553,7 +1564,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               && conversationFlow.phase !== 'committing'
               ? conversationFlow.advance
               : undefined}
-            showSpeechBubble={props.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && (Boolean(companionSpeechTitle) || !residentParcelGardenPanelActive)}
+            showSpeechBubble={!narrativeOverlayVisible
+              && props.ftueProfileStep !== 'garden_intro'
+              && !(conversationExperience?.definition.id.startsWith('mossprout:ftue:first-meeting:') && conversationExperience.session.status === 'completed' && (route.kind === 'conversation' || route.kind === 'visit'))
+              && props.ftueProfileStep !== 'bond_choice' && props.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && (Boolean(companionSpeechTitle) || !residentParcelGardenPanelActive)}
             showNameplate={route.kind === 'dashboard' && props.familyId !== 'mossprout'}
             stagePresentation={props.reuseUnderlyingStage && !props.renderRegularStage ? 'speech-only' : 'full'}
             title={companionSpeechTitle ?? (residentStoryResumeDashboard
@@ -1595,7 +1609,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             starters={props.conversationStarters}
           />
         ) : (route.kind === 'visit' || route.kind === 'conversation') && !residentFtueDashboard ? (
-          conversationExperience ? <CompanionConversationScene
+          conversationExperience && props.active !== false ? <CompanionConversationScene
             bondIconTargetRef={bondRewardTargetRef}
             bondProgress={displayedBondProgress}
             bondRewardPulseKey={rewardPulseKey}
@@ -1630,9 +1644,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onGoalDecision={props.onGoalConversationDecision}
             onInsightDecision={(accept, node) => {
               props.onInsightConversationDecision(accept, node);
-              if (accept && !conversationExperience.session.preview) {
-                if (props.familyId !== 'mossprout') selectExperienceDestination('insight');
-              }
+
             }}
             onKeepTalking={props.onKeepTalkingConversation}
             onDismissOutcome={dismissConversationOutcome}
@@ -1652,16 +1664,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             onJournalHandoff={props.onJournalConversationHandoff}
             onQuestHandoff={props.onQuestConversationHandoff}
             onMemoryDecision={(remember, summary) => {
-              const currentNode = conversationExperience.definition.nodes.find(
-                (candidate) => candidate.id === conversationExperience.session.currentNodeId
-              );
               props.onMemoryConversationDecision(remember, summary);
-              if (
-                remember
-                && !conversationExperience.session.preview
-                && currentNode?.kind === 'memory_proposal'
-                && currentNode.memoryKey.includes(':form-match')
-              ) selectExperienceDestination('insight');
             }}
             memories={props.memories}
             onStoryComplete={experience.showHome}

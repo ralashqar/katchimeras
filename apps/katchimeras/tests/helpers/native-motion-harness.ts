@@ -111,7 +111,10 @@ export function loadNativeModule(path: string, mocks: Record<string, unknown>, g
       // Propagate native mocks through the same package graph used by the app.
       const localRequire = createRequire(resolve(path));
       if (id.startsWith('@incubator/') || (path.includes('packages') && id.startsWith('.'))) {
-        return loadNativeModule(localRequire.resolve(id), mocks, globals);
+        const resolved = localRequire.resolve(id);
+        // Metro treats artwork as an asset reference, never JavaScript source.
+        if (/\.(webp|png|jpe?g|gif)$/.test(resolved)) return resolved;
+        return loadNativeModule(resolved, mocks, globals);
       }
       return requireFromTest(id);
     },

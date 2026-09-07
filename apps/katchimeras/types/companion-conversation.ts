@@ -34,6 +34,8 @@ export type ConversationTransition =
   | { kind: 'continuation'; destination?: 'menu' | 'memory' };
 
 export type ConversationOption = {
+  /** Optional natural spoken wording; otherwise the exact choice label is used. */
+  spokenText?: string;
   id: string;
   label: string;
   reply: string;
@@ -232,7 +234,14 @@ export type ConversationDefinition = {
   topicKey?: string;
 };
 
+export type ConversationTranscriptEntry = {
+  id: string;
+  speaker: KatchimeraSkinId | "player";
+  text: string;
+};
+
 export type ConversationTurn = {
+  transcript?: ConversationTranscriptEntry[];
   id: string;
   nodeId: string;
   questionId?: string;
@@ -271,6 +280,13 @@ export type ConversationOutcomePresentation = {
 export type ConversationSessionStatus = 'active' | 'completed' | 'archived';
 
 export type ConversationSession = {
+  /** Explicit presentation checkpoints; older sessions keep their original engine behavior. */
+  dialoguePresentation?: boolean;
+  outcomeCompletionPending?: boolean;
+  pendingInsightReward?: { id: string; creatureId: string; kind: 'conversation_completed' | 'insight_saved'; occurredAt: number; dayId: string };
+  transcriptPrefix?: ConversationTranscriptEntry[];
+  transcriptEvents?: (ConversationTranscriptEntry & { afterTurn: number })[];
+  dialogueAcknowledgedAt?: number;
   id: string;
   definitionId: string;
   definitionVersion: number;

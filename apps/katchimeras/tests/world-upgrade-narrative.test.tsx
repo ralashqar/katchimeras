@@ -12,7 +12,12 @@ import { loadNativeModule, nativeMotionHarness, nativeViews } from './helpers/na
 test('required splash alternates portraits and cannot close before final saved Continue', async () => {
   const host = (name: string) => name as unknown as React.ComponentType<Record<string, unknown>>;
   const motion = nativeMotionHarness();
+  const presentation = loadNativeModule('components/katchadeck/world/narrative-presentation.tsx', {
+    'react-native': { ...nativeViews, Text: 'Text' },
+    '@/constants/katcha-ui': { KatchaUI: { type: { companionCardTitle: {}, companionDisplay: {}, companionBody: {} } } },
+  });
   const module = loadNativeModule('components/katchadeck/world/world-upgrade-narrative.tsx', {
+    './narrative-presentation': presentation,
     'react-native': { ...nativeViews, Pressable: 'Pressable', Text: 'Text', Modal: 'Modal', ScrollView: 'ScrollView' },
     'react-native-reanimated': { ...motion.animated, withSpring: (to: number) => motion.animated.withTiming(to, { duration: 300 }) },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 12 }) },

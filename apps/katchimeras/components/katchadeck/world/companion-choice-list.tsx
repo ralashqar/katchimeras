@@ -74,7 +74,8 @@ export function CompanionChoiceList({
               </View>
             ) : null}
             <ThemedText
-              selectable
+              selectable={false}
+              pointerEvents="none"
               style={{ flex: 1, fontSize: 15, fontWeight: '800', lineHeight: 20 }}
               lightColor={KatchaUI.companionScenePanel.optionInk}
               darkColor={KatchaUI.companionScenePanel.optionInk}>

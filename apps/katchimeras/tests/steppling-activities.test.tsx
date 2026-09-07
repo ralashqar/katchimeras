@@ -162,6 +162,10 @@ test('shared conversation completion awards Steppling once and preserves Mosspro
   const commit = module.commitKatchimeraActionCompletion as (input: { definition: typeof definition; session: ConversationSession }) => { rewardReceipt: { creatureId: string; points: number } | null };
   assert.equal(commit({ definition, session: active }).rewardReceipt, null);
   const completed = { ...active, status: 'completed' as const, completedAt: Date.now() };
+  const gated = { ...completed, dialoguePresentation: true };
+  assert.equal(commit({ definition, session: gated }).rewardReceipt, null, 'reading the result cannot earn the card');
+  assert.equal(commit({ definition, session: { ...gated, dialogueAcknowledgedAt: Date.now(), outcomeCompletionPending: true } }).rewardReceipt, null);
+  assert.equal(relationships.actionPresentations.length, 0, 'no completed card may mount before overlay exit');
   const first = commit({ definition, session: completed });
   const second = commit({ definition, session: completed });
   assert.equal(first.rewardReceipt?.points, 8);

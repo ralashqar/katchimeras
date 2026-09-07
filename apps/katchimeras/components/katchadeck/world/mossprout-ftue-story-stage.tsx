@@ -1,3 +1,5 @@
+import { loadFtueNarrativeHistory } from '@/features/onboarding/ftue-narrative-history';
+import { FtueBondNarrative } from './ftue-bond-narrative';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { MossproutFtueRestAction } from './mossprout-ftue-rest-action';
 import { MossproutFirstGrowStage } from './mossprout-first-grow-stage';
@@ -26,8 +28,6 @@ import { MOSSPROUT_CHAPTER_ZERO_REQUESTS } from '@/utils/merge-world/chapter-zer
 import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { useFtueRun } from '@/features/onboarding/ftue-runtime';
 import {
-  MOSSPROUT_BOND_SHARE_PROMPTS,
-  MOSSPROUT_SUPPORT_STYLE_OPTIONS,
   MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW,
   MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW,
   mossproutBondShareSelection,
@@ -36,7 +36,6 @@ import {
 import { mossproutMemoryPlantById } from '@/constants/mossprout-memory-plants';
 
 const INTRODUCTION_REWARD = { amount: MOSSPROUT_FTUE_NAME_BOND_REWARD_PREVIEW, kind: 'bond' as const };
-const BOND_SHARE_REWARD = { amount: MOSSPROUT_FTUE_BOND_SHARE_REWARD_PREVIEW, kind: 'bond' as const };
 
 export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActionIcon = 'leaf.fill', gardenStoryActionLabel = 'Show me the Garden', mode = 'garden', nickname, onNarration, onBondRewardRequest, onContinue, onOpenMerge, pendingBondCelebration }: {
   actionStackTargetRef?: RefObject<ViewType | null>;
@@ -113,29 +112,9 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
             subtitle={selectedBondShare.answer.label}
             title={selectedBondShare.prompt.cardLabel}
           />
-        ) : selectedBondShare ? MOSSPROUT_SUPPORT_STYLE_OPTIONS.map((option) => (
-          <DayActionActiveRow animateLayout={false} key={option.id} label={option.label}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => onContinue?.(option.id)}
-              style={({ pressed }) => pressed && styles.pressed}>
-              <DayActionCardSurface artwork={<DayActionIcon icon={option.icon} />} title={option.label} />
-            </Pressable>
-          </DayActionActiveRow>
-        )) : MOSSPROUT_BOND_SHARE_PROMPTS[0].options.map((option) => (
-          <DayActionActiveRow animateLayout={false} key={option.id} label={option.label}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => onContinue?.(`${MOSSPROUT_BOND_SHARE_PROMPTS[0].id}:${option.id}`)}
-              style={({ pressed }) => pressed && styles.pressed}>
-              <DayActionCardSurface
-                artwork={<DayActionIcon icon={option.icon} />}
-                reward={<DayActionRewardChip reward={BOND_SHARE_REWARD} />}
-                title={option.label}
-              />
-            </Pressable>
-          </DayActionActiveRow>
-        ))}
+        ) : <FtueBondNarrative runId={ftueRun?.runId ?? 'first-session'} selectedGrowthId={selectedBondShare?.id}
+          onContinue={(id) => onContinue?.(id)} />}
+
       </View>
     </Animated.View>
   );
@@ -233,7 +212,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, gardenStoryActio
 
   if (mode === 'water_response') return (
     <Animated.View style={styles.actionStage}>
-      <MossproutFtueRestAction onNarration={onNarration} onRest={onContinue} />
+      <MossproutFtueRestAction history={ftueRun ? loadFtueNarrativeHistory(ftueRun.runId).entries : []} onNarration={onNarration} onRest={onContinue} />
     </Animated.View>
   );
 

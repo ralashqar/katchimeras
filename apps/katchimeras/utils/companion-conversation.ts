@@ -1,3 +1,4 @@
+import { rememberConversationLine } from '@/utils/conversation-transcript';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type {
   ConversationDefinition,
@@ -89,7 +90,7 @@ export function answerConversation(
   optionId: string,
   answeredAt = Date.now()
 ): ConversationAnswerResult {
-  if (session.status !== 'active') {
+  if (session.status !== 'active' || (session.dialoguePresentation && session.pendingReply !== undefined)) {
     return { session, completedGame: false };
   }
   const workingSession = session.pendingReply !== undefined
@@ -100,7 +101,7 @@ export function answerConversation(
   if (node.kind === 'choice') {
     const option = node.options.find((candidate) => candidate.id === optionId);
     if (!option) return { session, completedGame: false };
-    const answered = withAnsweredOption(workingSession, node.id, option, answeredAt, option.nextNodeId);
+    const answered = withAnsweredOption(workingSession, node.id, option, answeredAt, option.nextNodeId, node.prompt);
     return {
       session: advancePastReplyBeforeNextQuestion(answered, definition, answeredAt),
       completedGame: false,
@@ -111,7 +112,7 @@ export function answerConversation(
     if (!option) return { session, completedGame: false };
     const pollResult = buildVillagePollResult(node.options, optionId, `${workingSession.id}:${node.id}`);
     const answered = {
-      ...withAnsweredOption(workingSession, node.id, option, answeredAt, node.nextNodeId),
+      ...withAnsweredOption(workingSession, node.id, option, answeredAt, node.nextNodeId, node.prompt),
       pollResult,
     };
     return {
@@ -136,6 +137,7 @@ export function answerConversation(
     id: `conversation-turn:${workingSession.id}:${workingSession.turns.length + 1}`,
     nodeId: node.id,
     questionId: question.id,
+    transcript: answerTranscript(workingSession, (workingSession.turns.at(-1)?.optionId ? question.promptByPriorOptionId?.[workingSession.turns.at(-1)!.optionId] : undefined) ?? question.prompt, option),
     optionId: option.id,
     ...(option.intentId ? { intentId: option.intentId } : {}),
     answeredAt,
@@ -191,6 +193,11 @@ export function continueConversation(
   }
   const node = conversationNode(definition, session.currentNodeId);
   if (!node) return session;
+  if (session.dialoguePresentation && node.kind !== 'choice' && node.kind !== 'poll' && node.kind !== 'profile_game' && node.kind !== 'insight_game') {
+    const text = 'prompt' in node ? node.prompt : node.kind === 'end' ? node.message
+      : node.kind === 'insight_reveal' ? session.insightResult?.reflection ?? node.title : node.title;
+    session = rememberConversationLine(session, `${session.id}:${node.id}:message`, text);
+  }
   if (node.kind === 'form_reveal' || node.kind === 'insight_reveal' || node.kind === 'memory_proposal' || node.kind === 'goal_proposal' || node.kind === 'quick_goal_proposal' || node.kind === 'journal_handoff' || node.kind === 'quest_handoff') {
     if (!node.nextNodeId) return completeSession(session, continuedAt);
     const next = conversationNode(definition, node.nextNodeId);
@@ -557,7 +564,7 @@ function hasOutcomeLessEnding(definition: ConversationDefinition): boolean {
 }
 
 function enterNode(session: ConversationSession, node: ConversationNode, occurredAt: number): ConversationSession {
-  if (node.kind === 'end') return completeSession(session, occurredAt);
+  if (node.kind === 'end' && !session.dialoguePresentation) return completeSession(session, occurredAt);
   return session;
 }
 
@@ -567,6 +574,9 @@ function advancePastReplyBeforeNextQuestion(
   occurredAt: number,
 ): ConversationSession {
   if (session.pendingReply === undefined || !session.pendingNextNodeId) return session;
+  // The transcript retains the reply while the next prompt appears without an
+  // extra tap. A final reply without a next node still waits for explicit exit.
+  if (session.dialoguePresentation) return continueConversation(session, definition, occurredAt);
   const next = conversationNode(definition, session.pendingNextNodeId);
   const directGardenHandoff = definition.id === 'steppling:journey:day-one' && definition.version >= 3 && next?.kind === 'end' && !session.pendingReply;
   if (!next || (!directGardenHandoff && !['choice', 'poll', 'profile_game', 'insight_game'].includes(next.kind))) return session;
@@ -581,7 +591,17 @@ function advancePastReplyBeforeNextQuestion(
 
 function completeSession(session: ConversationSession, completedAt: number): ConversationSession {
   if (session.status === 'completed') return session;
-  return { ...session, status: 'completed', completedAt, updatedAt: completedAt };
+  return { ...session, status: 'completed', completedAt, updatedAt: completedAt, ...(session.dialoguePresentation ? { dialogueAcknowledgedAt: completedAt } : {}) };
+}
+
+function answerTranscript(session: ConversationSession, prompt: string, option: ConversationOption) {
+  const id = `conversation-turn:${session.id}:${session.turns.length + 1}`;
+  const previous = session.turns.at(-1)?.transcript?.find((entry) => entry.speaker === 'player')?.text ?? 'that';
+  return [
+    { id: `${id}:prompt`, speaker: session.formId, text: prompt.replace('{answer}', previous) },
+    { id: `${id}:answer`, speaker: 'player' as const, text: option.spokenText ?? option.label },
+    { id: `${id}:reply`, speaker: session.formId, text: option.reply },
+  ].filter((entry) => entry.text.trim());
 }
 
 function withAnsweredOption(
@@ -589,7 +609,8 @@ function withAnsweredOption(
   nodeId: string,
   option: ConversationOption,
   answeredAt: number,
-  nextNodeId: string | null
+  nextNodeId: string | null,
+  prompt: string,
 ): ConversationSession {
   return {
     ...session,
@@ -599,6 +620,7 @@ function withAnsweredOption(
     turns: [...session.turns, {
       id: `conversation-turn:${session.id}:${session.turns.length + 1}`,
       nodeId,
+      transcript: answerTranscript(session, prompt, option),
       optionId: option.id,
       ...(option.intentId ? { intentId: option.intentId } : {}),
       answeredAt,

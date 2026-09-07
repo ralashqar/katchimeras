@@ -503,7 +503,7 @@ test('FTUE Energy recovery uses one general reflection with no journal hierarchy
 
 test('Mossprout remembers the day, reflects it back, then offers one narrative Garden objective', () => {
   const firstMeetings = mossproutFtueConversationDefinitions.filter((definition) => definition.id.startsWith('mossprout:ftue:first-meeting:'));
-  assert.ok(firstMeetings.every((definition) => definition.version === 9));
+  assert.ok(firstMeetings.every((definition) => definition.version === 10));
   for (const definition of firstMeetings) {
     const hello = definition.nodes.find((node) => node.id === 'hello');
     assert.equal(hello?.kind, 'choice');
@@ -531,10 +531,10 @@ test('Mossprout remembers the day, reflects it back, then offers one narrative G
   assert.match(mossproutStage, /INTRODUCTION_REWARD/);
   assert.match(mossproutStage, /mode === 'intro_action'[\s\S]*?style=\{styles\.plainActionStage\}/);
   assert.match(mossproutStage, /plainActionStage: \{ gap: 7 \}/);
-  assert.match(mossproutStage, /mode === 'bond_choice'[\s\S]*?MOSSPROUT_BOND_SHARE_PROMPTS\[0\]\.options\.map/);
+  assert.match(mossproutStage, /mode === 'bond_choice'[\s\S]*?<FtueBondNarrative/);
   assert.match(mossproutStage, /mode === 'garden_intro'[\s\S]*?<DayActionCardSurface[\s\S]*?eyebrow="MEMORY SEED"/);
   assert.doesNotMatch(mossproutStage, /seedName:|seedDescription:|seedEyebrow:/);
-  assert.match(mossproutStage, /onContinue\?\.\(`\$\{MOSSPROUT_BOND_SHARE_PROMPTS\[0\]\.id\}:\$\{option\.id\}`\)/);
+  assert.match(mossproutStage, /onContinue=\{\(id\) => onContinue\?\.\(id\)\}/);
   assert.match(bondShare, /What would help most right now\?/);
   assert.match(bondShare, /Making a little progress[\s\S]*?Finding a little calm[\s\S]*?Feeling more like myself/);
   assert.match(bondShare, /Give me one small thing to try[\s\S]*?Help me think it through[\s\S]*?Give me a push[\s\S]*?Mostly just keep me company/);
@@ -942,7 +942,7 @@ test('the first resident Garden handoff uses one shared parcel panel without a s
   const conversation = readFileSync('constants/mossprout-story-conversations.ts', 'utf8');
   const conversationFlow = readFileSync('features/companion/use-companion-conversation-flow.ts', 'utf8');
   assert.match(interaction, /residentParcelGardenPanelActive = props\.ftueResidentHandoffActive[\s\S]*?!props\.ftueResidentStoryResume/);
-  assert.match(interaction, /showSpeechBubble=\{props\.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && \(Boolean\(companionSpeechTitle\) \|\| !residentParcelGardenPanelActive\)\}/);
+  assert.match(interaction, /showSpeechBubble=\{!narrativeOverlayVisible[\s\S]*?&& props\.ftueProfileStep !== 'bond_choice' && props\.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && \(Boolean\(companionSpeechTitle\) \|\| !residentParcelGardenPanelActive\)\}/);
   assert.match(interaction, /residentParcelHandoffActive=\{residentParcelGardenPanelActive\}/);
   assert.match(stage, /residentParcelHandoffActive \? <View[\s\S]*?<MossproutJourneyRequestPanel/);
   assert.match(stage, /actionLabel="Go to the Garden"[\s\S]*?eyebrow="GARDEN PARCEL"/);
@@ -1727,4 +1727,11 @@ test('world Garden stays hidden through Mossprout dialogue and Grow, but returns
   assert.equal(mossproutFtueShowsWorldGarden('world.first_seed_grew'), false, 'Continue back to Mossprout owns this step');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   assert.match(screen, /!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && mossproutFtueShowsWorldGarden\(ftueStepId\)/);
+});
+
+test('a consumed first-meeting launch cannot keep overhead FTUE speech hidden', () => {
+  const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
+  const gate = interaction.slice(interaction.indexOf('const initialConversationHandoffPending'), interaction.indexOf('const requestStoryConversation'));
+  assert.match(gate, /!initialConversationObservedActiveRef.current/);
+  assert.match(gate, /conversationSession.status === 'completed'/);
 });

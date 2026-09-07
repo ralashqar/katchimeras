@@ -1721,7 +1721,9 @@ function MeasuredIllustratedChoice({ accent, disabled, dimmed, fullRow, icon, im
       <View pointerEvents="none" style={[styles.illustratedChoiceHighlight, fullRow && styles.fullRowIllustratedChoiceHighlight, threeColumn && styles.illustratedChoiceHighlightThreeColumn]} />
       <Animated.View style={[styles.illustratedChoiceArtFrame, fullRow && styles.fullRowIllustratedChoiceArtFrame, threeColumn && styles.illustratedChoiceArtFrameThreeColumn, artStyle]}>
         {image ? (
-          <Image contentFit="contain" source={image} style={[styles.illustratedChoiceArt, fullRow && styles.fullRowIllustratedChoiceArt, threeColumn && styles.illustratedChoiceArtThreeColumn]} transition={0} />
+          // Preserve source pixels: the FTUE camera enlarges this small layout
+          // after decoding, and selection adds another scale pulse.
+          <Image allowDownscaling={false} contentFit="contain" source={image} style={[styles.illustratedChoiceArt, fullRow && styles.fullRowIllustratedChoiceArt, threeColumn && styles.illustratedChoiceArtThreeColumn]} transition={0} />
         ) : (
           <IconSymbol color={accent} name={icon} size={threeColumn ? 30 : 32} />
         )}

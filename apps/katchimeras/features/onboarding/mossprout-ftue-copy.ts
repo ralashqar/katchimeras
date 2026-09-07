@@ -5,7 +5,7 @@ export const MOSSPROUT_FTUE_COPY = {
   opening: 'A little of your day can wake something here.',
   dayQuestion: 'How do you feel?',
   helpQuestion: 'What would feel good right now?',
-  seedOrigin: 'Your answer became a Memory Seed. Let’s give it a place in the Garden.',
+  seedOrigin: 'What you’ve shared is the beginning of our first Memory Seed. We can plant it and grow something together.\n\nCome with me to the Garden. I’ll show you where to plant it.',
   bond: 'Your Bond grows through little moments together.',
   planted: 'There. A place of its own. Let’s help the Garden wake up around it.',
   mergePurpose: 'Merge a Plant. Complete its request to earn Glow and restore the Garden.',

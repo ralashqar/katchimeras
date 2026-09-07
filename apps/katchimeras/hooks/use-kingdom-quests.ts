@@ -1,3 +1,4 @@
+import { conversationTranscript, rememberConversationLine } from '@/utils/conversation-transcript';
 import { legacyMossproutPondConversation } from '@/constants/mossprout-campaign-conversations';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -263,7 +264,7 @@ function settleActionConversationCompletion(
   session: ConversationSession,
   definition: ConversationDefinition | null | undefined,
 ) {
-  if (!definition || (definition.familyId !== 'mossprout' && !session.actionOrigin)) return;
+  if (!definition || (session.dialoguePresentation && (!session.dialogueAcknowledgedAt || session.outcomePresentation)) || (definition.familyId !== 'mossprout' && !session.actionOrigin)) return;
   commitKatchimeraActionCompletion({ session, definition });
 }
 
@@ -315,6 +316,13 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const [companionDiscoveryState, setCompanionDiscoveryState] = useState(loadCompanionDiscoveryState);
   const [companionJourneyState, setCompanionJourneyState] = useState(loadCompanionJourneyState);
   const [companionContentState, setCompanionContentState] = useState<CompanionContentState>(loadCompanionContentState);
+  // Conversation writes run in the event handler so storage failures reach the
+  // overlay's retry boundary, rather than throwing during a React state updater.
+  const commitConversationState = useCallback((update: (current: CompanionContentState) => CompanionContentState) => {
+    const next = update(loadCompanionContentState());
+    setCompanionContentState(next);
+  }, []);
+
   const [selectedVisitGreeting, setSelectedVisitGreeting] = useState<CompanionVisitGreeting>('regular');
   const recordedVisitKeyRef = useRef<string | null>(null);
   const [storedHomeState, setStoredHomeState] = useState(() => homeRepository.load());
@@ -1987,16 +1995,16 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const answerSelectedConversation = useCallback((optionId: string) => {
     if (!selectedConversationSession || !selectedConversationDefinition) return;
     const occurredAt = Date.now();
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       const currentSession = current.conversationSessions.find((session) => session.id === selectedConversationSession.id);
-      if (!currentSession) return current;
+      if (!currentSession || currentSession.pendingReply !== undefined) return current;
       const revisingPendingAnswer = currentSession.pendingReply !== undefined;
       const activeNode = selectedConversationDefinition.nodes.find((node) => node.id === currentSession.currentNodeId);
-      const result = answerConversation(currentSession, selectedConversationDefinition, optionId, occurredAt);
+      const result = answerConversation({ ...currentSession, dialoguePresentation: true }, selectedConversationDefinition, optionId, occurredAt);
       if (result.session === currentSession) return current;
       let resolvedSession = result.session;
       if (activeNode?.kind === 'poll' && resolvedSession.pollResult) {
-        resolvedSession = continueConversation(resolvedSession, selectedConversationDefinition, occurredAt);
+        if (!resolvedSession.dialoguePresentation) resolvedSession = continueConversation(resolvedSession, selectedConversationDefinition, occurredAt);
         const selectedLabel = activeNode.options.find((option) => option.id === resolvedSession.pollResult?.selectedOptionId)?.label ?? 'Your answer';
         resolvedSession = withConversationOutcome(resolvedSession, {
           kind: 'insight',
@@ -2040,35 +2048,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       saveCompanionContentState(next);
       return next;
     });
-    const selectedNode = selectedConversationDefinition.nodes.find((node) => node.id === selectedConversationSession.currentNodeId);
-    if (
-      selectedNode?.kind === 'poll'
-      && !selectedConversationSession.preview
-      && selectedResident
-      && selectedConversationDefinition.familyId !== 'mossprout'
-      && conversationHasIndependentBond(selectedConversationDefinition.id, selectedConversationSession.servedDayId)
-    ) awardBond({
-      id: `conversation-thread:${selectedResident.creature.creatureId}:${selectedConversationDefinition.id}`,
-      creatureId: selectedResident.creature.creatureId,
-      kind: 'conversation_completed',
-      points: independentConversationBondPoints(selectedConversationDefinition.id),
-      occurredAt,
-      dayId: selectedConversationSession.servedDayId,
-    });
-  }, [awardBond, selectedConversationDefinition, selectedConversationSession, selectedResident]);
+  }, [commitConversationState, selectedConversationDefinition, selectedConversationSession]);
+
   const continueSelectedConversation = useCallback(() => {
     if (!selectedConversationSession || !selectedConversationDefinition || !selectedResident) return;
     const occurredAt = Date.now();
-    let nextSession = continueConversation(selectedConversationSession, selectedConversationDefinition, occurredAt);
+    let nextSession = continueConversation({ ...selectedConversationSession, dialoguePresentation: true }, selectedConversationDefinition, occurredAt);
     if (nextSession === selectedConversationSession) return;
     const completedNow = nextSession.status === 'completed' && selectedConversationSession.status !== 'completed';
-    if (completedNow) {
-      // Narrative/end-node conversations (including Pocket Expedition) return
-      // immediately after this callback. Publish the durable action receipt
-      // before navigation can unmount this hook; the effect below is recovery,
-      // not the owner of the normal completion handoff.
-      settleActionConversationCompletion(nextSession, selectedConversationDefinition);
-    }
     let enteredNode = selectedConversationDefinition.nodes.find((node) => node.id === nextSession.currentNodeId);
     if (enteredNode?.kind === 'quest_handoff' && !nextSession.preview) {
       const availableQuest = enteredNode.suggestedQuestIds.some((questId) => eligibleSelectedOffers.some((offer) => offer.id === questId));
@@ -2081,7 +2068,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         }
       }
     }
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       let next = upsertConversationSession(current, nextSession);
       if (!nextSession.preview && enteredNode?.kind === 'insight_reveal' && selectedConversationSession.currentNodeId !== nextSession.currentNodeId) {
         next = recordConversationTelemetry(next, {
@@ -2144,7 +2131,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
             actionOrigin: nextSession.actionOrigin,
             sessionId: `companion-conversation-v2:${nextSession.familyId}:${occurredAt + 1}:${next.conversationSessions.length}`,
           });
-          next = upsertConversationSession(next, followUp);
+          next = upsertConversationSession(next, { ...followUp, dialoguePresentation: true, transcriptPrefix: conversationTranscript(nextSession, selectedConversationDefinition) });
           if (!followUp.preview) next = recordConversationTelemetry(next, {
             id: `${followUp.id}:started`, familyId: followUp.familyId, sessionId: followUp.id,
             definitionId: followUp.definitionId, kind: 'conversation_started', occurredAt: occurredAt + 1,
@@ -2154,7 +2141,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       saveCompanionContentState(next);
       return next;
     });
-    if (!nextSession.preview && completedNow && selectedConversationDefinition.familyId !== 'mossprout' && conversationHasIndependentBond(selectedConversationDefinition.id, nextSession.servedDayId)) awardBond({
+    if (completedNow) settleActionConversationCompletion(nextSession, selectedConversationDefinition);
+    if (!nextSession.preview && !nextSession.actionOrigin && completedNow && selectedConversationDefinition.familyId !== 'mossprout' && conversationHasIndependentBond(selectedConversationDefinition.id, nextSession.servedDayId)) awardBond({
       id: `conversation-thread:${selectedResident.creature.creatureId}:${selectedConversationDefinition.id}`,
       creatureId: selectedResident.creature.creatureId,
       kind: 'conversation_completed',
@@ -2162,7 +2150,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       occurredAt,
       dayId: nextSession.servedDayId,
     });
-  }, [awardBond, companionJourneyState, eligibleSelectedOffers, selectedActiveQuest, selectedBondProgress.level, selectedConversationDefinition, selectedConversationSession, selectedFriendshipProgress.level, selectedResident]);
+  }, [commitConversationState, awardBond, companionJourneyState, eligibleSelectedOffers, selectedActiveQuest, selectedBondProgress.level, selectedConversationDefinition, selectedConversationSession, selectedFriendshipProgress.level, selectedResident]);
 
   const startSelectedConversation = useCallback((input: {
     definitionId?: string;
@@ -2177,7 +2165,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     const conversationDayId = selectedFamilyId === 'mossprout'
       ? mossproutConversationCompletionDayId(calendarConversationDayId)
       : calendarConversationDayId;
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       const definitions = companionConversationDefinitionsForFamily(selectedFamilyId)
         .filter((definition) => definition.format !== 'profile_game'
           || isConversationV2IdealSkinFamily(selectedFamilyId)
@@ -2280,7 +2268,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       saveCompanionContentState(next);
       return next;
     });
-  }, [companionJourneyState, selectedActiveQuest, selectedBondProgress.level, selectedConversationSession, selectedEncounterId, selectedFamilyId, selectedFriendshipProgress.level, selectedResident, today?.isoDate]);
+  }, [commitConversationState, companionJourneyState, selectedActiveQuest, selectedBondProgress.level, selectedConversationSession, selectedEncounterId, selectedFamilyId, selectedFriendshipProgress.level, selectedResident, today?.isoDate]);
   const keepTalkingSelectedConversation = useCallback((poolId?: string) => {
     startSelectedConversation(poolId ? { poolId } : {});
   }, [startSelectedConversation]);
@@ -2290,7 +2278,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (!definition || definition.familyId !== selectedFamilyId || !['insight_game', 'profile_game'].includes(definition.format ?? '')) return;
     if (definition.format === 'profile_game' && !isConversationV2IdealSkinFamily(selectedFamilyId) && selectedFamilyId !== 'mossprout') return;
     const occurredAt = Date.now();
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       const session = createConversationSession({
         definition,
         formId: (selectedResident.creature.skinId ?? selectedResident.creature.visualKey) as KatchimeraSkinId,
@@ -2314,7 +2302,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       saveCompanionContentState(next);
       return next;
     });
-  }, [selectedEncounterId, selectedFamilyId, selectedResident, today?.isoDate]);
+  }, [commitConversationState, selectedEncounterId, selectedFamilyId, selectedResident, today?.isoDate]);
   const decideSelectedConversationMemory = useCallback((remember: boolean, summary: string) => {
     if (!selectedConversationSession || !selectedConversationDefinition || !selectedFamilyId || !selectedResident) return;
     const node = selectedConversationDefinition.nodes.find((candidate) => candidate.id === selectedConversationSession.currentNodeId);
@@ -2358,7 +2346,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       }, occurredAt);
     }
     settleActionConversationCompletion(outcomeSession, selectedConversationDefinition);
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       let next = current;
       if (!selectedConversationSession.preview) next = recordConversationTelemetry(next, {
         id: `${selectedConversationSession.id}:${node.id}:proposed`,
@@ -2464,7 +2452,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     setMicrocopy(selectedConversationSession.preview
       ? 'Preview only — memory was not changed'
       : remember ? isFormInsight ? 'Form match saved to Your insights' : 'Saved to Long Memory' : 'Not remembered');
-  }, [awardBond, selectedConversationDefinition, selectedConversationSession, selectedFamilyId, selectedResident]);
+  }, [commitConversationState, awardBond, selectedConversationDefinition, selectedConversationSession, selectedFamilyId, selectedResident]);
   const decideSelectedConversationInsight = useCallback((accept: boolean, node: Extract<ConversationNode, { kind: 'insight_reveal' }>) => {
     if (!selectedConversationSession || !selectedConversationDefinition || !selectedConversationSession.insightResult || !selectedResident) return;
     const occurredAt = Date.now();
@@ -2500,8 +2488,16 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         ...(!displayOnly ? { destination: 'insight' as const, destinationLabel: 'See all my insights' } : {}),
       }, occurredAt);
     }
+    if (accept && !selectedConversationSession.preview && selectedFamilyId !== 'mossprout' && !selectedConversationSession.actionOrigin) {
+      outcomeSession = { ...outcomeSession, pendingInsightReward: {
+        id: `${displayOnly ? 'conversation-thread' : 'insight-saved'}:${selectedResident.creature.creatureId}:${selectedConversationSession.id}:${node.id}`,
+        creatureId: selectedResident.creature.creatureId,
+        kind: displayOnly ? 'conversation_completed' as const : 'insight_saved' as const,
+        occurredAt, dayId: selectedConversationSession.servedDayId,
+      } };
+    }
     settleActionConversationCompletion(outcomeSession, selectedConversationDefinition);
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       let next = current;
       if (accept && !displayOnly && !selectedConversationSession.preview) next = upsertCompanionInsight(next, {
         familyId: selectedConversationSession.familyId,
@@ -2537,33 +2533,23 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       saveCompanionContentState(next);
       return next;
     });
-    if (accept && !selectedConversationSession.preview && selectedFamilyId !== 'mossprout') {
-      const commonReward = {
-        creatureId: selectedResident.creature.creatureId,
-        points: selectedFamilyId === 'mossprout' ? 4 : undefined,
-        occurredAt,
-        dayId: selectedConversationSession.servedDayId,
-      };
-      if (displayOnly) awardBond({
-        ...commonReward,
-        id: `conversation-thread:${selectedResident.creature.creatureId}:${selectedConversationSession.id}:${node.id}`,
-        kind: 'conversation_completed',
-      });
-      else awardBond({
-        ...commonReward,
-        id: `insight-saved:${selectedResident.creature.creatureId}:${selectedConversationSession.id}:${node.id}`,
-        kind: 'insight_saved',
-      });
-    }
-  }, [awardBond, selectedConversationDefinition, selectedConversationSession, selectedFamilyId, selectedResident]);
+
+  }, [commitConversationState, selectedConversationDefinition, selectedConversationSession, selectedFamilyId, selectedResident]);
+
+  useEffect(() => {
+    const session = selectedConversationSession;
+    if (session?.status !== 'completed' || !session.dialogueAcknowledgedAt || session.outcomePresentation || !session.pendingInsightReward) return;
+    // awardBond deduplicates the persisted event ID, including after relaunch.
+    awardBond(session.pendingInsightReward);
+  }, [awardBond, selectedConversationSession]);
 
   const removeSelectedInsight = useCallback((insightId: string) => {
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       const next = removeCompanionInsight(current, insightId);
       if (next !== current) saveCompanionContentState(next);
       return next;
     });
-  }, []);
+  }, [commitConversationState]);
   const acknowledgeBondCelebration = useCallback((receiptId: string) => {
     const current = loadIdentityAwareCompanionBondState();
     const next = acknowledgeCompanionBondCelebration(current, receiptId);
@@ -2667,7 +2653,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       }, occurredAt);
     }
     settleActionConversationCompletion(outcomeSession, selectedConversationDefinition);
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       let next = selectedConversationSession.preview ? current : recordConversationTelemetry(current, {
         id: `${selectedConversationSession.id}:${node.id}:proposed`,
         familyId: selectedConversationSession.familyId,
@@ -2698,7 +2684,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       saveCompanionContentState(next);
       return next;
     });
-  }, [awardBond, companionJourneyState, selectedConversationDefinition, selectedConversationSession, selectedFamilyId, selectedResident, today?.isoDate]);
+  }, [commitConversationState, awardBond, companionJourneyState, selectedConversationDefinition, selectedConversationSession, selectedFamilyId, selectedResident, today?.isoDate]);
   const decideSelectedConversationQuickGoal = useCallback((accept: boolean, added: boolean, node: Extract<ConversationNode, { kind: 'quick_goal_proposal' }>) => {
     if (!selectedConversationSession || !selectedConversationDefinition || !selectedResident) return;
     const occurredAt = Date.now();
@@ -2726,7 +2712,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       }, occurredAt);
     }
     settleActionConversationCompletion(outcomeSession, selectedConversationDefinition);
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       const next = upsertConversationSession(current, outcomeSession);
       saveCompanionContentState(next);
       return next;
@@ -2741,11 +2727,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       occurredAt,
       dayId: today?.isoDate,
     });
-  }, [awardBond, selectedConversationDefinition, selectedConversationSession, selectedResident, today?.isoDate]);
+  }, [commitConversationState, awardBond, selectedConversationDefinition, selectedConversationSession, selectedResident, today?.isoDate]);
   const recordSelectedConversationJournalHandoffOpened = useCallback((node: Extract<ConversationNode, { kind: 'journal_handoff' }>) => {
     if (!selectedConversationSession || selectedConversationSession.currentNodeId !== node.id || selectedConversationSession.preview) return;
     const occurredAt = Date.now();
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       const next = recordConversationTelemetry(current, {
         id: `${selectedConversationSession.id}:${node.id}:opened`,
         familyId: selectedConversationSession.familyId,
@@ -2758,7 +2744,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       if (next !== current) saveCompanionContentState(next);
       return next;
     });
-  }, [selectedConversationSession]);
+  }, [commitConversationState, selectedConversationSession]);
   const decideSelectedConversationJournalHandoff = useCallback((
     saved: boolean,
     node: Extract<ConversationNode, { kind: 'journal_handoff' }>,
@@ -2779,7 +2765,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       nextSession = continueConversation(nextSession, selectedConversationDefinition, occurredAt);
     }
     settleActionConversationCompletion(nextSession, selectedConversationDefinition);
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       let next = current;
       if (!selectedConversationSession.preview) next = recordConversationTelemetry(next, {
         id: `${selectedConversationSession.id}:${node.id}:${saved ? 'saved' : 'skipped'}`,
@@ -2825,7 +2811,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           ? 'Field note saved with Mossprout'
           : 'Saved to Today — the Pantry is restocking'
         : 'Nothing was saved');
-  }, [awardBond, selectedConversationDefinition, selectedConversationSession, selectedResident]);
+  }, [commitConversationState, awardBond, selectedConversationDefinition, selectedConversationSession, selectedResident]);
   const decideSelectedConversationQuestHandoff = useCallback((
     accept: boolean,
     accepted: boolean,
@@ -2854,17 +2840,21 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       }, occurredAt);
     }
     settleActionConversationCompletion(outcomeSession, selectedConversationDefinition);
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       const next = upsertConversationSession(current, outcomeSession);
       saveCompanionContentState(next);
       return next;
     });
-  }, [selectedConversationDefinition, selectedConversationSession]);
+  }, [commitConversationState, selectedConversationDefinition, selectedConversationSession]);
   const dismissSelectedConversationOutcome = useCallback(() => {
     if (!selectedConversationSession?.outcomePresentation) return;
     const occurredAt = Date.now();
     const dismissOutcome = (session: ConversationSession) => {
-      let acknowledged: ConversationSession = { ...session, outcomePresentation: undefined, updatedAt: occurredAt };
+      const history = session.outcomePresentation ? rememberConversationLine(session, session.outcomePresentation.id,
+        `${session.outcomePresentation.title}. ${session.outcomePresentation.message}`) : session;
+      let acknowledged: ConversationSession = { ...history, outcomePresentation: undefined, updatedAt: occurredAt };
+      if (session.outcomeCompletionPending) return { ...acknowledged, outcomeCompletionPending: undefined,
+        status: 'completed' as const, completedAt: occurredAt, dialogueAcknowledgedAt: occurredAt };
       if (selectedConversationDefinition && acknowledged.status === 'active') {
         const node = conversationNode(selectedConversationDefinition, acknowledged.currentNodeId);
         if (node?.kind === 'end') acknowledged = continueConversation(acknowledged, selectedConversationDefinition, occurredAt);
@@ -2872,7 +2862,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       return acknowledged;
     };
     const dismissedSelectedSession = dismissOutcome(selectedConversationSession);
-    setCompanionContentState((current) => {
+    commitConversationState((current) => {
       const session = current.conversationSessions.find((candidate) => candidate.id === selectedConversationSession.id);
       if (!session?.outcomePresentation) return current;
       const acknowledged = dismissOutcome(session);
@@ -2880,6 +2870,17 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       saveCompanionContentState(next);
       return next;
     });
+    if (!selectedConversationSession.preview && !selectedConversationSession.actionOrigin && selectedConversationSession.status !== 'completed'
+      && dismissedSelectedSession.status === 'completed' && selectedResident && selectedConversationDefinition
+      && selectedConversationDefinition.familyId !== 'mossprout'
+      && conversationHasIndependentBond(selectedConversationDefinition.id, dismissedSelectedSession.servedDayId)) {
+      awardBond({
+        id: `conversation-thread:${selectedResident.creature.creatureId}:${selectedConversationDefinition.id}`,
+        creatureId: selectedResident.creature.creatureId, kind: 'conversation_completed',
+        points: independentConversationBondPoints(selectedConversationDefinition.id), occurredAt,
+        dayId: dismissedSelectedSession.servedDayId,
+      });
+    }
     const feastleLevel = selectedConversationDefinition?.id.match(/^feastle:friendship:(\d+)$/)?.[1];
     if (feastleLevel) completeFeastleConversation(Number(feastleLevel));
     if (selectedConversationDefinition) {
@@ -2889,7 +2890,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     }
     const authoredMatch = selectedConversationDefinition?.id.match(/^(baristabbit|steppling|voyagle|flexel|bedrotte):story:(\d+)$/);
     if (authoredMatch && isAuthoredCohortFamily(authoredMatch[1])) completeAuthoredCohortConversation(authoredMatch[1], Number(authoredMatch[2]));
-  }, [awardBond, selectedConversationDefinition, selectedConversationSession, selectedResident]);
+  }, [commitConversationState, awardBond, selectedConversationDefinition, selectedConversationSession, selectedResident]);
   const previewSelectedConversation = useCallback((definitionId: string) => {
     if (!DEV_TOOLS_ENABLED || !selectedResident || !selectedFamilyId || !today?.isoDate || !isConversationV2Family(selectedFamilyId)) return;
     const definition = companionConversationDefinitionById.get(definitionId);
@@ -3361,6 +3362,9 @@ function withConversationOutcome(
 ) {
   return {
     ...session,
+    ...(session.dialoguePresentation && session.status === 'completed' ? {
+      status: 'active' as const, completedAt: undefined, dialogueAcknowledgedAt: undefined, outcomeCompletionPending: true,
+    } : {}),
     outcomePresentation: {
       ...presentation,
       id: `conversation-outcome:${session.id}:${createdAt}`,

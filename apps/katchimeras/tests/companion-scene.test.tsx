@@ -75,18 +75,18 @@ test('both families preserve lane order, identity and day number through rest an
   }
 });
 
-test('new greetings lead to play, while v8 saves retain their intent-specific follow-up', () => {
+test('new greetings restore the intent follow-up while older saves retain their route', () => {
   for (const definition of mossproutFtueConversationDefinitions.filter((item) => item.id.includes('first-meeting:'))) {
-    for (const version of [7, 8, 9]) {
+    for (const version of [7, 8, 9, 10]) {
       const resolved = resolveMossproutFtueConversation(definition, 'desired-help:calm', version);
       const hello = resolved.nodes.find((node) => node.id === 'hello');
       assert.equal(hello?.kind, 'choice');
       if (hello?.kind !== 'choice') continue;
-      assert.ok(hello.options.every((option) => option.nextNodeId === (version === 8 ? 'followup' : 'end')));
+      assert.ok(hello.options.every((option) => option.nextNodeId === ((version === 8 || version >= 10) ? 'followup' : 'end')));
       const followup = resolved.nodes.find((node) => node.id === 'followup');
-      assert.equal(Boolean(followup), version === 8);
-      assert.equal(resolveMossproutFtueConversation(resolved, 'calm', version).nodes.filter((node) => node.id === 'followup').length, version === 8 ? 1 : 0);
-      if (followup?.kind === 'choice') assert.equal(followup.prompt, MOSSPROUT_FOLLOWUPS.calm.prompt);
+      assert.equal(Boolean(followup), version === 8 || version >= 10);
+      assert.equal(resolveMossproutFtueConversation(resolved, 'calm', version).nodes.filter((node) => node.id === 'followup').length, (version === 8 || version >= 10) ? 1 : 0);
+      if (followup?.kind === 'choice') assert.ok(followup.prompt.endsWith(MOSSPROUT_FOLLOWUPS.calm.prompt));
     }
   }
 });

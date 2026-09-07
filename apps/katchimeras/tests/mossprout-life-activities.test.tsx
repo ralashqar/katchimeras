@@ -380,14 +380,29 @@ test('first Grow shares the daily noticing receipt, survives interruption, and r
   assert.equal(runtime.loadFirstNoticeCompletion(), undefined);
 });
 
-test('FTUE opens noticing choices with one action tap, keeps Back hidden, and supports skipping', async () => {
+for (const outcome of ['later', 'light']) test(`FTUE chains noticing without a gateway and safely finishes ${outcome}`, async () => {
   const copy = await import('../features/onboarding/mossprout-first-grow');
   let run = { runId: 'first-grow', stepId: 'companion.water_together', answers: {} as Record<string, { optionId: string }> };
   const listeners = new Set<() => void>();
   const actions: string[] = [];
+  let rejectCompletion = true;
+  let completion: any;
+  let rewards = 0;
   let narration: string | null = null;
   const onNarration = (value: string | null) => { narration = value; };
+  const saved = new Map<string, unknown>();
+  const sharedHistory = loadNativeModule('features/onboarding/ftue-narrative-history.ts', {
+    '@/utils/app-storage': { getStoredJson: (key: string, fallback: unknown) => saved.get(key) ?? fallback, setStoredJson: (key: string, value: unknown) => saved.set(key, value) },
+  });
+  const growDialogue = loadNativeModule('components/katchadeck/world/ftue-grow-dialogue.tsx', {
+    '@/features/onboarding/ftue-narrative-history': sharedHistory,
+    './conversation-narrative-overlay': { ConversationNarrativeOverlay: ({ children, ...props }: any) => React.createElement('Overlay', props, children((work: () => unknown) => work())) },
+    './companion-choice-list': { CompanionChoiceList: 'Choices' },
+    '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
+    '@/utils/app-storage': { getStoredJson: (key: string, fallback: unknown) => saved.get(key) ?? fallback, setStoredJson: (key: string, value: unknown) => saved.set(key, value) },
+  });
   const module = loadNativeModule('components/katchadeck/world/mossprout-first-grow-stage.tsx', {
+    './ftue-grow-dialogue': growDialogue,
     'react-native': { ...nativeViews, Pressable: 'Pressable' }, 'expo-image': { Image: 'Image' },
     '@/components/katchadeck/ui/day-action-row': { DayActionActiveRow: 'Active', DayActionCompletedRow: 'Completed' },
     '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: 'Card', DayActionRewardChip: 'Reward' },
@@ -395,9 +410,15 @@ test('FTUE opens noticing choices with one action tap, keeps Back hidden, and su
     '@/constants/katchimera-action-art': { katchimeraActionArt: () => 1 },
     '@/utils/companion-bond': { COMPANION_BOND_REWARDS },
     '@/features/onboarding/mossprout-first-grow': copy,
-    '@/features/onboarding/mossprout-first-grow-runtime': { loadFirstNoticeCompletion: () => undefined, completeFirstNotice: () => assert.fail('skip must not reward') },
-    '@/utils/mossprout-life-activity-storage': {},
+    '@/features/onboarding/mossprout-first-grow-runtime': { loadFirstNoticeCompletion: () => completion, completeFirstNotice: async () => {
+      assert.notEqual(outcome, 'later', 'skip must not reward');
+      if (rejectCompletion) { rejectCompletion = false; throw new Error('disk unavailable'); }
+      if (!completion) { rewards++; completion = { id: 'notice', status: 'complete', answer: 'Some light', response: 'Well noticed.' }; }
+      return completion;
+    } },
+    '@/utils/mossprout-life-activity-storage': { acknowledgeMossproutLifeCompletion: () => { completion.presentedAt = 1; } },
     '@/features/onboarding/ftue-runtime': {
+      loadFtueRun: () => run,
       useFtueRun: () => React.useSyncExternalStore((listener) => { listeners.add(listener); return () => listeners.delete(listener); }, () => run),
       advanceFtueActionDurably: async ({ actionId, optionId }: { actionId: string; optionId: string }) => {
         actions.push(actionId);
@@ -412,24 +433,38 @@ test('FTUE opens noticing choices with one action tap, keeps Back hidden, and su
   const Stage = module.MossproutFirstGrowStage as React.ComponentType<{ onNarration: typeof onNarration }>;
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<Stage onNarration={onNarration} />); });
-  assert.equal(narration, copy.MOSSPROUT_GARDEN_RETURN.prompt);
+  assert.equal(narration, null, 'overlay owns the FTUE prompt');
+  assert.equal(tree!.root.findByType('Overlay' as React.ElementType).props.entries[0].text, copy.MOSSPROUT_GARDEN_RETURN.prompt);
   await act(async () => tree!.root.findByType('Choices' as React.ElementType).props.onSelect('pleased'));
-  assert.match(narration!, /trying to look mysterious/);
-  const press = (title: string) => act(async () => tree!.root.findByProps({ title }).parent!.props.onPress());
-  assert.equal(tree!.root.findAllByProps({ title: 'Grow with Mossprout' }).length, 0, 'read the reply before the invitation');
-  const continueButton = tree!.root.findByProps({ label: 'Continue' });
-  await act(async () => tree!.update(<Stage onNarration={onNarration} />));
-  assert.equal(tree!.root.findByProps({ label: 'Continue' }), continueButton, 'rerenders retain the current control');
+  assert.match(tree!.root.findByType('Overlay' as React.ElementType).props.entries[2].text, /trying to look mysterious/);
+  assert.equal(actions.length, 0, 'reply stays visible before final exit');
+  assert.equal(tree!.root.findAllByProps({ label: 'Continue' }).length, 0, 'noticing choices follow the Garden reply without another Continue');
+  assert.equal(tree!.root.findAllByType('Active' as React.ElementType).length, 0, 'no action-card gateway before noticing');
+  assert.ok(tree!.root.findByType('Overlay' as React.ElementType).props.entries.some((entry: { text: string }) => entry.text === copy.MOSSPROUT_FIRST_NOTICE.prompt));
+  await act(async () => tree!.unmount());
+  await act(async () => { tree = create(<Stage onNarration={onNarration} />); });
+  assert.ok(tree!.root.findByType('Choices' as React.ElementType).props.options.some((choice: { id: string }) => choice.id === 'light'), 'relaunch resumes the noticing question');
+  await act(async () => tree!.root.findByType('Choices' as React.ElementType).props.onSelect(outcome));
+  assert.equal(run.stepId, 'companion.water_together', 'FTUE advances only after the final overlay exit');
   await act(async () => tree!.root.findByProps({ label: 'Continue' }).props.onPress());
-  assert.equal(tree!.root.findAllByProps({ title: 'Grow with Mossprout' }).length, 0, 'FTUE skips the Grow gateway');
-  const noticeRow = tree!.root.findByType('Active' as React.ElementType);
-  assert.equal(noticeRow.props.animateLayout, false, 'FTUE changes do not animate a list gap');
-  assert.equal(noticeRow.props.enteringEnabled, false, 'the notice card starts at its final position');
-  await press('Notice one small thing');
-  assert.equal(tree!.root.findAllByType('Active' as React.ElementType).length, 0, 'choices replace the invitation instead of retaining a second layout');
-  assert.equal(tree!.root.findAllByProps({ label: 'Back' }).length, 0);
-  assert.equal(narration, copy.MOSSPROUT_FIRST_NOTICE.prompt);
-  await act(async () => tree!.root.findByType('NoticeChoices' as React.ElementType).props.onSelect('later'));
+  if (outcome === 'light') {
+    assert.equal(run.stepId, 'companion.first_notice');
+    assert.equal(tree!.root.findAllByType('Overlay' as React.ElementType).length, 0, 'reward/error lives back in the world');
+    await act(async () => tree!.root.findByProps({ label: 'Try again' }).props.onPress());
+    assert.equal(rewards, 1);
+    assert.equal(narration, null, 'reward handoff does not repeat the narrative overhead');
+    assert.equal(tree!.root.findAllByType('Overlay' as React.ElementType).length, 0, 'reward starts only after narrative exit');
+    assert.equal(tree!.root.findAllByType('Completed' as React.ElementType).length, 1);
+    await act(async () => tree!.unmount());
+    await act(async () => { tree = create(<Stage onNarration={onNarration} />); });
+    assert.equal(tree!.root.findAllByType('Completed' as React.ElementType).length, 1, 'interrupted reward resumes');
+    assert.equal(narration, null, 'recovered rewards do not replay overhead dialogue');
+    await act(async () => tree!.root.findByType('Completed' as React.ElementType).props.onFinished());
+    assert.equal(rewards, 1, 'resuming does not award twice');
+    assert.deepEqual(actions, ['companion.choose_garden_return', 'companion.open_first_grow', 'companion.complete_first_notice']);
+    await act(async () => tree!.unmount());
+    return;
+  }
   assert.equal(run.stepId, 'companion.first_rest');
   assert.deepEqual(actions, ['companion.choose_garden_return', 'companion.open_first_grow', 'companion.skip_first_notice']);
   assert.equal(tree!.root.findAllByType('Completed' as React.ElementType).length, 0);
@@ -437,8 +472,10 @@ test('FTUE opens noticing choices with one action tap, keeps Back hidden, and su
   run = { ...run, stepId: 'companion.first_notice' };
   await act(async () => { tree = create(<Stage onNarration={onNarration} />); });
   assert.equal(tree!.root.findAllByProps({ title: 'Grow with Mossprout' }).length, 0);
-  assert.equal(tree!.root.findAllByType('NoticeChoices' as React.ElementType).length, 1, 'resume opens the saved noticing conversation directly');
-  assert.equal(narration, copy.MOSSPROUT_FIRST_NOTICE.prompt);
+  assert.equal(tree!.root.findAllByType('Overlay' as React.ElementType).length, 1, 'resume opens the saved noticing conversation directly');
+  assert.equal(narration, null);
+  assert.ok(tree!.root.findByType('Overlay' as React.ElementType).props.entries.some((entry: { text: string }) => entry.text === copy.MOSSPROUT_FIRST_NOTICE.prompt));
+  assert.equal(tree!.root.findByType('Overlay' as React.ElementType).props.entries[0].text, copy.MOSSPROUT_GARDEN_RETURN.prompt, 'history survives the action-card interlude');
   await act(async () => tree!.unmount());
 });
 
@@ -459,6 +496,7 @@ test('Rest follows two Continue beats; failed saves retry the final action witho
   const copy = await import('../features/onboarding/mossprout-ftue-copy');
   const { ftueDialoguePages } = await import('../features/onboarding/ftue-dialogue-pages');
   const module = loadNativeModule('components/katchadeck/world/mossprout-ftue-rest-action.tsx', {
+    './conversation-narrative-overlay': { ConversationNarrativeOverlay: 'Overlay' },
     '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
     '@/features/onboarding/mossprout-ftue-copy': copy,
   });
@@ -502,4 +540,39 @@ test('hiding header Back removes the button while preserving the currency header
   await act(async () => tree!.update(<Header navigationLocked={false} onBack={() => {}} />));
   assert.equal(tree!.root.findAllByType('Back' as React.ElementType).length, 1, 'regular interactions retain Back');
   await act(async () => tree!.unmount());
+});
+
+test('Bond teaching can interrupt the narrative and return to the same saved history', async () => {
+  const saved = new Map<string, unknown>();
+  const history = loadNativeModule('features/onboarding/ftue-narrative-history.ts', {
+    '@/utils/app-storage': { getStoredJson: (key: string, fallback: unknown) => saved.get(key) ?? fallback,
+      setStoredJson: (key: string, value: unknown) => saved.set(key, JSON.parse(JSON.stringify(value))) },
+  });
+  const entries = [{ id: 'notice:question', speaker: 'mossprout', text: 'What catches your attention?' },
+    { id: 'notice:answer', speaker: 'player', text: 'Some light' },
+    { id: 'notice:reply', speaker: 'mossprout', text: 'I like that you caught it.' }];
+  history.saveFtueNarrativeHistory('run', entries, { id: 'notice', value: 'light' });
+  history.saveFtueNarrativeHistory('run', entries);
+  const restored = history.loadFtueNarrativeHistory('run');
+  assert.equal(restored.entries.length, 3, 'reward recovery does not duplicate chat');
+  assert.equal(history.loadFtueNarrativeHistory('fresh-run').entries.length, 0);
+  let finished = 0; let exit = false;
+  const copy = await import('../features/onboarding/mossprout-ftue-copy');
+  const module = loadNativeModule('components/katchadeck/world/mossprout-ftue-rest-action.tsx', {
+    './conversation-narrative-overlay': { ConversationNarrativeOverlay: ({ children, ...props }: any) => React.createElement('Overlay', props, children((action: () => unknown, closing: boolean) => { exit = closing; return action(); })) },
+    '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
+    '@/features/onboarding/mossprout-ftue-copy': copy,
+  });
+  const Rest = module.MossproutFtueRestAction as React.ComponentType<any>;
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(<Rest history={restored.entries} onRest={() => { finished++; }} />); });
+  const overlay = tree.root.findByType('Overlay' as React.ElementType);
+  assert.equal(overlay.props.required, true);
+  assert.equal(JSON.stringify(overlay.props.entries.slice(0, 3)), JSON.stringify(restored.entries));
+  assert.equal(overlay.props.entries.at(-1).text, copy.MOSSPROUT_FTUE_COPY.farewell);
+  assert.equal(finished, 0, 'reopening after Bond teaching does not finish the dialogue');
+  await act(async () => tree.root.findByType('Button' as React.ElementType).props.onPress());
+  assert.equal(exit, true);
+  assert.equal(finished, 1);
+  await act(async () => tree.unmount());
 });

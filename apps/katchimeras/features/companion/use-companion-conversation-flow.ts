@@ -23,6 +23,7 @@ export function conversationReplyDelayMs(text: string, reduceMotion: boolean): n
 
 export function useCompanionConversationFlow({
   definition,
+  manualDialogue = false,
   onCommitInsight,
   onCommitMemory,
   onComplete,
@@ -35,6 +36,7 @@ export function useCompanionConversationFlow({
   skipCompletedTransition = false,
 }: {
   definition: ConversationDefinition | null;
+  manualDialogue?: boolean;
   onCommitInsight: (node: Extract<ConversationNode, { kind: 'insight_reveal' }>) => void;
   onCommitMemory: (summary: string) => void;
   onComplete: () => void;
@@ -87,36 +89,36 @@ export function useCompanionConversationFlow({
   // question or outcome without mounting a waiting screen.
   useLayoutEffect(() => {
     if (!session || !definition || session.pendingReply === undefined) return;
-    if (journeyNarrative) return;
+    if (journeyNarrative || manualDialogue) return;
     onContinue();
-  }, [definition, journeyNarrative, onContinue, session]);
+  }, [manualDialogue, definition, journeyNarrative, onContinue, session]);
 
   // The first resident questionnaire already explains why this visitor is a
   // match. Its reveal node is only a durable graph boundary; do not mount a
   // second "preparing/waiting" screen before the actionable parcel panel.
   useLayoutEffect(() => {
-    if (!directResidentParcelHandoff || !session || node?.kind !== 'form_reveal') return;
+    if (manualDialogue || !directResidentParcelHandoff || !session || node?.kind !== 'form_reveal') return;
     const key = `${session.id}:${node.id}:direct-resident-parcel`;
     if (automatedRef.current.has(key)) return;
     automatedRef.current.add(key);
     onContinue();
-  }, [directResidentParcelHandoff, node, onContinue, session]);
+  }, [manualDialogue, directResidentParcelHandoff, node, onContinue, session]);
 
   useLayoutEffect(() => {
-    if (!(skipCompletedTransition || trailChat) || (screenReaderEnabled && !directResidentParcelHandoff && !trailChat) || !session || !definition || session.outcomePresentation) return;
+    if ((manualDialogue && !session?.dialogueAcknowledgedAt) || !(skipCompletedTransition || trailChat) || (screenReaderEnabled && !directResidentParcelHandoff && !trailChat) || !session || !definition || session.outcomePresentation) return;
     if (session.status !== 'completed') return;
     const key = `${session.id}:complete`;
     if (automatedRef.current.has(key)) return;
     automatedRef.current.add(key);
     onComplete();
-  }, [definition, directResidentParcelHandoff, node?.kind, onComplete, screenReaderEnabled, session, skipCompletedTransition, trailChat]);
+  }, [manualDialogue, definition, directResidentParcelHandoff, node?.kind, onComplete, screenReaderEnabled, session, skipCompletedTransition, trailChat]);
 
   useEffect(() => {
     if (!session || !definition || session.preview) return;
 
     if (session.pendingReply !== undefined) return;
 
-    if (node?.kind === 'memory_proposal') {
+    if (node?.kind === 'memory_proposal' && !manualDialogue) {
       const key = `${session.id}:${node.id}:memory`;
       if (automatedRef.current.has(key)) return;
       automatedRef.current.add(key);
@@ -126,7 +128,7 @@ export function useCompanionConversationFlow({
       return;
     }
 
-    if (node?.kind === 'insight_reveal' && session.insightResult) {
+    if (node?.kind === 'insight_reveal' && session.insightResult && !manualDialogue) {
       const key = `${session.id}:${node.id}:insight`;
       if (automatedRef.current.has(key)) return;
       automatedRef.current.add(key);
@@ -135,7 +137,7 @@ export function useCompanionConversationFlow({
     }
 
     if (session.outcomePresentation) {
-      if (screenReaderEnabled || outcomeRequiresManualAdvance || trailChat) return;
+      if (manualDialogue || screenReaderEnabled || outcomeRequiresManualAdvance || trailChat) return;
       const copy = `${session.outcomePresentation.title} ${session.outcomePresentation.message}`;
       const timer = setTimeout(
         onDismissOutcome,
@@ -145,6 +147,7 @@ export function useCompanionConversationFlow({
     }
 
     if (node?.kind === 'form_reveal') {
+      if (manualDialogue) return;
       if (directResidentParcelHandoff) return;
       if (screenReaderEnabled) return;
       const timer = setTimeout(onContinue, reduceMotion ? 120 : 1900);
@@ -152,7 +155,7 @@ export function useCompanionConversationFlow({
     }
 
     if (node?.kind === 'end' && session.status === 'active') {
-      if (journeyNarrative) return;
+      if (journeyNarrative || manualDialogue) return;
       const key = `${session.id}:end`;
       if (automatedRef.current.has(key)) return;
       const timer = setTimeout(() => {
@@ -164,6 +167,13 @@ export function useCompanionConversationFlow({
     }
 
     if (session.status === 'completed') {
+      if (manualDialogue) {
+        if (session.dialogueAcknowledgedAt) {
+          const key = `${session.id}:complete`;
+          if (!automatedRef.current.has(key)) { automatedRef.current.add(key); onComplete(); }
+        }
+        return;
+      }
       // The resident questionnaire is revisited after the card is earned so
       // Mossprout can confirm the match. That final result is a deliberate
       // player-controlled exit, even after a cold remount. Its earlier parcel
@@ -183,7 +193,7 @@ export function useCompanionConversationFlow({
       }, reduceMotion ? 0 : 360);
       return () => clearTimeout(timer);
     }
-  }, [definition, directResidentParcelHandoff, journeyNarrative, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, outcomeAutoAdvanceMs, outcomeRequiresManualAdvance, reduceMotion, screenReaderEnabled, session, skipCompletedTransition, trailChat]);
+  }, [manualDialogue, definition, directResidentParcelHandoff, journeyNarrative, node, onCommitInsight, onCommitMemory, onComplete, onContinue, onDismissOutcome, outcomeAutoAdvanceMs, outcomeRequiresManualAdvance, reduceMotion, screenReaderEnabled, session, skipCompletedTransition, trailChat]);
 
   const advance = useCallback(() => {
     if (!session || !definition) return;
@@ -196,7 +206,7 @@ export function useCompanionConversationFlow({
       return;
     }
     if (node?.kind === 'end' && session.status === 'active') {
-      if (journeyNarrative && !skipCompletedTransition) {
+      if (journeyNarrative && !skipCompletedTransition && !manualDialogue) {
         onContinue();
         onComplete();
         return;
@@ -205,11 +215,11 @@ export function useCompanionConversationFlow({
       return;
     }
     if (session.status === 'completed') onComplete();
-  }, [definition, journeyNarrative, node?.kind, onComplete, onContinue, onDismissOutcome, session, skipCompletedTransition]);
+  }, [manualDialogue, definition, journeyNarrative, node?.kind, onComplete, onContinue, onDismissOutcome, session, skipCompletedTransition]);
 
   return {
     advance,
     phase,
-    requiresManualAdvance: (screenReaderEnabled || journeyNarrativeAdvanceReady || ((outcomeRequiresManualAdvance || trailChat) && Boolean(session?.outcomePresentation))) && phase !== 'awaiting_choice' && phase !== 'committing',
+    requiresManualAdvance: (manualDialogue || screenReaderEnabled || journeyNarrativeAdvanceReady || ((outcomeRequiresManualAdvance || trailChat) && Boolean(session?.outcomePresentation))) && phase !== 'awaiting_choice' && phase !== 'committing',
   };
 }

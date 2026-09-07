@@ -1,13 +1,14 @@
-import { CompanionNarrativePanel } from './companion-narrative-panel';
+import { MossproutSeedNarrativeReward } from './mossprout-seed-narrative-reward';
+import { conversationUsesNarrativeOverlay } from '@/utils/conversation-presentation';
+import { ConversationNarrativeOverlay } from './conversation-narrative-overlay';
+import { conversationTranscript } from '@/utils/conversation-transcript';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { DailyHabitOffer } from './companion-life-actions';
 import { lifeHabitById } from '@/constants/companion-life-content';
-import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useEffect, useState, type ReactNode, type RefObject } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, useWindowDimensions, View, type View as ViewType } from 'react-native';
+import { useState, type ReactNode, type RefObject } from 'react';
+import { Pressable, View, type View as ViewType } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -28,15 +29,9 @@ import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
 import type { CompanionMemory } from '@/utils/companion-content';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
 import type { CompanionConversationPresentationPhase } from '@/features/companion/use-companion-conversation-flow';
-import {
-  companionChoiceColumnCount,
-  estimatedCompanionChoiceContentHeight,
-  useCompanionAdaptivePanel,
-} from '@/hooks/use-companion-adaptive-panel';
 import { CompanionChoiceList } from './companion-choice-list';
 import type { CompanionMergeRequest } from './companion-merge-request-tray';
 import { MossproutJourneyRequestPanel } from './mossprout-journey-request-panel';
-import { KatchimeraPageHeader } from './katchimera-page-header';
 
 export function conversationSpeechLine(
   session: ConversationSession,
@@ -77,16 +72,16 @@ export function CompanionConversationScene({
   developerContent,
   flowPhase,
   name,
-  onAdvance,
-  onAnswer,
+  onAdvance: onAdvanceAction,
+  onAnswer: onAnswerAction,
   onClose,
-  onCompletedExit,
-  onMemoryDecision,
-  onGoalDecision,
-  onInsightDecision,
-  onQuickGoalDecision,
-  onJournalHandoff,
-  onQuestHandoff,
+  onCompletedExit: onCompletedExitAction,
+  onMemoryDecision: onMemoryDecisionAction,
+  onGoalDecision: onGoalDecisionAction,
+  onInsightDecision: onInsightDecisionAction,
+  onQuickGoalDecision: onQuickGoalDecisionAction,
+  onJournalHandoff: onJournalHandoffAction,
+  onQuestHandoff: onQuestHandoffAction,
   hasActiveFocus,
   journeyTaskHandoff = false,
   journeyTaskRequests = [],
@@ -138,121 +133,35 @@ export function CompanionConversationScene({
   journalMergeEnergyPreview: number;
   navigationLocked?: boolean;
 }) {
-  const insets = useSafeAreaInsets();
-  const { height, width } = useWindowDimensions();
   const node = conversationNode(definition, session.currentNodeId);
   const journeyNarrative = definition.purpose === 'journey' && definition.format === 'narrative';
-  const journeyRequestHandoffVisible = !session.outcomePresentation
-    && session.pendingReply === undefined
-    && !session.preview
-    && journeyNarrative
-    && node?.kind === 'end'
-    && journeyTaskHandoff;
-  const haptic = () => {
-    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-  };
-  const answer = (optionId: string) => { haptic(); onAnswer(optionId); };
-  const progress = conversationProgress(definition, session);
-  const showConversationProgress = !session.outcomePresentation
-    && session.status !== 'completed'
-    && (node?.kind === 'choice' || node?.kind === 'poll' || node?.kind === 'profile_game' || node?.kind === 'insight_game' || node?.kind === 'journal_handoff');
   const activeGameQuestion = node?.kind === 'profile_game' || node?.kind === 'insight_game'
-    ? conversationGameQuestion(node, session)
-    : null;
-  const visibleOptionCount = node?.kind === 'choice' || node?.kind === 'poll'
-    ? node.options.length
-    : node?.kind === 'profile_game' || node?.kind === 'insight_game'
-      ? activeGameQuestion?.options.length ?? 0
-      : 0;
-  const estimatedContentHeight = journeyRequestHandoffVisible
-    ? 253
-    : visibleOptionCount > 0
-    ? estimatedCompanionChoiceContentHeight(
-        visibleOptionCount,
-        companionChoiceColumnCount(width, visibleOptionCount),
-      )
-    : 190;
-  const panelContentKey = `${session.currentNodeId}:${activeGameQuestion?.id ?? 'no-question'}:${session.status}:${session.outcomePresentation?.id ?? 'none'}:${session.pendingReply ?? 'ready'}:${visibleOptionCount}:${journeyRequestHandoffVisible ? 'journey-handoff' : 'standard'}`;
-  const panelChromeHeight = showConversationProgress ? 51 : 20;
-  const adaptivePanel = useCompanionAdaptivePanel({
-    chromeHeight: panelChromeHeight,
-    contentKey: panelContentKey,
-    estimatedContentHeight,
-    safeAreaBottom: insets.bottom,
-    safeAreaTop: insets.top,
-    viewportHeight: height,
-  });
-  const singleResultCard = Boolean(session.outcomePresentation && definition.id.startsWith('steppling:trail-chat:'));
-  const NarrativeContainer = singleResultCard ? View : CompanionNarrativePanel;
-  const standaloneContinue = !session.outcomePresentation && !developerContent && (
-    (session.status === 'completed' && !session.preview)
-    || (session.pendingReply !== undefined && journeyNarrative)
-    || (node?.kind === 'end' && session.status !== 'completed' && !journeyRequestHandoffVisible)
-  );
-  const shortPanelBottomLift = standaloneContinue || adaptivePanel.scrollable
-    ? 0
-    : Math.min(22, Math.max(0, (adaptivePanel.maxHeight - adaptivePanel.panelHeight) * 0.1));
-  useEffect(() => {
-    if (!session.outcomePresentation?.celebrate || process.env.EXPO_OS !== 'ios') return;
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [session.outcomePresentation?.id, session.outcomePresentation?.celebrate]);
-
-  return (
-    <View style={{
-      flex: 1,
-      gap: 10,
-      minHeight: 0,
-      paddingBottom: insets.bottom + 10 + shortPanelBottomLift,
-      paddingHorizontal: width >= 700 ? Math.max(28, (width - 720) / 2) : 16,
-      paddingTop: insets.top + 10,
-    }}>
-      <KatchimeraPageHeader
-        bondIconTargetRef={bondIconTargetRef}
-        bondProgress={bondProgress}
-        bondRewardPulseKey={bondRewardPulseKey}
-        includeSafeArea={false}
-        navigationLocked={navigationLocked}
-        onBack={onClose}
-      />
-
-      <View accessibilityElementsHidden pointerEvents="none" style={{ flex: 1, minHeight: 120 }} />
-
-      {standaloneContinue ? (session.status === 'completed'
-        ? (definition.id === 'steppling:journey:day-one' && definition.version >= 3) || definition.id.startsWith('steppling:trail-chat:') ? null
-          : <PrimaryAction label="Continue" onPress={onCompletedExit} />
-        : requiresManualAdvance ? <PrimaryAction
-        label={node?.kind === 'end' && journeyNarrative ? 'Finish Journey' : 'Continue'}
-        onPress={onAdvance} /> : null) : <NarrativeContainer
-        accessibilityLabel={`Conversation ${flowPhase.replace('_', ' ')}`}
-        style={{
-          height: adaptivePanel.panelHeight,
-          paddingTop: singleResultCard ? 0 : showConversationProgress ? 12 : 8,
-        }}>
-        {showConversationProgress ? <>
-          <View style={{ alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' }}>
-            <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>
-              {session.preview ? 'DEVELOPER PREVIEW' : definition.trigger === 'signature_game' ? 'A LITTLE GAME' : definition.trigger === 'journal' ? 'FROM YOUR JOURNAL' : 'OUR CONVERSATION'}
-            </ThemedText>
-            <ThemedText selectable style={{ fontSize: 11, fontVariant: ['tabular-nums'], fontWeight: '900' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>
-              {progress.label}
-            </ThemedText>
-          </View>
-          <View style={{ backgroundColor: KatchaUI.companionScenePanel.softBackground, borderRadius: 999, height: 6, marginBottom: 8, marginTop: 6, overflow: 'hidden' }}>
-            <View style={{ backgroundColor: KatchaUI.companionScenePanel.accent, borderRadius: 999, height: '100%', width: `${Math.max(8, progress.ratio * 100)}%` }} />
-          </View>
-        </> : null}
-
-        <ScrollView
-          key={panelContentKey}
-          bounces={adaptivePanel.scrollable}
-          contentContainerStyle={{ gap: 10, paddingBottom: 20, paddingTop: showConversationProgress ? 2 : 6 }}
-          contentInsetAdjustmentBehavior="never"
-          keyboardShouldPersistTaps="handled"
-          nestedScrollEnabled
-          onContentSizeChange={(_, contentHeight) => adaptivePanel.onContentHeightChange(contentHeight)}
-          scrollEnabled={adaptivePanel.scrollable}
-          showsVerticalScrollIndicator={false}
-          style={{ flex: 1, minHeight: 0 }}>
+    ? conversationGameQuestion(node, session) : null;
+  const history = conversationTranscript(session, definition);
+  const line = conversationSpeechLine(session, definition);
+  const entries = history.at(-1)?.text === line ? history : [...history, {
+    id: node?.kind === 'choice' || node?.kind === 'poll' || activeGameQuestion
+      ? `conversation-turn:${session.id}:${session.turns.length + 1}:prompt`
+      : `${session.id}:${session.currentNodeId}:${session.outcomePresentation?.id ?? ''}:current`,
+    speaker: session.formId, text: line,
+  }];
+  const terminal = !session.preview && ((session.pendingReply !== undefined && !session.pendingNextNodeId) || (session.pendingReply === undefined && (node?.kind === 'end' || session.status === 'completed' || session.outcomeCompletionPending)))
+    && !(definition.isOpener && session.exitTransition && session.exitTransition.kind !== 'continuation');
+  return <ConversationNarrativeOverlay inline={!conversationUsesNarrativeOverlay(definition)} title={name} entries={entries}
+    checkpoint={`${session.id}:${session.updatedAt}:${session.currentNodeId}:${session.pendingReply ?? ''}`}
+    required={navigationLocked} onClose={onClose}>
+    {(perform) => {
+      const onAdvance = () => perform(onAdvanceAction, terminal);
+      const onCompletedExit = () => perform(onCompletedExitAction, true);
+      const answer = (id: string) => perform(() => onAnswerAction(id));
+      const onGoalDecision: typeof onGoalDecisionAction = (...args) => perform(() => onGoalDecisionAction(...args));
+      const onQuickGoalDecision: typeof onQuickGoalDecisionAction = (...args) => perform(() => onQuickGoalDecisionAction(...args));
+      const onJournalHandoff: typeof onJournalHandoffAction = (...args) => perform(() => onJournalHandoffAction(...args), args[0] && !session.preview);
+      const onQuestHandoff: typeof onQuestHandoffAction = (...args) => perform(() => onQuestHandoffAction(...args));
+      const onMemoryDecision: typeof onMemoryDecisionAction = (...args) => perform(() => onMemoryDecisionAction(...args));
+      const onInsightDecision: typeof onInsightDecisionAction = (...args) => perform(() => onInsightDecisionAction(...args));
+      return <View style={{ gap: 10 }}>
+        {node?.kind === 'end' && definition.id.startsWith('mossprout:ftue:first-meeting:') && !session.pendingReply ? <MossproutSeedNarrativeReward /> : null}
         {session.outcomePresentation ? (
           <ConversationOutcomeCard
             inlineContinue={definition.id.startsWith('steppling:trail-chat:')}
@@ -261,13 +170,13 @@ export function CompanionConversationScene({
             requiresManualAdvance={requiresManualAdvance}
           />
         ) : session.pendingReply !== undefined ? <NarrativeTransition
-          label={journeyNarrative ? 'Continue the story' : 'Mossprout is thinking…'}
-          onAdvance={journeyNarrative ? onAdvance : undefined}
-          requiresManualAdvance={journeyNarrative && requiresManualAdvance}
+          label="Continue the conversation"
+          onAdvance={onAdvance}
+          requiresManualAdvance={requiresManualAdvance}
         /> : session.status === 'completed' ? (
           session.preview ? <View style={{ alignItems: 'center', gap: 10, paddingVertical: 6 }}>
             <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Preview complete. Choose another flow below or exit the preview.</ThemedText>
-          </View> : definition.id === 'steppling:journey:day-one' && definition.version >= 3 ? null : <ConversationCompletion
+          </View> : <ConversationCompletion
             label={definition.id === 'mossprout:game:form-finder' ? 'Closest match found' : 'Conversation complete'}
             onContinue={onCompletedExit}
           />
@@ -288,11 +197,11 @@ export function CompanionConversationScene({
             requiresManualAdvance={requiresManualAdvance}
           />
         ) : node?.kind === 'choice' ? (
-          <CompanionChoiceList options={node.id.startsWith('habit.') ? node.options.filter((option) => option.id !== 'choose') : node.options} onSelect={answer} />
+          <CompanionChoiceList presentation="single-column" options={node.id.startsWith('habit.') ? node.options.filter((option) => option.id !== 'choose') : node.options} onSelect={answer} />
         ) : node?.kind === 'poll' ? (
-          <CompanionChoiceList options={node.options} onSelect={answer} />
+          <CompanionChoiceList presentation="single-column" options={node.options} onSelect={answer} />
         ) : node?.kind === 'profile_game' || node?.kind === 'insight_game' ? (
-          <CompanionChoiceList options={activeGameQuestion?.options ?? []} onSelect={answer} />
+          <CompanionChoiceList presentation="single-column" options={activeGameQuestion?.options ?? []} onSelect={answer} />
         ) : node?.kind === 'form_reveal' ? (
           <FormReveal definition={definition} node={node} onAdvance={onAdvance} preview={Boolean(session.preview)} session={session} skins={skins} />
         ) : node?.kind === 'insight_reveal' ? (
@@ -354,12 +263,10 @@ export function CompanionConversationScene({
           </View>
         ) : null}
         {developerContent}
-        </ScrollView>
-      </NarrativeContainer>}
-    </View>
-  );
+      </View>;
+    }}
+  </ConversationNarrativeOverlay>;
 }
-
 function GoalBundleProposal({ hasActiveGoalPlan, node, onDecision }: {
   hasActiveGoalPlan: boolean;
   node: Extract<ConversationNode, { kind: 'goal_proposal' }>;
@@ -476,7 +383,7 @@ function FormReveal({ definition, node, onAdvance, preview, session, skins }: {
       {!cardReveal && runnerName ? <ThemedText selectable style={{ fontSize: 12, fontWeight: '800' }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>Runner-up: {runnerName}</ThemedText> : null}
       {cardReveal ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>The card is not earned yet. Reveal the resident, then help with two small requests.</ThemedText> : !top?.unlocked ? <ThemedText selectable style={{ fontSize: 12, lineHeight: 17 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>Not discovered yet. Its hatch cues will stay visible in your collection.</ThemedText> : null}
     </View>
-    <NarrativeTransition label={preview ? 'Preview ready' : cardReveal ? 'Preparing a veiled parcel…' : 'Saving this match to your insights…'} onAdvance={onAdvance} requiresManualAdvance={preview} />
+    <NarrativeTransition label={preview ? 'Preview ready' : cardReveal ? 'Preparing a veiled parcel…' : 'Saving this match to your insights…'} onAdvance={onAdvance} requiresManualAdvance />
   </View>;
 }
 
@@ -491,21 +398,15 @@ function InsightReveal({ node, onDecision, preview, session }: {
     <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>I could not resolve this result yet. Try the conversation again.</ThemedText>
     <SecondaryAction label="Close" onPress={() => onDecision(false, node)} />
   </View>;
-  if (!preview) return <AutomaticInsightTransition label="Adding your insight…" />;
+
   return <Animated.View entering={FadeInUp.duration(260)} style={{ gap: 10 }}>
     <View style={{ backgroundColor: KatchaUI.companionScenePanel.cardBackground, borderColor: 'rgba(174,119,38,0.3)', borderCurve: 'continuous', borderRadius: 21, borderWidth: 1, gap: 6, paddingHorizontal: 16, paddingVertical: 15 }}>
       <ThemedText selectable style={{ fontSize: 22, fontWeight: '900', lineHeight: 26 }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{result.title}</ThemedText>
       <ThemedText selectable style={{ fontSize: 14, lineHeight: 20 }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{result.summary}</ThemedText>
     </View>
-    <PrimaryAction label="Continue preview" onPress={() => onDecision(false, node)} />
+    <PrimaryAction label={preview ? "Continue preview" : node.persistence === "offer_save" ? "Remember this" : "Continue"} onPress={() => onDecision(!preview, node)} />
+    {!preview && node.persistence === "offer_save" ? <SecondaryAction label="Not now" onPress={() => onDecision(false, node)} /> : null}
   </Animated.View>;
-}
-
-function AutomaticInsightTransition({ label }: { label: string }) {
-  return <View accessibilityLiveRegion="polite" style={{ alignItems: 'center', gap: 10, paddingVertical: 22 }}>
-    <ActivityIndicator color={KatchaUI.companionScenePanel.accent} size="small" />
-    <ThemedText selectable style={{ fontSize: 13, fontWeight: '800' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{label}</ThemedText>
-  </View>;
 }
 
 function MemoryProposal({ node, onDecision, session }: {
@@ -516,7 +417,7 @@ function MemoryProposal({ node, onDecision, session }: {
   const topName = katchimeraSkinById.get(session.formResult?.topFormId ?? session.formId)?.displayName ?? 'this form';
   const summary = node.summary.replace('{topForm}', topName);
   const isFormInsight = node.memoryKey.includes(':form-match');
-  if (!session.preview) return <AutomaticInsightTransition label={isFormInsight ? 'Saving your form insight…' : 'Tucking this into shared memory…'} />;
+  if (!session.preview) return <View style={{ gap: 10 }}><PrimaryAction label="Remember this" onPress={() => onDecision(true, summary)} /><SecondaryAction label="Not now" onPress={() => onDecision(false, summary)} /></View>;
   if (isFormInsight && session.preview) return <View style={{ gap: 10 }}>
     <View style={{ backgroundColor: KatchaUI.companionScenePanel.softBackground, borderCurve: 'continuous', borderRadius: 18, gap: 5, padding: 13 }}>
       <ThemedText selectable style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>YOUR FORM INSIGHT</ThemedText>
@@ -574,31 +475,4 @@ function optionLabel(definition: ConversationDefinition, session: ConversationSe
     }
   }
   return null;
-}
-
-function conversationProgress(definition: ConversationDefinition, session: ConversationSession): { label: string; ratio: number } {
-  const node = conversationNode(definition, session.currentNodeId);
-  if (session.status === 'completed') return { label: 'Done', ratio: 1 };
-  if (node?.kind === 'profile_game' || node?.kind === 'insight_game') {
-    const total = node.kind === 'profile_game' ? 3 : node.questions.length;
-    const answered = session.turns.filter((turn) => turn.nodeId === node.id).length;
-    const current = Math.min(total, answered + (session.pendingReply !== undefined ? 0 : 1));
-    return { label: `${current} of ${total}`, ratio: current / total };
-  }
-  const target = Math.max(1, session.encounterTargetTurns ?? 3);
-  const completedTurns = Math.min(target, session.encounterTurns ?? 0);
-  const ratio = Math.min(0.96, Math.max(0.12, (completedTurns + 0.5) / target));
-  const phase = node?.kind === 'choice' && node.phase
-    ? node.phase
-    : ratio < 0.26
-      ? 'opening'
-      : ratio < 0.58
-        ? 'explore'
-        : ratio < 0.84
-          ? 'deepen'
-          : 'resolve';
-  const labels: Record<typeof phase, string> = {
-    opening: 'Opening', explore: 'Following the thread', deepen: 'Going deeper', resolve: 'Bringing it together',
-  };
-  return { label: labels[phase], ratio };
 }

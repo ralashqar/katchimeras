@@ -39,7 +39,7 @@ const openingLines: Record<string, string> = {
 function definition(key: string, opening: string): ConversationDefinition {
   return {
     id: `${MOSSPROUT_FTUE_CONVERSATION_PREFIX}:${key}`,
-    version: 9,
+    version: 10,
     familyId: 'mossprout',
     title: 'Meet Mossprout',
     trigger: 'evergreen',
@@ -57,8 +57,9 @@ function definition(key: string, opening: string): ConversationDefinition {
     nodes: [
       {
         id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout.`,
-        options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'end' })),
+        options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'followup' })),
       },
+      { id: 'followup', kind: 'choice', prompt: mossproutFollowup('progress').prompt, options: mossproutFollowup('progress').options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) },
       { id: 'end', kind: 'end', message: MOSSPROUT_FTUE_COPY.seedOrigin },
     ],
   };
@@ -67,12 +68,13 @@ function definition(key: string, opening: string): ConversationDefinition {
 export function resolveMossproutFtueConversation(definition: ConversationDefinition, intent: string | null | undefined, savedVersion: number) {
   if (!definition.id.startsWith(MOSSPROUT_FTUE_CONVERSATION_PREFIX)) return definition;
   const followup = mossproutFollowup(intent);
-  // Version 8 conversations already in progress finish in place. New meetings
-  // save the deeper question for the first Bloom; pre-v8 meetings remain short.
-  return { ...definition, nodes: [...definition.nodes.filter((node) => node.id !== 'followup'), ...(savedVersion === 8 ? [{ id: 'followup', kind: 'choice' as const, prompt: followup.prompt, options: [] }] : [])].map((node) => {
-    if (node.id === 'hello' && node.kind === 'choice') return { ...node, options: node.options.map((option) => ({ ...option, nextNodeId: savedVersion === 8 ? 'followup' : 'end' })) };
+  // New meetings connect the player’s intention to the Seed before planting.
+  // Keep older sessions on their saved route, including the v8 follow-up.
+  const hasFollowup = savedVersion === 8 || savedVersion >= 10;
+  return { ...definition, nodes: [...definition.nodes.filter((node) => node.id !== 'followup'), ...(hasFollowup ? [{ id: 'followup', kind: 'choice' as const, prompt: followup.prompt, options: [] }] : [])].map((node) => {
+    if (node.id === 'hello' && node.kind === 'choice') return { ...node, options: node.options.map((option) => ({ ...option, nextNodeId: hasFollowup ? 'followup' : 'end' })) };
     if (node.id !== 'followup') return node;
-    return { id: 'followup', kind: 'choice' as const, prompt: followup.prompt, options: followup.options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) };
+    return { id: 'followup', kind: 'choice' as const, prompt: `${intent?.replace('desired-help:', '') === 'calm' ? 'You said a little calm would feel good.' : intent?.replace('desired-help:', '') === 'unsure' ? 'You said you weren’t sure what would feel good yet. That’s all right.' : 'You said a little progress would feel good.'}\n\n${followup.prompt}`, options: followup.options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) };
   }) };
 }
 
