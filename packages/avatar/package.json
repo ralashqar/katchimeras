@@ -5,7 +5,8 @@
     "./expressions": "./src/expressions.ts",
     "./layered-avatar": "./src/layered-avatar.tsx",
     "./layout": "./src/layout.ts",
-    "./energy": "./src/energy.tsx"
+    "./energy": "./src/energy.tsx",
+    "./feed-motion": "./src/feed-motion.ts"
   },
   "files": [
     "src"

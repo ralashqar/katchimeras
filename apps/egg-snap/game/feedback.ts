@@ -24,12 +24,13 @@ export function useFeedback(muted: boolean, hapticsEnabled = true, paused = fals
   }, [audio, haptics, muted, hapticsEnabled, paused]);
   useEffect(() => () => { audio.dispose(); haptics.cancel(); }, [audio, haptics]);
   return useMemo(() => ({
-    cue(type: 'pickup' | 'snap' | 'place' | 'chip' | 'miss' | 'hit' | 'blast' | 'interrupt') {
+    cue(type: 'pickup' | 'snap' | 'place' | 'cell-impact' | 'chip' | 'miss' | 'hit' | 'blast' | 'interrupt') {
       if (suspended.current) return;
       switch (type) {
         case 'pickup': haptics.pickUp(); break;
         case 'snap': haptics.snap(); break;
         case 'place': haptics.place(); audio.play('place'); break;
+        case 'cell-impact': haptics.place(); break;
         case 'chip': haptics.chip(); audio.play('place'); break;
         case 'miss': haptics.reject(); audio.play('missed'); break;
         case 'hit': haptics.hit(); audio.play('hit'); break;

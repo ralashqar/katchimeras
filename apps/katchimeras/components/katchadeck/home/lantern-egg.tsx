@@ -1,3 +1,4 @@
+import { runEggFeedMotion } from "@incubator/avatar/feed-motion";
 import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -133,21 +134,7 @@ export function LanternEgg({
     if (feedKey <= 0) {
       return;
     }
-    absorb.value = withSequence(
-      withTiming(1, { duration: 200, easing: Easing.out(Easing.cubic) }),
-      withTiming(0, { duration: 680, easing: Easing.out(Easing.cubic) })
-    );
-    feedShake.value = 0;
-    feedShake.value = withSequence(
-      withTiming(1, { duration: 55, easing: Easing.linear }),
-      withTiming(-1, { duration: 55, easing: Easing.linear }),
-      withTiming(1, { duration: 55, easing: Easing.linear }),
-      withTiming(-1, { duration: 55, easing: Easing.linear }),
-      withTiming(0.5, { duration: 55, easing: Easing.linear }),
-      withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) })
-    );
-    ripple.value = 0;
-    ripple.value = withDelay(160, withTiming(1, { duration: 720, easing: Easing.out(Easing.cubic) }));
+    runEggFeedMotion(absorb, feedShake, ripple);
   }, [absorb, feedKey, feedShake, ripple]);
 
   // Ready-to-hatch: a burst of rattle then stillness, repeating every ~2.6s —

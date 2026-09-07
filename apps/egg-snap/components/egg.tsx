@@ -12,6 +12,8 @@ export function Egg({
   size = 160,
   face,
   pulse = 0,
+  feedKey = 0,
+  hitKey = 0,
   hurt = false,
   wisp = false,
   paused = false,
@@ -22,6 +24,8 @@ export function Egg({
   size?: number;
   face?: string;
   pulse?: number;
+  feedKey?: number;
+  hitKey?: number;
   hurt?: boolean;
   wisp?: boolean;
   paused?: boolean;
@@ -48,6 +52,8 @@ export function Egg({
       <EggEnergy
         energy={Math.min(1, streak / 10)}
         pulseKey={pulse}
+        feedKey={feedKey}
+        hitKey={hitKey}
         hurt={hurt}
         reduceMotion={reduceMotion}
         paused={paused}

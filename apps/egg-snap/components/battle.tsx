@@ -1,6 +1,8 @@
+import { CombatVolley, type CombatVolleyData } from "./combat-volley";
+import { cellDamage } from "../game/volley-presentation";
 import { TileMatchTheme } from "@incubator/tile-match/theme";
 import { TILE_COLORS } from "../data/tile-theme";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { Modal, Pressable, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,12 +22,9 @@ import {
 import { NO_CELL, type DropRelease } from "@incubator/tile-match/engine";
 import { buildSlotBurst } from "@incubator/tile-match/timing";
 import {
-  Bullets,
   buildVolley,
-  ClearBurstSkia,
   SlotBlastSkia,
   SlotMissSkia,
-  type BulletVolley,
   type MissCell,
 } from "@incubator/tile-match/effects";
 import { cellOrigin } from "@incubator/tile-match/geometry";
@@ -228,7 +227,19 @@ function Battle({
   const [miss, setMiss] = useState<{ id: number; cells: MissCell[] } | null>(
     null,
   );
-  const [volleys, setVolleys] = useState<BulletVolley[]>([]);
+  const [volleys, setVolleys] = useState<CombatVolleyData[]>([]);
+  const [displayHp, setDisplayHp] = useState(definition.health);
+  const [fireKey, setFireKey] = useState(0);
+  const [opponentHitKey, setOpponentHitKey] = useState(0);
+  const deliveredImpacts = useRef(new Set<string>());
+  const impact = useCallback((id: number, index: number, damage: number, count: number) => {
+    const key = id + ':' + index;
+    if (deliveredImpacts.current.has(key)) return;
+    deliveredImpacts.current.add(key);
+    setDisplayHp(hp => Math.max(0, hp - cellDamage(damage, count, index)));
+    setOpponentHitKey(k => k + 1);
+    feedbackRef.current.cue('cell-impact');
+  }, []);
   const [hurt, setHurt] = useState(false);
   const [impulse, setImpulse] = useState<{ id: number; strength: number }>();
   const feedback = useFeedback(muted, hapticsEnabled, suspended || backgrounded);
@@ -248,7 +259,9 @@ function Battle({
     (id: number) => setVolleys((all) => all.filter((v) => v.id !== id)),
     [],
   );
-  useEffect(() => {
+  // SlotField hides resolved cells in this commit. Mount their flying replacements
+  // before paint as well: a passive effect leaves a blank frame between the two.
+  useLayoutEffect(() => {
     const events = state.events.filter((e) => e.id > seenEvent.current);
     seenEvent.current = state.eventSequence;
     for (const event of events) {
@@ -272,7 +285,10 @@ function Battle({
             y: layout.stage ? layout.stage.rival.visible.y + layout.stage.rival.visible.height * .5 : layout.opponentY + layout.opponentSize * 0.52,
           },
         });
-        if (!reduced) setVolleys((v) => [...v.slice(-4), volley]);
+        volley.bullets = cells.map((c, i) => ({ x: layout.field.x + c.x + layout.metrics.cell/2, y: layout.field.y + offset.dy.value + c.y + layout.metrics.cell/2, colorId: c.colorId, size: layout.metrics.cell, delay: i * 48 }));
+        setVolleys(v => [...v, { ...volley, damage: event.damage ?? 0,
+          opponentWidth: layout.stage?.rival.visible.width ?? layout.opponentSize * .6 }]);
+        setFireKey(event.id);
         if (event.run.combo > 0 || event.run.lastGroupCount >= 2)
           setImpulse({ id: event.id, strength: impulseStrength(event.run.lastGroupCount, event.run.combo,
             event.run.beat.varieties.some(v => v.id === 'drift')) });
@@ -285,7 +301,7 @@ function Battle({
       }
       if (event.type === "blast") feedbackRef.current.cue("blast");
       if (event.type === "interrupt") feedbackRef.current.cue("interrupt");
-      if (event.type === "end") feedbackRef.current.end(state.outcome === "won");
+
       if (event.type === "chip") feedbackRef.current.cue("chip");
     }
   }, [state.eventSequence, state.events, state.outcome, layout, offset.dy, reduced, width]);
@@ -315,10 +331,11 @@ function Battle({
     }
   }, [act, ref]);
   useEffect(() => {
-    if (!state.outcome) return;
-    const timer = setTimeout(() => void save(), reduced ? 300 : 1100);
+    if (!state.outcome || volleys.length || suspended || backgrounded) return;
+    feedbackRef.current.end(state.outcome === "won");
+    const timer = setTimeout(() => void save(), 350);
     return () => clearTimeout(timer);
-  }, [state.outcome, save, reduced]);
+  }, [state.outcome, save, volleys.length, suspended, backgrounded]);
   const onPickUp = useCallback(() => feedbackRef.current.cue("pickup"), []);
   const onCell = useCallback((pieceId: string, index: number) => {
     if (index !== NO_CELL) feedbackRef.current.cue("snap");
@@ -374,18 +391,6 @@ function Battle({
   );
   const resolved = run.beat.status === "resolved";
   const move = currentMove(state);
-  const burst = useMemo(
-    () =>
-      run.lastResolution
-        ? buildSlotBurst(
-            run.grid,
-            layout.metrics,
-            run.lastResolution.clearedCells,
-            run.lastGroupSizes,
-          )
-        : [],
-    [run.lastResolution, run.grid, run.lastGroupSizes, layout.metrics],
-  );
   const blasted = useMemo(
     () =>
       run.beat.voided
@@ -484,19 +489,19 @@ function Battle({
         <Copy style={{ fontWeight: "800" }}>{definition.rival}</Copy>
         <View style={{ width: layout.stage && height < 700 ? 80 : 140, marginTop: 3 }}>
           <Meter
-            fraction={state.opponentHp / definition.health}
+            fraction={displayHp / definition.health}
             color="#EDC377"
           />
         </View>
         {!layout.stage && (        <Egg
           skin={definition.skin}
-          face={state.outcome === "won" ? "surprise" : "determined"}
+          face={displayHp === 0 ? "surprise" : "determined"}
           size={layout.opponentSize}
-          pulse={state.resolvedSequence}
+          hitKey={opponentHitKey}
           paused={suspended}
         />)}
         <Copy style={{ fontSize: 11 }}>
-          {state.opponentHp} / {definition.health}
+          {displayHp} / {definition.health}
         </Copy>
       </View>
       <View
@@ -525,9 +530,9 @@ function Battle({
       </View>
       {layout.stage ? <>
         <GroundedEgg placement={layout.stage.rival} skin={definition.skin}
-          face={state.outcome === "won" ? "surprise" : "determined"} pulse={state.resolvedSequence} paused={suspended} />
+          face={displayHp === 0 ? "surprise" : "determined"} hitKey={opponentHitKey} paused={suspended} />
         <GroundedEgg placement={layout.stage.player} skin={profile!.skin} streak={run.combo}
-          pulse={run.piecesPlaced} hurt={hurt} wisp={!!profile!.wisp} paused={suspended} />
+          pulse={run.piecesPlaced} feedKey={fireKey} hurt={hurt} wisp={!!profile!.wisp} paused={suspended} />
       </> : (      <View
         pointerEvents="none"
         style={{
@@ -540,6 +545,7 @@ function Battle({
           skin={profile!.skin}
           streak={run.combo}
           pulse={run.piecesPlaced}
+          feedKey={fireKey}
           hurt={hurt}
           wisp={!!profile!.wisp}
           size={layout.eggSize}
@@ -601,19 +607,7 @@ function Battle({
             cell={layout.metrics.cell}
             reduceMotion={reduced}
           />
-        ) : (
-          resolved && (
-            <ClearBurstSkia
-              key={`burst-${run.eventSequence}`}
-              cells={burst}
-              width={layout.metrics.width}
-              height={layout.metrics.height}
-              cell={layout.metrics.cell}
-              pitch={layout.metrics.pitch}
-              reduceMotion={reduced}
-            />
-          )
-        )}
+        ) : null}
       </Animated.View>
       <View
         pointerEvents="none"
@@ -696,7 +690,7 @@ function Battle({
         </View>
       )}
       {volleys.map((v) => (
-        <Bullets key={v.id} volley={v} onDone={retire} />
+        <CombatVolley key={v.id} volley={v} paused={suspended || backgrounded} reduced={reduced} onImpact={impact} onDone={retire} />
       ))}
       {story && (
         <Dialogue
