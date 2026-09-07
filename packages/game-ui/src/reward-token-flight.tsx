@@ -7,6 +7,9 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  useDerivedValue,
+  useAnimatedReaction,
+  type SharedValue,
   withDelay,
   withRepeat,
   withTiming,
@@ -44,6 +47,7 @@ export function RewardTokenFlight({
   to,
   tokenSize,
   zIndex = 1,
+  timeline,
 }: {
   children: ReactNode;
   count: number;
@@ -54,6 +58,8 @@ export function RewardTokenFlight({
   to: RewardFlightPoint;
   tokenSize: number;
   zIndex?: number;
+  /** Optional game clock: flight pauses with gameplay and resumes at the same position. */
+  timeline?: {clock: SharedValue<number>; startAt: number};
 }) {
   const riseProgress = useSharedValue(0);
   const flightProgress = useSharedValue(0);
@@ -62,10 +68,28 @@ export function RewardTokenFlight({
   const onArriveRef = useRef(onArrive);
   onArriveRef.current = onArrive;
   const arrive = useCallback(() => onArriveRef.current(), []);
+  const notified = useSharedValue(false);
+  const riseDuration = reduceMotion ? 100 : REWARD_TOKEN_RISE_MS;
+  const flightDelay = riseDuration + (reduceMotion ? 90 : REWARD_TOKEN_HOVER_MS) + index * (reduceMotion ? 28 : REWARD_TOKEN_STAGGER_MS);
+  const flightDuration = reduceMotion ? 250 : REWARD_TOKEN_FLIGHT_MS;
+  const timedRise = useDerivedValue(() => {
+    if (!timeline) return riseProgress.value;
+    const t = Math.max(0, Math.min(1, (timeline.clock.value - timeline.startAt) / riseDuration));
+    return 1 - Math.pow(1 - t, 3);
+  });
+  const timedFlight = useDerivedValue(() => {
+    if (!timeline) return flightProgress.value;
+    const t = Math.max(0, Math.min(1, (timeline.clock.value - timeline.startAt - flightDelay) / flightDuration));
+    return t * t * t;
+  });
+  useAnimatedReaction(() => !!timeline && timedFlight.value >= 1, (done) => {
+    if (done && !notified.value) {notified.value = true; runOnJS(arrive)();}
+  });
   const vector =
     BURST_VECTORS[index] ?? BURST_VECTORS[BURST_VECTORS.length - 1];
 
   useEffect(() => {
+    if (timeline) return;
     const riseDuration = reduceMotion ? 100 : REWARD_TOKEN_RISE_MS;
     const hoverDuration = reduceMotion ? 90 : REWARD_TOKEN_HOVER_MS;
     const stagger = reduceMotion ? index * 28 : index * REWARD_TOKEN_STAGGER_MS;
@@ -111,11 +135,12 @@ export function RewardTokenFlight({
     index,
     reduceMotion,
     riseProgress,
+    timeline,
   ]);
 
   const animatedStyle = useAnimatedStyle(() => {
-    const rise = riseProgress.value;
-    const flight = flightProgress.value;
+    const rise = timedRise.value;
+    const flight = timedFlight.value;
     const inverse = 1 - flight;
     const burstX = from.x + vector.x;
     const burstY = from.y + vector.y;
@@ -136,7 +161,7 @@ export function RewardTokenFlight({
           2 * inverse * flight * controlY +
           flight * flight * to.y;
     const hoverEnvelope = rise * inverse;
-    const phase = hoverPhase.value * Math.PI * 2 + index * 0.92;
+    const phase = (timeline ? Math.max(0, timeline.clock.value - timeline.startAt) / 720 : hoverPhase.value) * Math.PI * 2 + index * 0.92;
     const hoverStrength = reduceMotion ? 0.5 : 1;
     const x = baseX + Math.cos(phase) * 3 * hoverEnvelope * hoverStrength;
     const y = baseY + Math.sin(phase) * 4 * hoverEnvelope * hoverStrength;

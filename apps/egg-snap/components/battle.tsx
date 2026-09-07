@@ -3,6 +3,7 @@ import { ARENA_ENABLED } from "../game/dev-tools";
 import { CombatVolleys, type CombatVolleyData, type CombatBurstData } from "./combat-volley";
 import { CELL_STAGGER_MS } from "../game/volley-presentation";
 import { TileArtTheme } from "./tile-art-theme";
+import { DuelHatchRewards } from './duel-hatch-rewards';
 import { AppearanceGallery } from "./appearance-gallery";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -13,6 +14,7 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import {
   Tray,
@@ -198,6 +200,21 @@ function Battle({
   const opponentHitSignal = useSharedValue(0);
   const playerHitSignal = useSharedValue(0);
   const playerDizzySignal = useSharedValue(0);
+  const playerHealth = useSharedValue(1);
+  const opponentHealth = useSharedValue(1);
+  useLayoutEffect(() => {
+    const update = () => {
+      playerHealth.value = withTiming(presentation.current.playerHp / definition.health, {duration: 180});
+      opponentHealth.value = withTiming(presentation.current.opponentHp / definition.health, {duration: 180});
+    };
+    update();
+    return presentation.subscribe(update);
+  }, [presentation, definition.health, playerHealth, opponentHealth]);
+  const playerHatchAt = state.outcome && state.playerHp === 0 ? state.elapsed : undefined;
+  const opponentHatchAt = state.outcome && state.opponentHp === 0 ? state.elapsed : undefined;
+  const [hatchFinished, setHatchFinished] = useState(false);
+  const finishHatch = useCallback(() => setHatchFinished(true), []);
+  const receiveSpark = useCallback(() => setFireKey(key => key + 1), []);
   const [impulse, setImpulse] = useState<{ id: number; strength: number }>();
   const feedback = useFeedback(muted, hapticsEnabled, suspended || backgrounded);
   const feedbackRef = useRef(feedback);
@@ -285,11 +302,11 @@ function Battle({
     }
   }, [act, ref]);
   useEffect(() => {
-    if (!state.outcome || volleys.length || bursts.length || suspended || backgrounded) return;
+    if (!state.outcome || !hatchFinished || volleys.length || bursts.length || suspended || backgrounded) return;
     if (state.outcome !== "draw") feedbackRef.current.end(state.outcome === "won");
     const timer = setTimeout(() => void save(), 350);
     return () => clearTimeout(timer);
-  }, [state.outcome, save, volleys.length, bursts.length, suspended, backgrounded]);
+  }, [state.outcome, hatchFinished, save, volleys.length, bursts.length, suspended, backgrounded]);
   const onPickUp = useCallback(() => feedbackRef.current.cue("pickup"), []);
   const onCell = useCallback((pieceId: string, index: number) => {
     if (index !== NO_CELL) feedbackRef.current.cue("snap");
@@ -435,14 +452,17 @@ function Battle({
           face={state.outcome === "won" || state.outcome === "draw" ? "surprise" : undefined} streak={state.opponent.run.combo} pulse={state.opponent.run.piecesPlaced} feedKey={opponentFireKey}
           size={layout.opponentSize}
           hitSignal={opponentHitSignal}
+          health={opponentHealth} hatchAt={opponentHatchAt} clock={clock}
           paused={suspended}
         /></View>}
       <OpponentField fighter={state.opponent} layout={rivalLayout} dy={rivalOffset.dy} clock={clock}
-        reduced={reduced} paused={suspended || backgrounded} />
+        reduced={reduced} paused={suspended || backgrounded} hidden={!!state.outcome} />
       {layout.stage ? <>
         <GroundedEgg placement={layout.stage.rival} skin={definition.skin}
+          health={opponentHealth} hatchAt={opponentHatchAt} clock={clock}
           face={state.outcome === "won" || state.outcome === "draw" ? "surprise" : undefined} streak={state.opponent.run.combo} pulse={state.opponent.run.piecesPlaced} feedKey={opponentFireKey} hitSignal={opponentHitSignal} paused={suspended} />
         <GroundedEgg placement={layout.stage.player} skin={profile!.skin} streak={run.combo}
+          health={playerHealth} hatchAt={playerHatchAt} clock={clock}
           pulse={run.piecesPlaced} feedKey={fireKey} hitSignal={playerHitSignal} dizzySignal={playerDizzySignal} wisp={!!profile!.wisp} paused={suspended} />
       </> : (      <View
         pointerEvents="none"
@@ -458,6 +478,7 @@ function Battle({
           pulse={run.piecesPlaced}
           feedKey={fireKey}
           hitSignal={playerHitSignal}
+          health={playerHealth} hatchAt={playerHatchAt} clock={clock}
           dizzySignal={playerDizzySignal}
 
           wisp={!!profile!.wisp}
@@ -473,6 +494,7 @@ function Battle({
             position: "absolute",
             left: layout.field.x,
             top: layout.field.y,
+            opacity: state.outcome ? 0 : 1,
             width: layout.metrics.width,
             height: layout.metrics.height,
           },
@@ -495,7 +517,7 @@ function Battle({
           metrics={layout.metrics}
           groups={run.beat.groups}
           generation={run.trayGeneration}
-          hidden={resolved}
+          hidden={resolved || !!state.outcome}
           hoverCells={hover}
           arrival={arrival}
           reduceMotion={reduced}
@@ -572,6 +594,9 @@ function Battle({
       </View>
       {__DEV__ && guides && layout.stage && <StageGuides layout={layout} />}
       <CombatVolleys volleys={volleys} bursts={bursts} clock={clock} endedAt={state.outcome ? state.elapsed : undefined} reduced={reduced} onDone={retire} />
+      {state.outcome && <DuelHatchRewards clock={clock} at={state.elapsed} won={state.outcome === 'won'} onDone={finishHatch} onArrive={receiveSpark}
+        from={layout.stage ? {x: layout.stage.rival.visible.x + layout.stage.rival.visible.width/2, y: layout.stage.rival.visible.y + layout.stage.rival.visible.height/2} : {x: width/2, y: layout.opponentY + layout.opponentSize/2}}
+        to={layout.stage ? {x: layout.stage.player.visible.x + layout.stage.player.visible.width/2, y: layout.stage.player.visible.y + layout.stage.player.visible.height/2} : {x: width/2, y: layout.eggY + layout.eggSize/2}} />}
       {practice && <PerformancePanel presentation={presentation} volleys={volleys} bursts={bursts} paused={suspended} />}
       {story && (
         <Dialogue

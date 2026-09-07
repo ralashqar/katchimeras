@@ -4,9 +4,9 @@ import { SlotField, varietyBackLayers, varietyFieldLayers } from '@incubator/til
 import type { CombatantState } from '../game/combat';
 import type { opponentFieldLayout } from '../game/layout';
 
-export const OpponentField = memo(function OpponentField({fighter, layout, dy, clock, reduced, paused}: {
+export const OpponentField = memo(function OpponentField({fighter, layout, dy, clock, reduced, paused, hidden = false}: {
   fighter: CombatantState; layout: ReturnType<typeof opponentFieldLayout>; dy: SharedValue<number>;
-  clock: SharedValue<number>; reduced: boolean; paused: boolean;
+  clock: SharedValue<number>; reduced: boolean; paused: boolean; hidden?: boolean;
 }) {
   const {run} = fighter;
   const resolved = run.beat.status === 'resolved';
@@ -15,7 +15,7 @@ export const OpponentField = memo(function OpponentField({fighter, layout, dy, c
   const style = useAnimatedStyle(() => ({transform: [{translateY: dy.value}]}));
   const layerProps = {metrics: layout.metrics, beat: run.beat, clock, beatStartedAt: fighter.beatStartedAt, reduceMotion: reduced || paused};
   return <Animated.View pointerEvents="none" accessibilityLabel="Opponent puzzle" style={[
-    {position: 'absolute', left: layout.field.x, top: layout.field.y, width: layout.metrics.width, height: layout.metrics.height}, style,
+    {position: 'absolute', opacity: hidden ? 0 : 1, left: layout.field.x, top: layout.field.y, width: layout.metrics.width, height: layout.metrics.height}, style,
   ]}>
     {!resolved && varietyBackLayers.map(({id, Layer}) => <Layer key={id} {...layerProps} />)}
     <SlotField grid={run.grid} metrics={layout.metrics} groups={run.beat.groups} generation={run.trayGeneration}

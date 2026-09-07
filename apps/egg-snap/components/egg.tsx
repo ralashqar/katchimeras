@@ -3,8 +3,10 @@ import { LayeredAvatar } from "@incubator/avatar/layered-avatar";
 import { EggEnergy } from "@incubator/avatar/energy";
 import { useEggExpressionPlayer } from "@incubator/avatar/expressions";
 import { Image } from "expo-image";
-import { View } from "react-native";
-import { runOnJS, useAnimatedReaction, useReducedMotion, type SharedValue } from "react-native-reanimated";
+import { View, StyleSheet } from "react-native";
+import Animated, { runOnJS, useAnimatedReaction, useAnimatedStyle, useReducedMotion, type SharedValue } from "react-native-reanimated";
+import { DEFEAT_SHAKE_MS, healthCrackOpacity } from '../game/hatch-presentation';
+import { EggHatchPuff } from './egg-hatch-puff';
 import { BODIES, FACES, WISP } from "../data/art";
 
 export const Egg = memo(function Egg({
@@ -21,6 +23,9 @@ export const Egg = memo(function Egg({
   wisp = false,
   paused = false,
   anchor,
+  health,
+  hatchAt,
+  clock,
 }: {
   skin?: string;
   streak?: number;
@@ -35,6 +40,9 @@ export const Egg = memo(function Egg({
   wisp?: boolean;
   paused?: boolean;
   anchor?: { x: number; y: number };
+  health?: SharedValue<number>;
+  hatchAt?: number;
+  clock?: SharedValue<number>;
 }) {
   const body = BODIES[skin] ?? BODIES.classic;
   const [dizzyKey, setDizzyKey] = useState(0);
@@ -58,12 +66,20 @@ export const Egg = memo(function Egg({
             : "sleepy"));
   const expression = useEggExpressionPlayer({ baseFaceId });
   const reduceMotion = useReducedMotion();
+  const crackStyle = useAnimatedStyle(() => ({opacity: healthCrackOpacity(health?.value ?? 1)}));
+  const hatchStyle = useAnimatedStyle(() => {
+    if (hatchAt === undefined || !clock) return {opacity: 1, transform: [{translateX: 0}, {scale: 1}]};
+    const age = Math.max(0, clock.value - hatchAt);
+    const exit = Math.max(0, Math.min(1, (age - DEFEAT_SHAKE_MS) / 240));
+    const shake = reduceMotion || age >= DEFEAT_SHAKE_MS ? 0 : Math.sin(age * Math.PI / 55) * (2 + age / 250);
+    return {opacity: 1 - exit, transform: [{translateX: shake}, {scale: reduceMotion ? 1 : 1 + .04 * Math.min(1, age/1000) - .64 * exit * exit}]};
+  });
   return (
     <View
       style={{ width: size, height: size }}
       accessibilityLabel={`${body.name} egg`}
     >
-      <EggEnergy
+      <Animated.View style={[StyleSheet.absoluteFill, hatchStyle]}><EggEnergy
         energy={Math.min(1, streak / 10)}
         pulseKey={pulse}
         feedKey={feedKey}
@@ -73,7 +89,7 @@ export const Egg = memo(function Egg({
         rimTexture={require("../assets/effects/egg-rim.png")}
         hurt={hurt}
         reduceMotion={reduceMotion}
-        paused={paused}
+        paused={paused || hatchAt !== undefined}
         anchor={anchor}
       >
         <LayeredAvatar
@@ -82,6 +98,9 @@ export const Egg = memo(function Egg({
           bodyPresentation={body.presentation}
           hatPresentation={{ scale: 1, offsetX: 0, offsetY: 0 }}
           faceTransitionDuration={expression.transitionMs}
+          bodyOverlay={health && <Animated.View style={[StyleSheet.absoluteFill, crackStyle]}>
+            <Image source={require('@incubator/art-egg-avatars/effects/crack-2.png')} contentFit="contain" style={StyleSheet.absoluteFill} />
+          </Animated.View>}
         />
       </EggEnergy>
       {wisp && (
@@ -96,7 +115,8 @@ export const Egg = memo(function Egg({
             height: size * 0.3,
           }}
         />
-      )}
+      )}</Animated.View>
+      {hatchAt !== undefined && clock && <EggHatchPuff size={size} clock={clock} at={hatchAt} reduced={reduceMotion} />}
     </View>
   );
 });

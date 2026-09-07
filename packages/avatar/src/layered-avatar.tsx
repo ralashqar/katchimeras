@@ -1,12 +1,14 @@
 import { Image, type ImageSource } from 'expo-image';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { centeredLayerStyle, type LayerPresentation } from './layout';
+import type { ReactNode } from 'react';
 export type LayeredAvatarProps = {
 bodySource: ImageSource | number; faceSource: ImageSource | number; hat?: ImageSource | number | null; heldAccessory?: ImageSource | number | null;
 bodyPresentation: LayerPresentation; hatPresentation: LayerPresentation; heldPresentation?: LayerPresentation;
+bodyOverlay?: ReactNode;
 faceScale?:number; faceTransitionDuration?:number; allowDownscaling?:boolean;showFace?:boolean;transition?:number;priority?:'low'|'normal'|'high';onError?:()=>void;onLoad?:()=>void;style?:StyleProp<ViewStyle>;
 };
-export function LayeredAvatar({bodySource,faceSource,hat,heldAccessory,bodyPresentation,hatPresentation,heldPresentation,faceScale=0.92,faceTransitionDuration=0,allowDownscaling=true,showFace=true,transition=0,priority='normal',onError,onLoad,style}: LayeredAvatarProps) {
+export function LayeredAvatar({bodySource,faceSource,hat,heldAccessory,bodyPresentation,hatPresentation,heldPresentation,bodyOverlay,faceScale=0.92,faceTransitionDuration=0,allowDownscaling=true,showFace=true,transition=0,priority='normal',onError,onLoad,style}: LayeredAvatarProps) {
   return (
     <View pointerEvents="none" style={[styles.container, style]}>
       {/* Keep each native image view stable while its source changes. A recyclingKey
@@ -24,6 +26,7 @@ export function LayeredAvatar({bodySource,faceSource,hat,heldAccessory,bodyPrese
         style={centeredLayerStyle(bodyPresentation.scale, bodyPresentation.offsetX, bodyPresentation.offsetY)}
         transition={transition}
       />
+      {bodyOverlay && <View style={centeredLayerStyle(bodyPresentation.scale, bodyPresentation.offsetX, bodyPresentation.offsetY)}>{bodyOverlay}</View>}
       {showFace ? (
         <Image
           allowDownscaling={allowDownscaling}
