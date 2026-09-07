@@ -28,7 +28,7 @@ import { impulseStrength } from "@incubator/tile-match/feedback";
 import { CombatCallout } from "./combat-callout";
 import { DUELS, getDuel, MOVES, mechanicSequence, DEFAULT_ARENA_AI } from "../data/campaign";
 import type { CombatPresentation } from "../game/combat-presentation";
-import { resultFor } from "../game/combat";
+import { resultFor, riggedCells, BACKFIRE } from "../game/combat";
 import { MOSSPROUT_DUEL } from "../data/duel-stages";
 import { StageGuides } from "./stage-guides";
 import { OpponentField } from "./opponent-field";
@@ -197,6 +197,7 @@ function Battle({
   const [opponentFireKey, setOpponentFireKey] = useState(0);
   const opponentHitSignal = useSharedValue(0);
   const playerHitSignal = useSharedValue(0);
+  const playerDizzySignal = useSharedValue(0);
   const [impulse, setImpulse] = useState<{ id: number; strength: number }>();
   const feedback = useFeedback(muted, hapticsEnabled, suspended || backgrounded);
   const feedbackRef = useRef(feedback);
@@ -222,18 +223,21 @@ function Battle({
   // before paint as well: a passive effect leaves a blank frame between the two.
   useLayoutEffect(() => presentation.subscribeEvents(events => {
     for (const event of events) {
-      if (event.type === 'volley' && event.run?.lastResolution) {
+      if ((event.type === 'volley' || event.type === 'backfire') && event.run?.lastResolution) {
+        const backfire = event.type === 'backfire';
         const incoming = event.side === 'opponent';
+        const hitsPlayer = backfire || incoming;
         const source = incoming ? rivalLayout : layout;
         const dy = incoming ? rivalOffset.dy.value : offset.dy.value;
-        const cells = buildSlotBurst(event.run.grid, source.metrics, event.run.lastResolution.clearedCells, event.run.lastGroupSizes);
-        const targetBounds = incoming ? layout.stage?.player.visible : layout.stage?.rival.visible;
+        const cells = buildSlotBurst(event.run.grid, source.metrics, backfire ? riggedCells(event.run) : event.run.lastResolution.clearedCells, backfire ? [] : event.run.lastGroupSizes);
+        const targetBounds = hitsPlayer ? layout.stage?.player.visible : layout.stage?.rival.visible;
         const target = targetBounds ? {x: targetBounds.x + targetBounds.width / 2, y: targetBounds.y + targetBounds.height * .5} :
-          {x: width / 2, y: incoming ? layout.eggY + layout.eggSize * .52 : layout.opponentY + layout.opponentSize * .52};
+          {x: width / 2, y: hitsPlayer ? layout.eggY + layout.eggSize * .52 : layout.opponentY + layout.opponentSize * .52};
         const bullets = cells.map((c, i) => ({x: source.field.x + c.x + source.metrics.cell/2,
-          y: source.field.y + dy + c.y + source.metrics.cell/2, colorId: c.colorId, size: source.metrics.cell, delay: i * CELL_STAGGER_MS}));
-        setVolleys(v => [...v, {id: event.id, target, bullets, startAt: event.at, damage: event.damage ?? 0, quality: presentation.quality.current,
-          opponentWidth: targetBounds?.width ?? (incoming ? layout.eggSize : layout.opponentSize) * .6}]);
+          y: source.field.y + dy + c.y + source.metrics.cell/2, colorId: c.colorId, size: source.metrics.cell, delay: (backfire ? BACKFIRE.shakeMs : 0) + i * CELL_STAGGER_MS}));
+        setVolleys(v => [...v, {id: event.id, target, bullets, startAt: event.at, damage: event.damage ?? 0, shakeMs: backfire ? BACKFIRE.shakeMs : 0, quality: presentation.quality.current,
+          opponentWidth: targetBounds?.width ?? (hitsPlayer ? layout.eggSize : layout.opponentSize) * .6}]);
+        if (backfire) continue;
         if (incoming) setOpponentFireKey(event.id);
         else {
           setFireKey(event.id);
@@ -244,14 +248,16 @@ function Battle({
         }
       }
       if (event.type === 'impact') {
-        if (event.side === 'player') opponentHitSignal.value = event.id;
+        if (event.side === 'player' && event.damageTarget === 'player') playerDizzySignal.value = event.id;
+        if ((event.damageTarget ?? (event.side === 'player' ? 'opponent' : 'player')) === 'opponent') opponentHitSignal.value = event.id;
         else playerHitSignal.value = event.id;
         feedbackRef.current.cue('cell-impact');
       }
       if (event.type === 'blast' && event.run) {
         const source = event.side === 'opponent' ? rivalLayout : layout;
         const dy = event.side === 'opponent' ? rivalOffset.dy.value : offset.dy.value;
-        const cells = event.run.beat.groups.flatMap(g => g.cells.map(i => ({
+        const rigged = new Set(event.side === 'player' ? riggedCells(event.run).map(c => c.index) : []);
+        const cells = event.run.beat.groups.flatMap(g => g.cells.filter(i => !rigged.has(i)).map(i => ({
           x: source.field.x + source.metrics.outer + (i % event.run!.grid.cols)*source.metrics.pitch,
           y: source.field.y + dy + source.metrics.outer + Math.floor(i / event.run!.grid.cols)*source.metrics.pitch, colorId: g.colorId,
         })));
@@ -262,7 +268,7 @@ function Battle({
       }
       if (event.side === 'player' && event.type === 'chip') feedbackRef.current.cue('chip');
     }
-  }), [presentation, layout, rivalLayout, offset.dy, rivalOffset.dy, width, playerHitSignal, opponentHitSignal]);
+  }), [presentation, layout, rivalLayout, offset.dy, rivalOffset.dy, width, playerHitSignal, opponentHitSignal, playerDizzySignal]);
   const save = useCallback(async () => {
     if (completion.current || !ref.current.outcome) return;
     completion.current = true;
@@ -355,7 +361,7 @@ function Battle({
       : "A little rest…"
     : resolved
       ? run.beat.voided
-        ? "Trap triggered!"
+        ? "Rigged cells backfire!"
         : run.lastBeatGrade === "perfect"
           ? run.lastBeatPace === "late"
             ? "Perfect · take your time"
@@ -437,7 +443,7 @@ function Battle({
         <GroundedEgg placement={layout.stage.rival} skin={definition.skin}
           face={state.outcome === "won" || state.outcome === "draw" ? "surprise" : undefined} streak={state.opponent.run.combo} pulse={state.opponent.run.piecesPlaced} feedKey={opponentFireKey} hitSignal={opponentHitSignal} paused={suspended} />
         <GroundedEgg placement={layout.stage.player} skin={profile!.skin} streak={run.combo}
-          pulse={run.piecesPlaced} feedKey={fireKey} hitSignal={playerHitSignal} wisp={!!profile!.wisp} paused={suspended} />
+          pulse={run.piecesPlaced} feedKey={fireKey} hitSignal={playerHitSignal} dizzySignal={playerDizzySignal} wisp={!!profile!.wisp} paused={suspended} />
       </> : (      <View
         pointerEvents="none"
         style={{
@@ -452,6 +458,7 @@ function Battle({
           pulse={run.piecesPlaced}
           feedKey={fireKey}
           hitSignal={playerHitSignal}
+          dizzySignal={playerDizzySignal}
 
           wisp={!!profile!.wisp}
           size={layout.eggSize}

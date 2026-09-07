@@ -3,18 +3,27 @@ import { beatSettleMs, blastSettleMs } from '@incubator/tile-match/timing';
 import type { DuelDefinition, DuelResult } from './types';
 import { actionDelay, choosePlacement, randomStep, seedNumber } from './opponent';
 import { arrivalTime, cellDamage, CELL_STAGGER_MS } from './volley-presentation';
+import { varietyData } from '@incubator/tile-match/varieties';
+
+export const BACKFIRE = {shakeMs: 240, perCell: 2, maxDamage: 8} as const;
+export function riggedCells(run: SlotRunState) {
+  const bomb = varietyData<{pieceId: string}>(run.beat, 'bomb');
+  return run.beat.groups.filter(g => g.pieceId === bomb?.pieceId)
+    .flatMap(g => g.cells.map(index => ({index, colorId: g.colorId})));
+}
 
 export const COMBAT = { perCell: 2, exactBonus: 4, lateBonus: 2, comboStep: .125, comboCap: 2.25 } as const;
 export type Combatant = 'player' | 'opponent';
 export type CombatEvent = {
-  id: number; at: number; type: 'placement' | 'volley' | 'miss' | 'blast' | 'chip' | 'impact' | 'end';
+  id: number; at: number; type: 'placement' | 'volley' | 'backfire' | 'miss' | 'blast' | 'chip' | 'impact' | 'end';
+  damageTarget?: Combatant;
   side: Combatant; damage?: number; run?: SlotRunState; volleyId?: number; cellIndex?: number;
 };
 export type CombatantState = {
   run: SlotRunState; beatStartedAt: number; lastDropAt: number; nextBeatAt: number;
   resolvedSequence: number; exactBeats: number; totalBeats: number;
 };
-export type PendingImpact = { at: number; side: Combatant; damage: number; volleyId: number; cellIndex: number };
+export type PendingImpact = { at: number; side: Combatant; damageTarget?: Combatant; damage: number; volleyId: number; cellIndex: number };
 export type CombatState = {
   definition: DuelDefinition; attemptId: string; seed: string; practice: boolean;
   player: CombatantState; opponent: CombatantState;
@@ -78,6 +87,18 @@ function resolve(s: CombatState, side: Combatant): CombatState {
     exactBeats: fighter.exactBeats + Number(run.lastBeatGrade === 'perfect'), totalBeats: fighter.totalBeats + 1,
     nextBeatAt: s.elapsed + settle}};
   s = emit(s, {side, type: run.beat.voided ? 'blast' : damage ? 'volley' : 'miss', run, damage});
+  if (side === 'player' && run.beat.voided) {
+    const count = riggedCells(run).length;
+    if (count) {
+      const penalty = Math.min(BACKFIRE.maxDamage, count * BACKFIRE.perCell);
+      s = emit(s, {side, type: 'backfire', run, damage: penalty, damageTarget: 'player'});
+      const hits: PendingImpact[] = Array.from({length: count}, (_, i) => ({side, damageTarget: 'player',
+        at: s.elapsed + arrivalTime(BACKFIRE.shakeMs + i * CELL_STAGGER_MS),
+        damage: cellDamage(penalty, count, i), volleyId: s.eventSequence, cellIndex: i}));
+      s = {...s, player: {...s.player, nextBeatAt: Math.max(s.player.nextBeatAt, hits[count-1].at + 100)},
+        impacts: [...s.impacts, ...hits].sort((a,b) => a.at-b.at || a.volleyId-b.volleyId || a.cellIndex-b.cellIndex)};
+    }
+  }
   if (damage) s = {...s, impacts: [...s.impacts, ...Array.from({length: cells}, (_, i) => ({
     side, at: s.elapsed + arrivalTime(i * CELL_STAGGER_MS), damage: cellDamage(damage, cells, i), volleyId: s.eventSequence, cellIndex: i,
   }))].sort((a,b) => a.at-b.at || a.volleyId-b.volleyId || a.cellIndex-b.cellIndex)};
@@ -95,9 +116,10 @@ function impactsAt(s: CombatState): CombatState {
   if (!due.length) return s;
   s = {...s, impacts: s.impacts.filter(i => i.at > s.elapsed)};
   for (const hit of due) {
-    const hp = hit.side === 'player' ? 'opponentHp' : 'playerHp';
+    const target = hit.damageTarget ?? (hit.side === 'player' ? 'opponent' : 'player');
+    const hp = target === 'player' ? 'playerHp' : 'opponentHp';
     s = {...s, [hp]: Math.max(0, s[hp] - hit.damage)};
-    s = emit(s, {type: 'impact', side: hit.side, damage: hit.damage, volleyId: hit.volleyId, cellIndex: hit.cellIndex});
+    s = emit(s, {type: 'impact', side: hit.side, damageTarget: target, damage: hit.damage, volleyId: hit.volleyId, cellIndex: hit.cellIndex});
   }
   if (!s.playerHp || !s.opponentHp) {
     s = {...s, impacts: [], outcome: !s.playerHp && !s.opponentHp ? 'draw' : !s.opponentHp ? 'won' : 'lost'};

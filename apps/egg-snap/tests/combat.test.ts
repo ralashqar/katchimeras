@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DUELS, mechanicSequence, validateCampaign, validateDuel } from '../data/campaign';
-import { createCombat, placeCombat, tickCombat, resultFor, type CombatState } from '../game/combat';
+import { createCombat, placeCombat, tickCombat, resultFor, riggedCells, BACKFIRE, type CombatState } from '../game/combat';
 import { choosePlacement } from '../game/opponent';
 import { beatDeadlineMs } from '@incubator/tile-match/engine';
 import { varietyData } from '@incubator/tile-match/varieties';
@@ -153,7 +153,9 @@ test('bombs void charged cells and armour costs extra real actions on either sid
   const group = s.run.beat.groups.find(g => g.pieceId === safe.id)!;
   s = placeCombat(s, {pieceId: safe.id, ...group.origin}, 100);
   s = placeCombat(s, {pieceId: bomb.pieceId, discard: true}, 200);
-  assert.equal(s.run.beat.voided, true); assert.equal(s.impacts.length, 0);
+  assert.equal(s.run.beat.voided, true);
+  assert.ok(s.impacts.length > 0);
+  assert.ok(s.impacts.every(hit => hit.damageTarget === 'player'), 'the cancelled volley cannot damage the opponent');
   const shield = solve(createCombat({...DUELS[3], ai: slowAi}, 'shield', 'shield'));
   assert.ok(shield.events.some(e => e.type === 'chip'));
   assert.equal(shield.run.combo, 1);
@@ -228,4 +230,45 @@ test('player and miniature opponent footprints fit portrait layouts', () => {
     }
     assert.ok(r.metrics.cell < l.metrics.cell);
   }
+});
+
+
+test('rigged cells shake then damage only the player on each collision, once', () => {
+  let s = createCombat({...DUELS[4], ai: slowAi}, 'backfire', 'backfire');
+  const count = riggedCells(s.run).length;
+  const bomb = varietyData<{pieceId: string}>(s.run.beat, 'bomb')!;
+  const group = s.run.beat.groups.find(g => g.pieceId === bomb.pieceId)!;
+  s = placeCombat(s, {pieceId: bomb.pieceId, ...group.origin}, 100);
+  assert.equal(s.events.filter(e => e.type === 'backfire').length, 1);
+  assert.equal(s.playerHp, s.definition.health);
+  assert.equal(s.impacts.length, count);
+  const hits = [...s.impacts];
+  assert.equal(hits[0].at, 100 + BACKFIRE.shakeMs + CELL_FLIGHT_MS);
+  s = tickCombat(s, hits[0].at - 1);
+  assert.equal(s.playerHp, s.definition.health);
+  let damage = 0;
+  for (const hit of hits) {
+    s = tickCombat(s, hit.at);
+    damage += hit.damage;
+    assert.equal(s.playerHp, s.definition.health - damage);
+    assert.equal(s.opponentHp, s.definition.health);
+    assert.deepEqual(tickCombat(s, hit.at), s);
+  }
+  assert.equal(damage, Math.min(BACKFIRE.maxDamage, count * BACKFIRE.perCell));
+  assert.ok(s.events.filter(e => e.type === 'impact').every(e => e.damageTarget === 'player'));
+});
+
+test('disarming a bomb remains safe and lethal backfire can end the duel', () => {
+  const definition = {...DUELS[4], ai: slowAi};
+  const safe = solve(createCombat(definition, 'safe', 'safe'));
+  assert.equal(safe.run.beat.voided, false);
+  assert.ok(!safe.events.some(e => e.type === 'backfire'));
+  let s = createCombat(definition, 'lethal', 'lethal');
+  s = {...s, playerHp: 1};
+  const bomb = varietyData<{pieceId: string}>(s.run.beat, 'bomb')!;
+  const group = s.run.beat.groups.find(g => g.pieceId === bomb.pieceId)!;
+  s = placeCombat(s, {pieceId: bomb.pieceId, ...group.origin}, 100);
+  s = tickCombat(s, s.impacts[0].at);
+  assert.equal(s.outcome, 'lost');
+  assert.equal(s.opponentHp, s.definition.health);
 });

@@ -12,6 +12,7 @@ import determined from "@incubator/art-egg-avatars/catalog/face/determined";
 import heroic from "@incubator/art-egg-avatars/catalog/face/heroic-glint";
 import surprise from "@incubator/art-egg-avatars/catalog/face/big-surprise";
 import grin from "@incubator/art-egg-avatars/catalog/face/big-grin";
+import dizzy from "@incubator/art-egg-avatars/catalog/face/dizzy-swirls";
 export const BODIES: Record<string, typeof classic> = {
   classic,
   moss,
@@ -22,6 +23,7 @@ export const BODIES: Record<string, typeof classic> = {
   tide,
 };
 export const FACES: Record<string, typeof sleepy> = {
+  dizzy,
   sleepy,
   curious,
   determined,

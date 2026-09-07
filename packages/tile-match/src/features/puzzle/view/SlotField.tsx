@@ -39,6 +39,7 @@ import {
   createPicture,
   type SkPaint,
   type SkCanvas,
+  type SkPicture,
 } from '@shopify/react-native-skia';
 import { memo, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
@@ -49,6 +50,7 @@ import {
   useDerivedValue,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 import { palette, semantic } from '../../../ui/tokens';
@@ -303,9 +305,9 @@ export const SlotField = memo(function SlotField({
   // Let the light gather gently, independently of the quicker cell entrance.
   // Opacity-only motion also remains comfortable with reduced motion enabled.
   useEffect(() => {
-    borderIntro.value = withTiming(1, {duration: reduceMotion ? 140 : 450, easing: Easing.linear});
+    borderIntro.value = withTiming(1, {duration: reduceMotion ? 140 : 450 + (groups.length - 1) * 70, easing: Easing.linear});
     return () => cancelAnimation(borderIntro);
-  }, [borderIntro, reduceMotion]);
+  }, [borderIntro, reduceMotion, groups.length]);
 
   useEffect(() => {
     if (reduceMotion) {
@@ -463,7 +465,7 @@ export const SlotField = memo(function SlotField({
     if (hidden || hiddenSV.value) return emptyPicture;
     if (intro.value >= 1 && arrive.value >= 1) return settledPicture;
     return createPicture(canvas => {
-      if (intro.value < 1) drawCells(canvas, cells.value, intro.value, arrive.value);
+      if (intro.value < 1) drawCells(canvas, cells.value, appearance ? 1 : intro.value, arrive.value);
       else {
         canvas.drawPicture(basePicture);
         drawCells(canvas, arriving, 1, arrive.value);
@@ -475,15 +477,25 @@ export const SlotField = memo(function SlotField({
     const t = borderIntro.value;
     return t * t * (3 - 2 * t);
   });
+  const footprints = useMemo(() => groups.map(group => {
+    const xs = group.cells.map(i => metrics.outer + (i % grid.cols) * metrics.pitch);
+    const ys = group.cells.map(i => metrics.outer + Math.floor(i / grid.cols) * metrics.pitch);
+    const x = Math.min(...xs), y = Math.min(...ys);
+    return {id: group.id, x, y, width: Math.max(...xs) + cell - x, height: Math.max(...ys) + cell - y};
+  }), [groups, metrics, grid.cols, cell]);
 
   return (
     <View style={{ width, height }} pointerEvents="none">
       <Canvas style={{ position: 'absolute', left: 0, top: 0, width, height }}>
+        {appearance ? !hidden && footprints.map((bounds, index) => <FootprintEntrance key={bounds.id}
+          bounds={bounds} index={index} count={footprints.length} progress={borderIntro} reduced={reduceMotion}
+          contour={contourPicture} badge={miniature ? badgePicture : undefined} cells={picture} />) : <>
         {!hidden && <Group opacity={decorationOpacity}>
           <Picture picture={contourPicture} />
           {miniature && <Picture picture={badgePicture} />}
         </Group>}
         <Picture picture={picture} />
+        </>}
       </Canvas>
 
       {/* The drop ghost. Keyed by position in the list, not by cell, so a piece moving reuses these
@@ -505,6 +517,32 @@ export const SlotField = memo(function SlotField({
     </View>
   );
 });
+
+/** Both eggs use the same local-centre entrance. Cached art moves as one object. */
+function FootprintEntrance({bounds, index, count, progress, reduced, contour, badge, cells}: {
+  bounds: {x: number; y: number; width: number; height: number}; index: number; count: number;
+  progress: SharedValue<number>; reduced: boolean; contour: SkPicture; badge?: SkPicture; cells: SharedValue<SkPicture>;
+}) {
+  const phase = useDerivedValue(() => reduced ? progress.value : Math.max(0, Math.min(1, (progress.value * (450 + (count - 1) * 70) - index * 70) / 450)));
+  const opacity = useDerivedValue(() => {
+    const t = Math.min(1, phase.value / .6);
+    return t * t * (3 - 2 * t);
+  });
+  const transform = useDerivedValue(() => {
+    const t = phase.value;
+    // One smooth overshoot, then a continuous return to exactly full size.
+    const settle = Math.max(0, (t - .7) / .3);
+    const scale = reduced ? 1 : t < .7 ? .45 + .61 * (1 - Math.pow(1 - t / .7, 3)) : 1.06 - .06 * settle * settle * (3 - 2 * settle);
+    return [{scale}];
+  });
+  return <Group origin={{x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2}} transform={transform} opacity={opacity}>
+    <Group clip={{x: bounds.x - 10, y: bounds.y - 12, width: bounds.width + 20, height: bounds.height + 24}}>
+      <Picture picture={contour} />
+      {badge && <Picture picture={badge} />}
+      <Picture picture={cells} />
+    </Group>
+  </Group>;
+}
 
 /**
  * One ghost cell.

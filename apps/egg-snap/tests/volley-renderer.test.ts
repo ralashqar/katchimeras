@@ -78,5 +78,13 @@ for (const spriteSize of [64, 128]) test(`the actual ${spriteSize}px volley rend
   const incoming={...volley,id:2,startAt:1000,target:{x:200,y:600},bullets:volley.bullets.map(b=>({...b,y:100}))};
   await act(()=>root.update(React.createElement(output.exports.CombatVolleys,{...props,volleys:[incoming]})));
   assert.ok(frame(1180).some(s=>s.y>200 && s.y<600),'opponent cells visibly fly down toward the player');
+  const backfire = {...volley, id:3, startAt:2000, shakeMs:240, target:{x:200,y:600},
+    bullets:volley.bullets.map(b=>({...b, delay:b.delay+240}))};
+  await act(()=>root.update(React.createElement(output.exports.CombatVolleys,{...props,volleys:[backfire]})));
+  const held = frame(2000), shaken = frame(2040);
+  assert.equal(held.length, 2, 'rigged cells remain visible at the handoff');
+  assert.equal(shaken[0].y, held[0].y, 'shake holds cells at their footprint height');
+  assert.notEqual(shaken[0].x, held[0].x, 'rigged cells visibly shake before launch');
+  assert.ok(frame(2420).some(s=>s.y>500 && s.y<600), 'backfire cells fly toward the player after the shake');
   await act(()=>root.unmount());assert.equal(reactions.size,0);
 });

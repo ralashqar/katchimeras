@@ -115,7 +115,8 @@ export const CombatVolleys = memo(function CombatVolleys({ volleys, bursts, cloc
       }
       if (age < CELL_FLIGHT_MS) {
         const t = 1-Math.pow(1-Math.max(0,age/CELL_FLIGHT_MS),1.5);
-        draw(b.x + (reduced ? 0 : 2*(1-t)*t*b.outward+t*t*b.dx), b.y + (reduced ? 0 : b.dy*t),
+        const shake = !reduced && b.shakeMs > 0 && now < b.shakeStart + b.shakeMs ? Math.sin((now-b.shakeStart)*.12)*3 : 0;
+        draw(b.x + shake + (reduced ? 0 : 2*(1-t)*t*b.outward+t*t*b.dx), b.y + (reduced ? 0 : b.dy*t),
           b.size*(reduced ? 1 : 1-t*.55), 0, b.colour, 1);
         if (age >= 0 && age < CELL_LAUNCH_MS) {
           const t = age / CELL_LAUNCH_MS;

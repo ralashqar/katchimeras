@@ -1,10 +1,10 @@
-import { memo } from "react";
+import { memo, useEffect, useState } from "react";
 import { LayeredAvatar } from "@incubator/avatar/layered-avatar";
 import { EggEnergy } from "@incubator/avatar/energy";
 import { useEggExpressionPlayer } from "@incubator/avatar/expressions";
 import { Image } from "expo-image";
 import { View } from "react-native";
-import { useReducedMotion, type SharedValue } from "react-native-reanimated";
+import { runOnJS, useAnimatedReaction, useReducedMotion, type SharedValue } from "react-native-reanimated";
 import { BODIES, FACES, WISP } from "../data/art";
 
 export const Egg = memo(function Egg({
@@ -16,6 +16,7 @@ export const Egg = memo(function Egg({
   feedKey = 0,
   hitKey = 0,
   hitSignal,
+  dizzySignal,
   hurt = false,
   wisp = false,
   paused = false,
@@ -29,13 +30,23 @@ export const Egg = memo(function Egg({
   feedKey?: number;
   hitKey?: number;
   hitSignal?: SharedValue<number>;
+  dizzySignal?: SharedValue<number>;
   hurt?: boolean;
   wisp?: boolean;
   paused?: boolean;
   anchor?: { x: number; y: number };
 }) {
   const body = BODIES[skin] ?? BODIES.classic;
-  const baseFaceId = hurt
+  const [dizzyKey, setDizzyKey] = useState(0);
+  useAnimatedReaction(() => dizzySignal?.value ?? 0, (value, previous) => {
+    if (value > 0 && value !== previous) runOnJS(setDizzyKey)(value);
+  });
+  useEffect(() => {
+    if (!dizzyKey || paused) return;
+    const timer = setTimeout(() => setDizzyKey(0), 900);
+    return () => clearTimeout(timer);
+  }, [dizzyKey, paused]);
+  const baseFaceId = dizzyKey ? 'dizzy' : hurt
     ? "surprise"
     : (face ??
       (streak >= 10

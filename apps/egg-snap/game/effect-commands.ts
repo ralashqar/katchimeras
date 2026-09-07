@@ -3,18 +3,18 @@ import { SLOT_BLAST_SHAKE_MS, SLOT_BLAST_POP_MS, SLOT_BLAST_STEP_MS } from '@inc
 import { TILE_COLORS } from '../data/tile-theme';
 import { arrivalTime, cellImpactTarget, CELL_FLIGHT_MS, CELL_IMPACT_MS } from './volley-presentation';
 import { EFFECT_BUDGET, type EffectQuality } from './effect-quality';
-export type CombatVolleyData = BulletVolley & { damage: number; opponentWidth: number; startAt: number; quality?: EffectQuality };
+export type CombatVolleyData = BulletVolley & { damage: number; shakeMs?: number; opponentWidth: number; startAt: number; quality?: EffectQuality };
 export type CombatBurstData = {id: number; startAt: number; kind: 'miss' | 'blast'; cell: number;
   cells: {x: number; y: number; colorId: keyof typeof TILE_COLORS}[]; quality: EffectQuality};
 
 const ids = Object.keys(TILE_COLORS) as (keyof typeof TILE_COLORS)[];
 export function effectCommands(volleys: readonly CombatVolleyData[], bursts: readonly CombatBurstData[], endedAt?: number) {
   return [...volleys.flatMap(v => v.bullets.map(b => ({
-    ...b, kind: "volley" as const, ordinal: 0, start: v.startAt + b.delay, target: cellImpactTarget(b.x, v.target, v.opponentWidth),
+    ...b, shakeMs: v.shakeMs ?? 0, shakeStart: v.startAt, kind: "volley" as const, ordinal: 0, start: v.startAt + b.delay, target: cellImpactTarget(b.x, v.target, v.opponentWidth),
     colour: ids.indexOf(b.colorId), shards: EFFECT_BUDGET[v.quality ?? 'balanced'].shards,
     cap: EFFECT_BUDGET[v.quality ?? 'balanced'].cap,
   }))).filter(b => endedAt === undefined || b.start + CELL_FLIGHT_MS <= endedAt),
-    ...bursts.flatMap(b => b.cells.map((c, ordinal) => ({...c, kind: b.kind, ordinal,
+    ...bursts.flatMap(b => b.cells.map((c, ordinal) => ({...c, shakeMs: 0, shakeStart: b.startAt, kind: b.kind, ordinal,
       x: c.x + b.cell/2, y: c.y + b.cell/2, target: {x: c.x + b.cell/2, y: c.y + b.cell/2},
       start: b.startAt, size: b.cell, colour: ids.indexOf(c.colorId),
       shards: EFFECT_BUDGET[b.quality].shards, cap: EFFECT_BUDGET[b.quality].cap,

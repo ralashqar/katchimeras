@@ -37,7 +37,7 @@ export const DUELS: readonly DuelDefinition[] = [
   duel('glade-4', 'Under the shell', 'Pebble', 'frost', 380, ai(1170,1710,.89), mechanicSequence(['armour']),
     'We both chip our shields before filling the shapes. The piece returns for another try; chipping never breaks your streak.'),
   duel('glade-5', 'A tricky seed', 'Bramble', 'sunset', 400, ai(1080,1620,.92), mechanicSequence(['bomb']),
-    'Play the OTHER piece first to disarm the red-marked trap. Either egg can make a mistake: triggering a trap destroys that whole volley.'),
+    'Play the OTHER piece first to disarm the red-marked trap. A triggered trap cancels your volley and sends its cells back at you for a little damage.'),
   {...duel('glade-6', 'Keeper of the glade', 'Elder Moss', 'starglow', 720, ai(765,1215,.97), mechanicSequence(['drift','armour','bomb']),
     'The keeper plays quickly and carefully. You share the same gusts, shields and traps. Keep your aim steady and your streak bright.'), boss: true, reward: 100,
     dialogue: ['Elder Moss: You have brought a little light to every corner of this glade.', 'One last dance, little spark. Then the path beyond is yours.']},

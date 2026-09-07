@@ -17,7 +17,7 @@ export const MECHANIC_LESSONS: Record<string, { title: string; lines: readonly s
   drift: {title:'Forest gust', lines:['The next puzzle brings a breeze. The outlines now sway up and down. Aim where they are, then let go.']},
   armour: {title:'Shell shield', lines:['Place the matching piece to chip the shield. It returns to your tray; place it again to fill the outline. A chip never breaks your streak.']},
   fuse: {title:'Better together', lines:['Two pieces now fit into one larger outline. Match both halves by their shape. Neither piece rotates.']},
-  bomb: {title:'A tricky seed', lines:['A red marker means that piece is rigged. Place the OTHER piece first to disarm it, then finish the beat.']},
+  bomb: {title:'A tricky seed', lines:['A red marker means that piece is rigged. Place the OTHER piece first to disarm it, then finish the beat. Triggering it cancels your volley and sends the rigged cells back at you for a little damage.']},
   crossed: {title:'Cross-up', lines:['The tray order has flipped. Follow each piece’s shape and colour, rather than its side.']},
   hues: {title:'Colour shift', lines:['The outline cycles colours. Watch the small timer and land when it matches your piece. Waiting for the right colour is allowed.']},
 };
