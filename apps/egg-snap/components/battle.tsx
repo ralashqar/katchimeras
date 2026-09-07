@@ -48,7 +48,6 @@ import { Scene } from "./scene";
 import { Egg } from "./egg";
 import { Button, Copy, styles } from "./ui";
 import { Dialogue } from "./dialogue";
-
 const trayStyle = {
   backgroundColor: "rgba(15, 25, 20, 0.91)",
   borderColor: "#E4D3A740",
@@ -504,6 +503,7 @@ function Battle({
         style={{
           position: "absolute",
           top: layout.warningY,
+          display: layout.stage && state.phase !== "warning" ? "none" : "flex",
           left: layout.frame.x + 38,
           width: layout.frame.width - 76,
           gap: 5,
@@ -619,17 +619,16 @@ function Battle({
         pointerEvents="none"
         style={{
           position: "absolute",
-          ...(layout.stage ? { top: layout.stage.player.contact.y + (height < 700 ? 8 : 22) }
+          ...(layout.stage ? { top: layout.stage.player.visible.y - (height < 700 ? 45 : 64) }
             : { bottom: height - layout.trayY + 10 }),
           left: layout.frame.x + 18,
           width: layout.frame.width - 36,
-          ...(layout.stage ? { paddingHorizontal: 9, borderRadius: 14, backgroundColor: '#111C15C7', borderWidth: 1, borderColor: '#E7D9A322' } : {}),
         }}
       >
         <CombatCallout
           stage={!!layout.stage}
           compact={height < 700}
-          label={callout || (run.combo > 1 ? `${run.combo} Perfect streak` : "Find the shape. Feel the spark.")}
+          label={callout || (layout.stage ? "" : (run.combo > 1 ? `${run.combo} Perfect streak` : "Find the shape. Feel the spark."))}
           streak={run.combo}
           perfect={resolved && run.lastBeatGrade === "perfect" && !state.outcome}
           sequence={run.eventSequence}
@@ -645,8 +644,8 @@ function Battle({
           height: layout.trayHeight,
         }}
       >
-        {layout.stage && <View pointerEvents="none" style={{ position: 'absolute', top: 4, left: 0, right: 0, zIndex: 1 }}>
-          <Copy style={{ textAlign: 'center', fontSize: 9, color: '#DBCEAC', letterSpacing: 2 }}>DRAG PIECES</Copy>
+        {layout.stage && <View pointerEvents="none" style={{ position: 'absolute', top: -22, left: 0, right: 0, zIndex: 1 }}>
+          <Copy style={{ textAlign: 'center', fontSize: 10, color: '#FFF1CA', letterSpacing: 2, textShadowColor: '#182B20', textShadowRadius: 4 }}>DRAG PIECES</Copy>
         </View>}
         <Tray
           style={trayStyle}
@@ -670,16 +669,18 @@ function Battle({
           left: layout.frame.x + 24,
           width: layout.frame.width - 48,
           gap: 4,
-          ...(layout.stage ? { padding: 6, borderRadius: 10, backgroundColor: '#101C15D9' } : {}),
+
         }}
       >
-        <View style={styles.row}>
-          <Copy style={{ fontSize: 10 }}>YOUR SPARK{layout.stage ? ` · ${run.combo} PERFECT STREAK` : ""}</Copy>
+        {!layout.stage && <View style={styles.row}>
+          <Copy style={{ fontSize: 10 }}>YOUR SPARK</Copy>
           <Copy style={{ fontSize: 10 }}>
             {state.playerHp} / {definition.playerHealth}
           </Copy>
+        </View>}
+        <View accessible accessibilityLabel={`Health ${state.playerHp} of ${definition.playerHealth}`}>
+          <Meter fraction={state.playerHp / definition.playerHealth} />
         </View>
-        <Meter fraction={state.playerHp / definition.playerHealth} />
       </View>
       {__DEV__ && guides && layout.stage && <StageGuides layout={layout} />}
       {miss && (

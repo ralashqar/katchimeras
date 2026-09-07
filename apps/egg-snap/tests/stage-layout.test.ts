@@ -23,6 +23,9 @@ test('all skins stand on the projected platforms across phone crops and tablet m
   for (const [width, height] of screens) for (const skin of Object.keys(ground)) {
     const l = battleLayout(width, height, 24, 20, MOSSPROUT_DUEL, skin, skin);
     const stage = l.stage!;
+    close(stage.player.contact.y, l.trayY - 42);
+    assert.ok(stage.projection.y <= .001 && stage.projection.y + stage.projection.height >= height - .001);
+    assert.ok(l.playerHudY >= l.trayY && l.playerHudY + 8 <= l.trayY + l.trayHeight);
     for (const subject of [stage.player, stage.rival]) {
       close(subject.sprite.x + subject.anchor.x * subject.sprite.width, subject.contact.x);
       close(subject.sprite.y + subject.anchor.y * subject.sprite.height, subject.contact.y);
@@ -36,7 +39,7 @@ test('all skins stand on the projected platforms across phone crops and tablet m
         close(expanded.y + subject.anchor.y * expanded.height, subject.contact.y);
       }
     }
-    assert.ok(stage.rival.visible.width > l.frame.width * .20, 'rival remains larger than the original stage');
+    assert.ok(stage.rival.visible.height >= 40, 'distant rival retains the minimum visible height');
     assert.ok(stage.rival.visible.width < stage.rival.platform.width, 'rival fits its platform');
     const play = slotPlayRect(l.metrics);
     assert.ok(l.field.x + play.x >= l.frame.x);

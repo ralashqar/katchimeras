@@ -1,0 +1,10 @@
+{
+  "id": "mossprout-duel-toy-v6",
+  "provider": "built-in imagegen",
+  "style": "Cozy toy diorama 3D, readable large shapes, low detail, very low texture detail, soft bevels, cushiony. Smooth clean molded clay materials, broad olive green and warm cream colours. Simplify foliage into a few large leaf forms, eliminate small foliage, bark grooves, grain, speckling, mottling and scratches. Keep the forest, cottage and lantern with a calm open path.",
+  "templateSha256": "05a31257aa4f1cedd9b45c84561767430e9107075b1c62139b0a136e38c18b0a",
+  "referenceSha256": "5eadda0a23cd6ea0a4d793907636b877825061128b08b32c8fbd8fbb61fafa10",
+  "status": "active",
+  "candidateSha256": "f968e181a134d6f597c0baa1936a8cc0c56b5098051d9d6b9d4dfc6209ade076",
+  "reviewNote": "Reference and candidate visually compared: matching top ellipses, standing centers and camera. Runtime template unchanged."
+}

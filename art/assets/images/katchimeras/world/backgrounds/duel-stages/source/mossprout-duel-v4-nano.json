@@ -1,0 +1,17 @@
+{
+  "provider": "fal",
+  "model": "fal-ai/nano-banana-2/edit",
+  "prompt": "Image 1 is the exact composition to restyle. Image 2 is a MATERIAL AND SHAPE STYLE reference only, not a camera or layout reference.\nRegenerate image 1 as a cozy toy diorama 3D game environment: soft bevels, cushiony rounded shapes, low detail and VERY LOW TEXTURE DETAIL. Strongly simplify all surfaces and vegetation. Smooth matte molded clay and vinyl materials, broad clean color gradients, pillowy tree crowns, chunky rounded trunks, a few plump leaf clusters, simple pebble bushes and sparse toy flowers. No bark grooves, tiny leaves, mottling, grain, pores, scratches, cracks, noisy ground, realistic moss or photographic detail. Match image 2's friendly warm cream stone and rounded designer-toy shapes, simplifying texture even further.\nKeep image 1's camera angle, perspective, composition and both platform positions EXACTLY. Low camera, shallow elliptical tops. The far platform standing center remains at 50% horizontal, 30.6% vertical. Near standing center remains at 50% horizontal, 67.4% vertical. Preserve their sizes, top ellipses and low rims. Keep the lantern left, rounded cottage upper right, woodland framing and warm golden light, but simplify them into soft toy forms. Preserve calm open pathway and empty gameplay spaces. Full-bleed portrait 9:16 background. Both platforms completely EMPTY. No eggs, creatures, characters, character shadows, text, signage, symbols, UI or puzzle pieces.",
+  "response": {
+    "status": "completed",
+    "gridUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/mossprout-duel-v4-nano/1788766587606_grid.png",
+    "cells": [
+      {
+        "index": 0,
+        "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/mossprout-duel-v4-nano/1788766587606_grid.png"
+      }
+    ],
+    "model": "fal-ai/nano-banana-2/edit",
+    "mode": "single"
+  }
+}

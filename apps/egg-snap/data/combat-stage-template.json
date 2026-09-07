@@ -1,0 +1,8 @@
+{
+  "templateId": "mossprout-camera-v3",
+  "reference": "art/assets/images/katchimeras/world/backgrounds/duel-stages/source/mossprout-duel-v3.png",
+  "sourceSize": { "width": 941, "height": 1672 },
+  "player": { "contact": { "x": 0.5, "y": 0.674 }, "platform": { "x": 0.15, "y": 0.626, "width": 0.7, "height": 0.091 } },
+  "rival": { "contact": { "x": 0.5, "y": 0.306 }, "platform": { "x": 0.33, "y": 0.294, "width": 0.34, "height": 0.024 } },
+  "playRegion": { "x": 0.035, "y": 0.39, "width": 0.93, "height": 0.24 }
+}

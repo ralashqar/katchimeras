@@ -1,3 +1,4 @@
+import { ACTIVE_COMBAT_STAGE, COMBAT_STAGE_SOURCES } from "./combat-stage-art.gen";
 import classic from "@incubator/art-egg-avatars/catalog/body/classic";
 import moss from "@incubator/art-egg-avatars/catalog/body/moss";
 import honeycomb from "@incubator/art-egg-avatars/catalog/body/honeycomb";
@@ -29,12 +30,7 @@ export const FACES: Record<string, typeof sleepy> = {
   grin,
 };
 export const WISP = require("@incubator/art-wisps/fern.webp");
-export const DUEL_BACKGROUNDS = {
-  'mossprout-duel-v2': {
-    full: require('@incubator/art-world/backgrounds/duel-stages/mossprout-duel-v2-full.webp'),
-    medium: require('@incubator/art-world/backgrounds/duel-stages/mossprout-duel-v2-medium.webp'),
-  },
-};
+export const DUEL_BACKGROUNDS = { [ACTIVE_COMBAT_STAGE]: COMBAT_STAGE_SOURCES };
 export const BACKGROUNDS = {
   mossprout: {
     source: require("@incubator/art-world/backgrounds/mossprout-exploration-v1.png"),

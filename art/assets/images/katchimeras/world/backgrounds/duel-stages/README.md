@@ -2,7 +2,43 @@
 
 Generated with the built-in image generator. These images contain scenery only. Eggs, shadows, targets and HUD are rendered by the app.
 
-## Current revision: cozy toy diorama (v2)
+## Active artwork: template-based toy forest (v6)
+
+The current artwork is `source/mossprout-duel-toy-v6.png`, created with built-in imagegen. Its generation prompt, material refinement prompt, original reference, candidate, comparison guide and review record are saved under `recipes/mossprout-duel-toy-v6/`. This variant uses the unchanged v3 camera/ground-contact template.
+
+The reusable workflow is documented in `tooling/art-pipeline/EGG-SNAP-ENVIRONMENTS.md`. Use `egg-snap-environment.py prepare`, generate with the built-in image tool, then `import`, visually review, and `activate`. App-owned template JSON is shared by rendering and authoring; activating artwork never changes platform geometry.
+
+## Previous artwork: detailed forest with lower camera (v3 restored)
+
+The user selected the later detailed forest with flatter platforms and a lower camera angle. Runtime uses `source/mossprout-duel-v3.png` and its existing WebP variants, with measured platform contacts: rival (0.500, 0.306), player (0.500, 0.674), source 941 x 1672. Current UI and tray-relative framing are retained. Other art revisions below are historical alternatives, not active assets.
+
+## Historical Mossprout hex style, built-in imagegen (v5)
+
+Active source: `source/mossprout-duel-v5.png` (941 x 1672), with full/medium WebP variants. Generated with the built-in image generator, replacing the rejected FAL revision. Style references were `world/hex/mossprout_focused_v1_main_hex_tile_512.webp` and `world/hex/mossprout_focused_v1_ancient_tree_grove_hex_tile.webp`. V3 supplied camera/composition only.
+
+Prompt direction: reproduce the hex tiles' clean sculpted toy forms, oversized cushion-shaped leaves, rounded wooden posts, cream paving, leaf-roof cottage and sparse large daisies. Use a handful of readable shapes with broad breathing spaces, very low detail and virtually no surface texture. Preserve the two empty platforms and open gameplay areas. No eggs, UI, writing, realistic bark, grain, dirt, intricate moss or dense small foliage. Full-bleed portrait environment, not a floating hex island.
+
+Final edit prompt: preserve composition and large shapes; remove grain, speckling, mottling, scratches, bark lines and surface texture. Use clean smooth molded clay/vinyl, broad colours and gentle lighting gradients. Keep crisp rounded leaf and petal silhouettes, smooth olive ground and warm cream stones; add no objects or detail.
+
+Measured contacts: rival (0.505, 0.300), player (0.500, 0.694). Runtime projection keeps the player grounded 42 points above the tray. Rebuild LODs with `prepare-egg-snap-stage.py`.
+
+## Historical project toy style via FAL (v4, rejected)
+
+Active source: `source/mossprout-duel-v4-nano.png` (1536 x 2752), with full/medium WebP runtime variants. Generated through the existing Supabase/FAL art pipeline using **fal-ai/nano-banana-2/edit**, not the built-in image generator. The v3 scene is the composition reference and `world/base/base_env2.png` is the material/shape style guide.
+
+Direction: cozy toy diorama 3D, soft bevels, cushiony forms, low detail, very low texture detail. Preserve the camera, platforms, lantern, cottage and quiet gameplay areas; simplify surfaces into smooth matte clay/vinyl, pillowy foliage and chunky rounded trunks. No bark grooves, grain, cracks, realistic moss, characters or UI.
+
+The full prompt and provider receipt are in `source/mossprout-duel-v4-nano.json`. Reproduce or resume with `python tooling/art-pipeline/scripts/generate-egg-snap-stage.py`; the script does not regenerate an existing output. Then rebuild runtime LODs with `prepare-egg-snap-stage.py`. Existing normalized ground contacts remain valid.
+
+## Historical lower camera (v3)
+
+Active source: `source/mossprout-duel-v3.png` (941 x 1672), with full/medium WebP variants. Generated with the built-in image generator from the user's second visual reference. V1 and V2 remain historical references.
+
+Prompt: Create an empty cozy 3D toy forest plate using the reference's lower camera angle and shallow elliptical platform tops. Soft bevels, cushiony foliage, smooth low-texture materials, warm sunlight, a rounded cottage and lantern. Two empty platforms with clear central pathway and player-side target space. Remove all eggs, UI, writing, signs, bars, tiles, symbols and character shadows. Keep ground below for the runtime tray.
+
+Measured contacts: rival (0.50, 0.306), player (0.50, 0.674). The projection is scaled and vertically aligned to keep the player's feet 42 points above the tray. Art and ground contacts use the same projection. Hero grades appear above the player without a panel. Health is a slim bar inside the tray with an accessible health label. Idle instruction panels are omitted; attack warnings appear during warning phases.
+
+## Historical cozy toy diorama (v2)
 
 The active Mossprout plate is `source/mossprout-duel-v2.png`, with `mossprout-duel-v2-full.webp` and `mossprout-duel-v2-medium.webp` runtime variants. Created with the built-in image generator from v1. The original neutral master and v1 remain as historical composition references; derive future toy environments from v2.
 

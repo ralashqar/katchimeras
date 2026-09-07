@@ -20,12 +20,12 @@ export function CombatCallout({ label, streak, perfect, sequence, reduced, stage
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return <Animated.View pointerEvents="none" style={[{ paddingVertical: 3, overflow: 'visible' }, style]}>
     <Copy numberOfLines={1} adjustsFontSizeToFit style={{ textAlign: 'center', color,
-      fontFamily: 'EggDisplay', fontSize: stage ? (perfect ? (compact ? 20 : 24) : 16) : perfect ? 28 : 23,
-      lineHeight: stage ? (perfect ? (compact ? 26 : 31) : 22) : perfect ? 36 : 31, fontWeight: '400',
-      textShadowColor: perfect ? color : 'transparent', textShadowRadius: perfect ? 8 : 0,
+      fontFamily: 'EggDisplay', fontSize: stage ? (perfect ? (compact ? 28 : 38) : 16) : perfect ? 28 : 23,
+      lineHeight: stage ? (perfect ? (compact ? 38 : 50) : 22) : perfect ? 36 : 31, fontWeight: '400',
+      textShadowColor: '#19301D', textShadowRadius: stage ? 6 : perfect ? 8 : 0,
       textShadowOffset: { width: 0, height: 0 } }}>
       {perfect ? `${WORDS[tier]} · ${streak}` : label}
     </Copy>
-    {perfect && !(stage && compact) && <Copy style={{ textAlign: 'center', fontSize: compact ? 9 : 10, lineHeight: compact ? 12 : 14, color }}>{label}</Copy>}
+    {perfect && !stage && <Copy style={{ textAlign: 'center', fontSize: compact ? 9 : 10, lineHeight: compact ? 12 : 14, color }}>{label}</Copy>}
   </Animated.View>;
 }

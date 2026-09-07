@@ -11,10 +11,11 @@ ART = ROOT / 'art/assets/images/katchimeras'
 STAGE = ART / 'world/backgrounds/duel-stages'
 
 def main():
-    source = Image.open(STAGE / 'source/mossprout-duel-v2.png').convert('RGB')
+    active = json.loads((ROOT / 'apps/egg-snap/data/combat-stage-active.json').read_text())['id']
+    source = Image.open(STAGE / 'source' / f'{active}.png').convert('RGB')
     for label, width in [('full', source.width), ('medium', 640)]:
         image = source.resize((width, round(source.height * width / source.width)), Image.Resampling.LANCZOS)
-        image.save(STAGE / f'mossprout-duel-v2-{label}.webp', quality=91, method=6)
+        image.save(STAGE / f'{active}-{label}.webp', quality=95, method=6)
     bodies = {}
     for skin in ['classic', 'moss', 'honeycomb', 'frost', 'sunset', 'starglow', 'tide']:
         image = Image.open(ART / 'egg-avatars/bases' / f'{skin}.webp').convert('RGBA')

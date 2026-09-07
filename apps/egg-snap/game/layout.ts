@@ -7,7 +7,6 @@ import {
   firstCellCenter,
 } from "@incubator/tile-match/geometry";
 import { slotPlayRect } from "@incubator/tile-match/timing";
-
 function legacyBattleLayout(
   width: number,
   height: number,
@@ -62,7 +61,14 @@ export function battleLayout(width: number, height: number, top: number, bottom:
   if (!definition) return result;
   const frameWidth = Math.min(width, 480, height * .54);
   const frame = { x: (width - frameWidth) / 2, y: 0, width: frameWidth, height };
-  const projection = coverProjection(definition.sourceSize, frame);
+  const trayHeight = height < 700 ? 106 : legacy.trayHeight;
+  const trayY = height - bottom - trayHeight - 18;
+  // Frame the art and its contacts together: the near egg stands directly above the tray.
+  const desiredContactY = trayY - 42;
+  const projectedHeight = Math.max(height, desiredContactY / definition.player.contact.y,
+    (height - desiredContactY) / (1 - definition.player.contact.y));
+  const projection = coverProjection(definition.sourceSize, { ...frame, height: projectedHeight });
+  projection.y += desiredContactY - (projection.y + projection.height * definition.player.contact.y);
   const playerContact = projectStagePoint(projection, definition.player.contact);
   const rivalContact = projectStagePoint(projection, definition.rival.contact);
   const contactFor = (skin: string) => ground[skin as keyof typeof ground] ?? ground.classic;
@@ -72,7 +78,7 @@ export function battleLayout(width: number, height: number, top: number, bottom:
   // Reserve a clean five-cell central corridor even at the 12% growth cap.
   const visibleWidth = Math.min(frameWidth * (height < 700 ? .30 : .40), metrics.pitch * 4.6 / 1.12);
   const playerSize = visibleWidth / p.bounds.width;
-  const rivalVisibleHeight = Math.max(40, rivalContact.y - (top + (height < 700 ? 65 : 112)));
+  const rivalVisibleHeight = Math.max(40, rivalContact.y - (top + (height < 700 ? 54 : 112)));
   const rivalSize = Math.min(frameWidth * .29 / r.bounds.width, rivalVisibleHeight / r.bounds.height);
   const playerSprite = groundedSprite(playerContact, playerSize, p.anchor);
   const rivalSprite = groundedSprite(rivalContact, rivalSize, r.anchor);
@@ -83,8 +89,7 @@ export function battleLayout(width: number, height: number, top: number, bottom:
   const playTop = Math.max(rivalContact.y + 66, playerContact.y - playerVisible.height / 2 - play.height / 2);
   const y = playTop - play.y;
   const first = firstCellCenter(metrics);
-  const trayHeight = height < 700 ? 106 : legacy.trayHeight;
-  const trayY = height - bottom - trayHeight - (height < 700 ? 38 : 18);
+
   const driftAmplitude = Math.max(0, Math.min(18, playTop - (rivalContact.y + 58), trayY - 66 - playTop - play.height));
   const stage: StagePlacement = { definition, frame, projection, playRegion: projectStageRect(projection, definition.playRegion),
     player: { contact: playerContact, sprite: playerSprite, platform: projectStageRect(projection, definition.player.platform), anchor: p.anchor, visible: playerVisible },
@@ -92,6 +97,6 @@ export function battleLayout(width: number, height: number, top: number, bottom:
   return { ...result, frame, stage, metrics, field: { x, y }, trayY, trayHeight, driftAmplitude,
     eggSize: playerSize, eggY: playerSprite.y, opponentSize: rivalSize, opponentY: rivalSprite.y,
     opponentHudY: height < 700 ? Math.max(top + 54, rivalVisible.y) : Math.max(top + 54, rivalVisible.y - 57), warningY: rivalContact.y + 14,
-    playerHudY: height < 700 ? height - bottom - 36 : trayY - 45,
+    playerHudY: trayY + trayHeight - 10,
     dropFrame: { ...legacy.dropFrame, anchorX: x + first.x, anchorY: y + first.y, pitch: metrics.pitch } };
 }

@@ -9,7 +9,7 @@ export function DuelBackdrop({ stage, onDisplay, onError, impactKey }: {
   stage: StagePlacement; onDisplay: () => void; onError: () => void; impactKey: number;
 }) {
   const { frame, projection, definition } = stage;
-  const sources = DUEL_BACKGROUNDS[definition.id];
+  const sources = DUEL_BACKGROUNDS[definition.id as keyof typeof DUEL_BACKGROUNDS];
   const source = frame.width * PixelRatio.get() <= 640 ? sources.medium : sources.full;
   const light = useSharedValue(0);
   const reduced = useReducedMotion();
