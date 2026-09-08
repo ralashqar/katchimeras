@@ -11,7 +11,7 @@ export const MOSSPROUT_FTUE_COPY = {
   mergePurpose: 'Merge a Plant. Complete its request to earn Glow and restore the Garden.',
   growth: 'Look—your Memory Seed is growing. You gave it a beginning. We made it bloom together.',
   waterQuestion: 'We made something for the Garden. Let’s make a little room for you, too.',
-  farewell: 'I’m going to rest for a while. When I wake, we’ll have another Journey together.\n\nYou can still tend the garden or leave me a little moment while I’m quiet.\n\nSee that mist? Let’s use some Glow to find out what’s beyond it.',
+  farewell: 'I’m going to rest for a while. When I wake, we’ll have another Journey together.\n\nThis garden was full of friends once. When the mist came, they drifted into it, one by one.\n\nEvery place we bring back helps one of them find the way home. See that mist? Someone is waiting beyond it.',
   restAction: 'Rest, Mossprout',
   meditation: 'Mossprout is meditating',
   meditationAvailable: 'Mossprout is resting. Let’s see what’s nearby.',

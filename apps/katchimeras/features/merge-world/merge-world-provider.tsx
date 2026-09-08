@@ -37,7 +37,7 @@ import { loadCompanionJourneyState, subscribeCompanionJourneys } from '@/utils/c
 import { localDayId } from '@/utils/world-identity';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { acknowledgeActiveContentFlowPresentation, publishContentFlowDomainEvent } from '@/features/content-flow/content-flow-director';
-import { PETALIMP_ISLAND_CAMPAIGN_ID } from '@/constants/petalimp-island-campaign';
+import { isIslandCampaignChapterId, isIslandCampaignId } from '@/constants/island-campaigns/registry';
 
 type MergeWorldContextValue = {
   state: MergeWorldState | null;
@@ -224,7 +224,7 @@ export function MergeWorldProvider({
           );
         });
       } else if (receipt.characterId === 'mossprout') {
-        if (receipt.sourceId === PETALIMP_ISLAND_CAMPAIGN_ID) return;
+        if (isIslandCampaignId(receipt.sourceId)) return;
         const orderId = receipt.id.replace('merge-story-served:', '');
         relationshipProgressionRepository.update((current) => {
           if (orderId === 'mossprout:chapter-0:first-sprout') {
@@ -271,7 +271,7 @@ export function MergeWorldProvider({
       return;
     }
     if (receipt.kind === 'conversation' && receipt.sourceId) {
-      if (receipt.characterId === 'mossprout' && receipt.sourceId.startsWith('petalimp-bloom-level-')) return;
+      if (receipt.characterId === 'mossprout' && isIslandCampaignChapterId(receipt.sourceId)) return;
       enqueueFriendshipInvitation(receipt.characterId, receipt.sourceId, receipt.createdAt);
       return;
     }
@@ -900,7 +900,7 @@ export function MergeWorldProvider({
     }
     if (reduced.changed && command.type === 'serveOrder' && servedCharacterId === 'mossprout') {
       relationshipProgressionRepository.update((relationships) => {
-        if (servedOrder?.storyArcId === PETALIMP_ISLAND_CAMPAIGN_ID) return relationships;
+        if (isIslandCampaignId(servedOrder?.storyArcId)) return relationships;
         const withJourney = recordMossproutJourneyOrderServed(relationships, command.orderId, command.now);
         if (servedOrder?.storyArcId !== 'mossprout:casual-garden') return withJourney;
         const dayId = servedOrder.storyBeatId ?? localDayId(new Date(command.now));
@@ -923,10 +923,10 @@ export function MergeWorldProvider({
         });
       });
     }
-    // Petalimp's island campaign owns its return scene and next request. Its
-    // orders share Mossprout's board inventory, but must never wake or rebuild
-    // the legacy Mossprout journey after serving.
-    const nextState = reduced.changed && servedCharacterId && servedOrder?.storyArcId !== PETALIMP_ISLAND_CAMPAIGN_ID
+    // An island campaign owns its return scene and next request. Its orders
+    // share Mossprout's board inventory, but must never wake or rebuild the
+    // legacy Mossprout journey after serving.
+    const nextState = reduced.changed && servedCharacterId && !isIslandCampaignId(servedOrder?.storyArcId)
       ? reconcileFeaturedStory(reduced.state, servedCharacterId, command.now)
       : reduced.state;
     const result = nextState === reduced.state ? reduced : { ...reduced, state: nextState };

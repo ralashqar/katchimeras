@@ -1,5 +1,6 @@
 import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
 import { StepplingGardenFinale } from '@/components/katchadeck/onboarding/steppling-garden-finale';
+import { STEPPLING_FINALE_NODE_IDS } from '@/features/onboarding/steppling-garden-lesson';
 import { useFtueMistHandoff } from '@/features/onboarding/use-ftue-mist-handoff';
 import { isMossproutFirstGrowStep } from '@/features/onboarding/mossprout-first-grow';
 import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
@@ -745,7 +746,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     return <View style={styles.inactiveScreen} />;
   }
 
-  if (familyId === 'steppling' && stepplingLesson.active && ['closing', 'summary'].includes(stepplingLesson.run?.nodeId ?? '')) {
+  if (familyId === 'steppling' && stepplingLesson.active && STEPPLING_FINALE_NODE_IDS.includes(stepplingLesson.run?.nodeId ?? '')) {
     return <StepplingGardenFinale hosted={hostedInHaven} summary={stepplingLesson.run?.nodeId === 'summary'} />;
   }
   return (

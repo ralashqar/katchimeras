@@ -8,8 +8,11 @@ import { validateContentFlowDefinition } from '@/features/content-flow/content-f
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
 import { createContentFlowRun, reduceContentFlow, stabilizeContentFlow } from '@/features/content-flow/content-flow-interpreter';
 import { GLOW_DISCOVERY_FLOW, glowDiscoveryResumeCamera, glowDiscoveryResumeWorld } from '@/features/onboarding/glow-discovery-flow';
-import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
+import { MOSSPROUT_NATURE_ISLANDS, mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
 import { PETALIMP_ISLAND_CAMPAIGN_ID, petalimpIslandChapterOrder } from '@/constants/petalimp-island-campaign';
+import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
+import { ISLAND_WAKE_ORDER, islandWakeState } from '@/constants/island-campaigns/wake-order';
+import { acknowledgeChapterReturn, completeChapter, greetIslandFriend, startAndServeChapter } from './helpers/island-campaign';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import type { MergeWorldCommand, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import { readFileSync } from './helpers/content-fs';
@@ -41,31 +44,46 @@ function completeBloomCampaignRequest(state: MergeWorldState, level: MossproutNa
   } } };
 }
 
-test('all nature island levels use the shared purchase flow, survive reload, and charge only once', () => {
-  let state = { ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 10_000 };
-  for (const island of MOSSPROUT_NATURE_ISLANDS) {
-    if (island.id === 'bloom-garden') continue;
+test('every island level uses the shared purchase flow in wake order, survives reload, and charges only once', () => {
+  let state = restored(10_000);
+  for (const entry of ISLAND_WAKE_ORDER) {
+    const campaign = ISLAND_CAMPAIGNS.find((candidate) => candidate.islandId === entry.islandId);
+    if (!campaign) break;
+    const island = mossproutNatureIslandById.get(entry.islandId)!;
+    const reveal = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null).find((candidate) => candidate.id === `nature:${island.id}`)!;
+    assert.equal(reveal.transition, 'island_reveal'); assert.equal(reveal.eligible, true); assert.equal(reveal.cost, island.levels[0]!.coinCost);
+    assert.ok(WORLD_UPGRADE_FLOWS.some((flow) => flow.id === worldUpgradeRunId(reveal)));
+    const revealCommand: MergeWorldCommand = { type: 'revealMossproutNatureIsland', islandId: island.id, campaignId: campaign.campaignId,
+      residentSkinId: campaign.residentSkinId, cost: reveal.cost, receiptId: worldUpgradeRunId(reveal), now: NOW };
+    const beforeReveal = state.coins;
+    state = normalizeMergeWorldState(JSON.parse(JSON.stringify(reduceMergeWorld(state, revealCommand).state)), NOW);
+    assert.equal(state.coins, beforeReveal - reveal.cost);
+    assert.equal(reduceMergeWorld(state, revealCommand).state.coins, state.coins, 'a replayed reveal never charges twice');
+    state = greetIslandFriend(state, campaign, NOW);
     for (const level of island.levels) {
-      const offer = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null)
-        .find((candidate) => candidate.id === `nature:${island.id}`)!;
+      state = acknowledgeChapterReturn(startAndServeChapter(state, campaign, level.level, NOW), campaign, level.level, NOW);
+      const offer = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null).find((candidate) => candidate.id === `nature:${island.id}`)!;
       assert.ok(offer, `${island.id} level ${level.level} has a marker`);
-      assert.equal(offer.cost, level.coinCost);
+      assert.equal(offer.cost, level.level === 1 ? 0 : level.coinCost);
       assert.equal(offer.nextLevel, level.level);
-      assert.equal(offer.action, level.level === 1 ? 'Clear mist' : 'Upgrade');
+      assert.equal(offer.eligible, true);
+      assert.equal(offer.action, level.level === 1 ? 'Restore' : 'Upgrade');
       assert.ok(WORLD_UPGRADE_FLOWS.some((flow) => flow.id === worldUpgradeRunId(offer)));
-      const command: MergeWorldCommand = { type: 'upgradeMossproutNatureIsland', islandId: island.id,
-        level: level.level, receiptId: worldUpgradeRunId(offer), now: NOW };
+      const command: MergeWorldCommand = { type: 'upgradeMossproutNatureIsland', islandId: island.id, level: level.level,
+        receiptId: worldUpgradeRunId(offer), now: NOW, ...(level.level === 1 ? { economyMode: 'free' } : {}) };
       const before = state.coins;
       const paid = reduceMergeWorld(state, command);
       assert.equal(paid.changed, true);
-      assert.equal(paid.state.coins, before - level.coinCost);
+      assert.equal(paid.state.coins, before - offer.cost);
       state = normalizeMergeWorldState(JSON.parse(JSON.stringify(paid.state)), NOW);
       assert.equal(state.haven.mossproutNatureIslands[island.id], level.level);
       assert.equal(reduceMergeWorld(state, command).state.coins, state.coins);
+      state = completeChapter(state, campaign, level.level, NOW);
     }
     assert.equal(worldUpgradeOffers(state).some((offer) => offer.id === `nature:${island.id}`), false);
+    assert.ok(state.ownedKatchimeraCards.some((card) => card.cardId === campaign.residentSkinId), `${campaign.residentName} is home`);
   }
-  assert.equal(state.haven.tileStages.mossprout, 1, 'the campaign island still owns the final aggregate tiers');
+  assert.equal(state.haven.tileStages.mossprout, MOSSPROUT_NATURE_ISLANDS.every((island) => state.haven.mossproutNatureIslands[island.id] === 4) ? 4 : 1);
 });
 
 test('mist islands are targetable and every reveal keeps other tiles and camera bounds stable', () => {
@@ -120,7 +138,7 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
 
 test('only the next authored level is offered, preserving costs and aggregate Haven progression', () => {
   const initial = worldUpgradeOffers(world());
-  assert.ok(initial.filter((offer) => offer.id !== 'nature:bloom-garden').every((offer) => offer.eligible));
+  assert.ok(initial.filter((offer) => offer.sleepingSkinId == null).every((offer) => offer.eligible));
   assert.equal(initial.find((offer) => offer.id === 'nature:bloom-garden')?.transition, 'island_reveal');
   assert.equal(initial.find((offer) => offer.id === 'haven:mossprout')?.cost, 20);
   const offers = worldUpgradeOffers(restored());
@@ -128,9 +146,13 @@ test('only the next authored level is offered, preserving costs and aggregate Ha
   assert.equal(offers.find((offer) => offer.id === 'mist:steppling-home')?.cost, 40);
   for (const island of MOSSPROUT_NATURE_ISLANDS) {
     const offer = offers.find((item) => item.id === `nature:${island.id}`)!;
-    assert.equal(offer.nextLevel, island.id === 'bloom-garden' ? 0 : 1); assert.equal(offer.cost, island.levels[0].coinCost);
-    assert.equal(offer.eligible, true);
+    const open = islandWakeState(restored(), island.id) === 'open';
+    assert.equal(offer.cost, island.levels[0].coinCost);
+    assert.equal(offer.eligible, open, `${island.id} is ${open ? 'open' : 'resting'}`);
+    if (open) assert.equal(offer.nextLevel, 0);
+    else assert.equal(offer.sleepingSkinId, ISLAND_WAKE_ORDER.find((entry) => entry.islandId === island.id)?.residentSkinId);
   }
+  assert.equal(offers.filter((offer) => offer.eligible && offer.id.startsWith('nature:')).length, 1, 'exactly one island is the next step');
   assert.equal(new Set(WORLD_UPGRADE_DEFINITIONS.map(worldUpgradeRunId)).size, WORLD_UPGRADE_DEFINITIONS.length);
 });
 
@@ -139,24 +161,24 @@ test('unaffordable spots remain discoverable without story or resident prerequis
   const mist = offers.find((offer) => offer.id === 'mist:steppling-home')!;
   assert.equal(mist.eligible, true); assert.equal(mist.affordable, false); assert.equal(mist.missingGlow, 37);
   const locked = worldUpgradeOffers(createInitialMergeWorldState(NOW, ['mossprout']));
-  assert.ok(locked.filter((offer) => offer.id !== 'nature:bloom-garden').every((offer) => offer.eligible));
+  assert.ok(locked.filter((offer) => offer.sleepingSkinId == null).every((offer) => offer.eligible));
   assert.equal(locked.find((offer) => offer.id === 'nature:bloom-garden')?.eligible, true);
+  assert.ok(visibleWorldUpgradeOffers(locked, undefined, null).some((offer) => offer.sleepingSkinId != null), 'resting friends stay visible on the map');
 });
 
-test('45 Glow unlocks Pond Sanctuary before any story progress, with no duplicate charge', () => {
+test('Glow alone cannot wake Pond Sanctuary before its turn, and the mist purchase still works', () => {
   const state = { ...createInitialMergeWorldState(NOW, []), coins: 45 };
   const offer = worldUpgradeOffers(state).find((candidate) => candidate.id === 'nature:pond-sanctuary')!;
-  assert.equal(offer.eligible, true);
-  assert.equal(offer.affordable, true);
+  assert.equal(offer.eligible, false);
+  assert.equal(offer.affordable, false);
+  assert.equal(offer.sleepingSkinId, 'drizzlet');
+  assert.match(offer.lockedReason ?? '', /resting here/);
   const command = { type: 'upgradeMossproutNatureIsland' as const, islandId: 'pond-sanctuary' as const,
     level: 1 as const, receiptId: 'pond:glow-only', now: NOW };
-  const paid = reduceMergeWorld(state, command);
-  assert.equal(paid.changed, true);
-  assert.equal(paid.state.coins, 5);
-  assert.equal(paid.state.haven.mossproutNatureIslands['pond-sanctuary'], 1);
-  assert.deepEqual(paid.state.characterProgress, state.characterProgress);
-  const reloaded = normalizeMergeWorldState(JSON.parse(JSON.stringify(paid.state)), NOW);
-  assert.equal(reduceMergeWorld(reloaded, command).state.coins, 5);
+  const refused = reduceMergeWorld(state, command);
+  assert.equal(refused.changed, false);
+  assert.equal(refused.state.coins, 45);
+  assert.equal(refused.state.haven.mossproutNatureIslands['pond-sanctuary'], 0);
   const mist = reduceMergeWorld(state, { type: 'unlockWorldTarget', targetId: 'mossprout:overgrown-trail', receiptId: 'mist:glow-only', now: NOW });
   assert.equal(mist.changed, true);
   assert.equal(mist.state.coins, 5);
@@ -180,9 +202,10 @@ test('every upgrade holds the old world before spending and replays its receipt-
     const hold = flow.nodes.find((node) => node.id === 'upgrade.focus')!;
     assert.equal(hold.kind === 'presentation' && hold.payload?.holdWorldState, true);
     const commit = flow.nodes.find((node) => node.id === 'upgrade.commit')!;
+    const giftedBy = ISLAND_CAMPAIGNS.find((campaign) => flow.id === `world-upgrade:nature:${campaign.islandId}:1`);
     assert.deepEqual(commit.kind === 'effect' && commit.payload?.economy,
-      flow.id === 'world-upgrade:nature:bloom-garden:1'
-        ? { mode: 'free', reason: 'Petalimp restores the first flowers after the request.' }
+      giftedBy
+        ? { mode: 'free', reason: `${giftedBy.residentName} restores this part of the garden after the request.` }
         : { mode: 'normal' });
     const reveal = flow.nodes.find((node) => node.id === 'upgrade.reveal')!;
     assert.equal(reveal.kind === 'presentation' && reveal.replayPolicy, 'replay');

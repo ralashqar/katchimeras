@@ -26,10 +26,12 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   const node = useRef<View | null>(null);
   const button = useRef<View | null>(null);
   const [bubbleHeight, setBubbleHeight] = useState(MARKER_SIZE);
-  const locked = Boolean(offer.lockedReason);
+  const sleepingSkin = offer.sleepingSkinId ? katchimeraSkinById.get(offer.sleepingSkinId) : null;
+  const sleepingPortrait = sleepingSkin?.visualKey ? getCreatureVisual(sleepingSkin.visualKey, 'grown') : null;
+  const locked = Boolean(offer.lockedReason) && !sleepingPortrait;
   const markerSkin = offer.markerSkinId ? katchimeraSkinById.get(offer.markerSkinId) : null;
   const markerPortrait = markerSkin?.visualKey ? getCreatureVisual(markerSkin.visualKey, 'grown') : null;
-  const paintedWidth = markerPortrait ? 78 : MARKER_SIZE;
+  const paintedWidth = markerPortrait || sleepingPortrait ? 78 : MARKER_SIZE;
   const campaignPending = Boolean(markerSkin && !offer.eligible);
   useEffect(() => {
     visibility.value = hidden ? withTiming(0, { duration: reduced ? 80 : 140 })
@@ -71,13 +73,19 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   return <Animated.View pointerEvents={hidden ? 'none' : 'box-none'} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} style={[styles.position, projection]}>
       <Animated.View ref={target} collapsable={false} pointerEvents="none" accessible={false}
         onLayout={() => { onTargetChange?.(offer.id, null); if (!moving && !hidden) onTargetChange?.(offer.id, node.current); }} style={[styles.spotlightTarget, spotlightBounds]} />
-      <Pressable ref={button} collapsable={false} accessibilityRole="button" accessibilityLabel={locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
-        accessibilityValue={locked ? undefined : { min: 0, max: glowTotal, now: glowProgress, text: offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
+      <Pressable ref={button} collapsable={false} accessibilityRole="button" accessibilityLabel={sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
+        accessibilityValue={locked || sleepingPortrait ? undefined : { min: 0, max: glowTotal, now: glowProgress, text: offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
         accessibilityHint={offer.lockedReason ?? (campaignPending ? 'Resumes this island story' : offer.affordable ? 'Opens upgrade details' : `${offer.missingGlow} more Glow needed. Opens upgrade details.`)}
         disabled={moving || hidden} onPress={() => onPress(offer)} style={styles.hitTarget}>
       <Animated.View pointerEvents="none" onLayout={(event) => setBubbleHeight(event.nativeEvent.layout.height)}
-        style={[styles.bubble, markerPortrait ? styles.portraitBubble : null, motion]}>
-        {locked ? <Image accessibilityIgnoresInvertColors cachePolicy="memory-disk" contentFit="contain" source={LOCK_ART} style={styles.lockArt} transition={0} /> : <>
+        style={[styles.bubble, markerPortrait || sleepingPortrait ? styles.portraitBubble : null, sleepingPortrait ? styles.sleepingBubble : null, motion]}>
+        {sleepingPortrait ? <>
+          <View style={[styles.portraitFrame, styles.sleepingFrame]}>
+            <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain"
+              source={sleepingPortrait.source} style={[styles.portrait, styles.silhouette]} transition={0} accessible={false} />
+          </View>
+          <Text style={styles.sleepingGlyph}>z z</Text>
+        </> : locked ? <Image accessibilityIgnoresInvertColors cachePolicy="memory-disk" contentFit="contain" source={LOCK_ART} style={styles.lockArt} transition={0} /> : <>
           {markerPortrait ? <View style={styles.portraitFrame}>
             <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain"
               source={markerPortrait.source} style={styles.portrait} transition={0} accessible={false} />
@@ -112,4 +120,9 @@ const styles = StyleSheet.create({
   portraitProgress: { width: 58, marginTop: -10, zIndex: 2, paddingHorizontal: 2, paddingVertical: 2, borderRadius: 999,
     backgroundColor: '#FFF3D0', borderWidth: 2, borderColor: '#D6AF62', boxShadow: '0 2px 4px rgba(67,43,18,0.22)' },
   percent: { color: '#654A26', fontSize: 12, lineHeight: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  // Resting friends sit in a dimmer bubble so the one open island reads as the next step.
+  sleepingBubble: { backgroundColor: '#EFE6D2', borderColor: '#C9B48F' },
+  sleepingFrame: { backgroundColor: '#D9DECF', borderColor: '#F3ECDD' },
+  silhouette: { opacity: 0.78, tintColor: '#344238' },
+  sleepingGlyph: { color: '#7B6544', fontSize: 11, lineHeight: 14, fontWeight: '900', letterSpacing: 1, marginTop: 1 },
 });

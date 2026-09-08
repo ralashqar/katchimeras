@@ -16,7 +16,7 @@ export function reconcileUpgradeProgress(world: MergeWorldState): MergeWorldStat
   // Card ownership is collectible identity, not a stack. Older story grants and
   // the island campaign can both describe the same friend while a save migrates,
   // so retain the first durable ownership record and discard duplicate entries.
-  let ownedKatchimeraCards = world.ownedKatchimeraCards.filter((card, index, cards) => (
+  const ownedKatchimeraCards = world.ownedKatchimeraCards.filter((card, index, cards) => (
     cards.findIndex((candidate) => candidate.cardId === card.cardId) === index
   ));
   for (const story of WORLD_UPGRADE_STORIES) {
@@ -30,12 +30,6 @@ export function reconcileUpgradeProgress(world: MergeWorldState): MergeWorldStat
       const prior = world.upgradeSkinGrants?.[story.id];
       upgradeSkinGrants[story.id] = { skinId: story.rewardSkinId,
         grantedAt: prior && Number.isFinite(prior.grantedAt) ? prior.grantedAt : world.updatedAt };
-      if (story.rewardSkinId === 'petalimp' && !ownedKatchimeraCards.some((card) => card.cardId === 'petalimp')) {
-        ownedKatchimeraCards = [...ownedKatchimeraCards, {
-          cardId: 'petalimp', familyId: 'mossprout', acquisition: 'island_campaign',
-          sourceReceiptId: 'island-campaign:petalimp-bloom:friend', acquiredAt: world.updatedAt, coinCost: 0,
-        }];
-      }
     }
   }
   const mossproutResidentSkinIds = MOSSPROUT_RESIDENT_IDS.filter((id) => (

@@ -8,6 +8,7 @@ import { AppFontFamilies } from '@/constants/theme';
 import Animated, { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { GameUI } from '@/constants/game-ui';
+import { islandCampaignForOffer } from '@/constants/island-campaigns/registry';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { getCreatureVisual } from '@/game/days/visuals';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
@@ -27,6 +28,10 @@ export type WorldUpgradeCampaignState = {
   residentName: string;
   residentSkinId: KatchimeraSkinId;
   stateLabel: string;
+  /** The friend's own line for this moment, shown as speech above the request. */
+  speech?: string | null;
+  /** Resolved chapters, newest last, so the story stays readable from the panel. */
+  completedChapters?: readonly { level: number; title: string; line: string }[];
 };
 
 const LOCK_ART = require('@incubator/art-world/hex/kingdom_dream_mist_lock_v1_512.webp');
@@ -41,6 +46,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
 }) {
   const reduced = useReducedMotion(); const progress = useSharedValue(0);
   const [history, setHistory] = useState(false);
+  const [chapterLogOpen, setChapterLogOpen] = useState(false);
   const [availableHeight, setAvailableHeight] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
@@ -56,13 +62,16 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   const closeRef = useRef<View>(null); const closeGuard = useRef(false);
   const locked = Boolean(offer.lockedReason);
   const affordable = world.coins >= offer.cost;
-  // Bloom Garden's story is delivered by its mandatory island-campaign
+  // A friend's island tells its story through the mandatory island-campaign
   // narrative. Keep the standard upgrade panel focused on cost and reward.
-  const story = offer.id === 'nature:bloom-garden'
+  const story = islandCampaignForOffer(offer.id)
     ? null
     : worldUpgradeStory(offer.id, offer.nextLevel);
   const campaignSkin = campaignState ? katchimeraSkinById.get(campaignState.residentSkinId) : null;
   const campaignPortrait = campaignSkin?.visualKey ? getCreatureVisual(campaignSkin.visualKey, 'grown').source : null;
+  const sleepingSkin = offer.sleepingSkinId ? katchimeraSkinById.get(offer.sleepingSkinId) : null;
+  const sleepingPortrait = locked && sleepingSkin?.visualKey ? getCreatureVisual(sleepingSkin.visualKey, 'grown').source : null;
+  const sleepingHint = sleepingPortrait ? islandCampaignForOffer(offer.id)?.copy.sleepingHint ?? null : null;
   const coachVisible = settled && layoutReady && coached && offer.eligible && affordable && !locked && !busy && !closing && !history
     && scrollY >= contentHeight - scrollHeight - 1;
   useEffect(() => {
@@ -105,7 +114,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   const motion = useAnimatedStyle(() => ({ opacity: progress.value, transform: [{ scale: reduced || !entranceReady ? 1 : 0.82 + progress.value * 0.18 }] }));
   const controls = (tutorial = false) => <View style={styles.actions}>
     {locked ? <>
-      <KatchaButton accessibilityHint={offer.lockedReason} disabled fullWidth label="Journey Day 2 required" />
+      <KatchaButton accessibilityHint={offer.lockedReason} disabled fullWidth label={offer.lockedLabel ?? 'Locked'} />
     </> : offer.eligible ? <>
       <Text style={styles.cost}>{offer.cost.toLocaleString()} Glow{!affordable ? ` · Need ${(offer.cost - world.coins).toLocaleString()} more` : ''}</Text>
       {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
@@ -133,10 +142,15 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
         onContentSizeChange={(_width, height) => setContentHeight(height)}
         onLayout={(event) => setScrollHeight(event.nativeEvent.layout.width > 0 ? event.nativeEvent.layout.height : 0)} scrollEnabled={!measured || contentHeight > scrollHeight + 1}>
         <Text style={styles.sectionTitle}>Required</Text>
-        <View style={styles.currencyTile}><Image accessibilityIgnoresInvertColors={locked} cachePolicy="memory-disk" source={locked ? LOCK_ART : GAME_CURRENCY_ART.coins} style={locked ? styles.lockArt : styles.currencyArt} contentFit="contain" transition={0} /></View>
-        <Text style={[styles.amount, !locked && !affordable && styles.unaffordable]}>{locked ? 'Journey Day 2 required' : `${offer.cost.toLocaleString()} Glow`}</Text>
-        <View style={styles.unlocks}><Text style={styles.sectionTitle}>{locked ? 'Unlock condition' : offer.currentLevel >= offer.maxLevel ? 'Fully grown' : 'Unlocks'}</Text>
+        <View style={[styles.currencyTile, sleepingPortrait ? styles.sleepingTile : null]}>
+          {sleepingPortrait
+            ? <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain" source={sleepingPortrait} style={[styles.sleepingArt, styles.silhouette]} transition={0} />
+            : <Image accessibilityIgnoresInvertColors={locked} cachePolicy="memory-disk" source={locked ? LOCK_ART : GAME_CURRENCY_ART.coins} style={locked ? styles.lockArt : styles.currencyArt} contentFit="contain" transition={0} />}
+        </View>
+        <Text style={[styles.amount, !locked && !affordable && styles.unaffordable]}>{locked ? offer.lockedLabel ?? 'Locked' : `${offer.cost.toLocaleString()} Glow`}</Text>
+        <View style={styles.unlocks}><Text style={styles.sectionTitle}>{locked ? sleepingPortrait ? 'Still resting' : 'Unlock condition' : offer.currentLevel >= offer.maxLevel ? 'Fully grown' : 'Unlocks'}</Text>
           <Text style={styles.unlockName}>{locked ? offer.lockedReason : offer.nextName}</Text>
+          {sleepingHint ? <Text style={styles.reward}>{sleepingHint}</Text> : null}
           {!locked && story?.rewardSkinId ? <Text style={styles.reward}>Welcomes {katchimeraSkinById.get(story.rewardSkinId)?.displayName} to your collection</Text> : null}
         </View>
         {!locked && campaignState ? <View accessibilityLabel={`${campaignState.residentName}. ${campaignState.stateLabel}`} style={styles.campaign}>
@@ -152,6 +166,9 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
               </View>
             </View>
           </View>
+          {campaignState.speech ? <View accessibilityRole="text" style={styles.campaignSpeech}>
+            <Text style={styles.campaignSpeechText}>{`“${campaignState.speech}”`}</Text>
+          </View> : null}
           {campaignState.order ? <CompanionMergeRequestTray
             accessibilityLabel={`${campaignState.residentName}'s Merge request`}
             countLabel={campaignState.order.served ? 'Complete' : 'Requested'}
@@ -162,6 +179,17 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
             palette={COMPANION_MERGE_REQUEST_PALETTE}
             requests={[campaignState.order]}
           /> : null}
+          {campaignState.completedChapters?.length ? <View style={styles.chapterLog}>
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: chapterLogOpen }}
+              accessibilityLabel={`${campaignState.residentName}’s story so far`} onPress={() => setChapterLogOpen((open) => !open)} style={styles.chapterLogToggle}>
+              <Text style={styles.chapterLogTitle}>{`Story so far · ${campaignState.completedChapters.length} chapter${campaignState.completedChapters.length === 1 ? '' : 's'}`}</Text>
+              <Text style={styles.chapterLogChevron}>{chapterLogOpen ? '−' : '+'}</Text>
+            </Pressable>
+            {chapterLogOpen ? campaignState.completedChapters.map((entry) => <View key={entry.level} style={styles.chapterEntry}>
+              <Text style={styles.chapterEntryTitle}>{`${entry.level}. ${entry.title}`}</Text>
+              <Text style={styles.chapterEntryLine}>{`“${entry.line}”`}</Text>
+            </View>) : null}
+          </View> : null}
         </View> : null}
         {controls(true)}
       </ScrollView>
@@ -190,6 +218,9 @@ const styles = StyleSheet.create({
   sectionTitle: { ...KatchaUI.type.companionCardTitle, fontSize: 21, lineHeight: 26, color: '#69512D', textAlign: 'center' },
   currencyTile: { alignSelf: 'center', width: 72, height: 72, borderRadius: 20, backgroundColor: '#F4E4B3', alignItems: 'center', justifyContent: 'center' }, currencyArt: { width: 60, height: 60 },
   lockArt: { width: 66, height: 66 },
+  sleepingTile: { backgroundColor: '#D9DECF', overflow: 'hidden' },
+  sleepingArt: { width: 92, height: 92, marginTop: 14 },
+  silhouette: { opacity: 0.78, tintColor: '#344238' },
   amount: { ...KatchaUI.type.companionCardTitle, color: '#537741', fontSize: 22, lineHeight: 28, textAlign: 'center', fontVariant: ['tabular-nums'] }, unaffordable: { color: '#B44639' },
   unlocks: { padding: 14, gap: 8, backgroundColor: '#F0E9CF', borderRadius: 18 }, unlockName: { ...KatchaUI.type.companionDisplay, fontSize: 17, lineHeight: 23, color: '#76633F', textAlign: 'center' },
   cost: { ...KatchaUI.type.companionBody, color: GameUI.color.inkSecondary, fontSize: 12, lineHeight: 17, textAlign: 'center', fontVariant: ['tabular-nums'] },
@@ -205,4 +236,13 @@ const styles = StyleSheet.create({
   campaignComplete: { color: '#4C8B3D', fontFamily: AppFontFamilies.fredokaBold, fontSize: 17, lineHeight: 19 },
   campaignState: { ...KatchaUI.type.companionBody, color: '#7B6544', flexShrink: 1, fontSize: 11.5, lineHeight: 16 },
   campaignStateComplete: { color: '#4C7A3E' },
+  campaignSpeech: { backgroundColor: '#FFF8E6', borderColor: 'rgba(132,100,45,0.18)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 8 },
+  campaignSpeechText: { ...KatchaUI.type.companionBody, color: '#4A3A22', fontSize: 13, lineHeight: 18 },
+  chapterLog: { borderTopColor: 'rgba(132,100,45,0.16)', borderTopWidth: 1, gap: 6, paddingTop: 6 },
+  chapterLogToggle: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 30 },
+  chapterLogTitle: { ...KatchaUI.type.companionBody, color: '#7B6544', fontSize: 11.5, fontWeight: '800', letterSpacing: 0.3 },
+  chapterLogChevron: { color: '#7B6544', fontFamily: AppFontFamilies.fredokaBold, fontSize: 18, lineHeight: 20 },
+  chapterEntry: { gap: 2, paddingBottom: 4 },
+  chapterEntryTitle: { ...KatchaUI.type.companionBody, color: '#5C4426', fontSize: 12, fontWeight: '800' },
+  chapterEntryLine: { ...KatchaUI.type.companionBody, color: '#6A5A3F', fontSize: 12, lineHeight: 17 },
 });

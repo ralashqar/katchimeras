@@ -1,4 +1,5 @@
 import { canonicalFamilyId, familyIdFromCompanionId, katchimeraFamilies } from '@/constants/katchimera-skins';
+import type { KingdomProgress } from '@/features/kingdom-progress/kingdom-progress';
 import type { HomeDayRecord, JournalLocationSelection } from '@/types/home';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { CompanionAchievementContext } from '@/types/companion-achievements';
@@ -16,6 +17,8 @@ export type CompanionAchievementSources = {
   quests: CompanionQuestState;
   journey: CompanionJourneyState;
   quickGoals: CompanionQuickGoalState;
+  /** Kingdom-wide progress (friends home, places restored); optional for callers without a world. */
+  kingdom?: KingdomProgress | null;
 };
 
 type JournalLike = {
@@ -316,6 +319,10 @@ export function buildCompanionAchievementContexts(
   if (mossprout) {
     Object.assign(mossprout.values, photoSnapshot.values);
     Object.assign(mossprout.sourceDayBySignal, photoSnapshot.sourceDayBySignal);
+    if (sources.kingdom) {
+      mossprout.values['mossprout.friendsHome'] = sources.kingdom.friends.home;
+      mossprout.values['mossprout.placesRestored'] = sources.kingdom.places.restored;
+    }
   }
 
   for (const [key, ids] of buckets) {

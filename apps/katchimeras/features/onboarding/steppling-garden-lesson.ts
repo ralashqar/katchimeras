@@ -6,8 +6,19 @@ export const STEPPLING_GARDEN_RUN_ID = 'ftue:steppling-garden:1';
 export const STEPPLING_PARCEL_ID = 'journey:steppling:day-1:journey-locker';
 export const STEPPLING_SHOE_ORDER_ID = 'steppling:discovery:first-trail';
 export const STEPPLING_GARDEN_CLOSING = 'A Shoe, some Glow, and our first little adventure. We can keep growing this place together, at your pace.';
+/**
+ * Scene nodes after the merge tasks; the board is unlocked and the companion
+ * surface owns the screen. The Kingdom goal that follows the summary is owned
+ * by the Kingdom screen (`MergeWorldState.kingdomGoal`), not by this run.
+ */
+export const STEPPLING_FINALE_NODE_IDS: readonly string[] = ['closing', 'summary'];
+
 export const STEPPLING_GARDEN_FLOW = defineStory({
   id: 'steppling-garden-lesson', version: 1, entryNodeId: 'parcel', metadata: { kind: 'story' },
+  // An interim build authored the Kingdom goal as a node of this run. A save
+  // that stopped there must land back on the summary it was reached from,
+  // otherwise the lesson stays active forever with no surface that can end it.
+  migrations: { 'kingdom.goal': 'summary' },
   nodes: [
     ...['parcel', 'spawn.first', 'spawn.second', 'merge', 'serve'].map((id, index, ids) => story.task({
       id, capability: 'steppling.garden.task', surface: 'merge', taskId: id,
@@ -49,7 +60,7 @@ export function stepplingGardenDrop(state: MergeWorldState, generatorId: string)
 export function stepplingGardenBoardStep(nodeId: string, state: MergeWorldState): FtueStepDefinition | null {
   if (nodeId === 'complete') return null;
   const base = { id: `steppling.garden.${nodeId}`, surface: 'merge' as const, actions: [] };
-  if (['closing', 'summary'].includes(nodeId)) return { ...base, guide: { eyebrow: '', title: 'Back to Steppling.', body: '' }, interaction: { mode: 'blocked' } };
+  if (STEPPLING_FINALE_NODE_IDS.includes(nodeId)) return { ...base, guide: { eyebrow: '', title: 'Back to Steppling.', body: '' }, interaction: { mode: 'blocked' } };
   if (['parcel', 'spawn.first', 'spawn.second'].includes(nodeId) && !state.board.some((cell) => !cell.locked && !cell.mist && !cell.occupant)) {
     return { ...base, guide: { eyebrow: '', title: 'A little room', body: 'Merge or store an item, then we’ll continue.' } };
   }

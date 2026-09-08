@@ -7,6 +7,8 @@ import { measureMergeWork } from './performance';
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
 import { sharedWorldPurchase } from '@/constants/shared-world';
+import { islandCampaignForIsland } from '@/constants/island-campaigns/registry';
+import { mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
 import type { HavenStage } from '@/constants/haven-catalog';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
@@ -346,19 +348,29 @@ export function acknowledgeStoredIslandCampaignResidentCardReveal(campaignId: st
   }), now);
 }
 
+/** Mossprout's wish has been told; the Kingdom tracker and its first map hint may appear. */
+export function introduceStoredKingdomGoal(now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'introduceKingdomGoal', now }), now);
+}
+
+export function acknowledgeStoredKingdomGoalCoachmark(now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'ackKingdomGoalCoachmark', now }), now);
+}
+
 /** Exactly-once story upgrade. Retrying an effect key returns its original receipt. */
 export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryWorldUpgradeEffectPayload, now = Date.now()) {
   const target = payload.target;
   if (payload.transition === 'island_reveal') {
-    if (target.kind !== 'haven_nature_island' || target.islandId !== 'bloom-garden' || payload.toLevel !== 1 || payload.economy.mode !== 'normal') {
+    const campaign = target.kind === 'haven_nature_island' ? islandCampaignForIsland(target.islandId) : null;
+    if (!campaign || payload.toLevel !== 1 || payload.economy.mode !== 'normal') {
       throw new Error('Unknown nature-island reveal');
     }
     return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
       type: 'revealMossproutNatureIsland',
-      islandId: 'bloom-garden',
-      campaignId: 'island-campaign:petalimp-bloom',
-      residentSkinId: 'petalimp',
-      cost: 40,
+      islandId: campaign.islandId,
+      campaignId: campaign.campaignId,
+      residentSkinId: campaign.residentSkinId,
+      cost: mossproutNatureIslandLevelDefinition(campaign.islandId, 1)?.coinCost ?? 40,
       receiptId: effectKey,
       now,
     }), now);

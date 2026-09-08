@@ -14,7 +14,7 @@ import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue
 import { mossproutStoryConversationDefinitions } from '@/constants/mossprout-story-conversations';
 import { stepplingDayOneConversation } from '@/constants/steppling-day-one-conversation';
 import { mossproutCampaignConversationDefinitions } from '@/constants/mossprout-campaign-conversations';
-import { petalimpIslandConversationDefinitions } from '@/constants/petalimp-island-campaign';
+import { ALL_ISLAND_CAMPAIGN_CONVERSATION_DEFINITIONS } from '@/constants/island-campaigns/helpers';
 import {
   authoredConversationTopics,
   authoredFamilyConversationDefinitions,
@@ -926,7 +926,7 @@ export const companionConversationDefinitionsV2: readonly ConversationDefinition
   ...STEPPLING_TRAIL_CONVERSATIONS,
   ...mossproutFtueConversationDefinitions,
   ...mossproutCampaignConversationDefinitions,
-  ...petalimpIslandConversationDefinitions,
+  ...ALL_ISLAND_CAMPAIGN_CONVERSATION_DEFINITIONS,
   ...mossproutStoryConversationDefinitions,
   ...familyPack('baristabbit', BARISTA_POLLS, BARISTA_PROFILE),
   ...baristabbitStoryConversationDefinitions,

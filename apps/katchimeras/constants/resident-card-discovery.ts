@@ -1,3 +1,4 @@
+import { islandCampaignForResident } from '@/constants/island-campaigns/registry';
 import { MOSSPROUT_RESIDENT_IDS, mossproutResidentById } from '@/constants/mossprout-residents';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeOrder } from '@/types/merge-world';
@@ -31,10 +32,12 @@ export const MOSSPROUT_RESIDENT_CARD_NODES: readonly ResidentCardNodeDefinition[
 export const MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT = new Map(MOSSPROUT_RESIDENT_CARD_NODES.map((node) => [node.residentId, node]));
 export const MOSSPROUT_RESIDENT_CARD_NODE_BY_GATE = new Map(MOSSPROUT_RESIDENT_CARD_NODES.map((node) => [node.gateId, node]));
 
+/** Friends who live on an authored island arrive through that island's story, never through a journey parcel. */
 export function nextUnearnedMossproutResident(earnedIds: readonly KatchimeraSkinId[], preferredId?: KatchimeraSkinId | null): KatchimeraSkinId | null {
   const earned = new Set(earnedIds);
-  if (preferredId && preferredId !== 'mossprout' && !earned.has(preferredId) && MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT.has(preferredId)) return preferredId;
-  return MOSSPROUT_RESIDENT_CARD_NODES.find((node) => !earned.has(node.residentId))?.residentId ?? null;
+  const journeyDiscoverable = (id: KatchimeraSkinId) => !earned.has(id) && !islandCampaignForResident(id);
+  if (preferredId && preferredId !== 'mossprout' && journeyDiscoverable(preferredId) && MOSSPROUT_RESIDENT_CARD_NODE_BY_RESIDENT.has(preferredId)) return preferredId;
+  return MOSSPROUT_RESIDENT_CARD_NODES.find((node) => journeyDiscoverable(node.residentId))?.residentId ?? null;
 }
 
 export function residentDiscoveryOrders(discoveryId: string, residentId: KatchimeraSkinId, now: number): MergeOrder[] {

@@ -1,5 +1,5 @@
 import { useStepplingGardenLesson, reconcileStepplingGarden } from '@/features/onboarding/steppling-garden-runtime';
-import { STEPPLING_PARCEL_ID, STEPPLING_SHOE_ORDER_ID, stepplingGardenBoardStep, stepplingGardenCheckpoint } from '@/features/onboarding/steppling-garden-lesson';
+import { STEPPLING_FINALE_NODE_IDS, STEPPLING_PARCEL_ID, STEPPLING_SHOE_ORDER_ID, stepplingGardenBoardStep, stepplingGardenCheckpoint } from '@/features/onboarding/steppling-garden-lesson';
 import { acknowledgeStepplingDayOneGarden } from '@/features/companion/use-steppling-day-one';
 import * as Haptics from 'expo-haptics';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
@@ -71,7 +71,10 @@ import { useKatchimeraCards } from '@/hooks/use-katchimera-cards';
 import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { localDayId } from '@/utils/world-identity';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
-import { PETALIMP_ISLAND_CAMPAIGN_ID, petalimpIslandReturnLevel } from '@/constants/petalimp-island-campaign';
+import { activeIslandCampaignReturn } from '@/constants/island-campaigns/helpers';
+import { islandCampaignReturnNoteId, parseIslandCampaignReturnNoteId } from '@/constants/island-campaigns/registry';
+import type { IslandCampaignDefinition } from '@/constants/island-campaigns/types';
+import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
 
 import type { MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 import { MergePlaySurface } from './merge-play-surface';
@@ -116,7 +119,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   const [stepplingLessonError, setStepplingLessonError] = useState(false);
   const glowScene = glowRun ? glowDiscoveryScene(glowRun.nodeId) : null;
   const navigation = useNavigation();
-  const stepplingBoardLocked = active && stepplingLesson.active && !['closing', 'summary'].includes(stepplingLesson.run?.nodeId ?? '');
+  const stepplingBoardLocked = active && stepplingLesson.active && !STEPPLING_FINALE_NODE_IDS.includes(stepplingLesson.run?.nodeId ?? '');
   usePreventRemove(stepplingBoardLocked, () => {});
   const handoffActive = ftueRun?.status === 'active' && ftueRun.stepId.startsWith('merge.handoff.');
   const handoffFeedback = useGameFeedback();
@@ -163,10 +166,10 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     }
     else router.push('/legacy-games');
   }, [creatureId, flushMergeWorld, router, source, transitionTo]);
-  const returnToPetalimpIsland = useCallback(async () => {
+  const returnToIslandCampaign = useCallback(async (campaign: IslandCampaignDefinition) => {
     await flushMergeWorld();
     transitionTo({
-      announcement: 'Returning to Bloom Garden',
+      announcement: `Returning to ${mossproutNatureIslandById.get(campaign.islandId)?.name ?? 'the island'}`,
       target: 'katchimeras',
       navigate: () => router.dismissTo('/(tabs)/katchimeras'),
     });
@@ -235,7 +238,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     return () => subscription.remove();
   }, [stepplingBoardLocked]);
   useEffect(() => {
-    if (!active || !stepplingLesson.active || !['closing', 'summary'].includes(stepplingLesson.run?.nodeId ?? '') || parcelFlight || serveFlight || stepplingReturning.current) return;
+    if (!active || !stepplingLesson.active || !STEPPLING_FINALE_NODE_IDS.includes(stepplingLesson.run?.nodeId ?? '') || parcelFlight || serveFlight || stepplingReturning.current) return;
     stepplingReturning.current = true;
     void flushMergeWorld().then(() => {
       transitionTo({ announcement: 'Returning to Steppling', target: 'katchimeras', navigate: () => {
@@ -424,9 +427,10 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
 
   const openCharacterReturn = useCallback((characterId: MergeOrder['characterId'], noteId: string) => {
     if (!active || storyNavigationPendingRef.current) return;
-    if (noteId.startsWith(`${PETALIMP_ISLAND_CAMPAIGN_ID}:return:`)) {
+    const islandReturn = parseIslandCampaignReturnNoteId(noteId);
+    if (islandReturn) {
       storyNavigationPendingRef.current = true;
-      void returnToPetalimpIsland().catch(() => { storyNavigationPendingRef.current = false; });
+      void returnToIslandCampaign(islandReturn.campaign).catch(() => { storyNavigationPendingRef.current = false; });
       return;
     }
     if (noteId === MOSSPROUT_FTUE_RETURN_NOTE_ID) {
@@ -477,7 +481,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       },
     });
     if (!accepted) storyNavigationPendingRef.current = false;
-  }, [active, mossproutJourneyDayId, returnToPetalimpIsland, router, transitionTo]);
+  }, [active, mossproutJourneyDayId, returnToIslandCampaign, router, transitionTo]);
 
   useEffect(() => {
     if (!active
@@ -697,14 +701,14 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       bondPoints: 0,
     };
     const journeyReturnReady = mossproutJourney?.status === 'return_available' || mossproutJourney?.status === 'resolution_ready';
-    const islandReturnLevel = petalimpIslandReturnLevel(state);
-    const islandReturnEntry: MergeTrayEntry | null = islandReturnLevel ? {
-      id: `${PETALIMP_ISLAND_CAMPAIGN_ID}:return:${islandReturnLevel}`,
+    const islandReturn = activeIslandCampaignReturn(state);
+    const islandReturnEntry: MergeTrayEntry | null = islandReturn ? {
+      id: islandCampaignReturnNoteId(islandReturn.campaign, islandReturn.level),
       kind: 'chat_note',
       characterId: 'mossprout',
-      portraitSkinId: 'petalimp',
-      title: 'Meet me at Bloom Garden',
-      accessibilityHint: 'Return to Petalimp’s island for the next scene',
+      portraitSkinId: islandReturn.campaign.residentSkinId,
+      title: islandReturn.campaign.copy.returnNoteTitle,
+      accessibilityHint: islandReturn.campaign.copy.returnNoteHint,
       bondPoints: 0,
     } : null;
     const returnEntries: MergeTrayEntry[] = chapterZeroActive ? [] : islandReturnEntry ? [islandReturnEntry] : mossproutJourneyExclusive

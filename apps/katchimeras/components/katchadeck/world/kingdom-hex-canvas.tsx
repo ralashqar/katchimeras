@@ -176,6 +176,9 @@ type Props = {
   mossproutNatureIslandReveals?: Partial<Record<MossproutNatureIslandId, boolean>>;
   mossproutGarden?: MossproutGardenSceneState;
   onSelectNatureIsland?: (islandId: MossproutNatureIslandId) => void;
+  /** Frames an island once per id, then reports back so the caller can point at it. */
+  focusNatureIslandId?: MossproutNatureIslandId | null;
+  onFocusNatureIslandComplete?: (islandId: MossproutNatureIslandId) => void;
   onSelectMemoryPlant?: (instanceId: string) => void;
   onSelectGateway?: () => void;
   onGatewayTargetChange?: (node: View | null) => void;
@@ -236,6 +239,47 @@ const WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE = 2;
 // never rasterized from a small in-world copy while zooming.
 const WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE = 2.7;
 const MEMORY_PLANT_NATIVE_SURFACE_SCALE = 3.2;
+const MEMORY_PLANT_CROSSFADE_MS = 420;
+const MEDITATION_BLEND_MS = 520;
+const MEDITATION_ART_GUARD_MS = 600;
+
+/**
+ * Settling into meditation swaps an animated idle for a still pose.
+ *
+ * Two things made that read as a snap rather than a blend. Stopping an animated
+ * WebP rewinds it to its first frame, so the standing pose jumped before it had
+ * faded; playback is therefore held until the standing layer is fully
+ * transparent. And the blend used to start whether or not the meditation art
+ * had been decoded, crossing into an empty layer and popping the pose in late;
+ * it now waits for that art to be on screen, with a guard so a source that
+ * never reports still resolves.
+ */
+function useMeditationBlend(meditating: boolean, mounted: boolean, reduceMotion: boolean) {
+  const progress = useSharedValue(meditating ? 1 : 0);
+  const [artDisplayed, setArtDisplayed] = useState(false);
+  const [settled, setSettled] = useState(meditating);
+  const onArtDisplayed = useCallback(() => setArtDisplayed(true), []);
+  useEffect(() => {
+    if (!mounted || artDisplayed) return;
+    const guard = setTimeout(onArtDisplayed, MEDITATION_ART_GUARD_MS);
+    return () => clearTimeout(guard);
+  }, [artDisplayed, mounted, onArtDisplayed]);
+  useEffect(() => {
+    if (meditating && !artDisplayed) return;
+    progress.value = reduceMotion
+      ? meditating ? 1 : 0
+      : withTiming(meditating ? 1 : 0, { duration: MEDITATION_BLEND_MS, easing: Easing.inOut(Easing.cubic) });
+    return () => cancelAnimation(progress);
+  }, [artDisplayed, meditating, progress, reduceMotion]);
+  useEffect(() => {
+    if (!meditating) { setSettled(false); return; }
+    if (reduceMotion) { setSettled(true); return; }
+    if (!artDisplayed) return;
+    const timer = setTimeout(() => setSettled(true), MEDITATION_BLEND_MS + 40);
+    return () => clearTimeout(timer);
+  }, [artDisplayed, meditating, reduceMotion]);
+  return { onArtDisplayed, playbackActive: !settled, progress };
+}
 const WORLD_FTUE_EGG_WIDTH = SHARED_RESIDENT_WIDTH;
 const WORLD_FTUE_EGG_HEIGHT = SHARED_RESIDENT_HEIGHT;
 const WORLD_FTUE_EGG_STAGE_SCALE = WORLD_FTUE_EGG_WIDTH / 200;
@@ -436,6 +480,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   mossproutNatureIslandReveals = {},
   mossproutGarden,
   onSelectNatureIsland,
+  focusNatureIslandId = null,
+  onFocusNatureIslandComplete,
   onSelectMemoryPlant,
   onSelectGateway,
   onGatewayTargetChange,
@@ -844,6 +890,23 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const animateToCameraSnapshot = camera.animateToSnapshot;
   const readLiveCameraSnapshot = camera.getSnapshot;
   const tutorialCameraReady = camera.ready;
+  // Programmatic island framing (the Kingdom goal hint). Each id focuses once
+  // until the caller clears it, so re-renders never restart the pan.
+  const focusedNatureIslandRef = useRef<MossproutNatureIslandId | null>(null);
+  useEffect(() => {
+    if (!focusNatureIslandId) { focusedNatureIslandRef.current = null; return; }
+    if (!tutorialCameraReady || focusedNatureIslandRef.current === focusNatureIslandId) return;
+    const target = natureIslandFrames.find((entry) => entry.islandId === focusNatureIslandId);
+    if (!target) return;
+    focusedNatureIslandRef.current = focusNatureIslandId;
+    camera.focusFrame(target.frame, {
+      durationMs: reduceMotion ? 0 : 480,
+      horizontalPadding: 70,
+      screenCenterY: viewport.height * 0.42,
+      verticalPadding: 140,
+      onComplete: () => onFocusNatureIslandComplete?.(focusNatureIslandId),
+    });
+  }, [camera, focusNatureIslandId, natureIslandFrames, onFocusNatureIslandComplete, reduceMotion, tutorialCameraReady, viewport.height]);
   const discoveredEggOriginRef = useRef<KingdomCameraSnapshot | null>(null);
   const interactionOriginSnapshotRef = useRef<KingdomCameraSnapshot | null>(null);
   useEffect(() => {
@@ -2440,13 +2503,14 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
   const reduceMotion = useReducedMotion();
   const rewardPulse = useSharedValue(0);
   const rewardShake = useSharedValue(0);
-  const meditationProgress = useSharedValue(meditating ? 1 : 0);
   const handledRewardPulseKeyRef = useRef(rewardPulseKey);
   const nativeWidth = frame.width * WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE;
   const nativeHeight = frame.height * WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE;
   const glowSize = nativeWidth * 0.84;
   const meditationSource = resolveCreatureMeditationArtSource(creature.visualKey);
-  const showMeditation = useExitRetention(Boolean(meditationSource && meditating), reduceMotion ? 0 : 520);
+  const showMeditation = useExitRetention(Boolean(meditationSource && meditating), reduceMotion ? 0 : MEDITATION_BLEND_MS);
+  const meditation = useMeditationBlend(meditating, showMeditation, reduceMotion);
+  const meditationProgress = meditation.progress;
 
   useEffect(() => {
     if (rewardPulseKey <= handledRewardPulseKeyRef.current) return;
@@ -2457,15 +2521,6 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
       cancelAnimation(rewardShake);
     };
   }, [reduceMotion, rewardPulse, rewardPulseKey, rewardShake]);
-  useEffect(() => {
-    meditationProgress.value = reduceMotion
-      ? meditating ? 1 : 0
-      : withTiming(meditating ? 1 : 0, {
-          duration: 520,
-          easing: Easing.inOut(Easing.cubic),
-        });
-    return () => cancelAnimation(meditationProgress);
-  }, [meditating, meditationProgress, reduceMotion]);
 
   const projectionStyle = useAnimatedStyle(() => ({
     transform: [
@@ -2574,7 +2629,7 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
               allowDownscaling={false}
               fallbackSource={source ?? resolveCreatureArtSource(creature.visualKey)}
               forceStatic={cameraMoving}
-              playbackActive={!meditating}
+              playbackActive={meditation.playbackActive}
               style={StyleSheet.absoluteFill}
               visualKey={creature.visualKey}
             />
@@ -2587,6 +2642,7 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
                 allowDownscaling={false}
                 cachePolicy="memory-disk"
                 contentFit="contain"
+                onDisplay={meditation.onArtDisplayed}
                 source={meditationSource}
                 style={StyleSheet.absoluteFill}
                 transition={0}
@@ -2631,6 +2687,34 @@ const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
   visualKey: string;
 }) {
   const reduceMotion = useReducedMotion();
+  // A planted memory keeps the same instance when it grows: only `visualKey`
+  // and `source` change. Staging the swap here — during render, not in a
+  // post-paint effect — is what keeps the new stage from flashing at full
+  // opacity for a frame before the blend starts. The incoming stage mounts as
+  // its own layer (transparent on its first paint) while the outgoing stage
+  // stays painted underneath and fades out, so the two genuinely cross-blend.
+  const [artLayers, setArtLayers] = useState<{
+    current: { key: string; source: ImageSourcePropType };
+    outgoing: { key: string; source: ImageSourcePropType } | null;
+  }>(() => ({ current: { key: visualKey, source }, outgoing: null }));
+  if (artLayers.current.key !== visualKey) {
+    setArtLayers((state) => (state.current.key === visualKey ? state : {
+      current: { key: visualKey, source },
+      outgoing: state.current,
+    }));
+  }
+  const [blendReadyKey, setBlendReadyKey] = useState<string | null>(null);
+  const outgoingStage = artLayers.outgoing;
+  const blendReady = blendReadyKey === visualKey;
+  const handleIncomingPainted = useCallback(() => setBlendReadyKey(visualKey), [visualKey]);
+  useEffect(() => {
+    if (!outgoingStage || !blendReady) return;
+    const timer = setTimeout(
+      () => setArtLayers((state) => (state.outgoing ? { ...state, outgoing: null } : state)),
+      (reduceMotion ? 140 : MEMORY_PLANT_CROSSFADE_MS) + 80,
+    );
+    return () => clearTimeout(timer);
+  }, [blendReady, outgoingStage, reduceMotion]);
   const revealOpacity = useSharedValue(animateReveal ? 0 : 1);
   const revealScale = useSharedValue(animateReveal ? 0.48 : 1);
   const revealLift = useSharedValue(animateReveal ? 12 : 0);
@@ -2649,20 +2733,28 @@ const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
 
   useEffect(() => {
     if (revealRequestedForVisualKeyRef.current !== visualKey || handledVisualKeyRef.current === visualKey) return;
+    // Only a plant appearing for the first time may start from nothing. A
+    // stage change is already on screen, and resetting opacity/scale here —
+    // one frame after React painted the new art — is what made the growth
+    // read as a pop-in. There the surface stays put and the swell alone plays
+    // over the layers' cross-blend.
+    const firstAppearance = handledVisualKeyRef.current === null;
     handledVisualKeyRef.current = visualKey;
     setShowCelebration(true);
-    revealOpacity.value = 0;
-    revealScale.value = reduceMotion ? 0.88 : 0.48;
-    revealLift.value = reduceMotion ? 4 : 12;
     celebrationOpacity.value = 0;
-    revealOpacity.value = withTiming(1, {
-      duration: reduceMotion ? 100 : 220,
-      easing: Easing.out(Easing.cubic),
-    });
-    revealLift.value = withTiming(0, {
-      duration: reduceMotion ? 100 : 440,
-      easing: Easing.out(Easing.cubic),
-    });
+    if (firstAppearance) {
+      revealOpacity.value = 0;
+      revealScale.value = reduceMotion ? 0.88 : 0.48;
+      revealLift.value = reduceMotion ? 4 : 12;
+      revealOpacity.value = withTiming(1, {
+        duration: reduceMotion ? 100 : 220,
+        easing: Easing.out(Easing.cubic),
+      });
+      revealLift.value = withTiming(0, {
+        duration: reduceMotion ? 100 : 440,
+        easing: Easing.out(Easing.cubic),
+      });
+    }
     revealScale.value = reduceMotion
       ? withTiming(1, { duration: 140, easing: Easing.out(Easing.cubic) })
       : withSequence(
@@ -2763,19 +2855,88 @@ const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
               />
             </Animated.View>
           ) : null}
-          <Image
-            accessibilityIgnoresInvertColors
-            allowDownscaling={false}
-            cachePolicy="memory-disk"
-            contentFit="contain"
-            priority="high"
-            recyclingKey={visualKey}
-            source={source}
-            style={StyleSheet.absoluteFill}
-            transition={0}
+          {outgoingStage ? (
+            <MemoryPlantArtLayer
+              enters={false}
+              fadeOut={blendReady}
+              key={outgoingStage.key}
+              reduceMotion={reduceMotion}
+              source={outgoingStage.source}
+              visualKey={outgoingStage.key}
+            />
+          ) : null}
+          <MemoryPlantArtLayer
+            enters={outgoingStage !== null}
+            fadeOut={false}
+            key={artLayers.current.key}
+            onPainted={handleIncomingPainted}
+            reduceMotion={reduceMotion}
+            source={artLayers.current.source}
+            visualKey={artLayers.current.key}
           />
         </Animated.View>
       </Animated.View>
+    </Animated.View>
+  );
+});
+
+const MemoryPlantArtLayer = memo(function MemoryPlantArtLayer({
+  enters,
+  fadeOut,
+  onPainted,
+  reduceMotion,
+  source,
+  visualKey,
+}: {
+  enters: boolean;
+  fadeOut: boolean;
+  onPainted?: () => void;
+  reduceMotion: boolean;
+  source: ImageSourcePropType;
+  visualKey: string;
+}) {
+  // Shared values are initialised at mount, before the first paint, so a layer
+  // that enters mid-blend is transparent from its very first frame.
+  const opacity = useSharedValue(enters ? 0 : 1);
+  const [painted, setPainted] = useState(!enters);
+  const onPaintedRef = useRef(onPainted);
+  onPaintedRef.current = onPainted;
+  const confirmPainted = useCallback(() => {
+    setPainted(true);
+    onPaintedRef.current?.();
+  }, []);
+  useEffect(() => {
+    if (painted) return;
+    // Never strand a half-blended stage if the load callback never arrives.
+    const guard = setTimeout(confirmPainted, 600);
+    return () => clearTimeout(guard);
+  }, [confirmPainted, painted]);
+  const target = fadeOut || !painted ? 0 : 1;
+  useEffect(() => {
+    // The incoming stage rises early and the outgoing one holds late, so their
+    // alphas overlap instead of both sitting near half and letting the ground
+    // show through the plant halfway into the blend.
+    opacity.value = withTiming(target, {
+      duration: reduceMotion ? 140 : MEMORY_PLANT_CROSSFADE_MS,
+      easing: target === 0 ? Easing.in(Easing.cubic) : Easing.out(Easing.cubic),
+    });
+    return () => cancelAnimation(opacity);
+  }, [opacity, reduceMotion, target]);
+  const blendStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View collapsable={false} pointerEvents="none" style={[StyleSheet.absoluteFill, blendStyle]}>
+      <Image
+        accessibilityIgnoresInvertColors
+        allowDownscaling={false}
+        cachePolicy="memory-disk"
+        contentFit="contain"
+        onDisplay={confirmPainted}
+        priority="high"
+        recyclingKey={visualKey}
+        source={source}
+        style={StyleSheet.absoluteFill}
+        transition={0}
+      />
     </Animated.View>
   );
 });
@@ -2827,12 +2988,13 @@ const ResidentCreature = memo(function ResidentCreature({
   const reactionLift = useSharedValue(0);
   const reactionRotation = useSharedValue(0);
   const reactionScale = useSharedValue(1);
-  const meditationProgress = useSharedValue(meditating ? 1 : 0);
   const reduceMotion = useReducedMotion();
   const meditationSource = creature
     ? resolveCreatureMeditationArtSource(creature.visualKey)
     : null;
-  const showMeditation = useExitRetention(Boolean(meditationSource && meditating), reduceMotion ? 0 : 520);
+  const showMeditation = useExitRetention(Boolean(meditationSource && meditating), reduceMotion ? 0 : MEDITATION_BLEND_MS);
+  const meditation = useMeditationBlend(meditating, showMeditation, reduceMotion);
+  const meditationProgress = meditation.progress;
 
   useEffect(() => {
     if (stableWorldPresentation) {
@@ -2862,16 +3024,6 @@ const ResidentCreature = memo(function ResidentCreature({
       withSpring(1, { damping: 12, stiffness: 180 }),
     );
   }, [celebrationNonce, reactionLift, reactionRotation, reactionScale, reduceMotion]);
-
-  useEffect(() => {
-    meditationProgress.value = reduceMotion
-      ? meditating ? 1 : 0
-      : withTiming(meditating ? 1 : 0, {
-          duration: 520,
-          easing: Easing.inOut(Easing.cubic),
-        });
-    return () => cancelAnimation(meditationProgress);
-  }, [meditating, meditationProgress, reduceMotion]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -2934,7 +3086,7 @@ const ResidentCreature = memo(function ResidentCreature({
             {creature && animated ? (
               <CreatureAnimatedArt
                 accessibilityLabel={`${creature.name} animated`}
-                playbackActive={!meditating}
+                playbackActive={meditation.playbackActive}
                 fallbackSource={resolveCreatureArtSource(creature.visualKey)}
                 onLoad={markReady}
                 style={StyleSheet.absoluteFill}
@@ -2950,6 +3102,7 @@ const ResidentCreature = memo(function ResidentCreature({
                 allowDownscaling={false}
                 cachePolicy="memory-disk"
                 contentFit="contain"
+                onDisplay={meditation.onArtDisplayed}
                 source={meditationSource}
                 style={StyleSheet.absoluteFill}
                 transition={0}

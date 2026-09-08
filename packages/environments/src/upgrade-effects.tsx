@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -20,18 +20,51 @@ export function createUpgradeEffects({coinArt:COIN_ART, fontFamily}: {coinArt: i
 type HavenTileUpgradePresentation = {nonce:number;coinOrigin:{x:number;y:number};palette:HavenUpgradeEffectPalette;reactionLine:string};
 const COIN_SIZE = 34;
 
-const COIN_VECTORS = [
-  { arc: -66, delay: 0, offsetX: -24, offsetY: -22 },
-  { arc: -82, delay: 55, offsetX: -11, offsetY: -34 },
-  { arc: -92, delay: 110, offsetX: 0, offsetY: -38 },
-  { arc: -78, delay: 165, offsetX: 13, offsetY: -32 },
-  { arc: -62, delay: 220, offsetX: 26, offsetY: -20 },
-] as const;
-
 function random01(index: number, salt: number) {
   const value = Math.sin((index + 1) * 12.9898 + salt * 78.233) * 43_758.5453;
   return value - Math.floor(value);
 }
+
+// The Glow leaves the top bar and has to cross most of the screen to reach a
+// hex tile. A handful of coins reads as a token gesture over that distance, so
+// this is a dense stream: launched close together, fanned out, each one landing
+// on its own beat. Every landing must still fall inside the payment window
+// below (`HAVEN_UPGRADE_TIMING.revealAtMs`) or the coin is cut mid-flight.
+const COIN_COUNT = 12;
+const COIN_LAUNCH_STAGGER_MS = 42;
+const COIN_FLIGHT_MS = 430;
+
+const COIN_VECTORS = Array.from({ length: COIN_COUNT }, (_, index) => {
+  const spread = COIN_COUNT > 1 ? index / (COIN_COUNT - 1) - 0.5 : 0;
+  return {
+    arc: -58 - Math.round(random01(index, 11) * 48),
+    delay: index * COIN_LAUNCH_STAGGER_MS,
+    duration: COIN_FLIGHT_MS + Math.round(random01(index, 12) * 90),
+    offsetX: Math.round(spread * 76 + (random01(index, 13) - 0.5) * 16),
+    offsetY: -16 - Math.round(random01(index, 14) * 28),
+    sway: Math.round((random01(index, 15) - 0.5) * 68),
+  };
+});
+
+/**
+ * One tick per coin seating in the tile. Landings this close together would
+ * blur into a buzz, so beats under the minimum gap are dropped; the final coin
+ * always keeps its beat and lands heavier than the rest.
+ */
+const COIN_HAPTIC_MIN_GAP_MS = 46;
+const COIN_HAPTIC_BEATS = (() => {
+  const landings = COIN_VECTORS.map((vector) => vector.delay + vector.duration).sort((a, b) => a - b);
+  const last = landings[landings.length - 1] ?? 0;
+  const beats: number[] = [];
+  landings.slice(0, -1).forEach((at) => {
+    if (beats.length && at - beats[beats.length - 1]! < COIN_HAPTIC_MIN_GAP_MS) return;
+    beats.push(at);
+  });
+  // The final coin always keeps its beat and lands alone: a light tap a few
+  // milliseconds ahead of the heavier one would smear into it.
+  while (beats.length && last - beats[beats.length - 1]! < COIN_HAPTIC_MIN_GAP_MS) beats.pop();
+  return [...beats.map((at) => ({ at, last: false })), { at: last, last: true }];
+})();
 
 function silhouetteWidthAt(y: number) {
   if (y < 0.18) return 0.58 + (y / 0.18) * 0.34;
@@ -69,6 +102,8 @@ type EffectRect = { height: number; left: number; top: number; width: number };
 
 type Props = {
   area: EffectRect;
+  /** Fired as each Glow coin seats in the tile; `last` marks the final one. */
+  onCoinLanded?: (last: boolean) => void;
   phase: HavenUpgradePresentationPhase;
   presentation: HavenTileUpgradePresentation;
   reducedMotion: boolean;
@@ -79,6 +114,7 @@ type Props = {
 
 const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
   area,
+  onCoinLanded,
   phase,
   presentation,
   reducedMotion,
@@ -107,6 +143,21 @@ const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
   const showCoins = coinsEnabled && !reducedMotion && (phase === 'payment' || phase === 'cover');
   const showEnergy = !reducedMotion && ['cover', 'reveal', 'react'].includes(phase);
   const showReaction = reactionEnabled && (phase === 'react' || phase === 'complete');
+
+  // Scheduled once per receipt, not per phase: the stream keeps ticking across
+  // the payment → cover boundary instead of being cancelled halfway through.
+  const hapticNonce = showCoins ? presentation.nonce : null;
+  const coinLandedRef = useRef(onCoinLanded);
+  coinLandedRef.current = onCoinLanded;
+  const scheduledHapticNonce = useRef<number | null>(null);
+  const hapticTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => { hapticTimers.current.forEach(clearTimeout); hapticTimers.current = []; }, []);
+  useEffect(() => {
+    if (hapticNonce == null || scheduledHapticNonce.current === hapticNonce) return;
+    scheduledHapticNonce.current = hapticNonce;
+    hapticTimers.current.forEach(clearTimeout);
+    hapticTimers.current = COIN_HAPTIC_BEATS.map((beat) => setTimeout(() => coinLandedRef.current?.(beat.last), beat.at));
+  }, [hapticNonce]);
 
   return (
     <View accessibilityElementsHidden pointerEvents="auto" style={StyleSheet.absoluteFill}>
@@ -158,15 +209,15 @@ function UpgradeCoin({ from, index, target, vector }: {
 }) {
   const progress = useSharedValue(0);
   useEffect(() => {
-    progress.value = withDelay(vector.delay, withTiming(1, { duration: 430, easing: Easing.inOut(Easing.cubic) }));
+    progress.value = withDelay(vector.delay, withTiming(1, { duration: vector.duration, easing: Easing.inOut(Easing.cubic) }));
     return () => cancelAnimation(progress);
-  }, [progress, vector.delay]);
+  }, [progress, vector.delay, vector.duration]);
   const style = useAnimatedStyle(() => {
     const value = progress.value;
     const inverse = 1 - value;
     const startX = from.x + vector.offsetX;
     const startY = from.y + vector.offsetY;
-    const controlX = (startX + target.x) / 2 + (index % 2 === 0 ? -24 : 24);
+    const controlX = (startX + target.x) / 2 + vector.sway;
     const controlY = Math.min(startY, target.y) + vector.arc;
     const x = inverse * inverse * startX + 2 * inverse * value * controlX + value * value * target.x;
     const y = inverse * inverse * startY + 2 * inverse * value * controlY + value * value * target.y;
@@ -179,7 +230,7 @@ function UpgradeCoin({ from, index, target, vector }: {
         { scale: interpolate(value, [0, 0.75, 1], [0.82, 1.05, 0.34]) },
       ],
     };
-  }, [from.x, from.y, index, target.x, target.y, vector.arc, vector.offsetX, vector.offsetY]);
+  }, [from.x, from.y, index, target.x, target.y, vector.arc, vector.offsetX, vector.offsetY, vector.sway]);
   return <Animated.View style={[styles.coin, style]}><Image contentFit="contain" source={COIN_ART} style={StyleSheet.absoluteFill} transition={0} /></Animated.View>;
 }
 

@@ -18,7 +18,7 @@ export const MOSSPROUT_RESIDENTS: readonly MossproutResidentDefinition[] = [
     { title: 'A patient piece', description: 'Bring something that can take its time becoming useful.' },
     { title: 'The next growing thing', description: 'Mossprout knows exactly where one more living detail could belong.' },
   ] },
-  { id: 'petalimp', revealDialogue: 'Mossprout said this garden needed taste. I brought plenty. Help me place two things?', requestThemes: ['garden'], requestCopy: [
+  { id: 'petalimp', revealDialogue: 'Mossprout said this garden was waiting for someone who would fuss over it. I fuss beautifully. Shall we begin small?', requestThemes: ['garden'], requestCopy: [
     { title: 'Petalimp picks a colour', description: 'Petalimp would like one bloom bright enough to reorganise the whole flower bed.' },
     { title: 'A very important flower', description: 'The importance is mostly decided by Petalimp, but the flower will help.' },
     { title: 'Seasonal arrangements', description: 'Petalimp is testing which growing things look happiest together.' },

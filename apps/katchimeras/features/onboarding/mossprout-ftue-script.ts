@@ -617,7 +617,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.meditating', surface: 'companion', navigation: { ...mossproutCompanionResume, lock: false },
       camera: mossproutMeditationCamera,
-      guide: { eyebrow: 'Resting', title: COPY.meditation, body: 'The world is still yours to explore.' },
+      guide: { eyebrow: 'Resting', title: COPY.meditation, body: COPY.meditationHelp },
       actions: [{ id: 'companion.tend_garden', title: 'Explore the mist', description: 'Find a path beyond the Garden.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
     },

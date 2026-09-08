@@ -2,6 +2,7 @@ import { defineStory, story } from '@/features/content-flow/story-manifest';
 import { storyOperations, upgradeWorldTargetRecipe } from '@/features/content-flow/story-world-operations';
 import { WORLD_UPGRADE_DEFINITIONS, type WorldUpgradeDefinition } from './world-upgrade-offers';
 import { worldUpgradeStory } from './world-upgrade-stories';
+import { islandCampaignForOffer } from '@/constants/island-campaigns/registry';
 
 export const worldUpgradeRunId = (offer: Pick<WorldUpgradeDefinition, 'id' | 'nextLevel'>) => `world-upgrade:${offer.id}:${offer.nextLevel}`;
 function upgradeFlow(offer: WorldUpgradeDefinition, version: number) { return defineStory({
@@ -13,7 +14,7 @@ function upgradeFlow(offer: WorldUpgradeDefinition, version: number) { return de
     ...upgradeWorldTargetRecipe({ id: 'upgrade', target: offer.target, focusTarget: offer.visualTarget,
       toLevel: offer.transition === 'island_reveal' ? 1 : offer.nextLevel,
       economy: offer.economyMode === 'free'
-        ? { mode: 'free', reason: 'Petalimp restores the first flowers after the request.' }
+        ? { mode: 'free', reason: `${islandCampaignForOffer(offer.id)?.residentName ?? 'A friend'} restores this part of the garden after the request.` }
         : { mode: 'normal' },
       transition: offer.transition, cameraAlreadyFocused: true,
       presentation: { preset: offer.action === 'Clear mist' ? 'mist-clear' : 'growth', showCoins: true,

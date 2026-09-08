@@ -4,6 +4,7 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { eggQuestionAction } from '@/features/onboarding/egg-question-action';
 import * as stepplingPolicy from '@/features/onboarding/steppling-egg-policy';
+import { HAVEN_UPGRADE_TIMING } from '@incubator/environments/upgrade-presentation';
 import { loadNativeModule, nativeMotionHarness, nativeViews } from './helpers/native-motion-harness';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -11,12 +12,15 @@ const host = (name: string) => name as unknown as React.ComponentType<Record<str
 const lifecyclePath = 'features/today/use-shared-action-panel-lifecycle.ts';
 const seamlessPath = 'components/katchadeck/world/seamless-world-image.tsx';
 
+const silentHaptics = { impactAsync: async () => undefined, ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' } };
+
 test('restoration effects never draw replacement tile artwork before or during the blend', async () => {
   const clock = nativeMotionHarness();
   const module = loadNativeModule('components/katchadeck/world/haven-upgrade-effects.tsx', {
     'react-native': nativeViews,
     'react-native-reanimated': { ...clock.animated, default: { ...clock.animated.default, Text: host('AnimatedText') } },
     'expo-image': { Image: host('Image') }, 'expo-linear-gradient': { LinearGradient: host('Gradient') },
+    'expo-haptics': silentHaptics,
     '@/constants/game-currency-art': { GAME_CURRENCY_ART: { coins: 1 } },
     '@/constants/theme': { AppFontFamilies: { manrope: 'test' } },
   });
@@ -31,6 +35,39 @@ test('restoration effects never draw replacement tile artwork before or during t
     assert.equal(tree!.root.findAllByType(host('Image')).length, 0, `${phase} must not overlay a copy of the restored tile`);
     if (phase === 'cover' || phase === 'reveal') assert.equal(tree!.root.findAllByType(host('Gradient')).length, 7, 'keep the light rays');
   }
+  await act(async () => { tree!.unmount(); });
+});
+
+test('the Glow flight taps once per landing, spaced apart, and lands heavier on the last coin', async () => {
+  const clock = nativeMotionHarness();
+  const taps: { at: number; style: string }[] = [];
+  const started = Date.now();
+  const module = loadNativeModule('components/katchadeck/world/haven-upgrade-effects.tsx', {
+    'react-native': nativeViews,
+    'react-native-reanimated': { ...clock.animated, default: { ...clock.animated.default, Text: host('AnimatedText') } },
+    'expo-image': { Image: host('Image') }, 'expo-linear-gradient': { LinearGradient: host('Gradient') },
+    'expo-haptics': { ...silentHaptics,
+      impactAsync: async (style: string) => { taps.push({ at: Date.now() - started, style }); } },
+    '@/constants/game-currency-art': { GAME_CURRENCY_ART: { coins: 1 } },
+    '@/constants/theme': { AppFontFamilies: { manrope: 'test' } },
+  });
+  const Effects = module.HavenUpgradeEffects as unknown as React.ComponentType<Record<string, unknown>>;
+  const props = { area: { left: 0, top: 0, width: 200, height: 200 }, target: { x: 100, y: 620 },
+    presentation: { nonce: 4, coinOrigin: { x: 300, y: 60 }, reactionLine: '', palette: { accent: '#fff', glow: '#fff', primary: '#fff' } },
+    showReaction: false, reducedMotion: false };
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Effects {...props} phase="payment" />); });
+  // The flight is long on purpose; every coin must seat before the blend takes
+  // the screen, so the whole sequence fits inside the payment window.
+  await act(async () => { await new Promise((done) => setTimeout(done, HAVEN_UPGRADE_TIMING.revealAtMs + 120)); });
+  assert.ok(taps.length >= 6, `a long flight needs a felt stream of landings, got ${taps.length}`);
+  assert.equal(taps.filter((tap) => tap.style === 'medium').length, 1, 'only the final coin lands heavier');
+  assert.equal(taps.at(-1)!.style, 'medium');
+  taps.forEach((tap, index) => {
+    if (index === 0) return;
+    assert.ok(tap.at - taps[index - 1]!.at >= 30, `taps ${index - 1}→${index} blurred together at ${tap.at}ms`);
+  });
+  assert.ok(taps.at(-1)!.at < HAVEN_UPGRADE_TIMING.revealAtMs, 'the last coin seats before the restoration blend');
   await act(async () => { tree!.unmount(); });
 });
 

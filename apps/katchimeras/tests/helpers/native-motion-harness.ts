@@ -105,6 +105,8 @@ export function loadNativeModule(path: string, mocks: Record<string, unknown>, g
   const code = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const module = { exports: {} as Record<string, Function> };
   runInNewContext(code, {
+    // The sandbox stands in for a React Native runtime, which always has timers.
+    setTimeout, clearTimeout, setInterval, clearInterval,
     ...globals, module, exports: module.exports, console,
     require: (id: string) => {
       if (id in mocks) return mocks[id];

@@ -12,6 +12,8 @@ import type {
   ConversationTurn,
 } from '@/types/companion-conversation';
 import type { KatchimeraStoryProgress } from '@/types/relationship-progression';
+import type { KatchimeraSkinId } from '@/types/katchimera';
+import { islandCampaignForResident } from '@/constants/island-campaigns/registry';
 
 type Choice = readonly [id: string, label: string, reply: string];
 type Insight = {
@@ -334,12 +336,18 @@ export function resolveMossproutCampaignConversation(
   definition: ConversationDefinition,
   story: KatchimeraStoryProgress | undefined,
   turns: readonly ConversationTurn[] = [],
+  homeResidentIds?: readonly KatchimeraSkinId[],
 ): ConversationDefinition {
   if (definition.familyId !== 'mossprout') return definition;
   const campaignEpisode = mossproutCampaignEpisodeByOpeningId.get(definition.id)
     ?? mossproutCampaignEpisodeByResolutionId.get(definition.id);
   const matchedSkinId = story?.coStarSkinId ?? null;
-  const guestSkinId = campaignEpisode?.guestSkinId === 'matched' ? matchedSkinId : campaignEpisode?.guestSkinId ?? matchedSkinId;
+  const authoredGuestSkinId = campaignEpisode?.guestSkinId === 'matched' ? matchedSkinId : campaignEpisode?.guestSkinId ?? matchedSkinId;
+  // Island friends only visit Mossprout's journey once they are home; before
+  // that their island story owns their introduction.
+  const guestSkinId = authoredGuestSkinId && islandCampaignForResident(authoredGuestSkinId) && !homeResidentIds?.includes(authoredGuestSkinId)
+    ? null
+    : authoredGuestSkinId;
   const guest = guestSkinId ? katchimeraSkinById.get(guestSkinId)?.displayName ?? 'a passing beetle' : 'a passing beetle';
   const promise = promiseCopy[story?.storyFacts?.garden_promise ?? ''] ?? 'space for whatever needs it';
   const completed = story?.completedBeatIds ?? [];

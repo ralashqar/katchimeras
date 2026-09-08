@@ -777,7 +777,16 @@ test('meditation stays inside companion interaction with compact action-card UI'
   assert.match(havenWorld, /mossproutMeditating=\{mossproutMeditating\}/);
   assert.match(canvas, /<ResidentCreature[\s\S]*?meditating=\{tile\.companion\.familyId === 'mossprout' && mossproutMeditating\}/);
   assert.match(canvas, /residentMeditationAura[\s\S]*?<RotatingRadialSunburst[\s\S]*?source=\{meditationSource\}/);
-  assert.match(canvas, /meditationProgress\.value = reduceMotion[\s\S]*?withTiming\(meditating \? 1 : 0/);
+  assert.match(canvas, /progress\.value = reduceMotion[\s\S]*?withTiming\(meditating \? 1 : 0/);
+  // Stopping an animated WebP rewinds it to frame one, so the standing pose
+  // must keep playing until it has fully faded, and the blend must not start
+  // before the meditation art is actually on screen.
+  assert.match(canvas, /function useMeditationBlend\(meditating: boolean, mounted: boolean, reduceMotion: boolean\)/);
+  assert.match(canvas, /if \(meditating && !artDisplayed\) return;\s*\n\s*progress\.value = reduceMotion/);
+  assert.match(canvas, /return \{ onArtDisplayed, playbackActive: !settled, progress \}/);
+  assert.doesNotMatch(canvas, /playbackActive=\{!meditating\}/);
+  assert.equal(canvas.match(/playbackActive=\{meditation\.playbackActive\}/g)?.length, 2);
+  assert.equal(canvas.match(/onDisplay=\{meditation\.onArtDisplayed\}/g)?.length, 2);
   assert.match(canvas, /<RotatingRadialSunburst[\s\S]*?source=\{meditationSource\}/);
   assert.match(creatureArt, /mossprout-meditating\.png/);
   assert.equal(existsSync(require.resolve('@incubator/art-cutouts/mossprout-meditating.png')), true);
@@ -1758,7 +1767,7 @@ test('world Garden stays hidden through Mossprout dialogue and Grow, but returns
   assert.equal(mossproutFtueShowsWorldGarden('world.egg_intro'), false);
   assert.equal(mossproutFtueShowsWorldGarden('world.first_seed_grew'), false, 'Continue back to Mossprout owns this step');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  assert.match(screen, /!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && havenMergeBoardActive && mossproutFtueShowsWorldGarden\(ftueStepId\)/);
+  assert.match(screen, /!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && !kingdomGoalGuideActive && havenMergeBoardActive && mossproutFtueShowsWorldGarden\(ftueStepId\)/);
 });
 
 test('a consumed first-meeting launch cannot keep overhead FTUE speech hidden', () => {

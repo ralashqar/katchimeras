@@ -22,12 +22,17 @@ export type HavenUpgradeEffectPalette = {
   primary: string;
 };
 
+/**
+ * `revealAtMs` closes the payment window, so it also bounds the Glow flight
+ * from the top bar (see COIN_VECTORS in `upgrade-effects`): the last coin must
+ * seat in the tile before the restoration blend takes the screen.
+ */
 export const HAVEN_UPGRADE_TIMING = {
   cameraMs: 420,
-  coverAtMs: 330,
-  revealAtMs: 650,
-  reactAtMs: 1_180,
-  completeAtMs: 2_300,
+  coverAtMs: 520,
+  revealAtMs: 1_060,
+  reactAtMs: 1_590,
+  completeAtMs: 2_710,
 } as const;
 
 export const HAVEN_UPGRADE_REDUCED_TIMING = {

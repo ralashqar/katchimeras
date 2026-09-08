@@ -6,7 +6,11 @@ import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { StoryWorldUpgradeEffectPayload, StoryTarget } from '@/types/content-flow';
 import { worldUpgradeStory } from './world-upgrade-stories';
 import { upgradeCompletedLevel } from './world-upgrade-progress';
-import { petalimpIslandChapterStatus, PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_ID } from '@/constants/petalimp-island-campaign';
+import { islandCampaignChapterStatus } from '@/constants/island-campaigns/helpers';
+import { ISLAND_CAMPAIGNS, islandCampaignForIsland } from '@/constants/island-campaigns/registry';
+import { islandWakeEntry, islandWakeLockedReason, islandWakeState } from '@/constants/island-campaigns/wake-order';
+import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
+import type { MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
 
 export type WorldUpgradeDefinition = {
   id: string;
@@ -30,17 +34,25 @@ export type WorldUpgradeOffer = WorldUpgradeDefinition & {
   affordable: boolean;
   missingGlow: number;
   lockedReason?: string;
+  /** Short label for the disabled action while `lockedReason` explains it. */
+  lockedLabel?: string;
   /** A discovered island host replaces the generic upgrade toy on its marker. */
   markerSkinId?: KatchimeraSkinId;
+  /** A friend still resting in the mist: the marker shows their silhouette. */
+  sleepingSkinId?: KatchimeraSkinId;
 };
 
 export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [
-  {
-    id: 'nature:bloom-garden', target: { kind: 'haven_nature_island', islandId: 'bloom-garden' },
-    visualTarget: { kind: 'haven_nature_island', islandId: 'bloom-garden' }, name: 'Bloom Garden',
-    nextName: 'A forgotten garden', description: 'Clear the mist to reveal this hidden patch.', nextLevel: 0,
-    cost: 40, action: 'Clear mist', transition: 'island_reveal',
-  },
+  // A friend's island is revealed first, then restored through their story.
+  ...ISLAND_CAMPAIGNS.map((campaign): WorldUpgradeDefinition => {
+    const island = mossproutNatureIslandById.get(campaign.islandId)!;
+    return {
+      id: `nature:${campaign.islandId}`, target: { kind: 'haven_nature_island', islandId: campaign.islandId },
+      visualTarget: { kind: 'haven_nature_island', islandId: campaign.islandId }, name: island.name,
+      nextName: campaign.copy.mistNextName, description: campaign.copy.mistDescription, nextLevel: 0,
+      cost: island.levels[0]!.coinCost, action: 'Clear mist', transition: 'island_reveal',
+    };
+  }),
   ...Object.values(HAVEN_ENVIRONMENTS).flatMap((environment) => environment!.stages.filter((stage) => stage.stage > 0
     // Mossprout's later Haven tiers are earned through the nature islands.
     && (environment!.characterId !== 'mossprout' || stage.stage === 1)).map((stage): WorldUpgradeDefinition => ({
@@ -54,8 +66,8 @@ export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [
     id: `nature:${island.id}`, target: { kind: 'haven_nature_island', islandId: island.id },
     visualTarget: { kind: 'haven_nature_island', islandId: island.id }, name: island.name, nextName: level.name,
     description: level.description, nextLevel: level.level, cost: level.coinCost,
-    action: island.id === PETALIMP_ISLAND_ID && level.level === 1 ? 'Restore' : level.level === 1 ? 'Clear mist' : 'Upgrade',
-    ...(island.id === PETALIMP_ISLAND_ID && level.level === 1 ? { economyMode: 'free' as const } : {}),
+    action: islandCampaignForIsland(island.id) && level.level === 1 ? 'Restore' : level.level === 1 ? 'Clear mist' : 'Upgrade',
+    ...(islandCampaignForIsland(island.id) && level.level === 1 ? { economyMode: 'free' as const } : {}),
   }))),
   ...SHARED_WORLD_PURCHASES.map((purchase): WorldUpgradeDefinition => ({
     id: `mist:${purchase.tileId}`, target: { kind: 'haven_structure', structureId: purchase.tileId },
@@ -71,28 +83,36 @@ export function worldUpgradeOffers(world: MergeWorldState): WorldUpgradeOffer[] 
     const currentLevel = target.kind === 'haven_tile' ? world.haven.tileStages[target.familyId as MergeCharacterId] ?? 0
       : target.kind === 'haven_nature_island' ? world.haven.mossproutNatureIslands[target.islandId as keyof typeof world.haven.mossproutNatureIslands] ?? 0
       : world.worldUnlocks?.[definition.unlockId!] ? 1 : 0;
-    const isBloom = target.kind === 'haven_nature_island' && target.islandId === PETALIMP_ISLAND_ID;
-    const bloomRevealed = Boolean(world.haven.mossproutNatureIslandReveals[PETALIMP_ISLAND_ID]);
+    const campaign = target.kind === 'haven_nature_island' ? islandCampaignForIsland(target.islandId) : null;
+    const revealed = campaign ? Boolean(world.haven.mossproutNatureIslandReveals[campaign.islandId]) : false;
+    const islandId = target.kind === 'haven_nature_island' ? target.islandId as MossproutNatureIslandId : null;
+    if (islandId && currentLevel === 0 && islandWakeState(world, islandId) === 'sleeping') {
+      // One resting marker per island: the reveal for a friend's island, the first level otherwise.
+      const representative = definition.transition === 'island_reveal' || (!campaign && definition.nextLevel === 1);
+      if (!representative) return [];
+      return [{ ...definition, currentLevel: 0, maxLevel: 4, eligible: false, affordable: false, missingGlow: definition.cost,
+        lockedReason: islandWakeLockedReason(world, islandId) ?? undefined, lockedLabel: 'Resting',
+        sleepingSkinId: islandWakeEntry(islandId)?.residentSkinId }];
+    }
     if (definition.transition === 'island_reveal') {
-      if (bloomRevealed || currentLevel !== 0) return [];
+      if (revealed || currentLevel !== 0) return [];
       return [{ ...definition, currentLevel: 0, maxLevel: 4, eligible: true, affordable: world.coins >= definition.cost,
         missingGlow: Math.max(0, definition.cost - world.coins) }];
     }
-    if (currentLevel + 1 !== definition.nextLevel || (isBloom && !bloomRevealed)) return [];
+    if (currentLevel + 1 !== definition.nextLevel || (campaign && !revealed)) return [];
     let eligible = true;
     let cost = definition.cost;
     let economyMode = definition.economyMode;
-    if (isBloom) {
-      const level = definition.nextLevel as import('@/types/merge-world').MossproutNatureIslandLevel;
-      const status = petalimpIslandChapterStatus(world, level);
-      eligible = status === 'restoration_ready';
+    if (campaign) {
+      const level = definition.nextLevel as MossproutNatureIslandLevel;
+      eligible = islandCampaignChapterStatus(world, campaign, level) === 'restoration_ready';
       if (level === 1) {
         cost = 0;
         economyMode = 'free';
       }
     }
-    const markerSkinId = isBloom && world.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID]?.discoveryRevealSeenAt != null
-      ? 'petalimp' as const
+    const markerSkinId = campaign && world.islandCampaigns?.[campaign.campaignId]?.discoveryRevealSeenAt != null
+      ? campaign.residentSkinId
       : undefined;
     return [{ ...definition, cost, economyMode, currentLevel, maxLevel: worldUpgradeMaxLevel(definition), storyId: worldUpgradeStory(definition.id, definition.nextLevel)?.id, eligible, markerSkinId,
       affordable: world.coins >= cost, missingGlow: Math.max(0, cost - world.coins) }];
@@ -118,7 +138,7 @@ export function worldUpgradeArchiveOffer(world: MergeWorldState, id: string): Wo
 /** A pending mist lesson owns its upgrade UI even if an old FTUE snapshot lags. */
 export function visibleWorldUpgradeOffers(offers: WorldUpgradeOffer[], ftueStepId: string | undefined,
   glowRun: { nodeId: string; status: string } | null) {
-  return offers.filter((offer) => (offer.eligible || offer.markerSkinId != null) && (
+  return offers.filter((offer) => (offer.eligible || offer.markerSkinId != null || offer.sleepingSkinId != null) && (
     glowRun && glowRun.status !== 'completed'
       ? ['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy'].includes(glowRun.nodeId) && offer.id === 'mist:steppling-home'
       : ftueStepId ? ['world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId) && offer.id === 'haven:mossprout'

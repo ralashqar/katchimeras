@@ -508,7 +508,9 @@ export type MergeWorldState = {
   worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
   glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 };
   stepplingGardenLesson?: { preparedAt: number; servedAt?: number };
-  version: 23;
+  /** Mossprout's wish — bring every friend home — once it has been told, and once its map hint was seen. */
+  kingdomGoal?: { introducedAt: number; coachmarkSeenAt: number | null };
+  version: 24;
   /** The first personal Merge World is owned by Mossprout. */
   ownerCharacterId: 'mossprout';
   revision: number;
@@ -630,6 +632,8 @@ export type MergeWorldCommand =
   | { type: 'activateIslandCampaignChapter'; campaignId: string; islandId: MossproutNatureIslandId; residentSkinId: KatchimeraSkinId; level: MossproutNatureIslandLevel; selectedOptionId?: string | null; orders: MergeOrder[]; now: number }
   | { type: 'ackIslandCampaignChapterReturn'; campaignId: string; level: MossproutNatureIslandLevel; now: number }
   | { type: 'completeIslandCampaignChapter'; campaignId: string; level: MossproutNatureIslandLevel; now: number }
+  | { type: 'introduceKingdomGoal'; now: number }
+  | { type: 'ackKingdomGoalCoachmark'; now: number }
   | { type: 'revealHaven'; now: number }
   | { type: 'grantPlantableMemory'; definitionId: MossproutMemoryPlantId; source: PlantableMemorySource; receiptId: string; now: number }
   | { type: 'placePlantableMemory'; instanceId: string; slotId: MossproutGardenPlantSlotId; receiptId: string; now: number }
@@ -659,6 +663,8 @@ export type MergeWorldCommandResult = {
   companionDiscoveryAdvanced?: { discoveryId: string; stage: number; completedCharacterId?: MergeCharacterId };
   residentCardRevealed?: { discoveryId: string; residentId: KatchimeraSkinId };
   residentCardEarned?: { discoveryId: string; residentId: KatchimeraSkinId };
+  /** An island friend's final chapter just granted their card. */
+  friendCardEarned?: { campaignId: string; residentSkinId: KatchimeraSkinId };
   clearedMistCells?: number[];
   spawnedCell?: number;
   spawnedItems?: { instanceId: string; definitionId: string; progressionGateId?: string; cell: number }[];

@@ -26,6 +26,8 @@ type FamilyProfile = {
   primary: Ladder;
   secondary: Ladder;
   extra?: Ladder;
+  /** Kingdom-wide journey ladders (friends home, places restored). */
+  more?: readonly Ladder[];
 };
 
 const ladder = (
@@ -129,6 +131,10 @@ const profiles: Record<KatchimeraFamilyId, FamilyProfile> = {
   mossprout: {
     primary: ladder('park-visits', 'Green places', 'Park and green-space visits you confirmed.', 'mossprout.parkVisits', [1, 3, 10, 25], 'park visit', 'park visits', 'Visit', 'visits', 'total', { 1: ['first_park'], 3: ['parks_3'], 10: ['parks_10'], 25: ['parks_25'] }),
     secondary: ladder('nature-places', 'Nature discovered', 'Distinct parks, gardens, forests and trails.', 'mossprout.distinctNaturePlaces', [1, 5, 10, 25], 'nature place', 'nature places', 'Discover', 'places', 'distinct'),
+    more: [
+      ladder('friends-home', 'Friends home', 'Friends of the garden who found their way back through the mist.', 'mossprout.friendsHome', [2, 3, 5, 9], 'friend home', 'friends home', 'Bring', 'friends', 'total'),
+      ladder('places-restored', 'Places restored', 'Parts of the Kingdom brought fully back to life.', 'mossprout.placesRestored', [2, 4, 7], 'place restored', 'places restored', 'Restore', 'places', 'total'),
+    ],
   },
   shellio: {
     primary: ladder('water-visits', 'Waterside days', 'Beach, coast and waterside visits you confirmed.', 'shellio.waterVisits', [1, 3, 10, 25], 'waterside visit', 'waterside visits', 'Share', 'visits', 'total'),
@@ -286,6 +292,7 @@ export const COMPANION_ACHIEVEMENT_CATALOG: readonly CompanionAchievementDef[] =
     ...ladderDefs(family.id, profile.primary, 'domain'),
     ...ladderDefs(family.id, profile.secondary, 'collection'),
     ...(profile.extra ? ladderDefs(family.id, profile.extra, 'domain') : []),
+    ...(profile.more ?? []).flatMap((item) => ladderDefs(family.id, item, 'journey')),
     ...sharedLadder(family.id, 'family-goals', 'Goals practised', `Goals completed with ${family.displayName}, including repeats.`, `${family.id}.quickGoals`, SHARED_THRESHOLDS, 'goal', 'goals'),
     ...sharedLadder(family.id, 'companion-quests', 'Quests completed', `Real-life and playful quests completed with ${family.displayName}.`, `${family.id}.quests`, QUEST_THRESHOLDS, 'quest', 'quests'),
     ...sharedLadder(family.id, 'journey-goals', 'Longer goals', `Longer Journey goals completed with ${family.displayName}.`, `${family.id}.journeyGoals`, JOURNEY_THRESHOLDS, 'Journey goal', 'journey'),
@@ -369,6 +376,8 @@ const RECORDING_HELP_BY_SIGNAL: Readonly<Record<string, string>> = {
   'pixooka.distinctGames': 'Record a Video game and enter its title. Each different confirmed title counts once.',
   'mossprout.parkVisits': 'In Today, add “Went somewhere”, choose Park or green space, and confirm the place.',
   'mossprout.distinctNaturePlaces': 'Confirm parks, gardens, forests or trails. Each different location counts once.',
+  'mossprout.friendsHome': 'Clear the mist on the next island in the Kingdom and help its friend restore their home.',
+  'mossprout.placesRestored': 'Restore every level of a Kingdom island, or Mossprout’s own garden, to bring it fully back.',
   'mossprout.photoBlooms': 'Keep a photo in the journal where flowers or blossom are a main or clear supporting subject. A screen showing flowers does not count. If the match is uncertain, confirm it during photo review.',
   'mossprout.photoWildPlaces': 'Keep a photo in the journal of a park, garden, forest, beach, mountain or body of water. Each kept photo counts once.',
   'mossprout.photoNatureQualities': 'Keep journal photos of different nature finds. Flowers, blossom, autumn, snow, water, mountains, stars, sunset, sky, forest, garden and beach can each count once.',

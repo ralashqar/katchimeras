@@ -85,7 +85,7 @@ import { resolveMossproutCampaignConversation } from '@/constants/mossprout-camp
 import { companionIdForFamily, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { companionQuickGoalTemplateById } from '@/constants/companion-quick-goals';
-import { activateStoredResidentCardDiscovery } from '@/utils/merge-world/repository';
+import { activateStoredResidentCardDiscovery, loadMergeWorldState, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
 import type { ConversationDefinition, ConversationMode, ConversationNode, ConversationOutcomePresentation, ConversationSession } from '@/types/companion-conversation';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
 import { isConversationV2Family, isConversationV2IdealSkinFamily } from '@/types/companion-conversation';
@@ -307,6 +307,19 @@ export type { QuestCaptureFeedback } from '@/types/companion-interaction';
 export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args) {
   const router = useRouter();
   const economy = useEconomy();
+  // Island friends only guest-star in Mossprout's journey once they are home.
+  const [homeResidentSkinIds, setHomeResidentSkinIds] = useState<readonly KatchimeraSkinId[]>([]);
+  useEffect(() => {
+    let live = true;
+    const apply = (world: { mossproutResidentSkinIds: readonly KatchimeraSkinId[] }) => {
+      if (!live) return;
+      setHomeResidentSkinIds((previous) => previous.length === world.mossproutResidentSkinIds.length
+        && previous.every((id, index) => id === world.mossproutResidentSkinIds[index]) ? previous : [...world.mossproutResidentSkinIds]);
+    };
+    void loadMergeWorldState().then(apply).catch(() => undefined);
+    const unsubscribe = subscribeMergeWorldSnapshots(apply);
+    return () => { live = false; unsubscribe(); };
+  }, []);
   const [microcopy, setMicrocopy] = useState<string | null>(null);
   const [selectedResident, setSelectedResident] = useState<SelectedResident | null>(null);
   const [selectedEncounterId, setSelectedEncounterId] = useState<string | null>(null);
@@ -1019,8 +1032,9 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       selectedConversationSession.definitionVersion < 5 ? legacyMossproutPondConversation(definition.id) ?? definition : definition,
       relationshipProgressionRepository.load().stories.mossprout,
       selectedConversationSession.turns,
+      homeResidentSkinIds,
     );
-  }, [selectedConversationSession]);
+  }, [homeResidentSkinIds, selectedConversationSession]);
   useEffect(() => {
     if (selectedConversationSession && selectedConversationDefinition) recordLifeConversation(selectedConversationSession, selectedConversationDefinition);
   }, [selectedConversationSession, selectedConversationDefinition]);

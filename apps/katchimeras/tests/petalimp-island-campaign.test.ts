@@ -5,8 +5,10 @@ import { resolve } from 'node:path';
 
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
 import { MOSSPROUT_CAMPAIGN_EPISODES } from '@/constants/mossprout-campaign';
-import { PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_CHAPTERS, petalimpGrowthStyle, petalimpIslandChapterOrder, petalimpIslandChapterStatus, petalimpIslandResolutionConversationId, petalimpIslandReturnConversationId, petalimpIslandReturnLevel, petalimpIslandUpgradePanelState } from '@/constants/petalimp-island-campaign';
-import { FERNIP_ISLAND_LOCK_REASON, fernipIslandJourneyUnlocked } from '@/constants/nature-island-unlocks';
+import { PETALIMP_BLOOM_CAMPAIGN, PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_CHAPTERS, petalimpGrowthStyle, petalimpIslandChapterOrder, petalimpIslandChapterStatus, petalimpIslandResolutionConversationId, petalimpIslandReturnConversationId, petalimpIslandReturnLevel, petalimpIslandUpgradePanelState } from '@/constants/petalimp-island-campaign';
+import { ISLAND_WAKE_ORDER, islandWakeBlocker, islandWakeState } from '@/constants/island-campaigns/wake-order';
+import { islandCampaignOpeningConversationId, islandCampaignPreviousStyle } from '@/constants/island-campaigns/helpers';
+import { acknowledgeChapterReturn, completeChapter, completeIslandCampaign, greetIslandFriend, restoreIslandLevel, revealIsland, startAndServeChapter } from './helpers/island-campaign';
 import { visibleWorldUpgradeOffers, worldUpgradeOffers } from '@/features/world-upgrades/world-upgrade-offers';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import type { MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
@@ -72,6 +74,45 @@ test('Petalimp has four story-led openings, choice-specific requests, returns, a
   assert.equal(petalimpGrowthStyle(['begin-small', 'belong-change', 'pace-pause', 'change-help']), 'curious');
 });
 
+test('Petalimp keeps prices out of her mouth and remembers the previous answer', () => {
+  for (const chapter of PETALIMP_ISLAND_CHAPTERS) {
+    for (const choice of chapter.choices) assert.doesNotMatch(choice.returnLine, /\d+ Glow/, `${choice.id} leaves the cost to the panel`);
+    if (chapter.level === 1) {
+      assert.equal(chapter.callbackLine, undefined);
+      for (const choice of chapter.choices) assert.match(choice.returnLine, /gift/, `${choice.id} makes the first restoration a gift`);
+    } else {
+      for (const style of PETALIMP_BLOOM_CAMPAIGN.payoff.styles) {
+        assert.ok(chapter.callbackLine?.[style], `level ${chapter.level} remembers a ${style} answer`);
+        const variant = companionConversationDefinitionById.get(`${chapter.conversationId}:after-${style}`);
+        assert.ok(variant, `${chapter.conversationId}:after-${style} is registered`);
+        const node = variant?.nodes[0];
+        if (node?.kind === 'choice') {
+          assert.ok(node.prompt.startsWith(chapter.callbackLine![style]!));
+          assert.equal(node.helperText, undefined, 'no mechanics hint under a personal question');
+          assert.deepEqual(node.options.map((option) => option.id), chapter.choices.map((choice) => choice.id));
+        }
+      }
+    }
+  }
+  assert.equal(islandCampaignOpeningConversationId(PETALIMP_BLOOM_CAMPAIGN, 1, null), PETALIMP_ISLAND_CHAPTERS[0]!.conversationId);
+  assert.equal(islandCampaignOpeningConversationId(PETALIMP_BLOOM_CAMPAIGN, 2, 'gentle'), `${PETALIMP_ISLAND_CHAPTERS[1]!.conversationId}:after-gentle`);
+  let state = greetIslandFriend(revealIsland({ ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 500 }, PETALIMP_BLOOM_CAMPAIGN, NOW), PETALIMP_BLOOM_CAMPAIGN, NOW);
+  assert.equal(islandCampaignPreviousStyle(state, PETALIMP_BLOOM_CAMPAIGN, 2), null);
+  state = completeChapter(restoreIslandLevel(acknowledgeChapterReturn(startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, 1, NOW, 1), PETALIMP_BLOOM_CAMPAIGN, 1, NOW), PETALIMP_BLOOM_CAMPAIGN, 1, NOW), PETALIMP_BLOOM_CAMPAIGN, 1, NOW);
+  assert.equal(islandCampaignPreviousStyle(state, PETALIMP_BLOOM_CAMPAIGN, 2), 'curious');
+  const log = petalimpIslandUpgradePanelState(state)!;
+  assert.deepEqual(log.completedChapters.map((entry) => entry.level), [1]);
+  assert.equal(log.completedChapters[0]?.line, PETALIMP_ISLAND_CHAPTERS[0]!.choices[1]!.resolutionLine);
+  state = acknowledgeChapterReturn(startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, 2, NOW), PETALIMP_BLOOM_CAMPAIGN, 2, NOW);
+  const waiting = petalimpIslandUpgradePanelState({ ...state, coins: 10 })!;
+  assert.equal(waiting.status, 'restoration_ready');
+  assert.equal(waiting.speech, PETALIMP_ISLAND_CHAPTERS[1]!.choices[0]!.returnLine, 'the return line lives on the panel');
+  assert.equal(waiting.stateLabel, 'Request complete · Ready to restore');
+  assert.match(waiting.voicedStateLabel, /10 of 60 Glow/);
+  assert.match(petalimpIslandUpgradePanelState({ ...state, coins: 45 })!.voicedStateLabel, /close now/);
+  assert.match(petalimpIslandUpgradePanelState({ ...state, coins: 60 })!.voicedStateLabel, /Whenever you are ready/);
+});
+
 test('Petalimp choices play as dialogue and the finale resolves the accumulated growth insight', () => {
   const opening = companionConversationDefinitionById.get(PETALIMP_ISLAND_CHAPTERS[0]!.conversationId)!;
   let openingSession: ConversationSession = {
@@ -112,14 +153,14 @@ test('fresh Bloom Garden uses one ordinary mystery panel without leaking Petalim
   const screen = readFileSync(resolve(root, 'components/katchadeck/roster/katchimera-kingdom-screen.tsx'), 'utf8');
   assert.match(screen, /presentation\.natureIslandReveal/);
   assert.doesNotMatch(screen, /preUpgradeActionLabel/);
-  assert.match(screen, /interactionNatureIslandId=\{pendingIslandCampaignLevel \? PETALIMP_ISLAND_ID : null\}/,
-    'every Petalimp narrative focuses Bloom Garden instead of Mossprout');
-  assert.match(screen, /preserveInteractionCameraOnExit=\{Boolean\(pendingIslandCampaignLevel\)\}/,
-    'Petalimp handoffs retain the Bloom Garden close-up for restoration');
-  assert.doesNotMatch(screen, /setPendingIslandCampaignLevel\(null\);\s*openGarden\(activeOrderId/,
+  assert.match(screen, /interactionNatureIslandId=\{pendingIslandCampaign\?\.campaign\.islandId \?\? null\}/,
+    'every island narrative focuses its island instead of Mossprout');
+  assert.match(screen, /preserveInteractionCameraOnExit=\{Boolean\(pendingIslandCampaign\)\}/,
+    'island handoffs retain the island close-up for restoration');
+  assert.doesNotMatch(screen, /setPendingIslandCampaign\(null\);\s*openGarden\(activeOrderId/,
     'the Merge handoff cannot expose Mossprout focus between the narrative and route cover');
-  assert.match(screen, /interactionRewardPulseKey=\{pendingIslandCampaignLevel \? 0 : interactionRewardPulseKey\}/,
-    'Petalimp conversations cannot shake the hidden Mossprout host');
+  assert.match(screen, /interactionRewardPulseKey=\{pendingIslandCampaign \? 0 : interactionRewardPulseKey\}/,
+    'island conversations cannot shake the hidden Mossprout host');
   const canvas = readFileSync(resolve(root, 'components/katchadeck/world/kingdom-hex-canvas.tsx'), 'utf8');
   assert.match(canvas, /if \(preserveInteractionCameraOnExit\) \{[\s\S]*?onComplete\(\);[\s\S]*?return;/);
   assert.match(canvas, /if \(!interactionResidentId \|\| interactionNatureIslandId\) return null;/,
@@ -146,8 +187,8 @@ test('fresh Bloom Garden uses one ordinary mystery panel without leaking Petalim
     'the insufficient-Glow action cannot restore the upgrade camera before navigation begins');
   assert.doesNotMatch(screen, /resumePetalimpIslandCampaign/,
     'Petalimp markers and island taps cannot bypass the upgrade panel');
-  assert.match(screen, /campaignState=\{petalimpPanelState\}/);
-  assert.match(screen, /onCampaignAction=\{petalimpPanelState\?\.actionLabel \? handlePetalimpPanelAction : undefined\}/);
+  assert.match(screen, /campaignState=\{islandCampaignPanelState\}/);
+  assert.match(screen, /onCampaignAction=\{islandCampaignPanelState\?\.actionLabel \? handleIslandCampaignPanelAction : undefined\}/);
   assert.match(screen, /const handleUpgradeOfferPress[\s\S]{0,160}?openUpgradeOffer\(offer\)/,
     'every upgrade-marker press opens the shared panel first');
   assert.match(canvas, /!upgradeCameraCommitted\.current && !preserveUpgradeCamera/,
@@ -246,17 +287,18 @@ test('a served Petalimp request becomes one persistent island return note withou
   assert.ok(served.externalRewardReceipts.some((receipt) => receipt.kind === 'story_order_served' && receipt.sourceId === PETALIMP_ISLAND_CAMPAIGN_ID));
   assert.equal(served.externalRewardReceipts.some((receipt) => receipt.kind === 'conversation' && receipt.sourceId === order.chapterId), false);
 
+  assert.equal(PETALIMP_BLOOM_CAMPAIGN.copy.returnNoteTitle, 'Meet me at Bloom Garden');
   const mergeScreen = readFileSync(resolve(root, 'components/katchadeck/games/merge-world-screen.tsx'), 'utf8');
-  assert.match(mergeScreen, /title: 'Meet me at Bloom Garden'/);
-  assert.match(mergeScreen, /portraitSkinId: 'petalimp'/);
+  assert.match(mergeScreen, /title: islandReturn\.campaign\.copy\.returnNoteTitle/);
+  assert.match(mergeScreen, /portraitSkinId: islandReturn\.campaign\.residentSkinId/);
   assert.doesNotMatch(mergeScreen, /servedOrder\?\.storyArcId === 'island-campaign:petalimp-bloom'[\s\S]{0,300}?router\.dismissTo/);
-  assert.match(mergeScreen, /returnToPetalimpIsland[\s\S]*?router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/,
-    'the Petalimp return clears the old interaction stack instead of revealing Mossprout');
+  assert.match(mergeScreen, /returnToIslandCampaign[\s\S]*?router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/,
+    'the island return clears the old interaction stack instead of revealing Mossprout');
   const provider = readFileSync(resolve(root, 'features/merge-world/merge-world-provider.tsx'), 'utf8');
-  assert.match(provider, /receipt\.sourceId === PETALIMP_ISLAND_CAMPAIGN_ID\) return/);
-  assert.match(provider, /servedOrder\?\.storyArcId === PETALIMP_ISLAND_CAMPAIGN_ID\) return relationships/);
-  assert.match(provider, /servedOrder\?\.storyArcId !== PETALIMP_ISLAND_CAMPAIGN_ID[\s\S]*?reconcileFeaturedStory/,
-    'Petalimp orders never reconcile the legacy Mossprout journey');
+  assert.match(provider, /isIslandCampaignId\(receipt\.sourceId\)\) return/);
+  assert.match(provider, /isIslandCampaignId\(servedOrder\?\.storyArcId\)\) return relationships/);
+  assert.match(provider, /!isIslandCampaignId\(servedOrder\?\.storyArcId\)[\s\S]*?reconcileFeaturedStory/,
+    'island orders never reconcile the legacy Mossprout journey');
 
   const content = normaliseCompanionContentState({
     ...emptyCompanionContentState(),
@@ -291,7 +333,7 @@ test('v22 campaign saves migrate to a visible garden without duplicate ownership
   (raw as { version: number }).version = 22;
   raw.haven.mossproutNatureIslands['bloom-garden'] = 2;
   const migrated = normalizeMergeWorldState(JSON.parse(JSON.stringify(raw)), NOW);
-  assert.equal(migrated.version, 23);
+  assert.equal(migrated.version, 24);
   assert.ok(migrated.haven.mossproutNatureIslandReveals['bloom-garden']);
   assert.equal(normalizeMergeWorldState(JSON.parse(JSON.stringify(migrated)), NOW).ownedKatchimeraCards.filter((card) => card.cardId === 'petalimp').length, 0);
 });
@@ -309,9 +351,18 @@ test('legacy in-progress chapters resume at the correct return boundary', () => 
   assert.equal(migrated.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID]?.chapters['1']?.returnConversationSeenAt, null);
 });
 
-test('Petalimp is available immediately while Fernip inherits the Journey Day 2 island lock', () => {
+test('Petalimp is available immediately while every other island sleeps until she is home', () => {
+  assert.equal(ISLAND_WAKE_ORDER[0]?.islandId, 'bloom-garden');
   assert.equal(MOSSPROUT_CAMPAIGN_EPISODES[1]?.guestSkinId, 'fernip');
-  assert.match(FERNIP_ISLAND_LOCK_REASON, /Journey Day 2/);
-  assert.equal(fernipIslandJourneyUnlocked({ journeyDays: [] }), false);
-  assert.equal(fernipIslandJourneyUnlocked({ journeyDays: [{ familyId: 'mossprout', beatId: 'quiet-patch:pond-knock', status: 'complete' }] }), true);
+  const fresh = { ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 1000 };
+  assert.equal(islandWakeState(fresh, 'bloom-garden'), 'open');
+  assert.equal(islandWakeState(fresh, 'wildgrowth-grove'), 'sleeping');
+  const wildgrowthReveal = worldUpgradeOffers(fresh).find((offer) => offer.id === 'nature:wildgrowth-grove');
+  assert.equal(wildgrowthReveal?.eligible, false);
+  assert.equal(wildgrowthReveal?.sleepingSkinId, 'fernip');
+  assert.match(wildgrowthReveal?.lockedReason ?? '', /Bring Petalimp home first/);
+  assert.equal(reduceMergeWorld(fresh, { type: 'upgradeMossproutNatureIsland', islandId: 'wildgrowth-grove', level: 1, now: NOW }).changed, false);
+  const home = completeIslandCampaign(fresh, PETALIMP_BLOOM_CAMPAIGN, NOW);
+  assert.equal(islandWakeState(home, 'bloom-garden'), 'revealed');
+  assert.equal(islandWakeBlocker(home, 'wildgrowth-grove'), null, 'Petalimp being home is what lets the next island wake');
 });

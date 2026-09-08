@@ -28,19 +28,22 @@ test('shared dialogue portrait preserves the world-selector circle and art geome
     assert.equal(art.props.style.width, size); assert.equal(art.props.source, 42);
   }
 });
-test('every authored purchase has a unique complete story and valid live speakers', () => {
-  assert.equal(WORLD_UPGRADE_STORIES.length, 26);
-  assert.equal(new Set(WORLD_UPGRADE_STORIES.map((story) => story.id)).size, 26);
+test('only the shared clearings keep a panel story; every island friend tells their own', () => {
+  assert.equal(WORLD_UPGRADE_STORIES.length, 2);
+  assert.deepEqual(WORLD_UPGRADE_STORIES.map((story) => story.id), ['haven:mossprout:1', 'mist:steppling-home:1']);
   for (const offer of WORLD_UPGRADE_DEFINITIONS) {
-    if (offer.transition === 'island_reveal') continue;
+    if (offer.transition === 'island_reveal' || offer.id.startsWith('nature:')) {
+      assert.equal(WORLD_UPGRADE_STORIES.some((item) => item.offerId === offer.id), false, `${offer.id} is narrated by its island campaign`);
+      continue;
+    }
     const story = WORLD_UPGRADE_STORIES.find((item) => item.offerId === offer.id && item.level === offer.nextLevel);
     assert.ok(story); assert.equal(story.before.length, 3); assert.equal(story.after.length, 1);
     for (const line of [...story.before, ...story.after]) { assert.ok(line.text.length); assert.ok(katchimeraSkinById.get(line.speaker)?.visualKey); }
-    if (story.rewardSkinId) assert.equal(katchimeraSkinById.get(story.rewardSkinId)?.status, 'live');
+    assert.equal(story.rewardSkinId, undefined, 'cards are earned through island stories, never a purchase');
   }
-  const guest = WORLD_UPGRADE_STORIES.flatMap((story) => story.before).find((line) => line.speaker === 'steppling')!;
-  assert.equal(upgradeSpeaker(guest, false).speaker, 'mossprout');
-  assert.equal(upgradeSpeaker(guest, true).speaker, 'steppling');
+  const mossproutLine = WORLD_UPGRADE_STORIES[0]!.before[0]!;
+  assert.equal(upgradeSpeaker({ ...mossproutLine, speaker: 'steppling', beforeSteppling: 'quiet' }, false).text, 'quiet');
+  assert.equal(upgradeSpeaker({ ...mossproutLine, speaker: 'steppling' }, true).speaker, 'steppling');
   assert.ok(WORLD_UPGRADE_FLOWS.every((flow) => flow.version === 3));
   assert.ok(LEGACY_WORLD_UPGRADE_FLOWS.every((flow) => flow.version === 2));
 });
@@ -51,31 +54,27 @@ test('Glow percent cannot signal affordable before exact cost', () => {
   assert.equal(offers.find((offer) => offer.id === 'haven:mossprout')?.maxLevel, 4);
   assert.equal(offers.find((offer) => offer.id === 'mist:steppling-home')?.maxLevel, 1);
 });
-test('milestone grant is atomic with payment, survives reload and cannot be duplicated', () => {
-  let state = initial();
+test('legacy fully grown islands bring their friend home once, across reload, with no story grant left behind', () => {
+  const grown = initial();
+  const legacy = { ...grown, version: 23, upgradeSkinGrants: { 'nature:orchard-grove:4': { skinId: 'amberleaf', grantedAt: NOW - 1 } },
+    haven: { ...grown.haven, mossproutNatureIslands: { ...grown.haven.mossproutNatureIslands, 'orchard-grove': 4 as const, 'wildgrowth-grove': 4 as const } } };
+  let state = normalizeMergeWorldState(JSON.parse(JSON.stringify(legacy)), NOW);
+  assert.equal(state.haven.mossproutNatureIslands['orchard-grove'], 4, 'earned levels are never put back under mist');
+  assert.equal(state.haven.mossproutNatureIslands['wildgrowth-grove'], 4);
   for (const [islandId, skinId] of [['orchard-grove', 'amberleaf'], ['wildgrowth-grove', 'fernip']] as const) {
-    for (const level of [1, 2, 3, 4] as const) {
-      const command = { type: 'upgradeMossproutNatureIsland' as const, islandId, level, now: NOW, receiptId: `v2:${islandId}:${level}` };
-      if (level === 4) {
-        const failed = reduceMergeWorld({ ...state, coins: 0 }, command);
-        assert.equal(failed.changed, false); assert.equal(failed.state.upgradeSkinGrants?.[`nature:${islandId}:4`], undefined);
-      }
-      state = reduceMergeWorld(state, command).state;
-      const paid = state.coins;
-      state = normalizeMergeWorldState(JSON.parse(JSON.stringify(state)), NOW);
-      assert.equal(reduceMergeWorld(state, command).state.coins, paid);
-      const rewardLevel = 4;
-      assert.equal(state.upgradeSkinGrants?.[`nature:${islandId}:${rewardLevel}`]?.skinId, level >= rewardLevel ? skinId : undefined);
-    }
+    assert.equal(state.ownedKatchimeraCards.filter((card) => card.cardId === skinId).length, 1, `${skinId} is home exactly once`);
+    assert.equal(state.ownedKatchimeraCards.find((card) => card.cardId === skinId)?.acquisition, 'island_campaign');
+    assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level: 4, now: NOW, receiptId: `v2:${islandId}:4` }).changed, false);
   }
-  assert.equal(Object.keys(state.upgradeSkinGrants ?? {}).length, 2);
-  const migrated = normalizeMergeWorldState({ ...state, upgradeSkinGrants: undefined }, NOW);
-  assert.deepEqual(migrated.upgradeSkinGrants, state.upgradeSkinGrants);
+  assert.deepEqual(state.upgradeSkinGrants, {}, 'island stories no longer mint grants');
+  state = normalizeMergeWorldState(JSON.parse(JSON.stringify(state)), NOW);
+  assert.equal(state.ownedKatchimeraCards.filter((card) => card.cardId === 'amberleaf' || card.cardId === 'fernip').length, 2);
+  assert.ok(state.mossproutResidentSkinIds.includes('fernip'));
 });
 test('read cursors clamp to available dialogue and do not mutate currency or tiles', () => {
   const state = initial();
-  const reconciled = reconcileUpgradeProgress({ ...state, upgradeStoryRead: { 'nature:seed-nursery:1': 500, 'nature:seed-nursery:4': 2, bogus: 8 } });
-  assert.deepEqual(reconciled.upgradeStoryRead, { 'nature:seed-nursery:1': 3 });
+  const reconciled = reconcileUpgradeProgress({ ...state, upgradeStoryRead: { 'haven:mossprout:1': 500, 'nature:seed-nursery:4': 2, bogus: 8 } });
+  assert.deepEqual(reconciled.upgradeStoryRead, { 'haven:mossprout:1': 3 });
   assert.equal(reconciled.coins, state.coins); assert.deepEqual(reconciled.haven, state.haven);
 });
 

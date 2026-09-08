@@ -33,7 +33,9 @@ test('every canonical companion owns a curated semantic collection', () => {
   assert.ok(flickerbun.some((def) => def.metric.signal === 'flickerbun.distinctScreenTitles'));
   assert.ok(flickerbun.some((def) => def.metric.signal === 'flickerbun.cinemaVisits'));
   const mossprout = COMPANION_ACHIEVEMENT_CATALOG.filter((def) => def.familyId === 'mossprout');
-  assert.equal(mossprout.length, 29);
+  assert.equal(mossprout.length, 36);
+  assert.deepEqual(mossprout.filter((def) => def.sectionId === 'friends-home').map((def) => def.metric.target), [2, 3, 5, 9]);
+  assert.ok(mossprout.some((def) => def.metric.signal === 'mossprout.placesRestored' && def.pillar === 'journey'));
   assert.equal(mossprout.filter((def) => def.metric.kind === 'photo').length, 12);
 });
 

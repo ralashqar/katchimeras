@@ -6,8 +6,11 @@ import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorl
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import type { MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
-import { MOSSPROUT_NATURE_ISLAND_IDS } from '@/constants/mossprout-nature-islands';
-import { PETALIMP_ISLAND_CAMPAIGN_ID, petalimpIslandChapterOrder } from '@/constants/petalimp-island-campaign';
+import { MOSSPROUT_NATURE_ISLAND_IDS, mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
+import { PETALIMP_BLOOM_CAMPAIGN, PETALIMP_ISLAND_CAMPAIGN_ID, petalimpIslandChapterOrder } from '@/constants/petalimp-island-campaign';
+import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
+import { ISLAND_WAKE_ORDER, islandWakeState } from '@/constants/island-campaigns/wake-order';
+import { acknowledgeChapterReturn, completeChapter, completeIslandCampaign, greetIslandFriend, restoreIslandLevel, revealIsland, startAndServeChapter } from './helpers/island-campaign';
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
 import { mossproutFtueGardenMissionOrder } from '@/utils/merge-world/chapter-zero-policy';
 import { GARDEN_PLANT_SLOT_POSITIONS, MOSSPROUT_FIRST_MEMORY_SLOT_ID, mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
@@ -198,14 +201,16 @@ test('authored Haven upgrades are atomic, economy-explicit, and idempotent by re
   assert.equal(duplicate.state.storyWorldMutationReceipts.length, 1);
 
   let islandState = reduceMergeWorld(mossproutWorld(), { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 3 }).state;
-  islandState = reduceMergeWorld(islandState, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 1, now: NOW + 3 }).state;
-  islandState = reduceMergeWorld(islandState, { type: 'reconcileHavenStory', characterId: 'mossprout', storyLevel: 2, now: NOW + 4 }).state;
+  islandState = greetIslandFriend(revealIsland(islandState, PETALIMP_BLOOM_CAMPAIGN, NOW + 3), PETALIMP_BLOOM_CAMPAIGN, NOW + 3);
+  islandState = acknowledgeChapterReturn(startAndServeChapter(islandState, PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 3), PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 3);
+  islandState = completeChapter(restoreIslandLevel(islandState, PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 3), PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 3);
+  islandState = acknowledgeChapterReturn(startAndServeChapter(islandState, PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 4), PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 4);
   islandState = { ...islandState, coins: 0 };
   const granted = reduceMergeWorld(islandState, {
     type: 'upgradeMossproutNatureIsland',
-    islandId: 'seed-nursery',
+    islandId: 'bloom-garden',
     level: 2,
-    receiptId: 'flow:journey:seed-nursery',
+    receiptId: 'flow:journey:bloom-garden',
     economyMode: 'grant',
     grantedCoins: 60,
     now: NOW + 5,
@@ -216,74 +221,55 @@ test('authored Haven upgrades are atomic, economy-explicit, and idempotent by re
   assert.equal(granted.storyWorldMutationReceipt?.economyMode, 'grant');
 });
 
-test('five standard Mossprout nature islands retain the established upgrade curve beside the campaign island', () => {
-  let state = mossproutWorld();
+test('island friends come home in wake order, each island keeping the established Glow curve', () => {
+  let state = { ...mossproutWorld(), coins: 10_000 };
   state = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 1 }).state;
   assert.deepEqual(Object.values(state.haven.mossproutNatureIslands), [0, 0, 0, 0, 0, 0]);
-  const beforeUnlocks = state.coins;
   for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
-    if (islandId === 'bloom-garden') continue;
-    state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level: 1, now: NOW + 1 }).state;
+    if (islandId === ISLAND_WAKE_ORDER[0]!.islandId) continue;
+    const before = state.coins;
+    const refused = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level: 1, now: NOW + 1 });
+    assert.equal(refused.changed, false, `${islandId} sleeps until its turn`);
+    assert.equal(refused.state.coins, before);
   }
-  assert.equal(state.coins, beforeUnlocks - 200);
-  assert.deepEqual(Object.values(state.haven.mossproutNatureIslands), [1, 0, 1, 1, 1, 1]);
-
-  const storyReady = reduceMergeWorld(state, {
-    type: 'reconcileHavenStory',
-    characterId: 'mossprout',
-    storyLevel: 4,
-    now: NOW + 2,
-  }).state;
-  state = { ...storyReady, coins: 4_000 };
-
-  const seed = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 3 });
-  assert.equal(seed.changed, true);
-  assert.equal(seed.state.coins, 3_940);
-  assert.equal(seed.state.haven.mossproutNatureIslands['seed-nursery'], 2);
-  assert.equal(seed.state.haven.mossproutNatureIslands['bloom-garden'], 0);
-  assert.equal(seed.natureIslandUpgrade?.completedTier, false);
-  assert.equal(seed.state.haven.tileStages.mossprout, 1);
-
-  state = seed.state;
-  const levelTwoCosts = [60, 65, 65, 75, 75];
-  for (const [index, islandId] of MOSSPROUT_NATURE_ISLAND_IDS.slice(1).entries()) {
-    if (islandId === 'bloom-garden') continue;
-    const result = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level: 2, now: NOW + 4 + index });
-    assert.equal(result.changed, true);
-    state = result.state;
-    if (index === 4) assert.equal(result.natureIslandUpgrade?.completedTier, false);
+  for (const [index, entry] of ISLAND_WAKE_ORDER.entries()) {
+    const campaign = ISLAND_CAMPAIGNS.find((candidate) => candidate.islandId === entry.islandId);
+    if (!campaign) break;
+    assert.equal(islandWakeState(state, entry.islandId), 'open', `${entry.islandId} wakes once the previous friend is home`);
+    const before = state.coins;
+    state = completeIslandCampaign(state, campaign, NOW + 10 * (index + 1));
+    const island = mossproutNatureIslandById.get(entry.islandId)!;
+    assert.equal(before - state.coins, island.levels.reduce((sum, level) => sum + level.coinCost, 0),
+      'clearing the mist costs the first level; the friend gifts that restoration');
+    assert.equal(state.haven.mossproutNatureIslands[entry.islandId], 4);
+    assert.ok(state.mossproutResidentSkinIds.includes(entry.residentSkinId));
+    assert.equal(islandWakeState(state, entry.islandId), 'revealed');
   }
-  assert.equal(state.coins, 3_660);
-  assert.equal(levelTwoCosts.reduce((sum, cost) => sum + cost, 60), 400);
-  assert.equal(state.haven.tileStages.mossprout, 1);
-
-  for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
-    if (islandId === 'bloom-garden') continue;
-    state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level: 3, now: NOW + 20 }).state;
-  }
-  assert.equal(state.coins, 2_910);
-  assert.equal(state.haven.tileStages.mossprout, 1);
-  for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
-    if (islandId === 'bloom-garden') continue;
-    state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level: 4, now: NOW + 30 }).state;
-  }
-  assert.equal(state.coins, 1_410);
-  assert.equal(state.haven.tileStages.mossprout, 1);
+  const allHome = MOSSPROUT_NATURE_ISLAND_IDS.every((islandId) => state.haven.mossproutNatureIslands[islandId] === 4);
+  assert.equal(state.haven.tileStages.mossprout, allHome ? 4 : 1, 'the aggregate tier only completes with every island');
 });
 
-test('nature island upgrades reject skips, duplicate commands, and insufficient Glow without story requirements', () => {
+test('nature island upgrades reject skips, duplicate commands, and insufficient Glow', () => {
   let state = mossproutWorld();
   state = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 1 }).state;
-  assert.equal(reduceMergeWorld({ ...state, coins: 39 }, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 1, now: NOW + 1 }).changed, false);
-  state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 1, now: NOW + 1 }).state;
-  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 3, now: NOW + 2 }).changed, false);
-  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 3 }).changed, true);
+  assert.equal(reduceMergeWorld({ ...state, coins: 39 }, { type: 'revealMossproutNatureIsland', islandId: 'bloom-garden', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID,
+    residentSkinId: 'petalimp', cost: 40, receiptId: 'poor', now: NOW + 1 }).changed, false);
+  state = greetIslandFriend(revealIsland(state, PETALIMP_BLOOM_CAMPAIGN, NOW + 1), PETALIMP_BLOOM_CAMPAIGN, NOW + 1);
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 1, economyMode: 'free', now: NOW + 1 }).changed, false,
+    'the friend must be asked before the gift restoration');
+  state = acknowledgeChapterReturn(startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 1), PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 1);
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 3, now: NOW + 2 }).changed, false);
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 1, now: NOW + 2 }).changed, false,
+    'the first restoration is a gift, never a purchase');
+  state = completeChapter(restoreIslandLevel(state, PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 2), PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 2);
+  state = acknowledgeChapterReturn(startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 3), PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 3);
   state = { ...state, coins: 59 };
-  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 5 }).changed, false);
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 2, now: NOW + 5 }).changed, false);
   state = { ...state, coins: 60 };
-  const upgraded = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 6 });
+  const upgraded = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 2, now: NOW + 6 });
   assert.equal(upgraded.changed, true);
-  assert.equal(reduceMergeWorld(upgraded.state, { type: 'upgradeMossproutNatureIsland', islandId: 'seed-nursery', level: 2, now: NOW + 7 }).changed, false);
+  assert.equal(upgraded.state.coins, 0);
+  assert.equal(reduceMergeWorld(upgraded.state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 2, now: NOW + 7 }).changed, false);
 });
 
 test('v20 restored Havens keep their main stage but restart all new satellites at Level 1', () => {
@@ -294,7 +280,7 @@ test('v20 restored Havens keep their main stage but restart all new satellites a
     haven: { ...current.haven, tileStages: { ...current.haven.tileStages, mossprout: 4 }, revealState: 'revealed' as const },
   };
   const migrated = normalizeMergeWorldState(legacy, NOW);
-  assert.equal(migrated.version, 23);
+  assert.equal(migrated.version, 24);
   assert.equal(migrated.haven.tileStages.mossprout, 4);
   assert.deepEqual(Object.values(migrated.haven.mossproutNatureIslands), [1, 1, 1, 1, 1, 1]);
 });
@@ -303,7 +289,7 @@ test('v13 Mossprout saves reset into the current personal-world contract', () =>
   const current = mossproutWorld();
   const legacy = { ...current, version: 13, haven: undefined };
   const migrated = normalizeMergeWorldState(legacy, NOW);
-  assert.equal(migrated.version, 23);
+  assert.equal(migrated.version, 24);
   assert.equal(migrated.ownerCharacterId, 'mossprout');
   assert.equal(migrated.haven.tileStages.mossprout, undefined);
   assert.equal(migrated.haven.revealState, 'hidden');
@@ -450,6 +436,13 @@ test('FTUE upgrade is explicit and meditation Back exits without reopening Merge
   assert.match(canvas, /MEMORY_PLANT_NATIVE_SURFACE_SCALE[\s\S]*?revealScale\.value[\s\S]*?withSequence\([\s\S]*?withTiming\(1\.14[\s\S]*?withTiming\(1,/);
   assert.match(canvas, /revealRequestedForVisualKeyRef[\s\S]*?if \(animateReveal\) revealRequestedForVisualKeyRef\.current = visualKey[\s\S]*?revealRequestedForVisualKeyRef\.current !== visualKey/);
   assert.doesNotMatch(canvas, /\}, \[animateReveal, celebrationOpacity/);
+  // A memory plant that grows keeps its instance, so the stage swap has to be
+  // staged during render and blended between two layers. Resetting opacity in
+  // the post-paint effect showed the grown art in full for a frame first.
+  assert.match(canvas, /if \(artLayers\.current\.key !== visualKey\)[\s\S]*?outgoing: state\.current/);
+  assert.match(canvas, /const firstAppearance = handledVisualKeyRef\.current === null[\s\S]*?if \(firstAppearance\) \{[\s\S]*?revealOpacity\.value = 0/);
+  assert.match(canvas, /outgoingStage \?[\s\S]*?enters=\{false\}[\s\S]*?fadeOut=\{blendReady\}[\s\S]*?enters=\{outgoingStage !== null\}[\s\S]*?onPainted=\{handleIncomingPainted\}/);
+  assert.match(canvas, /const MemoryPlantArtLayer[\s\S]*?useSharedValue\(enters \? 0 : 1\)[\s\S]*?onDisplay=\{confirmPainted\}/);
   assert.match(canvas, /RotatingRadialSunburst[\s\S]*?CelebrationParticles[\s\S]*?memory-plant-confetti-/);
   assert.match(canvas, /Centre the celebration on the planted[\s\S]*?top: \(nativeHeight - raySize\) \/ 2 \+ nativeHeight \* 0\.14/);
   assert.doesNotMatch(canvas, /animatePlant/);

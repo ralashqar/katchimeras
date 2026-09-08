@@ -25,8 +25,11 @@ import { loadCompanionJourneyState } from '@/utils/companion-journey-storage';
 import { loadCompanionQuickGoalState } from '@/utils/companion-quick-goal-storage';
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
 import { loadDiscoveryState } from '@/utils/discoveries-storage';
+import { kingdomProgress } from '@/features/kingdom-progress/kingdom-progress';
+import type { MergeWorldState } from '@/types/merge-world';
+import { loadMergeWorldState, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
 
-const COMPANION_ACHIEVEMENT_CATALOG_VERSION = 2;
+const COMPANION_ACHIEVEMENT_CATALOG_VERSION = 3;
 
 export function useCompanionAchievements() {
   const archive = useAllDays();
@@ -34,6 +37,14 @@ export function useCompanionAchievements() {
   const [backfillCount, setBackfillCount] = useState(0);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const [world, setWorld] = useState<MergeWorldState | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadMergeWorldState().then((snapshot) => { if (live) setWorld(snapshot); }).catch(() => undefined);
+    const unsubscribe = subscribeMergeWorldSnapshots((snapshot) => { if (live) setWorld(snapshot); });
+    return () => { live = false; unsubscribe(); };
+  }, []);
+  const kingdom = useMemo(() => world ? kingdomProgress(world) : null, [world]);
 
   const evaluate = useCallback(() => {
     const quests = loadCompanionQuests();
@@ -43,6 +54,7 @@ export function useCompanionAchievements() {
       bond: loadCompanionBondState(quests),
       journey: loadCompanionJourneyState(),
       quickGoals: loadCompanionQuickGoalState(),
+      kingdom,
     });
     const previous = loadCompanionAchievementState();
     const catalogChanged = (previous.catalogVersion ?? 1) < COMPANION_ACHIEVEMENT_CATALOG_VERSION;
@@ -75,7 +87,7 @@ export function useCompanionAchievements() {
     if (records.length || !previous.baselined || catalogChanged) saveCompanionAchievementState(next);
     setState(next);
     if (silent && records.length) setBackfillCount(records.length);
-  }, [archive.days]);
+  }, [archive.days, kingdom]);
 
   useEffect(evaluate, [evaluate]);
   useFocusEffect(useCallback(() => {
@@ -90,8 +102,9 @@ export function useCompanionAchievements() {
       bond: loadCompanionBondState(quests),
       journey: loadCompanionJourneyState(),
       quickGoals: loadCompanionQuickGoalState(),
+      kingdom,
     });
-  }, [archive.days, state]);
+  }, [archive.days, kingdom, state]);
 
   const entriesForFamily = useCallback((familyId: string): CompanionAchievementEntry[] => {
     const context = contexts.get(familyId);

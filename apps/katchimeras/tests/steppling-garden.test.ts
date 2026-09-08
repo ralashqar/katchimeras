@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
-import { STEPPLING_GARDEN_FLOW, STEPPLING_PARCEL_ID, STEPPLING_SHOE_ORDER_ID, stepplingGardenBoardStep, stepplingGardenCheckpoint, stepplingGardenDrop } from '@/features/onboarding/steppling-garden-lesson';
+import { STEPPLING_FINALE_NODE_IDS, STEPPLING_GARDEN_FLOW, STEPPLING_PARCEL_ID, STEPPLING_SHOE_ORDER_ID, stepplingGardenBoardStep, stepplingGardenCheckpoint, stepplingGardenDrop } from '@/features/onboarding/steppling-garden-lesson';
 import { validateContentFlowDefinition } from '@/features/content-flow/content-flow-compiler';
 import { registerContentFlowDefinition } from '@/features/content-flow/content-flow-catalog';
 import { createContentFlowRun, reduceContentFlow } from '@/features/content-flow/content-flow-interpreter';
@@ -40,8 +40,10 @@ test('Steppling lesson registers and every authored task and finale action is va
   assert.equal(run.nodeId, 'closing');
   run = reduceContentFlow(STEPPLING_GARDEN_FLOW, run, { type: 'submit_scene', actionId: 'summary' }).run;
   assert.equal(run.nodeId, 'summary'); assert.notEqual(run.status, 'completed');
+  assert.ok(STEPPLING_FINALE_NODE_IDS.includes(run.nodeId));
+  assert.deepEqual([...STEPPLING_FINALE_NODE_IDS], ['closing', 'summary'], 'the Kingdom goal is owned by the Kingdom screen, not this run');
   run = reduceContentFlow(STEPPLING_GARDEN_FLOW, JSON.parse(JSON.stringify(run)), { type: 'submit_scene', actionId: 'finish' }).run;
-  assert.equal(run.status, 'completed');
+  assert.equal(run.status, 'completed', 'the summary tap ends the lesson');
 });
 test('parcel, two guaranteed Socks, merge and one Shoe order survive reloads without duplicate rewards', () => {
   let state = prepared();
@@ -87,7 +89,7 @@ test('full board releases the interaction gate without destroying board contents
 test('journal recovery follows saved board evidence and preserves the summary and completion receipts', async () => {
   let run = createContentFlowRun(STEPPLING_GARDEN_FLOW, { runId: 'ftue:steppling-garden:1', now: NOW });
   const runtime = loadNativeModule('features/onboarding/steppling-garden-runtime.ts', {
-    './steppling-garden-lesson': { STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID: 'ftue:steppling-garden:1', stepplingGardenCheckpoint },
+    './steppling-garden-lesson': { STEPPLING_FINALE_NODE_IDS, STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID: 'ftue:steppling-garden:1', stepplingGardenCheckpoint },
     '@/features/content-flow/content-flow-catalog': { registerContentFlowDefinition() {} },
     '@/features/content-flow/content-flow-director': {},
     '@/features/content-flow/content-flow-repository': {
@@ -102,4 +104,16 @@ test('journal recovery follows saved board evidence and preserves the summary an
     run = { ...run, nodeId, status: nodeId === 'complete' ? 'completed' : 'active' };
     await runtime.reconcileStepplingGarden(state); assert.equal(run.nodeId, nodeId);
   }
+  // An interim build authored the Kingdom goal inside this run. A save left on
+  // that node has no surface that could ever dispatch, so the lesson would stay
+  // active forever and hold the Kingdom's camera locked. Repair it on read.
+  run = { ...run, nodeId: 'kingdom.goal', status: 'active', definitionVersion: 2 };
+  await runtime.reconcileStepplingGarden(state);
+  assert.equal(run.nodeId, 'summary');
+  assert.equal(run.definitionVersion, STEPPLING_GARDEN_FLOW.version);
+  assert.equal(STEPPLING_GARDEN_FLOW.migrations?.['kingdom.goal'], 'summary');
+  const completed = { ...run, nodeId: 'kingdom.goal', status: 'completed' as const };
+  run = completed;
+  await runtime.reconcileStepplingGarden(state);
+  assert.equal(run.nodeId, 'kingdom.goal', 'a finished run is never rewound');
 });
