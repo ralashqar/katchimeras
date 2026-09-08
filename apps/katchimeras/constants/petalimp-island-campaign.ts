@@ -217,6 +217,15 @@ export function petalimpIslandChapterOrder(level: MossproutNatureIslandLevel, ch
 
 export type PetalimpIslandChapterStatus = 'available' | 'orders_active' | 'return_ready' | 'restoration_ready' | 'resolution_ready' | 'complete';
 
+export type PetalimpIslandUpgradePanelState = {
+  action: 'start_story' | 'open_merge' | 'continue_return' | 'continue_resolution' | null;
+  level: MossproutNatureIslandLevel;
+  order: MergeOrder | null;
+  orderComplete: boolean;
+  stateLabel: string;
+  status: PetalimpIslandChapterStatus;
+};
+
 export function petalimpIslandChapterStatus(world: MergeWorldState, level: MossproutNatureIslandLevel): PetalimpIslandChapterStatus {
   const progress = world.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID]?.chapters[String(level)];
   if (!progress) return 'available';
@@ -224,6 +233,30 @@ export function petalimpIslandChapterStatus(world: MergeWorldState, level: Mossp
   if (!progress.orderIds.every((id) => progress.servedOrderIds.includes(id))) return 'orders_active';
   if (progress.returnConversationSeenAt == null) return 'return_ready';
   return (world.haven.mossproutNatureIslands[PETALIMP_ISLAND_ID] ?? 0) >= level ? 'resolution_ready' : 'restoration_ready';
+}
+
+/** One durable view model owns what the Bloom Garden upgrade panel shows and where its explicit action leads. */
+export function petalimpIslandUpgradePanelState(world: MergeWorldState): PetalimpIslandUpgradePanelState | null {
+  const campaign = world.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID];
+  if (!campaign?.discoveryRevealSeenAt) return null;
+  const chapter = PETALIMP_ISLAND_CHAPTERS.find((candidate) => petalimpIslandChapterStatus(world, candidate.level) !== 'complete');
+  if (!chapter) return null;
+  const progress = campaign.chapters[String(chapter.level)];
+  const status = petalimpIslandChapterStatus(world, chapter.level);
+  const orderId = progress?.orderIds[0];
+  const savedOrder = orderId ? world.activeOrders.find((candidate) => candidate.id === orderId) : null;
+  const authoredOrder = progress ? petalimpIslandChapterOrder(chapter.level, progress.selectedOptionId) : null;
+  const order = savedOrder ?? (authoredOrder && orderId ? { ...authoredOrder, id: orderId } : null);
+  const orderComplete = Boolean(orderId && progress?.servedOrderIds.includes(orderId));
+  const presentation = {
+    available: { action: 'start_story' as const, stateLabel: 'Choose how this part of the garden should grow.' },
+    orders_active: { action: 'open_merge' as const, stateLabel: 'Requested in Merge' },
+    return_ready: { action: 'continue_return' as const, stateLabel: 'Request complete' },
+    restoration_ready: { action: null, stateLabel: 'Request complete · Ready to restore' },
+    resolution_ready: { action: 'continue_resolution' as const, stateLabel: 'Restored · Story waiting' },
+    complete: { action: null, stateLabel: 'Garden story complete' },
+  }[status];
+  return { ...presentation, level: chapter.level, order, orderComplete, status };
 }
 
 export function petalimpIslandReturnLevel(world: MergeWorldState): MossproutNatureIslandLevel | null {

@@ -982,7 +982,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       });
     } else if (upgradeFocusId.current) {
       const origin = upgradeOrigin.current;
-      if (origin && !upgradeCameraCommitted.current) animateToCameraSnapshot(origin, reduceMotion ? 80 : 440);
+      if (origin && !upgradeCameraCommitted.current && !preserveUpgradeCamera) animateToCameraSnapshot(origin, reduceMotion ? 80 : 440);
       upgradeOrigin.current = null; upgradeFocusId.current = null; upgradeCameraCommitted.current = false;
     }
   }, [animateToCameraSnapshot, focusInteractionTile, preserveUpgradeCamera, readLiveCameraSnapshot, reduceMotion, selectedUpgradeOffer, storyTargetFrame, tutorialCameraReady, upgradePresentation, upgradeSelectionCommitted, viewport.height]);

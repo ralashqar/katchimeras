@@ -237,6 +237,7 @@ export function KingdomCompanionScreen({
   ftueCompanionSurfaceOwned = false,
   renderRegularStage = false,
   reuseUnderlyingStage = false,
+  hostedNarrativeOnly = false,
   suppressWorldSpeech = false,
   onVisibleCreatureRewardPulse,
   onFtueBondSpotlightComplete,
@@ -269,6 +270,7 @@ export function KingdomCompanionScreen({
   ftueCompanionSurfaceOwned?: boolean;
   renderRegularStage?: boolean;
   reuseUnderlyingStage?: boolean;
+  hostedNarrativeOnly?: boolean;
   suppressWorldSpeech?: boolean;
   onVisibleCreatureRewardPulse?: () => void;
   onFtueBondSpotlightComplete?: () => void | Promise<void>;
@@ -630,7 +632,7 @@ export function KingdomCompanionScreen({
         />
       ) : <View style={[styles.companionRouteStage, reuseUnderlyingStage && styles.transparentScreen]} />}
 
-      {homeIdentityOpen ? <HomeIdentitySheet identity={identity} onChange={updateIdentity} onClose={() => setHomeIdentityOpen(false)} /> : null}
+      {!hostedNarrativeOnly && homeIdentityOpen ? <HomeIdentitySheet identity={identity} onChange={updateIdentity} onClose={() => setHomeIdentityOpen(false)} /> : null}
 
       {quests.selectedResident && !embeddedJournal && !questNoteCapture ? (
         <CompanionInteractionSheet
@@ -640,6 +642,7 @@ export function KingdomCompanionScreen({
           embedded={presentation === 'companion'}
           renderRegularStage={renderRegularStage}
           reuseUnderlyingStage={reuseUnderlyingStage}
+          hostedNarrativeOnly={hostedNarrativeOnly}
           suppressWorldSpeech={suppressWorldSpeech}
           onVisibleCreatureRewardPulse={onVisibleCreatureRewardPulse}
           creatureId={quests.selectedResident.creature.creatureId}
@@ -726,7 +729,7 @@ export function KingdomCompanionScreen({
           onInsightAction={handleInsightAction}
           memorySaved={Boolean(savedOrigin)}
           bondProgress={quests.selectedBondProgress}
-          pendingBondCelebration={bondCelebration ? null : quests.selectedPendingBondCelebration}
+          pendingBondCelebration={hostedNarrativeOnly || bondCelebration ? null : quests.selectedPendingBondCelebration}
           onBondCelebrationComplete={completeBondCelebration}
           achievementProgress={selectedAchievementProgress}
           introductionDefinition={quests.selectedIntroductionDefinition}
@@ -1144,7 +1147,7 @@ export function KingdomCompanionScreen({
           }}
         />
       ) : null}
-      {isFocused && bondCelebration ? (
+      {isFocused && !hostedNarrativeOnly && bondCelebration ? (
         <CompanionBondLevelUpCelebration
           autoContinue={!ftueDayOneActionActive}
           continueLabel={ftueDayOneActionActive ? 'Hear Mossprout\'s story' : undefined}
@@ -1164,7 +1167,7 @@ export function KingdomCompanionScreen({
           variant={bondCelebration.variant}
         />
       ) : null}
-      {isFocused && companionAchievements.pending.length > 0 && !bondCelebration && !quests.selectedPendingBondCelebration && !questExperienceActive && !embeddedJournal && !questNoteCapture ? (
+      {isFocused && !hostedNarrativeOnly && companionAchievements.pending.length > 0 && !bondCelebration && !quests.selectedPendingBondCelebration && !questExperienceActive && !embeddedJournal && !questNoteCapture ? (
         <CompanionAchievementCelebration
           achievements={companionAchievements.pending}
           onAchievementSeen={(id) => companionAchievements.markSeen([id])}
@@ -1189,7 +1192,7 @@ export function KingdomCompanionScreen({
               quests.performSelectedQuestAction();
             }
           : undefined}
-        open={Boolean(quests.questResultNotice)}
+        open={!hostedNarrativeOnly && Boolean(quests.questResultNotice)}
         title={quests.questResultNotice?.title ?? ''}
         tone={quests.questResultNotice?.kind === 'success' ? 'info' : 'warning'}
       />
@@ -1225,7 +1228,7 @@ export function KingdomCompanionScreen({
             noteExpanded: true,
           });
         }}
-        open={Boolean(questNoteMismatch)}
+        open={!hostedNarrativeOnly && Boolean(questNoteMismatch)}
         surface="parchment"
         title="That doesn’t answer the quest yet"
         tone="warning"

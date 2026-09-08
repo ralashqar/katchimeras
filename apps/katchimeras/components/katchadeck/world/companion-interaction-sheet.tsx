@@ -218,6 +218,8 @@ export type CompanionInteractionSheetProps = {
   embedded?: boolean;
   /** Draw the canonical companion environment while retaining a transparent FTUE shell. */
   renderRegularStage?: boolean;
+  /** Render only the requested narrative overlay when hosted over another world target. */
+  hostedNarrativeOnly?: boolean;
   /** Prevent the hosted companion speech layer from painting over a nature island. */
   suppressWorldSpeech?: boolean;
   reuseUnderlyingStage?: boolean;
@@ -1507,7 +1509,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     || meditationDashboardActive
     || Boolean(dashboardRouteActive && (actionNarration || (!quickGoalPickerOpen && unifiedJourneyActive && journeyNarration)))
     || ['intro_action', 'nickname', 'bond', 'first_insight', 'resident_result'].includes(props.ftueProfileStep ?? '');
-  const ftueActionDockVisible = dashboardRouteActive && props.familyId === 'mossprout'
+  const ftueActionDockVisible = !props.hostedNarrativeOnly && dashboardRouteActive && props.familyId === 'mossprout'
     && Boolean(props.ftueProfileStep && props.onFtueProfileContinue)
     && !meditation && !quickGoalPickerOpen && !questionnaireExperience && !activeAttemptId;
   // The cinematic creature is positioned in full-screen coordinates, while
@@ -1544,7 +1546,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             strong={questPresentation.backdrop === 'strong'}
             visualKey={props.visualKey}
           />
-        ) : !questionnaireExperience ? (
+        ) : !questionnaireExperience && !props.hostedNarrativeOnly ? (
           <CompanionCinematicStage
             bubbleBody={companionSpeechTitle
               ? undefined
@@ -1594,7 +1596,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             visualKey={props.visualKey}
           />
         ) : null}
-        {!meditation && idealSkinPreparing ? (
+        {!props.hostedNarrativeOnly && !meditation && idealSkinPreparing ? (
           <View accessibilityLabel="Preparing ideal skin questionnaire" accessibilityLiveRegion="polite" style={styles.onboardingLoading}>
             <ActivityIndicator color="#75450A" size="small" />
             <ThemedText selectable style={styles.onboardingLoadingText} lightColor="#4F3A25" darkColor="#4F3A25">
@@ -1602,7 +1604,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             </ThemedText>
           </View>
         ) : null}
-        {initialConversationHandoffPending ? null : route.kind === 'chat_lobby' && isConversationV2Family(props.familyId) && !meditation ? (
+        {props.hostedNarrativeOnly && (!conversationExperience || (route.kind !== 'visit' && route.kind !== 'conversation'))
+          ? null
+          : initialConversationHandoffPending ? null : route.kind === 'chat_lobby' && isConversationV2Family(props.familyId) && !meditation ? (
           <CompanionChatLobby
             activeSession={props.conversationSession?.status === 'active' ? props.conversationSession : null}
             familyId={props.familyId}
@@ -2411,7 +2415,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             if (attemptId) props.onCancelQuestAttempt?.(attemptId);
             returnToQuest();
           }}
-          open={endAttemptOpen}
+          open={!props.hostedNarrativeOnly && endAttemptOpen}
           portal={false}
           surface="night"
           title="Exit this game?"
@@ -2427,12 +2431,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             returnToQuest();
             props.onChooseAnotherQuest();
           }}
-          open={leaveQuestOpen}
+          open={!props.hostedNarrativeOnly && leaveQuestOpen}
           portal={false}
           title="Leave this quest?"
           tone="destructive"
         />
-        {props.active !== false && bondReward ? (
+        {props.active !== false && !props.hostedNarrativeOnly && bondReward ? (
           <BondRewardFlightOverlay
             from={bondReward.from}
             onFinish={() => {
@@ -2462,7 +2466,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             to={bondReward.to}
           />
         ) : null}
-        {props.active !== false && mossproutActionDashboard && props.ftueBondSpotlightActive ? (
+        {props.active !== false && !props.hostedNarrativeOnly && mossproutActionDashboard && props.ftueBondSpotlightActive ? (
           <CompanionFtueCoachmark
             buttonLabel={props.ftueProfileStep === 'notice_bond' ? 'Continue' : 'Try a Bond action'}
             message={props.ftueProfileStep === 'notice_bond' ? [
@@ -2479,7 +2483,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             targetRef={ftueBondTargetRef}
           />
         ) : null}
-        {props.active !== false && mossproutActionDashboard && props.ftueDayOneActionActive && !ftueBondQuestionId && !props.ftueDayOneActionAnswerId && !ftueDayOneLessonCompleted ? (
+        {props.active !== false && !props.hostedNarrativeOnly && mossproutActionDashboard && props.ftueDayOneActionActive && !ftueBondQuestionId && !props.ftueDayOneActionAnswerId && !ftueDayOneLessonCompleted ? (
           <CompanionFtueCoachmark
             message={[
               { text: 'Pick ' },

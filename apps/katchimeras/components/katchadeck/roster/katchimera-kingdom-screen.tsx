@@ -6,7 +6,7 @@ import { purchaseWorldUpgrade, useWorldUpgradeRun } from '@/features/world-upgra
 import { dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
 import { WorldUpgradeNarrative } from '@/components/katchadeck/world/world-upgrade-narrative';
 import { CompanionFtueCoachmark } from '@/components/katchadeck/onboarding/companion-ftue-coachmark';
-import { WorldUpgradePanel, type UpgradeCoachmarkState } from '@/components/katchadeck/world/world-upgrade-panel';
+import { WorldUpgradePanel, type UpgradeCoachmarkState, type WorldUpgradeCampaignState } from '@/components/katchadeck/world/world-upgrade-panel';
 import { KatchimeraCardRevealModal } from '@/components/katchadeck/collection/katchimera-card-deck-carousel';
 import { KatchimeraFriendDiscoveryReveal } from '@/components/katchadeck/world/katchimera-friend-discovery-reveal';
 import { worldUpgradeStory, upgradeUsesTutorialNarrative } from '@/features/world-upgrades/world-upgrade-stories';
@@ -93,7 +93,7 @@ import {
   contentFlowEffectResult,
 } from '@/features/content-flow/story-world-operations';
 import { useStoryPresentationOperation } from '@/features/content-flow/use-story-presentation-operation';
-import { PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_CHAPTERS, PETALIMP_ISLAND_ID, petalimpGrowthStyle, petalimpIslandChapterChoice, petalimpIslandChapterOrder, petalimpIslandChapterStatus, petalimpIslandResolutionConversationId, petalimpIslandReturnConversationId } from '@/constants/petalimp-island-campaign';
+import { PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_CHAPTERS, PETALIMP_ISLAND_ID, petalimpGrowthStyle, petalimpIslandChapterChoice, petalimpIslandChapterOrder, petalimpIslandChapterStatus, petalimpIslandResolutionConversationId, petalimpIslandReturnConversationId, petalimpIslandUpgradePanelState } from '@/constants/petalimp-island-campaign';
 import { FERNIP_ISLAND_ID, FERNIP_ISLAND_LOCK_REASON, fernipIslandJourneyUnlocked } from '@/constants/nature-island-unlocks';
 
 type Props = {
@@ -241,6 +241,29 @@ export function KatchimeraKingdomScreen({
     ? selectedUpgrade
     : upgradeOffers.find((offer) => offer.id === selectedUpgrade.id && offer.nextLevel === selectedUpgrade.nextLevel) ?? selectedUpgrade
     : null;
+  const petalimpPanelProgress = sharedUpgrade?.id === `nature:${PETALIMP_ISLAND_ID}`
+    ? petalimpIslandUpgradePanelState(mergeWorld)
+    : null;
+  const petalimpPanelActionLabel = petalimpPanelProgress?.action === 'start_story' ? 'Plan with Petalimp'
+    : petalimpPanelProgress?.action === 'open_merge' ? 'Open Merge'
+      : petalimpPanelProgress?.action === 'continue_return' ? 'Talk to Petalimp'
+        : petalimpPanelProgress?.action === 'continue_resolution' ? 'See what grew'
+          : undefined;
+  const petalimpPanelState: WorldUpgradeCampaignState | null = petalimpPanelProgress ? {
+    actionLabel: petalimpPanelActionLabel,
+    order: petalimpPanelProgress.order ? {
+      id: petalimpPanelProgress.order.id,
+      title: petalimpPanelProgress.order.title,
+      description: petalimpPanelProgress.order.description,
+      definitionIds: petalimpPanelProgress.order.requirements.flatMap((requirement) => (
+        Array.from({ length: requirement.quantity }, () => requirement.definitionId)
+      )),
+      served: petalimpPanelProgress.orderComplete,
+    } : null,
+    residentName: 'Petalimp',
+    residentSkinId: 'petalimp',
+    stateLabel: petalimpPanelProgress.stateLabel,
+  } : null;
   const ftueGardenUpgradeActive = ftueStepId === 'world.first_bloom_offer' || ftueStepId === 'world.first_bloom_restore';
   const coachedUpgrade = ftueGardenUpgradeActive || mistUpgradeActive;
   useEffect(() => {
@@ -973,33 +996,18 @@ export function KatchimeraKingdomScreen({
   }, [mergeWorld, visibleCompanionSlots]);
   petalimpNarrativeAfterUpgradeRef.current = openPetalimpIslandNarrative;
 
-  const resumePetalimpIslandCampaign = useCallback(() => {
-    if (!petalimpCampaign?.discoveryRevealSeenAt) return false;
-    const chapter = PETALIMP_ISLAND_CHAPTERS.find((candidate) => petalimpIslandChapterStatus(mergeWorld, candidate.level) !== 'complete');
-    if (!chapter) return false;
-    const level = chapter.level;
-    const status = petalimpIslandChapterStatus(mergeWorld, level);
-    if (status === 'available') {
-      openPetalimpIslandNarrative(level, 'opening');
-      return true;
+  const handlePetalimpPanelAction = useCallback(() => {
+    const progress = petalimpIslandUpgradePanelState(mergeWorldRef.current);
+    if (!progress?.action) return;
+    if (progress.action === 'open_merge') {
+      openGarden(progress.order?.id, 'mossprout');
+      return;
     }
-    if (status === 'orders_active') {
-      const chapter = petalimpCampaign.chapters[String(level)];
-      const orderId = chapter?.orderIds.find((id) => !chapter.servedOrderIds.includes(id));
-      if (orderId) openGarden(orderId, 'mossprout');
-      return true;
-    }
-    if (status === 'return_ready') {
-      openPetalimpIslandNarrative(level, 'return');
-      return true;
-    }
-    if (status === 'resolution_ready') {
-      openPetalimpIslandNarrative(level, 'resolution');
-      return true;
-    }
-    // restoration_ready belongs to the ordinary upgrade panel.
-    return false;
-  }, [mergeWorld, openGarden, openPetalimpIslandNarrative, petalimpCampaign]);
+    openPetalimpIslandNarrative(progress.level, progress.action === 'start_story'
+      ? 'opening'
+      : progress.action === 'continue_return' ? 'return' : 'resolution');
+    setSelectedUpgrade(null);
+  }, [openGarden, openPetalimpIslandNarrative]);
 
   const continueFromPetalimpDiscovery = useCallback(async () => {
     if (islandDiscoveryContinueBusy.current) return;
@@ -1109,9 +1117,8 @@ export function KatchimeraKingdomScreen({
     finally { upgradePressBusy.current = false; }
   }, [ftueStepId, glowRun, upgradePresentation, upgradePurchasing]);
   const handleUpgradeOfferPress = useCallback((offer: WorldUpgradeOffer) => {
-    if (offer.id === `nature:${PETALIMP_ISLAND_ID}` && !offer.eligible && resumePetalimpIslandCampaign()) return;
     void openUpgradeOffer(offer);
-  }, [openUpgradeOffer, resumePetalimpIslandCampaign]);
+  }, [openUpgradeOffer]);
   const setUpgradeMarkerNode = useCallback((id: string, node: View | null) => {
     if (id === 'haven:mossprout') registerFtueTarget('upgrade:mossprout', node);
     if (id === 'mist:steppling-home') registerFtueTarget('upgrade:steppling', node);
@@ -1191,11 +1198,14 @@ export function KatchimeraKingdomScreen({
         onDismissUpgrade={() => upgradeDismiss.current?.()}
         upgradePanel={screenFocused && sharedUpgrade && !upgradePresentation && !activeInteractionResidentId ? <WorldUpgradePanel
           offer={sharedUpgrade} world={mergeWorld} busy={upgradePurchasing || (upgradeCommitted && !upgradeError)}
+          campaignState={petalimpPanelState}
           saveRead={saveUpgradeStoryRead}
           onCoachmarkChange={setUpgradeCoachmark} error={upgradeError} coached={coachedUpgrade} actionRef={upgradeActionRef} registerDismiss={registerUpgradeDismiss}
+          onCampaignAction={petalimpPanelState?.actionLabel ? handlePetalimpPanelAction : undefined}
           onClose={() => { pendingUpgradeReward.current = null; setSelectedUpgrade(null); setUpgradeError(null); }} onConfirm={() => { void confirmWorldUpgrade(); }}
           onGarden={() => { openGarden(); }} /> : null}
-        preserveUpgradeCamera={ftueGardenUpgradeActive || (selectedUpgrade?.id === 'mist:steppling-home' && Boolean(glowRun && glowRun.status !== 'completed'))}
+        preserveUpgradeCamera={ftueGardenUpgradeActive || Boolean(pendingIslandCampaignLevel)
+          || (selectedUpgrade?.id === 'mist:steppling-home' && Boolean(glowRun && glowRun.status !== 'completed'))}
         upgradeSelectionCommitted={upgradeCommitted}
         upgradeFailed={Boolean(upgradeError)}
         onUpgradeOfferPress={handleUpgradeOfferPress}
@@ -1213,7 +1223,6 @@ export function KatchimeraKingdomScreen({
             void openUpgradeOffer(offer);
             return;
           }
-          if (islandId === PETALIMP_ISLAND_ID && resumePetalimpIslandCampaign()) return;
           if (offer) void openUpgradeOffer(offer);
           else { const archive = worldUpgradeArchiveOffer(mergeWorld, `nature:${islandId}`); if (archive) setSelectedUpgrade(archive); }
         }}

@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
 import { MOSSPROUT_CAMPAIGN_EPISODES } from '@/constants/mossprout-campaign';
-import { PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_CHAPTERS, petalimpGrowthStyle, petalimpIslandChapterOrder, petalimpIslandChapterStatus, petalimpIslandResolutionConversationId, petalimpIslandReturnConversationId, petalimpIslandReturnLevel } from '@/constants/petalimp-island-campaign';
+import { PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_CHAPTERS, petalimpGrowthStyle, petalimpIslandChapterOrder, petalimpIslandChapterStatus, petalimpIslandResolutionConversationId, petalimpIslandReturnConversationId, petalimpIslandReturnLevel, petalimpIslandUpgradePanelState } from '@/constants/petalimp-island-campaign';
 import { FERNIP_ISLAND_LOCK_REASON, fernipIslandJourneyUnlocked } from '@/constants/nature-island-unlocks';
 import { visibleWorldUpgradeOffers, worldUpgradeOffers } from '@/features/world-upgrades/world-upgrade-offers';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
@@ -130,14 +130,28 @@ test('fresh Bloom Garden uses one ordinary mystery panel without leaking Petalim
   const interaction = readFileSync(resolve(process.cwd(), 'components/katchadeck/world/companion-interaction-sheet.tsx'), 'utf8');
   assert.match(route, /suppressWorldSpeech=\{hostedNarrativeRequired\}/,
     'hosted friend-island stories suppress the reused companion speech layer for their full lifetime');
+  assert.match(route, /hostedNarrativeOnly=\{hostedNarrativeRequired\}/,
+    'hosted friend-island stories enter a narrative-only renderer instead of the Mossprout interaction page');
   assert.match(interaction, /showSpeechBubble=\{!props\.suppressWorldSpeech &&/,
     'suppressed island speech cannot mount while the narrative overlay prepares or hands off');
+  assert.match(interaction, /props\.hostedNarrativeOnly && \(!conversationExperience \|\| \(route\.kind !== 'visit' && route\.kind !== 'conversation'\)\)[\s\S]*?\? null/,
+    'the narrative-only renderer stays blank before hydration and after conversation completion');
+  assert.match(interaction, /!props\.hostedNarrativeOnly && dashboardRouteActive/,
+    'Mossprout action UI cannot render during a friend-island narrative handoff');
   assert.match(canvas, /!upgradePresentation\?\.natureIslandId[\s\S]*?upgradePresentation\?\.creatureId === tile\.companion\.creature\.creatureId/,
     'nature-island upgrades never shake Mossprout as their celebration actor');
   assert.match(screen, /onCovered: closeResidentInteraction,[\s\S]*?navigate: \(\) => \{[\s\S]*?setSelectedUpgrade\(null\);[\s\S]*?router\.push/,
     'Merge navigation retains the island close-up until the source scene is covered');
   assert.match(screen, /onGarden=\{\(\) => \{ openGarden\(\); \}\}/,
     'the insufficient-Glow action cannot restore the upgrade camera before navigation begins');
+  assert.doesNotMatch(screen, /resumePetalimpIslandCampaign/,
+    'Petalimp markers and island taps cannot bypass the upgrade panel');
+  assert.match(screen, /campaignState=\{petalimpPanelState\}/);
+  assert.match(screen, /onCampaignAction=\{petalimpPanelState\?\.actionLabel \? handlePetalimpPanelAction : undefined\}/);
+  assert.match(screen, /const handleUpgradeOfferPress[\s\S]{0,160}?openUpgradeOffer\(offer\)/,
+    'every upgrade-marker press opens the shared panel first');
+  assert.match(canvas, /!upgradeCameraCommitted\.current && !preserveUpgradeCamera/,
+    'panel-to-island-story handoffs cannot briefly restore the overview camera');
 });
 
 test('paid world upgrades spend visibly from the persistent top-bar Glow pill', () => {
@@ -174,6 +188,10 @@ test('every request and Petalimp return happen before its matching restoration',
   assert.equal(worldUpgradeOffers(state).find((offer) => offer.id === 'nature:bloom-garden')!.eligible, false);
   state = acknowledgeReturn(state, 1);
   assert.equal(petalimpIslandChapterStatus(state, 1), 'restoration_ready');
+  const readyPanel = petalimpIslandUpgradePanelState(state)!;
+  assert.equal(readyPanel.action, null);
+  assert.equal(readyPanel.orderComplete, true);
+  assert.equal(readyPanel.stateLabel, 'Request complete · Ready to restore');
   const levelOne = worldUpgradeOffers(state).find((offer) => offer.id === 'nature:bloom-garden')!;
   assert.equal(levelOne.nextLevel, 1); assert.equal(levelOne.cost, 0); assert.equal(levelOne.economyMode, 'free');
   const before = state.coins;
@@ -205,6 +223,11 @@ test('a served Petalimp request becomes one persistent island return note withou
   assert.equal(waitingOffer.eligible, false);
   assert.equal(waitingOffer.markerSkinId, 'petalimp');
   assert.equal(visibleWorldUpgradeOffers([waitingOffer], undefined, null).length, 1, 'Petalimp remains visible while the request is active');
+  const requestedPanel = petalimpIslandUpgradePanelState(state)!;
+  assert.equal(requestedPanel.action, 'open_merge');
+  assert.equal(requestedPanel.order?.id, order.id);
+  assert.equal(requestedPanel.orderComplete, false);
+  assert.equal(requestedPanel.stateLabel, 'Requested in Merge');
 
   const board = [...state.board];
   let cursor = 0;
@@ -215,6 +238,11 @@ test('a served Petalimp request becomes one persistent island return note withou
   }
   const served = reduceMergeWorld({ ...state, board }, { type: 'serveOrder', orderId: order.id, now: NOW + 3 }).state;
   assert.equal(petalimpIslandReturnLevel(served), 1);
+  const completePanel = petalimpIslandUpgradePanelState(served)!;
+  assert.equal(completePanel.action, 'continue_return');
+  assert.equal(completePanel.order?.id, order.id, 'served orders remain presentable after leaving the active-order queue');
+  assert.equal(completePanel.orderComplete, true);
+  assert.equal(completePanel.stateLabel, 'Request complete');
   assert.ok(served.externalRewardReceipts.some((receipt) => receipt.kind === 'story_order_served' && receipt.sourceId === PETALIMP_ISLAND_CAMPAIGN_ID));
   assert.equal(served.externalRewardReceipts.some((receipt) => receipt.kind === 'conversation' && receipt.sourceId === order.chapterId), false);
 

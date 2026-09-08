@@ -9,15 +9,31 @@ import Animated, { runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, 
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { GameUI } from '@/constants/game-ui';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
+import { getCreatureVisual } from '@/game/days/visuals';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { worldUpgradeStory } from '@/features/world-upgrades/world-upgrade-stories';
 import type { MergeWorldState } from '@/types/merge-world';
+import type { KatchimeraSkinId } from '@/types/katchimera';
+import {
+  COMPANION_MERGE_REQUEST_PALETTE,
+  CompanionMergeRequestTray,
+  type CompanionMergeRequest,
+} from './companion-merge-request-tray';
 export type UpgradeCoachmarkState = { visible: boolean; revision: number };
+
+export type WorldUpgradeCampaignState = {
+  actionLabel?: string;
+  order?: CompanionMergeRequest | null;
+  residentName: string;
+  residentSkinId: KatchimeraSkinId;
+  stateLabel: string;
+};
 
 const LOCK_ART = require('@incubator/art-world/hex/kingdom_dream_mist_lock_v1_512.webp');
 
-export function WorldUpgradePanel({ offer, world, busy, error, coached = false, actionRef, onClose, onConfirm, onGarden, registerDismiss, saveRead, onCoachmarkChange }: {
+export function WorldUpgradePanel({ offer, world, busy, error, coached = false, actionRef, campaignState, onCampaignAction, onClose, onConfirm, onGarden, registerDismiss, saveRead, onCoachmarkChange }: {
   offer: WorldUpgradeOffer; world: MergeWorldState; busy: boolean; error?: string | null; coached?: boolean;
+  campaignState?: WorldUpgradeCampaignState | null; onCampaignAction?: () => void;
   actionRef: RefObject<View | null>; onClose: () => void; onConfirm: () => void; onGarden: () => void;
   onCoachmarkChange?: (state: UpgradeCoachmarkState) => void;
   registerDismiss?: (dismiss: (() => void) | null) => void;
@@ -39,18 +55,19 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   const [settled, setSettled] = useState(false); const [closing, setClosing] = useState(false);
   const closeRef = useRef<View>(null); const closeGuard = useRef(false);
   const locked = Boolean(offer.lockedReason);
-  const actionable = offer.eligible;
   const affordable = world.coins >= offer.cost;
   // Bloom Garden's story is delivered by its mandatory island-campaign
   // narrative. Keep the standard upgrade panel focused on cost and reward.
   const story = offer.id === 'nature:bloom-garden'
     ? null
     : worldUpgradeStory(offer.id, offer.nextLevel);
-  const coachVisible = settled && layoutReady && coached && affordable && !locked && !busy && !closing && !history
+  const campaignSkin = campaignState ? katchimeraSkinById.get(campaignState.residentSkinId) : null;
+  const campaignPortrait = campaignSkin?.visualKey ? getCreatureVisual(campaignSkin.visualKey, 'grown').source : null;
+  const coachVisible = settled && layoutReady && coached && offer.eligible && affordable && !locked && !busy && !closing && !history
     && scrollY >= contentHeight - scrollHeight - 1;
   useEffect(() => {
-    if (settled && layoutReady && coached && affordable && !history) scrollRef.current?.scrollToEnd({ animated: false });
-  }, [settled, layoutReady, coached, affordable, history, contentHeight, scrollHeight]);
+    if (settled && layoutReady && coached && offer.eligible && affordable && !history) scrollRef.current?.scrollToEnd({ animated: false });
+  }, [settled, layoutReady, coached, offer.eligible, affordable, history, contentHeight, scrollHeight]);
   useEffect(() => {
     onCoachmarkChange?.({ visible: coachVisible, revision: panelHeight + scrollY });
   }, [coachVisible, onCoachmarkChange, panelHeight, scrollY]);
@@ -98,7 +115,9 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
           onPress={() => { setHistory(false); leave(onConfirm); }} />
       </View>
       {!affordable ? <KatchaButton fullWidth label="Tend garden" disabled={busy || closing} onPress={() => { setHistory(false); leave(onGarden); }} /> : null}
-    </> : <Text style={styles.cost}>{offer.currentLevel >= offer.maxLevel ? 'Fully grown · ' : ''}Level {offer.currentLevel} / {offer.maxLevel}</Text>}
+    </> : campaignState?.actionLabel && onCampaignAction ? <KatchaButton fullWidth label={campaignState.actionLabel} disabled={busy || closing}
+      onPress={() => { setHistory(false); leave(onCampaignAction); }} />
+      : <Text style={styles.cost}>{offer.currentLevel >= offer.maxLevel ? 'Fully grown · ' : ''}Level {offer.currentLevel} / {offer.maxLevel}</Text>}
   </View>;
   return <>
     <View style={styles.bounds} pointerEvents="box-none" onLayout={(event) => setAvailableHeight(event.nativeEvent.layout.height)}>
@@ -116,10 +135,34 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
         <Text style={styles.sectionTitle}>Required</Text>
         <View style={styles.currencyTile}><Image accessibilityIgnoresInvertColors={locked} cachePolicy="memory-disk" source={locked ? LOCK_ART : GAME_CURRENCY_ART.coins} style={locked ? styles.lockArt : styles.currencyArt} contentFit="contain" transition={0} /></View>
         <Text style={[styles.amount, !locked && !affordable && styles.unaffordable]}>{locked ? 'Journey Day 2 required' : `${offer.cost.toLocaleString()} Glow`}</Text>
-        <View style={styles.unlocks}><Text style={styles.sectionTitle}>{locked ? 'Unlock condition' : actionable ? 'Unlocks' : 'Fully grown'}</Text>
+        <View style={styles.unlocks}><Text style={styles.sectionTitle}>{locked ? 'Unlock condition' : offer.currentLevel >= offer.maxLevel ? 'Fully grown' : 'Unlocks'}</Text>
           <Text style={styles.unlockName}>{locked ? offer.lockedReason : offer.nextName}</Text>
           {!locked && story?.rewardSkinId ? <Text style={styles.reward}>Welcomes {katchimeraSkinById.get(story.rewardSkinId)?.displayName} to your collection</Text> : null}
         </View>
+        {!locked && campaignState ? <View accessibilityLabel={`${campaignState.residentName}. ${campaignState.stateLabel}`} style={styles.campaign}>
+          <View style={styles.campaignHeader}>
+            <View style={styles.campaignPortrait}>
+              {campaignPortrait ? <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain" source={campaignPortrait} style={styles.campaignPortraitArt} transition={0} /> : null}
+            </View>
+            <View style={styles.campaignHeading}>
+              <Text style={styles.campaignTitle}>{campaignState.residentName}’s request</Text>
+              <View style={styles.campaignStateRow}>
+                {campaignState.order?.served ? <Text accessibilityLabel="Complete" style={styles.campaignComplete}>✓</Text> : null}
+                <Text style={[styles.campaignState, campaignState.order?.served && styles.campaignStateComplete]}>{campaignState.stateLabel}</Text>
+              </View>
+            </View>
+          </View>
+          {campaignState.order ? <CompanionMergeRequestTray
+            accessibilityLabel={`${campaignState.residentName}'s Merge request`}
+            countLabel={campaignState.order.served ? 'Complete' : 'Requested'}
+            eyebrow="MERGE ORDER"
+            onRequestPress={campaignState.actionLabel === 'Open Merge' && onCampaignAction
+              ? () => { setHistory(false); leave(onCampaignAction); }
+              : undefined}
+            palette={COMPANION_MERGE_REQUEST_PALETTE}
+            requests={[campaignState.order]}
+          /> : null}
+        </View> : null}
         {controls(true)}
       </ScrollView>
 
@@ -152,4 +195,14 @@ const styles = StyleSheet.create({
   cost: { ...KatchaUI.type.companionBody, color: GameUI.color.inkSecondary, fontSize: 12, lineHeight: 17, textAlign: 'center', fontVariant: ['tabular-nums'] },
   actions: { gap: 8 }, error: { ...KatchaUI.type.companionBody, color: GameUI.color.danger, fontSize: 12, textAlign: 'center' },
   reward: { ...KatchaUI.type.companionBody, color: '#637D37', fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  campaign: { backgroundColor: '#F4EFD9', borderColor: 'rgba(132,100,45,0.2)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, gap: 8, padding: 9 },
+  campaignHeader: { alignItems: 'center', flexDirection: 'row', gap: 9 },
+  campaignPortrait: { alignItems: 'center', backgroundColor: '#E9F5D6', borderColor: '#FFF8DD', borderRadius: 29, borderWidth: 4, height: 58, justifyContent: 'center', overflow: 'hidden', width: 58 },
+  campaignPortraitArt: { height: 72, marginTop: 12, width: 72 },
+  campaignHeading: { flex: 1, gap: 2 },
+  campaignTitle: { ...KatchaUI.type.companionCardTitle, color: '#5C4426', fontSize: 16, lineHeight: 20 },
+  campaignStateRow: { alignItems: 'center', flexDirection: 'row', gap: 5 },
+  campaignComplete: { color: '#4C8B3D', fontFamily: AppFontFamilies.fredokaBold, fontSize: 17, lineHeight: 19 },
+  campaignState: { ...KatchaUI.type.companionBody, color: '#7B6544', flexShrink: 1, fontSize: 11.5, lineHeight: 16 },
+  campaignStateComplete: { color: '#4C7A3E' },
 });

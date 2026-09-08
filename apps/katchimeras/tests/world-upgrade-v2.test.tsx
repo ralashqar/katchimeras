@@ -95,6 +95,10 @@ test('panel waits for exit animation, keeps shortage explicit, and reading never
     '@/components/katchadeck/ui/katcha-button': { KatchaButton: host('Button') },
     '@/constants/game-ui': { GameUI: { type: { title: {}, body: {} }, color: { ink: '#000', inkSecondary: '#333', danger: '#900' } } },
     '@/constants/katchimera-skins': { katchimeraSkinById }, '@/game/days/visuals': { getCreatureVisual: () => ({ source: 1 }) },
+    './companion-merge-request-tray': {
+      COMPANION_MERGE_REQUEST_PALETTE: {},
+      CompanionMergeRequestTray: host('RequestTray'),
+    },
     '@/features/world-upgrades/world-upgrade-stories': { WORLD_UPGRADE_STORIES, upgradeSpeaker, worldUpgradeStory: (id: string, level: number) => WORLD_UPGRADE_STORIES.find((story) => story.offerId === id && story.level === level) },
     '@/features/world-upgrades/world-upgrade-progress': { upgradeCompletedLevel: () => 0 },
     '@/utils/merge-world/repository': { saveUpgradeStoryRead: async (...args: unknown[]) => { readCalls.push(args); } },
@@ -188,5 +192,47 @@ test('panel waits for exit animation, keeps shortage explicit, and reading never
   await act(async () => { tree = create(<Panel {...props} world={saved} />); });
   assert.equal(readCalls.length, beforeResume, 'resuming does not reset the saved cursor');
   assert.equal(tree!.root.findAllByType(host('Narrative')).length, 0, 'saved progress never puts dialogue in the base card');
+  await act(async () => tree!.unmount());
+
+  let campaignActions = 0;
+  const campaignOffer = {
+    ...props.offer,
+    id: 'nature:bloom-garden',
+    name: 'Bloom Garden',
+    currentLevel: 1,
+    nextLevel: 2,
+    maxLevel: 4,
+    nextName: 'Colour Beds',
+    cost: 60,
+    eligible: false,
+  };
+  const campaignOrder = {
+    id: 'petalimp-bloom-level-2:test',
+    title: 'A little colour',
+    definitionIds: ['bouquet'],
+    served: false,
+  };
+  const campaignState = {
+    actionLabel: 'Open Merge',
+    order: campaignOrder,
+    residentName: 'Petalimp',
+    residentSkinId: 'petalimp',
+    stateLabel: 'Requested in Merge',
+  };
+  await act(async () => { tree = create(<Panel {...props} offer={campaignOffer} campaignState={campaignState} onCampaignAction={() => campaignActions++} />); });
+  const requestTray = tree!.root.findByType(host('RequestTray'));
+  assert.equal(requestTray.props.countLabel, 'Requested');
+  assert.equal(requestTray.props.requests[0].served, false);
+  assert.equal(typeof requestTray.props.onRequestPress, 'function', 'the current request can deep-link to Merge from its tray');
+  assert.ok(tree!.root.findAllByType(host('Button')).some((node) => node.props.label === 'Open Merge'));
+  await act(async () => { requestTray.props.onRequestPress(campaignOrder.id); motion.advance(140); });
+  assert.equal(campaignActions, 1, 'the campaign panel owns the explicit Merge handoff');
+  await act(async () => tree!.unmount());
+
+  await act(async () => { tree = create(<Panel {...props} offer={campaignOffer} campaignState={{ ...campaignState, actionLabel: 'Talk to Petalimp', order: { ...campaignOrder, served: true }, stateLabel: 'Request complete' }} onCampaignAction={() => campaignActions++} />); });
+  const completeTray = tree!.root.findByType(host('RequestTray'));
+  assert.equal(completeTray.props.countLabel, 'Complete');
+  assert.equal(completeTray.props.requests[0].served, true, 'the same panel shows the durable green completion state');
+  assert.equal(completeTray.props.onRequestPress, undefined, 'a served request cannot reopen Merge from its tray');
   await act(async () => tree!.unmount());
 });

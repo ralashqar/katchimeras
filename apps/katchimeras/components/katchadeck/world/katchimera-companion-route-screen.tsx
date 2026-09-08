@@ -844,6 +844,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       presentation="companion"
       renderRegularStage={renderRegularStage}
       reuseUnderlyingStage={reuseUnderlyingStage}
+      hostedNarrativeOnly={hostedNarrativeRequired}
       suppressWorldSpeech={hostedNarrativeRequired}
       onVisibleCreatureRewardPulse={onVisibleCreatureRewardPulse}
     />
