@@ -79,6 +79,9 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
         disabled={moving || hidden} onPress={() => onPress(offer)} style={styles.hitTarget}>
       <Animated.View pointerEvents="none" onLayout={(event) => setBubbleHeight(event.nativeEvent.layout.height)}
         style={[styles.bubble, markerPortrait || sleepingPortrait ? styles.portraitBubble : null, sleepingPortrait ? styles.sleepingBubble : null, motion]}>
+        {/* Paint first so the seam it covers never sits above the icon/portrait
+            content — it only fills the border gap, it isn't a foreground shape. */}
+        <View pointerEvents="none" style={styles.tail} />
         {sleepingPortrait ? <>
           <View style={[styles.portraitFrame, styles.sleepingFrame]}>
             <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain"
@@ -96,7 +99,6 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
           </View>
           <Text style={styles.percent}>{upgradePercent(offer.cost - offer.missingGlow, offer.cost)}%</Text>
         </>}
-        <View pointerEvents="none" style={styles.tail} />
       </Animated.View>
       </Pressable>
   </Animated.View>;
