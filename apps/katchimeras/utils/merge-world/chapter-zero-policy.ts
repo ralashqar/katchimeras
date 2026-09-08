@@ -113,7 +113,7 @@ export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderI
       energy: { ...state.energy, regenPaused: false, lastRegenAt: now },
       generators: {
         ...state.generators,
-        ...(garden ? { [FTUE_GARDEN_GENERATOR_ID]: { ...garden, forcedDropDefinitionId: null } } : {}),
+        ...(garden ? { [FTUE_GARDEN_GENERATOR_ID]: { ...garden, forcedDropDefinitionId: FTUE_SEED_DEFINITION_ID } } : {}),
       },
     };
   }
@@ -132,14 +132,15 @@ export function advanceMossproutChapterZero(state: MergeWorldState, servedOrderI
 
 /**
  * The current FTUE ends after the First Bloom. Retire the older multi-order
- * tutorial and return the Garden Basket to its normal Seed/Pebble drop table.
+ * tutorial. The Garden Basket stays Seed-only — its Pebble/Shell branch is
+ * Shellio's to bring, not something this moment should open on its own.
  */
 export function completeMossproutChapterZeroSlice(state: MergeWorldState, now = Date.now()): MergeWorldState {
   const garden = state.generators[FTUE_GARDEN_GENERATOR_ID];
   const activeOrders = state.activeOrders.filter((order) => !order.id.startsWith(ORDER_PREFIX));
   const alreadyComplete = activeOrders.length === state.activeOrders.length
     && !state.energy.regenPaused
-    && (!garden || garden.forcedDropDefinitionId == null);
+    && (!garden || garden.forcedDropDefinitionId === FTUE_SEED_DEFINITION_ID);
   if (alreadyComplete) return state;
   return {
     ...state,
@@ -147,7 +148,7 @@ export function completeMossproutChapterZeroSlice(state: MergeWorldState, now = 
     energy: { ...state.energy, regenPaused: false, lastRegenAt: now },
     generators: {
       ...state.generators,
-      ...(garden ? { [FTUE_GARDEN_GENERATOR_ID]: { ...garden, forcedDropDefinitionId: null } } : {}),
+      ...(garden ? { [FTUE_GARDEN_GENERATOR_ID]: { ...garden, forcedDropDefinitionId: FTUE_SEED_DEFINITION_ID } } : {}),
     },
   };
 }

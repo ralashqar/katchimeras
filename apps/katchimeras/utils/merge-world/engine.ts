@@ -3,7 +3,8 @@ import { reconcileUpgradeProgress } from '@/features/world-upgrades/world-upgrad
 const { mergeOrderReady, mergeOrderRequirementReadiness, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds, boardItemCounts } = createOrderQueries();
 export { mergeOrderReady, mergeOrderRequirementReadiness, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds };
 import { prepareStepplingGarden, stepplingGardenDrop, stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
-import { ensureOrdersRequireMerge } from './order-requirements';
+import { ensureOrdersRequireMerge, repairOrderChains } from './order-requirements';
+import { generatorChainOpen, openChainFor, openDefinitionFor, openTierOneDropIds } from './generator-branches';
 import { ensureCompanionDailyGarden, completeDailyGardenOrder, DAILY_GARDEN_ARC, DAILY_GARDEN_BONUS } from './companion-daily-garden';
 import {
   FEASTLE_STORY_REQUESTS,
@@ -45,6 +46,7 @@ import type {
   MergeBoardId,
   MergeBoardItem,
   HavenResidentMergeBoardState,
+  MergeChainId,
   MergeCharacterId,
   MergeExternalRewardReceipt,
   MergeGeneratorState,
@@ -945,6 +947,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
   // Version 3's five single-chain generators migrate into the shared eight.
   normalized = ensureProceduralOrders(normalized, now);
+  normalized = repairOrderChains(normalized);
   return reconcileUpgradeProgress(ensureOrdersRequireMerge(refreshTime(normalized, now)));
 }
 
@@ -1650,14 +1653,17 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   if (cell < 0) return unchanged(state, 'The board is full. Merge or store an item first.', 'board_full');
   // Level one always starts at tier one. Upgrades add a bounded chance of a
   // better seed without changing which authored chains the generator owns.
-  const dropIndex = randomUnit(`${seed}:chain:${state.revision}`) < 0.5 ? 0 : 1;
+  // A basket only offers the branch whose friend has arrived, so the Garden
+  // Basket makes Seeds alone until Shellio brings the waterside.
+  const openDrops = openTierOneDropIds(state, generator);
+  const dropIndex = openDrops.length < 2 ? 0 : randomUnit(`${seed}:chain:${state.revision}`) < 0.5 ? 0 : 1;
   const authoredDropIndex = opportunity?.dropDefinitionIds.length
     ? opportunity.usedCount % opportunity.dropDefinitionIds.length
     : -1;
   const authoredDefinitionId = authoredDropIndex >= 0
     ? opportunity?.dropDefinitionIds[authoredDropIndex]
     : undefined;
-  const baseDefinitionId = tutorialDrop ?? authoredDefinitionId ?? generator.forcedDropDefinitionId ?? generator.tierOneDropDefinitionIds[dropIndex];
+  const baseDefinitionId = tutorialDrop ?? authoredDefinitionId ?? generator.forcedDropDefinitionId ?? openDrops[dropIndex]!;
   const betterDropRoll = randomUnit(`${seed}:upgrade:${state.revision}`);
   const bonusTier = tutorialDrop || authoredDefinitionId || generator.forcedDropDefinitionId ? 0 : generator.level >= 4 && betterDropRoll < 0.05
     ? 2
@@ -3500,8 +3506,12 @@ function genericFamilyStoryOrders(
   requestedTemplateKeys: string[] = [],
 ): MergeOrder[] {
   const profile = KATCHIMERA_MERGE_PROFILES[characterId];
-  const [first, second] = profile.coreChains;
-  const unlockedGuest = profile.guestChains.find((chainId) => state.generators[GENERATOR_BY_CHAIN[chainId]]);
+  // A friend can only ask for what their basket currently makes. Until the
+  // branch's own friend arrives, requests fall back to the founding chain.
+  const [first, second] = profile.coreChains.map((chainId) => openChainFor(state, chainId)) as [MergeChainId, MergeChainId];
+  const unlockedGuest = profile.guestChains
+    .filter((chainId) => generatorChainOpen(state, chainId))
+    .find((chainId) => state.generators[GENERATOR_BY_CHAIN[chainId]]);
   const guestOrCore = unlockedGuest ?? second;
   const tier = Math.max(2, Math.min(6, 2 + Math.floor((targetLevel - 2) / 2)));
   const arcId = `${characterId}:merge-story`;
@@ -3519,7 +3529,10 @@ function genericFamilyStoryOrders(
     description: profile.narrativeTheme,
     narrativeSignal: targetLevel % 4 === 0 ? 'connection' : targetLevel % 3 === 0 ? 'curiosity' : 'comfort',
     difficulty: signature ? 'major' : requirements.length > 1 || tier >= 4 ? 'medium' : 'small',
-    requirements,
+    // Authored beats name their chain outright — Mossprout's own arc asks for
+    // waterside from level two. Route every requirement onto a chain this
+    // world can actually make, so no request is impossible to fill.
+    requirements: requirements.map((item) => ({ ...item, definitionId: openDefinitionFor(state, item.definitionId) })),
     reward: { coins: 22 + tier * 10, mergeXp: 18 + tier * 8, friendshipXp: signature ? 32 : 12, energy: signature ? 5 : requirements.length > 1 ? 3 : 2 },
     createdAt: now,
     signature,

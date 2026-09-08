@@ -28,6 +28,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { MergeBoardEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
 import { canReuseSpawnSprites, createMergeBoardEffects } from '@/utils/merge-world/board-effects';
+import { generatorChainOpen } from '@/utils/merge-world/generator-branches';
 import { mergeWorldGeneratorArt, mergeWorldItemArt, mossproutRootRewardArt, RESIDENT_CARD_ART } from '@/constants/merge-world-art';
 import { MERGE_CHARACTER_NAMES, MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS, MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
 import { COMPANION_DISCOVERIES_BY_ID } from '@/constants/companion-discovery-catalog';
@@ -317,7 +318,11 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const gateFromCell = interactionGate.kind === 'drag' ? interactionGate.fromCell : -1;
   const gateToCell = interactionGate.kind === 'drag' ? interactionGate.toCell : -1;
   const gateGeneratorCell = interactionGate.kind === 'generator' ? interactionGate.cell : -1;
-  const mossproutOnboarding = presentation.activeOrders.some((order) => order.id.startsWith('mossprout:chapter-0:'));
+  // Not "the chapter-0 order is still active": that order clears the moment
+  // it's served, but the Garden Basket stays Seed-only well after — its
+  // Pebble/Shell branch is Shellio's to open. Keep the tutorial pot art for
+  // as long as the basket actually is Seed-only, not just during the order.
+  const mossproutOnboarding = !generatorChainOpen(state, 'nature:waterside');
   const [baseArtDisplayed, setBaseArtDisplayed] = useState(!showBaseArt);
   const [cellArtReady, setCellArtReady] = useState(false);
   const visibleItemDefinitionIds = useMemo(() => sprites.flatMap((sprite) => sprite.occupant.kind === 'item' ? [sprite.occupant.definitionId] : []), [sprites]);

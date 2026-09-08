@@ -2,6 +2,7 @@ import { COMPANION_JOURNEY_PROFILES } from '@/constants/companion-journey-profil
 import { GENERATOR_BY_CHAIN, KATCHIMERA_MERGE_PROFILES, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { MergeOrder, MergeWorldState } from '@/types/merge-world';
 import { localDayId } from '@/utils/world-identity-rules';
+import { generatorChainOpen } from './generator-branches';
 
 export type DailyGardenFamily = 'mossprout' | 'steppling';
 export type CompanionDailyGardenBatch = {
@@ -26,6 +27,9 @@ export function ensureCompanionDailyGarden(state: MergeWorldState, familyId: Dai
   // Existing players finish the already offered legacy batch on its original day.
   if (!previous && familyId === 'mossprout' && state.mossproutDailyGardenOrders?.dayId === dayId) return state.companionDailyGardenVersion ? state : { ...state, companionDailyGardenVersion: 1 };
   const chains = KATCHIMERA_MERGE_PROFILES[familyId].coreChains.filter((chain) => {
+    // A branch whose friend has not arrived is not askable, even though the
+    // basket's authored catalog still lists it among its drops.
+    if (!generatorChainOpen(state, chain)) return false;
     const generator = state.generators[GENERATOR_BY_CHAIN[chain]] ?? (familyId === 'steppling' ? state.haven.residentMergeBoards.steppling?.generators[GENERATOR_BY_CHAIN[chain]] : undefined);
     const drops = generator?.forcedDropDefinitionId ? [generator.forcedDropDefinitionId] : generator?.tierOneDropDefinitionIds ?? [];
     return drops.some((id) => id.startsWith(`${chain}:`));
@@ -40,7 +44,13 @@ export function ensureCompanionDailyGarden(state: MergeWorldState, familyId: Dai
     while (desired > 1 && !MERGE_ITEMS_BY_ID.has(`${chain}:${desired}`)) desired--;
     return `${chain}:${desired}`;
   };
-  const combo = [{ definitionId: tier(primary, 3 + band), quantity: 1 }, { definitionId: tier(secondary, band === 2 ? 4 : 3), quantity: 1 }];
+  // With only one chain open (a branch's friend hasn't arrived yet), primary
+  // and secondary are the same chain — split the pair across two tiers of it
+  // instead of asking for two of the identical item.
+  const soloTierB = tier(primary, 4 + band) !== tier(primary, 3 + band) ? 4 + band : Math.max(1, 2 + band);
+  const combo = primary === secondary
+    ? [{ definitionId: tier(primary, 3 + band), quantity: 1 }, { definitionId: tier(primary, soloTierB), quantity: 1 }]
+    : [{ definitionId: tier(primary, 3 + band), quantity: 1 }, { definitionId: tier(secondary, band === 2 ? 4 : 3), quantity: 1 }];
   const combined = combo[0].definitionId === combo[1].definitionId ? [{ definitionId: combo[0].definitionId, quantity: 2 }] : combo;
   const requirements = [combined, [{ definitionId: tier(primary, 4 + band), quantity: 1 }]];
   const orders: MergeOrder[] = requirements.map((items, index) => ({
