@@ -16,8 +16,6 @@ import Animated, {
 
 import type { HavenUpgradePresentationPhase, HavenUpgradeEffectPalette } from './upgrade-presentation';
 
-export function createUpgradeEffects({coinArt:COIN_ART, fontFamily}: {coinArt: import('expo-image').ImageSource | number; fontFamily:string}) {
-type HavenTileUpgradePresentation = {nonce:number;coinOrigin:{x:number;y:number};palette:HavenUpgradeEffectPalette;reactionLine:string};
 const COIN_SIZE = 34;
 
 function random01(index: number, salt: number) {
@@ -51,8 +49,8 @@ const COIN_VECTORS = Array.from({ length: COIN_COUNT }, (_, index) => {
  * blur into a buzz, so beats under the minimum gap are dropped; the final coin
  * always keeps its beat and lands heavier than the rest.
  */
-const COIN_HAPTIC_MIN_GAP_MS = 46;
-const COIN_HAPTIC_BEATS = (() => {
+export const COIN_HAPTIC_MIN_GAP_MS = 46;
+export const COIN_HAPTIC_BEATS = (() => {
   const landings = COIN_VECTORS.map((vector) => vector.delay + vector.duration).sort((a, b) => a - b);
   const last = landings[landings.length - 1] ?? 0;
   const beats: number[] = [];
@@ -66,6 +64,15 @@ const COIN_HAPTIC_BEATS = (() => {
   return [...beats.map((at) => ({ at, last: false })), { at: last, last: true }];
 })();
 
+
+/**
+ * When the last coin seats in the tile. `HAVEN_UPGRADE_TIMING.revealAtMs` must
+ * stay above this or the restoration blend cuts the flight off mid-air.
+ */
+export const COIN_FLIGHT_WINDOW_MS = Math.max(...COIN_VECTORS.map((vector) => vector.delay + vector.duration));
+
+export function createUpgradeEffects({coinArt:COIN_ART, fontFamily}: {coinArt: import('expo-image').ImageSource | number; fontFamily:string}) {
+type HavenTileUpgradePresentation = {nonce:number;coinOrigin:{x:number;y:number};palette:HavenUpgradeEffectPalette;reactionLine:string};
 function silhouetteWidthAt(y: number) {
   if (y < 0.18) return 0.58 + (y / 0.18) * 0.34;
   if (y < 0.58) return 0.92;

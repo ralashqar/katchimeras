@@ -568,7 +568,7 @@ export function KatchimeraKingdomScreen({
     return () => cancelAnimationFrame(frame);
   }, [upgradePresentation?.coinCost, upgradePresentation?.nonce, upgradePresentation?.showCoins]);
 
-  useStoryPresentationOperation('haven', STORY_WORLD_UPGRADE_PRESENTATION, async (work, run, signal) => {
+  const upgradePresentationOperation = useStoryPresentationOperation('haven', STORY_WORLD_UPGRADE_PRESENTATION, async (work, run, signal) => {
     const payload = work.payload as StoryWorldUpgradePresentationPayload;
     const receipt = contentFlowEffectResult<StoryWorldMutationReceipt>(
       run.effectReceipts,
@@ -675,6 +675,13 @@ export function KatchimeraKingdomScreen({
       }, { once: true });
     });
   }, screenFocused && !activeInteractionResidentId && !interactionExiting);
+  // A restoration is queued the moment its narrative ends, but the presentation
+  // itself can only be built a few frames later (it has to measure the Glow
+  // counter first). Read the queue directly — not the gated `active` flag — so
+  // the markers and the panel stay down across that whole handoff instead of
+  // flashing back in for a frame between the story and the upgrade sequence.
+  const upgradeHandoffPending = upgradePresentationOperation.model.pendingWork.kind === 'presentation'
+    && upgradePresentationOperation.model.pendingWork.presentationType === STORY_WORLD_UPGRADE_PRESENTATION;
 
   const finishUpgradePresentation = useCallback((presentation: HavenTileUpgradePresentation) => {
     setRequiredUpgradeStory(null);
@@ -1287,12 +1294,12 @@ export function KatchimeraKingdomScreen({
         onOpenGarden={openGarden}
         onGardenPlotTargetChange={setGardenPlotNode}
         onTileUpgradeOfferPress={beginFirstSeedPlanting}
-        upgradeOffers={screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingEggOpen && !ordinaryUpgradeRun
+        upgradeOffers={screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingEggOpen && !ordinaryUpgradeRun && !upgradeHandoffPending
           ? kingdomGoalGuideActive ? visibleUpgradeOffers.filter((offer) => offer.id === `nature:${goalIslandId}`) : visibleUpgradeOffers
           : []}
         selectedUpgradeOffer={selectedUpgrade}
         onDismissUpgrade={() => upgradeDismiss.current?.()}
-        upgradePanel={screenFocused && sharedUpgrade && !upgradePresentation && !activeInteractionResidentId ? <WorldUpgradePanel
+        upgradePanel={screenFocused && sharedUpgrade && !upgradePresentation && !upgradeHandoffPending && !activeInteractionResidentId ? <WorldUpgradePanel
           offer={sharedUpgrade} world={mergeWorld} busy={upgradePurchasing || (upgradeCommitted && !upgradeError)}
           campaignState={islandCampaignPanelState}
           saveRead={saveUpgradeStoryRead}

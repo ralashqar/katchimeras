@@ -54,6 +54,11 @@ test('the wish waits for Steppling to leave, and the guide never locks the world
   assert.match(screen, /const kingdomGoalGuideActive = Boolean\([\s\S]*?goalIslandOffer/);
   // An active lesson with nothing on screen must not eat Back.
   assert.match(screen, /\(stepplingLesson\.active && Boolean\(interactionCreatureId\)\) \? undefined : <KatchimeraBackButton/);
+  // A queued restoration takes several frames to build its presentation. The
+  // markers and the panel must not flash back in over that handoff.
+  assert.match(screen, /const upgradeHandoffPending = upgradePresentationOperation\.model\.pendingWork\.kind === 'presentation'\s*\n\s*&& upgradePresentationOperation\.model\.pendingWork\.presentationType === STORY_WORLD_UPGRADE_PRESENTATION/);
+  assert.match(screen, /upgradeOffers=\{[^\n]*?&& !upgradeHandoffPending/);
+  assert.match(screen, /upgradePanel=\{[^\n]*?&& !upgradeHandoffPending/);
 });
 
 test('the goal scene tells the wish once and hands over exactly once per tap burst', async () => {

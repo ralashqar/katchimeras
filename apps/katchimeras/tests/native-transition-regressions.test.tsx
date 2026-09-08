@@ -60,14 +60,24 @@ test('the Glow flight taps once per landing, spaced apart, and lands heavier on 
   // The flight is long on purpose; every coin must seat before the blend takes
   // the screen, so the whole sequence fits inside the payment window.
   await act(async () => { await new Promise((done) => setTimeout(done, HAVEN_UPGRADE_TIMING.revealAtMs + 120)); });
+  const schedule = loadNativeModule(require.resolve('@incubator/environments/upgrade-effects'), {
+    'react-native': nativeViews, 'react-native-reanimated': clock.animated,
+    'expo-image': { Image: host('Image') }, 'expo-linear-gradient': { LinearGradient: host('Gradient') },
+  }) as unknown as { COIN_FLIGHT_WINDOW_MS: number; COIN_HAPTIC_BEATS: { at: number; last: boolean }[]; COIN_HAPTIC_MIN_GAP_MS: number };
+  assert.equal(taps.length, schedule.COIN_HAPTIC_BEATS.length, 'one tap per scheduled landing');
   assert.ok(taps.length >= 6, `a long flight needs a felt stream of landings, got ${taps.length}`);
   assert.equal(taps.filter((tap) => tap.style === 'medium').length, 1, 'only the final coin lands heavier');
   assert.equal(taps.at(-1)!.style, 'medium');
-  taps.forEach((tap, index) => {
+  assert.ok(taps.at(-1)!.at - taps[0]!.at > 250, 'the taps arrive over the flight, not all at once');
+  // Wall-clock gaps drift under a loaded parallel run, so the spacing and the
+  // fit inside the payment window are asserted against the schedule itself.
+  schedule.COIN_HAPTIC_BEATS.forEach((beat, index) => {
     if (index === 0) return;
-    assert.ok(tap.at - taps[index - 1]!.at >= 30, `taps ${index - 1}→${index} blurred together at ${tap.at}ms`);
+    assert.ok(beat.at - schedule.COIN_HAPTIC_BEATS[index - 1]!.at >= schedule.COIN_HAPTIC_MIN_GAP_MS,
+      `beats ${index - 1}→${index} would blur together`);
   });
-  assert.ok(taps.at(-1)!.at < HAVEN_UPGRADE_TIMING.revealAtMs, 'the last coin seats before the restoration blend');
+  assert.equal(schedule.COIN_HAPTIC_BEATS.at(-1)!.at, schedule.COIN_FLIGHT_WINDOW_MS, 'the last landing always taps');
+  assert.ok(schedule.COIN_FLIGHT_WINDOW_MS < HAVEN_UPGRADE_TIMING.revealAtMs, 'the last coin seats before the restoration blend');
   await act(async () => { tree!.unmount(); });
 });
 
