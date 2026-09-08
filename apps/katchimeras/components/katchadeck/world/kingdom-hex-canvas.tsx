@@ -1171,7 +1171,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           anchorY: residentInteractionScreenAnchorY,
           durationMs: reduceMotion ? 80 : SHARED_RESIDENT_FOCUS_DURATION_MS,
           onComplete: () => onResidentFocusComplete?.(interactionResidentId),
-          zoom: cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale,
+          // Not `cameraMaximumScale`: any resident interaction (island or not)
+          // boosts that to the egg/portrait rest zoom (2.05), meant for a
+          // single small subject. An island's art spans a whole tile — at
+          // that zoom the shot crops in far tighter than the fit-to-frame
+          // it replaced. The flat Kingdom cap frames it close without
+          // cropping into it.
+          zoom: KINGDOM_RENDERING.havenMaxScale,
         },
       );
       return;
@@ -1735,7 +1741,26 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             ) : null}
             {creatureNodes}
           </Animated.View>
-
+          {/* Rendered inside the camera's own GestureDetector, not after it,
+              so a drag starting on a marker still pans/pinches the world —
+              a plain Pressable outside this subtree never saw those touches
+              at all. The marker still opens on a clean tap release; its own
+              Pressable only cancels once the touch travels past its
+              press-move threshold, same as every other world hit target
+              here (nature islands, the gateway, memory plants). */}
+          {!upgradePresentation && interactionEnabled && onUpgradeOfferPress ? upgradeOffers.map((offer) => {
+            // Anchor to the painted stairs, not the island's larger touch target.
+            const target = offer.visualTarget;
+            const frame = target.kind === 'haven_nature_island'
+              ? scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame
+              : storyTargetFrame(target);
+            return frame ? <WorldUpgradeMarker key={offer.id} offer={offer} frame={frame}
+              hidden={Boolean(selectedUpgradeOffer)}
+              selected={selectedUpgradeOffer?.id === offer.id}
+              cameraScale={camera.scaleValue} cameraX={camera.translationXValue} cameraY={camera.translationYValue}
+              sceneWidth={scene.width} sceneHeight={scene.height} moving={camera.isMoving}
+              onPress={onUpgradeOfferPress} onTargetChange={onUpgradeOfferTargetChange} /> : null;
+          }) : null}
         </View>
       </GestureDetector>
       {revealedEggProjection ? (
@@ -1796,19 +1821,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           visualKey={plant.visualKey}
         />
       ))}
-      {!upgradePresentation && interactionEnabled && onUpgradeOfferPress ? upgradeOffers.map((offer) => {
-        // Anchor to the painted stairs, not the island's larger touch target.
-        const target = offer.visualTarget;
-        const frame = target.kind === 'haven_nature_island'
-          ? scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame
-          : storyTargetFrame(target);
-        return frame ? <WorldUpgradeMarker key={offer.id} offer={offer} frame={frame}
-          hidden={Boolean(selectedUpgradeOffer)}
-          selected={selectedUpgradeOffer?.id === offer.id}
-          cameraScale={camera.scaleValue} cameraX={camera.translationXValue} cameraY={camera.translationYValue}
-          sceneWidth={scene.width} sceneHeight={scene.height} moving={camera.isMoving}
-          onPress={onUpgradeOfferPress} onTargetChange={onUpgradeOfferTargetChange} /> : null;
-      }) : null}
       {selectedUpgradeOffer && upgradePanel && !upgradePresentation ? <>
         <Pressable style={[StyleSheet.absoluteFill, { zIndex: 31 }]} accessibilityRole="button" accessibilityLabel="Close upgrade" onPress={onDismissUpgrade} />
         {(() => {

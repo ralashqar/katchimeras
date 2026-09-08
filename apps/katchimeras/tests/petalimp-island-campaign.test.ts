@@ -171,8 +171,10 @@ test('fresh Bloom Garden uses one ordinary mystery panel without leaking Petalim
   // fit) computes a far lower scale than a resident close-up, since the
   // island's art is wide — the friend's island read as "far away" next to
   // Mossprout and Steppling. Frame it the same way instead: a fixed
-  // near-max zoom centred on the tile, not a fit-to-frame.
-  assert.match(canvas, /if \(interactionNatureIslandId && islandFrame\) \{[\s\S]*?focusTutorialResident\([\s\S]*?islandFrame\.left \+ islandFrame\.width \/ 2,[\s\S]*?islandFrame\.top \+ islandFrame\.height \/ 2,[\s\S]*?anchorY: residentInteractionScreenAnchorY,[\s\S]*?zoom: cameraMaximumScale \?\? KINGDOM_RENDERING\.havenMaxScale,/);
+  // near-max zoom centred on the tile, not a fit-to-frame. Not
+  // `cameraMaximumScale` though — any resident interaction boosts that to
+  // the egg/portrait rest zoom, which crops far too tight on a whole tile.
+  assert.match(canvas, /if \(interactionNatureIslandId && islandFrame\) \{[\s\S]*?focusTutorialResident\([\s\S]*?islandFrame\.left \+ islandFrame\.width \/ 2,[\s\S]*?islandFrame\.top \+ islandFrame\.height \/ 2,[\s\S]*?anchorY: residentInteractionScreenAnchorY,[\s\S]*?zoom: KINGDOM_RENDERING\.havenMaxScale,/);
   const route = readFileSync(resolve(process.cwd(), 'components/katchadeck/world/katchimera-companion-route-screen.tsx'), 'utf8');
   const interaction = readFileSync(resolve(process.cwd(), 'components/katchadeck/world/companion-interaction-sheet.tsx'), 'utf8');
   assert.match(route, /suppressWorldSpeech=\{hostedNarrativeRequired\}/,
@@ -199,6 +201,25 @@ test('fresh Bloom Garden uses one ordinary mystery panel without leaking Petalim
     'every upgrade-marker press opens the shared panel first');
   assert.match(canvas, /!upgradeCameraCommitted\.current && !preserveUpgradeCamera/,
     'panel-to-island-story handoffs cannot briefly restore the overview camera');
+});
+
+test('an upgrade marker sits inside the camera gesture detector, not after it', () => {
+  // A Pressable rendered outside the camera's GestureDetector subtree never
+  // sees a touch that starts on it — the marker's own Pressable claims it
+  // exclusively, so dragging from on top of a marker could not pan or pinch
+  // the world at all. Every other world hit target (nature islands, the
+  // gateway, memory plants) already lives inside the detector and drags
+  // through it fine; markers need the same placement, not new gesture code.
+  const canvas = readFileSync(resolve(root, 'components/katchadeck/world/kingdom-hex-canvas.tsx'), 'utf8');
+  const detectorOpen = canvas.indexOf('<GestureDetector');
+  const detectorClose = canvas.indexOf('</GestureDetector>');
+  const markerRender = canvas.indexOf('upgradeOffers.map((offer) => {');
+  assert.ok(detectorOpen >= 0 && detectorClose > detectorOpen, 'the camera GestureDetector is present');
+  assert.ok(markerRender >= 0, 'the upgrade-marker render block is present');
+  assert.ok(markerRender > detectorOpen && markerRender < detectorClose,
+    'WorldUpgradeMarker must render between the GestureDetector\'s open and close tags');
+  assert.equal(canvas.indexOf('upgradeOffers.map((offer) => {', markerRender + 1), -1,
+    'the marker render block must not also exist a second time outside the detector');
 });
 
 test('paid world upgrades spend visibly from the persistent top-bar Glow pill', () => {
