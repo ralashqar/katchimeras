@@ -1332,8 +1332,8 @@ export function KatchimeraKingdomScreen({
       ) : null}
       {ftueStepId === 'world.egg_intro' ? <FtueOpeningFade /> : null}
       {screenFocused && ftueCameraSettled && glowRun?.status === 'active' && glowScene?.view.kind === 'garden' && !activeInteractionResidentId && !upgradePresentation ? (
-        <View collapsable={false} ref={setHavenGuideNode} pointerEvents="none" style={{ position: 'absolute', right: 148, bottom: Math.max(insets.bottom, 12) + 30, width: Math.min(250, window.width - 164), zIndex: 85 }}>
-          <MergeFtueEggGuide hideAvatar inlineWidth={Math.min(250, window.width - 164)}
+        <View collapsable={false} ref={setHavenGuideNode} pointerEvents="none" style={{ position: 'absolute', right: 115, bottom: Math.max(insets.bottom, 12) + 30, width: Math.min(250, window.width - 131), zIndex: 85 }}>
+          <MergeFtueEggGuide hideAvatar inlineWidth={Math.min(250, window.width - 131)}
             anchor={{ x: 0, y: 0, width: 0, height: 0 }} screen={window}
             guide={{ eyebrow: '', title: 'Tap Merge.', body: 'Merge to earn Glow and clear the mist!' }} />
         </View>
@@ -1376,8 +1376,8 @@ const styles = StyleSheet.create({
   topHud: { maxWidth: 430, width: '100%' },
   currencyHud: { flex: 0, paddingLeft: 18, width: 106 },
   gardenButton: {
-    height: 132,
-    width: 132,
+    height: 99,
+    width: 99,
   },
   gardenButtonCluster: {
     alignItems: 'center',

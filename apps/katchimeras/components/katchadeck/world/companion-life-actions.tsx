@@ -27,6 +27,7 @@ import { loadCompanionContentState } from '@/utils/companion-content-storage';
 
 const families: readonly LifeCompanionFamily[] = ['mossprout', 'steppling'];
 const ink = '#352F23';
+const COMPANION_JOURNAL_BUTTON_ART = require('@incubator/art-world/square/companion-journal-button-v1-256.webp');
 function Copy({ children }: { children: ReactNode }) { return <ThemedText selectable lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink} style={{ fontSize: 14, fontWeight: '600', lineHeight: 20 }}>{children}</ThemedText>; }
 export function LifeButton({ label, onPress, disabled = false, subtitle, bond = false, completed = false }: { label: string; onPress: () => void; disabled?: boolean; subtitle?: string; bond?: boolean; completed?: boolean }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
@@ -57,8 +58,28 @@ export function DailyHabitOffer({ familyId, suggestedId, onDecision, entryId, pr
 
 export function CompanionJournalButton({ familyId, onVisitSeed }: { familyId: LifeCompanionFamily; onVisitSeed?: () => void }) {
   const [open, setOpen] = useState(false);
-  return <View style={{ alignSelf: 'flex-start', paddingTop: 6 }}>
-    <KatchaButton label="Journal" icon="book.closed.fill" onPress={() => setOpen(true)} />
+  return <View style={{ alignSelf: 'flex-start' }}>
+    <Pressable
+      accessibilityHint="Opens saved moments from your companion conversations"
+      accessibilityLabel="Open Journal"
+      accessibilityRole="button"
+      onPress={() => setOpen(true)}
+      style={({ pressed }) => ({
+        height: 99,
+        opacity: pressed ? 0.9 : 1,
+        transform: [{ scale: pressed ? 0.96 : 1 }],
+        width: 99,
+      })}>
+      <Image
+        accessibilityIgnoresInvertColors
+        allowDownscaling
+        cachePolicy="memory-disk"
+        contentFit="contain"
+        source={COMPANION_JOURNAL_BUTTON_ART}
+        style={{ height: 99, width: 99 }}
+        transition={0}
+      />
+    </Pressable>
     {open ? <CompanionJournalSheet familyId={familyId} onClose={() => setOpen(false)} onVisitSeed={onVisitSeed} /> : null}
   </View>;
 }
