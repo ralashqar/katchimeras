@@ -1084,8 +1084,16 @@ export function KatchimeraKingdomScreen({
     const active = activeIslandCampaign(mergeWorld);
     if (!active) return;
     const { campaign, chapter, status } = active;
+    // Not `mergeWorld.revision`: that bumps on every command in the game,
+    // including ones that have nothing to do with this campaign (an energy
+    // tick, an unrelated merge). Keying on it meant the guard reset itself
+    // the instant anything else happened — including mid-conversation — so
+    // the same narrative could get torn down and reopened before it ever
+    // reached its own completion callback, and its chapter never actually
+    // persisted as complete. `status` only changes when this chapter's own
+    // progress does, which is the only thing that should ever re-arm this.
     if (status === 'return_ready') {
-      const key = `return:${campaign.campaignId}:${chapter.level}:${mergeWorld.revision}`;
+      const key = `return:${campaign.campaignId}:${chapter.level}:${status}`;
       if (campaignAutoTransitionRef.current === key) return;
       campaignAutoTransitionRef.current = key;
       if (chapter.level === 1) {
@@ -1106,7 +1114,7 @@ export function KatchimeraKingdomScreen({
     }
     if (chapter.level === 1 && status === 'restoration_ready') {
       const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${campaign.islandId}` && candidate.nextLevel === 1 && candidate.eligible);
-      const key = `restore:${campaign.campaignId}:${mergeWorld.revision}`;
+      const key = `restore:${campaign.campaignId}:${status}`;
       if (!offer || campaignAutoTransitionRef.current === key) return;
       campaignAutoTransitionRef.current = key;
       void purchaseWorldUpgrade(offer).catch((error) => {
@@ -1116,7 +1124,7 @@ export function KatchimeraKingdomScreen({
       return;
     }
     if (status === 'resolution_ready') {
-      const key = `resolution:${campaign.campaignId}:${chapter.level}:${mergeWorld.revision}`;
+      const key = `resolution:${campaign.campaignId}:${chapter.level}:${status}`;
       if (campaignAutoTransitionRef.current === key) return;
       campaignAutoTransitionRef.current = key;
       openIslandCampaignNarrative(campaign, chapter.level, 'resolution');

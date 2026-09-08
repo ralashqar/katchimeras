@@ -222,6 +222,25 @@ test('an upgrade marker sits inside the camera gesture detector, not after it', 
     'the marker render block must not also exist a second time outside the detector');
 });
 
+test('the campaign auto-transition guard never keys on mergeWorld.revision', () => {
+  // That counter bumps on every command in the game, including ones with
+  // nothing to do with a given campaign (an energy tick, an unrelated
+  // merge). Keying the "already handled" guard on it meant the guard reset
+  // itself the instant anything else happened in the game — even mid
+  // conversation — so the same narrative could be torn down and reopened
+  // before it ever reached its own completion callback. Its chapter would
+  // then never persist as complete, and the whole reward beat would replay
+  // forever, once per unrelated tick and again every time the Kingdom
+  // screen remounted. The guard must key on the campaign's own `status`
+  // instead, which only changes when this chapter's own progress does.
+  const screen = readFileSync(resolve(root, 'components/katchadeck/roster/katchimera-kingdom-screen.tsx'), 'utf8');
+  assert.doesNotMatch(screen, /campaignAutoTransitionRef[\s\S]{0,400}mergeWorld\.revision/,
+    'no campaign auto-transition key may depend on the global revision counter');
+  assert.match(screen, /const key = `return:\$\{campaign\.campaignId\}:\$\{chapter\.level\}:\$\{status\}`/);
+  assert.match(screen, /const key = `restore:\$\{campaign\.campaignId\}:\$\{status\}`/);
+  assert.match(screen, /const key = `resolution:\$\{campaign\.campaignId\}:\$\{chapter\.level\}:\$\{status\}`/);
+});
+
 test('paid world upgrades spend visibly from the persistent top-bar Glow pill', () => {
   const screen = readFileSync(resolve(root, 'components/katchadeck/roster/katchimera-kingdom-screen.tsx'), 'utf8');
   assert.match(screen, /const node = glowCurrencyArtRef\.current/);
