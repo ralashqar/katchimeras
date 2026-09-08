@@ -2,6 +2,7 @@ import type { ConversationDefinition, ConversationSession, ConversationTranscrip
 
 /** Legacy turns are reconstructed only when their authored answer still exists. */
 export function conversationTranscript(session: ConversationSession, definition: ConversationDefinition): ConversationTranscriptEntry[] {
+  const companionSpeaker = definition.speakerSkinId ?? session.formId;
   const turns = session.turns.map((turn) => {
     if (turn.transcript) return turn.transcript;
     const node = definition.nodes.find((candidate) => candidate.id === turn.nodeId);
@@ -12,9 +13,9 @@ export function conversationTranscript(session: ConversationSession, definition:
     if (!option) return [];
     const prompt = question?.prompt ?? (node && 'prompt' in node ? node.prompt : '');
     return [
-      { id: `${turn.id}:prompt`, speaker: session.formId, text: prompt },
+      { id: `${turn.id}:prompt`, speaker: companionSpeaker, text: prompt },
       { id: `${turn.id}:answer`, speaker: 'player' as const, text: option.spokenText ?? option.label },
-      { id: `${turn.id}:reply`, speaker: session.formId, text: option.reply },
+      { id: `${turn.id}:reply`, speaker: companionSpeaker, text: option.reply },
     ].filter((entry) => entry.text.trim());
   });
   return [...(session.transcriptPrefix ?? []),

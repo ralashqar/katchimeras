@@ -1,5 +1,13 @@
 import { WISP_CATALOG_VERSION, WISPS_BY_ID } from '@/constants/wisps';
-import type { WispCollectionState, WispId } from '@/types/wisp';
+import type { WispCollectionState, WispGrantSource, WispId } from '@/types/wisp';
+
+export type WispGrantResult = {
+  applied: boolean;
+  discovered: boolean;
+  previousCount: number;
+  nextCount: number;
+  state: WispCollectionState;
+};
 
 export const EMPTY_WISP_STATE: WispCollectionState = {
   version: 2,
@@ -10,6 +18,7 @@ export const EMPTY_WISP_STATE: WispCollectionState = {
   appliedGrantReceiptIds: [],
   resonanceCounts: {},
   pendingResonance: null,
+  journeyRewards: {},
 };
 
 export function normalizeWispState(value: unknown): WispCollectionState {
@@ -70,5 +79,65 @@ export function normalizeWispState(value: unknown): WispCollectionState {
           nextCount: Math.max(2, Math.floor(candidate.pendingResonance.nextCount)),
         }
       : null,
+    journeyRewards: Object.fromEntries(Object.entries(candidate.journeyRewards ?? {}).filter(([rewardId, receipt]) => (
+      Boolean(rewardId)
+      && Boolean(receipt)
+      && WISPS_BY_ID.has(receipt.wispId)
+      && Number.isFinite(receipt.grantedAt)
+    )).map(([rewardId, receipt]) => [rewardId, {
+      rewardId,
+      wispId: receipt!.wispId,
+      choiceIds: Array.isArray(receipt!.choiceIds) ? receipt!.choiceIds.filter((id): id is string => typeof id === 'string') : [],
+      grantedAt: receipt!.grantedAt,
+      discovered: Boolean(receipt!.discovered),
+      previousCount: Math.max(0, Math.floor(Number(receipt!.previousCount) || 0)),
+      nextCount: Math.max(1, Math.floor(Number(receipt!.nextCount) || 1)),
+      seenReveal: Boolean(receipt!.seenReveal),
+    }])),
   };
+}
+
+/** Pure, receipt-idempotent grant shared by UI and story-flow reward effects. */
+export function applyWispGrant(
+  input: WispCollectionState,
+  id: WispId,
+  receiptId: string,
+  source: WispGrantSource,
+  options: { increaseResonance?: boolean; now?: number; sourceDayId?: string | null } = {},
+): WispGrantResult {
+  const state = normalizeWispState(input);
+  const existing = state.inventory[id];
+  // An already-owned Wisp represents its first point of Resonance even when
+  // it predates the Resonance counter. This keeps migrated saves and modern
+  // Journey rewards on the same 1 -> 2 duplicate progression.
+  const previousCount = existing ? Math.max(1, state.resonanceCounts?.[id] ?? 0) : 0;
+  if (!receiptId || (state.appliedGrantReceiptIds ?? []).includes(receiptId)) {
+    return { applied: false, discovered: !existing, previousCount, nextCount: previousCount, state };
+  }
+  const now = options.now ?? Date.now();
+  const quantity = (existing?.quantity ?? 0) + 1;
+  const nextCount = options.increaseResonance ? previousCount + 1 : previousCount;
+  const next = normalizeWispState({
+    ...state,
+    unlocked: {
+      ...state.unlocked,
+      [id]: state.unlocked[id] ?? { wispId: id, unlockedAt: now, sourceDayId: options.sourceDayId ?? null, seenReveal: false },
+    },
+    inventory: {
+      ...state.inventory,
+      [id]: {
+        wispId: id,
+        quantity,
+        sources: [...new Set([...(existing?.sources ?? []), source])],
+        firstGrantedAt: existing?.firstGrantedAt ?? now,
+        giftableQuantity: Math.max(existing?.giftableQuantity ?? 0, quantity - 1),
+      },
+    },
+    appliedGrantReceiptIds: [...(state.appliedGrantReceiptIds ?? []), receiptId],
+    resonanceCounts: options.increaseResonance ? { ...(state.resonanceCounts ?? {}), [id]: nextCount } : state.resonanceCounts,
+    pendingResonance: options.increaseResonance && existing
+      ? { wispId: id, previousCount: Math.max(1, previousCount), nextCount: Math.max(2, nextCount) }
+      : state.pendingResonance,
+  });
+  return { applied: true, discovered: !existing, previousCount, nextCount, state: next };
 }

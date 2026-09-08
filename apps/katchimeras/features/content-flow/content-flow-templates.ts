@@ -1,4 +1,5 @@
 import type { ContentFlowNode, ContentFlowSurface } from '@/types/content-flow';
+import type { WispId } from '@/types/wisp';
 import { defineStory, story } from './story-manifest';
 
 export function conversationScene(input: {
@@ -57,6 +58,20 @@ export function residentDiscoveryChapter(input: {
     story.presentation({ id: `${prefix}:dialogue`, capability: 'resident.dialogue', surface: 'merge', presentationId: 'resident-dialogue', payload, next: `${prefix}:orders` }),
     story.task({ id: `${prefix}:orders`, capability: 'resident.orders', surface: 'merge', taskId: 'resident-orders', payload, requirements: [{ id: 'orders', event: { type: 'resident.orders_completed' } }], next: `${prefix}:card-reward` }),
     story.presentation({ id: `${prefix}:card-reward`, capability: 'resident.card_reward', surface: 'collection', presentationId: 'resident-card-reward', payload, replayPolicy: 'continue', next: input.next }),
+  ];
+}
+
+export function journeyWispRewardChapter(input: {
+  id: string;
+  rewardId: string;
+  candidateWispIds: readonly WispId[];
+  fallbackWispId: WispId;
+  next: string;
+}): ContentFlowNode[] {
+  const payload = { rewardId: input.rewardId, candidateWispIds: input.candidateWispIds, fallbackWispId: input.fallbackWispId };
+  return [
+    story.effect({ id: input.id, capability: 'journey.wisp_reward', effectId: input.rewardId, payload, next: `${input.id}:reveal` }),
+    story.presentation({ id: `${input.id}:reveal`, capability: 'journey.wisp_reward_reveal', surface: 'companion', presentationId: input.rewardId, payload: { sourceEffectNodeId: input.id, rewardId: input.rewardId }, replayPolicy: 'replay', next: input.next }),
   ];
 }
 

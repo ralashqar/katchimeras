@@ -34,7 +34,7 @@ test('required splash alternates portraits and cannot close before final saved C
   const Narrative = module.WorldUpgradeNarrative as React.ComponentType<Record<string, unknown>>;
   const world = createInitialMergeWorldState(Date.UTC(2026, 8, 6), ['mossprout']);
   const story = WORLD_UPGRADE_STORIES[0]; let closed = 0; let fail = false; const saved: number[] = [];
-  const props = { offer: { ...worldUpgradeOffers(world)[0], currentLevel: 1, eligible: false }, world, required: true,
+  const props = { offer: { ...worldUpgradeOffers(world).find((offer) => offer.id === story.offerId && offer.nextLevel === story.level)!, currentLevel: 1, eligible: false }, world, required: true,
     onClose: () => closed++, saveRead: async (_id: string, count: number) => { if (fail) throw new Error('offline'); saved.push(count); } };
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<Narrative {...props} />); });

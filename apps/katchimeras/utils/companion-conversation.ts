@@ -11,6 +11,7 @@ import type {
   ConversationV2FamilyId,
   QueuedConversationSignal,
 } from '@/types/companion-conversation';
+import { conversationOptionWispAffinity } from '@/utils/journey-wisp-affinity';
 
 export const MAX_CONVERSATION_TRANSITIONS = 16;
 
@@ -101,7 +102,7 @@ export function answerConversation(
   if (node.kind === 'choice') {
     const option = node.options.find((candidate) => candidate.id === optionId);
     if (!option) return { session, completedGame: false };
-    const answered = withAnsweredOption(workingSession, node.id, option, answeredAt, option.nextNodeId, node.prompt);
+    const answered = withAnsweredOption(workingSession, node.id, option, answeredAt, option.nextNodeId, node.prompt, definition.speakerSkinId);
     return {
       session: advancePastReplyBeforeNextQuestion(answered, definition, answeredAt),
       completedGame: false,
@@ -112,7 +113,7 @@ export function answerConversation(
     if (!option) return { session, completedGame: false };
     const pollResult = buildVillagePollResult(node.options, optionId, `${workingSession.id}:${node.id}`);
     const answered = {
-      ...withAnsweredOption(workingSession, node.id, option, answeredAt, node.nextNodeId, node.prompt),
+      ...withAnsweredOption(workingSession, node.id, option, answeredAt, node.nextNodeId, node.prompt, definition.speakerSkinId),
       pollResult,
     };
     return {
@@ -594,13 +595,14 @@ function completeSession(session: ConversationSession, completedAt: number): Con
   return { ...session, status: 'completed', completedAt, updatedAt: completedAt, ...(session.dialoguePresentation ? { dialogueAcknowledgedAt: completedAt } : {}) };
 }
 
-function answerTranscript(session: ConversationSession, prompt: string, option: ConversationOption) {
+function answerTranscript(session: ConversationSession, prompt: string, option: ConversationOption, speakerSkinId?: KatchimeraSkinId) {
   const id = `conversation-turn:${session.id}:${session.turns.length + 1}`;
   const previous = session.turns.at(-1)?.transcript?.find((entry) => entry.speaker === 'player')?.text ?? 'that';
+  const speaker = speakerSkinId ?? session.formId;
   return [
-    { id: `${id}:prompt`, speaker: session.formId, text: prompt.replace('{answer}', previous) },
+    { id: `${id}:prompt`, speaker, text: prompt.replace('{answer}', previous) },
     { id: `${id}:answer`, speaker: 'player' as const, text: option.spokenText ?? option.label },
-    { id: `${id}:reply`, speaker: session.formId, text: option.reply },
+    { id: `${id}:reply`, speaker, text: option.reply },
   ].filter((entry) => entry.text.trim());
 }
 
@@ -611,7 +613,9 @@ function withAnsweredOption(
   answeredAt: number,
   nextNodeId: string | null,
   prompt: string,
+  speakerSkinId?: KatchimeraSkinId,
 ): ConversationSession {
+  const wispAffinity = conversationOptionWispAffinity(session.familyId, option);
   return {
     ...session,
     pendingReply: option.reply,
@@ -620,16 +624,31 @@ function withAnsweredOption(
     turns: [...session.turns, {
       id: `conversation-turn:${session.id}:${session.turns.length + 1}`,
       nodeId,
-      transcript: answerTranscript(session, prompt, option),
+      transcript: answerTranscript(session, prompt, option, speakerSkinId),
       optionId: option.id,
       ...(option.intentId ? { intentId: option.intentId } : {}),
+      ...(wispAffinity ? { wispAffinity } : {}),
       answeredAt,
     }],
     affinityScores: mergeAffinity(session.affinityScores, option.affinity),
+    wispAffinityScores: mergeWispAffinity(session.wispAffinityScores ?? {}, wispAffinity),
     encounterTurns: (session.encounterTurns ?? 0) + 1,
     updatedAt: answeredAt,
     ...(option.transition ? { exitTransition: option.transition } : {}),
   };
+}
+
+function mergeWispAffinity(
+  current: NonNullable<ConversationSession['wispAffinityScores']>,
+  addition?: ConversationOption['wispAffinity'],
+): NonNullable<ConversationSession['wispAffinityScores']> {
+  if (!addition) return current;
+  const next = { ...current };
+  for (const [id, score] of Object.entries(addition)) {
+    if (!Number.isFinite(score)) continue;
+    next[id as keyof typeof next] = (next[id as keyof typeof next] ?? 0) + Number(score);
+  }
+  return next;
 }
 
 function rewindPendingAnswer(

@@ -31,7 +31,7 @@ import { useCompanionAchievements } from '@/hooks/use-companion-achievements';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
-import type { ConversationNode } from '@/types/companion-conversation';
+import type { ConversationNode, ConversationSession } from '@/types/companion-conversation';
 import type { JournalSource, ManualJournalSubmission } from '@/types/home';
 import type { KatchimeraFamilyId, KatchimeraSkinId, KatchimeraWardrobeState } from '@/types/katchimera';
 import type { KingdomCreature } from '@/types/kingdom';
@@ -237,6 +237,7 @@ export function KingdomCompanionScreen({
   ftueCompanionSurfaceOwned = false,
   renderRegularStage = false,
   reuseUnderlyingStage = false,
+  suppressWorldSpeech = false,
   onVisibleCreatureRewardPulse,
   onFtueBondSpotlightComplete,
   onFtueJourneyDayComplete,
@@ -253,7 +254,7 @@ export function KingdomCompanionScreen({
   onOpenQuestGame?: (creatureId: string, questId: string) => void;
   ftueConversationDefinitionId?: string;
   initialConversationDefinitionId?: string;
-  onInitialConversationComplete?: () => void | Promise<void>;
+  onInitialConversationComplete?: (session: ConversationSession) => void | Promise<void>;
   onFtueConversationComplete?: () => void | Promise<void>;
   onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
   ftueOrderPreviewActive?: boolean;
@@ -268,6 +269,7 @@ export function KingdomCompanionScreen({
   ftueCompanionSurfaceOwned?: boolean;
   renderRegularStage?: boolean;
   reuseUnderlyingStage?: boolean;
+  suppressWorldSpeech?: boolean;
   onVisibleCreatureRewardPulse?: () => void;
   onFtueBondSpotlightComplete?: () => void | Promise<void>;
   onFtueJourneyDayComplete?: () => void;
@@ -638,6 +640,7 @@ export function KingdomCompanionScreen({
           embedded={presentation === 'companion'}
           renderRegularStage={renderRegularStage}
           reuseUnderlyingStage={reuseUnderlyingStage}
+          suppressWorldSpeech={suppressWorldSpeech}
           onVisibleCreatureRewardPulse={onVisibleCreatureRewardPulse}
           creatureId={quests.selectedResident.creature.creatureId}
           name={quests.selectedResident.creature.name}

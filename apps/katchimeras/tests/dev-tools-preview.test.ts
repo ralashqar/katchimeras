@@ -67,6 +67,20 @@ test('Journey developer tools expose scoped reset, quick mode, and full reset co
   assert.match(devPage, /await resetKatchimeraProgressForDebug\(\{ resetAt: Date\.now\(\) \}\);[\s\S]*?resetOnboardingProfile\(\)/);
 });
 
+test('developer tools can grant a large saved Merge wallet for island testing', () => {
+  const devPage = read('app/(tabs)/explore.tsx');
+  const repository = read('utils/merge-world/repository.ts');
+
+  assert.match(devPage, /Currency tools/);
+  assert.match(devPage, /Add 10,000 Glow \+ 500 Energy/);
+  assert.match(devPage, /grantStoredDevMergeCurrency/);
+  assert.match(devPage, /subscribeMergeWorldSnapshots/);
+  assert.match(repository, /export function grantStoredDevMergeCurrency/);
+  assert.match(repository, /if \(!DEV_TOOLS_ENABLED\)/);
+  assert.match(repository, /coins: Math\.min\(999_999/);
+  assert.match(repository, /value: Math\.min\(999_999/);
+});
+
 test('developer tools can fill every empty Haven order tray without mutating real orders', () => {
   const devPage = read('app/(tabs)/explore.tsx');
   const settings = read('utils/dev-settings.ts');

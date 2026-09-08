@@ -78,6 +78,56 @@ test('overlay keeps FTUE modal, uses player portrait, guards taps and finishes e
   assert.equal(timers.size, 0);
 });
 
+test('a batched conversation update reveals one transcript entry per beat', async () => {
+  const motion = nativeMotionHarness();
+  const timers = new Map<number, () => void>(); let serial = 0;
+  const module = loadNativeModule('components/katchadeck/world/conversation-narrative-overlay.tsx', {
+    'react-native': { ...nativeViews, Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', ScrollView: 'ScrollView' },
+    'react-native-reanimated': { ...motion.animated,
+      withTiming: (to: number, options = { duration: 180 }) => motion.animated.withTiming(to, options),
+      withSpring: (to: number) => motion.animated.withTiming(to, { duration: 300 }),
+    },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 12 }) },
+    './narrative-presentation': { NarrativeDialogue: host('Dialogue'), narrativeStyles: {} },
+    './haven-character-portrait': { HavenCharacterPortrait: host('Portrait') },
+    '@/components/katchadeck/egg-avatar/egg-avatar': { EggAvatar: host('Egg') },
+    '@/features/egg-avatar/egg-avatar-provider': { useEggAvatar: () => ({}) },
+    '@/constants/katchimera-skins': { katchimeraSkinById: new Map() },
+    '@/game/days/visuals': { getCreatureVisual: () => null },
+  }, { setTimeout: (fn: () => void) => { timers.set(++serial, fn); return serial; }, clearTimeout: (id: number) => timers.delete(id) });
+  const Overlay = module.ConversationNarrativeOverlay as React.ComponentType<any>;
+  const controls = () => React.createElement(host('Choices'));
+  const initialEntries = [{ id: 'prompt-one', speaker: 'mossprout', text: 'What feels right?' }];
+  const answeredEntries = [
+    ...initialEntries,
+    { id: 'answer-one', speaker: 'player', text: 'A gentler pace.' },
+    { id: 'reply-one', speaker: 'mossprout', text: 'Then we can leave room to breathe.' },
+    { id: 'prompt-two', speaker: 'mossprout', text: 'What shall we notice next?' },
+  ];
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(<Overlay title="Mossprout" checkpoint="question-one" entries={initialEntries} paced onClose={() => {}}>{controls}</Overlay>); });
+  await act(async () => tree.root.findByProps({ accessibilityLabel: 'Continue dialogue' }).props.onPress());
+  assert.equal(tree.root.findAllByType(host('Choices')).length, 1);
+
+  await act(async () => { tree.update(<Overlay title="Mossprout" checkpoint="question-two" entries={answeredEntries} paced initiallyRevealedCount={3} onClose={() => {}}>{controls}</Overlay>); });
+  assert.deepEqual(tree.root.findAllByType(host('Dialogue')).map((node) => node.props.text), [
+    'What feels right?', 'A gentler pace.',
+  ], 'the answer is the only newly admitted line after a batched session update');
+  assert.equal(tree.root.findAllByType(host('Choices')).length, 0);
+
+  await act(async () => { tree.update(<Overlay title="Mossprout" checkpoint="question-two:saved" entries={answeredEntries} paced initiallyRevealedCount={3} onClose={() => {}}>{controls}</Overlay>); });
+  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 2, 'checkpoint-only rerenders cannot skip another speech beat');
+  for (const expectedCount of [3, 4]) {
+    const tap = tree.root.findByProps({ accessibilityLabel: 'Continue dialogue' });
+    await act(async () => tap.props.onPress());
+    assert.equal(tree.root.findAllByType(host('Dialogue')).length, expectedCount);
+    assert.equal(tree.root.findAllByType(host('Choices')).length, 0);
+  }
+  await act(async () => tree.root.findByProps({ accessibilityLabel: 'Continue dialogue' }).props.onPress());
+  assert.equal(tree.root.findAllByType(host('Choices')).length, 1, 'choices wait for acknowledgement of the final prompt');
+  await act(async () => tree.unmount());
+});
+
 
 test('chained FTUE choices remain pressable through the real overlay and choice list', async () => {
   const motion = nativeMotionHarness();

@@ -1,6 +1,7 @@
 import { MOSSPROUT_CAMPAIGN_EPISODES, MOSSPROUT_CAMPAIGN_VERSION } from '@/constants/mossprout-campaign';
 import { assertValidJourneyCampaign } from '@/game/katchimeras/journey-campaign';
 import type { JourneyCampaignStep } from '@/types/journey-campaign';
+import { MOSSPROUT_JOURNEY_WISP_IDS } from '@/utils/journey-wisp-affinity';
 
 export const MOSSPROUT_JOURNEY_CAMPAIGN = assertValidJourneyCampaign({
   id: 'mossprout:journey',
@@ -18,24 +19,18 @@ export const MOSSPROUT_JOURNEY_CAMPAIGN = assertValidJourneyCampaign({
       { id: `${prefix}:opening`, kind: 'conversation', conversationId: episode.openingConversationId, role: 'opening' },
     ];
 
-    if (episode.episodeNumber === 1) {
-      steps.push({ id: `${prefix}:orders`, kind: 'merge_orders', objectiveId: episode.objectiveId!, orders: episode.mergeOrders });
-      if (episode.resolutionConversationId) steps.push({ id: `${prefix}:resolution`, kind: 'conversation', conversationId: episode.resolutionConversationId, role: 'resolution' });
-      if (episode.optionalAction) steps.push({ id: `${prefix}:optional`, kind: 'optional_action', action: episode.optionalAction });
-    } else if (episode.episodeNumber === 2) {
-      steps.push({ id: `${prefix}:orders`, kind: 'merge_orders', objectiveId: episode.objectiveId!, orders: episode.mergeOrders });
-      steps.push({ id: `${prefix}:resident`, kind: 'resident_discovery', selection: 'petalimp', nodeMode: 'fixed_campaign_node' });
-      if (episode.resolutionConversationId) steps.push({ id: `${prefix}:resolution`, kind: 'conversation', conversationId: episode.resolutionConversationId, role: 'resolution' });
-      if (episode.optionalAction) steps.push({ id: `${prefix}:optional`, kind: 'optional_action', action: episode.optionalAction });
-    } else if (episode.episodeNumber >= 3 && episode.episodeNumber <= 9) {
-      steps.push({ id: `${prefix}:resident`, kind: 'resident_discovery', selection: 'next_unearned', nodeMode: 'fixed_campaign_node' });
-      if (episode.resolutionConversationId) steps.push({ id: `${prefix}:resolution`, kind: 'conversation', conversationId: episode.resolutionConversationId, role: 'resolution' });
-      if (episode.optionalAction) steps.push({ id: `${prefix}:optional`, kind: 'optional_action', action: episode.optionalAction });
-    } else {
-      steps.push({ id: `${prefix}:orders`, kind: 'merge_orders', objectiveId: episode.objectiveId!, orders: episode.mergeOrders });
-      if (episode.resolutionConversationId) steps.push({ id: `${prefix}:resolution`, kind: 'conversation', conversationId: episode.resolutionConversationId, role: 'resolution' });
-      if (episode.optionalAction) steps.push({ id: `${prefix}:optional`, kind: 'optional_action', action: episode.optionalAction });
-    }
+    if (episode.mergeOrders.length) steps.push({ id: `${prefix}:orders`, kind: 'merge_orders', objectiveId: episode.objectiveId!, orders: episode.mergeOrders });
+    if (episode.resolutionConversationId) steps.push({ id: `${prefix}:resolution`, kind: 'conversation', conversationId: episode.resolutionConversationId, role: 'resolution' });
+    if (episode.episodeNumber >= 2 && episode.episodeNumber <= 9) steps.push({
+      id: `${prefix}:wisp`, kind: 'wisp_reward', rewardId: `mossprout:journey-wisp:${episode.beatId}`,
+      candidateWispIds: MOSSPROUT_JOURNEY_WISP_IDS, fallbackWispId: 'sprout',
+      legacyNodeIds: [
+        `${prefix}:resident`, `${prefix}:resident:open-garden`, `${prefix}:resident:parcel`,
+        `${prefix}:resident:revealed`, `${prefix}:resident:dialogue`, `${prefix}:resident:orders`,
+        `${prefix}:resident:card-reward`,
+      ],
+    });
+    if (episode.optionalAction) steps.push({ id: `${prefix}:optional`, kind: 'optional_action', action: episode.optionalAction });
     steps.push({ id: `${prefix}:complete`, kind: 'complete' });
 
     return {

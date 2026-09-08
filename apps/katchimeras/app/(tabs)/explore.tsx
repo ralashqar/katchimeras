@@ -61,8 +61,11 @@ import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { pickRandomAchievement } from '@/utils/achievement-celebration';
 import { STREAK_MILESTONE_REWARDS } from '@/utils/streak-engine';
 import {
+  grantStoredDevMergeCurrency,
+  loadMergeWorldState,
   prepareMossproutMergeFtueForDebug,
   resetMergeWorldActivityForDayForDebug,
+  subscribeMergeWorldSnapshots,
   type MossproutMergeFtueStepId,
 } from '@/utils/merge-world/repository';
 import { resetKatchimeraProgressForDebug } from '@/utils/reset-katchimera-progress-for-debug';
@@ -102,6 +105,9 @@ export default function ExploreScreen() {
     beats: string[] | null;
   } | null>(null);
   const [backfilling, setBackfilling] = useState(false);
+  const [currencyToolsOpen, setCurrencyToolsOpen] = useState(false);
+  const [currencyBusy, setCurrencyBusy] = useState(false);
+  const [devWallet, setDevWallet] = useState({ glow: 0, energy: 0 });
   const [journeyToolsOpen, setJourneyToolsOpen] = useState(false);
   const [journeyQuickMode, setJourneyQuickMode] = useState(isJourneyQuickModeEnabled());
 
@@ -151,13 +157,42 @@ export default function ExploreScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      let active = true;
       setProfile(loadOnboardingProfile());
       setStoredState(homeRepository.load());
       setJourneyQuickMode(isJourneyQuickModeEnabled());
+
+      void loadMergeWorldState().then((state) => {
+        if (active) setDevWallet({ glow: state.coins, energy: state.energy.value });
+      });
+      const unsubscribe = subscribeMergeWorldSnapshots((state) => {
+        if (active) setDevWallet({ glow: state.coins, energy: state.energy.value });
+      });
+
+      return () => {
+        active = false;
+        unsubscribe();
+      };
     }, [])
   );
 
   const reveal = createStarterReveal(profile);
+
+  async function handleGrantDevCurrency(input: { glow?: number; energy?: number }) {
+    if (currencyBusy) return;
+    setCurrencyBusy(true);
+    try {
+      const result = await grantStoredDevMergeCurrency(input);
+      setDevWallet({ glow: result.state.coins, energy: result.state.energy.value });
+    } catch (caught) {
+      Alert.alert(
+        'Currency grant failed',
+        caught instanceof Error ? caught.message : 'Glow and Energy could not be added. Please try again.',
+      );
+    } finally {
+      setCurrencyBusy(false);
+    }
+  }
 
   function handleReset() {
     Alert.alert('Restart onboarding?', 'This will wipe the current onboarding profile on this device.', [
@@ -621,6 +656,19 @@ export default function ExploreScreen() {
                 <KatchaButton label="Restart first-session onboarding · keep profile" onPress={handleRestartFirstSession} variant="primary" />
                 <KatchaButton label="Profile Snapshots" onPress={() => router.push('/dev-profile-snapshots' as Href)} variant="primary" />
                 <KatchaButton label="Content Flow Inspector" onPress={() => router.push('/dev-content-flow' as Href)} variant="secondary" />
+                <KatchaButton label={currencyToolsOpen ? 'Hide currency tools' : 'Currency tools'} onPress={() => setCurrencyToolsOpen((open) => !open)} variant="primary" />
+                {currencyToolsOpen ? <View style={styles.journeyTools}>
+                  <View style={styles.devToggleCopy}>
+                    <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">Island testing wallet</ThemedText>
+                    <ThemedText selectable style={styles.devWalletBalance} lightColor="#FFF1AF" darkColor="#FFF1AF">
+                      {devWallet.glow.toLocaleString()} Glow · {devWallet.energy.toLocaleString()} Energy
+                    </ThemedText>
+                    <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">Adds currency to the saved Merge wallet and updates the live island HUD immediately.</ThemedText>
+                  </View>
+                  <KatchaButton label="Add 10,000 Glow + 500 Energy" loading={currencyBusy} onPress={() => void handleGrantDevCurrency({ glow: 10_000, energy: 500 })} variant="primary" />
+                  <KatchaButton label="Add 5,000 Glow" loading={currencyBusy} onPress={() => void handleGrantDevCurrency({ glow: 5_000 })} variant="secondary" />
+                  <KatchaButton label="Add 500 Energy" loading={currencyBusy} onPress={() => void handleGrantDevCurrency({ energy: 500 })} variant="secondary" />
+                </View> : null}
                 <KatchaButton label={journeyToolsOpen ? 'Hide Journey tools' : 'Journey tools'} onPress={() => setJourneyToolsOpen((open) => !open)} variant="primary" />
                 {journeyToolsOpen ? <View style={styles.journeyTools}>
                   <View style={styles.devToggleCopy}>
@@ -1154,6 +1202,7 @@ const styles = StyleSheet.create({
   },
   devToggleCopy: { flex: 1, gap: 3 },
   devToggleTitle: { fontSize: 14, fontWeight: '800', lineHeight: 18 },
+  devWalletBalance: { fontSize: 18, fontWeight: '900', lineHeight: 23 },
   devToggleBody: { fontSize: 11, lineHeight: 15 },
   collectionGrid: {
     flexDirection: 'row',

@@ -114,7 +114,7 @@ const STORIES: Readonly<Record<number, DayStory>> = {
       ['support-tiny', 'One small step', 'Small enough to begin. I can do that.'],
       ['support-reflect', 'Talking it through', 'We can look before we leap—or before I trip over a root.'],
       ['support-push', 'A little encouragement', 'A kind push, then. No catapults.'],
-      ['support-company', 'Just some company', 'I’m very good at being nearby. {{guest}} is too—meet Petalimp.'],
+      ['support-company', 'Just some company', 'I’m very good at being nearby. {{guest}} is too—meet Fernip.'],
     ],
     bridge: '{{guest}} heard the pond knock too. Let’s make a listening place, then give the water a path home. Two small jobs. No heroic pond-diving.',
     returnPrompt: 'You did it. The water followed your path, and {{guest}} has been staring into the first puddle as if expecting an encore. What do you notice?',
@@ -267,7 +267,7 @@ const pondOpening = (): ConversationDefinition => ({ ...base(episode(2).openingC
     { id: 'nature-unsure', label: 'Nowhere comes to mind.', reply: 'Then we’ll leave that question open. Come hear this pond.', nextNodeId: 'bridge' },
   ] },
   ...['mossprout:window-view', 'mossprout:notice-living-thing', 'mossprout:check-plant'].map((id) => ({ id: `habit.${id}`, kind: 'quick_goal_proposal' as const, storyDaily: true, prompt: 'Would you like to make room for this each day?', templateId: id, title: lifeHabitById.get(id)!.title, nextNodeId: 'bridge' })),
-  { id: 'bridge', kind: 'end', message: 'Petalimp heard it too. Let’s make a listening place, then give the trickle a path home.' },
+  { id: 'bridge', kind: 'end', message: 'Fernip heard it too. Let’s make a listening place, then give the trickle a path home.' },
 ]), version: 5 });
 const pondResolution = (): ConversationDefinition => ({ ...base(episode(2).resolutionConversationId!, `${episode(2).title}: return`, [
   { id: 'scene', kind: 'choice', phase: 'resolve', prompt: 'Water! I was preparing a very polite speech to a frog.\n\nWhat would you like to remember about this?', options: choiceOptions([

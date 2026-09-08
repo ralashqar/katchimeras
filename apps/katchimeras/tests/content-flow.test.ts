@@ -234,8 +234,11 @@ test('all Mossprout Journey days compile as executable, terminal graphs', () => 
   const dayOne = flows[0]!;
   const dayTwo = flows[1]!;
   assert.equal(dayOne.nodes.some((node) => node.kind === 'effect' && node.effectType === 'resident.grant_parcel'), false);
-  assert.ok(dayTwo.nodes.some((node) => node.kind === 'effect' && node.effectType === 'resident.grant_parcel'));
-  assert.ok(dayTwo.nodes.some((node) => node.kind === 'presentation' && node.presentationType === 'resident.card_reward'));
+  assert.equal(dayTwo.nodes.some((node) => node.kind === 'effect' && node.effectType === 'resident.grant_parcel'), false);
+  assert.ok(dayTwo.nodes.some((node) => node.kind === 'effect' && node.effectType === 'journey.wisp_reward'));
+  assert.ok(dayTwo.nodes.some((node) => node.kind === 'presentation' && node.presentationType === 'journey.wisp_reward_reveal'));
+  const legacyResidentNode = 'mossprout:journey:quiet-patch:pond-knock:resident:card-reward';
+  assert.equal(dayTwo.migrations?.[legacyResidentNode], 'mossprout:journey:quiet-patch:pond-knock:wisp');
 });
 
 test('the shipping FTUE is a direct data-driven Content Flow manifest', () => {

@@ -13,6 +13,8 @@ import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-co
 import { useStepplingDayOne } from '@/features/companion/use-steppling-day-one';
 import { STEPPLING_DAY_ONE_CONVERSATION_ID } from '@/constants/steppling-day-one-conversation';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { WispDiscoveryReveal } from '@/components/katchadeck/wisps/wisp-discovery-reveal';
+import { WispResonanceReveal } from '@/components/katchadeck/wisps/wisp-resonance-reveal';
 import { markFlowStart, reportFlowReady } from '@/utils/flow-performance';
 import { companionIdForFamily, familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
@@ -52,7 +54,18 @@ import {
 } from '@/features/onboarding/mossprout-bond-share';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import type { ConversationSession } from '@/types/companion-conversation';
+import type { JourneyWispRewardReceipt } from '@/types/wisp';
 import { MOSSPROUT_FIRST_REST_CONVERSATION_ID } from '@/constants/mossprout-ftue-conversations';
+import { useStoryPresentationOperation } from '@/features/content-flow/use-story-presentation-operation';
+import { contentFlowEffectResult } from '@/features/content-flow/story-world-operations';
+import { acknowledgeStoredJourneyWispReward } from '@/utils/wisp-storage';
+import { useWisps } from '@/features/wisps/wisp-provider';
+
+type JourneyWispPresentation = {
+  receipt: JourneyWispRewardReceipt;
+  finish: () => void;
+};
 
 function isResidentFtueStep(stepId: string) {
   return stepId === 'companion.resident_affinity'
@@ -77,18 +90,20 @@ function prepareMossproutFirstResidentHandoff(now = Date.now()) {
   });
 }
 
-export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false, onHostedClose, onHostedFtueComplete, onHostedOpenMerge, onVisibleCreatureRewardPulse }: {
+export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, hostedNarrativeRequired = false, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false, onHostedClose, onHostedFtueComplete, onHostedInitialConversationComplete, onHostedOpenMerge, onVisibleCreatureRewardPulse }: {
   creatureId: string;
   source?: 'merge-world';
   ftueRouteOrigin?: boolean;
   ftueConversationDefinitionId?: string;
   journeyReturnConversationDefinitionId?: string;
+  hostedNarrativeRequired?: boolean;
   residentStoryResumeRequested?: boolean;
   renderRegularStage?: boolean;
   reuseUnderlyingStage?: boolean;
   hostedInHaven?: boolean;
   onHostedClose?: () => void;
   onHostedFtueComplete?: () => void;
+  onHostedInitialConversationComplete?: (definitionId: string, session: ConversationSession) => void | Promise<void>;
   onHostedOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
   onVisibleCreatureRewardPulse?: () => void;
 }) {
@@ -112,6 +127,40 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   // empty across that gap so its dashboard, speech bubble, and action dock never
   // get a chance to enter and then be cut off by the destination.
   const [narrativeHandoffActive, setNarrativeHandoffActive] = useState(false);
+  const [journeyWispPresentation, setJourneyWispPresentation] = useState<JourneyWispPresentation | null>(null);
+  const wisps = useWisps();
+  useStoryPresentationOperation('companion', 'journey.wisp_reward_reveal', async (work, run, signal) => {
+    const payload = work.payload as { sourceEffectNodeId?: string; rewardId?: string };
+    if (!payload.sourceEffectNodeId || !payload.rewardId) throw new Error('Journey Wisp reveal is missing its reward reference');
+    const receipt = contentFlowEffectResult<JourneyWispRewardReceipt>(
+      run.effectReceipts,
+      run.runId,
+      payload.sourceEffectNodeId,
+      payload.rewardId,
+    );
+    if (!receipt) throw new Error(`Journey Wisp reward ${payload.rewardId} was not committed`);
+    await new Promise<void>((resolve) => {
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        signal.removeEventListener('abort', abort);
+        setJourneyWispPresentation((current) => current?.receipt.rewardId === receipt.rewardId ? null : current);
+        resolve();
+      };
+      const abort = () => finish();
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
+      else setJourneyWispPresentation({ receipt, finish });
+    });
+  }, surfaceActive);
+  const finishJourneyWispPresentation = useCallback((equip = false) => {
+    const presentation = journeyWispPresentation;
+    if (!presentation) return;
+    if (equip) wisps.equip(presentation.receipt.wispId);
+    acknowledgeStoredJourneyWispReward(presentation.receipt.rewardId);
+    presentation.finish();
+  }, [journeyWispPresentation, wisps]);
   useEffect(() => {
     if (!stepplingDayOne.gardenHandoffPending) { stepplingGardenOpening.current = false; return; }
     if (!surfaceActive || !stepplingDayOne.ready || stepplingDayOne.error || stepplingGardenOpening.current) return;
@@ -177,6 +226,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     && navigationFtueRun.stepId === 'companion.resident_match_result';
   const residentFtueGraphActive = navigationFtueRun?.status === 'active'
     && isResidentFtueStep(navigationFtueRun.stepId);
+  const hostedInitialConversationId = journeyReturnConversationDefinitionId ?? stepplingDayOne.definitionId;
   const activeFtueConversationDefinitionId = navigationFtueRun?.status === 'active'
     && (navigationFtueRun.stepId === 'companion.first_meeting'
       || navigationFtueRun.stepId === 'companion.chapter_zero_return')
@@ -675,7 +725,9 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   // animation worklets behind Today, Merge, or a quest. All durable companion
   // progress already lives in the repositories and is rehydrated on focus.
   // A camera opened here retains this subtree so its Back restores the same menu.
-  if (narrativeHandoffActive || stepplingDayOne.gardenHandoffPending || mistHandoffActive || pendingMistExit) return <View pointerEvents="box-none" style={styles.inactiveScreen}>
+  if (narrativeHandoffActive || stepplingDayOne.gardenHandoffPending) return <View pointerEvents="box-none" style={styles.inactiveScreen} />;
+
+  if (mistHandoffActive || pendingMistExit) return <View pointerEvents="box-none" style={styles.inactiveScreen}>
     {mistHandoffError ? <View style={{ position: 'absolute', bottom: 40, left: 24, right: 24 }}>
       <KatchaButton label="Explore the mist · Try again" onPress={() => void continueToMist()} />
     </View> : null}
@@ -697,14 +749,18 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     return <StepplingGardenFinale hosted={hostedInHaven} summary={stepplingLesson.run?.nodeId === 'summary'} />;
   }
   return (
+    <View style={styles.screen}>
     <KingdomCompanionScreen
       active={surfaceActive}
       forceMossproutAvailable={hostedInHaven}
       ftueConversationDefinitionId={activeFtueConversationDefinitionId}
       initialConversationDefinitionId={!residentStoryResumeActive && navigationFtueRun?.status === 'active' && navigationFtueRun.stepId === 'companion.resident_affinity'
         ? 'mossprout:game:form-finder'
-        : journeyReturnConversationDefinitionId ?? stepplingDayOne.definitionId}
-      onInitialConversationComplete={familyId === 'steppling' ? completeStepplingNarrative : undefined}
+        : hostedInitialConversationId}
+      onInitialConversationComplete={hostedInitialConversationId ? async (session) => {
+        if (familyId === 'steppling' && hostedInitialConversationId === stepplingDayOne.definitionId) await completeStepplingNarrative();
+        await onHostedInitialConversationComplete?.(hostedInitialConversationId, session);
+      } : undefined}
       discoveryRecords={discovery.records}
       onFtueConversationComplete={activeFtueConversationDefinitionId || residentFtueGraphActive ? completeFtueConversation : undefined}
       onCompletedConversationExit={async (definitionId) => {
@@ -745,7 +801,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       ftueResidentHandoffActive={ftueResidentHandoffActive}
       ftueResidentMatchResultActive={residentMatchResultActive}
       ftueResidentStoryResume={residentStoryResumeActive}
-      ftueNavigationLocked={ftueNavigationLocked}
+      ftueNavigationLocked={ftueNavigationLocked || hostedNarrativeRequired}
       ftueCompanionSurfaceOwned={ftueCompanionSurfaceOwned}
       onFtueBondSpotlightComplete={acknowledgeFtueBond}
       onFtueJourneyDayComplete={completeFtueJourneyDay}
@@ -788,11 +844,28 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       presentation="companion"
       renderRegularStage={renderRegularStage}
       reuseUnderlyingStage={reuseUnderlyingStage}
+      suppressWorldSpeech={hostedNarrativeRequired}
       onVisibleCreatureRewardPulse={onVisibleCreatureRewardPulse}
     />
+    {journeyWispPresentation?.receipt.discovered ? (
+      <WispDiscoveryReveal
+        id={journeyWispPresentation.receipt.wispId}
+        onDismiss={() => finishJourneyWispPresentation(false)}
+        onEquip={() => finishJourneyWispPresentation(true)}
+      />
+    ) : journeyWispPresentation ? (
+      <WispResonanceReveal
+        id={journeyWispPresentation.receipt.wispId}
+        previousCount={journeyWispPresentation.receipt.previousCount}
+        nextCount={journeyWispPresentation.receipt.nextCount}
+        onDismiss={() => finishJourneyWispPresentation(false)}
+      />
+    ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   inactiveScreen: { flex: 1 },
+  screen: { flex: 1 },
 });

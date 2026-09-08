@@ -51,6 +51,34 @@ import {
 } from '@/features/onboarding/ftue-home-camera';
 import { eggScaleForEnergyRatio } from '@/utils/today-growth';
 import { MOSSPROUT_HELP_OPTIONS, MOSSPROUT_DAY_OPTIONS, MOSSPROUT_WATER_OPTIONS, mossproutSeedIntroduction } from '@/features/onboarding/mossprout-ftue-copy';
+import { mergeFtueDisplayGuide } from '@/features/onboarding/merge-ftue-guidance';
+
+test('Merge speech guidance is one green line and appears only for first-use mechanics', () => {
+  const mergeSteps = MOSSPROUT_FTUE_SCRIPT.steps.filter((step) => step.surface === 'merge');
+  const visible = mergeSteps.flatMap((step) => {
+    const guide = mergeFtueDisplayGuide(step);
+    return guide ? [{ id: step.id, guide }] : [];
+  });
+  assert.deepEqual(visible.map(({ id }) => id), [
+    'merge.seed_drag',
+    'merge.serve_sprout',
+    'merge.plant.spawn',
+    'merge.plant.seed_pairs',
+    'merge.return_note',
+    'merge.resident_parcel',
+    'merge.resident_card',
+  ]);
+  for (const { guide } of visible) {
+    assert.equal(guide.eyebrow, '');
+    assert.equal(guide.body, '');
+    assert.ok(guide.title.length <= 42);
+  }
+  assert.equal(mergeFtueDisplayGuide({
+    id: 'glow.lesson.single.match-2',
+    cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'sprout' } },
+    guide: { eyebrow: 'old', title: 'A much longer title', body: 'A much longer explanation.' },
+  })?.title, 'Match the Sprout in the mist.');
+});
 
 test('hero copy fits three lines without captions and Haven spotlight retries native layout', () => {
   const copy = readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8');
@@ -600,7 +628,7 @@ test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   assert.match(merge, /mergeGuidanceVisible = active && !serveFlight && !parcelFlight/);
   assert.match(merge, /spotlight=\{mergeGuidanceVisible \? mergeGuidanceSpotlight : null\}/);
   assert.match(merge, /const mergeGuidanceSpotlight = ftueStep\?\.spotlight \?\? postFtueDiscoveryGuidance\.spotlight/);
-  assert.match(merge, /const mergeGuidanceGuide = ftueStep\?\.surface === 'merge' \? ftueStep\.guide : null/);
+  assert.match(merge, /const mergeGuidanceGuide = ftueStep\?\.surface === 'merge' \? mergeFtueDisplayGuide\(ftueStep\) : null/);
   assert.match(merge, /guide=\{mergeGuidanceVisible \? mergeGuidanceGuide : null\}/);
   assert.match(overlay, /<MergeFtueEggGuide[\s\S]*?guideAnchorFrame\(spotlight, currentLayout\.spotlightFrames\)/);
   assert.ok(overlay.indexOf('<MergeFtueEggGuide') < overlay.indexOf('<FtueFingerCue'), 'the finger must render above the guide bubble');
@@ -698,7 +726,8 @@ test('route-changing FTUE actions persist before navigation and owned companion 
   assert.doesNotMatch(companion, /Could not prepare Mossprout Garden handoff'[\s\S]{0,120}?throw error/);
   assert.match(companion, /run\?\.stepId === 'companion\.first_meeting'[\s\S]*?setNarrativeHandoffActive\(true\)[\s\S]*?actionId: 'companion\.complete_first_meeting'[\s\S]*?actionId: 'companion\.continue_to_planting'[\s\S]*?world\.garden_arrival/);
   assert.match(companion, /completeStepplingNarrative = useCallback[\s\S]*?setNarrativeHandoffActive\(true\)[\s\S]*?completeStepplingDayOne/);
-  assert.match(companion, /if \(narrativeHandoffActive \|\| stepplingDayOne\.gardenHandoffPending \|\| mistHandoffActive \|\| pendingMistExit\) return/);
+  assert.match(companion, /if \(narrativeHandoffActive \|\| stepplingDayOne\.gardenHandoffPending\) return/);
+  assert.match(companion, /if \(mistHandoffActive \|\| pendingMistExit\) return/);
   assert.match(roster, /openFtueGarden = useCallback\(async \(\) => \{[\s\S]*?transitionTo\(\{[\s\S]*?target: 'merge'[\s\S]*?advanceFtueActionDurably[\s\S]*?result\.step\?\.surface !== 'merge'[\s\S]*?router\.push/);
   assert.doesNotMatch(roster, /continueFirstBloomToResident|haven\.continue_to_resident/);
   assert.match(companion, /run\?\.stepId === 'companion\.chapter_zero_return'[\s\S]*?nextStepId: 'companion\.water_together'/);
@@ -945,7 +974,7 @@ test('the first resident Garden handoff uses one shared parcel panel without a s
   const conversation = readFileSync('constants/mossprout-story-conversations.ts', 'utf8');
   const conversationFlow = readFileSync('features/companion/use-companion-conversation-flow.ts', 'utf8');
   assert.match(interaction, /residentParcelGardenPanelActive = props\.ftueResidentHandoffActive[\s\S]*?!props\.ftueResidentStoryResume/);
-  assert.match(interaction, /showSpeechBubble=\{ftueHasIntentionalSpeech && !narrativeOverlayVisible[\s\S]*?&& props\.ftueProfileStep !== 'bond_choice' && props\.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && \(Boolean\(companionSpeechTitle\) \|\| !residentParcelGardenPanelActive\)\}/);
+  assert.match(interaction, /showSpeechBubble=\{!props\.suppressWorldSpeech && ftueHasIntentionalSpeech && !narrativeOverlayVisible[\s\S]*?&& props\.ftueProfileStep !== 'bond_choice' && props\.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && \(Boolean\(companionSpeechTitle\) \|\| !residentParcelGardenPanelActive\)\}/);
   assert.match(interaction, /residentParcelHandoffActive=\{residentParcelGardenPanelActive\}/);
   assert.match(stage, /residentParcelHandoffActive \? <View[\s\S]*?<MossproutJourneyRequestPanel/);
   assert.match(stage, /actionLabel="Go to the Garden"[\s\S]*?eyebrow="GARDEN PARCEL"/);
@@ -984,10 +1013,10 @@ test('resident parcel and card guidance swaps only after its newly measured targ
 });
 
 test('resident reveal celebration and dialogue are separate visual phases', () => {
-  const merge = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  assert.match(merge, /celebrating \? <Animated\.View[\s\S]*?resident-celebration[\s\S]*?RotatingRadialSunburst[\s\S]*?CelebrationParticles/);
-  assert.match(merge, /: <Animated\.View[\s\S]*?resident-dialogue[\s\S]*?residentSpeech/);
-  assert.doesNotMatch(merge, /residentRevealCircle/);
+  const reveal = readFileSync('components/katchadeck/world/katchimera-friend-discovery-reveal.tsx', 'utf8');
+  assert.match(reveal, /celebrating \? <Animated\.View[\s\S]*?friend-discovery-celebration[\s\S]*?RotatingRadialSunburst[\s\S]*?CelebrationParticles/);
+  assert.match(reveal, /: <Animated\.View[\s\S]*?friend-discovery-dialogue[\s\S]*?styles\.speech/);
+  assert.doesNotMatch(reveal, /residentRevealCircle/);
 });
 
 test('Merge FTUE updates one persistent finger and spotlight tree for each measured target', () => {
@@ -1264,7 +1293,7 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(companion, /actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: 'companion\.water_together'[\s\S]*?await flushFtuePersistence\(\)/);
   assert.doesNotMatch(companion, /Showing the First Bloom/);
   assert.doesNotMatch(companion, /revealStoredHaven/);
-  assert.match(interaction, /Promise\.resolve\(onInitialConversationComplete\?\.\(\)\)[\s\S]*?\.then\(showFeastleStoryHome\)/);
+  assert.match(interaction, /Promise\.resolve\(onInitialConversationComplete\?\.\(session\)\)[\s\S]*?\.then\(showFeastleStoryHome\)/);
   assert.match(interaction, /CompanionFtueCoachmark[\s\S]*?ftueBondSpotlightActive[\s\S]*?ftueDayOneActionActive/);
   assert.doesNotMatch(companion, /companion\.complete_chapter_zero_return[\s\S]{0,800}?router\.dismissTo/);
   assert.match(repository, /seedStoredMossproutGardenAfterFtue[\s\S]*?completeMossproutChapterZeroSlice[\s\S]*?reconcileCharacterActivity[\s\S]*?status: 'complete'/);

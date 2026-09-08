@@ -141,7 +141,7 @@ export type MergeCharacterActivityOpportunity = {
   createdAt: number;
 };
 
-export type KatchimeraCardAcquisition = 'journey_match' | 'story_resident' | 'resident_discovery' | 'coins';
+export type KatchimeraCardAcquisition = 'journey_match' | 'story_resident' | 'resident_discovery' | 'island_campaign' | 'coins';
 
 export type OwnedKatchimeraCard = {
   cardId: KatchimeraSkinId;
@@ -465,17 +465,50 @@ export type StoryWorldMutationReceipt = {
   economyMode: 'normal' | 'free' | 'grant';
   coinCost: number;
   createdAt: number;
+  transition?: 'island_reveal';
+};
+
+export type IslandCampaignChapterProgress = {
+  level: MossproutNatureIslandLevel;
+  /** The authored answer that shapes this chapter's request and payoff. */
+  selectedOptionId?: string | null;
+  orderIds: string[];
+  servedOrderIds: string[];
+  startedAt: number;
+  /** Set after Petalimp acknowledges the delivered request, before Glow restoration. */
+  returnConversationSeenAt?: number | null;
+  completedAt: number | null;
+};
+
+export type MossproutNatureIslandReveal = {
+  revealedAt: number;
+  receiptId: string;
+  paid: number;
+};
+
+export type IslandCampaignProgress = {
+  campaignId: string;
+  islandId: MossproutNatureIslandId;
+  residentSkinId: KatchimeraSkinId;
+  /** Discovery lets this friend speak and publish requests before their card is earned. */
+  discoveredAt: number;
+  discoveryRevealSeenAt: number | null;
+  cardEarnedAt: number | null;
+  cardRevealSeenAt: number | null;
+  chapters: Record<string, IslandCampaignChapterProgress>;
 };
 
 export type MergeWorldState = {
   /** Reading is independent of purchase flow runs; cursors count revealed lines. */
   upgradeStoryRead?: Record<string, number>;
   upgradeSkinGrants?: Record<string, { skinId: string; grantedAt: number }>;
+  /** Durable mini-campaign state for narrative-led nature islands. */
+  islandCampaigns?: Record<string, IslandCampaignProgress>;
   stepplingEgg?: import('@/features/onboarding/steppling-egg-policy').StepplingEggProgress;
   worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
   glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 };
   stepplingGardenLesson?: { preparedAt: number; servedAt?: number };
-  version: 22;
+  version: 23;
   /** The first personal Merge World is owned by Mossprout. */
   ownerCharacterId: 'mossprout';
   revision: number;
@@ -526,6 +559,8 @@ export type MergeWorldState = {
   haven: {
     tileStages: Partial<Record<MergeCharacterId, HavenStage>>;
     mossproutNatureIslands: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>;
+    /** Level zero can be visible after its mist is cleared, before restoration. */
+    mossproutNatureIslandReveals: Partial<Record<MossproutNatureIslandId, MossproutNatureIslandReveal>>;
     revealState: HavenRevealState;
     mossproutStoryLevel: number;
     nextProceduralOrder: number;
@@ -588,6 +623,13 @@ export type MergeWorldCommand =
   | { type: 'reconcileHavenStory'; characterId: MergeCharacterId; storyLevel: number; now: number }
   | { type: 'upgradeHavenTile'; characterId: MergeCharacterId; stage: HavenStage; now: number; receiptId?: string; economyMode?: 'normal' | 'free' | 'grant'; grantedCoins?: number }
   | { type: 'upgradeMossproutNatureIsland'; islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; now: number; receiptId?: string; economyMode?: 'normal' | 'free' | 'grant'; grantedCoins?: number }
+  | { type: 'revealMossproutNatureIsland'; islandId: MossproutNatureIslandId; campaignId: string; residentSkinId: KatchimeraSkinId; cost: number; receiptId: string; now: number }
+  | { type: 'discoverIslandCampaignResident'; campaignId: string; islandId: MossproutNatureIslandId; residentSkinId: KatchimeraSkinId; now: number }
+  | { type: 'ackIslandCampaignResidentDiscovery'; campaignId: string; now: number }
+  | { type: 'ackIslandCampaignResidentCardReveal'; campaignId: string; now: number }
+  | { type: 'activateIslandCampaignChapter'; campaignId: string; islandId: MossproutNatureIslandId; residentSkinId: KatchimeraSkinId; level: MossproutNatureIslandLevel; selectedOptionId?: string | null; orders: MergeOrder[]; now: number }
+  | { type: 'ackIslandCampaignChapterReturn'; campaignId: string; level: MossproutNatureIslandLevel; now: number }
+  | { type: 'completeIslandCampaignChapter'; campaignId: string; level: MossproutNatureIslandLevel; now: number }
   | { type: 'revealHaven'; now: number }
   | { type: 'grantPlantableMemory'; definitionId: MossproutMemoryPlantId; source: PlantableMemorySource; receiptId: string; now: number }
   | { type: 'placePlantableMemory'; instanceId: string; slotId: MossproutGardenPlantSlotId; receiptId: string; now: number }

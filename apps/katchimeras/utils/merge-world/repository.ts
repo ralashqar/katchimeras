@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { WORLD_UPGRADE_STORIES } from '@/features/world-upgrades/world-upgrade-stories';
 import { upgradeCompletedLevel } from '@/features/world-upgrades/world-upgrade-progress';
 import { measureMergeWork } from './performance';
@@ -270,9 +271,98 @@ export function upgradeStoredMossproutNatureIsland(
   );
 }
 
+/** Starts one island chapter and publishes its authored Merge request exactly once. */
+export function activateStoredIslandCampaignChapter(input: {
+  campaignId: string;
+  islandId: import('@/types/merge-world').MossproutNatureIslandId;
+  residentSkinId: import('@/types/katchimera').KatchimeraSkinId;
+  level: import('@/types/merge-world').MossproutNatureIslandLevel;
+  selectedOptionId?: string | null;
+  orders: import('@/types/merge-world').MergeOrder[];
+}, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'activateIslandCampaignChapter',
+    ...input,
+    now,
+  }), now);
+}
+
+export function acknowledgeStoredIslandCampaignChapterReturn(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'ackIslandCampaignChapterReturn', campaignId, level, now,
+  }), now);
+}
+
+export function completeStoredIslandCampaignChapter(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'completeIslandCampaignChapter', campaignId, level, now,
+  }), now);
+}
+
+/** Developer-only wallet grant for testing long island and Merge progression. */
+export function grantStoredDevMergeCurrency(input: { glow?: number; energy?: number }, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => {
+    if (!DEV_TOOLS_ENABLED) return { state, changed: false, message: 'Developer tools are disabled.' };
+    const glow = Math.max(0, Math.floor(Number(input.glow) || 0));
+    const energy = Math.max(0, Math.floor(Number(input.energy) || 0));
+    if (glow === 0 && energy === 0) return { state, changed: false, message: 'No currency added.' };
+    const next: MergeWorldState = {
+      ...state,
+      coins: Math.min(999_999, state.coins + glow),
+      energy: { ...state.energy, value: Math.min(999_999, state.energy.value + energy) },
+      revision: state.revision + 1,
+      updatedAt: now,
+    };
+    return { state: next, changed: true, message: `Added ${glow.toLocaleString()} Glow and ${energy.toLocaleString()} Energy.` };
+  }, now);
+}
+
+/** Persists the moment an island resident first appears, before any request or card grant. */
+export function discoverStoredIslandCampaignResident(input: {
+  campaignId: string;
+  islandId: import('@/types/merge-world').MossproutNatureIslandId;
+  residentSkinId: import('@/types/katchimera').KatchimeraSkinId;
+}, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'discoverIslandCampaignResident',
+    ...input,
+    now,
+  }), now);
+}
+
+export function acknowledgeStoredIslandCampaignResidentDiscovery(campaignId: string, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'ackIslandCampaignResidentDiscovery',
+    campaignId,
+    now,
+  }), now);
+}
+
+export function acknowledgeStoredIslandCampaignResidentCardReveal(campaignId: string, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'ackIslandCampaignResidentCardReveal',
+    campaignId,
+    now,
+  }), now);
+}
+
 /** Exactly-once story upgrade. Retrying an effect key returns its original receipt. */
 export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryWorldUpgradeEffectPayload, now = Date.now()) {
   const target = payload.target;
+  if (payload.transition === 'island_reveal') {
+    if (target.kind !== 'haven_nature_island' || target.islandId !== 'bloom-garden' || payload.toLevel !== 1 || payload.economy.mode !== 'normal') {
+      throw new Error('Unknown nature-island reveal');
+    }
+    return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+      type: 'revealMossproutNatureIsland',
+      islandId: 'bloom-garden',
+      campaignId: 'island-campaign:petalimp-bloom',
+      residentSkinId: 'petalimp',
+      cost: 40,
+      receiptId: effectKey,
+      now,
+    }), now);
+  }
   if (target.kind === 'haven_structure') {
     const purchase = sharedWorldPurchase(target.structureId);
     if (!purchase || payload.toLevel !== 1 || payload.economy.mode !== 'normal') throw new Error('Unknown shared-world purchase');

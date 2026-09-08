@@ -264,7 +264,11 @@ export function normaliseCompanionContentState(value: unknown): CompanionContent
     introductions: uniqueById((Array.isArray(candidate.introductions) ? candidate.introductions.filter(isIntroduction) : []).map(canonicalizeOwner)).slice(-200),
     visits: uniqueById((Array.isArray(candidate.visits) ? candidate.visits.filter(isVisit) : []).map(canonicalizeOwner)).slice(-200),
     conversationSessions: uniqueById((Array.isArray(candidate.conversationSessions) ? candidate.conversationSessions.filter(isConversationSession).map(migrateStepplingDayOneSession) : [])).slice(-1000),
-    conversationSignals: uniqueById((Array.isArray(candidate.conversationSignals) ? candidate.conversationSignals.filter(isConversationSignal) : [])).slice(-1000),
+    conversationSignals: uniqueById((Array.isArray(candidate.conversationSignals) ? candidate.conversationSignals.filter(isConversationSignal) : []))
+      // Early Bloom Garden builds translated Petalimp chapter receipts into
+      // ordinary Mossprout invitations. The island campaign owns these scenes.
+      .filter((signal) => !(signal.familyId === 'mossprout' && signal.sourceId.startsWith('petalimp-bloom-level-')))
+      .slice(-1000),
     processedConversationEvidenceIds: [...new Set(Array.isArray(candidate.processedConversationEvidenceIds) ? candidate.processedConversationEvidenceIds.filter((id): id is string => typeof id === 'string') : [])].slice(-4000),
     servedConversationDayKeys: [...new Set([
       ...(Array.isArray(candidate.servedConversationDayKeys) ? candidate.servedConversationDayKeys.filter((key): key is string => typeof key === 'string') : []),

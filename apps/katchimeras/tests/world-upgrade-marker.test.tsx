@@ -25,6 +25,8 @@ test('both tutorial marker spotlight targets enclose the full badge at every zoo
     'expo-image': { Image: 'Image' },
     '@/components/katchadeck/progress-bar': { ProgressBar: 'ProgressBar' },
     '@/features/world-upgrades/world-upgrade-stories': { upgradePercent: () => 100 },
+    '@/constants/katchimera-skins': { katchimeraSkinById: new Map() },
+    '@/game/days/visuals': { getCreatureVisual: () => null },
     '@incubator/art-world/ui/upgrade-toy-v1.png': 1,
     '@incubator/art-world/ui/clear-mist-toy-v1.png': 2,
   });

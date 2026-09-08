@@ -1,5 +1,6 @@
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { CompanionEvidenceRef } from '@/types/companion-interaction';
+import type { WispId } from '@/types/wisp';
 
 /** Every family with a complete authored V2 data pack. */
 export const CONVERSATION_V2_FAMILIES = [
@@ -45,6 +46,8 @@ export type ConversationOption = {
   transition?: ConversationTransition;
   intentId?: string;
   affinity?: Partial<Record<KatchimeraSkinId, number>>;
+  /** Authored resonance used by Journey rewards. Choices without affinities remain neutral. */
+  wispAffinity?: Partial<Record<WispId, number>>;
   /** Short authored phrase used when this answer becomes part of an editable journal draft. */
   journalFragment?: string;
 };
@@ -205,6 +208,8 @@ export type ConversationDefinition = {
   id: string;
   version: number;
   familyId: ConversationV2FamilyId;
+  /** Optional guest who speaks while progression stays with the owning family. */
+  speakerSkinId?: KatchimeraSkinId;
   title: string;
   /** Short, action-led copy used when this conversation appears as a daily card. */
   actionTitle?: string;
@@ -247,6 +252,7 @@ export type ConversationTurn = {
   questionId?: string;
   optionId: string;
   intentId?: string;
+  wispAffinity?: Partial<Record<WispId, number>>;
   answeredAt: number;
 };
 
@@ -302,6 +308,7 @@ export type ConversationSession = {
   pendingNextNodeId?: string | null;
   turns: ConversationTurn[];
   affinityScores: Partial<Record<KatchimeraSkinId, number>>;
+  wispAffinityScores?: Partial<Record<WispId, number>>;
   formResult?: ConversationFormResult;
   insightResult?: ConversationInsightResult;
   pollResult?: ConversationPollResult;

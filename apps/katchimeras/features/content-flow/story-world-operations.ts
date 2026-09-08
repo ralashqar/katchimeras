@@ -100,11 +100,12 @@ export function upgradeWorldTargetRecipe(input: {
    * already established the exact composition for the upgrade control. */
   cameraAlreadyFocused?: boolean;
   presentation?: { preset?: string; reactionLine?: string; showCoins?: boolean };
+  transition?: StoryWorldUpgradeEffectPayload['transition'];
 }): ContentFlowNode[] {
   const focusId = `${input.id}.focus`;
   const effectId = `${input.id}.commit`;
   const revealId = `${input.id}.reveal`;
-  const effectPayload: StoryWorldUpgradeEffectPayload = { target: input.target, toLevel: input.toLevel, economy: input.economy };
+  const effectPayload: StoryWorldUpgradeEffectPayload = { target: input.target, toLevel: input.toLevel, economy: input.economy, transition: input.transition };
   const presentationPayload: StoryWorldUpgradePresentationPayload = {
     sourceEffectNodeId: effectId,
     sourceEffectId: effectId,

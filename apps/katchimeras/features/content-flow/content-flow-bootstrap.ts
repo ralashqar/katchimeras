@@ -28,6 +28,10 @@ import { loadCompanionBondState, saveCompanionBondState } from '@/utils/companio
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
 import { homeRepository } from '@/storage/repositories/home-repository';
+import { loadCompanionContentState } from '@/utils/companion-content-storage';
+import { grantStoredJourneyWisp, loadWispState } from '@/utils/wisp-storage';
+import { resolveJourneyWisp } from '@/utils/journey-wisp-affinity';
+import type { WispId } from '@/types/wisp';
 
 import { registerContentFlowEffect } from './content-flow-capabilities';
 import { registerContentFlowDefinition } from './content-flow-catalog';
@@ -87,6 +91,28 @@ export function bootstrapContentFlowCatalog() {
       throw new Error('The resident parcel could not be granted');
     }
     return { effectKey, residentId, dayId };
+  });
+  registerContentFlowEffect('journey.wisp_reward', async ({ effectKey, payload }) => {
+    const rewardId = String(payload.rewardId ?? effectKey);
+    const existing = loadWispState().journeyRewards?.[rewardId];
+    if (existing) return existing;
+    const candidateWispIds = Array.isArray(payload.candidateWispIds) ? payload.candidateWispIds.filter((id): id is WispId => typeof id === 'string') : [];
+    const fallbackWispId = String(payload.fallbackWispId ?? candidateWispIds[0] ?? 'sprout') as WispId;
+    if (!candidateWispIds.length) throw new Error('Journey Wisp reward has no candidates');
+    const priorRewards = Object.values(loadWispState().journeyRewards ?? {});
+    const after = priorRewards.reduce((latest, receipt) => Math.max(latest, receipt.grantedAt), 0);
+    const profile = loadOnboardingProfile();
+    const extraOptionIds = after === 0
+      ? Object.values(profile.mossproutAnswers).filter((value): value is string => typeof value === 'string' && Boolean(value))
+      : [];
+    const resolved = resolveJourneyWisp({
+      candidateWispIds,
+      fallbackWispId,
+      sessions: loadCompanionContentState().conversationSessions,
+      after,
+      extraOptionIds,
+    });
+    return grantStoredJourneyWisp({ rewardId, wispId: resolved.wispId, choiceIds: resolved.choiceIds }).receipt;
   });
   registerContentFlowEffect('optional_action.publish', async ({ effectKey, payload }) => ({ effectKey, action: payload.action }));
   registerContentFlowEffect('relationship.complete_day_one_lesson', async ({ run, effectKey }) => {

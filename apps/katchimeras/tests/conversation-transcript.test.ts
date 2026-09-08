@@ -50,6 +50,14 @@ test('saved transcript survives relaunch and authored text changes; follow-ups c
   assert.deepEqual(conversationTranscript({ ...start(), transcriptPrefix: history }, definition), history);
 });
 
+test('a guest resident can speak while the conversation remains owned by Mossprout', () => {
+  const guestDefinition = { ...definition, speakerSkinId: 'petalimp' as const };
+  const answered = answerConversation(start(), guestDefinition, 'calm', 2).session;
+  assert.deepEqual(conversationTranscript(answered, guestDefinition).map((entry) => entry.speaker), [
+    'petalimp', 'player', 'petalimp',
+  ]);
+});
+
 test('legacy history uses available authored answers and never invents missing choices', () => {
   const session = answerConversation(start(), definition, 'calm', 2).session;
   const legacy = { ...session, turns: session.turns.map(({ transcript, ...turn }) => turn) };
@@ -79,6 +87,7 @@ test('manual presentation traverses the authored packs without skipping replies 
 
 test('only multi-choice interactions use the narrative overlay, including their result nodes', () => {
   assert.equal(conversationUsesNarrativeOverlay({ ...definition, nodes: [{ id: 'end', kind: 'end', message: 'A few more steps.' }] }), false);
+  assert.equal(conversationUsesNarrativeOverlay({ ...definition, tags: ['required-narrative-overlay'], nodes: [{ id: 'end', kind: 'end', message: 'The island is growing.' }] }), true);
   assert.equal(conversationUsesNarrativeOverlay(definition), false, 'linear single-option dialogue stays overhead');
   const choice = definition.nodes[0];
   assert.equal(choice.kind, 'choice');

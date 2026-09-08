@@ -193,7 +193,7 @@ export function KatchimeraCardRevealModal({ cardId, cards, onDone }: {
           <Animated.View entering={FadeInUp.duration(reduceMotion ? 100 : 420)} style={styles.revealHeading}>
             <ThemedText style={styles.revealEyebrow} lightColor="#F2D27C" darkColor="#F2D27C">A NEW GARDEN RESIDENT</ThemedText>
             <ThemedText style={styles.revealTitle} lightColor="#FFF8E4" darkColor="#FFF8E4">{revealed.displayName} joined your deck</ThemedText>
-            <ThemedText style={styles.revealBody} lightColor="rgba(255,248,228,0.74)" darkColor="rgba(255,248,228,0.74)">Their first request is complete. The rest of this nature set is still waiting to be discovered.</ThemedText>
+            <ThemedText style={styles.revealBody} lightColor="rgba(255,248,228,0.74)" darkColor="rgba(255,248,228,0.74)">You grew a place together. Their card now belongs in your nature set.</ThemedText>
           </Animated.View>
           <View style={styles.revealDeck}>
             <Animated.View style={[styles.flipStage, flipStyle]}><KatchimeraCardDeckCarousel cards={revealCards} initialCardId={cardId} maxCardHeight={Math.min(450, height * 0.52)} /></Animated.View>

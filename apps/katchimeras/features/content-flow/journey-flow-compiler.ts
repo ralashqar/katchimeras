@@ -1,6 +1,6 @@
 import type { ContentFlowDefinition, ContentFlowNode } from '@/types/content-flow';
 import type { JourneyCampaignDefinition, JourneyCampaignStep, JourneyDayDefinition } from '@/types/journey-campaign';
-import { conversationScene, mergeOrderTask, residentDiscoveryChapter } from './content-flow-templates';
+import { conversationScene, journeyWispRewardChapter, mergeOrderTask, residentDiscoveryChapter } from './content-flow-templates';
 import { defineStory } from './story-manifest';
 
 function stepEntry(step: JourneyCampaignStep) {
@@ -15,6 +15,8 @@ function compileStep(step: JourneyCampaignStep, next: string): ContentFlowNode[]
       return [conversationScene({ id: step.id, conversationId: step.conversationId, next, questionnaire: true, payload: { result: step.result } })];
     case 'merge_orders':
       return [mergeOrderTask({ id: step.id, objectiveId: step.objectiveId, orderIds: step.orders.map((order) => order.id), orders: step.orders, next })];
+    case 'wisp_reward':
+      return journeyWispRewardChapter({ id: step.id, rewardId: step.rewardId, candidateWispIds: step.candidateWispIds, fallbackWispId: step.fallbackWispId, next });
     case 'optional_action':
       // Optional actions are published as independent child flows. They never
       // hold the Journey Day completion cursor hostage.
@@ -29,11 +31,15 @@ export function compileJourneyDayFlow(campaign: JourneyCampaignDefinition, day: 
     const nextStep = day.steps[index + 1];
     return compileStep(step, nextStep ? stepEntry(nextStep) : step.id);
   });
+  const migrations = Object.fromEntries(day.steps.flatMap((step) => (
+    step.kind === 'wisp_reward' ? (step.legacyNodeIds ?? []).map((legacyId) => [legacyId, step.id]) : []
+  )));
   return defineStory({
     id: `${campaign.id}:${day.id}`,
     version: campaign.version,
     entryNodeId: day.steps[0]!.id,
     nodes,
+    ...(Object.keys(migrations).length ? { migrations } : {}),
     metadata: { kind: 'journey_day' as const, campaignId: campaign.id, familyId: campaign.familyId, dayId: day.id, dayNumber: day.number, title: day.title, insightKey: day.insightKey },
   });
 }

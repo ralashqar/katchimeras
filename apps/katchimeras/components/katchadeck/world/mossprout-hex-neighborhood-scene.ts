@@ -107,6 +107,7 @@ const DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['dre
 // Each island's existing art is the fallback for every unlocked level.
 // Add a levelArt entry with bundled LODs and measured bounds when bespoke art exists.
 type NatureArtSpec = ArtSpec & {
+  revealedArt?: Omit<ArtSpec, 'coord'>;
   levelArt?: Partial<Record<Exclude<MossproutNatureIslandLevel, 0>, Omit<ArtSpec, 'coord'>>>;
 };
 export const MOSSPROUT_NATURE_ISLAND_ART: Record<MossproutNatureIslandId, NatureArtSpec> = {
@@ -126,6 +127,48 @@ export const MOSSPROUT_NATURE_ISLAND_ART: Record<MossproutNatureIslandId, Nature
       full: require('@incubator/art-world/hex/mossprout_focused_v1_bloom_garden_hex_tile.webp'),
       medium: require('@incubator/art-world/hex/mossprout_focused_v1_bloom_garden_hex_tile_512.webp'),
       thumb: require('@incubator/art-world/hex/mossprout_focused_v1_bloom_garden_hex_tile_256.webp'),
+    },
+    revealedArt: {
+      alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_bloom_garden_level_0_hex_tile.webp'],
+      sources: {
+        full: require('@incubator/art-world/hex/mossprout_bloom_garden_level_0_hex_tile.webp'),
+        medium: require('@incubator/art-world/hex/mossprout_bloom_garden_level_0_hex_tile_512.webp'),
+        thumb: require('@incubator/art-world/hex/mossprout_bloom_garden_level_0_hex_tile_256.webp'),
+      },
+    },
+    levelArt: {
+      1: {
+        alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_bloom_garden_level_1_hex_tile.webp'],
+        sources: {
+          full: require('@incubator/art-world/hex/mossprout_bloom_garden_level_1_hex_tile.webp'),
+          medium: require('@incubator/art-world/hex/mossprout_bloom_garden_level_1_hex_tile_512.webp'),
+          thumb: require('@incubator/art-world/hex/mossprout_bloom_garden_level_1_hex_tile_256.webp'),
+        },
+      },
+      2: {
+        alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_bloom_garden_level_2_hex_tile.webp'],
+        sources: {
+          full: require('@incubator/art-world/hex/mossprout_bloom_garden_level_2_hex_tile.webp'),
+          medium: require('@incubator/art-world/hex/mossprout_bloom_garden_level_2_hex_tile_512.webp'),
+          thumb: require('@incubator/art-world/hex/mossprout_bloom_garden_level_2_hex_tile_256.webp'),
+        },
+      },
+      3: {
+        alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_focused_v1_bloom_garden_hex_tile.webp'],
+        sources: {
+          full: require('@incubator/art-world/hex/mossprout_focused_v1_bloom_garden_hex_tile.webp'),
+          medium: require('@incubator/art-world/hex/mossprout_focused_v1_bloom_garden_hex_tile_512.webp'),
+          thumb: require('@incubator/art-world/hex/mossprout_focused_v1_bloom_garden_hex_tile_256.webp'),
+        },
+      },
+      4: {
+        alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_bloom_garden_level_4_hex_tile.webp'],
+        sources: {
+          full: require('@incubator/art-world/hex/mossprout_bloom_garden_level_4_hex_tile.webp'),
+          medium: require('@incubator/art-world/hex/mossprout_bloom_garden_level_4_hex_tile_512.webp'),
+          thumb: require('@incubator/art-world/hex/mossprout_bloom_garden_level_4_hex_tile_256.webp'),
+        },
+      },
     },
   },
   'pond-sanctuary': {
@@ -193,12 +236,15 @@ function layerFor(
 function natureLayerFor(
   islandId: MossproutNatureIslandId,
   level: MossproutNatureIslandLevel,
+  revealed = false,
 ): KingdomTileArtLayer {
   const fallback = MOSSPROUT_NATURE_ISLAND_ART[islandId];
-  const authored = level > 0
+  const authored = level === 0 && revealed && fallback.revealedArt
+    ? { ...fallback, ...fallback.revealedArt }
+    : level > 0
     ? { ...fallback, ...fallback.levelArt?.[level as Exclude<MossproutNatureIslandLevel, 0>] }
     : fallback;
-  const locked = level === 0;
+  const locked = level === 0 && !revealed;
   const rendered = locked
     ? {
         alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS,
@@ -231,6 +277,7 @@ export function buildMossproutHexNeighborhoodScene(
   companionSlots: KingdomHexCompanionSlot[],
   natureIslandLevels: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>,
   gardenState: MossproutGardenSceneState = { level: 0, plantableMemories: [] },
+  natureIslandReveals: Partial<Record<MossproutNatureIslandId, boolean>> = {},
 ): KingdomHexScene {
   const mossprout = companionSlots.find((slot) => slot.familyId === 'mossprout')
     ?? { id: 'family:mossprout', familyId: 'mossprout', kind: 'locked' as const, coord: MAIN.coord };
@@ -288,13 +335,14 @@ export function buildMossproutHexNeighborhoodScene(
     ...MOSSPROUT_NATURE_ISLANDS.map((island) => natureLayerFor(
       island.id,
       natureIslandLevels[island.id] ?? 0,
+      Boolean(natureIslandReveals[island.id]),
     )),
   ];
   // Reserve both art envelopes so changing mist to terrain never shifts the world.
   // Include every island's mist, fallback and authored stages in the bounds.
   // A reveal must never shift the scene origin (and every other island/camera).
   const natureBoundsLayers = MOSSPROUT_NATURE_ISLANDS.flatMap((island) =>
-    [natureLayerFor(island.id, 0), ...island.levels.map((level) => natureLayerFor(island.id, level.level))]);
+    [natureLayerFor(island.id, 0), natureLayerFor(island.id, 0, true), ...island.levels.map((level) => natureLayerFor(island.id, level.level, true))]);
   const boundsLayers = [...rawLayers, lockedSteppling, revealedSteppling, ...natureBoundsLayers];
   const { dx, dy, width, height } = mossproutSceneEnvelope(boundsLayers.map(layer => layer.frame));
   const layers = rawLayers.map((layer) => shiftLayer(layer, dx, dy)).sort((a, b) => a.depth - b.depth);

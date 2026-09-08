@@ -1,4 +1,5 @@
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
+import type { WispId } from '@/types/wisp';
 
 export type JourneyCampaignOrderDefinition = {
   id: string;
@@ -13,6 +14,7 @@ export type JourneyCampaignStep =
   | { id: string; kind: 'questionnaire'; conversationId: string; result: 'resident_affinity' }
   | { id: string; kind: 'resident_discovery'; selection: KatchimeraSkinId | 'matched' | 'next_unearned'; nodeMode: 'fixed_campaign_node' }
   | { id: string; kind: 'merge_orders'; objectiveId: string; orders: readonly JourneyCampaignOrderDefinition[] }
+  | { id: string; kind: 'wisp_reward'; rewardId: string; candidateWispIds: readonly WispId[]; fallbackWispId: WispId; legacyNodeIds?: readonly string[] }
   | { id: string; kind: 'optional_action'; action: 'goal' | 'reflection' | 'playful' }
   | { id: string; kind: 'complete' };
 

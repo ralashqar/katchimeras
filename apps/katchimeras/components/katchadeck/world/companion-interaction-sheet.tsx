@@ -191,7 +191,7 @@ export type CompanionInteractionSheetProps = {
   houseLevel?: number;
   initialDestination?: CompanionDestination | null;
   initialConversationDefinitionId?: string;
-  onInitialConversationComplete?: () => void | Promise<void>;
+  onInitialConversationComplete?: (session: ConversationSession) => void | Promise<void>;
   onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
   ftueOrderPreviewActive?: boolean;
   ftueProfileStep?: 'intro_action' | 'nickname' | 'bond' | 'bond_choice' | 'garden_intro' | 'water_together' | 'first_grow' | 'notice_bond' | 'water_response' | 'first_insight' | 'meditating' | 'resident_result' | null;
@@ -218,6 +218,8 @@ export type CompanionInteractionSheetProps = {
   embedded?: boolean;
   /** Draw the canonical companion environment while retaining a transparent FTUE shell. */
   renderRegularStage?: boolean;
+  /** Prevent the hosted companion speech layer from painting over a nature island. */
+  suppressWorldSpeech?: boolean;
   reuseUnderlyingStage?: boolean;
   /** Mirrors reward feedback onto a creature rendered by an underlying host. */
   onVisibleCreatureRewardPulse?: () => void;
@@ -769,7 +771,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     if (session.dialoguePresentation && !session.dialogueAcknowledgedAt) return;
     if (completedInitialConversationRef.current === session.id) return;
     completedInitialConversationRef.current = session.id;
-    void Promise.resolve(onInitialConversationComplete?.())
+    void Promise.resolve(onInitialConversationComplete?.(session))
       .catch((error) => console.warn('Could not finish the companion return handoff', error))
       .then(showFeastleStoryHome);
   }, [onInitialConversationComplete, props.conversationSession, props.ftueResidentMatchResultActive, props.initialConversationDefinitionId, showFeastleStoryHome]);
@@ -1292,7 +1294,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       void Promise.resolve(onCompletedConversationExit?.(completedConversationDefinitionId) ?? false)
         .then((handled) => handled || completedConversationDefinitionId !== 'mossprout:game:form-finder'
           ? undefined
-          : onInitialConversationComplete?.())
+          : conversationExperience?.session ? onInitialConversationComplete?.(conversationExperience.session) : undefined)
         .then(showFeastleStoryHome, (error) => {
           completedConversationExitRef.current = null;
           console.warn('Could not finish the completed conversation exit', error);
@@ -1300,7 +1302,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       return;
     }
     showFeastleStoryHome();
-  }, [completedConversationDefinitionId, completedConversationSessionId, completedConversationStatus, onCompletedConversationExit, onInitialConversationComplete, showFeastleStoryHome]);
+  }, [completedConversationDefinitionId, completedConversationSessionId, completedConversationStatus, conversationExperience?.session, onCompletedConversationExit, onInitialConversationComplete, showFeastleStoryHome]);
   const conversationFlow = useCompanionConversationFlow({
     manualDialogue: true,
     definition: conversationExperience?.definition ?? null,
@@ -1570,7 +1572,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               && conversationFlow.phase !== 'committing'
               ? conversationFlow.advance
               : undefined}
-            showSpeechBubble={ftueHasIntentionalSpeech && !narrativeOverlayVisible
+            showSpeechBubble={!props.suppressWorldSpeech && ftueHasIntentionalSpeech && !narrativeOverlayVisible
               && props.ftueProfileStep !== 'garden_intro'
               && !(conversationExperience?.definition.id.startsWith('mossprout:ftue:first-meeting:') && conversationExperience.session.status === 'completed' && (route.kind === 'conversation' || route.kind === 'visit'))
               && props.ftueProfileStep !== 'bond_choice' && props.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && (Boolean(companionSpeechTitle) || !residentParcelGardenPanelActive)}

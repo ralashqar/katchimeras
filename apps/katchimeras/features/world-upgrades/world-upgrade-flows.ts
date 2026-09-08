@@ -11,7 +11,11 @@ function upgradeFlow(offer: WorldUpgradeDefinition, version: number) { return de
     // through payment and reveal instead of starting a second pan/zoom.
     storyOperations.preserveCamera({ id: 'approach', next: 'upgrade.focus' }),
     ...upgradeWorldTargetRecipe({ id: 'upgrade', target: offer.target, focusTarget: offer.visualTarget,
-      toLevel: offer.nextLevel, economy: { mode: 'normal' }, cameraAlreadyFocused: true,
+      toLevel: offer.transition === 'island_reveal' ? 1 : offer.nextLevel,
+      economy: offer.economyMode === 'free'
+        ? { mode: 'free', reason: 'Petalimp restores the first flowers after the request.' }
+        : { mode: 'normal' },
+      transition: offer.transition, cameraAlreadyFocused: true,
       presentation: { preset: offer.action === 'Clear mist' ? 'mist-clear' : 'growth', showCoins: true,
         ...(version >= 3 ? { reactionLine: worldUpgradeStory(offer.id, offer.nextLevel)?.after[0]?.text } : {}) }, next: 'complete' }),
     story.complete(),

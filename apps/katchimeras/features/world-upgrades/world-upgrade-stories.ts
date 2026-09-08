@@ -48,7 +48,7 @@ chapter('nature:bloom-garden', [
   ['Which colour should we plant next, Petalimp?', 'Yes.', 'All right. A few beds, and a little of everything.', 'They don’t match. They belong together.'],
   ['The butterflies keep stopping by.', 'They need a scenic route. With snack stops.', 'A flower-lined walk should do nicely.', 'The first visitor has already forgotten where it was going.'],
   ['There is room here for every kind of bloom.', 'Even the ones with wonky petals?', 'Especially those. Let’s let the whole garden shine.', 'I would love to stay. There is so much blooming left to do.'],
-], 'petalimp', 'petalimp');
+], 'petalimp');
 chapter('nature:pond-sanctuary', [
   ['This hollow looks like it could hold a little sky.', 'And a little rain. I brought some, just in case.', 'Let’s make a smooth stone pool.', 'Look. A cloud has come to sit with us.'],
   ['The pond could use a few green islands.', 'Lily pads! Tiny umbrellas for very small fish.', 'Some reeds will make it feel sheltered, too.', 'A quiet corner, with excellent umbrellas.'],

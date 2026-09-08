@@ -62,7 +62,7 @@ export type WispUnlockRecord = {
   seenReveal: boolean;
 };
 
-export type WispGrantSource = 'experience' | 'achievement' | 'family_achievement' | 'essence_shop' | 'visitor' | 'plus_claim' | 'purchase' | 'season' | 'game' | 'social' | 'gift' | 'migration';
+export type WispGrantSource = 'experience' | 'achievement' | 'family_achievement' | 'essence_shop' | 'visitor' | 'plus_claim' | 'purchase' | 'season' | 'game' | 'journey' | 'island_campaign' | 'social' | 'gift' | 'migration';
 
 export type WispInventoryRecord = {
   wispId: WispId;
@@ -70,6 +70,17 @@ export type WispInventoryRecord = {
   sources: WispGrantSource[];
   firstGrantedAt: number;
   giftableQuantity: number;
+};
+
+export type JourneyWispRewardReceipt = {
+  rewardId: string;
+  wispId: WispId;
+  choiceIds: string[];
+  grantedAt: number;
+  discovered: boolean;
+  previousCount: number;
+  nextCount: number;
+  seenReveal: boolean;
 };
 
 export type WispCollectionState = {
@@ -83,6 +94,7 @@ export type WispCollectionState = {
   /** Daily encounters only. Shop, gifting and achievement ownership do not grow Resonance. */
   resonanceCounts?: Partial<Record<WispId, number>>;
   pendingResonance?: { wispId: WispId; previousCount: number; nextCount: number } | null;
+  journeyRewards?: Record<string, JourneyWispRewardReceipt>;
 };
 
 export type WispProgress = {

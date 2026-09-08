@@ -5,7 +5,8 @@ import test from 'node:test';
 
 import type { HomeDayRecord } from '@/types/home';
 import { earnedWispIds, selectFeaturedWisps, wispProgress } from '@/utils/wisp-engine';
-import { normalizeWispState } from '@/utils/wisp-state';
+import { applyWispGrant, normalizeWispState } from '@/utils/wisp-state';
+import { resolveJourneyWisp } from '@/utils/journey-wisp-affinity';
 import { normalizeSceneState } from '@/utils/scene-state';
 import { todayEggShoulderWispFrame } from '@/utils/today-kingdom-hero-layout';
 
@@ -104,6 +105,16 @@ test('Today passes the equipped Wisp into the Egg hero instead of a page overlay
   assert.match(heroSource, /todayEggShoulderWispFrame\(eggStageScale\)/);
 });
 
+test('Wisp earnings open with the shared rays and celebration treatment', () => {
+  const root = path.resolve(__dirname, '..');
+  for (const file of ['wisp-discovery-reveal.tsx', 'wisp-resonance-reveal.tsx']) {
+    const source = fs.readFileSync(path.join(root, 'components/katchadeck/wisps', file), 'utf8');
+    assert.match(source, /RotatingRadialSunburst/);
+    assert.match(source, /CelebrationParticles/);
+    assert.match(source, /celebrating \? <Animated\.View/);
+  }
+});
+
 test('the all-Katchimeras developer switch unlocks Wisps without persisting debug ownership', () => {
   const root = path.resolve(__dirname, '..');
   const providerSource = fs.readFileSync(path.join(root, 'features/wisps/wisp-provider.tsx'), 'utf8');
@@ -135,6 +146,27 @@ test('daily Wisp Resonance and its pending return reveal survive normalization',
   });
   assert.equal(state.resonanceCounts?.sprout, 3);
   assert.deepEqual(state.pendingResonance, { wispId: 'sprout', previousCount: 2, nextCount: 3 });
+});
+
+test('Journey choices select a Wisp and a repeated species increases Resonance', () => {
+  const resolved = resolveJourneyWisp({
+    candidateWispIds: ['sprout', 'bloom', 'heartlet', 'breeze', 'giggle'],
+    fallbackWispId: 'sprout',
+    after: 0,
+    sessions: [{
+      id: 'session', definitionId: 'mossprout:test', definitionVersion: 1, familyId: 'mossprout',
+      formId: 'mossprout', createdDayId: 'day', servedDayId: 'day', status: 'completed', currentNodeId: 'end', gameQuestionIndex: 0, turns: [
+        { id: 'turn', nodeId: 'choice', optionId: 'quiet-rest', wispAffinity: { breeze: 2 }, answeredAt: 10 },
+      ], affinityScores: {}, evidenceRefs: [], outcomeIds: [], createdAt: 1, updatedAt: 10, completedAt: 10, preview: false,
+    }],
+  });
+  assert.equal(resolved.wispId, 'breeze');
+  const first = applyWispGrant(normalizeWispState({}), 'breeze', 'journey:1', 'journey', { increaseResonance: true, now: 10 });
+  const second = applyWispGrant(first.state, 'breeze', 'journey:2', 'journey', { increaseResonance: true, now: 20 });
+  assert.equal(first.discovered, true);
+  assert.deepEqual([second.previousCount, second.nextCount], [1, 2]);
+  assert.deepEqual(second.state.pendingResonance, { wispId: 'breeze', previousCount: 1, nextCount: 2 });
+  assert.equal(applyWispGrant(second.state, 'breeze', 'journey:2', 'journey', { increaseResonance: true }).applied, false);
 });
 
 test('Scene state keeps only owned catalog Scenes equipped', () => {

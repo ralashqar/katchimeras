@@ -1,6 +1,9 @@
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
+import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, ZoomIn, useReducedMotion } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { wispDefinition } from '@/constants/wisps';
@@ -12,22 +15,44 @@ export function WispResonanceReveal({ id, previousCount, nextCount, onDismiss }:
   const definition = wispDefinition(id);
   const previousTier = wispEvolutionTier(previousCount);
   const nextTier = wispEvolutionTier(nextCount);
+  const reduceMotion = useReducedMotion();
+  const [celebrating, setCelebrating] = useState(true);
+  useEffect(() => {
+    if (reduceMotion) {
+      setCelebrating(false);
+      return;
+    }
+    const timer = setTimeout(() => setCelebrating(false), 900);
+    return () => clearTimeout(timer);
+  }, [id, nextCount, reduceMotion]);
   return (
     <Animated.View entering={FadeIn.duration(240)} exiting={FadeOut.duration(180)} style={styles.scrim}>
-      <Animated.View entering={ZoomIn.duration(380)} style={styles.card}>
+      {celebrating ? <Animated.View exiting={FadeOut.duration(140)} key="resonance-celebration" pointerEvents="none" style={styles.splash}>
+        <RotatingRadialSunburst baseOpacity={0.86} rotationDurationMs={18_000} size={370} style={styles.rays} />
+        <CelebrationParticles layerStyle={styles.confetti} tier={2} tint="#B6E178" />
+        <Animated.View entering={ZoomIn.duration(500)} style={styles.splashWisp}>
+          <WispCompanion behavior="celebrate" id={id} size={220} />
+        </Animated.View>
+        <ThemedText style={styles.splashKicker} lightColor="#FFF4C7" darkColor="#FFF4C7">{definition.name.toUpperCase()} RETURNED</ThemedText>
+      </Animated.View> : <Animated.View entering={ZoomIn.duration(380)} key="resonance-details" style={styles.card}>
         <ThemedText style={styles.kicker} lightColor="#796241" darkColor="#796241">{definition.name.toUpperCase()} RETURNS</ThemedText>
         <View style={styles.hero}><WispCompanion behavior="celebrate" id={id} size={160} /></View>
         <ThemedText selectable style={styles.title} lightColor="#3B2B1C" darkColor="#3B2B1C">Resonance increased</ThemedText>
         <ThemedText selectable style={styles.count} lightColor="#5D7046" darkColor="#5D7046">{previousCount} → {nextCount}</ThemedText>
         <ThemedText selectable style={styles.copy} lightColor="#6D5943" darkColor="#6D5943">This kind of day has found you again.{previousTier !== nextTier ? ` ${definition.name} has evolved to ${nextTier}.` : ''}</ThemedText>
         <KatchaButton onPress={onDismiss} style={{marginTop: 18}} label="Keep the day" />
-      </Animated.View>
+      </Animated.View>}
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   scrim: { ...StyleSheet.absoluteFillObject, alignItems: 'center', backgroundColor: 'rgba(25,20,16,0.7)', justifyContent: 'center', padding: 22, zIndex: 120 },
+  splash: { alignItems: 'center', height: 370, justifyContent: 'center', width: 370 },
+  rays: { left: 0, top: 0 },
+  confetti: { top: '45%', zIndex: 3 },
+  splashWisp: { alignItems: 'center', height: 235, justifyContent: 'center', width: 235, zIndex: 2 },
+  splashKicker: { fontSize: 12, fontWeight: '900', letterSpacing: 1.4, marginTop: -8, textAlign: 'center', zIndex: 4 },
   card: { alignItems: 'center', backgroundColor: '#F8EBCF', borderCurve: 'continuous', borderRadius: 30, boxShadow: '0 22px 44px rgba(26,17,9,0.32)', maxWidth: 380, padding: 24, width: '100%' },
   kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.3, textAlign: 'center' },
   hero: { alignItems: 'center', height: 175, justifyContent: 'center' },

@@ -12,6 +12,7 @@ export type HavenTileUpgradePresentation = {
   fromStage: HavenStage;
   nonce: number;
   natureIslandId?: MossproutNatureIslandId;
+  natureIslandReveal?: boolean;
   palette: HavenUpgradeEffectPalette;
   reactionLine: string;
   /** Story camera operations can complete focus before the reveal begins. */

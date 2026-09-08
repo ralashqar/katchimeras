@@ -9,7 +9,9 @@ import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
 import { createContentFlowRun, reduceContentFlow, stabilizeContentFlow } from '@/features/content-flow/content-flow-interpreter';
 import { GLOW_DISCOVERY_FLOW, glowDiscoveryResumeCamera, glowDiscoveryResumeWorld } from '@/features/onboarding/glow-discovery-flow';
 import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
+import { PETALIMP_ISLAND_CAMPAIGN_ID, petalimpIslandChapterOrder } from '@/constants/petalimp-island-campaign';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
+import type { MergeWorldCommand, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import { readFileSync } from './helpers/content-fs';
 import { sharedResidentAnchor } from '@/components/katchadeck/world/shared-resident-presentation';
 import type { KingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
@@ -26,9 +28,23 @@ function restored(coins = 2000) {
   return reduceMergeWorld(world(coins), { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW }).state;
 }
 
+function completeBloomCampaignRequest(state: MergeWorldState, level: MossproutNatureIslandLevel) {
+  const order = petalimpIslandChapterOrder(level, NOW)!;
+  const activated = reduceMergeWorld(state, {
+    type: 'activateIslandCampaignChapter', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID,
+    islandId: 'bloom-garden', residentSkinId: 'petalimp', level, orders: [order], now: NOW,
+  }).state;
+  const campaign = activated.islandCampaigns![PETALIMP_ISLAND_CAMPAIGN_ID]!;
+  const chapter = campaign.chapters[String(level)]!;
+  return { ...activated, islandCampaigns: { ...activated.islandCampaigns, [PETALIMP_ISLAND_CAMPAIGN_ID]: {
+    ...campaign, chapters: { ...campaign.chapters, [String(level)]: { ...chapter, servedOrderIds: [...chapter.orderIds] } },
+  } } };
+}
+
 test('all nature island levels use the shared purchase flow, survive reload, and charge only once', () => {
   let state = { ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 10_000 };
   for (const island of MOSSPROUT_NATURE_ISLANDS) {
+    if (island.id === 'bloom-garden') continue;
     for (const level of island.levels) {
       const offer = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null)
         .find((candidate) => candidate.id === `nature:${island.id}`)!;
@@ -37,7 +53,7 @@ test('all nature island levels use the shared purchase flow, survive reload, and
       assert.equal(offer.nextLevel, level.level);
       assert.equal(offer.action, level.level === 1 ? 'Clear mist' : 'Upgrade');
       assert.ok(WORLD_UPGRADE_FLOWS.some((flow) => flow.id === worldUpgradeRunId(offer)));
-      const command = { type: 'upgradeMossproutNatureIsland' as const, islandId: island.id,
+      const command: MergeWorldCommand = { type: 'upgradeMossproutNatureIsland', islandId: island.id,
         level: level.level, receiptId: worldUpgradeRunId(offer), now: NOW };
       const before = state.coins;
       const paid = reduceMergeWorld(state, command);
@@ -49,7 +65,7 @@ test('all nature island levels use the shared purchase flow, survive reload, and
     }
     assert.equal(worldUpgradeOffers(state).some((offer) => offer.id === `nature:${island.id}`), false);
   }
-  assert.equal(state.haven.tileStages.mossprout, 4);
+  assert.equal(state.haven.tileStages.mossprout, 1, 'the campaign island still owns the final aggregate tiers');
 });
 
 test('mist islands are targetable and every reveal keeps other tiles and camera bounds stable', () => {
@@ -84,6 +100,7 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
       assert.notEqual(revealed.source, locked.source);
       assert.deepEqual(revealed.interactionFrame, locked.interactionFrame);
       if (level.level === 1) fallback = revealed.source;
+      else if (island.id === 'bloom-garden') assert.notEqual(revealed.source, fallback, 'Bloom Garden has a complete visual ladder');
       else assert.equal(revealed.source, fallback, 'missing bespoke art reuses the island fallback');
     }
   }
@@ -103,14 +120,15 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
 
 test('only the next authored level is offered, preserving costs and aggregate Haven progression', () => {
   const initial = worldUpgradeOffers(world());
-  assert.ok(initial.every((offer) => offer.eligible));
+  assert.ok(initial.filter((offer) => offer.id !== 'nature:bloom-garden').every((offer) => offer.eligible));
+  assert.equal(initial.find((offer) => offer.id === 'nature:bloom-garden')?.transition, 'island_reveal');
   assert.equal(initial.find((offer) => offer.id === 'haven:mossprout')?.cost, 20);
   const offers = worldUpgradeOffers(restored());
   assert.equal(offers.some((offer) => offer.id === 'haven:mossprout'), false);
   assert.equal(offers.find((offer) => offer.id === 'mist:steppling-home')?.cost, 40);
   for (const island of MOSSPROUT_NATURE_ISLANDS) {
     const offer = offers.find((item) => item.id === `nature:${island.id}`)!;
-    assert.equal(offer.nextLevel, 1); assert.equal(offer.cost, island.levels[0].coinCost);
+    assert.equal(offer.nextLevel, island.id === 'bloom-garden' ? 0 : 1); assert.equal(offer.cost, island.levels[0].coinCost);
     assert.equal(offer.eligible, true);
   }
   assert.equal(new Set(WORLD_UPGRADE_DEFINITIONS.map(worldUpgradeRunId)).size, WORLD_UPGRADE_DEFINITIONS.length);
@@ -121,7 +139,8 @@ test('unaffordable spots remain discoverable without story or resident prerequis
   const mist = offers.find((offer) => offer.id === 'mist:steppling-home')!;
   assert.equal(mist.eligible, true); assert.equal(mist.affordable, false); assert.equal(mist.missingGlow, 37);
   const locked = worldUpgradeOffers(createInitialMergeWorldState(NOW, ['mossprout']));
-  assert.ok(locked.every((offer) => offer.eligible));
+  assert.ok(locked.filter((offer) => offer.id !== 'nature:bloom-garden').every((offer) => offer.eligible));
+  assert.equal(locked.find((offer) => offer.id === 'nature:bloom-garden')?.eligible, true);
 });
 
 test('45 Glow unlocks Pond Sanctuary before any story progress, with no duplicate charge', () => {
@@ -161,7 +180,10 @@ test('every upgrade holds the old world before spending and replays its receipt-
     const hold = flow.nodes.find((node) => node.id === 'upgrade.focus')!;
     assert.equal(hold.kind === 'presentation' && hold.payload?.holdWorldState, true);
     const commit = flow.nodes.find((node) => node.id === 'upgrade.commit')!;
-    assert.deepEqual(commit.kind === 'effect' && commit.payload?.economy, { mode: 'normal' });
+    assert.deepEqual(commit.kind === 'effect' && commit.payload?.economy,
+      flow.id === 'world-upgrade:nature:bloom-garden:1'
+        ? { mode: 'free', reason: 'Petalimp restores the first flowers after the request.' }
+        : { mode: 'normal' });
     const reveal = flow.nodes.find((node) => node.id === 'upgrade.reveal')!;
     assert.equal(reveal.kind === 'presentation' && reveal.replayPolicy, 'replay');
     assert.equal(reveal.kind === 'presentation' && reveal.payload?.sourceEffectNodeId, 'upgrade.commit');

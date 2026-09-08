@@ -1496,7 +1496,7 @@ test('the modular Mossprout campaign validates and gives every day one authored 
     'conversation', 'merge_orders', 'conversation', 'optional_action', 'complete',
   ]);
   assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days[1]?.steps.some((step) => step.kind === 'merge_orders'), true);
-  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days[1]?.steps.some((step) => step.kind === 'resident_discovery' && step.selection === 'petalimp'), true);
-  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.slice(2, 9).every((day) => day.steps.some((step) => step.kind === 'resident_discovery')), true);
-  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.slice(2, 9).every((day) => day.steps.every((step) => step.kind !== 'merge_orders')), true);
+  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.slice(1, 9).every((day) => day.steps.some((step) => step.kind === 'wisp_reward')), true);
+  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.every((day) => day.steps.every((step) => step.kind !== 'resident_discovery')), true);
+  assert.equal(MOSSPROUT_JOURNEY_CAMPAIGN.days.slice(1).every((day) => day.steps.some((step) => step.kind === 'merge_orders')), true);
 });

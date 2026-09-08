@@ -31,6 +31,7 @@ import type { MergeRailInteractionGate } from '@/features/onboarding/merge-ftue'
 import { isAppForeground, useAppForeground } from '@/hooks/use-app-foreground';
 import type { HomeVisualKey } from '@/types/home';
 import type { MergeCharacterId, MergeOrder, MergeWorldArrival } from '@/types/merge-world';
+import type { KatchimeraSkinId } from '@/types/katchimera';
 import { resolveCreatureArtSource, resolveCreatureOrderArtSource } from '@/utils/creature-art';
 import { orderMountWindow, orderViewportWindows } from '@/utils/merge-world/order-window';
 import { recordMergeRender } from '@/utils/merge-world/performance';
@@ -138,6 +139,9 @@ export type MergeTrayEntry =
       kind: 'chat_note';
       characterId: MergeCharacterId;
       bondPoints: number;
+      portraitSkinId?: KatchimeraSkinId;
+      title?: string;
+      accessibilityHint?: string;
     };
 
 export type MergeOrderTrayEntry = Extract<MergeTrayEntry, { kind: 'order' }>;
@@ -640,26 +644,28 @@ function ChatNoteTrayCard({ entry, onPress, onRailTargetRef, reduceMotion }: {
   onRailTargetRef?: (targetKey: string, view: View | null) => void;
   reduceMotion: boolean;
 }) {
-  const characterSource = resolveCreatureArtSource(CHARACTER_VISUALS[entry.characterId], { lod: 'medium' });
+  const portraitSkin = entry.portraitSkinId ? katchimeraSkinById.get(entry.portraitSkinId) : null;
+  const characterSource = resolveCreatureArtSource(portraitSkin?.visualKey ?? CHARACTER_VISUALS[entry.characterId], { lod: 'medium' });
   const targetKey = `chat-note:${entry.id}`;
   const setTargetRef = useCallback(
     (view: View | null) => onRailTargetRef?.(targetKey, view),
     [onRailTargetRef, targetKey],
   );
-  const subtitle = entry.bondPoints > 0 ? `+${entry.bondPoints} Bond · Read` : 'Read next scene';
+  const speakerName = portraitSkin?.displayName ?? MERGE_CHARACTER_NAMES[entry.characterId];
+  const subtitle = entry.accessibilityHint ?? (entry.bondPoints > 0 ? `+${entry.bondPoints} Bond · Read` : 'Read next scene');
   return (
     <Pressable
-      accessibilityLabel={`${MERGE_CHARACTER_NAMES[entry.characterId]} left a note. ${subtitle}`}
+      accessibilityLabel={`${speakerName} left a note. ${subtitle}`}
       accessibilityRole="button"
       onPress={onPress}
       ref={setTargetRef}
       style={({ pressed }) => [styles.card, styles.noteCard, pressed && styles.pressed]}>
       <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(45).duration(230)} style={styles.characterLayer}>
-        <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-note-${entry.characterId}`} source={characterSource} style={styles.character} transition={0} />
+        <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" recyclingKey={`merge-note-${entry.portraitSkinId ?? entry.characterId}`} source={characterSource} style={styles.character} transition={0} />
       </Animated.View>
       <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="contain" source={TRAY_ART} style={styles.trayArt} transition={0} />
       <Animated.View entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.delay(115).duration(240).easing(CONTROLLED_EASE)} style={styles.notePaper}>
-        <ThemedText numberOfLines={2} style={styles.noteTitle} lightColor="#4A291B" darkColor="#4A291B">I have something for you</ThemedText>
+        <ThemedText numberOfLines={2} style={styles.noteTitle} lightColor="#4A291B" darkColor="#4A291B">{entry.title ?? 'I have something for you'}</ThemedText>
         <View pointerEvents="none" style={styles.noteIconBadge}>
           <IconSymbol color="#FFF6DB" name="envelope.fill" size={12} />
         </View>

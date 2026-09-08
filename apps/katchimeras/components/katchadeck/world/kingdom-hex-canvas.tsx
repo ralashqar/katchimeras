@@ -162,14 +162,18 @@ type Props = {
   onTileUpgradeOfferPress?: () => void;
   onTileUpgradeOfferTargetChange?: (node: ViewType | null) => void;
   interactionResidentId?: string | null;
+  interactionNatureIslandId?: MossproutNatureIslandId | null;
   mossproutMeditating?: boolean;
   interactionResidentAnchorY?: number;
   interactionExitNonce?: number;
+  /** Island narrative handoffs keep their close-up for the following restoration. */
+  preserveInteractionCameraOnExit?: boolean;
   interactionRewardPulseKey?: number;
   onInteractionExitFocusComplete?: () => void;
   onResidentFocusComplete?: (creatureId: string) => void;
   focusedMossproutWorld?: boolean;
   mossproutNatureIslandLevels?: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>;
+  mossproutNatureIslandReveals?: Partial<Record<MossproutNatureIslandId, boolean>>;
   mossproutGarden?: MossproutGardenSceneState;
   onSelectNatureIsland?: (islandId: MossproutNatureIslandId) => void;
   onSelectMemoryPlant?: (instanceId: string) => void;
@@ -419,14 +423,17 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onTileUpgradeOfferPress,
   onTileUpgradeOfferTargetChange,
   interactionResidentId = null,
+  interactionNatureIslandId = null,
   mossproutMeditating = false,
   interactionResidentAnchorY,
   interactionExitNonce = 0,
+  preserveInteractionCameraOnExit = false,
   interactionRewardPulseKey = 0,
   onInteractionExitFocusComplete,
   onResidentFocusComplete,
   focusedMossproutWorld = false,
   mossproutNatureIslandLevels,
+  mossproutNatureIslandReveals = {},
   mossproutGarden,
   onSelectNatureIsland,
   onSelectMemoryPlant,
@@ -499,9 +506,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           'orchard-grove': 0,
           'ancient-tree-grove': 0,
           'wildgrowth-grove': 0,
-        }, mossproutGarden)
+        }, mossproutGarden, mossproutNatureIslandReveals)
       : buildKingdomHexScene(companionSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value),
-    [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, verticalAlignmentSelection]
+    [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, verticalAlignmentSelection]
   );
   const upgradeFromScene = useMemo(() => {
     if (!focusedMossproutWorld || !upgradePresentation || !mossproutNatureIslandLevels) return committedScene;
@@ -523,8 +530,11 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     // the complete rendered world on the receipt's from-state until the
     // reveal finishes; otherwise the base image changes frame/source one
     // render before the guarded crossfade is ready.
-    return buildMossproutHexNeighborhoodScene(fromSlots, fromNatureLevels, fromGarden);
-  }, [committedScene, companionSlots, focusedMossproutWorld, mossproutGarden, mossproutNatureIslandLevels, upgradePresentation]);
+    const fromReveals = upgradePresentation.natureIslandReveal && upgradePresentation.natureIslandId
+      ? { ...mossproutNatureIslandReveals, [upgradePresentation.natureIslandId]: false }
+      : mossproutNatureIslandReveals;
+    return buildMossproutHexNeighborhoodScene(fromSlots, fromNatureLevels, fromGarden, fromReveals);
+  }, [committedScene, companionSlots, focusedMossproutWorld, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, upgradePresentation]);
   const scene = upgradePresentation
     ? upgradeFromScene
     : storySceneGuard?.scene ?? committedScene;
@@ -562,8 +572,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const islandId = upgradePresentation.natureIslandId;
       const fromLevels = { ...mossproutNatureIslandLevels, [islandId]: upgradePresentation.fromStage };
       const toLevels = { ...mossproutNatureIslandLevels, [islandId]: upgradePresentation.toStage };
-      const fromScene = buildMossproutHexNeighborhoodScene(companionSlots, fromLevels, mossproutGarden);
-      const toScene = buildMossproutHexNeighborhoodScene(companionSlots, toLevels, mossproutGarden);
+      const fromReveals = upgradePresentation.natureIslandReveal ? { ...mossproutNatureIslandReveals, [islandId]: false } : mossproutNatureIslandReveals;
+      const toReveals = { ...mossproutNatureIslandReveals, [islandId]: true };
+      const fromScene = buildMossproutHexNeighborhoodScene(companionSlots, fromLevels, mossproutGarden, fromReveals);
+      const toScene = buildMossproutHexNeighborhoodScene(companionSlots, toLevels, mossproutGarden, toReveals);
       const baseLayerId = `nature:mossprout:${islandId}`;
       const growthLayerId = `${baseLayerId}:growth`;
       const fromLayer = fromScene.tileArtLayers.find((layer) => layer.id === growthLayerId)
@@ -621,7 +633,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const toLayer = toScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const tile = toScene.tiles.find((candidate) => candidate.id === `family:${upgradePresentation.characterId}`);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, upgradePresentation, verticalAlignmentSelection]);
+  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, upgradePresentation, verticalAlignmentSelection]);
   const discoveryLayers = useMemo(() => {
     if (!discoveryRevealFamilyId) return null;
     const revealed = companionSlots.find((slot) => slot.familyId === discoveryRevealFamilyId && slot.kind === 'revealed_egg');
@@ -1075,8 +1087,25 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       interactionOriginSnapshotRef.current = null;
       return;
     }
-    const interactionFocusKey = interactionResidentId;
+    const interactionFocusKey = interactionNatureIslandId
+      ? `nature-island:${interactionNatureIslandId}`
+      : interactionResidentId;
     if (!tutorialCameraReady || focusedInteractionResidentRef.current === interactionFocusKey) return;
+    const islandFrame = interactionNatureIslandId
+      ? natureIslandFrames.find((candidate) => candidate.islandId === interactionNatureIslandId)?.frame ?? null
+      : null;
+    if (interactionNatureIslandId && islandFrame) {
+      if (hadWorldCameraRef.current) interactionOriginSnapshotRef.current ??= readLiveCameraSnapshot();
+      focusedInteractionResidentRef.current = interactionFocusKey;
+      focusInteractionTile(islandFrame, {
+        durationMs: reduceMotion ? 80 : SHARED_RESIDENT_FOCUS_DURATION_MS,
+        horizontalPadding: 54,
+        screenCenterY: viewport.height * 0.43,
+        verticalPadding: 128,
+        onComplete: () => onResidentFocusComplete?.(interactionResidentId),
+      });
+      return;
+    }
     const tile = scene.tiles.find((candidate) => (
       candidate.kind === 'companion'
       && candidate.companion?.kind === 'owned'
@@ -1101,7 +1130,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       onComplete: () => onResidentFocusComplete?.(interactionResidentId),
       zoom: cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale,
     });
-  }, [cameraMaximumScale, creatureWorldSize, focusTutorialResident, interactionResidentId, onResidentFocusComplete, readLiveCameraSnapshot, reduceMotion, residentInteractionScreenAnchorY, scene.tileArtLayers, scene.tiles, tutorialCameraReady]);
+  }, [cameraMaximumScale, creatureWorldSize, focusInteractionTile, focusTutorialResident, interactionNatureIslandId, interactionResidentId,
+    natureIslandFrames, onResidentFocusComplete, readLiveCameraSnapshot, reduceMotion, residentInteractionScreenAnchorY,
+    scene.tileArtLayers, scene.tiles, tutorialCameraReady, viewport.height]);
   const handledInteractionExitNonceRef = useRef(0);
   useEffect(() => {
     if (!interactionResidentId || interactionExitNonce <= handledInteractionExitNonceRef.current) return;
@@ -1110,6 +1141,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       interactionOriginSnapshotRef.current = null;
       onInteractionExitFocusComplete?.();
     };
+    if (preserveInteractionCameraOnExit) {
+      onComplete();
+      return;
+    }
     const durationMs = reduceMotion ? 80 : 440;
     const origin = interactionOriginSnapshotRef.current;
     if (origin) {
@@ -1133,7 +1168,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       verticalPadding: 40,
       onComplete,
     });
-  }, [animateToCameraSnapshot, focusInteractionTile, interactionExitNonce, interactionResidentId, onInteractionExitFocusComplete, reduceMotion, scene.centerTile, scene.tileArtLayers, scene.tiles]);
+  }, [animateToCameraSnapshot, focusInteractionTile, interactionExitNonce, interactionResidentId, onInteractionExitFocusComplete, preserveInteractionCameraOnExit, reduceMotion, scene.centerTile, scene.tileArtLayers, scene.tiles]);
   const upgradeCompletionRef = useRef(onUpgradePresentationComplete);
   const upgradeFocusRef = useRef(camera.focusUpgrade);
   const upgradeLayersRef = useRef(upgradeLayers);
@@ -1335,7 +1370,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   }, [artLayerById, scene.tiles]);
 
   const interactionResidentProjection = useMemo(() => {
-    if (!interactionResidentId) return null;
+    if (!interactionResidentId || interactionNatureIslandId) return null;
     const tile = scene.tiles.find((candidate) => (
       candidate.kind === 'companion'
       && candidate.companion?.kind === 'owned'
@@ -1353,7 +1388,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       frame: residentCreatureFrame(anchor.x, anchor.y, creatureWorldSize, stableWorldPresentation),
       source: artLayer?.residentSource,
     };
-  }, [artLayerById, creatureWorldSize, interactionResidentId, scene.tiles]);
+  }, [artLayerById, creatureWorldSize, interactionNatureIslandId, interactionResidentId, scene.tiles]);
 
   const creatureNodes = useMemo(() => {
     const items: { depth: number; node: ReactNode }[] = [];
@@ -1388,7 +1423,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       // The active interaction subject is drawn outside the transformed world
       // below. Keeping the small world copy here would both duplicate it and
       // preserve the blurry camera-scaled raster that FTUE already avoids.
-      if (tile.companion.creature.creatureId === interactionResidentId) continue;
+      if (!interactionNatureIslandId && tile.companion.creature.creatureId === interactionResidentId) continue;
       const { x, y } = artLayer?.residentAnchor ?? kingdomWorldViewPoint(
         { x: tile.cx, y: tile.cy },
         kingdomWorldViewConfig.katchimera
@@ -1399,11 +1434,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         depth: hexDrawDepth({ x, y }, 4),
         node: (
           <ResidentCreature
-            animated={stableWorldPresentation || interactionResidentId === tile.companion.creature.creatureId}
+            animated={stableWorldPresentation || interactionResidentId === tile.companion.creature.creatureId && !interactionNatureIslandId}
             celebrationNonce={
-              interactionResidentId === tile.companion.creature.creatureId && interactionRewardPulseKey > 0
+              !interactionNatureIslandId && interactionResidentId === tile.companion.creature.creatureId && interactionRewardPulseKey > 0
                 ? 1_000_000 + interactionRewardPulseKey
-              : upgradePresentation?.creatureId === tile.companion.creature.creatureId
+              : !upgradePresentation?.natureIslandId
+              && upgradePresentation?.creatureId === tile.companion.creature.creatureId
               && (upgradePhase === 'react' || upgradePhase === 'complete')
                 ? upgradePresentation.nonce
                 : undefined
@@ -1429,7 +1465,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
 
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, cameraLocked, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, interactionResidentId, interactionRewardPulseKey, mossproutMeditating, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
+  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, cameraLocked, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, interactionNatureIslandId, interactionResidentId, interactionRewardPulseKey, mossproutMeditating, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
 
   const home = homePreset(identity?.selectedHomeArchetypeId);
 
@@ -1732,6 +1768,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           presentation={upgradePresentation}
           reducedMotion={reduceMotion}
           showCoins={upgradePresentation.showCoins}
+          showReaction={!upgradePresentation.natureIslandId}
           target={upgradeEffectGeometry.target}
         />
       ) : null}

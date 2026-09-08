@@ -7,7 +7,8 @@ import { dispatchContentFlowCommand } from '@/features/content-flow/content-flow
 import { WorldUpgradeNarrative } from '@/components/katchadeck/world/world-upgrade-narrative';
 import { CompanionFtueCoachmark } from '@/components/katchadeck/onboarding/companion-ftue-coachmark';
 import { WorldUpgradePanel, type UpgradeCoachmarkState } from '@/components/katchadeck/world/world-upgrade-panel';
-import { WorldUpgradeReward } from '@/components/katchadeck/world/world-upgrade-reward';
+import { KatchimeraCardRevealModal } from '@/components/katchadeck/collection/katchimera-card-deck-carousel';
+import { KatchimeraFriendDiscoveryReveal } from '@/components/katchadeck/world/katchimera-friend-discovery-reveal';
 import { worldUpgradeStory, upgradeUsesTutorialNarrative } from '@/features/world-upgrades/world-upgrade-stories';
 import { useGlowEggHandoff } from '@/features/onboarding/use-glow-egg-handoff';
 import { CompanionJournalButton } from '@/components/katchadeck/world/companion-life-actions';
@@ -44,7 +45,6 @@ import {
   type KingdomTileUpgradeOffer,
 } from '@/components/katchadeck/world/kingdom-hex-canvas';
 import { KatchimeraCompanionRouteScreen } from '@/components/katchadeck/world/katchimera-companion-route-screen';
-import { MossproutNatureIslandSheet } from '@/components/katchadeck/world/mossprout-nature-island-sheet';
 import { HavenFtueOverlay } from '@/components/katchadeck/onboarding/haven-ftue-overlay';
 import { FtueGuideCopy } from '@/components/katchadeck/onboarding/ftue-guide-copy';
 import { FTUE_SCENE_LAYERS } from '@/constants/ftue-scene-layers';
@@ -63,10 +63,12 @@ import { useRelationshipProgression } from '@/hooks/use-relationship-progression
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import { loadWorldIdentity } from '@/utils/world-identity';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
-import type { MergeCharacterId, MergeWorldState, MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel, StoryWorldMutationReceipt } from '@/types/merge-world';
-import type { KatchimeraFamilyId } from '@/types/katchimera';
+import type { MergeCharacterId, MergeWorldState, MossproutGardenPlantSlotId, MossproutNatureIslandLevel, StoryWorldMutationReceipt } from '@/types/merge-world';
+import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
+import type { ConversationSession } from '@/types/companion-conversation';
 import { HAVEN_ENVIRONMENTS, type HavenStage } from '@/constants/haven-catalog';
-import { ensureStoredFirstFtueMemoryPlacement, saveUpgradeStoryRead } from '@/utils/merge-world/repository';
+import { acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, ensureStoredFirstFtueMemoryPlacement, saveUpgradeStoryRead } from '@/utils/merge-world/repository';
+import { useKatchimeraCards } from '@/hooks/use-katchimera-cards';
 import { mossproutNatureIslandById, mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
 import { havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
 import type { HavenTileUpgradePresentation } from '@/utils/haven-upgrade-presentation';
@@ -91,6 +93,8 @@ import {
   contentFlowEffectResult,
 } from '@/features/content-flow/story-world-operations';
 import { useStoryPresentationOperation } from '@/features/content-flow/use-story-presentation-operation';
+import { PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_CHAPTERS, PETALIMP_ISLAND_ID, petalimpGrowthStyle, petalimpIslandChapterChoice, petalimpIslandChapterOrder, petalimpIslandChapterStatus, petalimpIslandResolutionConversationId, petalimpIslandReturnConversationId } from '@/constants/petalimp-island-campaign';
+import { FERNIP_ISLAND_ID, FERNIP_ISLAND_LOCK_REASON, fernipIslandJourneyUnlocked } from '@/constants/nature-island-unlocks';
 
 type Props = {
   background: TodayAtmosphereBackground;
@@ -200,6 +204,7 @@ export function KatchimeraKingdomScreen({
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradePresentation, setUpgradePresentation] = useState<HavenTileUpgradePresentation | null>(null);
+  const [displayedGlow, setDisplayedGlow] = useState(mergeWorld.coins);
   const [requiredUpgradeStory, setRequiredUpgradeStory] = useState<{ offer: WorldUpgradeOffer; presentation: HavenTileUpgradePresentation } | null>(null);
   const prepareEggEntry = useCallback(() => { setFtueCameraSettled(false); setGlowPanelOpen(false); }, []);
   const eggHandoff = useGlowEggHandoff({ run: glowRun, world: mergeWorld, focused: screenFocused,
@@ -216,12 +221,26 @@ export function KatchimeraKingdomScreen({
   const revealedUpgradeRef = useRef<number | null>(null);
   const pendingUpgradeReward = useRef<string | null>(null);
   const [upgradeReward, setUpgradeReward] = useState<string | null>(null);
+  const { cards: mossproutCards } = useKatchimeraCards('mossprout');
+  const petalimpCampaign = mergeWorld.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID] ?? null;
+  const pendingPetalimpDiscovery = petalimpCampaign && petalimpCampaign.discoveryRevealSeenAt == null
+    ? petalimpCampaign
+    : null;
+  const pendingPetalimpCardReveal = petalimpCampaign
+    && petalimpCampaign.cardEarnedAt != null
+    && petalimpCampaign.cardRevealSeenAt == null
+    ? petalimpCampaign
+    : null;
+  const revealedFriendCardId = (upgradeReward ?? pendingPetalimpCardReveal?.residentSkinId ?? null) as KatchimeraSkinId | null;
   const upgradeDismiss = useRef<(() => void) | null>(null);
   const registerUpgradeDismiss = useCallback((dismiss: (() => void) | null) => { upgradeDismiss.current = dismiss; }, []);
   const activeFtueRunId = loadFtueRun()?.runId ?? null;
   const ordinaryUpgradeRun = useWorldUpgradeRun();
   const ftueUpgradeRun = useWorldUpgradeRun(activeFtueRunId ? `flow:${activeFtueRunId}` : 'no-ftue-upgrade');
-  const sharedUpgrade = selectedUpgrade ? upgradeOffers.find((offer) => offer.id === selectedUpgrade.id && offer.nextLevel === selectedUpgrade.nextLevel) ?? selectedUpgrade : null;
+  const sharedUpgrade = selectedUpgrade ? selectedUpgrade.lockedReason
+    ? selectedUpgrade
+    : upgradeOffers.find((offer) => offer.id === selectedUpgrade.id && offer.nextLevel === selectedUpgrade.nextLevel) ?? selectedUpgrade
+    : null;
   const ftueGardenUpgradeActive = ftueStepId === 'world.first_bloom_offer' || ftueStepId === 'world.first_bloom_restore';
   const coachedUpgrade = ftueGardenUpgradeActive || mistUpgradeActive;
   useEffect(() => {
@@ -249,12 +268,16 @@ export function KatchimeraKingdomScreen({
       if (offer) setSelectedUpgrade(offer);
     }
   }, [ordinaryUpgradeRun, ftueUpgradeRun, ftueStepId, glowRun]);
-  const [selectedNatureIslandId, setSelectedNatureIslandId] = useState<MossproutNatureIslandId | null>(null);
+  const [pendingIslandCampaignLevel, setPendingIslandCampaignLevel] = useState<MossproutNatureIslandLevel | null>(null);
+  const [pendingIslandCampaignPhase, setPendingIslandCampaignPhase] = useState<'opening' | 'return' | 'resolution'>('opening');
+  const petalimpNarrativeAfterUpgradeRef = useRef<((level: MossproutNatureIslandLevel, phase: 'opening' | 'return' | 'resolution') => void) | null>(null);
+  const islandDiscoveryContinueBusy = useRef(false);
+  const campaignAutoTransitionRef = useRef<string | null>(null);
   const [selectedMemoryPlantId, setSelectedMemoryPlantId] = useState<string | null>(null);
-  const [natureUpgradeError, setNatureUpgradeError] = useState<string | null>(null);
   const [firstSeedPlacementBusy, setFirstSeedPlacementBusy] = useState(false);
   const [firstSeedPlacementFailed, setFirstSeedPlacementFailed] = useState(false);
   const restoreButtonRef = useRef<View>(null);
+  const glowCurrencyArtRef = useRef<View>(null);
   const screenRef = useRef<View>(null);
   const ftueTargetRefs = useRef(new Map<string, View>());
   const upgradeNonceRef = useRef(0);
@@ -271,6 +294,7 @@ export function KatchimeraKingdomScreen({
   onFtueInspectRef.current = onFtueInspect;
   const identity = useMemo(loadWorldIdentity, []);
   const relationships = useRelationshipProgression();
+  const fernipIslandOpen = fernipIslandJourneyUnlocked(relationships);
   const mergeWorldRef = useRef(mergeWorld);
   mergeWorldRef.current = mergeWorld;
   interactionCreatureIdRef.current = interactionCreatureId;
@@ -482,9 +506,10 @@ export function KatchimeraKingdomScreen({
   ));
   const gardenWorldBottomCtaActive = (ftueStepId === 'world.seed_planted' && firstSeedPlacementFailed)
     || ftueStepId === 'world.first_seed_grew';
-  const measureRestoreOrigin = useCallback(() => new Promise<{ x: number; y: number }>((resolve) => {
-    const fallback = { x: window.width / 2, y: window.height - Math.max(90, insets.bottom + 66) };
-    const node = upgradeActionRef.current ?? restoreButtonRef.current;
+  const seedPlantingFtueActive = ftueStepId === 'world.garden_arrival' || ftueStepId === 'world.seed_planted';
+  const measureGlowCurrencyOrigin = useCallback(() => new Promise<{ x: number; y: number }>((resolve) => {
+    const fallback = { x: window.width - 54, y: insets.top + 28 };
+    const node = glowCurrencyArtRef.current;
     if (!node) {
       resolve(fallback);
       return;
@@ -492,7 +517,21 @@ export function KatchimeraKingdomScreen({
     node.measureInWindow((x, y, width, height) => {
       resolve(width > 0 && height > 0 ? { x: x + width / 2, y: y + height / 2 } : fallback);
     });
-  }), [insets.bottom, window.height, window.width]);
+  }), [insets.top, window.width]);
+
+  useEffect(() => {
+    if (upgradePresentation?.showCoins && upgradePresentation.coinCost > 0) return;
+    if (upgradePurchasing || upgradeCommitted) return;
+    setDisplayedGlow(mergeWorld.coins);
+  }, [mergeWorld.coins, upgradeCommitted, upgradePresentation, upgradePurchasing]);
+
+  useEffect(() => {
+    if (!upgradePresentation?.showCoins || upgradePresentation.coinCost <= 0) return;
+    // Paint the pre-purchase balance and the first outgoing tokens together,
+    // then count down for the same 650 ms occupied by the staggered flights.
+    const frame = requestAnimationFrame(() => setDisplayedGlow(mergeWorldRef.current.coins));
+    return () => cancelAnimationFrame(frame);
+  }, [upgradePresentation?.coinCost, upgradePresentation?.nonce, upgradePresentation?.showCoins]);
 
   useStoryPresentationOperation('haven', STORY_WORLD_UPGRADE_PRESENTATION, async (work, run, signal) => {
     const payload = work.payload as StoryWorldUpgradePresentationPayload;
@@ -505,7 +544,7 @@ export function KatchimeraKingdomScreen({
     if (!receipt) throw new Error(`Upgrade receipt for ${payload.sourceEffectNodeId} is not available`);
 
     const mossproutSlot = visibleCompanionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === 'mossprout');
-    const coinOrigin = await measureRestoreOrigin();
+    const coinOrigin = await measureGlowCurrencyOrigin();
     if (signal.aborted) return;
     let presentation: HavenTileUpgradePresentation;
     if (receipt.target.kind === 'haven_tile') {
@@ -530,7 +569,7 @@ export function KatchimeraKingdomScreen({
           primary: '#4F9F57',
         },
         reactionLine: payload.reactionLine ?? stage.reactionLine ?? 'Look what we built together.',
-        showCoins: payload.showCoins ?? receipt.economyMode === 'normal',
+        showCoins: receipt.coinCost > 0 && receipt.economyMode === 'normal' && (payload.showCoins ?? true),
         status: 'playing',
         storyPresentationKey: work.key,
         toStage: receipt.toLevel as HavenStage,
@@ -543,13 +582,13 @@ export function KatchimeraKingdomScreen({
         creatureId: 'steppling', creatureName: 'A new friend', fromStage: receipt.fromLevel as HavenStage,
         toStage: 1, nonce: ++upgradeNonceRef.current,
         palette: { accent: '#FFE28A', glow: '#FFD98C', mist: 'rgba(226,255,213,0.88)', primary: '#4F9F57' },
-        reactionLine: '', showCoins: receipt.coinCost > 0,
+        reactionLine: '', showCoins: receipt.coinCost > 0 && receipt.economyMode === 'normal',
         status: 'playing', storyPresentationKey: work.key, upgradeName: 'Misty clearing', visualTarget: payload.target,
       };
     } else {
       const island = mossproutNatureIslandById.get(receipt.target.islandId);
       const level = mossproutNatureIslandLevelDefinition(receipt.target.islandId, receipt.toLevel as MossproutNatureIslandLevel);
-      if (!island || !level || mossproutSlot?.kind !== 'owned') throw new Error(`Nature island ${receipt.target.islandId} is not ready`);
+      if (!island || (!level && receipt.transition !== 'island_reveal') || mossproutSlot?.kind !== 'owned') throw new Error(`Nature island ${receipt.target.islandId} is not ready`);
       presentation = {
         cameraAlreadyFocused: true,
         characterId: 'mossprout',
@@ -559,6 +598,7 @@ export function KatchimeraKingdomScreen({
         creatureName: mossproutSlot.creature.name,
         fromStage: receipt.fromLevel as HavenStage,
         natureIslandId: receipt.target.islandId,
+        natureIslandReveal: receipt.transition === 'island_reveal',
         nonce: ++upgradeNonceRef.current,
         palette: {
           accent: island.accent,
@@ -566,12 +606,14 @@ export function KatchimeraKingdomScreen({
           mist: 'rgba(226,255,213,0.88)',
           primary: '#4F9F57',
         },
-        reactionLine: payload.reactionLine ?? `${island.shortName} is growing beautifully.`,
-        showCoins: payload.showCoins ?? receipt.economyMode === 'normal',
+        reactionLine: receipt.target.islandId === PETALIMP_ISLAND_ID
+          ? receipt.transition === 'island_reveal' ? 'The mist lifts from a quiet, bare garden.' : ''
+          : payload.reactionLine ?? `${island.shortName} is growing beautifully.`,
+        showCoins: receipt.coinCost > 0 && receipt.economyMode === 'normal' && (payload.showCoins ?? true),
         status: 'playing',
         storyPresentationKey: work.key,
         toStage: receipt.toLevel as HavenStage,
-        upgradeName: level.name,
+        upgradeName: level?.name ?? 'Forgotten Garden',
         visualTarget: payload.target,
       };
     }
@@ -584,7 +626,7 @@ export function KatchimeraKingdomScreen({
     revealedUpgradeRef.current = null;
     setUpgrading(true);
     setDetailCreatureId(null);
-    setSelectedNatureIslandId(null);
+    setDisplayedGlow(presentation.showCoins ? mergeWorldRef.current.coins + presentation.coinCost : mergeWorldRef.current.coins);
     setUpgradePresentation(presentation);
     await new Promise<void>((resolve) => {
       storyUpgradeResolversRef.current.set(work.key, resolve);
@@ -592,6 +634,7 @@ export function KatchimeraKingdomScreen({
         storyUpgradeResolversRef.current.delete(work.key);
         setUpgradePresentation((current) => current?.storyPresentationKey === work.key ? null : current);
         setRequiredUpgradeStory((current) => current?.presentation.storyPresentationKey === work.key ? null : current);
+        setDisplayedGlow(mergeWorldRef.current.coins);
         setUpgrading(false);
         resolve();
       }, { once: true });
@@ -607,6 +650,7 @@ export function KatchimeraKingdomScreen({
       resolve?.();
     }
     setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
+    setDisplayedGlow(mergeWorldRef.current.coins);
     setUpgrading(false);
     if (
       ftueStepId === 'world.first_bloom_restore'
@@ -636,6 +680,14 @@ export function KatchimeraKingdomScreen({
     revealedUpgradeRef.current = presentation.nonce;
     if (tutorialUpgradeNonceRef.current === presentation.nonce) {
       finishUpgradePresentation(presentation);
+      return;
+    }
+    if (presentation.natureIslandId === PETALIMP_ISLAND_ID) {
+      finishUpgradePresentation(presentation);
+      if (!presentation.natureIslandReveal) requestAnimationFrame(() => petalimpNarrativeAfterUpgradeRef.current?.(
+        presentation.toStage as MossproutNatureIslandLevel,
+        'resolution',
+      ));
       return;
     }
     const id = presentation.natureIslandId ? `nature:${presentation.natureIslandId}`
@@ -826,6 +878,7 @@ export function KatchimeraKingdomScreen({
     setInteractionLoadingVisible(false);
     setHostedInteractionRequest(null);
     setInteractionCreatureId(null);
+    setPendingIslandCampaignLevel(null);
   }, []);
   useEffect(() => {
     if (!interactionCreatureId || !ftueStepId || ftueStepId.startsWith('companion.')) return;
@@ -866,11 +919,16 @@ export function KatchimeraKingdomScreen({
   const openGarden = useCallback((orderId?: string | null, requestedFamilyId?: KatchimeraFamilyId) => {
     const familyId = requestedFamilyId ?? interactionSlot?.familyId ?? 'mossprout';
     if (!usesSharedResidentStage(familyId) || !havenMergeBoardActive) return;
-    transitionTo({
+    const accepted = transitionTo({
       announcement: "Opening Mossprout's Garden",
       target: 'merge',
       onCovered: closeResidentInteraction,
       navigate: () => {
+        // Retain the island/upgrade focus while the source is visible. Clearing
+        // the selection earlier makes the camera restore behind the closing
+        // panel before the route curtain has finished covering the world.
+        setSelectedUpgrade(null);
+        setUpgradeError(null);
         router.push({
           pathname: '/katchimera/[creatureId]/activity',
           params: {
@@ -882,7 +940,146 @@ export function KatchimeraKingdomScreen({
         });
       },
     });
+    if (!accepted) {
+      setSelectedUpgrade(null);
+      setUpgradeError(null);
+    }
   }, [closeResidentInteraction, havenMergeBoardActive, interactionSlot?.familyId, router, transitionTo]);
+
+  const openPetalimpIslandNarrative = useCallback((level: MossproutNatureIslandLevel, phase: 'opening' | 'return' | 'resolution' = 'opening') => {
+    const chapter = PETALIMP_ISLAND_CHAPTERS.find((candidate) => candidate.level === level);
+    const mossprout = visibleCompanionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === 'mossprout');
+    if (!chapter || !mossprout || mossprout.kind !== 'owned') return;
+    const campaign = mergeWorld.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID];
+    const selectedOptionId = campaign?.chapters[String(level)]?.selectedOptionId;
+    const growthStyle = level === 4 ? petalimpGrowthStyle(PETALIMP_ISLAND_CHAPTERS.map((candidate) => (
+      campaign?.chapters[String(candidate.level)]?.selectedOptionId
+    ))) : undefined;
+    const definitionId = phase === 'opening' ? chapter.conversationId
+      : phase === 'return' ? petalimpIslandReturnConversationId(level, selectedOptionId)
+        : petalimpIslandResolutionConversationId(level, selectedOptionId, growthStyle);
+    if (!definitionId) return;
+    setPendingIslandCampaignLevel(level);
+    setPendingIslandCampaignPhase(phase);
+    setDetailCreatureId(null);
+    setInteractionCameraReady(false);
+    setInteractionExiting(false);
+    setHostedInteractionRequest({
+      creatureId: 'companion:mossprout',
+      journeyReturnConversationDefinitionId: definitionId,
+      key: `${PETALIMP_ISLAND_CAMPAIGN_ID}:level-${level}:${phase}:${Date.now().toString(36)}`,
+    });
+    setInteractionCreatureId(mossprout.creature.creatureId);
+  }, [mergeWorld, visibleCompanionSlots]);
+  petalimpNarrativeAfterUpgradeRef.current = openPetalimpIslandNarrative;
+
+  const resumePetalimpIslandCampaign = useCallback(() => {
+    if (!petalimpCampaign?.discoveryRevealSeenAt) return false;
+    const chapter = PETALIMP_ISLAND_CHAPTERS.find((candidate) => petalimpIslandChapterStatus(mergeWorld, candidate.level) !== 'complete');
+    if (!chapter) return false;
+    const level = chapter.level;
+    const status = petalimpIslandChapterStatus(mergeWorld, level);
+    if (status === 'available') {
+      openPetalimpIslandNarrative(level, 'opening');
+      return true;
+    }
+    if (status === 'orders_active') {
+      const chapter = petalimpCampaign.chapters[String(level)];
+      const orderId = chapter?.orderIds.find((id) => !chapter.servedOrderIds.includes(id));
+      if (orderId) openGarden(orderId, 'mossprout');
+      return true;
+    }
+    if (status === 'return_ready') {
+      openPetalimpIslandNarrative(level, 'return');
+      return true;
+    }
+    if (status === 'resolution_ready') {
+      openPetalimpIslandNarrative(level, 'resolution');
+      return true;
+    }
+    // restoration_ready belongs to the ordinary upgrade panel.
+    return false;
+  }, [mergeWorld, openGarden, openPetalimpIslandNarrative, petalimpCampaign]);
+
+  const continueFromPetalimpDiscovery = useCallback(async () => {
+    if (islandDiscoveryContinueBusy.current) return;
+    islandDiscoveryContinueBusy.current = true;
+    const level = pendingIslandCampaignLevel
+      ?? Math.min(4, (mergeWorldRef.current.haven.mossproutNatureIslands[PETALIMP_ISLAND_ID] ?? 0) + 1) as MossproutNatureIslandLevel;
+    try {
+      await acknowledgeStoredIslandCampaignResidentDiscovery(PETALIMP_ISLAND_CAMPAIGN_ID);
+      openPetalimpIslandNarrative(level, 'opening');
+    } catch (error) {
+      console.warn('Could not continue from Petalimp discovery', error);
+    } finally {
+      islandDiscoveryContinueBusy.current = false;
+    }
+  }, [openPetalimpIslandNarrative, pendingIslandCampaignLevel]);
+
+  const completePetalimpIslandConversation = useCallback(async (_definitionId: string, session: ConversationSession) => {
+    const chapter = PETALIMP_ISLAND_CHAPTERS.find((candidate) => candidate.level === pendingIslandCampaignLevel);
+    if (!chapter) return;
+    if (pendingIslandCampaignPhase === 'return') {
+      await acknowledgeStoredIslandCampaignChapterReturn(PETALIMP_ISLAND_CAMPAIGN_ID, chapter.level);
+      requestResidentInteractionExit();
+      return;
+    }
+    if (pendingIslandCampaignPhase === 'resolution') {
+      await completeStoredIslandCampaignChapter(PETALIMP_ISLAND_CAMPAIGN_ID, chapter.level);
+      requestResidentInteractionExit();
+      return;
+    }
+    const selectedOptionId = session.turns.find((turn) => petalimpIslandChapterChoice(chapter.level, turn.optionId))?.optionId;
+    if (!selectedOptionId) throw new Error('Choose how this part of the garden should grow.');
+    const order = petalimpIslandChapterOrder(chapter.level, selectedOptionId);
+    if (!order) return;
+    const result = await activateStoredIslandCampaignChapter({
+      campaignId: PETALIMP_ISLAND_CAMPAIGN_ID,
+      islandId: PETALIMP_ISLAND_ID,
+      residentSkinId: 'petalimp',
+      level: chapter.level,
+      selectedOptionId,
+      orders: [order],
+    });
+    const campaignProgress = result.state.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID]
+      ?.chapters[String(chapter.level)];
+    if (!campaignProgress?.orderIds[0]) throw new Error('Petalimp’s request could not be opened. Please try again.');
+    const activeOrderId = campaignProgress.orderIds[0];
+    openGarden(activeOrderId, 'mossprout');
+  }, [openGarden, pendingIslandCampaignLevel, pendingIslandCampaignPhase, requestResidentInteractionExit]);
+
+  useEffect(() => {
+    if (!screenFocused || !petalimpCampaign?.discoveryRevealSeenAt || pendingPetalimpDiscovery
+      || interactionCreatureId || selectedUpgrade || upgradePresentation || requiredUpgradeStory || ordinaryUpgradeRun) return;
+    const chapter = PETALIMP_ISLAND_CHAPTERS.find((candidate) => petalimpIslandChapterStatus(mergeWorld, candidate.level) !== 'complete');
+    if (!chapter) return;
+    const status = petalimpIslandChapterStatus(mergeWorld, chapter.level);
+    if (status === 'return_ready') {
+      const key = `return:${chapter.level}:${mergeWorld.revision}`;
+      if (campaignAutoTransitionRef.current === key) return;
+      campaignAutoTransitionRef.current = key;
+      openPetalimpIslandNarrative(chapter.level, 'return');
+      return;
+    }
+    if (chapter.level === 1 && status === 'restoration_ready') {
+      const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${PETALIMP_ISLAND_ID}` && candidate.nextLevel === 1 && candidate.eligible);
+      const key = `restore:${mergeWorld.revision}`;
+      if (!offer || campaignAutoTransitionRef.current === key) return;
+      campaignAutoTransitionRef.current = key;
+      void purchaseWorldUpgrade(offer).catch((error) => {
+        campaignAutoTransitionRef.current = null;
+        setUpgradeError(error instanceof Error ? error.message : 'The garden restoration paused.');
+      });
+      return;
+    }
+    if (status === 'resolution_ready') {
+      const key = `resolution:${chapter.level}:${mergeWorld.revision}`;
+      if (campaignAutoTransitionRef.current === key) return;
+      campaignAutoTransitionRef.current = key;
+      openPetalimpIslandNarrative(chapter.level, 'resolution');
+    }
+  }, [interactionCreatureId, mergeWorld, openPetalimpIslandNarrative, ordinaryUpgradeRun, pendingPetalimpDiscovery,
+    petalimpCampaign, requiredUpgradeStory, screenFocused, selectedUpgrade, upgradeOffers, upgradePresentation]);
 
   useEffect(() => {
     if (!screenFocused) { stepplingLessonOpening.current = false; return; }
@@ -911,6 +1108,10 @@ export function KatchimeraKingdomScreen({
     } catch (error) { setSelectedUpgrade(offer); setUpgradeError(error instanceof Error ? error.message : 'Could not open the upgrade. Please try again.'); }
     finally { upgradePressBusy.current = false; }
   }, [ftueStepId, glowRun, upgradePresentation, upgradePurchasing]);
+  const handleUpgradeOfferPress = useCallback((offer: WorldUpgradeOffer) => {
+    if (offer.id === `nature:${PETALIMP_ISLAND_ID}` && !offer.eligible && resumePetalimpIslandCampaign()) return;
+    void openUpgradeOffer(offer);
+  }, [openUpgradeOffer, resumePetalimpIslandCampaign]);
   const setUpgradeMarkerNode = useCallback((id: string, node: View | null) => {
     if (id === 'haven:mossprout') registerFtueTarget('upgrade:mossprout', node);
     if (id === 'mist:steppling-home') registerFtueTarget('upgrade:steppling', node);
@@ -932,10 +1133,16 @@ export function KatchimeraKingdomScreen({
         if (run?.status === 'failed_recoverable') throw new Error('The upgrade could not finish. Try again.');
         if (run?.status === 'completed') setSelectedUpgrade(null);
       }
-    } catch (error) { setUpgradeError(error instanceof Error ? error.message : 'Could not upgrade. Please try again.'); setUpgradeCommitted(false); }
+    } catch (error) { setDisplayedGlow(mergeWorldRef.current.coins); setUpgradeError(error instanceof Error ? error.message : 'Could not upgrade. Please try again.'); setUpgradeCommitted(false); }
     finally { upgradePressBusy.current = false; setUpgradePurchasing(false); }
   }, [ftueStepId, glowRun, sharedUpgrade, upgradeCommitted, upgradeError]);
-  const visibleUpgradeOffers = visibleWorldUpgradeOffers(upgradeOffers, ftueStepId, glowRun);
+  const presentedUpgradeOffers = upgradeOffers.map((offer): WorldUpgradeOffer => {
+    if (offer.id === `nature:${FERNIP_ISLAND_ID}` && !fernipIslandOpen) {
+      return { ...offer, lockedReason: FERNIP_ISLAND_LOCK_REASON };
+    }
+    return offer;
+  });
+  const visibleUpgradeOffers = visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
 
   // Mount the camera with its saved framing, rather than initializing the overview first.
   if (!glowReady || !stepplingLesson.ready) return null;
@@ -961,14 +1168,17 @@ export function KatchimeraKingdomScreen({
         highlightedLockedFamilyId={null}
         interactionEnabled={!activeInteractionResidentId && !stepplingEncounter.open && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
         interactionExitNonce={interactionExitNonce}
+        interactionNatureIslandId={pendingIslandCampaignLevel ? PETALIMP_ISLAND_ID : null}
+        preserveInteractionCameraOnExit={Boolean(pendingIslandCampaignLevel)}
         interactionResidentAnchorY={ftueReturnResidentAnchorY}
         interactionResidentId={activeInteractionResidentId}
         mossproutMeditating={mossproutMeditating}
-        interactionRewardPulseKey={interactionRewardPulseKey}
+        interactionRewardPulseKey={pendingIslandCampaignLevel ? 0 : interactionRewardPulseKey}
         gardenOrdersInteractive={false}
         initialTutorialCameraScale={initialFtueCameraScale}
         initialCameraSnapshot={initialCameraSnapshot}
         mossproutNatureIslandLevels={mergeWorld.haven.mossproutNatureIslands}
+        mossproutNatureIslandReveals={Object.fromEntries(Object.keys(mergeWorld.haven.mossproutNatureIslandReveals).map((id) => [id, true]))}
         mossproutGarden={mossproutGardenScene}
         onCameraSnapshotChange={onCameraSnapshotChange}
         onCameraMotionChange={handleCameraMotionChange}
@@ -984,11 +1194,11 @@ export function KatchimeraKingdomScreen({
           saveRead={saveUpgradeStoryRead}
           onCoachmarkChange={setUpgradeCoachmark} error={upgradeError} coached={coachedUpgrade} actionRef={upgradeActionRef} registerDismiss={registerUpgradeDismiss}
           onClose={() => { pendingUpgradeReward.current = null; setSelectedUpgrade(null); setUpgradeError(null); }} onConfirm={() => { void confirmWorldUpgrade(); }}
-          onGarden={() => { setSelectedUpgrade(null); setUpgradeError(null); openGarden(); }} /> : null}
+          onGarden={() => { openGarden(); }} /> : null}
         preserveUpgradeCamera={ftueGardenUpgradeActive || (selectedUpgrade?.id === 'mist:steppling-home' && Boolean(glowRun && glowRun.status !== 'completed'))}
         upgradeSelectionCommitted={upgradeCommitted}
         upgradeFailed={Boolean(upgradeError)}
-        onUpgradeOfferPress={(offer) => { void openUpgradeOffer(offer); }}
+        onUpgradeOfferPress={handleUpgradeOfferPress}
         onUpgradeOfferTargetChange={setUpgradeMarkerNode}
         onTileUpgradeOfferTargetChange={setGardenWorldOfferNode}
         onSelectHome={() => {}}
@@ -998,8 +1208,12 @@ export function KatchimeraKingdomScreen({
         onSelectNatureIsland={(islandId) => {
           if (ftueStep?.surface === 'haven') return;
           if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          setNatureUpgradeError(null);
-          const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${islandId}`);
+          const offer = presentedUpgradeOffers.find((candidate) => candidate.id === `nature:${islandId}`);
+          if (offer?.lockedReason) {
+            void openUpgradeOffer(offer);
+            return;
+          }
+          if (islandId === PETALIMP_ISLAND_ID && resumePetalimpIslandCampaign()) return;
           if (offer) void openUpgradeOffer(offer);
           else { const archive = worldUpgradeArchiveOffer(mergeWorld, `nature:${islandId}`); if (archive) setSelectedUpgrade(archive); }
         }}
@@ -1016,7 +1230,7 @@ export function KatchimeraKingdomScreen({
           const offer = upgradeOffers.find((candidate) => candidate.id === 'mist:steppling-home');
           if (offer && (!glowRun || ['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy'].includes(glowRun.nodeId))) { void openUpgradeOffer(offer); return; }
           setGlowPanelOpen(true);
-          void startGlowDiscovery().catch(() => setNatureUpgradeError('The path could not open. Please try again.'));
+          void startGlowDiscovery().catch((error) => console.warn('The path could not open', error));
         }}
         onSelectResident={(creatureId) => {
           if (glowDiscoveryLocksCamera(glowRun)) return;
@@ -1057,10 +1271,11 @@ export function KatchimeraKingdomScreen({
           onEnergyTokenArrive={stepplingEncounter.feedController.handleEnergyTokenArrive}
         />
       </View>
-      {ftueGardenUpgradeActive || (!upgradePresentation && (!ftueStepId || ftueStepId === 'companion.meditating')) ? (
+      {ftueGardenUpgradeActive || seedPlantingFtueActive || Boolean(selectedUpgrade) || Boolean(upgradePresentation)
+        || (!upgradePresentation && (!ftueStepId || ftueStepId === 'companion.meditating')) ? (
         <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 360)} pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }, ftueGardenUpgradeActive && { zIndex: 90 }]}>
           <GameHudBar
-            leading={ftueGardenUpgradeActive || stepplingLesson.active ? undefined : <KatchimeraBackButton
+            leading={ftueGardenUpgradeActive || seedPlantingFtueActive || upgradePresentation || stepplingLesson.active ? undefined : <KatchimeraBackButton
               accessibilityHint={interactionCreatureId ? "Returns to this Katchimera's world" : 'Returns to the Katchimera world map'}
               accessibilityLabel={interactionCreatureId ? 'Exit interaction' : 'All Havens'}
               compact
@@ -1069,9 +1284,12 @@ export function KatchimeraKingdomScreen({
             />}
             content={<View />}
             trailing={<GameCurrencyHud balances={[{
+              animateValue: Boolean(upgradePresentation?.showCoins && upgradePresentation.coinCost > 0),
               art: GAME_CURRENCY_ART.coins,
+              artTargetRef: glowCurrencyArtRef,
               id: 'coins',
-              value: mergeWorld.coins,
+              value: displayedGlow,
+              valueAnimationDurationMs: reduceMotion ? 180 : 650,
             }]} style={styles.currencyHud} tone="glass" />}
             density="compact"
             style={styles.topHud}
@@ -1095,7 +1313,7 @@ export function KatchimeraKingdomScreen({
               disabled={navigationLocked && !glowDiscoveryAllowsGarden(glowRun) && !['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '')}
               onPress={['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '') ? onFtueOpenGarden : () => {
                 if (glowScene?.view.kind === 'garden') {
-                  void submitGlowAction(glowScene.actionId).then((run) => { if (run?.status === 'active') openGarden(); }).catch(() => setNatureUpgradeError('The Garden could not open. Please try again.'));
+                  void submitGlowAction(glowScene.actionId).then((run) => { if (run?.status === 'active') openGarden(); }).catch((error) => console.warn('The Garden could not open', error));
                 } else openGarden();
               }}
               ref={setGardenButtonNode}
@@ -1126,11 +1344,13 @@ export function KatchimeraKingdomScreen({
             creatureId={interactionCreatureId}
             ftueConversationDefinitionId={hostedInteractionRequest?.ftueConversationDefinitionId}
             hostedInHaven
+            hostedNarrativeRequired={Boolean(pendingIslandCampaignLevel)}
             journeyReturnConversationDefinitionId={hostedInteractionRequest?.journeyReturnConversationDefinitionId}
             onHostedClose={requestResidentInteractionExit}
+            onHostedInitialConversationComplete={completePetalimpIslandConversation}
             onHostedFtueComplete={closeResidentInteraction}
             onHostedOpenMerge={interactionHasGarden ? openGarden : undefined}
-            onVisibleCreatureRewardPulse={pulseVisibleResident}
+            onVisibleCreatureRewardPulse={pendingIslandCampaignLevel ? undefined : pulseVisibleResident}
             residentStoryResumeRequested={hostedInteractionRequest?.residentStoryResumeRequested}
             reuseUnderlyingStage
             source={hostedInteractionRequest?.source}
@@ -1153,7 +1373,20 @@ export function KatchimeraKingdomScreen({
       {screenFocused && requiredUpgradeStory ? <WorldUpgradeNarrative key={requiredUpgradeStory.presentation.storyPresentationKey ?? requiredUpgradeStory.presentation.nonce}
         offer={requiredUpgradeStory.offer} world={mergeWorld} required saveRead={saveUpgradeStoryRead}
         onClose={() => finishUpgradePresentation(requiredUpgradeStory.presentation)} /> : null}
-      {screenFocused && upgradeReward && !sharedUpgrade && !upgradePresentation && !requiredUpgradeStory ? <WorldUpgradeReward skinId={upgradeReward} onClose={() => setUpgradeReward(null)} /> : null}
+      {screenFocused && pendingPetalimpDiscovery && !activeInteractionResidentId && !sharedUpgrade && !upgradePresentation && !requiredUpgradeStory ? <KatchimeraFriendDiscoveryReveal
+        actionLabel="Talk with Petalimp"
+        dialogue="I followed one stubborn glimmer through the mist. It led me to a Welcome Garden that has forgotten how to bloom. Will you help me bring it back?"
+        onContinue={() => { void continueFromPetalimpDiscovery(); }}
+        residentId="petalimp"
+      /> : null}
+      <KatchimeraCardRevealModal
+        cardId={screenFocused && !sharedUpgrade && !upgradePresentation && !requiredUpgradeStory ? revealedFriendCardId : null}
+        cards={mossproutCards}
+        onDone={() => {
+          setUpgradeReward(null);
+          if (pendingPetalimpCardReveal) void acknowledgeStoredIslandCampaignResidentCardReveal(pendingPetalimpCardReveal.campaignId);
+        }}
+      />
       {screenFocused && mistUpgradeActive && !sharedUpgrade && !upgradePresentation && !activeInteractionResidentId && !stepplingEggOpen ? (
         <HavenFtueOverlay
           cue={{ kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'steppling' } }}
@@ -1179,19 +1412,6 @@ export function KatchimeraKingdomScreen({
             </ThemedText>
           </View>
         </KatchaSheet>
-      ) : null}
-      {selectedNatureIslandId && !upgradePresentation ? (
-        <MossproutNatureIslandSheet
-          error={natureUpgradeError}
-          islandId={selectedNatureIslandId}
-          mergeWorld={mergeWorld}
-          onClose={() => {
-            setNatureUpgradeError(null);
-            setSelectedNatureIslandId(null);
-          }}
-          onUpgrade={(islandId) => { const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${islandId}`); if (offer) { setSelectedNatureIslandId(null); void openUpgradeOffer(offer); } }}
-          saving={upgrading}
-        />
       ) : null}
       {selectedMemoryPlant && selectedMemoryPlantDefinition && !upgradePresentation ? (
         <KatchaSheet

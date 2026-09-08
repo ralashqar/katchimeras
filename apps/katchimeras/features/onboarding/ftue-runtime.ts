@@ -623,6 +623,6 @@ export function ftuePersonalizationKey(run = loadFtueRun()) {
 export function ftueWispForRun(run = loadFtueRun()) {
   const answer = run?.answers['egg.day_texture'] ?? run?.answers['egg.support_style'] ?? run?.answers['egg.desired_feeling'] ?? run?.answers['egg.context.activity'] ?? Object.values(run?.answers ?? {}).find((item) => !item.private);
   if (answer?.optionId === 'more_connection' || answer?.optionId === 'family' || answer?.optionId === 'friends' || answer?.optionId === 'people') return 'heartlet';
-  if (answer?.optionId === 'more_calm' || answer?.optionId === 'relaxing' || answer?.optionId === 'rest') return 'moonlit';
+  if (answer?.optionId === 'more_calm' || answer?.optionId === 'relaxing' || answer?.optionId === 'rest') return 'breeze';
   return 'sprout';
 }

@@ -32,6 +32,7 @@ test('every authored purchase has a unique complete story and valid live speaker
   assert.equal(WORLD_UPGRADE_STORIES.length, 26);
   assert.equal(new Set(WORLD_UPGRADE_STORIES.map((story) => story.id)).size, 26);
   for (const offer of WORLD_UPGRADE_DEFINITIONS) {
+    if (offer.transition === 'island_reveal') continue;
     const story = WORLD_UPGRADE_STORIES.find((item) => item.offerId === offer.id && item.level === offer.nextLevel);
     assert.ok(story); assert.equal(story.before.length, 3); assert.equal(story.after.length, 1);
     for (const line of [...story.before, ...story.after]) { assert.ok(line.text.length); assert.ok(katchimeraSkinById.get(line.speaker)?.visualKey); }
@@ -52,7 +53,7 @@ test('Glow percent cannot signal affordable before exact cost', () => {
 });
 test('milestone grant is atomic with payment, survives reload and cannot be duplicated', () => {
   let state = initial();
-  for (const [islandId, skinId] of [['bloom-garden', 'petalimp'], ['orchard-grove', 'amberleaf'], ['wildgrowth-grove', 'fernip']] as const) {
+  for (const [islandId, skinId] of [['orchard-grove', 'amberleaf'], ['wildgrowth-grove', 'fernip']] as const) {
     for (const level of [1, 2, 3, 4] as const) {
       const command = { type: 'upgradeMossproutNatureIsland' as const, islandId, level, now: NOW, receiptId: `v2:${islandId}:${level}` };
       if (level === 4) {
@@ -63,17 +64,13 @@ test('milestone grant is atomic with payment, survives reload and cannot be dupl
       const paid = state.coins;
       state = normalizeMergeWorldState(JSON.parse(JSON.stringify(state)), NOW);
       assert.equal(reduceMergeWorld(state, command).state.coins, paid);
-      assert.equal(state.upgradeSkinGrants?.[`nature:${islandId}:4`]?.skinId, level === 4 ? skinId : undefined);
+      const rewardLevel = 4;
+      assert.equal(state.upgradeSkinGrants?.[`nature:${islandId}:${rewardLevel}`]?.skinId, level >= rewardLevel ? skinId : undefined);
     }
   }
-  assert.equal(Object.keys(state.upgradeSkinGrants ?? {}).length, 3);
+  assert.equal(Object.keys(state.upgradeSkinGrants ?? {}).length, 2);
   const migrated = normalizeMergeWorldState({ ...state, upgradeSkinGrants: undefined }, NOW);
   assert.deepEqual(migrated.upgradeSkinGrants, state.upgradeSkinGrants);
-  const alreadyOwned = reconcileUpgradeProgress({ ...state, upgradeSkinGrants: {}, ownedKatchimeraCards: [
-    ...state.ownedKatchimeraCards, { cardId: 'petalimp', familyId: 'mossprout', acquisition: 'story_resident', sourceReceiptId: 'existing', acquiredAt: NOW, coinCost: 0 },
-  ] });
-  assert.equal(alreadyOwned.upgradeSkinGrants?.['nature:bloom-garden:4']?.skinId, 'petalimp', 'existing art cards do not prevent the wardrobe unlock');
-  assert.equal(alreadyOwned.ownedKatchimeraCards.filter((card) => card.cardId === 'petalimp').length, 1, 'no duplicate collectible is created');
 });
 test('read cursors clamp to available dialogue and do not mutate currency or tiles', () => {
   const state = initial();
@@ -106,7 +103,7 @@ test('panel waits for exit animation, keeps shortage explicit, and reading never
   const Panel = module.WorldUpgradePanel as React.ComponentType<Record<string, unknown>>;
   let closes = 0; let purchases = 0; let scrollsToAction = 0;
   const world = { ...initial(), coins: 0 };
-  const props = { world, offer: worldUpgradeOffers(world)[0], busy: false, actionRef: { current: null }, onClose: () => closes++, onConfirm: () => purchases++, onGarden() {}, saveRead: async (...args: unknown[]) => { readCalls.push(args); } };
+  const props = { world, offer: worldUpgradeOffers(world).find((offer) => offer.id === 'haven:mossprout')!, busy: false, actionRef: { current: null }, onClose: () => closes++, onConfirm: () => purchases++, onGarden() {}, saveRead: async (...args: unknown[]) => { readCalls.push(args); } };
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<Panel {...props} />, { createNodeMock: (element) => element.type === 'ScrollView' ? { scrollToEnd: () => scrollsToAction++ } : null }); motion.advance(400); });
   const panelMotion = () => tree!.root.findByType(host('AnimatedView')).props.style[2].read();

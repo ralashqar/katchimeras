@@ -14,6 +14,8 @@ import { worldUpgradeStory } from '@/features/world-upgrades/world-upgrade-stori
 import type { MergeWorldState } from '@/types/merge-world';
 export type UpgradeCoachmarkState = { visible: boolean; revision: number };
 
+const LOCK_ART = require('@incubator/art-world/hex/kingdom_dream_mist_lock_v1_512.webp');
+
 export function WorldUpgradePanel({ offer, world, busy, error, coached = false, actionRef, onClose, onConfirm, onGarden, registerDismiss, saveRead, onCoachmarkChange }: {
   offer: WorldUpgradeOffer; world: MergeWorldState; busy: boolean; error?: string | null; coached?: boolean;
   actionRef: RefObject<View | null>; onClose: () => void; onConfirm: () => void; onGarden: () => void;
@@ -36,9 +38,15 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   useEffect(() => { if (layoutReady) setEntranceReady(true); }, [layoutReady]);
   const [settled, setSettled] = useState(false); const [closing, setClosing] = useState(false);
   const closeRef = useRef<View>(null); const closeGuard = useRef(false);
+  const locked = Boolean(offer.lockedReason);
+  const actionable = offer.eligible;
   const affordable = world.coins >= offer.cost;
-  const story = worldUpgradeStory(offer.id, offer.nextLevel);
-  const coachVisible = settled && layoutReady && coached && affordable && !busy && !closing && !history
+  // Bloom Garden's story is delivered by its mandatory island-campaign
+  // narrative. Keep the standard upgrade panel focused on cost and reward.
+  const story = offer.id === 'nature:bloom-garden'
+    ? null
+    : worldUpgradeStory(offer.id, offer.nextLevel);
+  const coachVisible = settled && layoutReady && coached && affordable && !locked && !busy && !closing && !history
     && scrollY >= contentHeight - scrollHeight - 1;
   useEffect(() => {
     if (settled && layoutReady && coached && affordable && !history) scrollRef.current?.scrollToEnd({ animated: false });
@@ -79,7 +87,9 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   }, [dismissHistory, history, dismiss]);
   const motion = useAnimatedStyle(() => ({ opacity: progress.value, transform: [{ scale: reduced || !entranceReady ? 1 : 0.82 + progress.value * 0.18 }] }));
   const controls = (tutorial = false) => <View style={styles.actions}>
-    {offer.eligible ? <>
+    {locked ? <>
+      <KatchaButton accessibilityHint={offer.lockedReason} disabled fullWidth label="Journey Day 2 required" />
+    </> : offer.eligible ? <>
       <Text style={styles.cost}>{offer.cost.toLocaleString()} Glow{!affordable ? ` · Need ${(offer.cost - world.coins).toLocaleString()} more` : ''}</Text>
       {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
       <View ref={tutorial ? actionRef : undefined} collapsable={false}>
@@ -94,9 +104,9 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
     <View style={styles.bounds} pointerEvents="box-none" onLayout={(event) => setAvailableHeight(event.nativeEvent.layout.height)}>
     <Animated.View accessibilityViewIsModal onAccessibilityEscape={dismiss} style={[styles.panel, { height: panelHeight || '100%' }, motion]}>
       <View style={styles.header} onLayout={(event) => setHeaderHeight(event.nativeEvent.layout.height)}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Expand story history" disabled={busy || closing} onPress={() => setHistory(true)} style={styles.storyButton}>
+        {story ? <Pressable accessibilityRole="button" accessibilityLabel={locked ? 'Upgrade story locked' : 'Expand story history'} disabled={locked || busy || closing} onPress={() => setHistory(true)} style={[styles.storyButton, locked && styles.storyButtonLocked]}>
           <View style={styles.storyIcon}><Text style={styles.storyDots}>···</Text><View style={styles.storyTail} /></View>
-        </Pressable>
+        </Pressable> : <View style={styles.storyButtonPlaceholder} />}
         <View style={styles.heading}><Text style={styles.title}>{offer.name}</Text><Text style={styles.level}>Level {offer.currentLevel} / {offer.maxLevel}</Text></View>
         <Pressable ref={closeRef} accessibilityRole="button" accessibilityLabel="Close upgrade" disabled={busy || closing} onPress={dismiss} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
       </View>
@@ -104,18 +114,18 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
         onContentSizeChange={(_width, height) => setContentHeight(height)}
         onLayout={(event) => setScrollHeight(event.nativeEvent.layout.width > 0 ? event.nativeEvent.layout.height : 0)} scrollEnabled={!measured || contentHeight > scrollHeight + 1}>
         <Text style={styles.sectionTitle}>Required</Text>
-        <View style={styles.currencyTile}><Image source={GAME_CURRENCY_ART.coins} style={styles.currencyArt} contentFit="contain" /></View>
-        <Text style={[styles.amount, !affordable && styles.unaffordable]}>{offer.cost.toLocaleString()} Glow</Text>
-        <View style={styles.unlocks}><Text style={styles.sectionTitle}>{offer.eligible ? 'Unlocks' : 'Fully grown'}</Text>
-          <Text style={styles.unlockName}>{offer.nextName}</Text>
-          {story?.rewardSkinId ? <Text style={styles.reward}>Welcomes {katchimeraSkinById.get(story.rewardSkinId)?.displayName} to your collection</Text> : null}
+        <View style={styles.currencyTile}><Image accessibilityIgnoresInvertColors={locked} cachePolicy="memory-disk" source={locked ? LOCK_ART : GAME_CURRENCY_ART.coins} style={locked ? styles.lockArt : styles.currencyArt} contentFit="contain" transition={0} /></View>
+        <Text style={[styles.amount, !locked && !affordable && styles.unaffordable]}>{locked ? 'Journey Day 2 required' : `${offer.cost.toLocaleString()} Glow`}</Text>
+        <View style={styles.unlocks}><Text style={styles.sectionTitle}>{locked ? 'Unlock condition' : actionable ? 'Unlocks' : 'Fully grown'}</Text>
+          <Text style={styles.unlockName}>{locked ? offer.lockedReason : offer.nextName}</Text>
+          {!locked && story?.rewardSkinId ? <Text style={styles.reward}>Welcomes {katchimeraSkinById.get(story.rewardSkinId)?.displayName} to your collection</Text> : null}
         </View>
         {controls(true)}
       </ScrollView>
 
     </Animated.View>
     </View>
-    {history ? <WorldUpgradeNarrative offer={offer} world={world} saveRead={saveRead} onClose={dismissHistory} /> : null}
+    {history && !locked ? <WorldUpgradeNarrative offer={offer} world={world} saveRead={saveRead} onClose={dismissHistory} /> : null}
   </>;
 }
 function focus(ref: RefObject<View | null>) { const handle = findNodeHandle(ref.current); if (handle) AccessibilityInfo.setAccessibilityFocus(handle); }
@@ -126,6 +136,8 @@ const styles = StyleSheet.create({
   title: { ...KatchaUI.type.companionCardTitle, color: GameUI.color.ink, fontSize: 22, lineHeight: 27 },
   level: { ...KatchaUI.type.companionCardTitle, color: '#79613A', fontSize: 16, lineHeight: 22, fontVariant: ['tabular-nums'] },
   storyButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#E9F5D6', borderColor: '#8CBA69', borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  storyButtonLocked: { opacity: 0.42 },
+  storyButtonPlaceholder: { width: 44, height: 44 },
   storyIcon: { width: 26, height: 22, backgroundColor: '#FFFDF2', borderColor: '#658447', borderWidth: 2, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   storyDots: { ...KatchaUI.type.companionCardTitle, color: '#658447', fontSize: 16, lineHeight: 17 },
   storyTail: { position: 'absolute', bottom: -5, left: 5, width: 7, height: 7, borderLeftWidth: 2, borderBottomWidth: 2, borderColor: '#658447', backgroundColor: '#FFFDF2', transform: [{ rotate: '-25deg' }] },
@@ -134,6 +146,7 @@ const styles = StyleSheet.create({
   baseInfo: { width: '100%', padding: 16, gap: 12 },
   sectionTitle: { ...KatchaUI.type.companionCardTitle, fontSize: 21, lineHeight: 26, color: '#69512D', textAlign: 'center' },
   currencyTile: { alignSelf: 'center', width: 72, height: 72, borderRadius: 20, backgroundColor: '#F4E4B3', alignItems: 'center', justifyContent: 'center' }, currencyArt: { width: 60, height: 60 },
+  lockArt: { width: 66, height: 66 },
   amount: { ...KatchaUI.type.companionCardTitle, color: '#537741', fontSize: 22, lineHeight: 28, textAlign: 'center', fontVariant: ['tabular-nums'] }, unaffordable: { color: '#B44639' },
   unlocks: { padding: 14, gap: 8, backgroundColor: '#F0E9CF', borderRadius: 18 }, unlockName: { ...KatchaUI.type.companionDisplay, fontSize: 17, lineHeight: 23, color: '#76633F', textAlign: 'center' },
   cost: { ...KatchaUI.type.companionBody, color: GameUI.color.inkSecondary, fontSize: 12, lineHeight: 17, textAlign: 'center', fontVariant: ['tabular-nums'] },

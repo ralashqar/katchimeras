@@ -29,6 +29,7 @@ import {
 import { advanceGlowRequests, glowTutorialDrop, normalizeGlowDiscoveryFields, reduceGlowDiscovery } from './glow-discovery-policy';
 import { normalizeStepplingEgg, reduceStepplingEgg } from '@/features/onboarding/steppling-egg-policy';
 import { sharedWorldPurchase } from '@/constants/shared-world';
+import { PETALIMP_ISLAND_CAMPAIGN_ID } from '@/constants/petalimp-island-campaign';
 import { COMPANION_JOURNEY_PROFILES, JOURNEY_MEDITATION_ORDER_GLOW, JOURNEY_MEDITATION_ORDER_MINUTES } from '@/constants/companion-journey-profiles';
 import {
   MERGE_ENERGY_REGEN_CAP,
@@ -178,7 +179,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 22,
+    version: 23,
     ownerCharacterId: 'mossprout',
     revision: 0,
     createdAt: now,
@@ -205,6 +206,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     companionDailyGardenVersion: 1,
     companionDailyGarden: {},
     mossproutDailyGardenOrders: null,
+    islandCampaigns: {},
     characterActivityOpportunities: [],
     ownedKatchimeraCards: [],
     mossproutResidentSkinIds: ['mossprout'],
@@ -229,6 +231,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     haven: {
       tileStages: {},
       mossproutNatureIslands: emptyMossproutNatureIslandLevels(),
+      mossproutNatureIslandReveals: {},
       revealState: 'hidden',
       mossproutStoryLevel: 0,
       nextProceduralOrder: 1,
@@ -477,6 +480,20 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       return upgradeHavenTile(current, command.characterId, command.stage, command.now, command.receiptId, command.economyMode, command.grantedCoins);
     case 'upgradeMossproutNatureIsland':
       return upgradeMossproutNatureIsland(current, command.islandId, command.level, command.now, command.receiptId, command.economyMode, command.grantedCoins);
+    case 'revealMossproutNatureIsland':
+      return revealMossproutNatureIsland(current, command);
+    case 'discoverIslandCampaignResident':
+      return discoverIslandCampaignResident(current, command);
+    case 'ackIslandCampaignResidentDiscovery':
+      return acknowledgeIslandCampaignResidentDiscovery(current, command.campaignId, command.now);
+    case 'ackIslandCampaignResidentCardReveal':
+      return acknowledgeIslandCampaignResidentCardReveal(current, command.campaignId, command.now);
+    case 'activateIslandCampaignChapter':
+      return activateIslandCampaignChapter(current, command);
+    case 'ackIslandCampaignChapterReturn':
+      return acknowledgeIslandCampaignChapterReturn(current, command.campaignId, command.level, command.now);
+    case 'completeIslandCampaignChapter':
+      return completeIslandCampaignChapter(current, command.campaignId, command.level, command.now);
     case 'revealHaven': {
       if (current.haven.revealState === 'revealed') return unchanged(current);
       return changed(touch({ ...current, haven: { ...current.haven, revealState: 'revealed' } }, command.now), 'The Haven awakens.');
@@ -789,7 +806,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // v18 intentionally starts the first personal Merge World cleanly. Earlier
   // snapshots are shared-board prototypes and cannot be assigned safely to a
   // single companion without carrying their ownership compromises forward.
-  if ((rawVersion !== 18 && rawVersion !== 19 && rawVersion !== 20 && rawVersion !== 21 && rawVersion !== 22) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 18 && rawVersion !== 19 && rawVersion !== 20 && rawVersion !== 21 && rawVersion !== 22 && rawVersion !== 23) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
@@ -799,7 +816,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     ...normalizeGlowDiscoveryFields(source),
     companionDailyGardenVersion: source.companionDailyGardenVersion,
     stepplingEgg: normalizeStepplingEgg(source.stepplingEgg),
-    version: 22,
+    version: 23,
     ownerCharacterId: 'mossprout',
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
@@ -858,7 +875,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
             definition
             && definition.familyId === card.familyId
             && KNOWN_CHARACTERS.has(card.familyId)
-            && (card.acquisition === 'journey_match' || card.acquisition === 'story_resident' || card.acquisition === 'resident_discovery' || card.acquisition === 'coins')
+            && (card.acquisition === 'journey_match' || card.acquisition === 'story_resident' || card.acquisition === 'resident_discovery' || card.acquisition === 'island_campaign' || card.acquisition === 'coins')
             && typeof card.sourceReceiptId === 'string'
           );
         }).map((card) => ({
@@ -867,6 +884,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
           coinCost: Math.max(0, Math.floor(finite(card.coinCost, 0))),
         }))
       : [],
+    islandCampaigns: normalizeIslandCampaigns(source.islandCampaigns, now),
     mossproutResidentSkinIds: normalizeMossproutResidentSkinIds(source.mossproutResidentSkinIds, source.ownedKatchimeraCards),
     ownedMemoryCards: normalizeOwnedMemoryCards(source.ownedMemoryCards, now),
     completedOrderCount: Math.max(0, finite(source.completedOrderCount, 0)),
@@ -915,6 +933,47 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // Version 3's five single-chain generators migrate into the shared eight.
   normalized = ensureProceduralOrders(normalized, now);
   return reconcileUpgradeProgress(ensureOrdersRequireMerge(refreshTime(normalized, now)));
+}
+
+function normalizeIslandCampaigns(value: unknown, now: number): NonNullable<MergeWorldState['islandCampaigns']> {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(Object.entries(value).flatMap(([campaignId, rawCampaign]) => {
+    if (!campaignId || !rawCampaign || typeof rawCampaign !== 'object') return [];
+    const campaign = rawCampaign as Partial<NonNullable<MergeWorldState['islandCampaigns']>[string]>;
+    if (!MOSSPROUT_NATURE_ISLAND_IDS.includes(campaign.islandId as MossproutNatureIslandId)
+      || typeof campaign.residentSkinId !== 'string'
+      || !katchimeraSkinById.has(campaign.residentSkinId)) return [];
+    const chapters = Object.fromEntries(Object.entries(campaign.chapters ?? {}).flatMap(([key, rawChapter]) => {
+      if (!rawChapter || typeof rawChapter !== 'object') return [];
+      const chapter = rawChapter as Partial<NonNullable<MergeWorldState['islandCampaigns']>[string]['chapters'][string]>;
+      const level = Math.floor(finite(chapter.level, Number(key))) as MossproutNatureIslandLevel;
+      if (level < 1 || level > 4) return [];
+      return [[String(level), {
+        level,
+        selectedOptionId: typeof chapter.selectedOptionId === 'string' ? chapter.selectedOptionId : null,
+        orderIds: uniqueStrings(chapter.orderIds),
+        servedOrderIds: uniqueStrings(chapter.servedOrderIds),
+        startedAt: finite(chapter.startedAt, now),
+        returnConversationSeenAt: chapter.returnConversationSeenAt == null ? null : finite(chapter.returnConversationSeenAt, now),
+        completedAt: chapter.completedAt == null ? null : finite(chapter.completedAt, now),
+      }]];
+    }));
+    const firstChapterAt = Math.min(...Object.values(chapters).map((chapter) => chapter.startedAt), now);
+    const legacyCampaign = !Object.prototype.hasOwnProperty.call(campaign, 'discoveredAt');
+    const discoveredAt = finite(campaign.discoveredAt, firstChapterAt);
+    return [[campaignId, {
+      campaignId,
+      islandId: campaign.islandId as MossproutNatureIslandId,
+      residentSkinId: campaign.residentSkinId as KatchimeraSkinId,
+      discoveredAt,
+      discoveryRevealSeenAt: campaign.discoveryRevealSeenAt == null
+        ? legacyCampaign ? discoveredAt : null
+        : finite(campaign.discoveryRevealSeenAt, discoveredAt),
+      cardEarnedAt: campaign.cardEarnedAt == null ? null : finite(campaign.cardEarnedAt, now),
+      cardRevealSeenAt: campaign.cardRevealSeenAt == null ? null : finite(campaign.cardRevealSeenAt, now),
+      chapters,
+    }]];
+  }));
 }
 
 function upgradeHavenTile(
@@ -1032,6 +1091,18 @@ function upgradeMossproutNatureIsland(
   }
   const definition = mossproutNatureIslandLevelDefinition(islandId, requestedLevel);
   if (!definition) return unchanged(state, 'This island cannot grow any further.');
+  if (islandId === 'bloom-garden') {
+    const campaign = state.islandCampaigns?.['island-campaign:petalimp-bloom'];
+    if (!state.haven.mossproutNatureIslandReveals['bloom-garden'] || !campaign?.discoveryRevealSeenAt) {
+      return unchanged(state, 'Clear the mist and discover the garden first.');
+    }
+    const chapter = campaign.chapters[String(requestedLevel)];
+    if (!chapter || !chapter.orderIds.every((id) => chapter.servedOrderIds.includes(id))) {
+      return unchanged(state, 'Finish Petalimp’s garden request first.');
+    }
+    if (chapter.returnConversationSeenAt == null) return unchanged(state, 'Return to Petalimp before restoring the garden.');
+    if (requestedLevel === 1 && economyMode !== 'free') return unchanged(state, 'The first restoration is a gift from Petalimp.');
+  }
   const grant = economyMode === 'grant' ? Math.max(0, Math.floor(grantedCoins)) : 0;
   const coinCost = economyMode === 'free' ? 0 : definition.coinCost;
   if (state.coins + grant < coinCost) {
@@ -1074,6 +1145,244 @@ function upgradeMossproutNatureIsland(
   };
 }
 
+function discoverIslandCampaignResident(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'discoverIslandCampaignResident' }>,
+): MergeWorldCommandResult {
+  if (!command.campaignId || !mossproutNatureIslandById.has(command.islandId) || !katchimeraSkinById.has(command.residentSkinId)) {
+    return unchanged(state, 'That island friend is not available.');
+  }
+  const existing = state.islandCampaigns?.[command.campaignId];
+  if (existing) return unchanged(state, 'You have already met this friend.');
+  return changed(touch({
+    ...state,
+    islandCampaigns: {
+      ...(state.islandCampaigns ?? {}),
+      [command.campaignId]: {
+        campaignId: command.campaignId,
+        islandId: command.islandId,
+        residentSkinId: command.residentSkinId,
+        discoveredAt: command.now,
+        discoveryRevealSeenAt: null,
+        cardEarnedAt: null,
+        cardRevealSeenAt: null,
+        chapters: {},
+      },
+    },
+  }, command.now), `${command.residentSkinId} appeared on the island.`);
+}
+
+function revealMossproutNatureIsland(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'revealMossproutNatureIsland' }>,
+): MergeWorldCommandResult {
+  const existingReceipt = state.storyWorldMutationReceipts.find((receipt) => receipt.id === command.receiptId);
+  if (existingReceipt) return {
+    ...unchanged(state, 'This mist was already cleared.'),
+    storyWorldMutationReceipt: existingReceipt,
+    natureIslandUpgrade: { islandId: command.islandId, level: 0, coinCost: existingReceipt.coinCost, completedTier: false },
+  };
+  if (command.islandId !== 'bloom-garden' || command.campaignId !== 'island-campaign:petalimp-bloom'
+    || command.residentSkinId !== 'petalimp') return unchanged(state, 'That hidden island is not authored yet.');
+  if ((state.haven.mossproutNatureIslands[command.islandId] ?? 0) !== 0) return unchanged(state, 'That island is already growing.');
+  if (state.haven.mossproutNatureIslandReveals[command.islandId]) return unchanged(state, 'That mist is already clear.');
+  const cost = Math.max(0, Math.floor(command.cost));
+  if (state.coins < cost) return unchanged(state, 'Earn a few more Glow through Merge orders.');
+  const receipt: StoryWorldMutationReceipt = {
+    id: command.receiptId,
+    kind: 'haven_upgrade',
+    target: { kind: 'haven_nature_island', islandId: command.islandId },
+    fromLevel: 0,
+    toLevel: 0,
+    economyMode: 'normal',
+    coinCost: cost,
+    createdAt: command.now,
+    transition: 'island_reveal',
+  };
+  const campaign = state.islandCampaigns?.[command.campaignId] ?? {
+    campaignId: command.campaignId,
+    islandId: command.islandId,
+    residentSkinId: command.residentSkinId,
+    discoveredAt: command.now,
+    discoveryRevealSeenAt: null,
+    cardEarnedAt: null,
+    cardRevealSeenAt: null,
+    chapters: {},
+  };
+  const next = touch({
+    ...state,
+    coins: state.coins - cost,
+    storyWorldMutationReceipts: [...state.storyWorldMutationReceipts, receipt],
+    islandCampaigns: { ...(state.islandCampaigns ?? {}), [command.campaignId]: campaign },
+    haven: {
+      ...state.haven,
+      mossproutNatureIslandReveals: {
+        ...state.haven.mossproutNatureIslandReveals,
+        [command.islandId]: { revealedAt: command.now, receiptId: command.receiptId, paid: cost },
+      },
+    },
+  }, command.now);
+  return {
+    state: next,
+    changed: true,
+    message: 'The mist cleared from a forgotten garden.',
+    storyWorldMutationReceipt: receipt,
+    natureIslandUpgrade: { islandId: command.islandId, level: 0, coinCost: cost, completedTier: false },
+  };
+}
+
+function acknowledgeIslandCampaignResidentDiscovery(
+  state: MergeWorldState,
+  campaignId: string,
+  now: number,
+): MergeWorldCommandResult {
+  const campaign = state.islandCampaigns?.[campaignId];
+  if (!campaign || campaign.discoveryRevealSeenAt != null) return unchanged(state);
+  return changed(touch({
+    ...state,
+    islandCampaigns: {
+      ...(state.islandCampaigns ?? {}),
+      [campaignId]: { ...campaign, discoveryRevealSeenAt: now },
+    },
+  }, now));
+}
+
+function acknowledgeIslandCampaignResidentCardReveal(
+  state: MergeWorldState,
+  campaignId: string,
+  now: number,
+): MergeWorldCommandResult {
+  const campaign = state.islandCampaigns?.[campaignId];
+  if (!campaign || campaign.cardEarnedAt == null || campaign.cardRevealSeenAt != null) return unchanged(state);
+  return changed(touch({
+    ...state,
+    islandCampaigns: {
+      ...(state.islandCampaigns ?? {}),
+      [campaignId]: { ...campaign, cardRevealSeenAt: now },
+    },
+  }, now));
+}
+
+function activateIslandCampaignChapter(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'activateIslandCampaignChapter' }>,
+): MergeWorldCommandResult {
+  if (!command.campaignId || !mossproutNatureIslandById.has(command.islandId) || command.level < 1 || command.level > 4) {
+    return unchanged(state, 'That island chapter is not available.');
+  }
+  const currentLevel = state.haven.mossproutNatureIslands[command.islandId] ?? 0;
+  const expectedLevel = currentLevel + 1;
+  if (command.level !== expectedLevel) return unchanged(state, 'Finish the current island chapter first.');
+  const existingCampaign = state.islandCampaigns?.[command.campaignId];
+  const existingChapter = existingCampaign?.chapters[String(command.level)];
+  if (existingChapter) return unchanged(state, 'That island request is already active.');
+  const orders = command.orders.filter((order) => order.storyArcId === command.campaignId && order.storyTargetLevel === command.level);
+  if (!orders.length) return unchanged(state, 'That island chapter has no request.');
+  const activeOrders = [...state.activeOrders, ...orders.filter((order) => !state.activeOrders.some((candidate) => candidate.id === order.id))];
+  const campaign = existingCampaign ?? {
+    campaignId: command.campaignId,
+    islandId: command.islandId,
+    residentSkinId: command.residentSkinId,
+    discoveredAt: command.now,
+    discoveryRevealSeenAt: command.now,
+    cardEarnedAt: null,
+    cardRevealSeenAt: null,
+    chapters: {},
+  };
+  return changed(touch({
+    ...state,
+    activeOrders,
+    islandCampaigns: {
+      ...(state.islandCampaigns ?? {}),
+      [command.campaignId]: {
+        ...campaign,
+        chapters: {
+          ...campaign.chapters,
+          [String(command.level)]: {
+            level: command.level,
+            selectedOptionId: command.selectedOptionId ?? null,
+            orderIds: orders.map((order) => order.id),
+            servedOrderIds: [],
+            startedAt: command.now,
+            returnConversationSeenAt: null,
+            completedAt: null,
+          },
+        },
+      },
+    },
+  }, command.now), `${orders[0]!.title} is ready in the Garden.`);
+}
+
+function acknowledgeIslandCampaignChapterReturn(
+  state: MergeWorldState,
+  campaignId: string,
+  level: MossproutNatureIslandLevel,
+  now: number,
+): MergeWorldCommandResult {
+  const campaign = state.islandCampaigns?.[campaignId];
+  const chapter = campaign?.chapters[String(level)];
+  if (!campaign || !chapter) return unchanged(state, 'That island chapter has not started.');
+  if (!chapter.orderIds.every((id) => chapter.servedOrderIds.includes(id))) return unchanged(state, 'Finish the island request first.');
+  if (chapter.returnConversationSeenAt != null) return unchanged(state);
+  return changed(touch({
+    ...state,
+    islandCampaigns: {
+      ...(state.islandCampaigns ?? {}),
+      [campaignId]: {
+        ...campaign,
+        chapters: {
+          ...campaign.chapters,
+          [String(level)]: { ...chapter, returnConversationSeenAt: now },
+        },
+      },
+    },
+  }, now));
+}
+
+function completeIslandCampaignChapter(
+  state: MergeWorldState,
+  campaignId: string,
+  level: MossproutNatureIslandLevel,
+  now: number,
+): MergeWorldCommandResult {
+  const campaign = state.islandCampaigns?.[campaignId];
+  const chapter = campaign?.chapters[String(level)];
+  if (!campaign || !chapter) return unchanged(state, 'That island chapter has not started.');
+  if (chapter.completedAt != null) return unchanged(state, 'That island chapter is already complete.');
+  if (!chapter.orderIds.every((id) => chapter.servedOrderIds.includes(id))) {
+    return unchanged(state, 'Finish the island request first.');
+  }
+  if ((state.haven.mossproutNatureIslands[campaign.islandId] ?? 0) < level) {
+    return unchanged(state, 'Restore this part of the island first.');
+  }
+  const earnsPetalimp = campaignId === 'island-campaign:petalimp-bloom' && level === 4;
+  const hasPetalimp = state.ownedKatchimeraCards.some((card) => card.cardId === 'petalimp');
+  const ownedKatchimeraCards = earnsPetalimp && !hasPetalimp ? [...state.ownedKatchimeraCards, {
+    cardId: 'petalimp' as const,
+    familyId: 'mossprout' as const,
+    acquisition: 'island_campaign' as const,
+    sourceReceiptId: `${campaignId}:friend`,
+    acquiredAt: now,
+    coinCost: 0,
+  }] : state.ownedKatchimeraCards;
+  const residentIds = new Set(state.mossproutResidentSkinIds);
+  if (earnsPetalimp) residentIds.add('petalimp');
+  return changed(touch({
+    ...state,
+    ownedKatchimeraCards,
+    mossproutResidentSkinIds: MOSSPROUT_RESIDENT_IDS.filter((id) => residentIds.has(id)),
+    islandCampaigns: {
+      ...(state.islandCampaigns ?? {}),
+      [campaignId]: {
+        ...campaign,
+        cardEarnedAt: earnsPetalimp ? campaign.cardEarnedAt ?? now : campaign.cardEarnedAt,
+        cardRevealSeenAt: earnsPetalimp && !hasPetalimp ? null : campaign.cardRevealSeenAt,
+        chapters: { ...campaign.chapters, [String(level)]: { ...chapter, completedAt: now } },
+      },
+    },
+  }, now), `${campaign.residentSkinId}'s island chapter is complete.`);
+}
+
 function normalizeStoryWorldMutationReceipts(value: unknown): StoryWorldMutationReceipt[] {
   if (!Array.isArray(value)) return [];
   const ids = new Set<string>();
@@ -1104,6 +1413,7 @@ function normalizeStoryWorldMutationReceipts(value: unknown): StoryWorldMutation
       economyMode: receipt.economyMode,
       coinCost: Math.max(0, Math.floor(Number(receipt.coinCost) || 0)),
       createdAt: Number(receipt.createdAt) || 0,
+      ...(receipt.transition === 'island_reveal' ? { transition: 'island_reveal' as const } : {}),
     }];
   });
 }
@@ -1129,13 +1439,30 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
   const mossproutNatureIslands = emptyMossproutNatureIslandLevels(baselineIslandLevel);
   // v18-v20 deliberately restart the new satellite tracks at Level 1. v21+
   // snapshots preserve their independent levels.
-  if ((rawVersion === 21 || rawVersion === 22) && raw.mossproutNatureIslands && typeof raw.mossproutNatureIslands === 'object') {
+  if ((rawVersion === 21 || rawVersion === 22 || rawVersion === 23) && raw.mossproutNatureIslands && typeof raw.mossproutNatureIslands === 'object') {
     for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
       const level = raw.mossproutNatureIslands[islandId];
       if (Number.isInteger(level) && Number(level) >= 0 && Number(level) <= 4) {
         mossproutNatureIslands[islandId] = Number(level) as MossproutNatureIslandLevel;
       }
     }
+  }
+  const mossproutNatureIslandReveals: MergeWorldState['haven']['mossproutNatureIslandReveals'] = {};
+  if (raw.mossproutNatureIslandReveals && typeof raw.mossproutNatureIslandReveals === 'object') {
+    for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
+      const reveal = raw.mossproutNatureIslandReveals[islandId];
+      if (reveal && typeof reveal.receiptId === 'string') mossproutNatureIslandReveals[islandId] = {
+        revealedAt: finite(reveal.revealedAt, now),
+        receiptId: reveal.receiptId,
+        paid: Math.max(0, Math.floor(finite(reveal.paid, 0))),
+      };
+    }
+  }
+  // Existing players who already grew or met a resident must never be put
+  // back under mist by the staged-reveal migration.
+  if (!mossproutNatureIslandReveals['bloom-garden']
+    && (mossproutNatureIslands['bloom-garden'] > 0 || Boolean(source.islandCampaigns?.['island-campaign:petalimp-bloom']))) {
+    mossproutNatureIslandReveals['bloom-garden'] = { revealedAt: now, receiptId: 'migration:petalimp-bloom-revealed', paid: 0 };
   }
   const stepplingFallback = createStepplingHavenBoard(now)!;
   const rawSteppling = raw.residentMergeBoards?.steppling;
@@ -1160,6 +1487,7 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
   return {
     tileStages,
     mossproutNatureIslands,
+    mossproutNatureIslandReveals,
     revealState,
     mossproutStoryLevel: Math.max(0, Math.floor(finite(raw.mossproutStoryLevel, 0))),
     nextProceduralOrder: Math.max(1, Math.floor(finite(raw.nextProceduralOrder, 1))),
@@ -1981,7 +2309,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
       createdAt: now,
       appliedAt: null,
     }] : []),
-    ...(order.chapterId && completesStoryBundle ? [{
+    ...(order.chapterId && completesStoryBundle && order.storyArcId !== PETALIMP_ISLAND_CAMPAIGN_ID ? [{
       id: `merge-conversation:${order.chapterId}`,
       kind: 'conversation' as const,
       characterId: order.characterId,
@@ -2041,6 +2369,28 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     landmarks,
     generators,
   };
+  const islandCampaign = Object.values(next.islandCampaigns ?? {}).find((campaign) => (
+    campaign.chapters[String(order.storyTargetLevel ?? '')]?.orderIds.includes(order.id)
+  ));
+  const islandChapter = islandCampaign?.chapters[String(order.storyTargetLevel ?? '')];
+  if (islandCampaign && islandChapter) {
+    next = {
+      ...next,
+      islandCampaigns: {
+        ...(next.islandCampaigns ?? {}),
+        [islandCampaign.campaignId]: {
+          ...islandCampaign,
+          chapters: {
+            ...islandCampaign.chapters,
+            [String(islandChapter.level)]: {
+              ...islandChapter,
+              servedOrderIds: [...new Set([...islandChapter.servedOrderIds, order.id])],
+            },
+          },
+        },
+      },
+    };
+  }
   const rewardCardId = order.reward.katchimeraCardId;
   if (rewardCardId) {
     const sourceReceiptId = `resident-order:${order.id}:${rewardCardId}`;

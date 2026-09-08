@@ -46,6 +46,7 @@ export type StoryWorldUpgradeEffectPayload = {
   target: Extract<StoryTarget, { kind: 'haven_tile' | 'haven_nature_island' | 'haven_structure' }>;
   toLevel: number;
   economy: StoryUpgradeEconomyPolicy;
+  transition?: 'island_reveal';
 };
 
 export type StoryWorldUpgradePresentationPayload = {

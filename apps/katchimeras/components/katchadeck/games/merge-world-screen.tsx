@@ -10,7 +10,6 @@ import { createSelectorStore } from '@/utils/merge-world/selector-store';
 import { ActivityIndicator, BackHandler, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isAppForeground, useAppForeground } from '@/hooks/use-app-foreground';
-import Animated, { FadeIn, FadeOut, ZoomIn, useReducedMotion } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { KatchimeraCardRevealModal } from '@/components/katchadeck/collection/katchimera-card-deck-carousel';
@@ -21,8 +20,7 @@ import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back
 import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
-import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
-import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
+import { KatchimeraFriendDiscoveryReveal } from '@/components/katchadeck/world/katchimera-friend-discovery-reveal';
 import {
   MERGE_GENERATORS_BY_ID,
   MERGE_ITEMS_BY_ID,
@@ -40,6 +38,7 @@ import { useGlowDiscovery, reconcileGlowLesson, submitGlowAction } from '@/featu
 import { glowDiscoveryBoardStep, glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, mergeFtueStepForBoard, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
+import { mergeFtueDisplayGuide } from '@/features/onboarding/merge-ftue-guidance';
 import type { FtueCueDefinition, FtueSpotlightDefinition } from '@/features/onboarding/ftue-types';
 import { useFtueNavigationLock } from '@/features/onboarding/use-ftue-navigation-lock';
 import {
@@ -69,10 +68,10 @@ import { beginMossproutJourneyReturn, mossproutJourneyForDay, mossproutJourneyRu
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { useKatchimeraCards } from '@/hooks/use-katchimera-cards';
-import { familyIdFromCompanionId, katchimeraSkinById } from '@/constants/katchimera-skins';
-import { mossproutResidentById } from '@/constants/mossprout-residents';
+import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { localDayId } from '@/utils/world-identity';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
+import { PETALIMP_ISLAND_CAMPAIGN_ID, petalimpIslandReturnLevel } from '@/constants/petalimp-island-campaign';
 
 import type { MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
 import { MergePlaySurface } from './merge-play-surface';
@@ -164,6 +163,14 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     }
     else router.push('/legacy-games');
   }, [creatureId, flushMergeWorld, router, source, transitionTo]);
+  const returnToPetalimpIsland = useCallback(async () => {
+    await flushMergeWorld();
+    transitionTo({
+      announcement: 'Returning to Bloom Garden',
+      target: 'katchimeras',
+      navigate: () => router.dismissTo('/(tabs)/katchimeras'),
+    });
+  }, [flushMergeWorld, router, transitionTo]);
   const returnToResidentStory = useCallback(async () => {
     if (!creatureId) return;
     await flushMergeWorld();
@@ -379,7 +386,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   }, [ftueStep, state]);
   const mergeGuidanceCue = ftueStep?.cue ?? postFtueDiscoveryGuidance.cue;
   const mergeGuidanceSpotlight = ftueStep?.spotlight ?? postFtueDiscoveryGuidance.spotlight;
-  const mergeGuidanceGuide = ftueStep?.surface === 'merge' ? ftueStep.guide : null;
+  const mergeGuidanceGuide = ftueStep?.surface === 'merge' ? mergeFtueDisplayGuide(ftueStep) : null;
   const mergeGuidanceVisible = active && !serveFlight && !parcelFlight;
 
   useEffect(() => subscribeCompanionStories(() => {
@@ -417,6 +424,11 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
 
   const openCharacterReturn = useCallback((characterId: MergeOrder['characterId'], noteId: string) => {
     if (!active || storyNavigationPendingRef.current) return;
+    if (noteId.startsWith(`${PETALIMP_ISLAND_CAMPAIGN_ID}:return:`)) {
+      storyNavigationPendingRef.current = true;
+      void returnToPetalimpIsland().catch(() => { storyNavigationPendingRef.current = false; });
+      return;
+    }
     if (noteId === MOSSPROUT_FTUE_RETURN_NOTE_ID) {
       if (!mergeFtueAllowsChatNote(ftueStepRef.current, noteId)) {
         setBlockedFtuePulseNonce((current) => current + 1);
@@ -465,7 +477,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       },
     });
     if (!accepted) storyNavigationPendingRef.current = false;
-  }, [active, mossproutJourneyDayId, router, transitionTo]);
+  }, [active, mossproutJourneyDayId, returnToPetalimpIsland, router, transitionTo]);
 
   useEffect(() => {
     if (!active
@@ -685,7 +697,17 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       bondPoints: 0,
     };
     const journeyReturnReady = mossproutJourney?.status === 'return_available' || mossproutJourney?.status === 'resolution_ready';
-    const returnEntries: MergeTrayEntry[] = chapterZeroActive ? [] : mossproutJourneyExclusive
+    const islandReturnLevel = petalimpIslandReturnLevel(state);
+    const islandReturnEntry: MergeTrayEntry | null = islandReturnLevel ? {
+      id: `${PETALIMP_ISLAND_CAMPAIGN_ID}:return:${islandReturnLevel}`,
+      kind: 'chat_note',
+      characterId: 'mossprout',
+      portraitSkinId: 'petalimp',
+      title: 'Meet me at Bloom Garden',
+      accessibilityHint: 'Return to Petalimp’s island for the next scene',
+      bondPoints: 0,
+    } : null;
+    const returnEntries: MergeTrayEntry[] = chapterZeroActive ? [] : islandReturnEntry ? [islandReturnEntry] : mossproutJourneyExclusive
       ? journeyReturnReady ? [mossproutReturnEntry] : []
       : [
       ...(ftueStep?.id === 'merge.return_note' ? [{
@@ -1106,7 +1128,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       {error ? <KatchaSurfaceProvider surface="parchment"><View style={[styles.errorBanner, { top: Math.max(insets.top + 56, 64) }]}><KatchaInlineNotice body={error} title="Merge paused" tone="danger" /></View></KatchaSurfaceProvider> : null}
       <MergeServeRewardOverlay flight={serveFlight} onCoinArrive={handleCoinArrive} onEnergyArrive={handleEnergyArrive} onFinish={finishServeAnimation} onItemsArrive={handleServeItemsArrive} />
       <MergeParcelFlightOverlay flight={parcelFlight} onFinish={finishParcelFlight} onItemArrive={handleParcelItemArrive} />
-      {active && !stepplingLesson.active && pendingResidentDialogue ? <ResidentRevealDialogue
+      {active && !stepplingLesson.active && pendingResidentDialogue ? <KatchimeraFriendDiscoveryReveal
         onContinue={() => dispatch({ type: 'ackResidentCardDialogue', discoveryId: pendingResidentDialogue.id, now: Date.now() })}
         residentId={pendingResidentDialogue.residentId}
       /> : null}
@@ -1170,41 +1192,6 @@ const MergeCoinHud = memo(function MergeCoinHud({ artRef, hudRef, presentation, 
     valueAnimationDurationMs: 0 }]} style={styles.currencyHud} tone="glass" />;
 });
 
-function ResidentRevealDialogue({ residentId, onContinue }: { residentId: KatchimeraSkinId; onContinue: () => void }) {
-  const reduceMotion = useReducedMotion();
-  const [celebrating, setCelebrating] = useState(true);
-  const resident = katchimeraSkinById.get(residentId);
-  const image = resolveCreatureArtSource(resident?.visualKey ?? 'mossprout', { stage: 'grown' });
-  const name = resident?.displayName ?? residentId;
-  const dialogue = mossproutResidentById.get(residentId)?.revealDialogue
-    ?? 'Mossprout told me this garden was growing. Help me with two small things, and I may stay.';
-  useEffect(() => {
-    if (reduceMotion) {
-      setCelebrating(false);
-      return;
-    }
-    const timer = setTimeout(() => setCelebrating(false), 1_150);
-    return () => clearTimeout(timer);
-  }, [reduceMotion]);
-  return <Animated.View accessibilityViewIsModal entering={FadeIn.duration(reduceMotion ? 80 : 220)} exiting={FadeOut.duration(reduceMotion ? 80 : 180)} style={styles.residentRevealOverlay}>
-    {celebrating ? <Animated.View exiting={FadeOut.duration(150)} key="resident-celebration" pointerEvents="none" style={styles.residentRevealHero}>
-      <RotatingRadialSunburst baseOpacity={0.9} rotationDurationMs={18_000} size={390} style={styles.residentRevealRays} />
-      <CelebrationParticles layerStyle={styles.residentRevealConfetti} tier={3} tint="#8DD56B" />
-      <Animated.View entering={reduceMotion ? FadeIn.duration(80) : ZoomIn.duration(560)} style={styles.residentRevealArtWrap}>
-        <Image accessibilityLabel={name} contentFit="contain" source={image} style={styles.residentRevealArt} transition={0} />
-      </Animated.View>
-    </Animated.View> : <Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 260)} key="resident-dialogue" style={styles.residentDialogueStage}>
-      <Image accessibilityLabel={name} contentFit="contain" source={image} style={styles.residentDialogueArt} transition={0} />
-      <View style={styles.residentSpeech}>
-        <ThemedText style={styles.residentEyebrow} lightColor="#D6B758" darkColor="#D6B758">A GARDEN RESIDENT ANSWERED</ThemedText>
-        <ThemedText selectable style={styles.residentTitle} lightColor="#332918" darkColor="#332918">{name}</ThemedText>
-        <ThemedText selectable style={styles.residentBody} lightColor="#5C513B" darkColor="#5C513B">{`“${dialogue}”`}</ThemedText>
-        <KatchaButton fullWidth glow label="See the first request" onPress={onContinue} />
-      </View>
-    </Animated.View>}
-  </Animated.View>;
-}
-
 function MergeCommandFeedback() {
   const lastResult = useMergeWorldLastResult();
   const feedback = useGameFeedback();
@@ -1241,18 +1228,6 @@ const styles = StyleSheet.create({
   memoryCardEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1, lineHeight: 14, textAlign: 'center' },
   memoryCardTitle: { fontSize: 21, fontWeight: '900', lineHeight: 26, textAlign: 'center' },
   memoryCardBody: { fontSize: 13, fontWeight: '600', lineHeight: 18, maxWidth: 290, textAlign: 'center' },
-  residentRevealOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', backgroundColor: 'rgba(24,42,23,0.88)', justifyContent: 'center', paddingHorizontal: 22, zIndex: GameUI.layer.modal },
-  residentRevealHero: { alignItems: 'center', height: 300, justifyContent: 'center', marginBottom: -22, width: 390 },
-  residentRevealRays: { left: 0, top: -45 },
-  residentRevealConfetti: { top: '50%', zIndex: 3 },
-  residentRevealArtWrap: { alignItems: 'center', height: 286, justifyContent: 'center', width: 286, zIndex: 2 },
-  residentRevealArt: { height: 286, width: 286 },
-  residentDialogueStage: { alignItems: 'center', maxWidth: 390, width: '100%' },
-  residentDialogueArt: { height: 220, marginBottom: -24, width: 220, zIndex: 4 },
-  residentSpeech: { backgroundColor: '#FFF8E6', borderColor: '#D6B758', borderCurve: 'continuous', borderRadius: 25, borderWidth: 2, gap: 8, maxWidth: 390, padding: 18, width: '100%', zIndex: 3 },
-  residentEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.25, textAlign: 'center' },
-  residentTitle: { fontSize: 27, fontWeight: '900', lineHeight: 31, textAlign: 'center' },
-  residentBody: { fontSize: 15, fontWeight: '700', lineHeight: 21, paddingBottom: 5, textAlign: 'center' },
   energyConnectionOverlay: { alignSelf: 'center', backgroundColor: 'rgba(31,24,45,0.9)', borderColor: 'rgba(255,226,151,0.5)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, boxShadow: '0 12px 30px rgba(24,14,34,0.42)', gap: 8, left: 18, maxWidth: 430, padding: 18, position: 'absolute', right: 18, zIndex: GameUI.layer.modal },
   energyConnectionEyebrow: { ...GameUI.type.label, fontSize: 11, letterSpacing: 1.4, textAlign: 'center' },
   energyConnectionTitle: { ...GameUI.type.title, fontSize: 19, lineHeight: 24, textAlign: 'center' },

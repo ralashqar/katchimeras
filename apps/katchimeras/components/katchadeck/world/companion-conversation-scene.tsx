@@ -137,23 +137,27 @@ export function CompanionConversationScene({
   const ftueRun = useFtueRun();
   const node = conversationNode(definition, session.currentNodeId);
   const journeyNarrative = definition.purpose === 'journey' && definition.format === 'narrative';
+  const islandCampaignNarrative = definition.tags?.includes('island-campaign') ?? false;
+  const narrativeOverlay = conversationUsesNarrativeOverlay(definition);
   const activeGameQuestion = node?.kind === 'profile_game' || node?.kind === 'insight_game'
     ? conversationGameQuestion(node, session) : null;
   const history = conversationTranscript(session, definition);
   const line = conversationSpeechLine(session, definition);
+  const companionSpeaker = definition.speakerSkinId ?? session.formId;
+  const conversationTitle = katchimeraSkinById.get(companionSpeaker)?.displayName ?? name;
   const entries = session.outcomePresentation || history.at(-1)?.text === line ? history : [...history, {
     id: node?.kind === 'choice' || node?.kind === 'poll' || activeGameQuestion
       ? `conversation-turn:${session.id}:${session.turns.length + 1}:prompt`
       : `${session.id}:${session.currentNodeId}:current`,
-    speaker: session.formId, text: line,
+    speaker: companionSpeaker, text: line,
   }];
   const terminal = !session.preview && ((session.pendingReply !== undefined && !session.pendingNextNodeId) || (session.pendingReply === undefined && (node?.kind === 'end' || session.status === 'completed' || session.outcomeCompletionPending)))
     && !(definition.isOpener && session.exitTransition && session.exitTransition.kind !== 'continuation');
   const actionOutcome = Boolean(session.actionOrigin && session.outcomePresentation && !session.preview);
   const finishActionOutcome = onAdvanceAction;
-  return <ConversationNarrativeOverlay inline={!conversationUsesNarrativeOverlay(definition)} title={name} entries={entries}
+  return <ConversationNarrativeOverlay inline={!narrativeOverlay} title={conversationTitle} entries={entries}
     checkpoint={`${session.id}:${session.updatedAt}:${session.currentNodeId}:${session.pendingReply ?? ''}`}
-    paced={ftueRun?.status === 'active'} initiallyRevealedCount={history.length}
+    paced={narrativeOverlay} initiallyRevealedCount={history.length}
     required={navigationLocked || ftueRun?.status === 'active'} onClose={actionOutcome ? finishActionOutcome : onClose}>
     {(perform) => {
       const onAdvance = () => actionOutcome
@@ -195,10 +199,10 @@ export function CompanionConversationScene({
             title={journeyTaskTitle ?? 'Today’s Garden requests'}
           /> : <NarrativeTransition
             label={journeyNarrative
-              ? journeyTaskHandoff ? 'Your Garden request is ready' : 'Finish today’s Journey'
+              ? journeyTaskHandoff ? 'Your Garden request is ready' : islandCampaignNarrative ? 'Continue the island story' : 'Finish today’s Journey'
               : storyFlow && !storyFinale ? 'Opening the next chapter…' : 'Finish this conversation'}
             actionLabel={journeyNarrative
-              ? journeyTaskHandoff ? 'Go to the Garden' : 'Finish Journey'
+              ? journeyTaskHandoff ? 'Go to the Garden' : islandCampaignNarrative ? 'Continue' : 'Finish Journey'
               : undefined}
             onAdvance={onAdvance}
             requiresManualAdvance={requiresManualAdvance}

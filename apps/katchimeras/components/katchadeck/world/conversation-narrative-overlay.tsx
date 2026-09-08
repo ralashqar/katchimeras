@@ -30,7 +30,7 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
     ? Math.min(entries.length, Math.max(1, initiallyRevealedCount + 1))
     : entries.length + 1);
   const afterDismiss = useRef<(() => void) | null>(null);
-  const priorCheckpoint = useRef(checkpoint);
+  const priorEntryIds = useRef(entries.map((entry) => entry.id));
   const locked = useRef(false);
   const mounted = useRef(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,14 +47,29 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
   }, [entrance, reduced]);
   useEffect(() => { locked.current = false; setBusy(false); }, [checkpoint]);
   useEffect(() => {
-    if (!paced) { setRevealStep(entries.length + 1); priorCheckpoint.current = checkpoint; return; }
-    if (priorCheckpoint.current !== checkpoint) {
-      priorCheckpoint.current = checkpoint;
-      setRevealStep((current) => Math.min(current, entries.length));
-    } else {
-      setRevealStep((current) => Math.min(current, entries.length + 1));
+    const nextIds = entries.map((entry) => entry.id);
+    const previousIds = priorEntryIds.current;
+    priorEntryIds.current = nextIds;
+    if (!paced) {
+      setRevealStep(entries.length + 1);
+      return;
     }
-  }, [checkpoint, entries.length, paced]);
+    const sameEntries = previousIds.length === nextIds.length
+      && previousIds.every((id, index) => id === nextIds[index]);
+    if (sameEntries) return;
+    setRevealStep((current) => {
+      const previousVisibleCount = Math.min(current, previousIds.length);
+      let retainedVisibleCount = 0;
+      while (
+        retainedVisibleCount < previousVisibleCount
+        && previousIds[retainedVisibleCount] === nextIds[retainedVisibleCount]
+      ) retainedVisibleCount += 1;
+      // A session update can append the player's answer, its reply and the
+      // next prompt in one React commit. Admit only the first unseen line;
+      // every later line keeps its own tap or reading-time beat.
+      return Math.min(entries.length, retainedVisibleCount + 1);
+    });
+  }, [entries, paced]);
   useEffect(() => {
     if (!visible && afterDismiss.current) {
       const complete = afterDismiss.current;
@@ -64,7 +79,7 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
   }, [visible]);
   const scrimMotion = useAnimatedStyle(() => ({ opacity: entrance.value }));
   const motion = useAnimatedStyle(() => ({ opacity: entrance.value, transform: [{ scale: reduced ? 1 : 0.92 + entrance.value * 0.08 }] }));
-  const controlsVisible = !paced || (priorCheckpoint.current === checkpoint && revealStep > entries.length);
+  const controlsVisible = !paced || revealStep > entries.length;
   const stagedEntries = paced ? entries.slice(0, Math.min(revealStep, entries.length)) : entries;
   const visibleEntries = compactComparison ? stagedEntries.slice(-1) : stagedEntries;
   const revealNext = useCallback(() => {
