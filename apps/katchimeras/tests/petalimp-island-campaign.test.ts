@@ -167,6 +167,12 @@ test('fresh Bloom Garden uses one ordinary mystery panel without leaking Petalim
     'island narratives never project Mossprout as their visible interaction subject');
   assert.match(canvas, /showReaction=\{!upgradePresentation\.natureIslandId\}/,
     'nature islands can never render upgrade reaction speech over their tile');
+  // Fitting the whole island tile into the viewport (a padded `focusFrame`
+  // fit) computes a far lower scale than a resident close-up, since the
+  // island's art is wide — the friend's island read as "far away" next to
+  // Mossprout and Steppling. Frame it the same way instead: a fixed
+  // near-max zoom centred on the tile, not a fit-to-frame.
+  assert.match(canvas, /if \(interactionNatureIslandId && islandFrame\) \{[\s\S]*?focusTutorialResident\([\s\S]*?islandFrame\.left \+ islandFrame\.width \/ 2,[\s\S]*?islandFrame\.top \+ islandFrame\.height \/ 2,[\s\S]*?anchorY: residentInteractionScreenAnchorY,[\s\S]*?zoom: cameraMaximumScale \?\? KINGDOM_RENDERING\.havenMaxScale,/);
   const route = readFileSync(resolve(process.cwd(), 'components/katchadeck/world/katchimera-companion-route-screen.tsx'), 'utf8');
   const interaction = readFileSync(resolve(process.cwd(), 'components/katchadeck/world/companion-interaction-sheet.tsx'), 'utf8');
   assert.match(route, /suppressWorldSpeech=\{hostedNarrativeRequired\}/,

@@ -1160,13 +1160,20 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (interactionNatureIslandId && islandFrame) {
       if (hadWorldCameraRef.current) interactionOriginSnapshotRef.current ??= readLiveCameraSnapshot();
       focusedInteractionResidentRef.current = interactionFocusKey;
-      focusInteractionTile(islandFrame, {
-        durationMs: reduceMotion ? 80 : SHARED_RESIDENT_FOCUS_DURATION_MS,
-        horizontalPadding: 54,
-        screenCenterY: viewport.height * 0.43,
-        verticalPadding: 128,
-        onComplete: () => onResidentFocusComplete?.(interactionResidentId),
-      });
+      // Fitting the whole island tile into view (as a `focusFrame` padding
+      // fit does) computes a much lower scale than a resident close-up, since
+      // the island's art is wide. Frame it the same way a resident is framed
+      // instead: a fixed near-max zoom centered on the tile, not a fit.
+      focusTutorialResident(
+        islandFrame.left + islandFrame.width / 2,
+        islandFrame.top + islandFrame.height / 2,
+        {
+          anchorY: residentInteractionScreenAnchorY,
+          durationMs: reduceMotion ? 80 : SHARED_RESIDENT_FOCUS_DURATION_MS,
+          onComplete: () => onResidentFocusComplete?.(interactionResidentId),
+          zoom: cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale,
+        },
+      );
       return;
     }
     const tile = scene.tiles.find((candidate) => (
@@ -1193,9 +1200,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       onComplete: () => onResidentFocusComplete?.(interactionResidentId),
       zoom: cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale,
     });
-  }, [cameraMaximumScale, creatureWorldSize, focusInteractionTile, focusTutorialResident, interactionNatureIslandId, interactionResidentId,
+  }, [cameraMaximumScale, creatureWorldSize, focusTutorialResident, interactionNatureIslandId, interactionResidentId,
     natureIslandFrames, onResidentFocusComplete, readLiveCameraSnapshot, reduceMotion, residentInteractionScreenAnchorY,
-    scene.tileArtLayers, scene.tiles, tutorialCameraReady, viewport.height]);
+    scene.tileArtLayers, scene.tiles, tutorialCameraReady]);
   const handledInteractionExitNonceRef = useRef(0);
   useEffect(() => {
     if (!interactionResidentId || interactionExitNonce <= handledInteractionExitNonceRef.current) return;

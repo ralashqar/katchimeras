@@ -61,6 +61,16 @@ test('the wish waits for Steppling to leave, and the guide never locks the world
   assert.match(screen, /upgradePanel=\{[^\n]*?&& !upgradeHandoffPending/);
 });
 
+test('the Journal and Merge shortcuts hide behind an open upgrade panel', () => {
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  // Neither shortcut's max-height accounts for the other's footprint, so a
+  // tall panel and these fixed-position buttons used to sit on top of each
+  // other. Hide both while `sharedUpgrade` — the same flag the panel itself
+  // is gated on — is set, instead of trying to reserve space for them.
+  assert.match(screen, /!kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && \(!ftueStepId \|\| ftueStepId === 'companion\.meditating'\) \? <View style=\{\{ position: 'absolute', left: 16/);
+  assert.match(screen, /!kingdomGoalGuideActive && !sharedUpgrade && havenMergeBoardActive && mossproutFtueShowsWorldGarden\(ftueStepId\)/);
+});
+
 test('the goal scene tells the wish once and hands over exactly once per tap burst', async () => {
   let introduced = 0;
   let done = 0;

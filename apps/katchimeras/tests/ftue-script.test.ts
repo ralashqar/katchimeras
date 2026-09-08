@@ -1767,7 +1767,7 @@ test('world Garden stays hidden through Mossprout dialogue and Grow, but returns
   assert.equal(mossproutFtueShowsWorldGarden('world.egg_intro'), false);
   assert.equal(mossproutFtueShowsWorldGarden('world.first_seed_grew'), false, 'Continue back to Mossprout owns this step');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  assert.match(screen, /!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && !kingdomGoalGuideActive && havenMergeBoardActive && mossproutFtueShowsWorldGarden\(ftueStepId\)/);
+  assert.match(screen, /!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && !kingdomGoalGuideActive && !sharedUpgrade && havenMergeBoardActive && mossproutFtueShowsWorldGarden\(ftueStepId\)/);
 });
 
 test('a consumed first-meeting launch cannot keep overhead FTUE speech hidden', () => {

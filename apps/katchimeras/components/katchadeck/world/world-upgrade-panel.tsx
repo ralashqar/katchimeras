@@ -116,7 +116,9 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
     {locked ? <>
       <KatchaButton accessibilityHint={offer.lockedReason} disabled fullWidth label={offer.lockedLabel ?? 'Locked'} />
     </> : offer.eligible ? <>
-      <Text style={styles.cost}>{offer.cost.toLocaleString()} Glow{!affordable ? ` · Need ${(offer.cost - world.coins).toLocaleString()} more` : ''}</Text>
+      {/* The cost already shows above and on the button itself; a shortage is
+          the one thing neither of those says. */}
+      {!affordable ? <Text style={styles.cost}>{`Need ${(offer.cost - world.coins).toLocaleString()} more`}</Text> : null}
       {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
       <View ref={tutorial ? actionRef : undefined} collapsable={false}>
         <KatchaButton fullWidth loading={busy} disabled={busy || closing || !affordable}
@@ -141,18 +143,32 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
       <ScrollView ref={scrollRef} onScroll={(event) => setScrollY(event.nativeEvent.contentOffset.y)} scrollEventThrottle={32} style={styles.scroll} contentContainerStyle={styles.baseInfo} showsVerticalScrollIndicator removeClippedSubviews={false}
         onContentSizeChange={(_width, height) => setContentHeight(height)}
         onLayout={(event) => setScrollHeight(event.nativeEvent.layout.width > 0 ? event.nativeEvent.layout.height : 0)} scrollEnabled={!measured || contentHeight > scrollHeight + 1}>
-        <Text style={styles.sectionTitle}>Required</Text>
-        <View style={[styles.currencyTile, sleepingPortrait ? styles.sleepingTile : null]}>
-          {sleepingPortrait
-            ? <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain" source={sleepingPortrait} style={[styles.sleepingArt, styles.silhouette]} transition={0} />
-            : <Image accessibilityIgnoresInvertColors={locked} cachePolicy="memory-disk" source={locked ? LOCK_ART : GAME_CURRENCY_ART.coins} style={locked ? styles.lockArt : styles.currencyArt} contentFit="contain" transition={0} />}
+        {/* Cost and reward were three separate stacked blocks (a "Required"
+            tile, a big amount, an "Unlocks" panel) — the same cost also
+            repeats on the action button below. One compact row says both:
+            what it costs, what it becomes. */}
+        <View accessibilityLabel={locked
+          ? `${offer.lockedLabel ?? 'Locked'}. ${offer.lockedReason ?? ''}`
+          : `${offer.cost.toLocaleString()} Glow. ${offer.currentLevel >= offer.maxLevel ? 'Fully grown' : `Unlocks ${offer.nextName}`}`}
+          style={styles.nextRow}>
+          <View style={[styles.nextIcon, sleepingPortrait ? styles.sleepingIcon : null]}>
+            {sleepingPortrait
+              ? <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain" source={sleepingPortrait} style={[styles.sleepingIconArt, styles.silhouette]} transition={0} />
+              : <Image accessibilityIgnoresInvertColors={locked} cachePolicy="memory-disk" source={locked ? LOCK_ART : GAME_CURRENCY_ART.coins} style={locked ? styles.lockIconArt : styles.currencyIconArt} contentFit="contain" transition={0} />}
+          </View>
+          <View style={styles.nextTextGroup}>
+            <Text numberOfLines={1} style={[styles.nextAmount, !locked && !affordable && styles.unaffordable]}>
+              {locked ? offer.lockedLabel ?? 'Locked' : `${offer.cost.toLocaleString()} Glow`}
+            </Text>
+            <Text numberOfLines={2} style={styles.nextCaption}>
+              {locked
+                ? offer.lockedReason
+                : offer.currentLevel >= offer.maxLevel ? 'Fully grown' : `Unlocks ${offer.nextName}`}
+            </Text>
+          </View>
         </View>
-        <Text style={[styles.amount, !locked && !affordable && styles.unaffordable]}>{locked ? offer.lockedLabel ?? 'Locked' : `${offer.cost.toLocaleString()} Glow`}</Text>
-        <View style={styles.unlocks}><Text style={styles.sectionTitle}>{locked ? sleepingPortrait ? 'Still resting' : 'Unlock condition' : offer.currentLevel >= offer.maxLevel ? 'Fully grown' : 'Unlocks'}</Text>
-          <Text style={styles.unlockName}>{locked ? offer.lockedReason : offer.nextName}</Text>
-          {sleepingHint ? <Text style={styles.reward}>{sleepingHint}</Text> : null}
-          {!locked && story?.rewardSkinId ? <Text style={styles.reward}>Welcomes {katchimeraSkinById.get(story.rewardSkinId)?.displayName} to your collection</Text> : null}
-        </View>
+        {sleepingHint ? <Text style={styles.reward}>{sleepingHint}</Text> : null}
+        {!locked && story?.rewardSkinId ? <Text style={styles.reward}>Welcomes {katchimeraSkinById.get(story.rewardSkinId)?.displayName} to your collection</Text> : null}
         {!locked && campaignState ? <View accessibilityLabel={`${campaignState.residentName}. ${campaignState.stateLabel}`} style={styles.campaign}>
           <View style={styles.campaignHeader}>
             <View style={styles.campaignPortrait}>
@@ -215,14 +231,17 @@ const styles = StyleSheet.create({
   close: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }, closeText: { fontFamily: AppFontFamilies.fredokaBold, color: '#79613A', fontSize: 30 },
   scroll: { flex: 1, minHeight: 0, width: '100%', backgroundColor: '#FFF8E7', borderTopLeftRadius: 22, borderTopRightRadius: 22 },
   baseInfo: { width: '100%', padding: 16, gap: 12 },
-  sectionTitle: { ...KatchaUI.type.companionCardTitle, fontSize: 21, lineHeight: 26, color: '#69512D', textAlign: 'center' },
-  currencyTile: { alignSelf: 'center', width: 72, height: 72, borderRadius: 20, backgroundColor: '#F4E4B3', alignItems: 'center', justifyContent: 'center' }, currencyArt: { width: 60, height: 60 },
-  lockArt: { width: 66, height: 66 },
-  sleepingTile: { backgroundColor: '#D9DECF', overflow: 'hidden' },
-  sleepingArt: { width: 92, height: 92, marginTop: 14 },
+  nextRow: { alignItems: 'center', backgroundColor: '#F4E4B3', borderRadius: 18, flexDirection: 'row', gap: 12, padding: 10 },
+  nextIcon: { alignItems: 'center', backgroundColor: '#FFF3D2', borderRadius: 14, height: 52, justifyContent: 'center', overflow: 'hidden', width: 52 },
+  currencyIconArt: { height: 38, width: 38 },
+  lockIconArt: { height: 40, width: 40 },
+  sleepingIcon: { backgroundColor: '#D9DECF' },
+  sleepingIconArt: { height: 64, marginTop: 12, width: 64 },
   silhouette: { opacity: 0.78, tintColor: '#344238' },
-  amount: { ...KatchaUI.type.companionCardTitle, color: '#537741', fontSize: 22, lineHeight: 28, textAlign: 'center', fontVariant: ['tabular-nums'] }, unaffordable: { color: '#B44639' },
-  unlocks: { padding: 14, gap: 8, backgroundColor: '#F0E9CF', borderRadius: 18 }, unlockName: { ...KatchaUI.type.companionDisplay, fontSize: 17, lineHeight: 23, color: '#76633F', textAlign: 'center' },
+  nextTextGroup: { flex: 1, gap: 1 },
+  nextAmount: { ...KatchaUI.type.companionCardTitle, color: '#537741', fontSize: 18, fontVariant: ['tabular-nums'], lineHeight: 22 },
+  unaffordable: { color: '#B44639' },
+  nextCaption: { ...KatchaUI.type.companionBody, color: '#76633F', fontSize: 12.5, fontWeight: '700', lineHeight: 16 },
   cost: { ...KatchaUI.type.companionBody, color: GameUI.color.inkSecondary, fontSize: 12, lineHeight: 17, textAlign: 'center', fontVariant: ['tabular-nums'] },
   actions: { gap: 8 }, error: { ...KatchaUI.type.companionBody, color: GameUI.color.danger, fontSize: 12, textAlign: 'center' },
   reward: { ...KatchaUI.type.companionBody, color: '#637D37', fontSize: 12, lineHeight: 17, textAlign: 'center' },
