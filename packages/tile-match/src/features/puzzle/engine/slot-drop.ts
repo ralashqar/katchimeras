@@ -102,6 +102,13 @@ export type DropRelease = {
   /** Packed field origin, or `NO_CELL` if the piece was not aimed at the field at all. */
   cellIndex: number;
   /**
+   * Which footprint claimed the drop, by index in `beat.groups`, or `NO_GROUP`.
+   *
+   * Only meaningful once footprints can move: `cellIndex` is then the origin *in that footprint's frame*, and
+   * the screen needs the index to draw the ghost and the miss where that footprint actually is.
+   */
+  groupIndex: number;
+  /**
    * The piece footprint's centre, in window coordinates.
    *
    * Where a failed piece comes apart. The player was watching the piece, so anywhere else reads as a
@@ -321,4 +328,136 @@ export function trayFingerLift(pieceHeight: number) {
 }
 export function trayGuideDestination(from: { x: number; y: number }, target: { x: number; y: number }, pieceHeight: number) {
   return { x: from.x + (target.x - from.x) / TRAY_DRAG_GAIN.x, y: from.y + (target.y - from.y + trayFingerLift(pieceHeight)) / TRAY_DRAG_GAIN.y };
+}
+
+// ------------------------------------------------------------- living targets
+
+/**
+ * Per-group live motion, as the view publishes it: `dx`, `dy` in points and `angle` in radians, one triple per
+ * footprint in `beat.groups` order.
+ *
+ * A flat array rather than objects for the same reason `DropFrame` is plain numbers: it is read inside the
+ * gesture worklet every frame, and it is written by a derived value every frame, so it must allocate nothing
+ * per group. Every consumer — the field's transform, the hover ghost, the drag resolve, the volley launch —
+ * reads the same array, which is what keeps them agreeing to the pixel.
+ */
+export const MOTION_STRIDE = 3;
+
+/**
+ * Per-group rest bounds in cells: `minRow`, `minColumn`, `maxRow`, `maxColumn`, one quad per footprint.
+ *
+ * Built once per beat on the JS side by `groupBoundsOf` and captured by the gesture. The resolve scores a drop
+ * by how much of the piece's rectangle lands inside each footprint's rectangle *in that footprint's own frame*
+ * (the screen, un-moved by that footprint's motion), which is how a footprint that has moved a cell up is still
+ * hit by a piece released a cell up.
+ */
+export const BOUNDS_STRIDE = 4;
+
+/** Returned by `resolveDropAmongGroups` when no footprint claimed the drop. */
+export const NO_GROUP = -1;
+
+export function groupBoundsOf(grid: BoardSpec, groups: readonly SlotGroup[]): number[] {
+  const bounds: number[] = [];
+  for (const group of groups) {
+    let minRow = Number.POSITIVE_INFINITY;
+    let minColumn = Number.POSITIVE_INFINITY;
+    let maxRow = Number.NEGATIVE_INFINITY;
+    let maxColumn = Number.NEGATIVE_INFINITY;
+    for (const index of group.cells) {
+      const row = Math.floor(index / grid.cols);
+      const column = index % grid.cols;
+      if (row < minRow) minRow = row;
+      if (column < minColumn) minColumn = column;
+      if (row > maxRow) maxRow = row;
+      if (column > maxColumn) maxColumn = column;
+    }
+    bounds.push(minRow, minColumn, maxRow, maxColumn);
+  }
+  return bounds;
+}
+
+/**
+ * The resolve's answer, packed into one number so the worklet returns a scalar.
+ *
+ * Both halves are stored offset by one so that `NO_CELL` and `NO_GROUP` (both -1) pack to zero and unpack
+ * cleanly. A cell index never exceeds `rows * cols`, far below the 16-bit field.
+ */
+export function packDropTarget(groupIndex: number, cellIndex: number): number {
+  'worklet';
+  return (groupIndex + 1) * 65536 + (cellIndex + 1);
+}
+
+export function unpackDropCell(packed: number): number {
+  'worklet';
+  return (packed % 65536) - 1;
+}
+
+export function unpackDropGroup(packed: number): number {
+  'worklet';
+  return Math.floor(packed / 65536) - 1;
+}
+
+/**
+ * Quantise a floating piece against footprints that have each moved, **on the UI thread**.
+ *
+ * `resolveDropCell` answers "which cell is the piece over" for a field that sits where the layout put it. Once
+ * every footprint can be somewhere else, that question has one answer per footprint: the piece is resolved in
+ * each footprint's own frame — its centre shifted back by that footprint's live `dx, dy` — and the footprint
+ * whose rectangle the piece's rectangle overlaps most in its own frame claims the drop. The cell it resolved
+ * to *there* is the origin the reducer scores, so accuracy is graded against where the footprint actually is.
+ *
+ * Nothing claiming the drop (the piece is over empty field in every frame) falls back to the un-moved
+ * resolve, so a drop into open space misses exactly as it did before anything moved. Zero motion everywhere
+ * therefore reproduces `resolveDropCell` bit for bit — the property `slot-drop.test.ts` pins.
+ *
+ * Rotation is deliberately absent. A turned footprint refuses its piece through `accepts` rather than by
+ * moving its cells, so the grid answer is unchanged by the angle; only `dx` and `dy` enter here.
+ *
+ * Ties go to the earlier group, matching `scorePlacement`'s own tie rule.
+ */
+export function resolveDropAmongGroups(
+  frame: DropFrame,
+  footprint: DropFootprint,
+  centerX: number,
+  centerY: number,
+  motion: readonly number[],
+  bounds: readonly number[],
+): number {
+  'worklet';
+  const groups = Math.floor(bounds.length / BOUNDS_STRIDE);
+  const pieceHeight = frame.rows - footprint.maxRow;
+  const pieceWidth = frame.cols - footprint.maxColumn;
+
+  let bestGroup = NO_GROUP;
+  let bestCell = NO_CELL;
+  let bestOverlap = 0;
+
+  for (let g = 0; g < groups; g += 1) {
+    const dx = motion[g * MOTION_STRIDE] ?? 0;
+    const dy = motion[g * MOTION_STRIDE + 1] ?? 0;
+    const cell = resolveDropCell(frame, footprint, centerX - dx, centerY - dy);
+    if (cell === NO_CELL) continue;
+
+    const row = Math.floor(cell / frame.cols);
+    const column = cell % frame.cols;
+    const minRow = bounds[g * BOUNDS_STRIDE];
+    const minColumn = bounds[g * BOUNDS_STRIDE + 1];
+    const maxRow = bounds[g * BOUNDS_STRIDE + 2];
+    const maxColumn = bounds[g * BOUNDS_STRIDE + 3];
+
+    const rows = Math.min(row + pieceHeight - 1, maxRow) - Math.max(row, minRow) + 1;
+    const columns = Math.min(column + pieceWidth - 1, maxColumn) - Math.max(column, minColumn) + 1;
+    const overlap = rows > 0 && columns > 0 ? rows * columns : 0;
+
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      bestGroup = g;
+      bestCell = cell;
+    }
+  }
+
+  if (bestGroup === NO_GROUP) {
+    return packDropTarget(NO_GROUP, resolveDropCell(frame, footprint, centerX, centerY));
+  }
+  return packDropTarget(bestGroup, bestCell);
 }

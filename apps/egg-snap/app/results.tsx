@@ -77,7 +77,9 @@ export default function Results() {
             {r.practice
               ? "PRACTICE COMPLETE"
               : r.won
-                ? "A LITTLE MORE LIGHT"
+                ? guided && duel?.boss && r.firstWin !== false
+                  ? "CHAPTER ONE · CRACKED"
+                  : "A LITTLE MORE LIGHT"
                 : "EVERY SPARK STARTS SOMEWHERE"}
           </Copy>
           {!!r.won && !!duel?.victoryDialogue && <Copy>{duel.victoryDialogue}</Copy>}

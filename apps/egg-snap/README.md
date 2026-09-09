@@ -1,6 +1,6 @@
 # Egg Snap
 
-Portrait, offline puzzle duels inside the incubator. The game has six Mossprout duels, the neighboring Cheerlet jigsaw duel, persisted stories, coins, discovery, skins and a companion wisp. All six Formula Snap modifiers are available in the development arena.
+Portrait, offline puzzle duels inside the incubator. The game has six Mossprout duels, the neighboring Cheerlet jigsaw duel, persisted stories, coins, discovery, skins and a companion wisp. All seven modifiers, including the new spin, are available in the development arena.
 
 ## Run
 
@@ -18,6 +18,8 @@ The web prestart step copies the installed CanvasKit WASM into the ignored publi
 ## Play
 
 New profiles open immediately into a guided duel. After winning, repair the central Mossprout nest, win two more battles on its tile, then spend 80 coins to unveil a neighboring Dream Mist hex. Its three-battle campaign leads to Pollen and Captain Crack. See [FTUE implementation](docs/ftue.md) for shared ownership, checkpoints and verification. Legacy campaign saves remain playable. Drag each piece to its matching colour and footprint; pieces lift above the finger. Return to the tray away from matching targets to cancel. A matching target takes priority even while the finger is still inside the tray. Both eggs independently play the same seeded puzzle sequence. Cells charge until the entire beat resolves, then launch toward the other egg. Exact beats build the egg's energy, even when slow. Each cell deals damage only when it arrives; both sides have equal health and the same damage rules. Chip protected cells with repeated placements; play the safe piece before an order bomb. A cycling bomb requires waiting for its safe phase.
+
+Targets are living: on a gust beat each footprint moves on its own inside its zone's slack, up to 1.75 cells, the two targets of a double half a cycle apart, with a sideways sway and a slight tilt arriving as the gust hardens. Drops are graded against where each footprint actually is. A spin beat turns one footprint on a clock; drop its piece only while it faces the way the piece does. First-session fights introduce one mechanic each on a single footprint before doubling it, the rival speeds up fight by fight, replays climb from the first-session numbers rather than jumping to the base definition, the rival says its line during the countdown, and it holds while a coach bubble is up. A pip meter under the rival shows how close its volley is. See [living targets](docs/living-targets.md).
 
 Outside the new-profile FTUE, the original first duel starts with one piece, brings two on beat two, introduces gentle modifiers on beat five, and two-piece modifier beats from beat seven. Progression follows beat number, so misses never give either side a different future puzzle. Streak bonuses remain personal. The 64-turn introduction holds its final tier in unusually long duels; other encounters loop their authored mechanics. A first-seen mechanic opens a short tutorial with both combatants and projectiles paused.
 

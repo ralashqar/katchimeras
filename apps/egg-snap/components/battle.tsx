@@ -3,6 +3,8 @@ import { MultipleSpotlights } from '@incubator/presentation/spotlight';
 import { SpeechTooltip } from '@incubator/game-ui/speech-tooltip';
 import { DragGuide } from '@incubator/presentation/drag-guide';
 import { ftueEncounter } from "../data/ftue-encounters";
+import { COACH_COPY, COACH_LESSON, COACH_WITHOUT_HAND, type CoachState } from "../data/coach-copy";
+import { motionRoomFor } from "@incubator/tile-match/motion";
 import { PerformancePanel } from "./performance-panel";
 import { ARENA_ENABLED } from "../game/dev-tools";
 import { CombatVolleys, type CombatVolleyData, type CombatBurstData } from "./combat-volley";
@@ -12,6 +14,8 @@ import { DuelHatchRewards } from './duel-hatch-rewards';
 import { CombatCountdown } from './combat-countdown';
 import { CombatTraySurface } from './combat-tray-surface';
 import { ShellHealth } from './shell-health';
+import { RivalCharge } from './rival-charge';
+import { rivalCharge, windUpAt } from '../game/rival-charge';
 import { trayCellSize } from '../game/tray-layout';
 import { AppearanceGallery } from "./appearance-gallery";
 import { CombatArtButton } from "./combat-art-button";
@@ -32,7 +36,7 @@ import {
   varietyBackLayers,
   type DropOutcome,
 } from "@incubator/tile-match/native";
-import { NO_CELL, type DropRelease } from "@incubator/tile-match/engine";
+import { MOTION_STRIDE, NO_CELL, NO_GROUP, groupBoundsOf, type DropRelease } from "@incubator/tile-match/engine";
 import { buildSlotBurst } from "@incubator/tile-match/timing";
 import { MECHANIC_LESSONS, snapLadder } from "../data/progression";
 import { impulseStrength } from "@incubator/tile-match/feedback";
@@ -45,7 +49,7 @@ import { OpponentField } from "./opponent-field";
 import { GroundedEgg } from "./grounded-egg";
 import { battleLayout, opponentFieldLayout } from "../game/layout";
 import { assistOpeningDrop, dropPreview, shouldCancelDrop } from "../game/drop-target";
-import { useCombatOffset } from "../game/use-combat-offset";
+import { useCombatMotion } from "../game/use-combat-offset";
 import { useCombat } from "../game/use-combat";
 import { useFeedback } from "../game/feedback";
 import { repository } from "../state/repository";
@@ -130,7 +134,7 @@ function Battle({
   const startCombat = useCallback(() => setStarted(true), []);
   const muted = profile?.preferences?.sound === false;
   const hapticsEnabled = profile?.preferences?.haptics !== false;
-  const [coach, setCoach] = useState<'snap' | 'bomb-notice' | 'bomb-safe' | 'bomb-clear' | 'armour' | null>(null);
+  const [coach, setCoach] = useState<CoachState | null>(null);
   const coached = useRef(new Set(profile?.seen ?? []));
   const coachStartBeats = useRef(0);
   const [pieceAnchors, setPieceAnchors] = useState<Record<string, { x: number; y: number }>>({});
@@ -145,7 +149,8 @@ function Battle({
   const [saving, setSaving] = useState(false);
   const baseSuspended = paused || story || !!lesson || !ready || !started;
   const suspended = baseSuspended || coach === 'bomb-notice';
-  const game = useCombat(definition, seed, suspended, practice, stress);
+  // The rival holds while a lesson is up, so reading is never punished.
+  const game = useCombat(definition, seed, suspended, practice, stress, !!coach);
   const { state, ref, clock, drop, backgrounded, presentation } = game;
   useLayoutEffect(() => { if (practice) presentation.performance.commits++; });
   const run = state.run;
@@ -155,12 +160,13 @@ function Battle({
     if (unseen) setLesson(unseen.id);
   }, [started, definition.guided, practice, story, lesson, state.outcome, run.beat, profile]);
   const bombData = varietyData<{ pieceId: string | null; armed: boolean }>(run.beat, 'bomb');
+  const spinData = varietyData<{ groupId: string | null; turned: boolean }>(run.beat, 'spin');
   useEffect(() => {
     if (!definition.guided || baseSuspended) return;
     if (coach) {
       if (coach === 'bomb-safe' && bombData && !bombData.armed) setCoach('bomb-clear');
       if (state.exactBeats > coachStartBeats.current) {
-        const id = coach.startsWith('bomb') ? 'mechanic:bomb' : coach === 'armour' ? 'mechanic:armour' : 'mechanic:tap';
+        const id = COACH_LESSON[coach];
         coached.current.add(id);
         setCoach(null);
         void act(() => repository.seen(id)).catch(() => {});
@@ -168,13 +174,14 @@ function Battle({
       return;
     }
     if (state.outcome || run.beat.status !== 'placing') return;
-    const next = bombData ? 'bomb-notice' : run.beat.varieties.some(v => v.id === 'armour') ? 'armour' : 'snap';
-    const id = next === 'bomb-notice' ? 'mechanic:bomb' : next === 'armour' ? 'mechanic:armour' : 'mechanic:tap';
+    const has = (id: string) => run.beat.varieties.some(v => v.id === id);
+    const next: CoachState = bombData ? 'bomb-notice' : has('armour') ? 'armour' : has('spin') && spinData?.groupId ? 'spin' : has('drift') ? 'gust' : 'snap';
+    const id = COACH_LESSON[next];
     if (!coached.current.has(id)) {
       coachStartBeats.current = state.exactBeats;
       setCoach(next);
     }
-  }, [act, baseSuspended, bombData, coach, definition.guided, run.beat, state.exactBeats, state.outcome]);
+  }, [act, baseSuspended, bombData, spinData?.groupId, coach, definition.guided, run.beat, state.exactBeats, state.outcome]);
   const reduced = useReducedMotion();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -183,18 +190,14 @@ function Battle({
     () => battleLayout(width, height, insets.top, insets.bottom, definition.regionId === "glade" ? MOSSPROUT_DUEL : undefined, playerArtId, definition.characterId ?? definition.skin),
     [width, height, insets.top, insets.bottom, definition.regionId, definition.skin, definition.characterId, playerArtId],
   );
-  const offset = useCombatOffset(run.beat, clock, state.beatStartedAt, layout.driftAmplitude, reduced);
+  const motion = useCombatMotion(run.beat, clock, state.beatStartedAt, run.grid, layout.metrics.pitch, layout.driftAmplitude, reduced);
+  const groupBounds = useMemo(() => groupBoundsOf(run.grid, run.beat.groups), [run.grid, run.beat.groups]);
   const rivalLayout = useMemo(() => opponentFieldLayout(layout), [layout]);
-  const rivalOffset = useCombatOffset(state.opponent.run.beat, clock, state.opponent.beatStartedAt, rivalLayout.driftAmplitude, reduced);
-  const fieldStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: offset.dx.value },
-      { translateY: offset.dy.value },
-    ],
-  }));
+  const rivalMotion = useCombatMotion(state.opponent.run.beat, clock, state.opponent.beatStartedAt, state.opponent.run.grid, rivalLayout.metrics.pitch, rivalLayout.driftAmplitude, reduced);
   const [hoverTarget, setHoverTarget] = useState<{
     pieceId: string;
     index: number;
+    group: number;
   } | null>(null);
   // Re-grade a held preview when colours, shields or filled cells change,
   // even if the finger has not crossed into a different grid cell.
@@ -233,8 +236,21 @@ function Battle({
   const feedback = useFeedback(muted, hapticsEnabled, suspended || backgrounded);
   const feedbackRef = useRef(feedback);
   feedbackRef.current = feedback;
-  const viewRef = useRef({ layout, offset });
-  viewRef.current = { layout, offset };
+  const viewRef = useRef({ layout, motion });
+  viewRef.current = { layout, motion };
+  const charge = rivalCharge(state.opponent.run);
+  /**
+   * When the rival next acts, mirrored for the UI thread. `Infinity` while it is held for a lesson or the opening
+   * gate, so a held rival never looks poised; `state.aiAt` is fresh at every commit that changed a run, which is
+   * every deal and every rival action.
+   */
+  const rivalActsAt = useSharedValue(Number.POSITIVE_INFINITY);
+  const rivalHeld = !!coach || (definition.openingGate ?? 0) > state.player.exactBeats || !!state.outcome;
+  useEffect(() => { rivalActsAt.value = rivalHeld ? Number.POSITIVE_INFINITY : state.aiAt; }, [rivalActsAt, rivalHeld, state.aiAt]);
+  const windUpStyle = useAnimatedStyle(() => {
+    const t = reduced ? 0 : windUpAt(rivalActsAt.value, clock.value);
+    return { transform: [{ scaleY: 1 - 0.08 * t }, { scaleX: 1 + 0.05 * t }] };
+  });
 
   const completion = useRef(false);
   useEffect(() => {
@@ -259,13 +275,21 @@ function Battle({
         const incoming = event.side === 'opponent';
         const hitsPlayer = backfire || incoming;
         const source = incoming ? rivalLayout : layout;
-        const dy = incoming ? rivalOffset.dy.value : offset.dy.value;
+        const live = incoming ? rivalMotion.value : motion.value;
+        // Rigged cells come ungrouped; every cell of a backfire belongs to the bomb's own footprint.
+        const riggedGroup = backfire ? event.run.beat.groups.findIndex(g => g.cells.some(i => riggedCells(event.run!).some(c => c.index === i))) : -1;
         const cells = buildSlotBurst(event.run.grid, source.metrics, backfire ? riggedCells(event.run) : event.run.lastResolution.clearedCells, backfire ? [] : event.run.lastGroupSizes);
         const targetBounds = hitsPlayer ? layout.stage?.player.visible : layout.stage?.rival.visible;
         const target = targetBounds ? {x: targetBounds.x + targetBounds.width / 2, y: targetBounds.y + targetBounds.height * .5} :
           {x: width / 2, y: hitsPlayer ? layout.eggY + layout.eggSize * .52 : layout.opponentY + layout.opponentSize * .52};
-        const bullets = cells.map((c, i) => ({x: source.field.x + c.x + source.metrics.cell/2,
-          y: source.field.y + dy + c.y + source.metrics.cell/2, colorId: c.colorId, size: source.metrics.cell, delay: (backfire ? BACKFIRE.shakeMs : 0) + i * CELL_STAGGER_MS}));
+        // Each cell launches from where its footprint is right now, not from where the dealer put it.
+        const bullets = cells.map((c, i) => {
+          const group = backfire ? riggedGroup : c.group;
+          const dx = group >= 0 ? live[group * MOTION_STRIDE] ?? 0 : 0;
+          const dy = group >= 0 ? live[group * MOTION_STRIDE + 1] ?? 0 : 0;
+          return {x: source.field.x + dx + c.x + source.metrics.cell/2,
+            y: source.field.y + dy + c.y + source.metrics.cell/2, colorId: c.colorId, size: source.metrics.cell, delay: (backfire ? BACKFIRE.shakeMs : 0) + i * CELL_STAGGER_MS};
+        });
         setVolleys(v => [...v, {id: event.id, target, bullets, projectile: backfire ? 'bomb' : 'shell', startAt: event.at, damage: event.damage ?? 0, shakeMs: backfire ? BACKFIRE.shakeMs : 0, quality: presentation.quality.current,
           opponentWidth: targetBounds?.width ?? (hitsPlayer ? layout.eggSize : layout.opponentSize) * .6}]);
         if (backfire) continue;
@@ -286,11 +310,11 @@ function Battle({
       }
       if (event.type === 'blast' && event.run) {
         const source = event.side === 'opponent' ? rivalLayout : layout;
-        const dy = event.side === 'opponent' ? rivalOffset.dy.value : offset.dy.value;
+        const live = event.side === 'opponent' ? rivalMotion.value : motion.value;
         const rigged = new Set(event.side === 'player' ? riggedCells(event.run).map(c => c.index) : []);
-        const cells = event.run.beat.groups.flatMap(g => g.cells.filter(i => !rigged.has(i)).map(i => ({
-          x: source.field.x + source.metrics.outer + (i % event.run!.grid.cols)*source.metrics.pitch,
-          y: source.field.y + dy + source.metrics.outer + Math.floor(i / event.run!.grid.cols)*source.metrics.pitch, colorId: g.colorId,
+        const cells = event.run.beat.groups.flatMap((g, group) => g.cells.filter(i => !rigged.has(i)).map(i => ({
+          x: source.field.x + (live[group * MOTION_STRIDE] ?? 0) + source.metrics.outer + (i % event.run!.grid.cols)*source.metrics.pitch,
+          y: source.field.y + (live[group * MOTION_STRIDE + 1] ?? 0) + source.metrics.outer + Math.floor(i / event.run!.grid.cols)*source.metrics.pitch, colorId: g.colorId,
         })));
         const burstId = burstSequence.current--;
         setBursts(all => [...all, {id: burstId, kind: 'blast', startAt: event.at,
@@ -299,7 +323,7 @@ function Battle({
       }
       if (event.side === 'player' && event.type === 'chip') feedbackRef.current.cue('chip');
     }
-  }), [presentation, layout, rivalLayout, offset.dy, rivalOffset.dy, width, playerHitSignal, opponentHitSignal, playerDizzySignal]);
+  }), [presentation, layout, rivalLayout, motion, rivalMotion, width, playerHitSignal, opponentHitSignal, playerDizzySignal]);
   const save = useCallback(async () => {
     if (completion.current || !ref.current.outcome) return;
     completion.current = true;
@@ -322,14 +346,14 @@ function Battle({
     return () => clearTimeout(timer);
   }, [state.outcome, hatchFinished, save, volleys.length, bursts.length, suspended, backgrounded]);
   const onPickUp = useCallback(() => feedbackRef.current.cue("pickup"), []);
-  const onCell = useCallback((pieceId: string, index: number) => {
+  const onCell = useCallback((pieceId: string, index: number, group: number = NO_GROUP) => {
     if (index !== NO_CELL) feedbackRef.current.cue("snap");
     setHoverTarget((current) =>
       index === NO_CELL
         ? current?.pieceId === pieceId
           ? null
           : current
-        : { pieceId, index },
+        : { pieceId, index, group },
     );
   }, []);
   const onDrop = useCallback(
@@ -406,10 +430,13 @@ function Battle({
         ? "Shield chipped · try again"
         : last?.refused === "colour"
           ? "Match the colour, too"
-          : "";
+          : last?.refused === "variety" && spinData?.turned
+            ? "Wait for it to turn back"
+            : "";
   const riggedGroup = run.beat.groups.find(group => group.pieceId === bombData?.pieceId);
   const safeGroup = run.beat.groups.find(group => group.pieceId !== bombData?.pieceId && run.tray.some(piece => piece.id === group.pieceId && !piece.used));
-  const guideGroup = coach === 'bomb-notice' || coach === 'bomb-clear' ? riggedGroup : coach === 'bomb-safe' ? safeGroup : run.beat.groups.find(group => run.tray.some(piece => piece.id === group.pieceId && !piece.used));
+  const spinningGroup = run.beat.groups.find(group => group.id === spinData?.groupId);
+  const guideGroup = coach === 'bomb-notice' || coach === 'bomb-clear' ? riggedGroup : coach === 'bomb-safe' ? safeGroup : coach === 'spin' && spinningGroup ? spinningGroup : run.beat.groups.find(group => run.tray.some(piece => piece.id === group.pieceId && !piece.used));
   const guidePiece = run.tray.find(piece => piece.id === guideGroup?.pieceId);
   const guideFrom = guidePiece ? pieceAnchors[guidePiece.id] : undefined;
   const frameFor = (group: (typeof run.beat.groups)[number]) => {
@@ -420,7 +447,14 @@ function Battle({
       width: (Math.max(...columns) - Math.min(...columns)) * layout.metrics.pitch + layout.metrics.cell + 16,
       height: (Math.max(...rows) - Math.min(...rows)) * layout.metrics.pitch + layout.metrics.cell + 16 };
   };
-  const ghostFrame = guideGroup ? frameFor(guideGroup) : { x: 0, y: 0, width: 0, height: 0 };
+  /** A moving target's spotlight covers everywhere it can go, not just where the dealer put it. */
+  const roamingFrame = (group: (typeof run.beat.groups)[number]) => {
+    const frame = frameFor(group);
+    const [vertical, inward] = motionRoomFor(run.grid, group, layout.metrics.pitch, layout.driftAmplitude);
+    return { x: frame.x + Math.min(0, inward), y: frame.y + Math.min(0, vertical),
+      width: frame.width + Math.abs(inward), height: frame.height + Math.abs(vertical) };
+  };
+  const ghostFrame = guideGroup ? (coach === 'gust' ? roamingFrame(guideGroup) : frameFor(guideGroup)) : { x: 0, y: 0, width: 0, height: 0 };
   const guideTarget = guideGroup && guidePiece ? {
     x: layout.dropFrame.anchorX + (guideGroup.origin.column + guidePiece.cells[0].column) * layout.metrics.pitch,
     y: layout.dropFrame.anchorY + (guideGroup.origin.row + guidePiece.cells[0].row) * layout.metrics.pitch,
@@ -449,13 +483,22 @@ function Battle({
         <SpeechTooltip left={bubbleLeft} top={bubbleTop} width={bubbleWidth} tailLeft={Math.max(18, Math.min(bubbleWidth - 34, guideTarget.x - bubbleLeft - 10))} below={bubbleBelow} interactive={coach === 'bomb-notice'} style={{ zIndex: 80, minHeight: bubbleHeight }}>
           <View style={{ flex: 1, paddingHorizontal: 8, gap: 10 }}>
             <Copy style={{ color: '#35422F', fontFamily: 'EggDisplay', fontSize: 17, lineHeight: 23 }}>
-              {coach === 'bomb-notice' ? 'This one is rigged! Don’t snap it yet.' : coach === 'bomb-safe' ? 'Snap this unmarked shape first to defuse it.' : coach === 'bomb-clear' ? 'Safe now! Snap the remaining shape.' : coach === 'armour' ? 'Chip this armoured shape, then snap again!' : 'Drag this block to its matching target.'}
+              {COACH_COPY[coach!]}
             </Copy>
             {coach === 'bomb-notice' && <Button onPress={() => setCoach('bomb-safe')}>Show me how</Button>}
           </View>
         </SpeechTooltip>
-        {guideFrom && coach !== 'bomb-notice' && <DragGuide hand={require('@incubator/art-merge-world/ui/ftue-hand.webp')} showHand from={guideFrom} to={guideTarget} />}
+        {guideFrom && !COACH_WITHOUT_HAND.includes(coach!) && <DragGuide hand={require('@incubator/art-merge-world/ui/ftue-hand.webp')} showHand from={guideFrom} to={guideTarget} />}
       </>}
+      {/* The rival's one line, beside them, for the length of the countdown. Never blocks; replays get the full story sheet. */}
+      {ready && !started && !story && !practice && !!definition.dialogue[0] && (
+        <SpeechTooltip left={Math.max(14, width / 2 - Math.min(250, width - 28) / 2)} top={rivalBottom + 10} width={Math.min(250, width - 28)}
+          tailLeft={Math.min(250, width - 28) / 2 - 10} below style={{ zIndex: 60 }}>
+          <Copy style={{ color: '#35422F', fontFamily: 'EggDisplay', fontSize: 16, lineHeight: 22, paddingHorizontal: 8 }}>
+            {definition.dialogue[0]}
+          </Copy>
+        </SpeechTooltip>
+      )}
       <View pointerEvents="box-none" style={{position: 'absolute', top: insets.top + 10,
         left: layout.frame.x + 12, right: width - layout.frame.x - layout.frame.width + 12,
         flexDirection: 'row', justifyContent: 'space-between', zIndex: 10}}>
@@ -467,6 +510,7 @@ function Battle({
         width: Math.min(236, layout.frame.width - 136)}}>
         <ShellHealth presentation={presentation} side="opponent" name={definition.rival}
           max={definition.opponentHealth ?? definition.health} compact={height < 700} reduced={reduced} />
+        {started && !state.outcome && <RivalCharge {...charge} reduced={reduced} />}
       </View>
       {!layout.stage && <View pointerEvents="none" style={{position: "absolute", left: (width-layout.opponentSize)/2, top: layout.opponentY}}><Egg
           skin={definition.skin} characterId={definition.characterId}
@@ -476,12 +520,15 @@ function Battle({
           health={opponentHealth} hatchAt={opponentHatchAt} clock={clock}
           paused={suspended}
         /></View>}
-      {started && <OpponentField fighter={state.opponent} layout={rivalLayout} dy={rivalOffset.dy} clock={clock}
+      {started && <OpponentField fighter={state.opponent} layout={rivalLayout} motion={rivalMotion} clock={clock}
         reduced={reduced} paused={suspended || backgrounded} hidden={!!state.outcome} />}
       {layout.stage ? <>
+        {/* The rival winds up before it acts: a squash toward its feet in the last moments before its action. */}
+        <Animated.View pointerEvents="none" style={[{ position: 'absolute', inset: 0, transformOrigin: `${layout.stage.rival.contact.x}px ${layout.stage.rival.contact.y}px` }, windUpStyle]}>
         <GroundedEgg placement={layout.stage.rival} skin={definition.skin} characterId={definition.characterId}
           health={opponentHealth} hatchAt={opponentHatchAt} clock={clock}
           face={state.outcome === "won" || state.outcome === "draw" ? "surprise" : undefined} streak={state.opponent.run.combo} pulse={state.opponent.run.piecesPlaced} feedKey={opponentFireKey} hitSignal={opponentHitSignal} paused={suspended} />
+        </Animated.View>
         <GroundedEgg placement={layout.stage.player} skin={profile!.skin} characterId={profile!.adventure?.activeEgg === 'pip' ? undefined : profile!.adventure?.activeEgg} hat={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.hat} held={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.held} face={profile!.adventure?.appearances[profile!.adventure.activeEgg]?.face} streak={run.combo}
           health={playerHealth} hatchAt={playerHatchAt} clock={clock}
           pulse={run.piecesPlaced} feedKey={fireKey} hitSignal={playerHitSignal} dizzySignal={playerDizzySignal} wisp={!!profile!.wisp} paused={suspended} />
@@ -509,19 +556,16 @@ function Battle({
       </View>
 )}
       {/* Mount after GO clears so the shared footprint entrance plays after the countdown. */}
-      {started && <Animated.View
+      {started && <View
         pointerEvents="none"
-        style={[
-          {
-            position: "absolute",
-            left: layout.field.x,
-            top: layout.field.y,
-            opacity: state.outcome ? 0 : 1,
-            width: layout.metrics.width,
-            height: layout.metrics.height,
-          },
-          fieldStyle,
-        ]}
+        style={{
+          position: "absolute",
+          left: layout.field.x,
+          top: layout.field.y,
+          opacity: state.outcome ? 0 : 1,
+          width: layout.metrics.width,
+          height: layout.metrics.height,
+        }}
       >
         {!resolved &&
           varietyBackLayers.map(({ id, Layer }) => (
@@ -541,8 +585,10 @@ function Battle({
           generation={run.trayGeneration}
           hidden={resolved || !!state.outcome}
           hoverCells={hover}
+          hoverGroup={hoverTarget?.group ?? NO_GROUP}
           arrival={arrival}
           reduceMotion={reduced}
+          motion={motion}
         />
         {!resolved &&
           varietyFieldLayers.map(({ id, Layer }) => (
@@ -556,7 +602,7 @@ function Battle({
             />
           ))}
 
-      </Animated.View>}
+      </View>}
       <View
         pointerEvents="none"
         style={{
@@ -596,7 +642,8 @@ function Battle({
           restingCellSize={trayCellSize(run.tray, layout.metrics.cell, layout.metrics.gap, layout.frame.width - 24, layout.trayHeight)}
           trayGeneration={run.trayGeneration}
           dropFrame={layout.dropFrame}
-          driftY={offset.dy}
+          motion={motion}
+          groupBounds={groupBounds}
           onPickUp={onPickUp}
           onPieceAnchor={coach ? onPieceAnchor : undefined}
           onCell={onCell}

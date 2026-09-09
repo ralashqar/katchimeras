@@ -22,18 +22,21 @@ function fieldFixture() {
     useDerivedValue(compute: () => unknown) { const value = compute(); derived.push(value); return { value }; },
     withTiming(_to: number, options: { duration: number }) { animations.push(options.duration); return 1; },
     cancelAnimation() {},
+    useAnimatedStyle(compute: () => unknown) { return compute(); },
     Easing: { linear: (n: number) => n },
+    default: { View: 'AnimatedView' },
   };
   const colors = {coral: {bright: '#FFAABB'}};
   const modules: Record<string, unknown> = {
     react: React,
     'react/jsx-runtime': require('react/jsx-runtime'),
-    'react-native': { View: 'View', StyleSheet: { create: (styles: unknown) => styles } },
+    'react-native': { View: 'View', StyleSheet: { create: (styles: unknown) => styles, absoluteFill: {} } },
     'react-native-reanimated': native,
     '@shopify/react-native-skia': { Canvas: 'Canvas', Group: 'Group', Picture: 'Picture', createPicture: () => ({}), Skia: {Paint: () => ({})} },
     '../../../ui/theme': { useTileColors: () => colors, useTileAppearance: () => undefined },
     '../../../ui/tokens': { palette: {}, semantic: {} },
     '../engine/types': { BLOCK_COLOR_IDS: ['coral'] },
+    '../engine/slot-drop': { MOTION_STRIDE: 3 },
     './metrics': { cellOrigin: () => ({ x: 0, y: 0 }) },
     './slot-metrics': timing,
     './footprint-glow': {footprintGlow: () => null},

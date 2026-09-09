@@ -1,4 +1,4 @@
-import { planBeat } from '@incubator/tile-match/engine';
+import { planBeat, DRIFT_FLOOR } from '@incubator/tile-match/engine';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { freshProfile, grantResult, canPlay, createProfileRepository, type Profile } from '../state/profile';
@@ -8,7 +8,7 @@ import { createContentFlowCatalog } from '@incubator/story/catalog';
 import { createContentFlowEffects } from '@incubator/story/effects';
 import { createContentFlowDirector } from '@incubator/story/director';
 import { createProfileSnapshots, type RestoreJournal, type ProfileSnapshot } from '@incubator/profile/snapshots';
-import { ftueEncounter } from '../data/ftue-encounters';
+import { ftueEncounter, FIRST_SESSION, FIRST_SESSION_LESSONS, REPLAY, replayWins } from '../data/ftue-encounters';
 import { getDuel, validateDuel } from '../data/campaign';
 import { createCombat, tickCombat, placeCombat } from '../game/combat';
 import { choosePlacement } from '../game/opponent';
@@ -37,7 +37,7 @@ test('opening magnetism accepts a near match but leaves distant releases alone',
   const frame = { anchorX: 20, anchorY: 300, pitch: 30 };
   const centerX = frame.anchorX + (group.origin.column + Math.max(...piece.cells.map(c => c.column)) / 2) * frame.pitch;
   const centerY = frame.anchorY + (group.origin.row + Math.max(...piece.cells.map(c => c.row)) / 2) * frame.pitch;
-  const release = { centerX: centerX + 20, centerY, fingerX: 0, fingerY: 0, cellIndex: -1 };
+  const release = { centerX: centerX + 20, centerY, fingerX: 0, fingerY: 0, cellIndex: -1, groupIndex: -1 };
   assert.equal(assistOpeningDrop(run, piece.id, release, frame).cellIndex, group.origin.row * run.grid.cols + group.origin.column);
   const far = { ...release, centerX: centerX + 100 };
   assert.equal(assistOpeningDrop(run, piece.id, far, frame), far);
@@ -185,23 +185,56 @@ test('early opponents have short health budgets and the first fight stays basic 
 });
 
 
-test('FTUE mixes favour standard doubles, introduce mechanics once, and never loop a special', () => {
+test('first-session fights open plain, introduce their lesson on a single, and settle on plain doubles', () => {
   const p = freshProfile();
-  for (const id of ['glade-1', 'glade-2', 'glade-3', 'glade-4', 'glade-5', 'glade-6']) {
+  for (const [id, row] of Object.entries(FIRST_SESSION)) {
     const definition = ftueEncounter(getDuel(id), p);
+    validateDuel(definition);
     const plans = Array.from({ length: 30 }, (_, index) => planBeat(definition.progression, index, 0, 123));
-    assert.equal(plans[0].varieties.length, 0);
-    assert.ok(plans.slice(1).every(plan => plan.slots === 2));
-    assert.ok(plans.filter(plan => !plan.varieties.length).length >= 27);
-    for (const mechanic of ['drift', 'bomb', 'armour']) {
-      assert.ok(plans.filter(plan => plan.varieties.some(v => v.id === mechanic)).length <= 1);
+    assert.equal(plans[0].varieties.length, 0, `${id} should open on a plain beat`);
+    assert.ok(plans.slice(row.turns.length).every(plan => plan.varieties.length === 0 && plan.slots === 2), `${id} should hold a plain double`);
+    const lesson = FIRST_SESSION_LESSONS[id];
+    if (lesson && lesson !== 'tap') {
+      const first = plans.findIndex(plan => plan.varieties.some(v => v.id === lesson));
+      assert.ok(first >= 1, `${id} never deals its lesson ${lesson}`);
+      if (lesson === 'drift' || lesson === 'armour' || lesson === 'spin') assert.equal(plans[first].slots, 1, `${id} should introduce ${lesson} on a single`);
     }
-    assert.ok(plans.slice(10).every(plan => plan.varieties.length === 0));
-    if (id === 'glade-1') {
-      assert.equal(plans[0].slots, 1);
-      assert.equal(plans[1].varieties.length, 0);
-      assert.equal(plans[2].varieties[0]?.id, 'drift');
-      assert.ok(plans.every(plan => plan.varieties.every(v => v.id === 'drift')));
-    }
+    for (const plan of plans) for (const v of plan.varieties) if (v.id === 'drift') assert.ok(v.strength >= DRIFT_FLOOR, `${id} deals an invisible gust`);
   }
+  const opening = Array.from({ length: 12 }, (_, index) => planBeat(ftueEncounter(getDuel('glade-1'), p).progression, index, 0, 123));
+  assert.equal(opening[0].slots, 1);
+  assert.ok(opening.every(plan => plan.varieties.length === 0), 'the first fight teaches the snap and nothing else');
+  // The rival gets quicker and sharper fight by fight.
+  const ids = ['glade-1', 'glade-2', 'glade-3', 'glade-4', 'glade-5', 'glade-6'];
+  for (let i = 1; i < ids.length; i++) {
+    const [earlier, later] = [FIRST_SESSION[ids[i - 1]], FIRST_SESSION[ids[i]]];
+    assert.ok(later.ai.minActionMs < earlier.ai.minActionMs && later.ai.accuracy > earlier.ai.accuracy && later.hp >= earlier.hp, `${ids[i]} is not harder than ${ids[i - 1]}`);
+  }
+});
+
+test('replays climb from the first-session fight instead of jumping to the base numbers', () => {
+  const base = getDuel('glade-1');
+  const won = (profile: ReturnType<typeof freshProfile>, wins: number) => ({
+    ...profile, completed: [...profile.completed, 'glade-1'],
+    receipts: Object.fromEntries(Array.from({ length: wins }, (_, i) => [`w${i}`, { attemptId: `w${i}`, levelId: 'glade-1', won: true, accuracy: 1, bestStreak: 3, durationMs: 1, coins: 20, practice: false }])),
+  });
+  const once = ftueEncounter(base, won(freshProfile(), 1));
+  assert.equal(once.opponentHealth, 45);
+  assert.ok(once.ai.minActionMs < FIRST_SESSION['glade-1'].ai.minActionMs && once.ai.minActionMs >= base.ai.minActionMs);
+  assert.ok(once.guided, 'replays keep the coach available');
+  const many = ftueEncounter(base, won(freshProfile(), 40));
+  assert.equal(many.opponentHealth, Math.round(36 * REPLAY.hpCap));
+  assert.deepEqual(many.ai, base.ai, 'the base definition is the ceiling');
+  assert.ok(replayWins(won(freshProfile(), 3), 'glade-1') === 3);
+  validateDuel(once); validateDuel(many);
+});
+
+test('the rival holds while a lesson is up and resumes when it clears', () => {
+  const definition = ftueEncounter(getDuel('glade-2'), freshProfile());
+  let s = createCombat(definition, 'hold', 'hold');
+  for (let now = 100; now <= 30000; now += 100) s = tickCombat(s, now, true);
+  assert.equal(s.opponent.run.piecesPlaced, 0, 'the rival must not act during a lesson');
+  assert.equal(s.playerHp, definition.health);
+  s = tickCombat(s, s.elapsed + 20000);
+  assert.ok(s.opponent.run.piecesPlaced > 0, 'the rival resumes after the hold lifts');
 });

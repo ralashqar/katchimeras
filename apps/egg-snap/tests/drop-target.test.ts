@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { NO_CELL, type DropRelease } from "@incubator/tile-match/engine";
+import { NO_CELL, NO_GROUP, type DropRelease } from "@incubator/tile-match/engine";
 import { varietyData } from "@incubator/tile-match/varieties";
 import { DUELS, MOVES } from "../data/campaign";
 import { createCombat, placeCombat, tickCombat } from "../game/combat";
@@ -15,6 +15,7 @@ function targetRelease(
   const group = s.run.beat.groups.find((g) => g.pieceId === pieceId)!;
   return {
     cellIndex: group.origin.row * s.run.grid.cols + group.origin.column,
+    groupIndex: NO_GROUP,
     centerX: 60,
     centerY: tray.trayY - 55,
     fingerX: 80,

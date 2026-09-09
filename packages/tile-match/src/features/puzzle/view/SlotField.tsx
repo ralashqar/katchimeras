@@ -43,15 +43,18 @@ import {
 } from '@shopify/react-native-skia';
 import { memo, useEffect, useMemo, useCallback, useLayoutEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
-import {
+import Animated, {
   Easing,
   makeMutable,
   cancelAnimation,
+  useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import { MOTION_STRIDE } from '../engine/slot-drop';
+import type { GroupMotion } from '../variety/view-registry';
 
 import { palette, semantic } from '../../../ui/tokens';
 import { BLOCK_COLOR_IDS } from '../engine/types';
@@ -178,6 +181,23 @@ export type SlotFieldProps = {
   reduceMotion?: boolean;
   /** Use one colour-family badge for a distant opponent footprint. */
   miniature?: boolean;
+  /**
+   * Where each footprint is right now, relative to where the dealer put it — see `GroupMotion`.
+   *
+   * Applied as a per-footprint transform on the Skia group each one already has for its entrance, so a moving
+   * field costs no picture re-record: the settled picture stays cached and only the group's matrix changes.
+   * Absent, or all zeros, is a still field. Only the appearance (atlas) path is per-footprint; the plain
+   * fallback draws one picture and holds still.
+   */
+  motion?: GroupMotion;
+  /**
+   * Which footprint the drag resolve attributed the hover to, so the ghost rides that footprint's motion.
+   *
+   * The ghost cells are in *that footprint's* frame — `resolveDropAmongGroups` shifted the piece back by the
+   * footprint's live offset before quantising — so they are drawn shifted forward by the same amount. `-1` for a
+   * hover nothing claimed, which is drawn at rest.
+   */
+  hoverGroup?: number;
 };
 
 /** One cell of a drop ghost. */
@@ -196,6 +216,8 @@ export const SlotField = memo(function SlotField({
   arrival,
   reduceMotion = false,
   miniature = false,
+  motion,
+  hoverGroup = -1,
 }: SlotFieldProps) {
   const arrivalId = arrival?.id;
   const arrivalCells = arrival?.cells;
@@ -475,12 +497,25 @@ export const SlotField = memo(function SlotField({
     return {id: group.id, x, y, width: Math.max(...xs) + cell - x, height: Math.max(...ys) + cell - y};
   }), [groups, metrics, grid.cols, cell]);
 
+  /**
+   * The hover rides the footprint that claimed it.
+   *
+   * Translate only — a turned footprint refuses its piece rather than moving its cells, so the ghost has no
+   * angle to follow. Read from the same array the footprint's own transform reads, so the two cannot disagree.
+   */
+  const hoverStyle = useAnimatedStyle(() => {
+    const live = motion?.value;
+    const dx = hoverGroup >= 0 && live ? live[hoverGroup * MOTION_STRIDE] ?? 0 : 0;
+    const dy = hoverGroup >= 0 && live ? live[hoverGroup * MOTION_STRIDE + 1] ?? 0 : 0;
+    return { transform: [{ translateX: dx }, { translateY: dy }] };
+  });
+
   return (
     <View style={{ width, height }} pointerEvents="none">
       <Canvas style={{ position: 'absolute', left: 0, top: 0, width, height }}>
         {appearance ? !hidden && footprints.map((bounds, index) => <FootprintEntrance key={bounds.id}
           bounds={bounds} index={index} count={footprints.length} progress={borderIntro} reduced={reduceMotion}
-          contour={contourPicture} cells={picture} />) : <>
+          contour={contourPicture} cells={picture} motion={motion} />) : <>
         {!hidden && <Group opacity={decorationOpacity}>
           <Picture picture={contourPicture} />
         </Group>}
@@ -494,7 +529,8 @@ export const SlotField = memo(function SlotField({
           would be drawn over the burst. */}
       {hidden
         ? null
-        : hoverCells?.map((ghost, ordinal) => (
+        : <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, hoverStyle]}>
+          {hoverCells?.map((ghost, ordinal) => (
             <HoverCell
               key={ordinal}
               index={ghost.index}
@@ -504,14 +540,21 @@ export const SlotField = memo(function SlotField({
               metrics={metrics}
             />
           ))}
+        </Animated.View>}
     </View>
   );
 });
 
-/** Both eggs use the same local-centre entrance. Cached art moves as one object. */
-function FootprintEntrance({bounds, index, count, progress, reduced, contour, cells}: {
+/**
+ * Both eggs use the same local-centre entrance. Cached art moves as one object.
+ *
+ * The live motion rides the same group: translate, then rotate about the footprint's centre, then the
+ * entrance scale. All three are matrix changes on a cached picture, which is what keeps a moving target free.
+ */
+function FootprintEntrance({bounds, index, count, progress, reduced, contour, cells, motion}: {
   bounds: {x: number; y: number; width: number; height: number}; index: number; count: number;
   progress: SharedValue<number>; reduced: boolean; contour: SkPicture; cells: SharedValue<SkPicture>;
+  motion?: GroupMotion;
 }) {
   const phase = useDerivedValue(() => reduced ? progress.value : Math.max(0, Math.min(1, (progress.value * (450 + (count - 1) * 70) - index * 70) / 450)));
   const opacity = useDerivedValue(() => {
@@ -523,7 +566,11 @@ function FootprintEntrance({bounds, index, count, progress, reduced, contour, ce
     // One smooth overshoot, then a continuous return to exactly full size.
     const settle = Math.max(0, (t - .7) / .3);
     const scale = reduced ? 1 : t < .7 ? .45 + .61 * (1 - Math.pow(1 - t / .7, 3)) : 1.06 - .06 * settle * settle * (3 - 2 * settle);
-    return [{scale}];
+    const live = motion?.value;
+    const dx = live ? live[index * MOTION_STRIDE] ?? 0 : 0;
+    const dy = live ? live[index * MOTION_STRIDE + 1] ?? 0 : 0;
+    const angle = live ? live[index * MOTION_STRIDE + 2] ?? 0 : 0;
+    return [{translateX: dx}, {translateY: dy}, {rotate: angle}, {scale}];
   });
   return <Group origin={{x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2}} transform={transform} opacity={opacity}>
     <Group clip={{x: bounds.x - 10, y: bounds.y - 12, width: bounds.width + 20, height: bounds.height + 24}}>

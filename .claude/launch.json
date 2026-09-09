@@ -4,8 +4,28 @@
     {
       "name": "design-preview",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "4173", "--directory", "design"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4173",
+        "--directory",
+        "design"
+      ],
       "port": 4173
+    },
+    {
+      "name": "egg-snap-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "web",
+        "--workspace=egg-snap",
+        "--",
+        "--port",
+        "8090",
+        "--clear"
+      ],
+      "port": 8090
     }
   ]
 }

@@ -7,12 +7,13 @@ import type { AiProfile, DuelDefinition, OpponentMoveDefinition, RegionDefinitio
 /** Puzzle mechanics only. Opponents no longer have timed attacks or fixed damage. */
 export const MOVES: Record<string, OpponentMoveDefinition> = {
   tap: {id: 'tap', name: 'Simple shapes', varieties: []},
-  drift: {id: 'drift', name: 'Forest gust', varieties: [{id: 'drift', strength: .45}]},
+  drift: {id: 'drift', name: 'Forest gust', varieties: [{id: 'drift', strength: .55}]},
   armour: {id: 'armour', name: 'Shell shield', varieties: [{id: 'armour', strength: .25}]},
   bomb: {id: 'bomb', name: 'Seed trap', varieties: [{id: 'bomb', strength: .25}]},
   fuse: {id: 'fuse', name: 'Puzzle spell', varieties: [{id: 'fuse', strength: .4}]},
   crossed: {id: 'crossed', name: 'Cross-up', varieties: [{id: 'crossed', strength: .5}]},
   hues: {id: 'hues', name: 'Colour shift', varieties: [{id: 'hues', strength: .45}]},
+  spin: {id: 'spin', name: 'Turnabout', varieties: [{id: 'spin', strength: .3}]},
 };
 export function mechanicSequence(mechanics: readonly string[], slots = 2, strength?: number): Progression {
   return {kind: 'stream', loop: true, turns: mechanics.map(id => ({

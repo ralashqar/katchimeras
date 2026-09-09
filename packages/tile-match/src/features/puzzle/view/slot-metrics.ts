@@ -138,7 +138,7 @@ export function buildSlotBurst(
   metrics: BoardMetrics,
   cells: readonly { index: number; colorId: BlockColorId }[],
   groupSizes: readonly number[] = [],
-): { x: number; y: number; colorId: BlockColorId; delayMs: number }[] {
+): { x: number; y: number; colorId: BlockColorId; delayMs: number; group: number }[] {
   /**
    * Which group each cell belongs to, by position in the flat list.
    *
@@ -160,6 +160,7 @@ export function buildSlotBurst(
       y,
       colorId,
       delayMs: order * SLOT_BURST_STEP_MS + group * SLOT_GROUP_GAP_MS,
+      group,
     };
   });
 }

@@ -31,7 +31,6 @@ import Animated, {
   useSharedValue,
   withDelay,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated';
 
 import { clamp } from '../../../core/math';
@@ -41,12 +40,18 @@ import { elevation, line, palette, radius, surface, zLayer } from '../../../ui/t
 import { cellsExtent } from '../engine/board';
 import {
   NO_CELL,
+  NO_GROUP,
   dropFootprintFor,
+  packDropTarget,
+  resolveDropAmongGroups,
   resolveDropCell,
+  unpackDropCell,
+  unpackDropGroup,
   type DropFrame,
   type DropRelease,
 } from '../engine/slot-drop';
 import type { Piece } from '../engine/types';
+import type { GroupMotion } from '../variety/view-registry';
 import { PieceArt } from './PieceArt';
 import type { BoardMetrics } from './metrics';
 
@@ -124,27 +129,35 @@ export type TrayProps = {
    */
   dropFrame?: DropFrame;
   /**
-   * How far the field has drifted from where the layout put it, in points.
+   * Where every footprint is right now, relative to where the dealer put it — see `GroupMotion`.
    *
-   * The field sways vertically on the upper rungs of the difficulty ladder, and this is the *live* offset
-   * — read on the UI thread, every gesture frame, so the drop quantises against where the footprints
-   * actually are. Without it the drag would still be graded against the field's resting position, and a
-   * drifting beat would be unwinnable in a way the player could see but not act on.
+   * Footprints move on the upper rungs of the difficulty ladder, each on its own, and this is the *live*
+   * position — read on the UI thread, every gesture frame, so the drop quantises against where each
+   * footprint actually is. Without it the drag would still be graded against the field's resting position,
+   * and a drifting beat would be unwinnable in a way the player could see but not act on.
    *
    * A shared value rather than a number for the reason the whole gesture is a worklet: a prop would
    * rebuild the pan sixty times a second, and rebuilding a gesture mid-drag drops its events.
    */
-  driftY?: Readonly<SharedValue<number>>;
+  motion?: GroupMotion;
+  /**
+   * Each footprint's rest rectangle in cells, flat in `BOUNDS_STRIDE` — `groupBoundsOf(grid, beat.groups)`.
+   *
+   * Constant for a beat, and the tray remounts per beat, so capturing it in the gesture costs nothing. Absent
+   * means resolve against the still field, as before anything moved.
+   */
+  groupBounds?: readonly number[];
   onSelect?: (pieceId: string | null) => void;
   onPieceAnchor?: (pieceId: string, point: { x: number; y: number }) => void;
   onPickUp?: (pieceId: string) => void;
   /**
    * The piece crossed into a different cell, or `NO_CELL` when it left the field or the drag ended.
    *
+   * `groupIndex` is the footprint whose frame the cell is in — the one that claimed the hover — or `NO_GROUP`.
    * Called only on an actual change, from the UI thread via `runOnJS` — a few times a second rather
    * than sixty.
    */
-  onCell?: (pieceId: string, cellIndex: number) => void;
+  onCell?: (pieceId: string, cellIndex: number, groupIndex: number) => void;
   /**
    * The finger lifted. Say what became of the piece.
    *
@@ -177,7 +190,8 @@ export const Tray = memo(function Tray({
   reduceMotion = false,
   trayGeneration,
   dropFrame,
-  driftY,
+  motion,
+  groupBounds,
   onSelect,
   onPickUp,
   onPieceAnchor,
@@ -222,7 +236,8 @@ export const Tray = memo(function Tray({
                 selected={selected}
                 reduceMotion={reduceMotion}
                 dropFrame={dropFrame}
-                driftY={driftY}
+                motion={motion}
+                groupBounds={groupBounds}
                 onSelect={onSelect}
                 onPickUp={onPickUp}
                 onPieceAnchor={onPieceAnchor}
@@ -308,7 +323,8 @@ const DraggablePiece = memo(function DraggablePiece({
   selected,
   reduceMotion,
   dropFrame,
-  driftY,
+  motion,
+  groupBounds,
   onSelect,
   onPickUp,
   onPieceAnchor,
@@ -323,11 +339,12 @@ const DraggablePiece = memo(function DraggablePiece({
   selected: boolean;
   reduceMotion: boolean;
   dropFrame?: DropFrame;
-  driftY?: Readonly<SharedValue<number>>;
+  motion?: GroupMotion;
+  groupBounds?: readonly number[];
   onSelect?: (pieceId: string | null) => void;
   onPieceAnchor?: (pieceId: string, point: { x: number; y: number }) => void;
   onPickUp?: (pieceId: string) => void;
-  onCell?: (pieceId: string, cellIndex: number) => void;
+  onCell?: (pieceId: string, cellIndex: number, groupIndex: number) => void;
   onDropAt?: (pieceId: string, release: DropRelease) => DropOutcome;
   onInvalid?: () => void;
 }) {
@@ -395,8 +412,8 @@ const DraggablePiece = memo(function DraggablePiece({
     }
   }, [reduceMotion, scale, selected]);
 
-  /** The last cell this piece resolved to, so the gesture can spot a genuine change. */
-  const lastCell = useSharedValue(NO_CELL);
+  /** The last cell and footprint this piece resolved to, packed, so the gesture can spot a genuine change. */
+  const lastTarget = useSharedValue(packDropTarget(NO_GROUP, NO_CELL));
   /**
    * True between `onEnd` handing the drop to JS and JS answering.
    *
@@ -444,9 +461,11 @@ const DraggablePiece = memo(function DraggablePiece({
    * dropped until this decides, which is imperceptible either way.
    */
   const finishDrag = useCallback(
-    (cellIndex: number, centerX: number, centerY: number, fingerX: number, fingerY: number) => {
+    (target: number, centerX: number, centerY: number, fingerX: number, fingerY: number) => {
       awaitingDrop.value = false;
       if (placed.value) return;
+      const cellIndex = unpackDropCell(target);
+      const groupIndex = unpackDropGroup(target);
       /**
        * Offered to the screen **whatever** it resolved to, including `NO_CELL`.
        *
@@ -457,7 +476,7 @@ const DraggablePiece = memo(function DraggablePiece({
        * and the tray's own bounds are the screen's business. So the tray reports and the screen decides.
        */
       const outcome =
-        onDropAt?.(piece.id, { cellIndex, centerX, centerY, fingerX, fingerY }) ?? 'rejected';
+        onDropAt?.(piece.id, { cellIndex, groupIndex, centerX, centerY, fingerX, fingerY }) ?? 'rejected';
 
       if (outcome === 'consumed') {
         // Hide immediately so the piece never springs back over the cell it just filled.
@@ -479,7 +498,7 @@ const DraggablePiece = memo(function DraggablePiece({
         returnToTray();
         if (outcome === 'rejected') onInvalid?.();
       }
-      onCell?.(piece.id, NO_CELL);
+      onCell?.(piece.id, NO_CELL, NO_GROUP);
     },
     [
       awaitingDrop,
@@ -506,8 +525,8 @@ const DraggablePiece = memo(function DraggablePiece({
   }, [placed, returning, opacity, onSelect, onPickUp, piece.id]);
 
   const reportCell = useCallback(
-    (cellIndex: number) => {
-      onCell?.(piece.id, cellIndex);
+    (target: number) => {
+      onCell?.(piece.id, unpackDropCell(target), unpackDropGroup(target));
     },
     [onCell, piece.id],
   );
@@ -533,25 +552,26 @@ const DraggablePiece = memo(function DraggablePiece({
        * Scalars in, a scalar out — no allocation, and no reason to wake the JS thread unless this differs
        * from the cell the ghost is already drawn for.
        *
-       * The drift is applied to the **piece**, not to the frame, and that is not a shortcut: `DropFrame` is
-       * a plain-number object captured by this worklet, so a per-frame `anchorY` would mean rebuilding it —
-       * and rebuilding the object rebuilds the gesture. Subtracting the offset from the piece's centre is
-       * the same arithmetic (the frame's anchor and the piece's position only ever appear as a difference),
-       * costs one subtraction, and leaves `resolveDropCell` pure and unaware that the field can move.
+       * Motion is applied to the **piece**, not to the frame, and that is not a shortcut: `DropFrame` is a
+       * plain-number object captured by this worklet, so a per-frame anchor would mean rebuilding it — and
+       * rebuilding the object rebuilds the gesture. `resolveDropAmongGroups` shifts the piece's centre back by
+       * each footprint's live offset instead, which is the same arithmetic, and lets the footprint whose frame
+       * the piece is most over claim the drop.
        */
-      const cellIndex = resolveDropCell(
-        dropFrame,
-        footprint,
-        homeCenterX.value + x,
-        homeCenterY.value + y - (driftY ? driftY.value : 0),
-      );
-      if (cellIndex === lastCell.value) return;
-      lastCell.value = cellIndex;
-      runOnJS(reportCell)(cellIndex);
+      const centerX = homeCenterX.value + x;
+      const centerY = homeCenterY.value + y;
+      const target =
+        motion && groupBounds
+          ? resolveDropAmongGroups(dropFrame, footprint, centerX, centerY, motion.value, groupBounds)
+          : packDropTarget(NO_GROUP, resolveDropCell(dropFrame, footprint, centerX, centerY));
+      if (target === lastTarget.value) return;
+      lastTarget.value = target;
+      runOnJS(reportCell)(target);
     },
     [
       dropFrame,
-      driftY,
+      motion,
+      groupBounds,
       footprint,
       fingerLift,
       reportCell,
@@ -559,7 +579,7 @@ const DraggablePiece = memo(function DraggablePiece({
       grabOffsetY,
       homeCenterX,
       homeCenterY,
-      lastCell,
+      lastTarget,
       translateX,
       translateY,
     ],
@@ -595,7 +615,7 @@ const DraggablePiece = memo(function DraggablePiece({
           grabOffsetY.value = event.y - hitboxHeight.value / 2;
           homeCenterX.value = event.absoluteX - event.x + hitboxWidth.value / 2;
           homeCenterY.value = event.absoluteY - event.y + hitboxHeight.value / 2;
-          lastCell.value = NO_CELL;
+          lastTarget.value = packDropTarget(NO_GROUP, NO_CELL);
           awaitingDrop.value = false;
         })
         .onStart((event) => {
@@ -623,7 +643,7 @@ const DraggablePiece = memo(function DraggablePiece({
            * testing the piece against the tray would make the cancel unreachable.
            */
           runOnJS(finishDrag)(
-            lastCell.value,
+            lastTarget.value,
             homeCenterX.value + translateX.value,
             homeCenterY.value + translateY.value,
             event.absoluteX,
@@ -635,7 +655,7 @@ const DraggablePiece = memo(function DraggablePiece({
           // before JS had confirmed it. A cancelled gesture never set the flag, so it still returns.
           if (!placed.value && !awaitingDrop.value) {
             returnToTray();
-            runOnJS(reportCell)(NO_CELL);
+            runOnJS(reportCell)(packDropTarget(NO_GROUP, NO_CELL));
           }
         }),
     [
@@ -647,7 +667,7 @@ const DraggablePiece = memo(function DraggablePiece({
       returnToTray,
       reportCell,
       awaitingDrop,
-      lastCell,
+      lastTarget,
       grabOffsetX,
       grabOffsetY,
       homeCenterX,

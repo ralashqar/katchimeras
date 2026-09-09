@@ -78,7 +78,7 @@ test('stage changes leave legacy scenes available and do not alter matching or t
       const group = s.run.beat.groups.find(g => g.pieceId === piece.id)!;
       const cellIndex = group.origin.row * s.run.grid.cols + group.origin.column;
       assert.ok(dropPreview(s.run, piece.id, cellIndex).every(c => c.onTarget));
-      assert.equal(shouldCancelDrop(s.run, piece.id, { cellIndex, centerX: 0, centerY: 0,
+      assert.equal(shouldCancelDrop(s.run, piece.id, { cellIndex, groupIndex: -1, centerX: 0, centerY: 0,
         fingerX: width / 2, fingerY: l.trayY + 20 }, l), false);
     }
   }

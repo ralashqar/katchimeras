@@ -18,6 +18,8 @@ export function useCombat(
   paused: boolean,
   practice: boolean,
   stress = false,
+  /** Keep the rival from acting — while a lesson is up. See `tickCombat`. */
+  holdAi = false,
 ) {
   const [state, setState] = useState(() =>
     createCombat(
@@ -31,6 +33,8 @@ export function useCombat(
   const ref = useRef(state);
   const pauseRef = useRef(paused);
   pauseRef.current = paused;
+  const holdRef = useRef(holdAi);
+  holdRef.current = holdAi;
   const autoAt = useRef(600);
   const foreground = useRef(AppState.currentState === "active");
   const [backgrounded, setBackgrounded] = useState(false);
@@ -74,14 +78,14 @@ export function useCombat(
           const start = practice ? performance.now() : 0;
           const target = ref.current.elapsed + delta;
           if (stress) while (autoAt.current <= target && !ref.current.outcome) {
-            commit(tickCombat(ref.current, autoAt.current));
+            commit(tickCombat(ref.current, autoAt.current, holdRef.current));
             const current = ref.current;
             const action = choosePlacement(current.run, true, current.elapsed-current.lastDropAt, .5);
             if (action?.type === 'place' || action?.type === 'discard') commit(placeCombat(current,
               action.type === 'place' ? action : {pieceId: action.pieceId, discard: true}, current.elapsed));
             autoAt.current += 600;
           }
-          commit(tickCombat(ref.current, target));
+          commit(tickCombat(ref.current, target, holdRef.current));
           if (practice) presentation.performance.simulation(performance.now() - start);
         }
         else clock.value += delta; // Let terminal impact particles settle before results.

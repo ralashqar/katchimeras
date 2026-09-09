@@ -1,31 +1,104 @@
-import type { DuelDefinition } from '../game/types';
+import { DRIFT_FLOOR, type Progression } from '@incubator/tile-match/engine';
+import type { AiProfile, DuelDefinition } from '../game/types';
 import type { Profile } from '../state/profile';
-import type { Progression } from '@incubator/tile-match/engine';
 import { MOVES } from './campaign';
 
-/** Introductions are authored once; a prolonged fight holds the final standard beat. */
-function encounterMix(mechanics: readonly ('tap' | 'drift' | 'bomb' | 'armour')[], singleOpening = false): Progression {
-  return { kind: 'stream', loop: false, turns: mechanics.map((id, index) => ({
-    slots: singleOpening && index === 0 ? 1 : 2,
-    varieties: MOVES[id].varieties.map(variety => ({ ...variety, strength: id === 'drift' ? .2 : variety.strength })),
+/** One authored turn: the mechanic, how many footprints, and an optional strength override. */
+export type EncounterTurn = readonly [id: keyof typeof MOVES, slots?: 1 | 2, strength?: number];
+
+export type EncounterRow = {
+  /** Opponent health; the player's own stays at the base definition. */
+  hp: number;
+  ai: AiProfile;
+  /** Hold the rival and deal singles until this many exact beats have landed. */
+  openingGate?: number;
+  turns: readonly EncounterTurn[];
+};
+
+const ai = (minActionMs: number, maxActionMs: number, accuracy: number): AiProfile => ({ minActionMs, maxActionMs, accuracy });
+
+/**
+ * The first session: one new idea per fight, and a rival that visibly speeds up.
+ *
+ * Two rules from the engine's own ladder shape every row. A mechanic is **introduced on a single** — one footprint,
+ * so there is exactly one thing to read — and only then doubled. And every row **ends on a plain double**: a
+ * non-looping stream holds its last turn forever, so a long fight settles onto standard placements rather than
+ * repeating a special.
+ *
+ * The gust is dealt at `DRIFT_FLOOR`, never below it: under the floor the drift reads its strength as a fade gate and
+ * the targets barely move, so the first gust a player met would have been one they could not see.
+ */
+export const FIRST_SESSION: Record<string, EncounterRow> = {
+  'glade-1': { hp: 36, ai: ai(4400, 6000, .68), openingGate: 1,
+    turns: [['tap', 1], ['tap'], ['tap'], ['tap'], ['tap'], ['tap']] },
+  'glade-2': { hp: 60, ai: ai(3800, 5200, .72),
+    turns: [['tap'], ['drift', 1], ['tap'], ['drift'], ['tap'], ['tap']] },
+  'glade-3': { hp: 64, ai: ai(3400, 4600, .75),
+    turns: [['tap'], ['bomb'], ['tap'], ['drift'], ['tap'], ['bomb'], ['tap']] },
+  'glade-4': { hp: 72, ai: ai(3000, 4200, .78),
+    turns: [['tap'], ['armour', 1], ['tap'], ['armour'], ['drift'], ['bomb'], ['tap']] },
+  'glade-5': { hp: 84, ai: ai(2800, 3800, .80),
+    turns: [['tap'], ['spin', 1], ['tap'], ['spin'], ['bomb'], ['armour'], ['drift'], ['tap']] },
+  'glade-6': { hp: 120, ai: ai(2400, 3200, .82),
+    turns: [['tap'], ['bomb'], ['spin'], ['armour'], ['drift', 2, .7], ['spin'], ['bomb'], ['drift', 2, .7], ['tap']] },
+  'cheerlet-1': { hp: 90, ai: ai(2600, 3600, .80),
+    turns: [['tap'], ['fuse', 1], ['tap'], ['fuse', 1], ['drift'], ['tap']] },
+  'cheerlet-2': { hp: 100, ai: ai(2400, 3400, .82),
+    turns: [['tap'], ['hues', 1], ['tap'], ['bomb'], ['hues', 1], ['drift'], ['tap']] },
+  'cheerlet-3': { hp: 140, ai: ai(2200, 3200, .85),
+    turns: [['tap'], ['armour'], ['spin'], ['bomb'], ['hues', 1], ['fuse', 1], ['drift', 2, .7], ['tap']] },
+};
+
+/** The mechanic each fight introduces, in the order a new player meets them. */
+export const FIRST_SESSION_LESSONS: Record<string, keyof typeof MOVES | null> = {
+  'glade-1': 'tap', 'glade-2': 'drift', 'glade-3': 'bomb', 'glade-4': 'armour', 'glade-5': 'spin', 'glade-6': null,
+  'cheerlet-1': 'fuse', 'cheerlet-2': 'hues', 'cheerlet-3': null,
+};
+
+export function firstSessionProgression(turns: readonly EncounterTurn[]): Progression {
+  return { kind: 'stream', loop: false, turns: turns.map(([id, slots = 2, strength]) => ({
+    slots: id === 'fuse' || id === 'hues' ? 1 : slots,
+    ...(id === 'fuse' ? { minShapeHeight: 2 } : {}),
+    varieties: MOVES[id].varieties.map(variety => ({ ...variety, strength: strength ?? (id === 'drift' ? DRIFT_FLOOR : variety.strength) })),
   })) };
 }
 
-/** Tutorial-specific pacing; replay and legacy duel definitions stay unchanged. */
+/**
+ * How a replay climbs, per earlier win of the same duel.
+ *
+ * A curve rather than a cliff: replays used to jump straight to the base definition — for the first duel, 36 HP
+ * against a four-to-six-second rival became 300 HP against one three times quicker. Each win now adds a quarter of
+ * the first-session health and shaves the rival's action time by eight percent, never past the base definition,
+ * which remains the ceiling and the arena's reference.
+ */
+export const REPLAY = { hpPerWin: .25, hpCap: 2.5, speedPerWin: .08, accuracyPerWin: .02 } as const;
+
+/** Real wins of this duel so far. Practice and losses do not count. */
+export function replayWins(profile: Profile, levelId: string): number {
+  return Object.values(profile.receipts).filter(r => r.levelId === levelId && r.won && !r.practice).length;
+}
+
+/** `ceiling` is the base definition: the replay never gets a quicker or sharper rival than it. */
+export function replayEncounter(session: DuelDefinition, row: EncounterRow, wins: number, ceiling: AiProfile): DuelDefinition {
+  const speed = Math.max(0, 1 - REPLAY.speedPerWin * wins);
+  return {
+    ...session,
+    opponentHealth: Math.round(row.hp * Math.min(REPLAY.hpCap, 1 + REPLAY.hpPerWin * wins)),
+    ai: {
+      minActionMs: Math.max(ceiling.minActionMs, Math.round(row.ai.minActionMs * speed)),
+      maxActionMs: Math.max(ceiling.maxActionMs, Math.round(row.ai.maxActionMs * speed)),
+      accuracy: Math.min(ceiling.accuracy, row.ai.accuracy + REPLAY.accuracyPerWin * wins),
+    },
+  };
+}
+
+/** First-session pacing for a new profile; replays climb from it. Legacy saves keep the base definitions. */
 export function ftueEncounter(base: DuelDefinition, profile: Profile): DuelDefinition {
-  if (!profile.adventure || profile.adventure.legacy || profile.completed.includes(base.id)) return base;
-  const common = { ...base, guided: true, ai: { minActionMs: 4400, maxActionMs: 6000, accuracy: .68 } };
-  switch (base.id) {
-    case 'glade-1': return { ...common, openingGate: 1, opponentHealth: 36,
-      progression: encounterMix(['tap', 'tap', 'drift', 'tap', 'tap', 'tap'], true) };
-    case 'glade-3': return { ...common, opponentHealth: 64, progression: encounterMix(['tap', 'bomb', 'tap', 'tap', 'drift', 'tap', 'tap', 'tap']) };
-    case 'glade-4': return { ...common, opponentHealth: 64, progression: encounterMix(['tap', 'armour', 'tap', 'tap', 'drift', 'tap', 'tap', 'tap']) };
-    case 'glade-2': return { ...common, opponentHealth: 60, progression: encounterMix(['tap', 'tap', 'drift', 'tap', 'tap', 'tap']) };
-    case 'glade-5': return { ...common, opponentHealth: 80, progression: encounterMix(['tap', 'bomb', 'tap', 'tap', 'armour', 'tap', 'drift', 'tap']) };
-    case 'glade-6': return { ...common, opponentHealth: 120, ai: { minActionMs: 2600, maxActionMs: 3600, accuracy: .78 }, progression: encounterMix(['tap', 'bomb', 'tap', 'tap', 'armour', 'tap', 'drift', 'tap', 'tap', 'tap']) };
-    case 'cheerlet-1': return {...common, opponentHealth: 90};
-    case 'cheerlet-2': return {...common, opponentHealth: 100};
-    case 'cheerlet-3': return {...common, opponentHealth: 140};
-    default: return base;
-  }
+  if (!profile.adventure || profile.adventure.legacy) return base;
+  const row = FIRST_SESSION[base.id];
+  if (!row) return base;
+  const session: DuelDefinition = { ...base, guided: true, opponentHealth: row.hp, ai: row.ai,
+    progression: firstSessionProgression(row.turns), ...(row.openingGate ? { openingGate: row.openingGate } : {}) };
+  if (!profile.completed.includes(base.id)) return session;
+  return replayEncounter(session, row, Math.max(1, replayWins(profile, base.id)), base.ai);
 }

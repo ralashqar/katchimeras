@@ -10,7 +10,8 @@
     "./timing": "./src/features/puzzle/view/slot-metrics.ts",
     "./theme": "./src/ui/theme.tsx",
     "./feedback": "./src/feedback.ts",
-    "./audio/*": "./assets/audio/*"
+    "./audio/*": "./assets/audio/*",
+    "./motion": "./src/features/puzzle/view/group-motion.ts"
   },
   "files": [
     "src",

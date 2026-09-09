@@ -27,6 +27,7 @@ import { CROSSED_VARIETY } from './crossed/crossed';
 import { HUES_VARIETY } from './hues/hues';
 import { DRIFT_VARIETY } from './drift/drift';
 import { FUSE_VARIETY } from './fuse/fuse';
+import { SPIN_VARIETY } from './spin/spin';
 import type {
   AbsorbInput,
   BeatShape,
@@ -59,6 +60,7 @@ const VARIETIES = {
   hues: HUES_VARIETY,
   armour: ARMOUR_VARIETY,
   fuse: FUSE_VARIETY,
+  spin: SPIN_VARIETY,
 } as const satisfies Record<string, VarietyDef<any>>;
 
 /** Every variety's id, derived from the table so a name exists in one place only. */

@@ -148,10 +148,16 @@ function deadline(f: CombatantState) {
   const d = beatDeadlineMs(f.run);
   return f.run.beat.status === 'resolved' ? f.nextBeatAt : d === null ? Infinity : f.beatStartedAt + d;
 }
-/** Process deadlines at their authored time, not the render frame that happens to notice them. */
-export function tickCombat(s: CombatState, now: number): CombatState {
+/**
+ * Process deadlines at their authored time, not the render frame that happens to notice them.
+ *
+ * `holdAi` keeps the rival from acting while it is true — the screen passes it while a lesson is up, so the rival
+ * never punishes reading. It is the opening gate's own mechanism, generalised: the rival's next action is pushed
+ * ahead of every tick, and resumes one action time after the hold lifts.
+ */
+export function tickCombat(s: CombatState, now: number, holdAi = false): CombatState {
   if (s.outcome || !Number.isFinite(now) || now < s.elapsed) return s;
-  const gated = (s.definition.openingGate ?? 0) > s.player.exactBeats;
+  const gated = holdAi || (s.definition.openingGate ?? 0) > s.player.exactBeats;
   if (gated) s = {...s, aiAt: now + s.definition.ai.maxActionMs};
   while (!s.outcome) {
     const at = Math.min(deadline(s.player), deadline(s.opponent), s.aiAt, s.impacts[0]?.at ?? Infinity);

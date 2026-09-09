@@ -68,6 +68,10 @@ export type DriftOffset = {
    * the field actually is rather than where the layout put it.
    */
   offsetY: Readonly<SharedValue<number>>;
+  /** The integrated phase, in cycles. `useGroupMotion` drives every footprint's own wave from it. */
+  phase: Readonly<SharedValue<number>>;
+  /** The faded strength, 0 up to the beat's own. Amplitude, rate and the per-group mixes all read it. */
+  live: Readonly<SharedValue<number>>;
 };
 
 /**
@@ -117,5 +121,5 @@ export function useDriftOffset(
 
   const offsetY = useDerivedValue(() => slotDriftOffset(phase.value, live.value, amplitude));
 
-  return { offsetY };
+  return { offsetY, phase, live };
 }

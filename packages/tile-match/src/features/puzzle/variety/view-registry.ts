@@ -30,19 +30,24 @@
  * or a plate should be Reanimated and Views.
  */
 
-import { useMemo } from 'react';
-import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
+import { useEffect, useMemo } from 'react';
+import { Easing, useDerivedValue, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import type { ComponentType } from 'react';
 
 import type { Beat } from '../engine/slot-types';
+import type { BoardSpec } from '../engine/types';
 import type { BoardMetrics } from '../view/metrics';
+import { MOTION_STRIDE } from '../engine/slot-drop';
+import { groupMotionAt, motionRoomsFor } from '../view/group-motion';
 import { varietyData } from './contract';
 import { VARIETY_IDS, type VarietyId } from './registry';
 import { ArmourLayer } from './armour/ArmourLayer';
 import { BombLayer } from './bomb/BombLayer';
 import { HuesLayer } from './hues/HuesLayer';
 import { FuseLayer } from './fuse/FuseLayer';
+import { SpinLayer } from './spin/SpinLayer';
 import { DRIFT_VARIETY, type DriftData } from './drift/drift';
+import { SPIN_VARIETY, type SpinData } from './spin/spin';
 import { useDriftOffset } from './drift/use-drift-offset';
 
 /** What every variety layer is handed. Scalars and numbers only — never engine types. */
@@ -55,20 +60,29 @@ export type VarietyLayerProps = {
   /** Optional host simulation clock. Freezes timing cues with pause/background. */
   clock?: Readonly<SharedValue<number>>;
   beatStartedAt?: number;
+  /** Where every footprint is right now, so a layer decorating one can ride along with it. */
+  motion?: GroupMotion;
 };
 
-/** Where the field is, relative to where the layout put it. Points, summed across varieties. */
-export type FieldOffset = {
-  dx: Readonly<SharedValue<number>>;
-  dy: Readonly<SharedValue<number>>;
-};
+/**
+ * Where every footprint is, relative to where the dealer put it: `dx, dy, angle` per group, flat in
+ * `MOTION_STRIDE`, in `beat.groups` order. See `slot-drop.ts`.
+ *
+ * One shared array rather than a pair of numbers for the field, because the field no longer moves as one thing.
+ * Every consumer — the footprint transform, the hover ghost, the drag resolve, the volley launch — reads this
+ * same array, which is what keeps them agreeing to the pixel.
+ */
+export type GroupMotion = Readonly<SharedValue<number[]>>;
 
-/** What the layout gives an offset hook to work from. */
-export type OffsetContext = {
+/** What the layout gives the motion hook to work from. */
+export type MotionContext = {
   paused?: boolean;
-  /** How far the field may rise at full strength — `layout.slotField.driftAmplitude`. */
+  /** Clearance the layout reserved above the play rect, in points. Added to each footprint's upward room. */
   driftAmplitude: number;
   reduceMotion: boolean;
+  grid: BoardSpec;
+  /** `metrics.pitch`, so room can be measured in cells. */
+  pitch: number;
 };
 
 export type VarietyView = {
@@ -104,6 +118,9 @@ const VARIETY_VIEWS = {
   // Fuse draws a chrome plate **behind** both halves of the split footprint so the cells paint over it
   // as a frame. BackLayer rather than FieldLayer so it sits below the footprints in the z-stack.
   fuse: { BackLayer: FuseLayer },
+  // The spin turns the footprint through the motion channel's angle — see `useGroupMotion` — and draws only the
+  // countdown to the next turn, because a timing mechanic without a visible clock is a guessing game.
+  spin: { FieldLayer: SpinLayer },
 } as const satisfies Record<VarietyId, VarietyView>;
 
 export function varietyView(id: VarietyId): VarietyView {
@@ -152,11 +169,11 @@ export const varietyBackLayers: readonly {
 });
 
 /**
- * The field's live offset, summed across every variety that moves it.
+ * Every footprint's live motion, from every variety that moves one.
  *
  * ## Hooks are called unconditionally, and that is not a workaround
  *
- * Every variety's offset hook runs on every render, whether its variety is on this beat or not, receiving its
+ * Every variety's motion hook runs on every render, whether its variety is on this beat or not, receiving its
  * data or `undefined` and returning rest when absent. React requires it — a hook cannot be called
  * conditionally — and the registry being a static object is what makes the order stable.
  *
@@ -164,18 +181,18 @@ export const varietyBackLayers: readonly {
  * beat, so this formalises an existing pattern rather than inventing one. The cost is one idle
  * `useFrameCallback` per registered variety, which is a comparison per frame on the UI thread.
  *
- * ## Why a single summed pair rather than one value per variety
+ * ## Why one array rather than an offset per variety
  *
- * Two consumers need this, and they must agree to the pixel: the field container's transform, and the tray's
- * drop resolve — so that accuracy is graded against where the footprints *are*. Handing them a list to sum
- * themselves would be two places to get it wrong. Summing means two varieties that both move the field
- * compose rather than one winning, which is the only sane default.
+ * Several consumers need this, and they must agree to the pixel: each footprint's transform, the hover ghost,
+ * and the tray's drop resolve — so that accuracy is graded against where the footprints *are*. Handing them a
+ * list to sum themselves would be several places to get it wrong. A variety that turns a footprint for a rule
+ * writes the same `angle` slot the drift's tilt would, so the two cannot fight over one target.
  *
- * `dx` exists and is always zero today. The drift is vertical because the layout can only afford vertical —
- * see `slotDriftOffset` — but a variety that slides the field sideways is an obvious future one, and adding
- * the axis later would mean touching the tray's gesture again.
+ * The drift used to move the field as a whole, by one vertical offset the layout had to reserve. It now moves
+ * each footprint inside its zone's own slack — see `group-motion.ts` — so the range is set by the grid rather
+ * than by the screen, which is what makes the gust visible on a tight battle layout.
  */
-export function useVarietyOffset(beat: Beat, ctx: OffsetContext): FieldOffset {
+export function useGroupMotion(beat: Beat, ctx: MotionContext): GroupMotion {
   const drift = useDriftOffset(
     ctx.driftAmplitude,
     varietyData<DriftData>(beat, DRIFT_VARIETY.id),
@@ -183,18 +200,45 @@ export function useVarietyOffset(beat: Beat, ctx: OffsetContext): FieldOffset {
     ctx.paused,
   );
 
-  // Listed explicitly rather than mapped over the registry, because each hook has its own signature and its
-  // own data type — and because a loop over hooks is exactly the thing React's rules forbid. One line per
-  // variety that moves the field is a small, honest price.
-  const contributions = useMemo(() => [drift.offsetY], [drift.offsetY]);
+  const rooms = useMemo(
+    () => motionRoomsFor(ctx.grid, beat.groups, ctx.pitch, ctx.driftAmplitude),
+    [ctx.grid, beat.groups, ctx.pitch, ctx.driftAmplitude],
+  );
+  const spin = useSpinAngle(beat, ctx.reduceMotion);
 
-  const dy = useDerivedValue(() => {
-    let total = 0;
-    for (const value of contributions) total += value.value;
-    return total;
+  return useDerivedValue(() => {
+    const out = groupMotionAt(drift.phase.value, drift.live.value, rooms, spin.index < 0);
+    if (spin.index >= 0) out[spin.index * MOTION_STRIDE + 2] = spin.angle.value;
+    return out;
   });
-
-  const dx = useDerivedValue(() => 0);
-
-  return { dx, dy };
 }
+
+/**
+ * The spinning footprint's angle, tweened, and which footprint it belongs to.
+ *
+ * Shared by `useGroupMotion` and any host that drives the motion from its own clock, so the two cannot disagree
+ * about how a turn looks. Three quarter turns go the short way round, and a new beat starts square rather than
+ * unwinding the last one's turn.
+ */
+export function useSpinAngle(beat: Beat, reduceMotion: boolean): { index: number; angle: Readonly<SharedValue<number>> } {
+  const data = varietyData<SpinData>(beat, SPIN_VARIETY.id);
+  const index = data?.groupId ? beat.groups.findIndex((group) => group.id === data.groupId) : -1;
+  const facing = data?.facing ?? 0;
+  const target = facing === 3 ? -Math.PI / 2 : (facing * Math.PI) / 2;
+  const angle = useSharedValue(0);
+
+  useEffect(() => {
+    angle.value = 0;
+  }, [angle, beat.index]);
+
+  useEffect(() => {
+    angle.value = reduceMotion
+      ? target
+      : withTiming(target, { duration: SPIN_TURN_MS, easing: Easing.out(Easing.cubic) });
+  }, [angle, target, reduceMotion]);
+
+  return { index, angle };
+}
+
+/** How long a turn takes to play, milliseconds. Quick enough to read as a snap, slow enough to be seen. */
+export const SPIN_TURN_MS = 220;
