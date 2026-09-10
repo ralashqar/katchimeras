@@ -2,6 +2,13 @@ import { getStoredRaw, removeStoredValue, setStoredRaw } from '@/utils/app-stora
 import type { StreakSnapshot } from '@/types/streak';
 
 const NOTIFICATION_ID_KEY = 'katchimera.streak.notification-id.v1';
+/**
+ * The streak story and its Today capture surface are not reachable from the
+ * Haven home, and this reminder deep-links to `/today`. Now that the first
+ * session asks for notification permission, keep it off until Today returns
+ * as a player-facing route; syncing still clears anything scheduled earlier.
+ */
+export const STREAK_REMINDER_ENABLED = false;
 let notificationsModule: typeof import('expo-notifications') | null | undefined;
 
 export async function syncStreakReminder(snapshot: StreakSnapshot, reminderHour = 20): Promise<void> {
@@ -12,6 +19,7 @@ export async function syncStreakReminder(snapshot: StreakSnapshot, reminderHour 
     await Notifications.cancelScheduledNotificationAsync(existingId).catch(() => {});
     removeStoredValue(NOTIFICATION_ID_KEY);
   }
+  if (!STREAK_REMINDER_ENABLED) return;
   if (snapshot.todayState === 'captured' || snapshot.todayState === 'repaired') return;
   const permission = await Notifications.getPermissionsAsync().catch(() => null);
   if (!permission?.granted) return;

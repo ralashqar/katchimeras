@@ -4,7 +4,7 @@ import test from 'node:test';
 import type { StoredHomeDayRecord, StoredHomeState } from '../types/home';
 import type { OnboardingProfile } from '../utils/onboarding-state';
 import { resolveHatchNotificationPlan } from '../utils/hatch-notification-plan';
-import { nextMossproutJourneyReminderDate } from '../utils/mossprout-journey-notification-plan';
+import { companionReturnNotificationContent, nextMossproutJourneyReminderDate } from '../utils/mossprout-journey-notification-plan';
 
 test('Mossprout Journey reminder targets the next local morning', () => {
   const target = nextMossproutJourneyReminderDate('2026-08-23');
@@ -14,6 +14,20 @@ test('Mossprout Journey reminder targets the next local morning', () => {
   assert.equal(target.getDate(), 24);
   assert.equal(target.getHours(), 9);
   assert.equal(target.getMinutes(), 0);
+});
+
+test('return reminders speak in the companion’s voice about the player’s world', () => {
+  const first = companionReturnNotificationContent({ familyId: 'mossprout', firstReturn: true, seedName: 'Seed of Curiosity' });
+  assert.equal(first.title, 'Mossprout is awake');
+  assert.equal(first.body, 'Your Seed of Curiosity opened while you were away. Come and see.');
+  const unnamed = companionReturnNotificationContent({ familyId: 'mossprout', firstReturn: true, seedName: '  ' });
+  assert.equal(unnamed.body, 'Something grew while you were away. Come and see.');
+  const later = companionReturnNotificationContent({ familyId: 'mossprout', firstReturn: false, seedName: 'Seed of Curiosity' });
+  assert.doesNotMatch(later.body, /Seed of/);
+  for (const content of [first, later, companionReturnNotificationContent({ familyId: 'steppling', firstReturn: true }), companionReturnNotificationContent({ familyId: 'steppling', firstReturn: false })]) {
+    assert.doesNotMatch(`${content.title} ${content.body}`, /chapter moment|Glow|Bond|\d/, 'no system vocabulary or numbers in a push');
+    assert.ok(content.body.length <= 90, 'fits a lock-screen line');
+  }
 });
 
 function day(

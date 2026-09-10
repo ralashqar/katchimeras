@@ -10,9 +10,9 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ScriptedActionList } from '@/components/katchadeck/onboarding/scripted-action-list';
 import { EggActionDock, EggQuestionPanel } from '@/components/katchadeck/home/today-nurture-experience';
 import { eggQuestionAction } from '@/features/onboarding/egg-question-action';
-import { STEPPLING_EGG_GUIDES, STEPPLING_INTENT_OPTIONS, STEPPLING_MOVEMENT_OPTIONS, STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, stepplingEggReady, stepplingStepFeedOffer, type StepplingEggProgress } from '@/features/onboarding/steppling-egg-policy';
+import { STEPPLING_EGG_GUIDES, STEPPLING_INTENT_OPTIONS, STEPPLING_MOVEMENT_OPTIONS, STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, STEPPLING_STEP_ACCESS_OPTIONS, stepplingEggReady, stepplingStepFeedOffer, type StepplingEggProgress } from '@/features/onboarding/steppling-egg-policy';
 import type { useStepplingEncounter } from '@/features/onboarding/use-steppling-encounter';
-import type { FtueChoiceOption } from '@/features/onboarding/ftue-types';
+import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
 
 const movementChoices = (options: readonly { id: string; label: string }[]): FtueChoiceOption[] => options.map((option) => ({
   ...option, icon: option.id === 'rest' || option.id === 'own-pace' ? 'heart.fill' : 'figure.walk',
@@ -20,6 +20,12 @@ const movementChoices = (options: readonly { id: string; label: string }[]): Ftu
 }));
 const INTENT_CHOICES = movementChoices(STEPPLING_INTENT_OPTIONS);
 const MOVEMENT_CHOICES = movementChoices(STEPPLING_MOVEMENT_OPTIONS);
+const STEP_ACCESS_ACTIONS: readonly FtueActionDefinition[] = [
+  { ...STEPPLING_STEP_ACCESS_OPTIONS.allow, icon: 'figure.walk', presentation: 'cta_action', handlerId: 'pedometer_steps' },
+  { ...STEPPLING_STEP_ACCESS_OPTIONS.decline, icon: 'heart.fill', presentation: 'cta_action', handlerId: 'acknowledgement' },
+];
+/** Motion access as the Egg sees it. 'should_request' waits for the spoken ask before any system prompt. */
+type StepAccess = 'unknown' | 'should_request' | 'available' | 'denied' | 'unsupported';
 
 export function StepplingEncounterPanel({ encounter, egg, cameraReady, onReady }: {
   encounter: ReturnType<typeof useStepplingEncounter>;
@@ -34,6 +40,11 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady, onReady }
   const gesture = useMemo(() => Gesture.Pan().enabled(false), []);
   const [steps, setSteps] = useState<number | null>(null);
   const [reading, setReading] = useState(true);
+  const [access, setAccess] = useState<StepAccess>('unknown');
+  const [requesting, setRequesting] = useState(false);
+  // A declined ask (or a refused system prompt) falls through to the movement
+  // question for this visit; the OS decision is re-read on the next one.
+  const declinedRef = useRef(false);
   // Camera readiness gates the entrance, not the lifetime of an answering card.
   // A settled notification / app resume must not tear down its native animation.
   const [hasEntered, setHasEntered] = useState(cameraReady);
@@ -47,14 +58,23 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady, onReady }
     setReading(true);
     try {
       const { Pedometer } = await import('expo-sensors');
+      if (!(await Pedometer.isAvailableAsync())) throw new Error('unavailable');
       const permission = await Pedometer.getPermissionsAsync();
-      if (!permission.granted || !(await Pedometer.isAvailableAsync())) throw new Error('unavailable');
+      if (revision !== readRevision.current) return;
+      if (!permission.granted) {
+        if (permission.canAskAgain === false || declinedRef.current) { setAccess('denied'); setSteps(0); }
+        // Keep the count unknown: the movement fallback waits for the spoken ask.
+        else setAccess('should_request');
+        return;
+      }
+      setAccess('available');
       const [year, month, day] = sourceDayId.split('-').map(Number);
       const result = await Pedometer.getStepCountAsync(new Date(year, month - 1, day), new Date(year, month - 1, day + 1));
       if (revision !== readRevision.current) return;
       setSteps(Number.isFinite(result.steps) ? Math.max(0, Math.floor(result.steps)) : 0);
     } catch {
       if (revision !== readRevision.current) return;
+      setAccess('unsupported');
       setSteps(0);
     } finally { if (revision === readRevision.current) setReading(false); }
   }, [sourceDayId]);
@@ -63,6 +83,23 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady, onReady }
     const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') void readSteps(); });
     return () => { readRevision.current += 1; subscription.remove(); };
   }, [readSteps]);
+  const allowSteps = useCallback(async () => {
+    if (requesting) return;
+    setRequesting(true);
+    try {
+      const { Pedometer } = await import('expo-sensors');
+      const granted = (await Pedometer.requestPermissionsAsync()).granted;
+      if (!granted) declinedRef.current = true;
+    } catch {
+      declinedRef.current = true;
+    } finally { setRequesting(false); }
+    await readSteps();
+  }, [readSteps, requesting]);
+  const declineSteps = useCallback(() => {
+    declinedRef.current = true;
+    setAccess('denied');
+    setSteps(0);
+  }, []);
 
   if (!hasEntered && !cameraReady) return null;
   // Freeze *all* inputs selecting the current card, not just the saved Egg.
@@ -71,6 +108,7 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady, onReady }
   const ready = stepplingEggReady(egg);
   const stepOffer = stepplingStepFeedOffer(egg, displayedSteps ?? 0);
   const movementFallback = displayedSteps != null && stepOffer.steps === 0;
+  const askForSteps = Boolean(egg?.intent) && !ready && access === 'should_request' && displayedSteps == null;
   const question = egg && (!egg.intent || movementFallback && !ready) ? eggQuestionAction(
     !egg.intent ? 'egg.steppling.intent' : 'egg.steppling.movement',
     !egg.intent ? 'What would you like more of?' : 'What movement suits you today?',
@@ -81,6 +119,7 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady, onReady }
   if ((encounter.hatching || egg?.hatchedAt) && !encounter.error) return null;
   const guide = !egg?.intent ? STEPPLING_EGG_GUIDES.intent
     : ready ? STEPPLING_EGG_GUIDES.ready
+      : askForSteps ? STEPPLING_EGG_GUIDES.permission
       : question ? STEPPLING_EGG_GUIDES.movement
         : stepOffer.steps > 0 ? STEPPLING_EGG_GUIDES.steps : STEPPLING_EGG_GUIDES.reading;
   return <>
@@ -91,6 +130,10 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady, onReady }
       {encounter.hatching ? <KatchaButton label="Try again" disabled={encounter.busy} onPress={() => void encounter.finish()} /> : null}
     </GameSurface> : null}
     {!egg ? <KatchaButton label="Try again" onPress={() => void encounter.enter()} disabled={encounter.busy} />
+      : askForSteps ? <ScriptedActionList actions={STEP_ACCESS_ACTIONS} locked={encounter.busy || requesting || !cameraReady} onAction={(action) => {
+        if (action.id === STEPPLING_STEP_ACCESS_OPTIONS.allow.id) void allowSteps();
+        else declineSteps();
+      }} />
       : question ? <EggQuestionPanel
         key={question.id} action={question}
         completionEvent={encounter.feedCompletionKey ? { action: question, id: encounter.feedCompletionKey } : null}

@@ -21,6 +21,7 @@
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Katchimeras can remember meaningful places even when the app is not open, so travel days can become landmarks in your world.",
         "NSLocationAlwaysUsageDescription": "Katchimeras can remember meaningful places even when the app is not open, so travel days can become landmarks in your world.",
         "NSHealthShareUsageDescription": "Katchimeras can read your workout routes from Apple Health when you choose to import a walk into a memory map.",
+        "NSMotionUsageDescription": "Katchimeras counts your steps on your phone so a walk can wake an Egg and settle a resting companion. Steps never leave your device.",
         "NSSpeechRecognitionUsageDescription": "Katchimeras transcribes your voice notes on your device so you can keep a written copy of the moment — the audio never leaves your phone."
       },
       "entitlements": {
@@ -33,7 +34,8 @@
       "package": "com.daruk.katchimeras",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "ACTIVITY_RECOGNITION"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

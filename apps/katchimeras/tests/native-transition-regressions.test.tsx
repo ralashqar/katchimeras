@@ -156,6 +156,58 @@ test('Steppling retains the answering card across camera unsettles and changed s
   await act(async () => { tree!.unmount(); });
 });
 
+test('Steppling asks for step access in voice before any Motion prompt; allow reads steps, decline falls back to movement', async () => {
+  for (const allow of [true, false]) {
+    let requests = 0; let granted = false;
+    const Question = host('Question');
+    const List = host('List');
+    const Guide = host('Guide');
+    const clock = nativeMotionHarness();
+    const module = loadNativeModule('components/katchadeck/world/steppling-encounter-panel.tsx', {
+      'react-native': { ...nativeViews, AppState: { addEventListener: () => ({ remove() {} }) } },
+      'react-native-reanimated': clock.animated,
+      'react-native-gesture-handler': { Gesture: { Pan: () => ({ enabled: () => ({}) }) } },
+      'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: 0, top: 0 }) },
+      'expo-sensors': { Pedometer: {
+        getPermissionsAsync: async () => ({ granted, canAskAgain: true }),
+        requestPermissionsAsync: async () => { requests++; granted = true; return { granted: true }; },
+        isAvailableAsync: async () => true, getStepCountAsync: async () => ({ steps: 1200 }),
+      } },
+      '@/components/themed-text': { ThemedText: host('Text') },
+      '@/components/katchadeck/ui/game-surface': { GameSurface: host('Surface') },
+      '@/components/katchadeck/ui/katcha-button': { KatchaButton: host('Button') },
+      '@/components/katchadeck/onboarding/scripted-action-list': { ScriptedActionList: List },
+      '@/components/katchadeck/onboarding/ftue-guide-copy': { EggHeroGuide: Guide },
+      '@/components/katchadeck/home/today-nurture-experience': { EggActionDock: host('Dock'), EggQuestionPanel: Question },
+      '@/features/onboarding/egg-question-action': { eggQuestionAction },
+      '@/features/onboarding/steppling-egg-policy': stepplingPolicy,
+    });
+    const Panel = module.StepplingEncounterPanel as React.ComponentType<Record<string, unknown>>;
+    const egg = { sourceDayId: '2026-09-03', intent: 'breaks', fedSteps: 0, alternative: null, hatchStartedAt: null, hatchedAt: null };
+    const encounter = { busy: false, feed: () => {}, finishFeedPanel() {} };
+    let tree: ReactTestRenderer;
+    await act(async () => { tree = create(<Panel encounter={encounter} egg={egg} cameraReady />); });
+    assert.equal(tree!.root.findAllByType(Question).length, 0, 'the movement fallback waits for the spoken ask');
+    assert.equal(tree!.root.findByType(Guide).props.guide, stepplingPolicy.STEPPLING_EGG_GUIDES.permission);
+    const list = tree!.root.findByType(List);
+    // Sandbox arrays carry another realm's prototype; compare by value.
+    assert.equal(list.props.actions.map((action: { id: string }) => action.id).join(','), `${stepplingPolicy.STEPPLING_STEP_ACCESS_OPTIONS.allow.id},${stepplingPolicy.STEPPLING_STEP_ACCESS_OPTIONS.decline.id}`);
+    assert.equal(requests, 0, 'no system prompt until the player answers');
+    const chosen = list.props.actions[allow ? 0 : 1];
+    await act(async () => { list.props.onAction(chosen, {}); });
+    if (allow) {
+      assert.equal(requests, 1);
+      assert.equal(tree!.root.findByType(List).props.stepCount, 1200, 'granted access reads yesterday’s steps');
+      assert.equal(tree!.root.findByType(Guide).props.guide, stepplingPolicy.STEPPLING_EGG_GUIDES.steps);
+    } else {
+      assert.equal(requests, 0);
+      assert.equal(tree!.root.findByType(Question).props.action.id, 'egg.steppling.movement', 'declining offers the movement question');
+      assert.equal(tree!.root.findByType(Guide).props.guide, stepplingPolicy.STEPPLING_EGG_GUIDES.movement);
+    }
+    await act(async () => { tree!.unmount(); });
+  }
+});
+
 test('world image crossfades both images but preserves the painted native view at promotion', async () => {
   const clock = nativeMotionHarness();
   const module = loadNativeModule(seamlessPath, {

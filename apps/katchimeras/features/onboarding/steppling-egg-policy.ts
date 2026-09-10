@@ -5,10 +5,16 @@ export const STEPPLING_EGG_GUIDES = {
   intent: { eyebrow: 'A new little friend', title: 'This one stirs at the thought of adventure.', body: '' },
   reading: { eyebrow: 'A little wobble', title: 'Did it move when you did?', body: '' },
   steps: { eyebrow: 'Yesterday’s steps', title: 'Looks like your steps help wake it up.', body: '' },
+  permission: { eyebrow: 'Yesterday’s steps', title: 'It stirs when you move. May it count your steps?', body: '' },
   movement: { eyebrow: 'Your own rhythm', title: 'There’s more than one way to move it.', body: '' },
   ready: { eyebrow: 'Ready to meet you', title: 'Those little moments woke someone up.', body: '' },
 } as const;
 
+/** Spoken before the system Motion prompt; both answers keep the Egg hatchable. */
+export const STEPPLING_STEP_ACCESS_OPTIONS = {
+  allow: { id: 'egg.steppling.allow_steps', title: 'Count my steps', description: 'Steps stay on your phone. They only wake the Egg.' },
+  decline: { id: 'egg.steppling.decline_steps', title: 'Not today', description: 'Steppling will ask what moved you instead.' },
+} as const;
 export const STEPPLING_EGG_TARGET = 500;
 export const STEPPLING_STEPS_PER_BOND = 300;
 const safeSteps = (steps: number) => Number.isFinite(steps) ? Math.max(0, Math.floor(steps)) : 0;

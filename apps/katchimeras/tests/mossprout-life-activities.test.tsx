@@ -496,9 +496,11 @@ test('Rest follows two Continue beats; failed saves retry the final action witho
   const copy = await import('../features/onboarding/mossprout-ftue-copy');
   const { ftueDialoguePages } = await import('../features/onboarding/ftue-dialogue-pages');
   const module = loadNativeModule('components/katchadeck/world/mossprout-ftue-rest-action.tsx', {
+    'react-native': nativeViews,
     './conversation-narrative-overlay': { ConversationNarrativeOverlay: 'Overlay' },
     '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
     '@/features/onboarding/mossprout-ftue-copy': copy,
+    '@/utils/companion-notification-permission': { getCompanionNotificationAccess: async () => 'granted', requestCompanionNotificationAccess: async () => true },
   });
   const Rest = module.MossproutFtueRestAction as React.ComponentType<{ onNarration: (text: string | null) => void; onRest: () => Promise<void> }>;
   let narration: string | null = null; let saves = 0; let fail = true;
@@ -517,6 +519,62 @@ test('Rest follows two Continue beats; failed saves retry the final action witho
   await act(async () => tree!.root.findByProps({ label: 'Try again' }).props.onPress());
   assert.equal(saves, 2);
   await act(async () => tree!.unmount());
+});
+
+test('Rest asks in Mossprout’s voice before the system notification prompt; either answer begins the rest', async () => {
+  const copy = await import('../features/onboarding/mossprout-ftue-copy');
+  const { ftueDialoguePages } = await import('../features/onboarding/ftue-dialogue-pages');
+  const pages = ftueDialoguePages(copy.MOSSPROUT_FTUE_COPY.farewell);
+  for (const allow of [true, false]) {
+    let requests = 0; let saves = 0; let narration: string | null = null;
+    const module = loadNativeModule('components/katchadeck/world/mossprout-ftue-rest-action.tsx', {
+      'react-native': nativeViews,
+      './conversation-narrative-overlay': { ConversationNarrativeOverlay: 'Overlay' },
+      '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
+      '@/features/onboarding/mossprout-ftue-copy': copy,
+      '@/utils/companion-notification-permission': {
+        getCompanionNotificationAccess: async () => 'should_request',
+        requestCompanionNotificationAccess: async () => { requests++; return true; },
+      },
+    });
+    const Rest = module.MossproutFtueRestAction as React.ComponentType<{ onNarration: (text: string | null) => void; onRest: () => Promise<void> }>;
+    let tree!: ReactTestRenderer;
+    await act(async () => { tree = create(<Rest onNarration={(text) => { narration = text; }} onRest={async () => { saves++; }} />); });
+    for (let index = 1; index < pages.length; index++) await act(async () => tree.root.findByProps({ label: 'Continue' }).props.onPress());
+    await act(async () => tree.root.findByProps({ label: copy.MOSSPROUT_FTUE_COPY.restAction }).props.onPress());
+    assert.equal(saves, 0, 'the rest waits for the wake answer');
+    assert.equal(requests, 0, 'no system prompt before Mossprout asks');
+    assert.equal(narration, copy.MOSSPROUT_FTUE_COPY.wakeAsk);
+    const label = allow ? copy.MOSSPROUT_FTUE_COPY.wakeAllow : copy.MOSSPROUT_FTUE_COPY.wakeDecline;
+    await act(async () => tree.root.findByProps({ label }).props.onPress());
+    assert.equal(requests, allow ? 1 : 0);
+    assert.equal(saves, 1, 'both answers begin the same rest');
+    await act(async () => tree.unmount());
+  }
+});
+
+test('a player who already decided on notifications rests without the wake question', async () => {
+  const copy = await import('../features/onboarding/mossprout-ftue-copy');
+  const { ftueDialoguePages } = await import('../features/onboarding/ftue-dialogue-pages');
+  const pages = ftueDialoguePages(copy.MOSSPROUT_FTUE_COPY.farewell);
+  for (const access of ['granted', 'denied', 'unsupported']) {
+    let requests = 0; let saves = 0;
+    const module = loadNativeModule('components/katchadeck/world/mossprout-ftue-rest-action.tsx', {
+      'react-native': nativeViews,
+      './conversation-narrative-overlay': { ConversationNarrativeOverlay: 'Overlay' },
+      '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
+      '@/features/onboarding/mossprout-ftue-copy': copy,
+      '@/utils/companion-notification-permission': { getCompanionNotificationAccess: async () => access, requestCompanionNotificationAccess: async () => { requests++; return true; } },
+    });
+    const Rest = module.MossproutFtueRestAction as React.ComponentType<{ onRest: () => Promise<void> }>;
+    let tree!: ReactTestRenderer;
+    await act(async () => { tree = create(<Rest onRest={async () => { saves++; }} />); });
+    for (let index = 1; index < pages.length; index++) await act(async () => tree.root.findByProps({ label: 'Continue' }).props.onPress());
+    await act(async () => tree.root.findByProps({ label: copy.MOSSPROUT_FTUE_COPY.restAction }).props.onPress());
+    assert.equal(saves, 1, `${access}: rests directly`);
+    assert.equal(requests, 0, `${access}: never re-prompts`);
+    await act(async () => tree.unmount());
+  }
 });
 
 test('hiding header Back removes the button while preserving the currency header', async () => {
@@ -559,9 +617,11 @@ test('Bond teaching can interrupt the narrative and return to the same saved his
   let finished = 0; let exit = false;
   const copy = await import('../features/onboarding/mossprout-ftue-copy');
   const module = loadNativeModule('components/katchadeck/world/mossprout-ftue-rest-action.tsx', {
+    'react-native': nativeViews,
     './conversation-narrative-overlay': { ConversationNarrativeOverlay: ({ children, ...props }: any) => React.createElement('Overlay', props, children((action: () => unknown, closing: boolean) => { exit = closing; return action(); })) },
     '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
     '@/features/onboarding/mossprout-ftue-copy': copy,
+    '@/utils/companion-notification-permission': { getCompanionNotificationAccess: async () => 'granted', requestCompanionNotificationAccess: async () => true },
   });
   const Rest = module.MossproutFtueRestAction as React.ComponentType<any>;
   let tree!: ReactTestRenderer;
