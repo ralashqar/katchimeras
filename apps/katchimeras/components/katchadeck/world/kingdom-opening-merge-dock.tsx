@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60, alignItems: 'center', gap: 10 },
   bar: {
     gap: 5, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 16, overflow: 'visible',
-    backgroundColor: 'rgba(255,255,255,0.82)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF',
     boxShadow: '0 4px 14px rgba(20,40,60,0.16)',
   },
   barHalo: { borderRadius: 16, backgroundColor: 'rgba(143,211,255,0.22)', boxShadow: `0 0 26px ${GLOW_COLOR}` },
