@@ -145,12 +145,8 @@ type Props = {
 };
 
 const GARDEN_BUTTON_ART = require('@incubator/art-world/square/mossprout-garden-button-v1-256.webp');
-/** While the opening keeps Mossprout's tile under mist, the same resting marker the six islands wear says who is there. */
-const MOSSPROUT_SLEEPING_OFFER: WorldUpgradeOffer = {
-  id: 'sleeping:mossprout', target: { kind: 'haven_tile', familyId: 'mossprout' }, visualTarget: { kind: 'haven_tile', familyId: 'mossprout' },
-  name: 'Mossprout', nextName: 'Mossprout', description: 'Someone is resting under the Mist.', nextLevel: 0, cost: 0, action: 'Clear mist',
-  currentLevel: 0, maxLevel: 0, eligible: false, affordable: false, missingGlow: 0, lockedReason: 'Resting under the Mist', sleepingSkinId: 'mossprout', bareMarker: true,
-};
+/** One shared empty list, so the canvas is not handed a fresh prop on every opening render. */
+const NO_UPGRADE_OFFERS: WorldUpgradeOffer[] = [];
 const FIRST_SEED_GARDEN_PLANT_OFFER = {
   accessibilityHint: 'Plants your first Memory Seed in the highlighted Garden patch',
   placement: 'below',
@@ -491,6 +487,10 @@ export function KatchimeraKingdomScreen({
   // The same beat the dock projects: spotlight and finger on the first pairs, the Basket refill, or nothing.
   const openingBoardStep = useMemo(() => openingBoardActive ? openingMistBoardStep(openingStep, mergeWorld, openingProgress) : null, [mergeWorld, openingBoardActive, openingProgress, openingStep]);
   const openingGuidanceVisible = Boolean(openingBoardStep && (openingBoardStep.cue || openingBoardStep.spotlight));
+  // The spotlight and finger wait for the dock to finish fading in, or they point at a board still in motion.
+  const [openingDockSettled, setOpeningDockSettled] = useState(false);
+  useEffect(() => { if (!openingBoardActive) setOpeningDockSettled(false); }, [openingBoardActive]);
+  const markOpeningDockSettled = useCallback(() => setOpeningDockSettled(true), []);
   const setGardenButtonNode = useCallback((node: View | null) => {
     registerFtueTarget('garden-button:mossprout', node);
   }, [registerFtueTarget]);
@@ -1322,10 +1322,8 @@ export function KatchimeraKingdomScreen({
   }, [flushMergeWorld, ftueStepId, glowRun, sharedUpgrade, upgradeCommitted, upgradeError]);
   // Sleeping islands arrive from the offers layer already locked, in wake order.
   const presentedUpgradeOffers = upgradeOffers;
-  const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? [MOSSPROUT_SLEEPING_OFFER]
-    : homeVeilForStep(ftueStepId) === 'veiled'
-      ? [MOSSPROUT_SLEEPING_OFFER, ...visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun)]
-      : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
+  // Alone until the hatch: no markers at all until the islands are drawn.
+  const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
 
   // Mount the camera with its saved framing, rather than initializing the overview first.
   if (!glowReady || !stepplingLesson.ready) return null;
@@ -1371,6 +1369,7 @@ export function KatchimeraKingdomScreen({
         onHomeTileTargetChange={setHomeTileNode}
         homeVeil={homeVeilForStep(ftueStepId)}
         homeSolo={homeSoloForStep(ftueStepId)}
+        openingWeather={homeVeilForStep(ftueStepId) !== 'none'}
         sleepingMarkersInert={Boolean(ftueStepId)}
         onTileUpgradeOfferPress={beginFirstSeedPlanting}
         upgradeOffers={screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingEggOpen && !ordinaryUpgradeRun && !upgradeHandoffPending
@@ -1703,8 +1702,9 @@ export function KatchimeraKingdomScreen({
         step={ftueStep} bottomInset={insets.bottom} onLookCloser={advanceOpening} /> : null}
       {openingBoardActive && ftueStep ? <KingdomOpeningMergeDock
         run={openingRun} step={ftueStep} width={window.width} bottomInset={insets.bottom}
-        impactKey={openingGlow.landed} onGlow={openingGlow.launch} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked} /> : null}
-      {openingGuidanceVisible && ftueCameraSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
+        impactKey={openingGlow.landed} onGlow={openingGlow.launch} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
+        onEntranceSettled={markOpeningDockSettled} /> : null}
+      {openingGuidanceVisible && ftueCameraSettled && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
         <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={openingBoardStep?.cue ?? null} guide={openingBoardStep?.guide ?? null}
           layoutNonce={openingProgress} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={openingBoardStep?.spotlight ?? null} state={mergeWorld} targetRevision={openingProgress} />
       </View> : null}

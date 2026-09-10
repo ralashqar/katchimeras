@@ -38,6 +38,8 @@ type AtmosphereLayerProps = {
   reduceMotionOverride?: boolean;
   renderer?: AtmosphereRenderer;
   settings: AtmosphereSettings;
+  /** Particle field size; defaults to the window. Set it when the layer is mounted inside a smaller frame. */
+  size?: { width: number; height: number };
   style?: ViewStyle;
 };
 
@@ -48,6 +50,7 @@ export const AtmosphereLayer = memo(function AtmosphereLayer({
   reduceMotionOverride = false,
   renderer = 'atlas',
   settings,
+  size,
   style,
 }: AtmosphereLayerProps) {
   const isFocused = useIsFocused();
@@ -85,6 +88,7 @@ export const AtmosphereLayer = memo(function AtmosphereLayer({
         reduceMotion={deviceReduceMotion || reduceMotionOverride}
         renderer={renderer}
         settings={settings}
+        size={size}
       />
     </Animated.View>
   );
@@ -170,6 +174,7 @@ function AtmosphereCanvas({
   reduceMotion,
   renderer,
   settings,
+  size,
 }: {
   active: boolean;
   densityScale: number;
@@ -177,8 +182,11 @@ function AtmosphereCanvas({
   reduceMotion: boolean;
   renderer: AtmosphereRenderer;
   settings: AtmosphereSettings;
+  size?: { width: number; height: number };
 }) {
-  const { height, width } = useWindowDimensions();
+  const window = useWindowDimensions();
+  const width = size?.width ?? window.width;
+  const height = size?.height ?? window.height;
   const elapsed = useSharedValue(0);
   const count = plane === 'foreground'
     ? atmosphereLayerParticleCount(

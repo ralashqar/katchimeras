@@ -46,12 +46,14 @@ import { EggAvatarArtwork, eggAvatarBodyPresentationStyle } from '@/components/k
 import type { EggExpressionCue } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
 import { FrozenMergeOrderTrayCard, type MergeOrderTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
 import { PersistentMergeItemArt } from '@/components/katchadeck/games/feastle-persistent-merge-board';
-import { HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade-effects';
+import { HavenAmbientEmbers, HavenUpgradeEffects } from '@/components/katchadeck/world/haven-upgrade-effects';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import type { KingdomHexScene, KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildMossproutHexNeighborhoodScene, mossproutGardenPlantSlotFrame, MOSSPROUT_GARDEN_PLANT_SLOT_IDS, type MossproutGardenSceneState } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
 import { SeamlessWorldImage, worldImageSourceKey } from '@/components/katchadeck/world/seamless-world-image';
+import { AtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
+import { OPENING_RAIN, OPENING_TILE_EMBERS } from '@/features/onboarding/opening-mist';
 import { CreatureAnimatedArt } from '@/components/katchadeck/world/creature-animated-art';
 import { CompanionStepsValue } from '@/components/katchadeck/world/companion-steps-value';
 import { worldEggReadyEffectsVisible, type WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
@@ -193,6 +195,8 @@ type Props = {
   homeVeil?: HomeVeilState;
   /** Draw Mossprout's tile alone (the opening's first beat). */
   homeSolo?: boolean;
+  /** The opening's weather: rain over the veiled world and sparkles on the veiled tile, thinning away with the lift. */
+  openingWeather?: boolean;
   /** Opening: resting friends are shown but cannot be opened yet. */
   sleepingMarkersInert?: boolean;
   /** Screen-space FTUE target for the home tile (wisp destination, spotlight). */
@@ -502,6 +506,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   discoveredEggTargetRef,
   homeVeil = 'none',
   homeSolo = false,
+  openingWeather = false,
   sleepingMarkersInert = false,
   onHomeTileTargetChange,
 }: Props) {
@@ -533,6 +538,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     homeVeilProgress.value = 0;
     veilLiftNonceRef.current = upgradePresentation?.nonce ?? null;
   }, [homeVeilProgress, revealingVeiledHome, upgradePresentation?.nonce]);
+  // The opening's rain and sparkles thin away on the same clock as the mist.
+  const openingWeatherStyle = useAnimatedStyle(() => ({ opacity: 1 - homeVeilProgress.value }));
   const [paintedTransitionKeys, setPaintedTransitionKeys] = useState<Record<string, string | null>>({});
   const [settledDiscoveryFamily, setSettledDiscoveryFamily] = useState<string | null>(null);
   const [settlingUpgrade, setSettlingUpgrade] = useState<{
@@ -603,8 +610,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const fromReveals = upgradePresentation.natureIslandReveal && upgradePresentation.natureIslandId
       ? { ...mossproutNatureIslandReveals, [upgradePresentation.natureIslandId]: false }
       : mossproutNatureIslandReveals;
-    return buildMossproutHexNeighborhoodScene(fromSlots, fromNatureLevels, fromGarden, fromReveals);
-  }, [committedScene, companionSlots, focusedMossproutWorld, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, upgradePresentation]);
+    // The opening's lift keeps the veiled, solo world: the from-scene must not
+    // bring the Garden and the islands in for the length of the crossblend.
+    return buildMossproutHexNeighborhoodScene(fromSlots, fromNatureLevels, fromGarden, fromReveals, { homeVeiled: homeVeil === 'veiled' || homeVeil === 'lifting', homeSolo });
+  }, [committedScene, companionSlots, focusedMossproutWorld, homeSolo, homeVeil, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, upgradePresentation]);
   const scene = upgradePresentation
     ? upgradeFromScene
     : storySceneGuard?.scene ?? committedScene;
@@ -630,6 +639,11 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     ],
     [focusedMossproutWorld, scene.tileArtLayers, scene.tiles]
   );
+  // Layers that join the scene after mount (the Garden and the islands after
+  // the hatch) fade in instead of snapping; the mount set itself paints at once.
+  const mountedLayerIdsRef = useRef<Set<string> | null>(null);
+  if (mountedLayerIdsRef.current === null) mountedLayerIdsRef.current = new Set(scene.tileArtLayers.map((layer) => layer.id));
+  const layerJoinedLater = useCallback((id: string) => Boolean(mountedLayerIdsRef.current && !mountedLayerIdsRef.current.has(id)), []);
   const upgradeLayers = useMemo(() => {
     if (!upgradePresentation) return null;
     if (focusedMossproutWorld && upgradePresentation.veilLift && mossproutNatureIslandLevels) {
@@ -1649,8 +1663,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               // Keep the already-painted old tile until the transition's old
               // copy has displayed. Hide it BEFORE blending, otherwise wider
               // mist edges remain opaque beneath the outgoing transition.
+              const joinedLater = layerJoinedLater(layer.id);
               return (
                 <Fragment key={`tile-stack-${layer.id}`}>
+                  <Animated.View entering={joinedLater ? FadeIn.duration(reduceMotion ? 120 : 720) : undefined} pointerEvents="box-none" style={StyleSheet.absoluteFill}>
                   <KingdomTileArt
                     hidden={transitionHasPainted}
                     focusAnchorX={scene.tileById.get(layer.id)?.cx ?? layer.frame.left + layer.frame.width / 2}
@@ -1668,6 +1684,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                         : undefined}
                     priority={layer.id === scene.centerTile.id || layer.id === 'structure:mossprout-hex-garden' ? 'high' : 'normal'}
                   />
+                  </Animated.View>
+                  {layer.id === scene.centerTile.id && openingWeather ? (
+                    <Animated.View pointerEvents="none" style={[styles.tileWeather, layer.frame, openingWeatherStyle]}>
+                      <HavenAmbientEmbers area={{ left: 0, top: 0, width: layer.frame.width, height: layer.frame.height }}
+                        intensity={OPENING_TILE_EMBERS.intensity} palette={OPENING_TILE_EMBERS.palette} reducedMotion={reduceMotion} />
+                    </Animated.View>
+                  ) : null}
                   {transitionLayers ? (
                     <HavenUpgradeTileArt
                       key={`upgrade:${upgradeOwnsLayer ? upgradePresentation?.nonce : settlingUpgrade?.nonce}`}
@@ -1807,6 +1830,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           }) : null}
         </View>
       </GestureDetector>
+      {openingWeather ? <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.openingRain, openingWeatherStyle]}>
+        <AtmosphereLayer plane="foreground" settings={OPENING_RAIN} />
+      </Animated.View> : null}
       {revealedEggProjection && homeVeil !== 'veiled' ? (
         <RevealedCompanionEgg
           cameraScale={camera.scaleValue}
@@ -3192,6 +3218,8 @@ const ResidentStatusGlyph = memo(function ResidentStatusGlyph({ status }: { stat
 
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden' },
+  openingRain: { zIndex: 40 },
+  tileWeather: { position: 'absolute', overflow: 'visible' },
   residentMeditationAura: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,220,125,0.16)',

@@ -27,7 +27,7 @@ import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-a
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { KingdomCreature } from '@/types/kingdom';
 import { loadCompanionBondState } from '@/utils/companion-bond-storage';
-import { todayAtmosphereBackgroundForDay, type TodayAtmosphereBackground } from '@/utils/day-background-scene';
+import { todayAtmosphereBackgroundForDay, todayAtmosphereBackgroundForScene, type TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests, questFor } from '@/utils/katchimera-quests';
 import { applyWardrobeToKingdom } from '@/utils/katchimera-wardrobe';
@@ -42,7 +42,7 @@ import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { MergeWorldProvider, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
 import { advanceFtueActionDurably, commitFtueAction, ftueWispForRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
-import { isMossproutOpeningStep } from '@/features/onboarding/opening-mist';
+import { homeSoloForStep, isMossproutOpeningStep, OPENING_SKY_SCENE_ID } from '@/features/onboarding/opening-mist';
 import { installMossproutOnboardingMergeWorld } from '@/utils/merge-world/repository';
 import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
@@ -315,9 +315,11 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
   );
   const selectorSlots = discoveryCompanionSlots;
   const today = useMemo(() => days.find((day) => day.isToday) ?? null, [days]);
+  // The opening plays under a twilight sky until the hatch; the day's own sky returns with the world.
+  const openingSky = ftueRun?.status === 'active' && homeSoloForStep(ftueRun.stepId);
   const background = useMemo(
-    () => todayAtmosphereBackgroundForDay(today, days),
-    [days, today],
+    () => openingSky ? todayAtmosphereBackgroundForScene(OPENING_SKY_SCENE_ID) : todayAtmosphereBackgroundForDay(today, days),
+    [days, openingSky, today],
   );
   const statusByCreatureId = useMemo(() => {
     const statuses: Partial<Record<string, KingdomResidentStatusGlyph>> = {};

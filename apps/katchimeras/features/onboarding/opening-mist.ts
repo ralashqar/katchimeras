@@ -1,5 +1,7 @@
 import type { FtueRunState, FtueStepDefinition, FtueTarget } from './ftue-types';
 import type { MergeWorldState } from '@/types/merge-world';
+import type { AtmosphereSettings } from '@/utils/atmosphere';
+import type { DayBackgroundSceneId } from '@/types/home';
 
 /**
  * The mist-veiled opening: every tile under mist, a docked board under
@@ -22,10 +24,23 @@ export const OPENING_GUIDED_MERGES = 2;
  * The opening camera: Mossprout's veiled tile close, its resting marker
  * sitting just above the "Clear the Mist" bar, the board beneath.
  */
-export const OPENING_CAMERA_ZOOM = 1.15;
-export const OPENING_CAMERA_ANCHOR_Y = 0.38;
+export const OPENING_CAMERA_ZOOM = 0.81;
+export const OPENING_CAMERA_ANCHOR_Y = 0.36;
 /** The first beat starts a little further out and glides in while the captions run. */
-export const OPENING_CAMERA_ENTRY_ZOOM = 0.92;
+export const OPENING_CAMERA_ENTRY_ZOOM = 0.67;
+
+/** The opening's sky: twilight, until the hatch. */
+export const OPENING_SKY_SCENE_ID: DayBackgroundSceneId = 'twilight_reflective';
+/** Rain over the veiled world; it thins away with the lift. */
+export const OPENING_RAIN: AtmosphereSettings = { intensity: 0.55, paused: false, preset: 'rain', quality: 'auto', seed: 11, wind: 0.18 };
+/**
+ * The reveal's own rising embers, looping quietly over the veiled tile in the
+ * mist's colours: pale sky, blue glow, lavender. `intensity` is peak opacity.
+ */
+export const OPENING_TILE_EMBERS = {
+  intensity: 0.75,
+  palette: { accent: '#EAF8FF', glow: '#9FD8FF', mist: 'rgba(214,229,238,0.92)', primary: '#CDB8FF' },
+} as const;
 export const OPENING_CAMERA_ENTRY_MS = 4_800;
 
 /** The 5×4 window of the canonical 7×9 board: columns 1–5, rows 2–5. */
@@ -51,9 +66,13 @@ export function isMossproutOpeningStep(stepId: string | null | undefined): boole
   return MOSSPROUT_OPENING_STEP_IDS.includes(stepId ?? '');
 }
 
-/** The first beat shows Mossprout's tile alone; the rest of the world waits for the board. */
+/**
+ * Mossprout's tile stands alone until the Egg has hatched: the mist beats, the
+ * Egg intro and the Egg's questions. The sleeping islands are met afterwards.
+ */
 export function homeSoloForStep(stepId: string | null | undefined): boolean {
-  return stepId === OPENING_MIST_OPEN_STEP_ID;
+  if (!stepId) return false;
+  return isMossproutOpeningStep(stepId) || stepId === 'world.egg_intro' || stepId.startsWith('egg.');
 }
 
 /** Merges counted so far toward the bar, clamped to the requirement. */

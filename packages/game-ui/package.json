@@ -10,7 +10,8 @@
     "./reward-token-flight": "./src/reward-token-flight.tsx",
     "./narrative-panel": "./src/narrative-panel.tsx",
     "./developer-profile-panel": "./src/developer-profile-panel.tsx",
-    "./speech-tooltip": "./src/speech-tooltip.tsx"
+    "./speech-tooltip": "./src/speech-tooltip.tsx",
+    "./stacked-alpha-video": "./src/stacked-alpha-video.tsx"
   },
   "files": [
     "src"
@@ -20,6 +21,8 @@
     "react-native": "0.81.5",
     "expo-image": "~3.0.11",
     "expo-linear-gradient": "~15.0.8",
-    "react-native-reanimated": "~4.1.1"
+    "react-native-reanimated": "~4.1.1",
+    "@shopify/react-native-skia": "2.3.14",
+    "expo-asset": "*"
   }
 }

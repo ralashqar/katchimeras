@@ -112,8 +112,8 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
   assert.equal(home(veiled).residentSource, undefined, 'nobody stands on the veiled tile');
   assert.ok(home(baseline).residentSource, 'unveiled, Mossprout stands on the tile as before');
   assert.ok(home(baseline).depth < garden(baseline).depth, 'unveiled, the Garden sits above the tile as before');
-  const solo = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeVeiled: true, homeSolo: true }) as KingdomHexScene;
-  assert.equal(solo.tileArtLayers.map((layer) => layer.id).join(','), home(baseline).id, 'the first beat draws Mossprout’s tile alone');
+  const solo = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeSolo: true }) as KingdomHexScene;
+  assert.equal(solo.tileArtLayers.map((layer) => layer.id).join(','), home(baseline).id, 'until the hatch Mossprout’s tile stands alone: no Garden, no neighbours, even unveiled');
   assert.equal(solo.width, baseline.width); assert.equal(solo.height, baseline.height);
   assert.deepEqual(home(solo).frame, home(baseline).frame, 'alone, the tile still sits where the world will grow around it');
   for (const island of MOSSPROUT_NATURE_ISLANDS) {

@@ -10,6 +10,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -274,6 +275,70 @@ function RisingParticle({ index, palette, particle }: {
   ]} />;
 }
 
+/**
+ * The reveal's rising embers, looping: the same particle geometry, shapes and
+ * palette colouring as `RisingParticle`, but each ember climbs, fades and
+ * starts again on its own timer, so a veiled tile can glow quietly for as
+ * long as it stays veiled. Half the reveal's count, slower, and scaled by
+ * `intensity`.
+ */
+const AMBIENT_EMBERS = RISING_PARTICLES.filter((_, index) => index % 2 === 0);
+
+function AmbientEmber({ index, intensity, palette, particle, reducedMotion }: {
+  index: number;
+  intensity: number;
+  palette: HavenUpgradeEffectPalette;
+  particle: (typeof RISING_PARTICLES)[number];
+  reducedMotion: boolean;
+}) {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    if (reducedMotion) { progress.value = 0.4; return; }
+    progress.value = 0;
+    progress.value = withDelay(particle.delay * 4, withRepeat(withTiming(1, { duration: particle.duration * 2.4, easing: Easing.inOut(Easing.quad) }), -1, false));
+    return () => cancelAnimation(progress);
+  }, [particle.delay, particle.duration, progress, reducedMotion]);
+  const style = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.16, 0.7, 1], [0, intensity, intensity * 0.72, 0]),
+    transform: [
+      { translateX: interpolate(progress.value, [0, 1], [0, particle.drift]) },
+      { translateY: interpolate(progress.value, [0, 1], [0, -particle.travel * 0.8]) },
+      { rotateZ: `${particle.rotation + interpolate(progress.value, [0, 1], [0, index % 2 ? 70 : -70])}deg` },
+      { scale: interpolate(progress.value, [0, 0.2, 1], [0.4, 1, 0.6]) },
+    ],
+  }));
+  const color = index % 3 === 0 ? palette.accent : index % 3 === 1 ? palette.glow : palette.primary;
+  // No blurred shadow here: these animate for as long as the tile is veiled,
+  // and a shadow on a moving view re-rasterises every frame.
+  return <Animated.View style={[
+    particle.leaf ? styles.ambientLeaf : styles.ambientEmber,
+    {
+      backgroundColor: color,
+      height: particle.leaf ? particle.size * 1.7 : particle.size,
+      left: `${particle.x * 100}%`,
+      top: `${particle.y * 100}%`,
+      width: particle.size,
+    },
+    style,
+  ]} />;
+}
+
+const HavenAmbientEmbers = memo(function HavenAmbientEmbers({ area, intensity = 0.8, palette, reducedMotion }: {
+  area: EffectRect;
+  /** Peak opacity of each ember, 0..1. */
+  intensity?: number;
+  palette: HavenUpgradeEffectPalette;
+  reducedMotion: boolean;
+}) {
+  return (
+    <View accessibilityElementsHidden pointerEvents="none" style={[styles.energyArea, area]}>
+      {AMBIENT_EMBERS.map((particle, index) => (
+        <AmbientEmber index={index} intensity={intensity} key={`ambient:${index}`} palette={palette} particle={particle} reducedMotion={reducedMotion} />
+      ))}
+    </View>
+  );
+});
+
 function RisingArrow({ accent, delay, x }: { accent: string; delay: number; x: number }) {
   const progress = useSharedValue(0);
   useEffect(() => {
@@ -294,6 +359,8 @@ const styles = StyleSheet.create({
   coin: { height: COIN_SIZE, left: 0, position: 'absolute', top: 0, width: COIN_SIZE, zIndex: 5 },
   emberParticle: { borderRadius: 999, boxShadow: '0 0 8px rgba(255,239,153,0.92)', position: 'absolute' },
   energyArea: { overflow: 'visible', position: 'absolute' },
+  ambientEmber: { borderRadius: 999, position: 'absolute' },
+  ambientLeaf: { borderBottomLeftRadius: 8, borderTopRightRadius: 8, position: 'absolute' },
   leafParticle: { borderBottomLeftRadius: 8, borderTopRightRadius: 8, boxShadow: '0 0 7px rgba(184,242,116,0.72)', position: 'absolute' },
   ray: { bottom: 0, opacity: 0.46, overflow: 'hidden', position: 'absolute' },
   reaction: {
@@ -312,5 +379,5 @@ const styles = StyleSheet.create({
   upArrow: { fontFamily: fontFamily, fontSize: 25, fontWeight: '900', position: 'absolute', textAlign: 'center', top: -5, width: 28 },
 });
 
-return { HavenUpgradeEffects };
+return { HavenUpgradeEffects, HavenAmbientEmbers };
 }

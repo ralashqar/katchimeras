@@ -91,8 +91,11 @@ test('the bar reads objective progress and the veil follows the opening steps', 
   assert.equal(homeVeilForStep('world.mist_lift'), 'lifting');
   assert.equal(homeVeilForStep('world.egg_intro'), 'none');
   assert.equal(homeVeilForStep(null), 'none');
-  assert.equal(homeSoloForStep('world.mist_open'), true, 'the first beat shows the tile alone');
-  assert.equal(homeSoloForStep('world.mist_clear'), false);
+  for (const stepId of ['world.mist_open', 'world.mist_clear', 'world.mist_lift', 'world.egg_intro', 'egg.opening', 'egg.context', 'egg.ready']) {
+    assert.equal(homeSoloForStep(stepId), true, `${stepId}: the tile stands alone until the hatch`);
+  }
+  assert.equal(homeSoloForStep('companion.first_meeting'), false, 'the islands are met after the hatch');
+  assert.equal(homeSoloForStep('world.garden_arrival'), false);
   assert.equal(homeSoloForStep(null), false);
 });
 
@@ -151,8 +154,16 @@ test('the docked board dispatches through the FTUE contract: Basket taps spend n
   assert.equal(dispatched.at(-1), 'item_spawned');
 
   const dock = readFileSync('components/katchadeck/world/kingdom-opening-merge-dock.tsx', 'utf8');
-  assert.match(dock, /useFtueMergeDispatch\(\{[\s\S]*?guided: true/);
+  assert.match(dock, /useFtueMergeDispatch\(\{[\s\S]*?guided: true, deferEvent: true/, 'the run advances on the next frame, off the merge animation');
+  assert.doesNotMatch(dock, /boxShadow: `0 0 \d+px \$\{GLOW_COLOR\}`/, 'no blurred shadows on the animating impact views');
+  assert.doesNotMatch(dock, /entering=\{FadeIn/, 'no layout animation on the Glow tokens');
   assert.match(dock, /boardLayout=\{OPENING_BOARD_LAYOUT\}[\s\S]*?railHidden[\s\S]*?counterHidden[\s\S]*?inspectorHidden[\s\S]*?trayEntries=\{\[\]\}/);
+  assert.match(dock, /animateEntrance=\{false\}/, 'one entrance, owned by the dock');
+  assert.match(dock, /onVisualReady=\{markBoardReady\}[\s\S]*?screenMetricsRevision=\{metricsRevision\}/, 'the dock waits for the board and re-measures after settling');
+  assert.match(dock, /if \(!boardReady\) return;\s*entrance\.value = withTiming\(1,/, 'fade and scale up only once the board has painted');
+  assert.match(dock, /awaitingSettledMetricsRef\.current = true;\s*setMetricsRevision\(\(revision\) => revision \+ 1\);/, 'the entrance end asks the board to re-measure');
+  assert.match(dock, /onBoardMetrics\?\.\(metrics\);\s*if \(awaitingSettledMetricsRef\.current\) \{\s*awaitingSettledMetricsRef\.current = false;\s*onEntranceSettledRef\.current\?\.\(\);/, 'guidance is told only once the settled measurement has landed');
+  assert.doesNotMatch(dock, /SlideInDown/, 'no layout-animation entrance that measures mid-flight');
   assert.doesNotMatch(dock, /FtueGuideCopy/, 'guidance comes from the Merge overlay, not a second copy block');
   const surface = readFileSync('components/katchadeck/games/merge-play-surface.tsx', 'utf8');
   assert.match(surface, /\{railHidden \? null : <MergeOrderRail[\s\S]*?\{counterHidden \? null : <ServiceCounter[\s\S]*?<SubscribedMergeBoard[\s\S]*?<MergeCellInspector/);

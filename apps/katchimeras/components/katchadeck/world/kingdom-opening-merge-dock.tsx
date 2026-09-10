@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { StyleSheet, Text, View, type View as ViewType } from 'react-native';
-import Animated, { Easing, FadeIn, SlideInDown, SlideOutDown, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
+import Animated, { Easing, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 
@@ -26,7 +26,9 @@ export const OPENING_GLOW_FLIGHT_MS = 700 + (OPENING_GLOWS_PER_MERGE - 1) * 65;
 /** How long the impact burst lives at the veiled tile. */
 export const OPENING_IMPACT_BURST_MS = 640;
 const GLOW_SIZE = 34;
-const BURST_PARTICLES = 10;
+// Fewer, shadow-free motes: four impacts land per merge, and blurred shadows on
+// animating views re-rasterise every frame.
+const BURST_PARTICLES = 6;
 const GLOW_COLOR = '#8FD3FF';
 
 export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint };
@@ -40,7 +42,7 @@ type OpeningImpact = { id: number; at: RewardFlightPoint };
  * Merges go through the same FTUE dispatch as the dedicated page; each
  * merged item sends a Glow (via `onGlow`) up into the mist.
  */
-export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ run, step, width, bottomInset, impactKey = 0, onGlow, onBoardMetrics, onBlockedInteraction }: {
+export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ run, step, width, bottomInset, impactKey = 0, onGlow, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
   run: FtueRunState | null;
   /** Bumps once per landed Glow; the bar flashes on each. */
   impactKey?: number;
@@ -52,6 +54,8 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   onGlow?: (from: RewardFlightPoint) => void;
   onBoardMetrics?: (metrics: MergeBoardScreenMetrics | null) => void;
   onBlockedInteraction?: () => void;
+  /** Fired once the fade-in has finished and the board has re-measured: the moment guidance may point at it. */
+  onEntranceSettled?: () => void;
 }) {
   const { state } = useMergeWorldState();
   const { dispatch: send } = useMergeWorldActions();
@@ -72,9 +76,18 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   runRef.current = run;
   stepRef.current = boardStep;
   const boardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
+  // Set when the entrance finishes; cleared by the measurement it triggers.
+  // Guidance is told only then, so it never lays out on a mid-entrance frame.
+  const awaitingSettledMetricsRef = useRef(false);
+  const onEntranceSettledRef = useRef(onEntranceSettled);
+  onEntranceSettledRef.current = onEntranceSettled;
   const handleMetrics = useCallback((metrics: MergeBoardScreenMetrics) => {
     boardMetricsRef.current = metrics;
     onBoardMetrics?.(metrics);
+    if (awaitingSettledMetricsRef.current) {
+      awaitingSettledMetricsRef.current = false;
+      onEntranceSettledRef.current?.();
+    }
   }, [onBoardMetrics]);
   useEffect(() => () => onBoardMetrics?.(null), [onBoardMetrics]);
 
@@ -86,7 +99,7 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
     void result;
   }, [onGlow]);
   const dispatch = useFtueMergeDispatch({
-    send, coordinator, sessionId, stateRef, runRef, stepRef, guided: true,
+    send, coordinator, sessionId, stateRef, runRef, stepRef, guided: true, deferEvent: true,
     onBlocked: onBlockedInteraction, onEvent: handleEvent,
   });
 
@@ -106,10 +119,41 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   const gate = useMemo(() => state ? mergeFtueBoardGate(boardStep, state) : { kind: 'locked' as const }, [boardStep, state]);
   const interactionKey = `${run?.runId ?? 'free'}:${boardStep?.id ?? 'open'}`;
 
-  return <Animated.View entering={SlideInDown.duration(420)} exiting={SlideOutDown.duration(360)} pointerEvents="box-none"
-    style={[styles.dock, { paddingBottom: bottomInset + 14 }]}>
+  // Entrance: the dock stays invisible until the board has painted its first
+  // frame, then fades and scales up as one piece, and the board re-measures
+  // itself once the motion has settled so the finger and Glow flights land on
+  // the resting layout rather than a mid-animation one.
+  const reduceMotion = useReducedMotion();
+  const [boardReady, setBoardReady] = useState(false);
+  const [metricsRevision, setMetricsRevision] = useState(0);
+  const entrance = useSharedValue(0);
+  const markBoardReady = useCallback(() => setBoardReady(true), []);
+  const settleMetrics = useCallback(() => {
+    // The board re-measures on the next frame; `handleMetrics` reports settled once that lands.
+    awaitingSettledMetricsRef.current = true;
+    setMetricsRevision((revision) => revision + 1);
+  }, []);
+  useEffect(() => {
+    // The board reports readiness itself; this is only the safety net.
+    const timer = setTimeout(markBoardReady, 700);
+    return () => clearTimeout(timer);
+  }, [markBoardReady]);
+  useEffect(() => {
+    if (!boardReady) return;
+    entrance.value = withTiming(1, { duration: reduceMotion ? 120 : 480, easing: Easing.out(Easing.cubic) }, (finished) => {
+      if (finished) runOnJS(settleMetrics)();
+    });
+  }, [boardReady, entrance, reduceMotion, settleMetrics]);
+  const entranceStyle = useAnimatedStyle(() => ({
+    opacity: entrance.value,
+    transform: [{ translateY: (1 - entrance.value) * 28 }, { scale: 0.94 + entrance.value * 0.06 }],
+  }));
+
+  return <Animated.View exiting={FadeOut.duration(260)} pointerEvents="box-none"
+    style={[styles.dock, { paddingBottom: bottomInset + 14 }, entranceStyle]}>
     <ClearTheMistBar progress={shownProgress} total={OPENING_MERGE_REQUIRED} width={boardWidth} impactKey={impactKey} />
     {state ? <MergePlaySurface
+      animateEntrance={false}
       boardLayout={OPENING_BOARD_LAYOUT}
       railHidden
       counterHidden
@@ -130,7 +174,9 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
       onSelect={setSelectedCell}
       onServe={() => false}
       onUseGrovelight={() => {}}
+      onVisualReady={markBoardReady}
       parcelTargetRef={parcelRef}
+      screenMetricsRevision={metricsRevision}
       selectedCell={selectedCell}
       sessionId={sessionId}
       state={state}
@@ -192,9 +238,9 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
     {flights.map((flight) => <RewardTokenFlight key={flight.id} count={OPENING_GLOWS_PER_MERGE} index={flight.index} tokenSize={GLOW_SIZE}
       from={{ x: flight.from.x - origin.x, y: flight.from.y - origin.y }} to={{ x: flight.to.x - origin.x, y: flight.to.y - origin.y }}
       onArrive={() => onArrive(flight.id)}>
-      <Animated.View entering={FadeIn.duration(120)} style={styles.glow}>
+      <View style={styles.glow}>
         <Image source={GAME_CURRENCY_ART.coins} contentFit="contain" style={styles.glowArt} accessible={false} />
-      </Animated.View>
+      </View>
     </RewardTokenFlight>)}
     {impacts.map((impact) => <ImpactBurst key={impact.id} x={impact.at.x - origin.x} y={impact.at.y - origin.y} onDone={() => onImpactDone(impact.id)} />)}
   </View>;
@@ -219,6 +265,8 @@ function ImpactBurst({ x, y, onDone }: { x: number; y: number; onDone: () => voi
     transform: [{ scale: 0.8 + t.value * 0.8 }],
   }));
   return <View pointerEvents="none" style={[styles.burst, { left: x, top: y }]}>
+    {/* Glow is layered translucent discs, not a blurred shadow: cheap to animate. */}
+    <Animated.View style={[styles.burstHalo, flashStyle]} />
     <Animated.View style={[styles.burstFlash, flashStyle]} />
     <Animated.View style={[styles.burstRing, ringStyle]} />
     {Array.from({ length: reduceMotion ? 0 : BURST_PARTICLES }, (_, index) => <ImpactMote key={index} index={index} t={t} />)}
@@ -276,7 +324,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF',
     boxShadow: '0 4px 14px rgba(20,40,60,0.16)',
   },
-  barHalo: { borderRadius: 16, backgroundColor: 'rgba(143,211,255,0.22)', boxShadow: `0 0 26px ${GLOW_COLOR}` },
+  barHalo: { borderRadius: 16, backgroundColor: 'rgba(143,211,255,0.28)' },
   barHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   barTitle: { ...KatchaDeckUI.typography.ftuePanelTitle, color: '#2E4A66' },
   barCount: { color: '#2E4A66', fontSize: 15, lineHeight: 18, fontWeight: '900', fontVariant: ['tabular-nums'] },
@@ -285,8 +333,9 @@ const styles = StyleSheet.create({
   glow: { width: GLOW_SIZE, height: GLOW_SIZE, alignItems: 'center', justifyContent: 'center' },
   glowArt: { width: GLOW_SIZE, height: GLOW_SIZE },
   burst: { position: 'absolute', width: 0, height: 0, alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
-  burstFlash: { position: 'absolute', width: 54, height: 54, marginLeft: -27, marginTop: -27, borderRadius: 27, backgroundColor: 'rgba(214,240,255,0.95)', boxShadow: `0 0 30px ${GLOW_COLOR}` },
+  burstHalo: { position: 'absolute', width: 96, height: 96, marginLeft: -48, marginTop: -48, borderRadius: 48, backgroundColor: 'rgba(143,211,255,0.28)' },
+  burstFlash: { position: 'absolute', width: 54, height: 54, marginLeft: -27, marginTop: -27, borderRadius: 27, backgroundColor: 'rgba(214,240,255,0.95)' },
   burstRing: { position: 'absolute', width: 48, height: 48, marginLeft: -24, marginTop: -24, borderRadius: 24, borderWidth: 3, borderColor: GLOW_COLOR },
-  mote: { position: 'absolute', width: 8, height: 8, marginLeft: -4, marginTop: -4, borderRadius: 4, backgroundColor: '#DDF4FF', boxShadow: `0 0 8px ${GLOW_COLOR}` },
+  mote: { position: 'absolute', width: 9, height: 9, marginLeft: -4.5, marginTop: -4.5, borderRadius: 4.5, backgroundColor: '#DDF4FF' },
   moteLarge: { width: 12, height: 12, marginLeft: -6, marginTop: -6, borderRadius: 6 },
 });

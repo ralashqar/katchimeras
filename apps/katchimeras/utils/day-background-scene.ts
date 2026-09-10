@@ -38,7 +38,7 @@ export function todayAtmosphereBackgroundForDay(
   return todayAtmosphereBackgroundForScene(sceneId);
 }
 
-function todayAtmosphereBackgroundForScene(
+export function todayAtmosphereBackgroundForScene(
   sceneId: DayBackgroundSceneId,
 ): TodayAtmosphereBackground {
   const bundled = TODAY_ATMOSPHERE_BACKGROUND_SOURCES[sceneId];

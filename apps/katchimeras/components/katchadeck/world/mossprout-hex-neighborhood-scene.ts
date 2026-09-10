@@ -281,7 +281,7 @@ export type MossproutSceneOptions = {
    * every camera stay put; only its art and draw order change.
    */
   homeVeiled?: boolean;
-  /** The opening's first beat: Mossprout's tile alone, nothing else drawn. The envelope is unchanged. */
+  /** Until the hatch: Mossprout's tile alone, no Garden, no neighbours. The envelope is unchanged. */
   homeSolo?: boolean;
 };
 
@@ -358,8 +358,9 @@ export function buildMossproutHexNeighborhoodScene(
       Boolean(natureIslandReveals[island.id]),
     )),
   ];
+  // The Garden is part of what the Mist hides, and it waits with the neighbours until the hatch.
   const rawLayers = [
-    mainLayer, ...(options.homeVeiled ? [] : [gardenLayer, ...plantLayers]),
+    mainLayer, ...(options.homeVeiled || options.homeSolo ? [] : [gardenLayer, ...plantLayers]),
     ...neighbourLayers,
   ];
   // Reserve both art envelopes so changing mist to terrain never shifts the world.

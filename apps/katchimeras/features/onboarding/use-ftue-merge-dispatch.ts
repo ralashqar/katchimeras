@@ -23,6 +23,13 @@ export type FtueMergeDispatchInput = {
    * docked board is guided while its haven-surface step is active.
    */
   guided: boolean;
+  /**
+   * Advance the FTUE run on the next frame instead of inside the board's
+   * command. Every run subscriber (the tab, the route, the Kingdom and its
+   * canvas) re-renders on that advance; the docked opening board keeps that
+   * off the frame the merge animation starts on.
+   */
+  deferEvent?: boolean;
   onBlocked?: () => void;
   onEvent?: (event: FtueEvent, result: MergeWorldCommandResult) => void;
 };
@@ -33,7 +40,7 @@ export type FtueMergeDispatchInput = {
  * Extracted from the dedicated merge page so the opening's docked board
  * cannot drift from it.
  */
-export function useFtueMergeDispatch({ send, coordinator, sessionId, stateRef, runRef, stepRef, guided, onBlocked, onEvent }: FtueMergeDispatchInput) {
+export function useFtueMergeDispatch({ send, coordinator, sessionId, stateRef, runRef, stepRef, guided, deferEvent = false, onBlocked, onEvent }: FtueMergeDispatchInput) {
   return useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
     const currentState = stateRef.current;
     const currentRun = runRef.current;
@@ -54,10 +61,14 @@ export function useFtueMergeDispatch({ send, coordinator, sessionId, stateRef, r
       if (result) stateRef.current = result.state;
       const event = mergeFtueEventForCommand(currentState, command, result);
       if (event && currentRun?.status === 'active') {
-        const nextRun = dispatchFtueEvent(event, `merge-command:${sessionId}:${event.revision}`);
-        runRef.current = nextRun;
-        stepRef.current = nextRun?.status === 'active' ? mossproutFtueStep(nextRun.stepId) : null;
-        if (result) onEvent?.(event, result);
+        const advance = () => {
+          const nextRun = dispatchFtueEvent(event, `merge-command:${sessionId}:${event.revision}`);
+          runRef.current = nextRun;
+          stepRef.current = nextRun?.status === 'active' ? mossproutFtueStep(nextRun.stepId) : null;
+          if (result) onEvent?.(event, result);
+        };
+        if (deferEvent) requestAnimationFrame(advance);
+        else advance();
       }
       if (token) coordinator.complete(token);
       return result;
@@ -65,5 +76,5 @@ export function useFtueMergeDispatch({ send, coordinator, sessionId, stateRef, r
       if (token) coordinator.abort(token);
       throw error;
     }
-  }, [coordinator, guided, onBlocked, onEvent, runRef, send, sessionId, stateRef, stepRef]);
+  }, [coordinator, deferEvent, guided, onBlocked, onEvent, runRef, send, sessionId, stateRef, stepRef]);
 }

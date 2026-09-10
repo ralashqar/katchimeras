@@ -4,10 +4,13 @@ import type { ComponentProps } from 'react';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { AppFontFamilies } from '@/constants/theme';
 
-const { HavenUpgradeEffects: BaseHavenUpgradeEffects } = createUpgradeEffects({
+const { HavenUpgradeEffects: BaseHavenUpgradeEffects, HavenAmbientEmbers } = createUpgradeEffects({
   coinArt: GAME_CURRENCY_ART.coins,
   fontFamily: AppFontFamilies.manrope,
 });
+
+/** The reveal's rising embers, looping: for a tile that should glow while it waits. */
+export { HavenAmbientEmbers };
 
 /** Each Glow coin seating in the tile is one tap; the last one lands heavier. */
 function tapCoinLanding(last: boolean) {

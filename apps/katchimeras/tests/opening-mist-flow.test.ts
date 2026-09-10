@@ -134,16 +134,28 @@ test('a v48 run that never saw the Egg restarts under the Mist; anyone further a
 
 test('the Kingdom wires the opening: fade on the first beat, dock and finger on the second, one lift commit on the third', () => {
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
+  const route = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
   assert.match(screen, /\{ftueStepId === OPENING_MIST_OPEN_STEP_ID \? <FtueOpeningFade \/> : null\}/);
   assert.doesNotMatch(screen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
   assert.match(screen, /<KingdomOpeningCaption[\s\S]*?onLookCloser=\{advanceOpening\}/);
   assert.match(screen, /const openingBoardActive = ftueStepId === OPENING_MIST_CLEAR_STEP_ID && Boolean\(openingRun\?\.mergeInstalled\) && isMossproutChapterZeroActive\(mergeWorld\)/);
   assert.match(screen, /const openingGuidanceVisible = Boolean\(openingBoardStep && \(openingBoardStep\.cue \|\| openingBoardStep\.spotlight\)\)/);
-  assert.match(screen, /\? \[MOSSPROUT_SLEEPING_OFFER, \.\.\.visibleWorldUpgradeOffers/, 'the veiled tile wears a resting Mossprout marker');
-  assert.match(screen, /sleepingSkinId: 'mossprout', bareMarker: true,/, 'only the round silhouette frame, no speech bubble');
-  const marker = readFileSync('components/katchadeck/world/world-upgrade-marker.tsx', 'utf8');
-  assert.match(marker, /\{bare \? null : <View pointerEvents="none" style=\{styles\.tail\} \/>\}/);
-  assert.match(marker, /\{bare \? null : <Text style=\{styles\.sleepingGlyph\}>z z<\/Text>\}/);
+  assert.match(screen, /const visibleUpgradeOffers = homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch');
+  assert.doesNotMatch(screen, /MOSSPROUT_SLEEPING_OFFER/, 'the silhouette marker is gone from the opening');
+  assert.match(screen, /openingWeather=\{homeVeilForStep\(ftueStepId\) !== 'none'\}/, 'rain and sparkles while the veil is up');
+  assert.match(screen, /openingGuidanceVisible && ftueCameraSettled && openingDockSettled \?/, 'the spotlight waits for the dock to settle');
+  assert.match(screen, /onEntranceSettled=\{markOpeningDockSettled\}/);
+  assert.match(canvas, /const openingWeatherStyle = useAnimatedStyle\(\(\) => \(\{ opacity: 1 - homeVeilProgress\.value \}\)\);/, 'weather thins on the lift clock');
+  assert.match(canvas, /<\/GestureDetector>\s*\{openingWeather \? <Animated\.View[\s\S]*?<AtmosphereLayer plane="foreground" settings=\{OPENING_RAIN\} \/>/, 'rain in front of the world');
+  assert.doesNotMatch(canvas, /<AtmosphereLayer plane="background" settings=\{OPENING_RAIN\}/, 'one rain plane: the second halved the headroom for nothing visible');
+  assert.match(screen, /const NO_UPGRADE_OFFERS: WorldUpgradeOffer\[\] = \[\];[\s\S]*?homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS :/, 'a stable empty offers prop while solo');
+  assert.match(canvas, /layer\.id === scene\.centerTile\.id && openingWeather \? \([\s\S]*?<HavenAmbientEmbers area=\{\{ left: 0, top: 0, width: layer\.frame\.width, height: layer\.frame\.height \}\}/, 'the reveal’s own embers loop over the veiled tile');
+  const effects = readFileSync('../../packages/environments/src/upgrade-effects.tsx', 'utf8');
+  assert.match(effects, /const AMBIENT_EMBERS = RISING_PARTICLES\.filter/, 'the ambient embers are the reveal particles themselves');
+  assert.match(effects, /withRepeat\(withTiming\(1, \{ duration: particle\.duration \* 2\.4/, 'looping, slower than the reveal');
+  assert.match(effects, /ambientEmber: \{ borderRadius: 999, position: 'absolute' \}/, 'ambient embers carry no blurred shadow');
+  assert.match(route, /const openingSky = ftueRun\?\.status === 'active' && homeSoloForStep\(ftueRun\.stepId\);[\s\S]*?openingSky \? todayAtmosphereBackgroundForScene\(OPENING_SKY_SCENE_ID\)/, 'twilight sky until the hatch');
   assert.match(screen, /<KingdomOpeningMergeDock[\s\S]*?onGlow=\{openingGlow\.launch\}/);
   assert.match(screen, /<OpeningGlowLayer flights=\{openingGlow\.flights\} impacts=\{openingGlow\.impacts\}/, 'landed Glow bursts where it hits the mist');
   const dock = readFileSync('components/katchadeck/world/kingdom-opening-merge-dock.tsx', 'utf8');
@@ -160,12 +172,12 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(screen, /if \(ftueStepId !== OPENING_MIST_LIFT_STEP_ID\) return;[\s\S]*?veilLiftKeyRef\.current = key;[\s\S]*?veilLift: true/);
   assert.match(screen, /Boolean\(upgradePresentation && !upgradePresentation\.veilLift\)/, 'the HUD stays hidden while the veil lifts');
   assert.match(screen, /homeVeil=\{homeVeilForStep\(ftueStepId\)\}\s*homeSolo=\{homeSoloForStep\(ftueStepId\)\}/);
+  assert.match(canvas, /return buildMossproutHexNeighborhoodScene\(fromSlots, fromNatureLevels, fromGarden, fromReveals, \{ homeVeiled: homeVeil === 'veiled' \|\| homeVeil === 'lifting', homeSolo \}\);/, 'the lift’s from-scene stays veiled and solo, so the world never flashes in during the crossblend');
+  assert.match(canvas, /const joinedLater = layerJoinedLater\(layer\.id\);[\s\S]*?<Animated\.View entering=\{joinedLater \? FadeIn\.duration\(reduceMotion \? 120 : 720\) : undefined\}[\s\S]*?<KingdomTileArt/, 'tiles that join after mount fade in rather than snap');
   assert.match(screen, /: ftueStepId === OPENING_MIST_OPEN_STEP_ID\s*\? OPENING_CAMERA_ENTRY_ZOOM/, 'the first beat mounts further out and glides in');
-  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   assert.match(canvas, /const revealingVeiledHome = Boolean\(upgradePresentation\?\.veilLift\);\s*const homeVeilProgress = useSharedValue\(0\);/, 'the lift owns one reveal clock, like the Steppling reveal');
   assert.match(canvas, /transitionLayers\.toLayer\.id === scene\.centerTile\.id && \(upgradeOwnsLayer \? revealingVeiledHome : settlingUpgrade\?\.nonce === veilLiftNonceRef\.current\)\s*\? homeVeilProgress : undefined/, 'the mist crossblend drives that clock');
   assert.match(canvas, /eggSkinId=\{revealedEggProjection\.eggSkinId\}\s*revealProgress=\{homeVeil !== 'none' \|\| settlingUpgrade\?\.nonce === veilLiftNonceRef\.current \? homeVeilProgress : undefined\}/, 'the Egg fades in with the tile, never ahead of it');
-  const route = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
   assert.match(route, /if \(ftueRun\?\.status !== 'active' \|\| ftueRun\.mergeInstalled \|\| !isMossproutOpeningStep\(ftueRun\.stepId\)\) return;[\s\S]*?installMossproutOnboardingMergeWorld\(Date\.now\(\), ftueWispForRun\(ftueRun\), \{ preserveHaven: true, opening: true \}\)[\s\S]*?updateFtueRun\(\{ mergeInstalled: true \}\)/);
   assert.match(route, /if \(stepId === 'world\.mist_open'\) \{\s*commitFtueAction\(\{ actionId: 'world\.look_closer'/);
   const tab = readFileSync('app/(tabs)/katchimeras.tsx', 'utf8');
