@@ -75,7 +75,12 @@ export function normalizeRelationshipProgressState(value: unknown): Relationship
     : [];
   const stories = normalizeStories(candidate.stories);
   const actionCompletions = Array.isArray(candidate.actionCompletions)
-    ? candidate.actionCompletions.filter(isActionCompletionRecord).slice(-160)
+    ? candidate.actionCompletions.filter(isActionCompletionRecord)
+      // Island campaigns own their progression and rewards in Merge World. Older
+      // builds accidentally mirrored their completed dialogue into Mossprout's
+      // daily action outbox, so discard those synthetic receipts on hydration.
+      .filter((completion) => !completion.actionId.startsWith('mossprout:conversation:mossprout:island:'))
+      .slice(-160)
     : [];
   const actionPresentations = Array.isArray(candidate.actionPresentations)
     ? candidate.actionPresentations.filter(isActionPresentationRecord).map((item) => item.status === 'claimed'

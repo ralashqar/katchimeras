@@ -37,14 +37,19 @@ A timing sibling of `hues` and the cycling bomb. One footprint of the beat turns
 
 One new idea per fight, introduced on a single before a double, with a rival that visibly speeds up. The table is `FIRST_SESSION` in `data/ftue-encounters.ts`; `replayEncounter` is the curve; coach copy is `data/coach-copy.ts`; the hold is `tickCombat(state, now, holdAi)`.
 
-| Duel | Opp HP | AI ms | Acc | New idea |
-|---|---|---|---|---|
-| glade-1 | 36 | 4400–6000 | .68 | snap (no drift) |
-| glade-2 | 60 | 3800–5200 | .72 | gust, coached, single first |
-| glade-3 | 64 | 3400–4600 | .75 | bomb (defuse) |
-| glade-4 | 72 | 3000–4200 | .78 | armour, single first |
-| glade-5 | 84 | 2800–3800 | .80 | spin, coached, single first |
-| glade-6 | 120 | 2400–3200 | .82 | everything, gust at .7 |
+| Duel | Opp HP | Player HP | AI ms | Acc | New idea |
+|---|---|---|---|---|---|
+| glade-1 | 100 | 120 | 4200–5600 | .70 | snap (no drift) |
+| glade-2 | 120 | 140 | 3600–5000 | .72 | gust, coached, single first |
+| glade-3 | 140 | 150 | 3200–4400 | .75 | bomb (defuse) |
+| glade-4 | 150 | 180 | 3000–4100 | .78 | armour, single first |
+| glade-5 | 170 | 200 | 2800–3800 | .80 | spin, coached, single first |
+| glade-6 | 240 | 260 | 2400–3200 | .83 | everything, gust at .7 |
+| cheerlet-1 | 190 | 240 | 2500–3400 | .82 | fuse |
+| cheerlet-2 | 210 | 250 | 2400–3200 | .84 | colour shift |
+| cheerlet-3 | 250 | 280 | 2200–3000 | .86 | everything |
+
+Tuned with `scripts/balance-probe.ts`, a human-paced model player (1.8 s to read a beat, 1.6 s per placement, 85% exact), against three targets: the opening fight lasts about half a minute with the rival landing two or three volleys; a casual player wins every glade fight and reaches the boss with roughly half their health; a sloppy player (2.2 s, 70%) still wins the first three fights and can lose the boss, where retries are free; a sharp player (1.1 s, 95%) still takes six or seven volleys from the boss. `tests/balance.test.ts` pins those ranges. Before this pass the opening fight lasted 11 seconds and the player lost 7 of 300 health.
 
 Every row ends on a plain double so a long fight settles. Replays use the same row with HP scaled by wins (capped at 2.5×) and the rival 8% faster per win, instead of jumping to the base numbers. Cheerlet gets `fuse` on its first duel and `hues` on its second; every first-session duel stays `guided`, since the rival's line now shows during the countdown regardless.
 

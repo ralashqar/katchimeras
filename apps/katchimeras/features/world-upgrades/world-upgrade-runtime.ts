@@ -7,9 +7,16 @@ import { worldUpgradeOffers, type WorldUpgradeOffer } from './world-upgrade-offe
 import { WORLD_UPGRADE_FLOWS, worldUpgradeRunId } from './world-upgrade-flows';
 
 let purchasing: Promise<ContentFlowRun | null> | null = null;
-export function purchaseWorldUpgrade(offer: WorldUpgradeOffer) {
+export function purchaseWorldUpgrade(
+  offer: WorldUpgradeOffer,
+  options: { beforeValidation?: () => Promise<void> } = {},
+) {
   if (purchasing) return purchasing;
   purchasing = (async () => {
+    // The upgrade panel reads the Merge provider's optimistic snapshot, while
+    // this boundary deliberately validates SQLite again. Flush the provider's
+    // buffered order/return state first so both sides validate one snapshot.
+    await options.beforeValidation?.();
     const runId = worldUpgradeRunId(offer);
     const existing = await loadContentFlowRun(runId);
     if (existing) return existing.status === 'completed' ? existing : dispatchContentFlowCommand(runId, { type: 'retry' });

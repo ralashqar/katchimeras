@@ -1,4 +1,5 @@
 import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
+import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
 import { advanceGlowUpgrade, recoverPaidGlowUpgrade } from '@/features/onboarding/glow-upgrade-runtime';
 import { worldUpgradeRunId } from '@/features/world-upgrades/world-upgrade-flows';
 import { WORLD_UPGRADE_DEFINITIONS, worldUpgradeMaxLevel, visibleWorldUpgradeOffers, worldUpgradeOffers, worldUpgradeArchiveOffer, type WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
@@ -186,6 +187,7 @@ export function KatchimeraKingdomScreen({
   worldSubjectPresentation,
 }: Props) {
   const router = useRouter();
+  const { flush: flushMergeWorld } = useMergeWorldActions();
   const { transitionTo } = useGameScreenTransition();
   const { run: glowRun, ready: glowReady } = useGlowDiscoveryState();
   const stepplingLesson = useStepplingGardenLesson();
@@ -1117,7 +1119,7 @@ export function KatchimeraKingdomScreen({
       const key = `restore:${campaign.campaignId}:${status}`;
       if (!offer || campaignAutoTransitionRef.current === key) return;
       campaignAutoTransitionRef.current = key;
-      void purchaseWorldUpgrade(offer).catch((error) => {
+      void purchaseWorldUpgrade(offer, { beforeValidation: flushMergeWorld }).catch((error) => {
         campaignAutoTransitionRef.current = null;
         setUpgradeError(error instanceof Error ? error.message : 'The garden restoration paused.');
       });
@@ -1129,8 +1131,8 @@ export function KatchimeraKingdomScreen({
       campaignAutoTransitionRef.current = key;
       openIslandCampaignNarrative(campaign, chapter.level, 'resolution');
     }
-  }, [interactionCreatureId, mergeWorld, openIslandCampaignNarrative, ordinaryUpgradeRun, pendingIslandDiscovery,
-    requiredUpgradeStory, screenFocused, selectedUpgrade, upgradeOffers, upgradePresentation]);
+  }, [flushMergeWorld, interactionCreatureId, mergeWorld, openIslandCampaignNarrative, ordinaryUpgradeRun,
+    pendingIslandDiscovery, requiredUpgradeStory, screenFocused, selectedUpgrade, upgradeOffers, upgradePresentation]);
 
   // Mossprout's wish plays once Steppling's garden lesson is over: a blocking
   // full-screen scene, then a guided walk to the first mist. Both phases are
@@ -1249,13 +1251,13 @@ export function KatchimeraKingdomScreen({
       } else if (ftueStepId === 'world.first_bloom_restore') {
         await advanceFtueActionDurably({ expectedStepId: ftueStepId, actionId: 'world.restore_with_first_bloom', nextStepId: ftueStepId, evidenceRef: 'shared-upgrade:confirm' });
       } else {
-        const run = await purchaseWorldUpgrade(sharedUpgrade);
+        const run = await purchaseWorldUpgrade(sharedUpgrade, { beforeValidation: flushMergeWorld });
         if (run?.status === 'failed_recoverable') throw new Error('The upgrade could not finish. Try again.');
         if (run?.status === 'completed') setSelectedUpgrade(null);
       }
     } catch (error) { setDisplayedGlow(mergeWorldRef.current.coins); setUpgradeError(error instanceof Error ? error.message : 'Could not upgrade. Please try again.'); setUpgradeCommitted(false); }
     finally { upgradePressBusy.current = false; setUpgradePurchasing(false); }
-  }, [ftueStepId, glowRun, sharedUpgrade, upgradeCommitted, upgradeError]);
+  }, [flushMergeWorld, ftueStepId, glowRun, sharedUpgrade, upgradeCommitted, upgradeError]);
   // Sleeping islands arrive from the offers layer already locked, in wake order.
   const presentedUpgradeOffers = upgradeOffers;
   const visibleUpgradeOffers = visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);

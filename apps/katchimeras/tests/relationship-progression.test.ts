@@ -1233,6 +1233,22 @@ test('legacy duplicate action completions are not migrated', () => {
   assert.deepEqual(normalized.actionCompletions, []);
 });
 
+test('legacy island campaign dialogue is removed from Mossprout action rewards on hydration', () => {
+  const actionId = 'mossprout:conversation:mossprout:island:petalimp:first-welcome:restored:begin-small';
+  const polluted = recordKatchimeraActionCompletion(emptyRelationshipProgressState(), {
+    dayId: '2026-09-08', familyId: 'mossprout', actionId,
+    instanceId: `2026-09-08:together:0:${actionId}`, slotId: 'together', sequence: 0,
+    kind: 'fun_chat', title: 'One Small Beginning', subtitle: 'A little moment shared with Mossprout',
+    icon: 'bubble.left.fill', artworkDefinitionIds: [], reward: { kind: 'bond', amount: 4 }, completedAt: 10,
+  });
+  assert.equal(polluted.actionCompletions.length, 1);
+  assert.equal(polluted.actionPresentations.length, 1);
+
+  const normalized = normalizeRelationshipProgressState(polluted);
+  assert.equal(normalized.actionCompletions.length, 0);
+  assert.equal(normalized.actionPresentations.length, 0);
+});
+
 test('resetting one relationship day restores empty slots without erasing other days or story progress', () => {
   const dayOne = '2026-08-21';
   const dayTwo = '2026-08-22';

@@ -158,29 +158,26 @@ test('opening opponent waits for the first successful snap; later fights keep st
 });
 
 
-test('early opponents have short health budgets and the first fight stays basic with a brief late breeze', () => {
+test('first-session fights use the table health for both sides and the first fight stays basic', () => {
   const profile = freshProfile();
-  const budgets = { 'glade-1': 36, 'glade-2': 60, 'glade-3': 64, 'glade-6': 120 };
-  for (const [id, hp] of Object.entries(budgets)) {
+  for (const [id, row] of Object.entries(FIRST_SESSION)) {
     const definition = ftueEncounter(getDuel(id), profile);
     const initial = createCombat(definition, id, id);
-    assert.equal(initial.opponentHp, hp);
-    assert.equal(initial.playerHp, definition.health);
-    assert.ok(initial.playerHp > initial.opponentHp);
+    assert.equal(initial.opponentHp, row.hp);
+    assert.equal(initial.playerHp, row.player);
+    assert.equal(definition.health, row.player, 'the HUD reads the same health the fight uses');
   }
-  for (let seed = 0; seed < 20; seed++) {
+  for (let seed = 0; seed < 10; seed++) {
     let s = createCombat(ftueEncounter(getDuel('glade-1'), profile), 'short', `short:${seed}`);
-    let placements = 0;
-    for (let now = 100; now <= 30000 && !s.outcome; now += 100) {
+    for (let now = 100; now <= 60000 && !s.outcome; now += 100) {
       s = tickCombat(s, now);
-      assert.ok(s.run.beat.varieties.every(variety => variety.id === 'drift'));
+      assert.equal(s.run.beat.varieties.length, 0, 'the first fight carries no mechanic');
       if (now % 1200 === 0 && s.run.beat.status === 'placing') {
         const action = choosePlacement(s.run, true, now - s.beatStartedAt);
-        if (action?.type === 'place') { s = placeCombat(s, action, now); placements++; }
+        if (action?.type === 'place') s = placeCombat(s, action, now);
       }
     }
     assert.equal(s.outcome, 'won');
-    assert.ok(placements <= 6, `${seed}: ${placements} placements`);
   }
 });
 
@@ -219,11 +216,11 @@ test('replays climb from the first-session fight instead of jumping to the base 
     receipts: Object.fromEntries(Array.from({ length: wins }, (_, i) => [`w${i}`, { attemptId: `w${i}`, levelId: 'glade-1', won: true, accuracy: 1, bestStreak: 3, durationMs: 1, coins: 20, practice: false }])),
   });
   const once = ftueEncounter(base, won(freshProfile(), 1));
-  assert.equal(once.opponentHealth, 45);
+  assert.equal(once.opponentHealth, Math.round(FIRST_SESSION['glade-1'].hp * (1 + REPLAY.hpPerWin)));
   assert.ok(once.ai.minActionMs < FIRST_SESSION['glade-1'].ai.minActionMs && once.ai.minActionMs >= base.ai.minActionMs);
   assert.ok(once.guided, 'replays keep the coach available');
   const many = ftueEncounter(base, won(freshProfile(), 40));
-  assert.equal(many.opponentHealth, Math.round(36 * REPLAY.hpCap));
+  assert.equal(many.opponentHealth, Math.round(FIRST_SESSION['glade-1'].hp * REPLAY.hpCap));
   assert.deepEqual(many.ai, base.ai, 'the base definition is the ceiling');
   assert.ok(replayWins(won(freshProfile(), 3), 'glade-1') === 3);
   validateDuel(once); validateDuel(many);

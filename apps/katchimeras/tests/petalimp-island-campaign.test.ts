@@ -241,6 +241,15 @@ test('the campaign auto-transition guard never keys on mergeWorld.revision', () 
   assert.match(screen, /const key = `resolution:\$\{campaign\.campaignId\}:\$\{chapter\.level\}:\$\{status\}`/);
 });
 
+test('island narrative completion cannot leak into Mossprout action-card rewards', () => {
+  const completion = readFileSync(resolve(root, 'game/katchimeras/action-completion.ts'), 'utf8');
+  const questHook = readFileSync(resolve(root, 'hooks/use-kingdom-quests.ts'), 'utf8');
+  assert.match(completion, /definition\.tags\?\.includes\('island-campaign'\) && !session\.actionOrigin/,
+    'the durable action boundary rejects campaign-owned dialogue without an explicit action origin');
+  assert.match(questHook, /definition\.tags\?\.includes\('island-campaign'\) && !session\.actionOrigin/,
+    'the conversation recovery effect does not repeatedly submit campaign-owned dialogue');
+});
+
 test('paid world upgrades spend visibly from the persistent top-bar Glow pill', () => {
   const screen = readFileSync(resolve(root, 'components/katchadeck/roster/katchimera-kingdom-screen.tsx'), 'utf8');
   assert.match(screen, /const node = glowCurrencyArtRef\.current/);

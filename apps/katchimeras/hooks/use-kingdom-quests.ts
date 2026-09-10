@@ -264,7 +264,10 @@ function settleActionConversationCompletion(
   session: ConversationSession,
   definition: ConversationDefinition | null | undefined,
 ) {
-  if (!definition || (session.dialoguePresentation && (!session.dialogueAcknowledgedAt || session.outcomePresentation)) || (definition.familyId !== 'mossprout' && !session.actionOrigin)) return;
+  if (!definition
+    || (definition.tags?.includes('island-campaign') && !session.actionOrigin)
+    || (session.dialoguePresentation && (!session.dialogueAcknowledgedAt || session.outcomePresentation))
+    || (definition.familyId !== 'mossprout' && !session.actionOrigin)) return;
   commitKatchimeraActionCompletion({ session, definition });
 }
 

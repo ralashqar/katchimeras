@@ -39,7 +39,11 @@ export function commitKatchimeraActionCompletion(input: {
   definition: ConversationDefinition;
 }): KatchimeraActionCompletionCommit {
   const { definition, session } = input;
-  if (session.preview || (session.dialoguePresentation && (!session.dialogueAcknowledgedAt || session.outcomePresentation || session.outcomeCompletionPending)) || session.status !== 'completed' || (session.familyId !== 'mossprout' && (!session.actionOrigin || session.actionOrigin.familyId !== session.familyId))) {
+  if (session.preview
+    || (definition.tags?.includes('island-campaign') && !session.actionOrigin)
+    || (session.dialoguePresentation && (!session.dialogueAcknowledgedAt || session.outcomePresentation || session.outcomeCompletionPending))
+    || session.status !== 'completed'
+    || (session.familyId !== 'mossprout' && (!session.actionOrigin || session.actionOrigin.familyId !== session.familyId))) {
     return { completion: null, rewardReceipt: null };
   }
   const completedAt = session.completedAt ?? session.updatedAt;

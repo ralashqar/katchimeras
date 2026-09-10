@@ -241,6 +241,34 @@ test('ordinary purchase deduplicates rapid taps, validates fresh balance, and re
   await runtime.purchaseWorldUpgrade(offer); assert.equal(retries, 1); assert.equal(starts, 1);
 });
 
+test('ordinary purchase flushes optimistic world progress before fresh eligibility validation', async () => {
+  let ready = false;
+  let starts = 0;
+  const offer = { id: 'nature:bloom-garden', nextLevel: 3, eligible: true, affordable: true };
+  const runtime = loadNativeModule('features/world-upgrades/world-upgrade-runtime.ts', {
+    '@/utils/merge-world/repository': { loadMergeWorldState: async () => ({ ready }) },
+    '@/features/content-flow/content-flow-director': {
+      startContentFlow: async () => { starts += 1; return { status: 'active' }; },
+      dispatchContentFlowCommand: async () => ({ status: 'active' }),
+    },
+    '@/features/content-flow/content-flow-repository': {
+      loadContentFlowRun: async () => null,
+      listContentFlowRuns: async () => [],
+      subscribeContentFlowJournal: () => () => {},
+    },
+    './world-upgrade-offers': {
+      worldUpgradeOffers: (state: { ready: boolean }) => [{ ...offer, eligible: state.ready }],
+    },
+    './world-upgrade-flows': {
+      WORLD_UPGRADE_FLOWS: [{ id: 'world-upgrade:nature:bloom-garden:3' }],
+      worldUpgradeRunId: () => 'world-upgrade:nature:bloom-garden:3',
+    },
+  });
+
+  await runtime.purchaseWorldUpgrade(offer, { beforeValidation: async () => { ready = true; } });
+  assert.equal(starts, 1);
+});
+
 test('a legacy confirmation checkpoint crosses the new marker scene without replaying spending', async () => {
   let run = { runId: 'flow:old-ftue', definitionId: MOSSPROUT_FTUE_FLOW.id, definitionVersion: MOSSPROUT_FTUE_FLOW.version,
     nodeId: 'world.first_bloom_offer', status: 'active', phase: 'awaiting_scene' };
