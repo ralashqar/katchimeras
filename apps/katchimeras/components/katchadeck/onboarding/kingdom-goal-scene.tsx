@@ -15,9 +15,9 @@ import type { MergeWorldState } from '@/types/merge-world';
 import { introduceStoredKingdomGoal, loadMergeWorldState, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
 
 /** Mossprout's wish: the Kingdom's long-term purpose, told once Steppling's garden lesson is over. */
-export const KINGDOM_GOAL_LINE = 'Every place we bring back brings a friend home. Let’s start with the one waiting beyond the mist.';
-export const KINGDOM_GOAL_PREMISE = 'This garden used to be full of friends. When the mist came, they drifted into it, one by one. Every place we bring back helps one of them find the way home.';
-export const KINGDOM_GOAL_ACTION = 'Find the first friend';
+export const KINGDOM_GOAL_LINE = 'Every clearing we wake sends a friend home. Let’s start with the one waiting beyond the mist.';
+export const KINGDOM_GOAL_PREMISE = 'They’re all still out there, holding whatever they were tending when the noticing stopped.';
+export const KINGDOM_GOAL_ACTION = 'Find the first one';
 
 function useMergeWorldSnapshot() {
   const [world, setWorld] = useState<MergeWorldState | null>(null);

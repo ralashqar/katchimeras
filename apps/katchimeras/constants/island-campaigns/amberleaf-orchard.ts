@@ -203,7 +203,7 @@ export const AMBERLEAF_ORCHARD_CAMPAIGN: IslandCampaignDefinition<AmberleafSeaso
     discoveryActionLabel: 'Talk with Amberleaf',
     revealReactionLine: 'The mist lifts from an orchard with a single small sapling.',
     mistNextName: 'A sleeping orchard',
-    mistDescription: 'Beyond this mist, someone has been counting seasons. Clear it and see what they kept.',
+    mistDescription: 'Someone in there is still counting seasons nobody else counted.',
     returnNoteTitle: 'Meet me at Orchard Grove',
     returnNoteHint: 'Return to Amberleaf’s orchard for the next scene',
     actionLabels: {
@@ -233,7 +233,7 @@ export const AMBERLEAF_ORCHARD_CAMPAIGN: IslandCampaignDefinition<AmberleafSeaso
     fallbackResolution: (level) => level === 4
       ? 'The orchard has a picnic roof and a journal full of seasons. I am staying.'
       : 'The orchard turned one more season, and I pressed a leaf from it.',
-    wakeHandoffLine: 'Beneath the old tree there is a friend who hides in the mist. Look slowly; they are shy.',
+    wakeHandoffLine: 'The seasons kept turning. No one counted them, so they stopped meaning anything. Beneath the old tree there is a friend who hides in the mist. Look slowly; they are shy.',
     sleepingHint: 'Someone is resting under the sapling. They will wake once the friend before them is home.',
   },
 };

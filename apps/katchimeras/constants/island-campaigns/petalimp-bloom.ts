@@ -205,7 +205,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
     discoveryActionLabel: 'Talk with Petalimp',
     revealReactionLine: 'The mist lifts from a quiet, bare garden.',
     mistNextName: 'A forgotten garden',
-    mistDescription: 'Something small is stirring in the mist. Clear it and see who has been waiting.',
+    mistDescription: 'Someone in there is still arranging flowers for nobody.',
     returnNoteTitle: 'Meet me at Bloom Garden',
     returnNoteHint: 'Return to Petalimp’s island for the next scene',
     actionLabels: {
@@ -235,7 +235,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
     fallbackResolution: (level) => level === 4
       ? 'Every bloom found room. We restored more than a garden; we made a welcome.'
       : 'The garden changed because we came back and cared for it together.',
-    wakeHandoffLine: 'Someone has been resting in the Wildgrowth. I think they would like to meet you.',
+    wakeHandoffLine: 'I was arranging flowers for nobody. Then you noticed one. Someone else is resting in the Wildgrowth—I think they would like to meet you.',
     sleepingHint: 'Someone is resting in this garden. They will wake once the last friend is home.',
   },
 };

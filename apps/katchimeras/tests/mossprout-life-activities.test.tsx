@@ -484,7 +484,7 @@ test('FTUE speech pages preserve the copy within the 120-character limit', async
   const { ftueDialoguePages, FTUE_DIALOGUE_MAX_CHARACTERS } = await import('../features/onboarding/ftue-dialogue-pages');
   const { MOSSPROUT_FTUE_COPY } = await import('../features/onboarding/mossprout-ftue-copy');
   const pages = ftueDialoguePages(MOSSPROUT_FTUE_COPY.farewell);
-  assert.equal(pages.length, 3);
+  assert.equal(pages.length, 2, 'rest, then the others in the mist');
   for (const text of [MOSSPROUT_FTUE_COPY.farewell, 'A longer sentence with several words. '.repeat(12), 'x'.repeat(250)]) {
     const split = ftueDialoguePages(text);
     assert.ok(split.every((page) => page.length <= FTUE_DIALOGUE_MAX_CHARACTERS));
@@ -509,12 +509,12 @@ test('Rest follows two Continue beats; failed saves retry the final action witho
   await act(async () => { tree = create(<Rest onNarration={(text) => { narration = text; }} onRest={onRest} />); });
   const pages = ftueDialoguePages(copy.MOSSPROUT_FTUE_COPY.farewell);
   assert.equal(narration, pages[0]);
-  await act(async () => tree!.root.findByProps({ label: 'Continue' }).props.onPress());
-  assert.equal(narration, pages[1]); assert.equal(saves, 0);
-  await act(async () => tree!.root.findByProps({ label: 'Continue' }).props.onPress());
-  assert.equal(narration, pages[2]); assert.equal(saves, 0);
+  for (let index = 1; index < pages.length; index++) {
+    await act(async () => tree!.root.findByProps({ label: 'Continue' }).props.onPress());
+    assert.equal(narration, pages[index]); assert.equal(saves, 0);
+  }
   await act(async () => { const press = tree!.root.findByProps({ label: copy.MOSSPROUT_FTUE_COPY.restAction }).props.onPress; press(); press(); });
-  assert.equal(saves, 1); assert.equal(narration, pages[2]);
+  assert.equal(saves, 1); assert.equal(narration, pages.at(-1));
   fail = false;
   await act(async () => tree!.root.findByProps({ label: 'Try again' }).props.onPress());
   assert.equal(saves, 2);

@@ -203,7 +203,7 @@ export const MISTLE_ANCIENT_TREE_CAMPAIGN: IslandCampaignDefinition<MistleMistSt
     discoveryActionLabel: 'Talk with Mistle',
     revealReactionLine: 'The mist thins around an ancient tree, but never quite leaves.',
     mistNextName: 'An old tree in the fog',
-    mistDescription: 'Something beyond this mist has been waiting a very long time. Clear it, slowly, and see who is there.',
+    mistDescription: 'The oldest roots are in there. The Mist began at them.',
     returnNoteTitle: 'Meet me at Ancient Tree Grove',
     returnNoteHint: 'Return to the ancient tree for the next scene',
     actionLabels: {
@@ -233,7 +233,7 @@ export const MISTLE_ANCIENT_TREE_CAMPAIGN: IslandCampaignDefinition<MistleMistSt
     fallbackResolution: (level) => level === 4
       ? 'The heartwood glows through the mist. Anyone lost can see it now.'
       : 'The tree grew a little, and the fog let a little more through.',
-    wakeHandoffLine: 'The last friends come and go with the weather. Keep living your days with Mossprout and they will find you.',
+    wakeHandoffLine: 'The Mist began at my roots. Not from anything wicked. From a quiet nobody broke. You broke it. Keep living your days with Mossprout and the rest will find you.',
     sleepingHint: 'Someone is resting at the roots of the old tree. They will wake once the friend before them is home.',
   },
 };

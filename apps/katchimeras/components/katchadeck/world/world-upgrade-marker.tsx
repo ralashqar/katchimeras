@@ -13,6 +13,7 @@ const CLEAR_MIST_ART = require('@incubator/art-world/ui/clear-mist-toy-v1.png');
 const LOCK_ART = require('@incubator/art-world/hex/kingdom_dream_mist_lock_v1_512.webp');
 const MARKER_SIZE = 68;
 const MARKER_TILE_WIDTH_RATIO = 0.15;
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY, sceneWidth, sceneHeight, moving, hidden = false, selected = false, onPress, onTargetChange }: {
   offer: WorldUpgradeOffer; frame: { left: number; top: number; width: number; height: number };
@@ -58,9 +59,21 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
     { translateX: sceneWidth / 2 + cameraX.value + (frame.left + frame.width / 2 - sceneWidth / 2) * cameraScale.value - MARKER_SIZE / 2 },
     { translateY: sceneHeight / 2 + cameraY.value + (frame.top + frame.height * 0.62 - sceneHeight / 2) * cameraScale.value - MARKER_SIZE / 2 },
   ] }));
-  const motion = useAnimatedStyle(() => ({ opacity: visibility.value, transform: [{
-    scale: frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value * (reduced ? 1 : visibility.value),
-  }] }));
+  // The painted bubble follows the world's zoom. The press target must follow
+  // it too: a fixed 68pt square under a bubble drawn at two or three times
+  // that size left most of the visible badge untappable when zoomed in, and
+  // the tap fell through to whatever tile sat beneath. Split the scale: the
+  // Pressable grows with the art but never shrinks below its 68pt minimum,
+  // and the bubble inside takes whatever remains so the painted size is
+  // unchanged at every zoom.
+  const hitMotion = useAnimatedStyle(() => {
+    const visual = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value * (reduced ? 1 : visibility.value);
+    return { opacity: visibility.value, transform: [{ scale: Math.max(1, visual) }] };
+  });
+  const bubbleMotion = useAnimatedStyle(() => {
+    const visual = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value * (reduced ? 1 : visibility.value);
+    return { transform: [{ scale: visual / Math.max(1, visual) }] };
+  });
   // Stable envelope at the maximum pulse, independent of the entrance scale.
   // Include the intrinsic percentage row, top tail, rim and shadow. Measuring
   // the 68px press target clipped these whenever the world camera zoomed in.
@@ -73,12 +86,12 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   return <Animated.View pointerEvents={hidden ? 'none' : 'box-none'} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} style={[styles.position, projection]}>
       <Animated.View ref={target} collapsable={false} pointerEvents="none" accessible={false}
         onLayout={() => { onTargetChange?.(offer.id, null); if (!moving && !hidden) onTargetChange?.(offer.id, node.current); }} style={[styles.spotlightTarget, spotlightBounds]} />
-      <Pressable ref={button} collapsable={false} accessibilityRole="button" accessibilityLabel={sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
+      <AnimatedPressable ref={button} collapsable={false} hitSlop={6} accessibilityRole="button" accessibilityLabel={sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
         accessibilityValue={locked || sleepingPortrait ? undefined : { min: 0, max: glowTotal, now: glowProgress, text: offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
         accessibilityHint={offer.lockedReason ?? (campaignPending ? 'Resumes this island story' : offer.affordable ? 'Opens upgrade details' : `${offer.missingGlow} more Glow needed. Opens upgrade details.`)}
-        disabled={moving || hidden} onPress={() => onPress(offer)} style={styles.hitTarget}>
+        disabled={moving || hidden} onPress={() => onPress(offer)} style={[styles.hitTarget, hitMotion]}>
       <Animated.View pointerEvents="none" onLayout={(event) => setBubbleHeight(event.nativeEvent.layout.height)}
-        style={[styles.bubble, markerPortrait || sleepingPortrait ? styles.portraitBubble : null, sleepingPortrait ? styles.sleepingBubble : null, motion]}>
+        style={[styles.bubble, markerPortrait || sleepingPortrait ? styles.portraitBubble : null, sleepingPortrait ? styles.sleepingBubble : null, bubbleMotion]}>
         {/* Paint first so the seam it covers never sits above the icon/portrait
             content — it only fills the border gap, it isn't a foreground shape. */}
         <View pointerEvents="none" style={styles.tail} />
@@ -100,7 +113,7 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
           <Text style={styles.percent}>{upgradePercent(offer.cost - offer.missingGlow, offer.cost)}%</Text>
         </>}
       </Animated.View>
-      </Pressable>
+      </AnimatedPressable>
   </Animated.View>;
 }
 const styles = StyleSheet.create({

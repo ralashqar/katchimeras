@@ -35,6 +35,7 @@ import {
 import { beginFtueAction, commitFtueAction, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { FTUE_MOSSPROUT_CREATURE } from '@/features/onboarding/mossprout-ftue-creature';
 import { mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
+import { mossproutEggGuide } from '@/features/onboarding/mossprout-egg-echo';
 import { recordMossproutOnboardingAnswer } from '@/features/onboarding/mossprout-profile';
 import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-reveal-controller';
 import { useEggFeedController } from '@/features/today/use-egg-feed-controller';
@@ -324,7 +325,7 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
             onboardingGuide={
               companionStageActive || (worldHosted && stepId === 'world.egg_intro')
                 ? null
-                : step?.guide ?? null
+                : mossproutEggGuide(step, ftueRun)
             }
             onboardingCameraDurationMs={mossproutGroveEggCameraDuration(stepId)}
             onboardingCameraPanY={mossproutGroveEggCameraPanTarget(stepId)}

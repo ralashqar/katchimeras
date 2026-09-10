@@ -6,11 +6,11 @@ export const MOSSPROUT_GARDEN_RETURN = {
     { id: 'together', label: 'We did that.', reply: 'We did. You brought the first little piece of your day, and we gave it somewhere to grow.' },
     { id: 'next', label: 'What happens now?', reply: 'We keep finding little things worth paying attention to. There’s room for them here.' },
   ],
-  invitation: 'The garden’s had some attention. Let’s save a little for your world, too.',
+  invitation: 'Your turn. Look up from this for a moment.',
 };
 export const MOSSPROUT_FIRST_NOTICE = {
   id: 'first-notice',
-  prompt: 'Take a look around you. What catches your attention?',
+  prompt: 'What’s there, around you?',
   choices: [
     { id: 'light', label: 'Some light', reply: 'It can make an ordinary corner look like somewhere new. I like that you caught it.' },
     { id: 'sound', label: 'A small sound', reply: 'There’s a whole little world going on when we stop to listen.' },

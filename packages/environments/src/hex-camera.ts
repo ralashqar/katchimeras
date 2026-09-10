@@ -113,6 +113,9 @@ export function useKingdomHexCamera({
   const onSnapshotChangeRef = useRef(onSnapshotChange);
   onSnapshotChangeRef.current = onSnapshotChange;
   const decayCompletions = useSharedValue(0);
+  // Whether the current pan touch ever activated. A touch that ends without
+  // travelling its activation offset was a tap on something in the world.
+  const panActivated = useSharedValue(false);
   const [ready, setReady] = useState(false);
   const [focusedTileId, setFocusedTileId] = useState<string | null>(centerId ?? null);
   const centerX = center.x;
@@ -392,12 +395,21 @@ export function useKingdomHexCamera({
         .activeOffsetX([-6, 6])
         .activeOffsetY([-6, 6])
         .onBegin(() => {
+          // Every touch down inside the world passes through here, including
+          // taps on markers and islands. Stop any glide so the finger holds
+          // the world still, but do not mark the camera as moving yet: that
+          // would disable every press target under the finger that started
+          // the press, and nothing would clear the flag if no pan followed.
           cancelAnimation(tx);
           cancelAnimation(ty);
           panStartTx.value = tx.value;
           panStartTy.value = ty.value;
           decayCompletions.value = 0;
+          panActivated.value = false;
           runOnJS(clearFrameFocus)();
+        })
+        .onStart(() => {
+          panActivated.value = true;
           runOnJS(beginMotion)();
         })
         .onChange((event) => {
@@ -405,6 +417,13 @@ export function useKingdomHexCamera({
           const yBounds = workletBounds(viewport.height, scene.height, scale.value);
           tx.value = workletClamp(panStartTx.value + event.translationX, xBounds);
           ty.value = workletClamp(panStartTy.value + event.translationY, yBounds);
+        })
+        .onFinalize(() => {
+          // A tap (or a touch that stopped a glide without panning) leaves
+          // the world exactly where it is: settle it so the moving flag,
+          // and every press target that reads it, are released at once.
+          if (panActivated.value) return;
+          runOnJS(commitSnapshot)(tx.value, ty.value, scale.value, false);
         })
         .onEnd((event) => {
           const xBounds = workletBounds(viewport.width, scene.width, scale.value);
@@ -420,7 +439,7 @@ export function useKingdomHexCamera({
           tx.value = withDecay({ velocity: event.velocityX, deceleration: 0.996, clamp: xBounds }, completeDecay);
           ty.value = withDecay({ velocity: event.velocityY, deceleration: 0.996, clamp: yBounds }, completeDecay);
         }),
-    [beginMotion, clearFrameFocus, decayCompletions, foreground, interactionEnabled, panStartTx, panStartTy, scale, scene, settleAfterPan, tx, ty, viewport.height, viewport.width]
+    [beginMotion, clearFrameFocus, commitSnapshot, decayCompletions, foreground, interactionEnabled, panActivated, panStartTx, panStartTy, scale, scene, settleAfterPan, tx, ty, viewport.height, viewport.width]
   );
 
   const pinch = useMemo(

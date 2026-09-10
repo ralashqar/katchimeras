@@ -14,10 +14,10 @@ const NOW = Date.parse('2026-09-08T12:00:00Z');
 
 test('Mossprout plants the wish at his farewell and the resting card keeps the garden open', () => {
   const pages = MOSSPROUT_FTUE_COPY.farewell.split('\n\n');
-  assert.equal(pages.length, 3);
-  assert.match(pages[1]!, /friends/);
+  assert.equal(pages.length, 2, 'one idea per page: rest, then the others');
+  assert.match(pages[0]!, /rest/i);
+  assert.match(pages[1]!, /others/);
   assert.match(pages[1]!, /mist/);
-  assert.match(pages[2]!, /Someone is waiting beyond it/);
   assert.equal(mossproutFtueStep('companion.meditating')?.guide?.body, MOSSPROUT_FTUE_COPY.meditationHelp);
 });
 
@@ -95,9 +95,10 @@ test('the goal scene tells the wish once and hands over exactly once per tap bur
   });
   const Scene = module.KingdomGoalScene as React.ComponentType<{ onDone: () => void }>;
   assert.match(module.KINGDOM_GOAL_LINE as unknown as string, /friend home/);
+  assert.match(module.KINGDOM_GOAL_PREMISE as unknown as string, /tending/);
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<Scene onDone={() => { done += 1; }} />); });
-  const button = tree!.root.findByProps({ label: 'Find the first friend' });
+  const button = tree!.root.findByProps({ label: 'Find the first one' });
   assert.match(JSON.stringify(tree!.toJSON()), /Clear the mist at Bloom Garden/, 'the next step is shown');
   await act(async () => { button.props.onPress(); button.props.onPress(); });
   assert.equal(introduced, 1, 'the wish is recorded once');

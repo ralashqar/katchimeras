@@ -26,7 +26,7 @@
     "test:merge-performance": "tsx --test tests/merge-performance.test.ts tests/merge-order-window.test.ts tests/merge-order-performance.test.ts",
     "test:today-exploration": "tsx --test tests/today-exploration-gesture.test.ts tests/today-exploration-backgrounds.test.ts tests/companion-home-layout.test.ts",
     "test:today-window": "tsx --test tests/today-tile-window.test.ts",
-    "test:today-growth": "tsx --test tests/ftue-script.test.ts tests/today-growth.test.ts tests/hatch-notification.test.ts tests/home-loop-presentation.test.ts tests/today-hatch-presentation.test.ts tests/today-energy-loop-performance.test.ts tests/home-storage-partition.test.ts",
+    "test:today-growth": "tsx --test tests/ftue-script.test.ts tests/mossprout-egg-echo.test.ts tests/today-growth.test.ts tests/hatch-notification.test.ts tests/home-loop-presentation.test.ts tests/today-hatch-presentation.test.ts tests/today-energy-loop-performance.test.ts tests/home-storage-partition.test.ts",
     "test:streak": "tsx --test tests/streak-engine.test.ts tests/streak-qualification.test.ts tests/streak-notification.test.ts",
     "test:world-atlas": "tsx --test tests/world-tile-atlas.test.ts",
     "test:world-board-lab": "tsx --test tests/world-board-lab.test.ts",

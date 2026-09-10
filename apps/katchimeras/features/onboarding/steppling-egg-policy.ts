@@ -2,12 +2,12 @@ import type { MergeWorldState, MergeWorldCommandResult } from '@/types/merge-wor
 import { GLOW_GATEWAY_ID, reduceGlowDiscovery } from '@/utils/merge-world/glow-discovery-policy';
 
 export const STEPPLING_EGG_GUIDES = {
-  intent: { eyebrow: 'A new little friend', title: 'This one stirs at the thought of adventure.', body: '' },
-  reading: { eyebrow: 'A little wobble', title: 'Did it move when you did?', body: '' },
-  steps: { eyebrow: 'Yesterday’s steps', title: 'Looks like your steps help wake it up.', body: '' },
-  permission: { eyebrow: 'Yesterday’s steps', title: 'It stirs when you move. May it count your steps?', body: '' },
-  movement: { eyebrow: 'Your own rhythm', title: 'There’s more than one way to move it.', body: '' },
-  ready: { eyebrow: 'Ready to meet you', title: 'Those little moments woke someone up.', body: '' },
+  intent: { eyebrow: 'A new Egg', title: 'This one moves when you do.', body: '' },
+  reading: { eyebrow: 'Yesterday’s steps', title: 'Counting yesterday’s steps…', body: '' },
+  steps: { eyebrow: 'Yesterday’s steps', title: 'Your steps are light too. Feed them in.', body: '' },
+  permission: { eyebrow: 'Yesterday’s steps', title: 'Your steps are light too. May it count them?', body: '' },
+  movement: { eyebrow: 'Your own rhythm', title: 'Steps are one way. Not the only one.', body: '' },
+  ready: { eyebrow: 'Awake', title: 'That woke someone.', body: '' },
 } as const;
 
 /** Spoken before the system Motion prompt; both answers keep the Egg hatchable. */

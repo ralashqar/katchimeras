@@ -77,7 +77,7 @@ test('Merge speech guidance is one green line and appears only for first-use mec
     id: 'glow.lesson.single.match-2',
     cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'sprout' } },
     guide: { eyebrow: 'old', title: 'A much longer title', body: 'A much longer explanation.' },
-  })?.title, 'Match the Sprout in the mist.');
+  })?.title, 'Bring the Sprout its twin.');
 });
 
 test('hero copy fits three lines without captions and Haven spotlight retries native layout', () => {
@@ -193,7 +193,7 @@ test('the Egg asks two meaningful real-life questions before Hatch', () => {
   assert.equal(step?.actions[0]?.handlerId, 'player_profile');
   assert.equal(step?.actions[0]?.options?.length, 5);
   assert.equal(mossproutFtueAction('egg.opening', 'egg.day_texture')?.nextStepId, 'egg.context');
-  assert.equal(step?.actions[0]?.title, 'How do you feel?');
+  assert.equal(step?.actions[0]?.title, 'How was your day, honestly?');
   assert.deepEqual(step?.actions[0]?.options?.map((option) => option.label), [
     'Radiant', 'Light', 'Meh', 'Heavy', 'Stormy',
   ]);

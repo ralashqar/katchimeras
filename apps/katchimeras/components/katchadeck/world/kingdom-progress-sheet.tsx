@@ -29,7 +29,7 @@ export function KingdomProgressSheet({ progress, onClose, onNext }: {
 }) {
   const actionable = progress.next.kind !== 'journey' && progress.next.kind !== 'complete';
   return <KatchaSheet
-    header={{ eyebrow: 'THE KINGDOM', title: 'Bringing everyone home', subtitle: 'Every place we bring back brings a friend home.' }}
+    header={{ eyebrow: 'THE GARDEN', title: 'Waking the friends', subtitle: 'One clearing, one friend, one small thing at a time.' }}
     onRequestClose={onClose}
     scroll
     size="tall"

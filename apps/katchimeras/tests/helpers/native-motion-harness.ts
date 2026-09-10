@@ -32,10 +32,10 @@ function complete(m: Motion) {
 export function nativeMotionHarness() {
   let now = 0;
   const values = new Set<Value>();
-  const builder = { delay: () => builder, duration: () => builder, easing: () => builder };
+  const builder = { delay: () => builder, duration: () => builder, easing: () => builder, springify: () => builder, damping: () => builder, stiffness: () => builder, mass: () => builder };
   const animated = {
     __esModule: true,
-    default: { View: 'AnimatedView' },
+    default: { View: 'AnimatedView', createAnimatedComponent: (component: unknown) => component },
     Easing: {
       cubic: (x: number) => x ** 3,
       quad: (x: number) => x ** 2,

@@ -3,6 +3,7 @@ import test from 'node:test';
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { loadNativeModule, nativeMotionHarness, nativeViews } from './helpers/native-motion-harness';
+import { readFileSync } from './helpers/content-fs';
 import { upgradeUsesTutorialNarrative } from '@/features/world-upgrades/world-upgrade-stories';
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
 import { GLOW_DISCOVERY_FLOW } from '@/features/onboarding/glow-discovery-flow';
@@ -16,6 +17,11 @@ test('only the two first tutorial clearings bypass the upgrade narrative', () =>
   assert.equal(upgradeUsesTutorialNarrative('nature:pond-sanctuary', 1, GLOW_DISCOVERY_FLOW.id), false);
   assert.equal(upgradeUsesTutorialNarrative('haven:mossprout', 2, MOSSPROUT_FTUE_FLOW.id), false);
 });
+const bubbleScaleOf = (nodes: { props: { style?: unknown } }[]) => {
+  const bubble = nodes.find((node) => Array.isArray(node.props.style) && (node.props.style as { backgroundColor?: string }[])[0]?.backgroundColor)!;
+  const styles = bubble.props.style as { read?: () => { transform: { scale: number }[] } }[];
+  return styles.at(-1)!.read!().transform[0].scale;
+};
 test('both tutorial marker spotlight targets enclose the full badge at every zoom and pulse', async () => {
   const host = (name: string) => name as unknown as React.ComponentType<Record<string, unknown>>;
   const motion = nativeMotionHarness();
@@ -55,9 +61,32 @@ test('both tutorial marker spotlight targets enclose the full badge at every zoo
     }
     await act(async () => proxy.props.onLayout());
     assert.equal(registrations.at(-2), null); assert.equal(registrations.at(-1), proxyNode, 'layout changes invalidate cached spotlight measurements');
-    assert.equal(tree!.root.findByType(host('Pressable')).props.style.width, 68);
+    const pressable = tree!.root.findByType(host('Pressable'));
+    assert.equal(pressable.props.style[0].width, 68);
+    // The press target follows the painted bubble, never smaller than its 68pt floor.
+    for (const zoom of [0.5, 1, 3]) {
+      cameraScale.value = zoom;
+      const visual = 600 * 0.15 / 68 * zoom;
+      const hit = pressable.props.style[1].read().transform[0].scale;
+      const bubble = bubbleScaleOf(tree!.root.findAllByType(host('AnimatedView')));
+      assert.equal(hit, Math.max(1, visual), `zoom ${zoom}: hit target scale`);
+      assert.ok(Math.abs(hit * bubble - visual) < 1e-9, `zoom ${zoom}: painted size unchanged`);
+    }
+    assert.equal(pressable.props.hitSlop, 6);
     await act(async () => tree!.update(<Marker {...props} hidden />));
     assert.equal(registrations.at(-1), null);
     await act(async () => tree!.unmount());
   }
+});
+
+test('a tap on a marker is never disabled by its own touch: the camera reads moving only once a pan activates, and a non-pan touch settles', () => {
+  const camera = readFileSync(require.resolve('@incubator/environments/hex-camera'), 'utf8');
+  const pan = camera.slice(camera.indexOf('Gesture.Pan()'), camera.indexOf('Gesture.Pinch()'));
+  const onBegin = pan.slice(pan.indexOf('.onBegin('), pan.indexOf('.onStart('));
+  assert.doesNotMatch(onBegin, /beginMotion/, 'touch down must not flip isMoving; the marker Pressable is disabled by it');
+  assert.match(onBegin, /panActivated\.value = false/);
+  assert.match(pan, /\.onStart\(\(\) => \{\s*panActivated\.value = true;\s*runOnJS\(beginMotion\)\(\);/);
+  assert.match(pan, /\.onFinalize\(\(\) => \{[\s\S]*?if \(panActivated\.value\) return;\s*runOnJS\(commitSnapshot\)\(tx\.value, ty\.value, scale\.value, false\);/);
+  const marker = readFileSync('components/katchadeck/world/world-upgrade-marker.tsx', 'utf8');
+  assert.match(marker, /disabled=\{moving \|\| hidden\}/, 'the marker still yields while the camera is really moving');
 });

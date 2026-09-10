@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { FadeInUp, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NarrativeDialogue, narrativeStyles as styles } from './narrative-presentation';
 import { HavenCharacterPortrait } from './haven-character-portrait';
@@ -9,6 +9,35 @@ import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { getCreatureVisual } from '@/game/days/visuals';
 import type { ConversationTranscriptEntry } from '@/types/companion-conversation';
+
+/**
+ * How long a paced line stays on its own before the next one arrives on its
+ * own: short enough that the conversation keeps moving, long enough to read.
+ * A tap anywhere skips the wait.
+ */
+export function narrativeReadingDelayMs(text: string): number {
+  return Math.min(3200, Math.max(1300, 800 + text.length * 20));
+}
+
+/**
+ * Which lines a batched transcript update may show at once. A session commit
+ * can append the player's answer, the reply to it and the next prompt in one
+ * go. The answer and its reply are one moment and appear together; only a
+ * further prompt earns its own tap or reading beat.
+ */
+export function narrativeAdmittedCount(
+  previousIds: readonly string[],
+  entries: readonly Pick<ConversationTranscriptEntry, 'id' | 'speaker'>[],
+  currentRevealStep: number,
+): number {
+  const previousVisibleCount = Math.min(currentRevealStep, previousIds.length);
+  let retained = 0;
+  while (retained < previousVisibleCount && previousIds[retained] === entries[retained]?.id) retained += 1;
+  const answer = entries[retained];
+  const reply = entries[retained + 1];
+  const admitted = answer?.speaker === 'player' && reply && reply.speaker !== 'player' ? retained + 2 : retained + 1;
+  return Math.min(entries.length, admitted);
+}
 
 /** Presentation only: callers retain ownership of saves, handoffs and rewards. */
 export function ConversationNarrativeOverlay({ title, entries, checkpoint, required = false, inline = false, paced = false, initiallyRevealedCount = 0, onClose, children }: {
@@ -22,6 +51,9 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
   const avatar = useEggAvatar();
   const scroll = useRef<ScrollView>(null);
   const nearBottom = useRef(true);
+  // Set whenever new speech or choices are revealed: the next content-size
+  // change scrolls to the end even if the reader had scrolled up to reread.
+  const autoScrollPending = useRef(false);
   const [latest, setLatest] = useState(false);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -57,18 +89,7 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
     const sameEntries = previousIds.length === nextIds.length
       && previousIds.every((id, index) => id === nextIds[index]);
     if (sameEntries) return;
-    setRevealStep((current) => {
-      const previousVisibleCount = Math.min(current, previousIds.length);
-      let retainedVisibleCount = 0;
-      while (
-        retainedVisibleCount < previousVisibleCount
-        && previousIds[retainedVisibleCount] === nextIds[retainedVisibleCount]
-      ) retainedVisibleCount += 1;
-      // A session update can append the player's answer, its reply and the
-      // next prompt in one React commit. Admit only the first unseen line;
-      // every later line keeps its own tap or reading-time beat.
-      return Math.min(entries.length, retainedVisibleCount + 1);
-    });
+    setRevealStep((current) => narrativeAdmittedCount(previousIds, entries, current));
   }, [entries, paced]);
   useEffect(() => {
     if (!visible && afterDismiss.current) {
@@ -82,6 +103,14 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
   const controlsVisible = !paced || revealStep > entries.length;
   const stagedEntries = paced ? entries.slice(0, Math.min(revealStep, entries.length)) : entries;
   const visibleEntries = compactComparison ? stagedEntries.slice(-1) : stagedEntries;
+  useEffect(() => {
+    // New speech or choices always bring the reader to the bottom, even if
+    // they tapped or scrolled a moment ago. The "Latest" pill only serves a
+    // reader who scrolls up while nothing new is arriving.
+    autoScrollPending.current = true;
+    nearBottom.current = true;
+    setLatest(false);
+  }, [visibleEntries.length, controlsVisible]);
   const revealNext = useCallback(() => {
     if (!paced || controlsVisible) return;
     if (revealTimer.current) { clearTimeout(revealTimer.current); revealTimer.current = null; }
@@ -91,8 +120,7 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
   useEffect(() => {
     if (!paced || controlsVisible || busy || !visibleEntries.length) return;
     const current = visibleEntries.at(-1);
-    const readingDelay = Math.min(5000, Math.max(2200, 1500 + (current?.text.length ?? 0) * 24));
-    revealTimer.current = setTimeout(revealNext, readingDelay);
+    revealTimer.current = setTimeout(revealNext, narrativeReadingDelayMs(current?.text ?? ''));
     return () => {
       if (revealTimer.current) clearTimeout(revealTimer.current);
       revealTimer.current = null;
@@ -132,20 +160,28 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
         </View>
         <ScrollView ref={scroll} style={styles.scroll} contentContainerStyle={styles.transcript} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator persistentScrollbar
           onScroll={({ nativeEvent: e }) => { nearBottom.current = e.contentOffset.y + e.layoutMeasurement.height >= e.contentSize.height - 48; setLatest(!nearBottom.current); }} scrollEventThrottle={32}
-          onContentSizeChange={() => { if (nearBottom.current) scroll.current?.scrollToEnd({ animated: !reduced }); }}>
+          onContentSizeChange={() => {
+            if (!nearBottom.current && !autoScrollPending.current) return;
+            autoScrollPending.current = false;
+            scroll.current?.scrollToEnd({ animated: !reduced });
+          }}>
           {visibleEntries.map((entry, index) => {
             const player = entry.speaker === 'player';
             const skin = player ? null : katchimeraSkinById.get(entry.speaker);
             const visual = skin?.visualKey ? getCreatureVisual(skin.visualKey, 'grown') : null;
             const current = paced && !controlsVisible && index === visibleEntries.length - 1;
-            return <Animated.View key={entry.id} entering={reduced ? undefined : FadeInDown.duration(220).delay(index === visibleEntries.length - 1 && !player ? 100 : 0)}>
+            // A new line rises into place like a fresh entry. A reply that
+            // follows the player's own words waits a beat so the answer lands first.
+            const followsPlayer = !player && visibleEntries[index - 1]?.speaker === 'player';
+            const entering = reduced ? undefined : FadeInUp.springify().damping(17).stiffness(210).mass(0.8).delay(followsPlayer ? 160 : 0);
+            return <Animated.View key={entry.id} entering={entering}>
               <NarrativeDialogue right={player} name={player ? 'You' : skin?.displayName ?? title} text={entry.text}
                 current={current}
                 portrait={player ? <View style={{ borderRadius: 42, backgroundColor: '#FFF6D8', borderWidth: 3, borderColor: '#ED9F4D' }}><EggAvatar skinId={avatar.equippedSkinId} faceId={avatar.equippedFaceId} hatId={avatar.equippedHatId} heldAccessoryId={avatar.equippedHeldAccessoryId} size={78} /></View> : visual ? <HavenCharacterPortrait source={visual.source} size={84} /> : null} />
             </Animated.View>;
           })}
           {controlsVisible ? <View collapsable={false} pointerEvents={busy ? 'none' : 'auto'} accessibilityState={{ busy }}>
-              <Animated.View key={checkpoint} entering={reduced ? undefined : FadeInDown.duration(220)} style={{ gap: 10 }}>
+              <Animated.View key={checkpoint} entering={reduced ? undefined : FadeInUp.duration(240).delay(80)} style={{ gap: 10 }}>
                 {children(perform)}
               </Animated.View>
             </View> : null}

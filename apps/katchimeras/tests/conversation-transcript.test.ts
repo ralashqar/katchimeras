@@ -118,8 +118,9 @@ for (const intent of ['calm', 'progress', 'unsure'] as const) {
     assert.ok(history.some((entry) => entry.text === choice.reply));
     const ending = resolved.nodes.find((node) => node.id === 'end');
     assert.ok(ending?.kind === 'end');
-    assert.match(ending.message, /Memory Seed/);
-    assert.match(ending.message, /Garden.*plant/);
+    // The Seed invitation is one spoken line: what was shared, and where it goes.
+    assert.match(ending.message, /already something/);
+    assert.match(ending.message, /soil/);
     session = continueConversation(session, resolved, 4);
     assert.equal(session.status, 'completed');
     assert.equal(session.dialogueAcknowledgedAt, 4);

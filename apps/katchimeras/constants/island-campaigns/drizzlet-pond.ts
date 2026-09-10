@@ -203,7 +203,7 @@ export const DRIZZLET_POND_CAMPAIGN: IslandCampaignDefinition<DrizzletFeelingSty
     discoveryActionLabel: 'Talk with Drizzlet',
     revealReactionLine: 'The mist lifts from a dry hollow that once held the sky.',
     mistNextName: 'A dry hollow',
-    mistDescription: 'Something beyond this mist is waiting for rain. Clear it and find out who brought the weather.',
+    mistDescription: 'Someone in there is still looking up, waiting for rain.',
     returnNoteTitle: 'Meet me at Pond Sanctuary',
     returnNoteHint: 'Return to Drizzlet’s pond for the next scene',
     actionLabels: {
@@ -233,7 +233,7 @@ export const DRIZZLET_POND_CAMPAIGN: IslandCampaignDefinition<DrizzletFeelingSty
     fallbackResolution: (level) => level === 4
       ? 'The pond holds the whole sky again, and a little quiet for us.'
       : 'The pond filled a little further, and the rain had somewhere to land.',
-    wakeHandoffLine: 'Up in the orchard someone has been saving leaves for you. Autumn-coloured ones.',
+    wakeHandoffLine: 'Rain only falls where someone is looking up. Up in the orchard someone has been saving leaves for you. Autumn-coloured ones.',
     sleepingHint: 'Someone is resting by the dry hollow. They will wake once the friend before them is home.',
   },
 };

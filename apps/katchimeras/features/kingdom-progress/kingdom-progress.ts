@@ -108,7 +108,7 @@ function nextStep(world: MergeWorldState, friends: KingdomFriendEntry[]): Kingdo
     const away = friends.filter((friend) => friend.status === 'away').map((friend) => friend.name);
     return { kind: 'journey', label: away.length
       ? `${away.join(' and ')} will find their way here through Mossprout’s journeys`
-      : 'The next friend is still resting. Keep growing the garden.' };
+      : 'The next friend is deeper in the mist. Keep making light.' };
   }
   return { kind: 'complete', label: 'Every friend is home.' };
 }

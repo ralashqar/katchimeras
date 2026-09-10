@@ -203,7 +203,7 @@ export const BLOSSLE_NURSERY_CAMPAIGN: IslandCampaignDefinition<BlossleBeginning
     discoveryActionLabel: 'Talk with Blossle',
     revealReactionLine: 'The mist lifts from rows of empty, hopeful pots.',
     mistNextName: 'A shelf of empty pots',
-    mistDescription: 'Someone beyond this mist has been saving a pot for something brave. Clear it and meet them.',
+    mistDescription: 'Someone in there is still saving a pot for something brave.',
     returnNoteTitle: 'Meet me at Seed Nursery',
     returnNoteHint: 'Return to Blossle’s nursery for the next scene',
     actionLabels: {
@@ -233,7 +233,7 @@ export const BLOSSLE_NURSERY_CAMPAIGN: IslandCampaignDefinition<BlossleBeginning
     fallbackResolution: (level) => level === 4
       ? 'The nursery sent its seedlings out into the world. I saved one pot for something brave.'
       : 'The nursery grew a little fuller, and a little more like the picture in my head.',
-    wakeHandoffLine: 'Down at the pond, someone has been listening for rain. Go and say hello for me.',
+    wakeHandoffLine: 'I saved a pot for something brave. It turns out that was you coming back. Down at the pond, someone has been listening for rain. Go and say hello for me.',
     sleepingHint: 'Someone is resting among the empty pots. They will wake once the friend before them is home.',
   },
 };

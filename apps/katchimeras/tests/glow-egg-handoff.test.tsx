@@ -11,7 +11,7 @@ import type { ContentFlowRun } from '../types/content-flow';
 const reveal = (): ContentFlowRun => ({ ...createContentFlowRun(GLOW_DISCOVERY_FLOW, { runId: 'handoff' }), nodeId: 'gateway.egg', phase: 'awaiting_input' });
 
 test('Meet the egg saves acceptance once and waits for encounter readiness across relaunch', () => {
-  assert.equal(glowDiscoveryScene('gateway.egg')?.view.actionLabel, 'Meet the egg');
+  assert.equal(glowDiscoveryScene('gateway.egg')?.view.actionLabel, 'Meet the Egg');
   let run = reduceContentFlow(GLOW_DISCOVERY_FLOW, reveal(), { type: 'submit_scene', actionId: 'done' }).run;
   assert.equal(run.nodeId, 'egg.enter'); assert.equal(run.status, 'active');
   run = JSON.parse(JSON.stringify(run));

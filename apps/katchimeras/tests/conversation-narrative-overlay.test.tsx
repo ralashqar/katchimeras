@@ -111,13 +111,13 @@ test('a batched conversation update reveals one transcript entry per beat', asyn
 
   await act(async () => { tree.update(<Overlay title="Mossprout" checkpoint="question-two" entries={answeredEntries} paced initiallyRevealedCount={3} onClose={() => {}}>{controls}</Overlay>); });
   assert.deepEqual(tree.root.findAllByType(host('Dialogue')).map((node) => node.props.text), [
-    'What feels right?', 'A gentler pace.',
-  ], 'the answer is the only newly admitted line after a batched session update');
+    'What feels right?', 'A gentler pace.', 'Then we can leave room to breathe.',
+  ], 'the answer and its reply arrive together; the next prompt keeps its own beat');
   assert.equal(tree.root.findAllByType(host('Choices')).length, 0);
 
   await act(async () => { tree.update(<Overlay title="Mossprout" checkpoint="question-two:saved" entries={answeredEntries} paced initiallyRevealedCount={3} onClose={() => {}}>{controls}</Overlay>); });
-  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 2, 'checkpoint-only rerenders cannot skip another speech beat');
-  for (const expectedCount of [3, 4]) {
+  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 3, 'checkpoint-only rerenders cannot skip another speech beat');
+  for (const expectedCount of [4]) {
     const tap = tree.root.findByProps({ accessibilityLabel: 'Continue dialogue' });
     await act(async () => tap.props.onPress());
     assert.equal(tree.root.findAllByType(host('Dialogue')).length, expectedCount);
@@ -273,4 +273,71 @@ test('Garden handoff stays empty, advances automatically, and exposes retry only
   assert.equal(calls, 3);
   assert.equal(tree.toJSON(), null);
   await act(async () => tree.unmount());
+});
+
+test('a reply arrives with the answer, later lines pace quickly, and new speech scrolls the reader down even after they scrolled up', async () => {
+  const ids = ['prompt-one', 'answer-one', 'reply-one', 'prompt-two'];
+  const entries = ids.map((id, index) => ({ id, speaker: index === 1 ? 'player' : 'mossprout' } as const));
+  const motion = nativeMotionHarness();
+  const scrolled: unknown[] = [];
+  const ScrollViewMock = React.forwardRef(function ScrollViewMock(props: Record<string, unknown>, ref) {
+    React.useImperativeHandle(ref, () => ({ scrollToEnd: (options: unknown) => { scrolled.push(options); } }));
+    return React.createElement('ScrollView', props);
+  });
+  const timers = new Map<number, { fn: () => void; ms: number }>(); let serial = 0;
+  const module = loadNativeModule('components/katchadeck/world/conversation-narrative-overlay.tsx', {
+    'react-native': { ...nativeViews, Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', ScrollView: ScrollViewMock },
+    'react-native-reanimated': { ...motion.animated,
+      withTiming: (to: number, options = { duration: 180 }) => motion.animated.withTiming(to, options),
+      withSpring: (to: number) => motion.animated.withTiming(to, { duration: 300 }),
+    },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 12 }) },
+    './narrative-presentation': { NarrativeDialogue: host('Dialogue'), narrativeStyles: {} },
+    './haven-character-portrait': { HavenCharacterPortrait: host('Portrait') },
+    '@/components/katchadeck/egg-avatar/egg-avatar': { EggAvatar: host('Egg') },
+    '@/features/egg-avatar/egg-avatar-provider': { useEggAvatar: () => ({}) },
+    '@/constants/katchimera-skins': { katchimeraSkinById: new Map() },
+    '@/game/days/visuals': { getCreatureVisual: () => null },
+  }, { setTimeout: (fn: () => void, ms: number) => { timers.set(++serial, { fn, ms }); return serial; }, clearTimeout: (id: number) => timers.delete(id) });
+  const { narrativeAdmittedCount, narrativeReadingDelayMs } = module as unknown as { narrativeAdmittedCount: (previous: readonly string[], entries: readonly { id: string; speaker: string }[], step: number) => number; narrativeReadingDelayMs: (text: string) => number };
+  assert.equal(narrativeAdmittedCount(['prompt-one'], entries, 2), 3, 'the answer and its reply are one moment');
+  assert.equal(narrativeAdmittedCount(['prompt-one', 'answer-one', 'reply-one'], entries, 3), 4, 'the next prompt follows on its own beat');
+  assert.equal(narrativeAdmittedCount([], entries.slice(0, 1), 0), 1, 'a fresh transcript still opens on one line');
+  assert.equal(narrativeAdmittedCount(['prompt-one'], [entries[0], { id: 'line-two', speaker: 'mossprout' }], 2), 2, 'two companion lines keep their beat');
+  assert.equal(narrativeReadingDelayMs(''), 1300);
+  assert.equal(narrativeReadingDelayMs('x'.repeat(40)), 1600);
+  assert.equal(narrativeReadingDelayMs('x'.repeat(400)), 3200, 'a long line never waits longer than a few seconds');
+  const Overlay = module.ConversationNarrativeOverlay as React.ComponentType<any>;
+  const controls = () => React.createElement(host('Choices'));
+  const transcript = [{ id: 'prompt-one', speaker: 'mossprout', text: 'What feels right?' }];
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(<Overlay title="Mossprout" checkpoint="q1" entries={transcript} paced onClose={() => {}}>{controls}</Overlay>); });
+  const scrollView = () => tree.root.findByType('ScrollView' as React.ElementType);
+  await act(async () => { scrollView().props.onContentSizeChange(); });
+  assert.equal(scrolled.length, 1, 'the first layout lands at the end');
+  // The reader scrolls up to reread: nothing new is arriving, so nothing pulls them down.
+  await act(async () => { scrollView().props.onScroll({ nativeEvent: { contentOffset: { y: 0 }, layoutMeasurement: { height: 400 }, contentSize: { height: 2000 } } }); });
+  const before = scrolled.length;
+  await act(async () => { scrollView().props.onContentSizeChange(); });
+  assert.equal(scrolled.length, before, 'no new content: their place is kept');
+  assert.equal(tree.root.findAll((node) => node.props.children === 'Latest ↓').length, 1, 'the Latest pill offers the way back');
+
+  // Their answer and its reply arrive: the transcript comes down to them.
+  const answered = [...transcript, { id: 'answer-one', speaker: 'player', text: 'A gentler pace.' }, { id: 'reply-one', speaker: 'mossprout', text: 'Then we can leave room to breathe.' }, { id: 'prompt-two', speaker: 'mossprout', text: 'What next?' }];
+  await act(async () => { tree.update(<Overlay title="Mossprout" checkpoint="q2" entries={answered} paced initiallyRevealedCount={3} onClose={() => {}}>{controls}</Overlay>); });
+  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 3);
+  await act(async () => { scrollView().props.onContentSizeChange(); });
+  assert.equal(scrolled.length, before + 1, 'new speech scrolls to the end despite the earlier scroll-up');
+  const pending = [...timers.values()].at(-1)!;
+  assert.ok(pending.ms >= 1300 && pending.ms <= 3200, `the reply is read in ${pending.ms}ms, then the next prompt follows on its own`);
+  await act(async () => { pending.fn(); });
+  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 4);
+  await act(async () => { scrollView().props.onContentSizeChange(); });
+  assert.equal(scrolled.length, before + 2, 'the auto-revealed prompt scrolls down too');
+  await act(async () => tree.root.findByProps({ accessibilityLabel: 'Continue dialogue' }).props.onPress());
+  assert.equal(tree.root.findAllByType(host('Choices')).length, 1);
+  await act(async () => { scrollView().props.onContentSizeChange(); });
+  assert.equal(scrolled.length, before + 3, 'choices scroll into view as well');
+  await act(async () => tree.unmount());
+  assert.equal(timers.size, 0);
 });

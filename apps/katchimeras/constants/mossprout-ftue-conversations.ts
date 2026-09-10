@@ -56,7 +56,7 @@ function definition(key: string, opening: string): ConversationDefinition {
     entryNodeId: 'hello',
     nodes: [
       {
-        id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout.`,
+        id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout. I think I was the last one awake.`,
         options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'followup' })),
       },
       { id: 'followup', kind: 'choice', prompt: mossproutFollowup('progress').prompt, options: mossproutFollowup('progress').options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) },
@@ -98,8 +98,8 @@ const chapterZeroReturnDefinition: ConversationDefinition = {
   nodes: [
     {
       id: 'home', kind: 'choice', phase: 'opening',
-      prompt: 'It worked. Something from your world changed mine.',
-      options: [{ id: 'see-change', label: 'See what changed', reply: 'The first bloom belongs in our Grove.', nextNodeId: 'end' }],
+      prompt: 'You came back. The Mist hates that.',
+      options: [{ id: 'see-change', label: 'See what changed', reply: 'Something from your world changed mine. Come and look.', nextNodeId: 'end' }],
     },
     { id: 'end', kind: 'end', message: 'There’s one little thing I want to ask before I rest.' },
   ],
@@ -125,15 +125,15 @@ const firstRestDefinition: ConversationDefinition = {
   nodes: [
     {
       id: 'seed-settles', kind: 'choice', phase: 'opening',
-      prompt: 'There. Now the Garden can remember what we started.',
+      prompt: 'There. Now the garden remembers what we started.',
       options: [{ id: 'continue', label: 'Stay with Mossprout', reply: 'That was a lot of growing for one day.', nextNodeId: 'roots' }],
     },
     {
       id: 'roots', kind: 'choice', phase: 'deepen',
-      prompt: 'Roots need quiet after they grow.',
+      prompt: 'I need to rest. Roots do, after they grow.',
       options: [{ id: 'rest', label: 'Rest, Mossprout', reply: 'When I wake up, tell me what you’d like us to grow next.', nextNodeId: 'end' }],
     },
-    { id: 'end', kind: 'end', message: 'I’ll keep our first Seed close.' },
+    { id: 'end', kind: 'end', message: 'I’ll keep your Memory close.' },
   ],
 };
 

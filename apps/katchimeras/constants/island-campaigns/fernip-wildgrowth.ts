@@ -203,7 +203,7 @@ export const FERNIP_WILDGROWTH_CAMPAIGN: IslandCampaignDefinition<FernipRestStyl
     discoveryActionLabel: 'Talk with Fernip',
     revealReactionLine: 'The mist drifts off a tangled, sleeping grove.',
     mistNextName: 'A tangled grove',
-    mistDescription: 'Something is resting in the ferns beyond this mist. Clear it and see who wakes.',
+    mistDescription: 'Someone in there is still resting, and has been for a very long time.',
     returnNoteTitle: 'Meet me at Wildgrowth Grove',
     returnNoteHint: 'Return to Fernip’s grove for the next scene',
     actionLabels: {
@@ -233,7 +233,7 @@ export const FERNIP_WILDGROWTH_CAMPAIGN: IslandCampaignDefinition<FernipRestStyl
     fallbackResolution: (level) => level === 4
       ? 'The whole wild corner is glowing. I did not tidy a single thing.'
       : 'The grove grew a little wilder, and a little more like home.',
-    wakeHandoffLine: 'Past the ferns there is a nursery where someone keeps counting seeds. I think they would like company.',
+    wakeHandoffLine: 'Resting is not the same as being forgotten. I had confused the two. Past the ferns there is a nursery where someone keeps counting seeds. I think they would like company.',
     sleepingHint: 'Someone is resting under the ferns. They will wake once the friend before them is home.',
   },
 };
