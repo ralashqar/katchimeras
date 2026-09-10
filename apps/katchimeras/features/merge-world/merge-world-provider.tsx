@@ -29,7 +29,8 @@ import { completeMossproutResidentCardDiscovery, mossproutDailyActionDeck, mossp
 import { completeMeditationRequest, currentJourneyCycle, settleDailyGardenDelivery } from '@/game/katchimeras/companion-journey-cycle';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { completeMossproutChapterZeroSlice, isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
-import { loadMergeWorldState, saveMergeWorldState, subscribeMergeWorldResets, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
+import { loadMergeWorldState, MergeWorldStaleWriteError, saveMergeWorldState, subscribeMergeWorldResets, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
+import { registerMergeWorldWriterFlush } from '@/utils/merge-world/writer-flush';
 import { isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, markAuthoredCohortOrderActive, markAuthoredCohortOrderServed, markFeastleOrderActive, markFeastleOrderServed, recordAuthoredCohortQuietBond, recordFeastleQuietBond, subscribeCompanionStories } from '@/utils/companion-story-storage';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { loadCompanionQuickGoalState, subscribeCompanionQuickGoals } from '@/utils/companion-quick-goal-storage';
@@ -45,8 +46,12 @@ type MergeWorldContextValue = {
   error: string | null;
   lastResult: MergeWorldCommandResult | null;
   friendshipLevels: Partial<Record<MergeCharacterId, number>>;
-  dispatch: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
+  dispatch: (command: MergeWorldCommand, options?: MergeWorldDispatchOptions) => MergeWorldCommandResult | null;
   flush: () => Promise<void>;
+};
+export type MergeWorldDispatchOptions = {
+  /** Skip the short ordinary-command buffer: guided lessons must land before the FTUE checkpoint. */
+  persist?: 'immediate';
 };
 type MergeWorldStateContextValue = Pick<MergeWorldContextValue, 'state' | 'loading' | 'error'>;
 type MergeWorldActionsContextValue = Pick<MergeWorldContextValue, 'dispatch' | 'flush'>;
@@ -140,6 +145,13 @@ export function MergeWorldProvider({
   const persistenceWorkerRef = useRef<Promise<void> | null>(null);
   const saveDeadlineRef = useRef<ReturnType<typeof createMergeSaveDeadline> | null>(null);
   const persistenceGenerationRef = useRef(0);
+  /**
+   * Revision of the database snapshot the current in-memory state descends
+   * from. Every save is validated against it, so this provider can never
+   * revert a store write (an island cleared, the Kingdom wish, a prepared
+   * lesson) that another writer landed after this state was derived.
+   */
+  const baseRevisionRef = useRef<number | null>(null);
   const externalWorkerRef = useRef<Promise<void> | null>(null);
   const externalGenerationRef = useRef(0);
   const applyingStoryReceiptDepthRef = useRef(0);
@@ -436,6 +448,7 @@ export function MergeWorldProvider({
       persistenceWorkerRef.current = null;
       externalWorkerRef.current = null;
       const reconciledState = activeRef.current ? featureAndReconcile(freshState) : freshState;
+      baseRevisionRef.current = freshState.revision;
       stateRef.current = reconciledState;
       setState(reconciledState);
       setLastResult(null);
@@ -454,12 +467,22 @@ export function MergeWorldProvider({
     // newer repository snapshots immediately and invalidate any stale buffered
     // write so reopening Games cannot overwrite or hide that reward.
     const release = acquireLifecycleResource('retained_subscription', 'merge:world-snapshots');
-    const unsubscribe = subscribeMergeWorldSnapshots((freshState) => {
-      if (!mountedRef.current || freshState.revision <= (stateRef.current?.revision ?? -1)) return;
+    const unsubscribe = subscribeMergeWorldSnapshots((freshState, origin) => {
+      if (!mountedRef.current || freshState === stateRef.current) return;
+      // Another provider's save is only news when it is newer than ours. A
+      // store write (story effect, world screen) always supersedes us: it was
+      // reduced from the flushed database, so our optimistic state descends
+      // from an older snapshot than the one it produced.
+      if (origin === 'provider' && freshState.revision <= (stateRef.current?.revision ?? -1)) return;
+      if (origin === 'store' && freshState.revision <= (baseRevisionRef.current ?? -1)) return;
+      if (pendingPersistenceRef.current) {
+        console.warn(`Merge world: dropping ${pendingPersistenceRef.current.coalescedCommands} unsaved command(s) superseded by a ${origin} write`);
+      }
       persistenceGenerationRef.current += 1;
       saveDeadlineRef.current?.cancel();
       pendingPersistenceRef.current = null;
       persistenceWorkerRef.current = null;
+      baseRevisionRef.current = freshState.revision;
       stateRef.current = freshState;
       setState(freshState);
       setLastResult(null);
@@ -483,11 +506,25 @@ export function MergeWorldProvider({
       for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
         if (workerGeneration !== persistenceGenerationRef.current) return;
         try {
-          await saveMergeWorldState(pending.state, [...pending.receiptIds]);
+          await saveMergeWorldState(pending.state, [...pending.receiptIds], { baseRevision: baseRevisionRef.current ?? undefined });
           if (workerGeneration !== persistenceGenerationRef.current) return;
+          baseRevisionRef.current = pending.state.revision;
           saved = true;
           break;
         } catch (caught) {
+          if (caught instanceof MergeWorldStaleWriteError) {
+            // Someone else wrote since this state was derived. Retrying would
+            // revert their change; adopt the newer snapshot instead.
+            if (workerGeneration !== persistenceGenerationRef.current) return;
+            console.warn('Merge world: discarding a stale save in favour of the newer stored snapshot');
+            persistenceGenerationRef.current += 1;
+            saveDeadlineRef.current?.cancel();
+            pendingPersistenceRef.current = null;
+            baseRevisionRef.current = caught.current.revision;
+            stateRef.current = caught.current;
+            if (mountedRef.current) { setState(caught.current); setLastResult(null); setError(null); }
+            return;
+          }
           caughtError = caught;
           if (attempt < RETRY_DELAYS_MS.length) await delay(RETRY_DELAYS_MS[attempt]);
         }
@@ -598,6 +635,9 @@ export function MergeWorldProvider({
     const worker = startPersistenceWorker();
     if (worker) await worker;
   }, [startPersistenceWorker]);
+  // Direct store readers/writers drain this provider before they touch the
+  // database, for the provider's whole lifetime (it is retained while unfocused).
+  useEffect(() => registerMergeWorldWriterFlush(flush), [flush]);
 
   useEffect(() => {
     if (active) return;
@@ -689,14 +729,16 @@ export function MergeWorldProvider({
     const release = acquireLifecycleResource('repository_worker', 'merge:initial-hydration');
     const worker = (async () => {
       try {
-        let next = await loadMergeWorldState();
+        const loaded = await loadMergeWorldState();
         if (cancelled || !activeRef.current) return;
-        next = reduceMergeWorld(next, { type: 'reconcileCharacters', characterIds, now: Date.now() }).state;
+        baseRevisionRef.current = loaded.revision;
+        let next = reduceMergeWorld(loaded, { type: 'reconcileCharacters', characterIds, now: Date.now() }).state;
         next = featureAndReconcile(next);
         const rewards = [...mergeActivityRewards(days, new Date(), { state: next, quickGoals: loadCompanionQuickGoalState() }), ...mergeQuestActivityRewards(questState)];
         const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now: Date.now() });
         next = activityResult.state;
-        await saveMergeWorldState(next);
+        await saveMergeWorldState(next, undefined, { baseRevision: loaded.revision });
+        baseRevisionRef.current = next.revision;
         if (cancelled || !activeRef.current) return;
         const appliedIds: string[] = [];
         for (const receipt of next.externalRewardReceipts.filter((item) => item.appliedAt == null)) {
@@ -710,7 +752,10 @@ export function MergeWorldProvider({
         // Applying a pending served-order receipt may have advanced Feastle to
         // a midpoint return. Repair the Merge projection before first paint.
         next = featureAndReconcile(next);
-        if (appliedIds.length || next !== beforeFriendshipReconcile) await saveMergeWorldState(next, appliedIds);
+        if (appliedIds.length || next !== beforeFriendshipReconcile) {
+          await saveMergeWorldState(next, appliedIds, { baseRevision: baseRevisionRef.current ?? undefined });
+          baseRevisionRef.current = next.revision;
+        }
         if (!cancelled && activeRef.current) {
           stateRef.current = next;
           setState(next);
@@ -820,7 +865,7 @@ export function MergeWorldProvider({
     enqueuePersistence(next);
   }, [active, characterIds, days, enqueuePersistence, featureAndReconcile, journeyRevision, loading, questState, quickGoalRevision, refreshFriendshipLevels, wisps.state.inventory]);
 
-  const dispatch = useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
+  const dispatch = useCallback((command: MergeWorldCommand, options?: MergeWorldDispatchOptions): MergeWorldCommandResult | null => {
     if (!activeRef.current || !isAppForeground()) return null;
     const current = stateRef.current;
     if (!current) return null;
@@ -936,7 +981,7 @@ export function MergeWorldProvider({
     stateRef.current = result.state;
     setState(result.state);
     setError(null);
-    enqueuePersistence(result.state, receiptIds, command.type === 'move' || command.type === 'tapGenerator');
+    enqueuePersistence(result.state, receiptIds, options?.persist !== 'immediate' && (command.type === 'move' || command.type === 'tapGenerator'));
     if (result.state.externalRewardReceipts.some((receipt) => receipt.appliedAt == null)) {
       void applyPendingExternalRewards();
     }

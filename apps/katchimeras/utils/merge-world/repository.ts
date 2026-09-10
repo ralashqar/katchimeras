@@ -16,6 +16,16 @@ import { completeMossproutChapterZeroSlice } from '@/utils/merge-world/chapter-z
 import { MOSSPROUT_FTUE_JOURNAL_ENERGY } from '@/utils/merge-world/economy-policy';
 import { firstFtueMemoryForSource, reduceFirstFtueMemoryPlacement } from '@/utils/merge-world/first-ftue-memory';
 import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
+import { flushMergeWorldWriters } from './writer-flush';
+import { MergeWorldStaleWriteError, mergeWriteIsStale } from './write-guard';
+export { MergeWorldStaleWriteError } from './write-guard';
+
+/**
+ * Who produced a published snapshot. A provider adopts another writer's store
+ * write unconditionally (its own optimistic state was derived from an older
+ * snapshot), but only adopts another provider's save when it is newer.
+ */
+export type MergeWorldSnapshotOrigin = 'provider' | 'store';
 
 const DATABASE_NAME = 'katchimeras-merge-world.db';
 const LOCAL_PROFILE_ID = 'local';
@@ -25,10 +35,10 @@ let resetGeneration = 0;
 let resetInProgress = false;
 let writeQueue: Promise<void> = Promise.resolve();
 const resetListeners = new Set<(state: MergeWorldState) => void>();
-const snapshotListeners = new Set<(state: MergeWorldState) => void>();
+const snapshotListeners = new Set<(state: MergeWorldState, origin: MergeWorldSnapshotOrigin) => void>();
 
-function publishSnapshot(state: MergeWorldState) {
-  snapshotListeners.forEach((listener) => listener(state));
+function publishSnapshot(state: MergeWorldState, origin: MergeWorldSnapshotOrigin) {
+  snapshotListeners.forEach((listener) => listener(state, origin));
 }
 
 function serializeWrite<T>(task: () => Promise<T>): Promise<T> {
@@ -70,6 +80,9 @@ async function database() {
 }
 
 export async function loadMergeWorldState(now = Date.now()): Promise<MergeWorldState> {
+  // A mounted provider may still hold commands it has not written. Read what
+  // the player sees, not what the database saw a moment ago.
+  await flushMergeWorldWriters();
   const db = await database();
   const row = await db.getFirstAsync<{ state_json: string; backup_json: string | null }>(
     'SELECT state_json, backup_json FROM merge_world_snapshot WHERE profile_id = ?',
@@ -90,7 +103,18 @@ export async function loadMergeWorldState(now = Date.now()): Promise<MergeWorldS
   }
 }
 
-export async function saveMergeWorldState(state: MergeWorldState, receiptIds?: readonly string[]): Promise<void> {
+export async function saveMergeWorldState(
+  state: MergeWorldState,
+  receiptIds?: readonly string[],
+  options: {
+    /**
+     * Revision of the snapshot this state was derived from. When the database
+     * has moved past it, the save is rejected with `MergeWorldStaleWriteError`
+     * carrying the newer snapshot, instead of reverting another writer.
+     */
+    baseRevision?: number;
+  } = {},
+): Promise<void> {
   // Companion/story resets notify their subscribers asynchronously. Do not
   // allow a subscriber holding the pre-reset board to queue it behind the
   // destructive reset and restore generators after the database is cleared.
@@ -109,6 +133,18 @@ export async function saveMergeWorldState(state: MergeWorldState, receiptIds?: r
     const db = await database();
     if (generation !== resetGeneration) return;
     if (resetInProgress) return;
+    if (options.baseRevision != null) {
+      const row = await db.getFirstAsync<{ revision: number; state_json: string }>(
+        'SELECT revision, state_json FROM merge_world_snapshot WHERE profile_id = ?',
+        [LOCAL_PROFILE_ID],
+      );
+      if (row && mergeWriteIsStale(row.revision, options.baseRevision)) {
+        let current: MergeWorldState;
+        try { current = normalizeMergeWorldState(JSON.parse(row.state_json), Date.now()); }
+        catch { current = state; }
+        throw new MergeWorldStaleWriteError(current);
+      }
+    }
     await db.withTransactionAsync(async () => {
       if (generation !== resetGeneration) return;
       if (resetInProgress) return;
@@ -135,13 +171,17 @@ export async function saveMergeWorldState(state: MergeWorldState, receiptIds?: r
       }
     });
   });
-  if (generation === resetGeneration && !resetInProgress) publishSnapshot(state);
+  if (generation === resetGeneration && !resetInProgress) publishSnapshot(state, 'provider');
 }
 
 async function reduceStoredMergeWorld(
   reduce: (state: MergeWorldState) => MergeWorldCommandResult,
   now = Date.now(),
 ): Promise<MergeWorldCommandResult> {
+  // Story effects and world screens reduce the database directly while a
+  // provider may still be buffering the player's last taps. Drain those first
+  // so this reduce starts from the board the player actually has.
+  await flushMergeWorldWriters();
   const generation = resetGeneration;
   const result = await serializeWrite(async () => {
     const db = await database();
@@ -170,7 +210,7 @@ async function reduceStoredMergeWorld(
     );
     return reduced;
   });
-  if (result.changed && generation === resetGeneration && !resetInProgress) publishSnapshot(result.state);
+  if (result.changed && generation === resetGeneration && !resetInProgress) publishSnapshot(result.state, 'store');
   return result;
 }
 
@@ -593,7 +633,7 @@ export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<vo
     });
     const freshState = createInitialMergeWorldState(now);
     resetListeners.forEach((listener) => listener(freshState));
-    publishSnapshot(freshState);
+    publishSnapshot(freshState, 'store');
   } finally {
     resetInProgress = false;
   }
@@ -631,7 +671,7 @@ export async function installMergeWorldStateForDebug(input: unknown, now = Date.
     resetInProgress = false;
   }
   resetListeners.forEach((listener) => listener(installed));
-  publishSnapshot(installed);
+  publishSnapshot(installed, 'store');
   return installed;
 }
 
@@ -679,7 +719,7 @@ export async function installMossproutOnboardingMergeWorld(
     resetInProgress = false;
   }
   resetListeners.forEach((listener) => listener(installedState));
-  publishSnapshot(installedState);
+  publishSnapshot(installedState, 'store');
   return installedState;
 }
 
@@ -726,7 +766,7 @@ function mergeFirstPair(state: MergeWorldState, definitionId: string, now: numbe
 async function persistPreparedFtueState(state: MergeWorldState) {
   await saveMergeWorldState(state);
   resetListeners.forEach((listener) => listener(state));
-  publishSnapshot(state);
+  publishSnapshot(state, 'store');
   return state;
 }
 
@@ -781,7 +821,7 @@ export async function resetMergeWorldActivityForDayForDebug(
     resetInProgress = false;
   }
   if (resetState) resetListeners.forEach((listener) => listener(resetState!));
-  if (resetState) publishSnapshot(resetState);
+  if (resetState) publishSnapshot(resetState, 'store');
 }
 
 export function subscribeMergeWorldResets(listener: (state: MergeWorldState) => void): () => void {
@@ -789,7 +829,7 @@ export function subscribeMergeWorldResets(listener: (state: MergeWorldState) => 
   return () => resetListeners.delete(listener);
 }
 
-export function subscribeMergeWorldSnapshots(listener: (state: MergeWorldState) => void): () => void {
+export function subscribeMergeWorldSnapshots(listener: (state: MergeWorldState, origin: MergeWorldSnapshotOrigin) => void): () => void {
   snapshotListeners.add(listener);
   return () => snapshotListeners.delete(listener);
 }

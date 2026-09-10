@@ -113,7 +113,30 @@ export async function reconcileFtueCheckpoint(ftue: FtueRunState) {
       run = retried;
       if (run.nodeId === ftue.stepId) break;
     }
-    const node = contentFlowDefinition(run.definitionId, run.definitionVersion)?.nodes.find((node) => node.id === run.nodeId);
+    const definition = contentFlowDefinition(run.definitionId, run.definitionVersion);
+    const node = definition?.nodes.find((node) => node.id === run.nodeId);
+    if (definition && node?.kind === 'task') {
+      // The synchronous checkpoint can outrun a task node's journaled event
+      // (a merge or serve delivered while the journal was still writing, or a
+      // kill in between). The manifest is authored in play order, so a
+      // checkpoint later in it proves the task's evidence happened; replay it
+      // rather than leaving the flow parked before every later scene.
+      const order = (id: string) => definition.nodes.findIndex((candidate) => candidate.id === id);
+      if (run.phase !== 'awaiting_event' || order(ftue.stepId) <= order(run.nodeId)) break;
+      let replayed = run;
+      for (const requirement of node.requirements) {
+        const occurredAt = Date.now();
+        replayed = await dispatchContentFlowCommand(run.runId, { type: 'record_event', event: {
+          eventId: `ftue:${ftue.runId}:${node.id}:${requirement.id}:reconcile:${occurredAt}`,
+          type: requirement.event.type, runId: run.runId, nodeId: run.nodeId,
+          payload: { ...(requirement.event.where ?? {}) }, occurredAt,
+        } }) ?? replayed;
+        if (replayed.nodeId !== run.nodeId) break;
+      }
+      if (replayed.nodeId === run.nodeId) break;
+      run = replayed;
+      continue;
+    }
     if (node?.kind !== 'scene') break;
     // Version 47 and earlier saved the confirmation checkpoint directly after
     // serving. Its journal can lag behind the newly inserted marker scene.

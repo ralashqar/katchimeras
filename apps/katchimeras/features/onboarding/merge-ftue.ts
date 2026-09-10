@@ -1,7 +1,7 @@
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import { MERGE_WORLD_COLUMNS } from '@/constants/merge-world-catalog';
 
-import type { FtueEvent, FtueStepDefinition, FtueTarget } from './ftue-types';
+import type { FtueEvent, FtueRunState, FtueStepDefinition, FtueTarget } from './ftue-types';
 import { mossproutFtueStep } from './mossprout-ftue-script';
 
 function activeResidentDiscovery(state: MergeWorldState) {
@@ -44,10 +44,87 @@ export function residentFtueCanonicalStep(state: MergeWorldState) {
 }
 
 /**
+ * The chapter-zero merge lesson, in board order. The FTUE checkpoint is
+ * written synchronously while the board persists a moment later, so after a
+ * process kill the two can disagree in either direction. The board is the
+ * truth for these steps: it decides which beat is playable, and the run is
+ * repaired to match (see `mossproutChapterZeroRepairTarget`).
+ */
+export const CHAPTER_ZERO_MERGE_STEP_IDS = ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom', 'merge.serve_sprout'] as const;
+export type ChapterZeroMergeStepId = typeof CHAPTER_ZERO_MERGE_STEP_IDS[number];
+export const CHAPTER_ZERO_ORDER_ID = 'mossprout:chapter-0:first-sprout';
+/** The authored scene that follows the served request. */
+export const CHAPTER_ZERO_SERVED_STEP_ID = 'world.first_bloom_offer';
+const CHAPTER_ZERO_GENERATOR_ID = 'wild-garden';
+const CHAPTER_ZERO_TIERS = { seed: 'nature:garden:1', sprout: 'nature:garden:2', plant: 'nature:garden:3' } as const;
+
+export type ChapterZeroCanonicalStep = {
+  stepId: ChapterZeroMergeStepId | typeof CHAPTER_ZERO_SERVED_STEP_ID;
+  /** The beat's source pieces are missing; the Basket must refill them first. */
+  refill: boolean;
+};
+
+function chapterZeroCount(state: MergeWorldState, definitionId: string) {
+  return state.board.reduce((total, cell) => total + Number(!cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === definitionId), 0);
+}
+
+export function isChapterZeroMergeStepId(stepId: string | null | undefined): stepId is ChapterZeroMergeStepId {
+  return (CHAPTER_ZERO_MERGE_STEP_IDS as readonly string[]).includes(stepId ?? '');
+}
+
+/** Board-derived beat, or null when the chapter-zero board is not installed. */
+export function mossproutChapterZeroMergeStep(state: MergeWorldState): ChapterZeroCanonicalStep | null {
+  const hasBasket = state.board.some((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === CHAPTER_ZERO_GENERATOR_ID);
+  const orderActive = state.activeOrders.some((order) => order.id === CHAPTER_ZERO_ORDER_ID);
+  const served = state.externalRewardReceipts.some((receipt) => receipt.id.includes(CHAPTER_ZERO_ORDER_ID));
+  if (!hasBasket || (!orderActive && !served)) return null;
+  if (!orderActive) return { stepId: CHAPTER_ZERO_SERVED_STEP_ID, refill: false };
+  const seeds = chapterZeroCount(state, CHAPTER_ZERO_TIERS.seed);
+  const sprouts = chapterZeroCount(state, CHAPTER_ZERO_TIERS.sprout);
+  if (chapterZeroCount(state, CHAPTER_ZERO_TIERS.plant) >= 1) return { stepId: 'merge.serve_sprout', refill: false };
+  if (sprouts >= 2) return { stepId: 'merge.first_bloom', refill: false };
+  if (sprouts === 1) return { stepId: 'merge.second_seed_drag', refill: seeds < 2 };
+  return { stepId: 'merge.seed_drag', refill: seeds < 2 };
+}
+
+/** A lost Seed is replaced from the Basket before the authored drag resumes. */
+export function chapterZeroRefillStep(stepId: ChapterZeroMergeStepId, state: MergeWorldState): FtueStepDefinition {
+  const target: FtueTarget = { kind: 'board_generator', generatorId: CHAPTER_ZERO_GENERATOR_ID };
+  const base = { id: `${stepId}.refill`, surface: 'merge' as const, actions: [] };
+  if (!state.board.some((cell) => !cell.locked && !cell.occupant && !cell.mist)) return {
+    ...base, guide: { eyebrow: 'A little room', title: 'Make space in the Garden.', body: 'Merge or store an item, then we’ll continue.' },
+  };
+  return {
+    ...base,
+    guide: { eyebrow: 'Let’s keep growing', title: 'One Seed went missing.', body: 'Tap the Garden Basket for another Seed.' },
+    cue: { kind: 'tap', target }, spotlight: { targets: [target] },
+    interaction: { mode: 'exclusive', allowed: { kind: 'generator_tap', target } },
+  };
+}
+
+/**
+ * Where the run must move so it matches the board, or null when it already
+ * does. Forward when the board outran the checkpoint, backward when the board
+ * write was lost; either way the player continues from a playable beat.
+ */
+export function mossproutChapterZeroRepairTarget(run: Pick<FtueRunState, 'status' | 'stepId'> | null, state: MergeWorldState | null): string | null {
+  if (!run || run.status !== 'active' || !state || !isChapterZeroMergeStepId(run.stepId)) return null;
+  const canonical = mossproutChapterZeroMergeStep(state);
+  return canonical && canonical.stepId !== run.stepId ? canonical.stepId : null;
+}
+
+/** Chapter-zero steps at or after `stepId`; their receipts are stale once the run rewinds there. */
+export function chapterZeroStepsFrom(stepId: string): string[] {
+  const index = (CHAPTER_ZERO_MERGE_STEP_IDS as readonly string[]).indexOf(stepId);
+  return index < 0 ? [] : CHAPTER_ZERO_MERGE_STEP_IDS.slice(index);
+}
+
+/**
  * Resident discovery is durable Merge progress, so its guidance must not
  * disappear merely because the one-time global FTUE run was completed or
  * persisted one transition late. While a resident sequence is physically
  * active on the board, that board state owns the corresponding Merge step.
+ * The chapter-zero lesson is owned by the board the same way.
  */
 export function mergeFtueStepForBoard(
   state: MergeWorldState | null,
@@ -55,6 +132,12 @@ export function mergeFtueStepForBoard(
 ) {
   if (!state) return scriptedStep;
   if (scriptedStep?.id.startsWith('glow.lesson.')) return scriptedStep;
+  if (scriptedStep && isChapterZeroMergeStepId(scriptedStep.id)) {
+    const canonical = mossproutChapterZeroMergeStep(state);
+    if (!canonical || canonical.stepId === CHAPTER_ZERO_SERVED_STEP_ID) return scriptedStep;
+    if (canonical.refill) return chapterZeroRefillStep(canonical.stepId, state);
+    return canonical.stepId === scriptedStep.id ? scriptedStep : mossproutFtueStep(canonical.stepId) ?? scriptedStep;
+  }
   const residentStepId = residentFtueCanonicalStep(state);
   if (!residentStepId?.startsWith('merge.resident_')) return scriptedStep;
   return mossproutFtueStep(residentStepId) ?? scriptedStep;

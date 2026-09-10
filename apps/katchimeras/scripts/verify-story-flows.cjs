@@ -10,6 +10,8 @@ const result = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', [
   'tests/world-upgrade-narrative.test.tsx',
   'tests/world-upgrades.test.tsx',
   'tests/ftue-script.test.ts',
+  'tests/ftue-checkpoint-reconcile.test.ts',
+  'tests/ftue-run-repair.test.ts',
   'tests/glow-discovery.test.ts',
   'tests/glow-egg-handoff.test.tsx',
   'tests/steppling-encounter.test.ts',

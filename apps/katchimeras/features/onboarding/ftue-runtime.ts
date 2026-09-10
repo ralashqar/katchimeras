@@ -268,13 +268,20 @@ export function registerFtueObjectiveBaseline(stepId: string, actionId: string, 
   });
 }
 
-/** Rewinds a known-invalid authored transition while preserving the run. */
-export function repairFtueStep(expectedStepId: string, targetStepId: string) {
+/**
+ * Rewinds a known-invalid authored transition while preserving the run.
+ *
+ * A committed receipt blocks its edge from firing again, so every step the
+ * player will replay after the rewind must lose its receipt, not only the
+ * target. Callers pass `clearStepIds` for the beats that follow the target.
+ */
+export function repairFtueStep(expectedStepId: string, targetStepId: string, options: { clearStepIds?: readonly string[] } = {}) {
   const current = loadFtueRun();
   if (!current || current.status !== 'active' || current.stepId !== expectedStepId || !mossproutFtueStep(targetStepId)) return current;
-  const receipts = current.receipts.filter((receipt) => receipt.stepId !== targetStepId);
+  const cleared = new Set([targetStepId, ...(options.clearStepIds ?? [])]);
+  const receipts = current.receipts.filter((receipt) => !cleared.has(receipt.stepId));
   const objectiveProgress = Object.fromEntries(Object.entries(current.objectiveProgress)
-    .filter(([key]) => !key.includes(`${targetStepId}:`)));
+    .filter(([key]) => ![...cleared].some((stepId) => key.includes(`${stepId}:`))));
   const complete = targetStepId === MOSSPROUT_FTUE_SCRIPT.terminalStepId;
   return publish({
     ...current,

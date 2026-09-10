@@ -37,7 +37,7 @@ import { MOSSPROUT_FTUE_COPY } from '@/features/onboarding/mossprout-ftue-copy';
 import { useGlowDiscovery, reconcileGlowLesson, submitGlowAction } from '@/features/onboarding/glow-discovery-runtime';
 import { glowDiscoveryBoardStep, glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
-import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, mergeFtueStepForBoard, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
+import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, mergeFtueStepForBoard, chapterZeroStepsFrom, mossproutChapterZeroRepairTarget, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import { mergeFtueDisplayGuide } from '@/features/onboarding/merge-ftue-guidance';
 import type { FtueCueDefinition, FtueSpotlightDefinition } from '@/features/onboarding/ftue-types';
 import { useFtueNavigationLock } from '@/features/onboarding/use-ftue-navigation-lock';
@@ -572,6 +572,15 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       repairFtueStep(ftueRun.stepId, ftueStep.id);
       return;
     }
+    // Chapter zero: the durable board decides the beat. A kill between the
+    // synchronous checkpoint and the buffered board write leaves the run ahead
+    // (rewind, clearing the receipts it will re-earn); a lost checkpoint leaves
+    // it behind (advance). Both land on a beat the board can actually play.
+    const chapterZeroTarget = mossproutChapterZeroRepairTarget(ftueRun, state);
+    if (chapterZeroTarget) {
+      repairFtueStep(ftueRun.stepId, chapterZeroTarget, { clearStepIds: chapterZeroStepsFrom(chapterZeroTarget) });
+      return;
+    }
     const repairTarget = mergeFtueRepairTarget(ftueStep, state);
     if (repairTarget) repairFtueStep(ftueStep.id, repairTarget);
   }, [active, ftueRun, ftueStep, state]);
@@ -654,7 +663,9 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
               : {}),
           }
         : command;
-      const result = send(effectiveCommand);
+      // A guided beat's board write must not trail its synchronous FTUE
+      // checkpoint by the ordinary-command buffer: persist it immediately.
+      const result = send(effectiveCommand, currentStep?.surface === 'merge' ? { persist: 'immediate' } : undefined);
       if (result) stateRef.current = result.state;
       const event = mergeFtueEventForCommand(currentState, command, result);
       if (event && currentRun?.status === 'active') {

@@ -54,8 +54,12 @@ export async function reconcileGlowLesson(world: MergeWorldState) {
   const run = await loadContentFlowRun(GLOW_DISCOVERY_RUN_ID);
   if (!run || run.status !== 'active' || !world.glowDiscoveryLesson) return;
   if (!glowDiscoveryLessonReady(run.nodeId, world)) return;
+  // A journaled event id is never reduced twice, so a node the run revisits
+  // (migration, rewind) would otherwise sit at its evidence forever while the
+  // Basket keeps spawning. Scope the id to this visit; the interpreter ignores
+  // events for a node that is no longer waiting, so replays stay harmless.
   await dispatchContentFlowCommand(run.runId, { type: 'record_event', event: {
-    eventId: `${run.runId}:${run.nodeId}:domain-complete`, type: `glow.${run.nodeId}`, runId: run.runId, nodeId: run.nodeId, payload: {}, occurredAt: Date.now(),
+    eventId: `${run.runId}:${run.nodeId}:domain-complete:${run.revision}`, type: `glow.${run.nodeId}`, runId: run.runId, nodeId: run.nodeId, payload: {}, occurredAt: Date.now(),
   } });
 }
 

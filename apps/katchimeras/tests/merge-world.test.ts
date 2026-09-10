@@ -1789,8 +1789,10 @@ test('a retained hidden Merge provider receives debug resets before Games is reo
 
 test('a retained hidden Merge provider adopts repository Energy rewards before Games is reopened', () => {
   const provider = readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
-  assert.match(provider, /subscribeMergeWorldSnapshots\(\(freshState\) =>/);
-  assert.match(provider, /freshState\.revision <= \(stateRef\.current\?\.revision \?\? -1\)/);
+  assert.match(provider, /subscribeMergeWorldSnapshots\(\(freshState, origin\) =>/);
+  // Another provider's save counts only when newer; a store write always supersedes the optimistic state.
+  assert.match(provider, /origin === 'provider' && freshState\.revision <= \(stateRef\.current\?\.revision \?\? -1\)/);
+  assert.match(provider, /origin === 'store' && freshState\.revision <= \(baseRevisionRef\.current \?\? -1\)/);
   assert.match(provider, /persistenceGenerationRef\.current \+= 1;[\s\S]*?pendingPersistenceRef\.current = null;/);
   assert.match(provider, /stateRef\.current = freshState;[\s\S]*?setState\(freshState\);/);
 });
