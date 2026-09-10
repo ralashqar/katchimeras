@@ -3841,6 +3841,11 @@ function normalizeStepEnergyByDay(value: unknown): MergeWorldState['stepEnergyBy
   return normalized;
 }
 
+/** A fresh level-one generator for a board that is not the persistent one (a mist mission). */
+export function createGeneratorState(id: string): MergeGeneratorState {
+  return generatorState(id);
+}
+
 function generatorState(id: string): MergeGeneratorState {
   const definition = MERGE_GENERATORS_BY_ID.get(id) ?? MERGE_GENERATORS[0];
   return {

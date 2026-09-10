@@ -8,6 +8,7 @@ import { validateContentFlowDefinition } from '@/features/content-flow/content-f
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
 import { createContentFlowRun, reduceContentFlow, stabilizeContentFlow } from '@/features/content-flow/content-flow-interpreter';
 import { GLOW_DISCOVERY_FLOW, glowDiscoveryResumeCamera, glowDiscoveryResumeWorld } from '@/features/onboarding/glow-discovery-flow';
+import { STEPPLING_MISSION_CAMERA } from '@/features/onboarding/steppling-mission';
 import { MOSSPROUT_NATURE_ISLANDS, mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
 import { PETALIMP_ISLAND_CAMPAIGN_ID, petalimpIslandChapterOrder } from '@/constants/petalimp-island-campaign';
 import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
@@ -229,13 +230,17 @@ test('every upgrade holds the old world before spending and replays its receipt-
   }
 });
 
-test('FTUE marker taps open a saved confirmation scene without spending', () => {
-  for (const [flow, marker, confirmation] of [[MOSSPROUT_FTUE_FLOW, 'world.first_bloom_offer', 'world.first_bloom_restore'], [GLOW_DISCOVERY_FLOW, 'gateway.offer', 'gateway.buy']] as const) {
-    const node = flow.nodes.find((item) => item.id === marker)!;
-    assert.equal(node.kind, 'scene');
-    assert.equal(node.kind === 'scene' && node.actions[0].next, confirmation);
-    assert.equal(flow.nodes.find((item) => item.id === confirmation)?.kind, 'scene');
-  }
+test('FTUE marker taps open a saved scene without spending: a confirmation for the Garden, the mission board for the mist', () => {
+  const garden = MOSSPROUT_FTUE_FLOW.nodes.find((item) => item.id === 'world.first_bloom_offer')!;
+  assert.equal(garden.kind, 'scene');
+  assert.equal(garden.kind === 'scene' && garden.actions[0].next, 'world.first_bloom_restore');
+  assert.equal(MOSSPROUT_FTUE_FLOW.nodes.find((item) => item.id === 'world.first_bloom_restore')?.kind, 'scene');
+  const bubble = GLOW_DISCOVERY_FLOW.nodes.find((item) => item.id === 'gateway.offer')!;
+  assert.equal(bubble.kind, 'scene');
+  assert.equal(bubble.kind === 'scene' && bubble.actions[0].next, 'mission.focus');
+  assert.equal(GLOW_DISCOVERY_FLOW.nodes.find((item) => item.id === 'mission.focus')?.kind, 'presentation', 'the camera frames the tile first');
+  assert.equal(GLOW_DISCOVERY_FLOW.nodes.find((item) => item.id === 'mission.clear')?.kind, 'task', 'then the board waits for its bar');
+  assert.equal(GLOW_DISCOVERY_FLOW.nodes.some((item) => item.id === 'gateway.buy'), false, 'no purchase sheet');
 });
 
 test('ordinary purchase deduplicates rapid taps, validates fresh balance, and resumes the existing journal', async () => {
@@ -312,10 +317,13 @@ test('mist upgrade stays available with a lagging FTUE or legacy chapter snapsho
   const offers = worldUpgradeOffers(state);
   assert.equal(offers.find((offer) => offer.id === 'mist:steppling-home')?.eligible, true);
   assert.equal(offers.some((offer) => offer.id.startsWith('nature:') && offer.eligible), true);
-  for (const nodeId of ['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy']) {
+  for (const nodeId of ['gateway.ready', 'gateway.return', 'gateway.offer']) {
     assert.deepEqual(visibleWorldUpgradeOffers(offers, 'companion.meditating', { nodeId, status: 'active' }).map((offer) => offer.id), ['mist:steppling-home']);
   }
   assert.deepEqual(visibleWorldUpgradeOffers(offers, undefined, { nodeId: 'lesson.spawn', status: 'active' }), []);
+  for (const nodeId of ['mission.focus', 'mission.clear']) {
+    assert.deepEqual(visibleWorldUpgradeOffers(offers, undefined, { nodeId, status: 'active' }), [], 'no markers while the mission board is up');
+  }
 });
 
 test('resting friends stay on the map through the whole FTUE while every other marker waits', () => {
@@ -343,45 +351,49 @@ function mistUpgradeRuntime(initialNode = 'gateway.offer', initialStatus = 'acti
       if (block) return run;
       if (command.type === 'retry') run = { ...run, status: 'active', error: null, nodeId: run.nodeId === 'gateway.return' ? 'gateway.offer' : run.nodeId };
       if (command.actionId === 'return') run = { ...run, nodeId: 'gateway.offer' };
-      if (command.actionId === 'open_upgrade') run = { ...run, nodeId: 'gateway.buy' };
-      if (command.actionId === 'unlock') run = { ...run, nodeId: 'gateway.purchase.focus' };
+      if (command.actionId === 'open_upgrade') run = { ...run, nodeId: 'mission.focus' };
       return run;
     } },
-    './glow-discovery-flow': { GLOW_DISCOVERY_RUN_ID: 'story:glow-steppling-v1' },
+    './glow-discovery-flow': {
+      GLOW_DISCOVERY_RUN_ID: 'story:glow-steppling-v1',
+      GLOW_GATEWAY_NODE_IDS: ['gateway.ready', 'gateway.return', 'gateway.offer'],
+      glowDiscoveryMissionNode: (nodeId: string) => nodeId === 'mission.focus' || nodeId === 'mission.clear',
+    },
     '@/utils/merge-world/glow-discovery-policy': { GLOW_GATEWAY_ID: 'mossprout:overgrown-trail' },
   });
   return { runtime, commands, setBlocked: (value: boolean) => { block = value; } };
 }
 
-test('mist panel opens without buying, then duplicate confirms advance the saved story only once', async () => {
+test('the bubble opens the mission board without buying, and repeated taps never send another command', async () => {
   const { runtime, commands } = mistUpgradeRuntime();
-  assert.equal((await runtime.advanceGlowUpgrade('open')).nodeId, 'gateway.buy');
+  assert.equal((await runtime.advanceGlowUpgrade('open')).nodeId, 'mission.focus');
   assert.deepEqual(commands, ['open_upgrade']);
   await Promise.all([runtime.advanceGlowUpgrade('confirm'), runtime.advanceGlowUpgrade('confirm')]);
-  assert.deepEqual(commands, ['open_upgrade', 'unlock']);
+  assert.deepEqual(commands, ['open_upgrade'], 'there is no confirm step: the mission is the price');
 });
 
 test('mist retries failed saves and rejects unchanged commands instead of leaving a permanent busy panel', async () => {
-  const { runtime, commands, setBlocked } = mistUpgradeRuntime('gateway.buy', 'failed_recoverable');
+  const { runtime, commands, setBlocked } = mistUpgradeRuntime('mission.clear', 'failed_recoverable');
   setBlocked(true);
   await assert.rejects(runtime.advanceGlowUpgrade('confirm'), /paused/);
   setBlocked(false);
-  assert.equal((await runtime.advanceGlowUpgrade('confirm')).nodeId, 'gateway.purchase.focus');
-  assert.deepEqual(commands, ['retry', 'retry', 'unlock']);
+  assert.equal((await runtime.advanceGlowUpgrade('confirm')).nodeId, 'mission.clear');
+  assert.deepEqual(commands, ['retry', 'retry']);
   const stalled = mistUpgradeRuntime();
   stalled.setBlocked(true);
   await assert.rejects(stalled.runtime.advanceGlowUpgrade('open'), /did not advance/);
   stalled.setBlocked(false);
-  assert.equal((await stalled.runtime.advanceGlowUpgrade('open')).nodeId, 'gateway.buy');
+  assert.equal((await stalled.runtime.advanceGlowUpgrade('open')).nodeId, 'mission.focus');
 });
 
 test('already paid mist resumes its reveal without another charge; unpaid mist is never auto-purchased', async () => {
-  const { runtime, commands } = mistUpgradeRuntime('gateway.buy');
+  const { runtime, commands } = mistUpgradeRuntime('gateway.offer');
   const initial = restored();
   assert.equal(await runtime.recoverPaidGlowUpgrade(initial), null);
   assert.deepEqual(commands, []);
   const paid = reduceMergeWorld(initial, { type: 'unlockWorldTarget', targetId: 'mossprout:overgrown-trail', receiptId: 'earlier-purchase', now: NOW }).state;
-  assert.equal((await runtime.recoverPaidGlowUpgrade(paid)).nodeId, 'gateway.purchase.focus');
+  // An old paid save plays the mission too; its receipt-backed reveal then charges zero.
+  assert.equal((await runtime.recoverPaidGlowUpgrade(paid)).nodeId, 'mission.focus');
   const resumed = reduceMergeWorld(paid, { type: 'unlockWorldTarget', targetId: 'mossprout:overgrown-trail', receiptId: 'recovered-story-purchase', now: NOW + 1 });
   assert.equal(resumed.state.coins, paid.coins);
   assert.equal(resumed.storyWorldMutationReceipt?.coinCost, 0);
@@ -401,7 +413,7 @@ test('enough Glow returns straight to an actionable scene with no camera acknowl
 test('a save stuck in the old return-camera step can open the new panel without a camera callback', async () => {
   for (const nodeId of ['gateway.return', 'gateway.ready']) {
     const { runtime, commands } = mistUpgradeRuntime(nodeId);
-    assert.equal((await runtime.advanceGlowUpgrade('open')).nodeId, 'gateway.buy');
+    assert.equal((await runtime.advanceGlowUpgrade('open')).nodeId, 'mission.focus');
     assert.deepEqual(commands, [nodeId === 'gateway.return' ? 'retry' : 'return', 'open_upgrade']);
     assert.equal(commands.includes('unlock'), false);
   }
@@ -409,16 +421,16 @@ test('a save stuck in the old return-camera step can open the new panel without 
 
 test('returning to mist exposes the upgrade bubble until tapped, including resumed confirmation', async () => {
   const offers = worldUpgradeOffers(restored());
-  for (const nodeId of ['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy']) {
+  for (const nodeId of ['gateway.ready', 'gateway.return', 'gateway.offer']) {
     const visible = visibleWorldUpgradeOffers(offers, 'companion.meditating', { nodeId, status: 'active' });
     assert.equal(visible.length, 1);
     assert.equal(visible[0].id, 'mist:steppling-home');
     const { runtime, commands } = mistUpgradeRuntime(nodeId);
     assert.equal(commands.length, 0, 'showing the bubble does not open or purchase automatically');
-    assert.equal((await runtime.advanceGlowUpgrade('open')).nodeId, 'gateway.buy');
-    assert.equal(commands.includes('unlock'), false, 'tapping opens confirmation without payment');
-    assert.equal(visibleWorldUpgradeOffers(offers, undefined, { nodeId: 'gateway.buy', status: 'active' })[0].id,
-      'mist:steppling-home', 'closing confirmation leaves its bubble available');
+    assert.equal((await runtime.advanceGlowUpgrade('open')).nodeId, 'mission.focus');
+    assert.equal(commands.includes('unlock'), false, 'tapping opens the mission board without payment');
+    assert.equal(visibleWorldUpgradeOffers(offers, undefined, { nodeId: 'gateway.offer', status: 'active' })[0].id,
+      'mist:steppling-home', 'the bubble stays until it is tapped');
   }
 });
 
@@ -515,13 +527,15 @@ test('legacy Garden restoration and finished mist requests enable the same paid 
 
 test('saved mist checkpoints restore one stable close-up without replaying purchase or egg framing', () => {
   const expected = { kind: 'focus_target', target: { kind: 'haven_gateway' }, zoom: 1.2, anchorY: 0.46, durationMs: 900 };
-  for (const nodeId of ['garden.open', 'lesson.prepare', 'lesson.spawn', 'lesson.repeat.serve', 'gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy']) {
+  for (const nodeId of ['garden.open', 'lesson.prepare', 'lesson.spawn', 'lesson.repeat.serve', 'gateway.ready', 'gateway.return', 'gateway.offer']) {
     assert.deepEqual(glowDiscoveryResumeCamera({ nodeId, status: 'active' }), expected);
     assert.deepEqual(glowDiscoveryResumeCamera({ nodeId, status: 'failed_recoverable' }), expected);
     assert.equal(glowDiscoveryResumeCamera({ nodeId, status: 'completed' }), null);
   }
-  assert.equal(glowDiscoveryResumeCamera({ nodeId: 'gateway.offer', status: 'active' }),
-    glowDiscoveryResumeCamera({ nodeId: 'gateway.buy', status: 'active' }), 'opening confirmation keeps the same camera directive');
+  for (const nodeId of ['mission.focus', 'mission.clear']) {
+    assert.deepEqual(glowDiscoveryResumeCamera({ nodeId, status: 'active' }), STEPPLING_MISSION_CAMERA, 'the mission board resumes with the opening’s framing');
+    assert.equal(glowDiscoveryResumeCamera({ nodeId, status: 'completed' }), null);
+  }
   for (const nodeId of ['gateway.focus', 'gateway.purchase.focus', 'gateway.egg', 'egg.enter', 'complete']) {
     assert.equal(glowDiscoveryResumeCamera({ nodeId, status: 'active' }), null);
   }

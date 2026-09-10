@@ -5,7 +5,7 @@ import type { ContentFlowRun } from '@/types/content-flow';
 import type { MergeWorldState } from '@/types/merge-world';
 import { glowGatewayState } from '@/utils/merge-world/glow-discovery-policy';
 import { loadMergeWorldState } from '@/utils/merge-world/repository';
-import { GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, glowDiscoveryLessonReady } from './glow-discovery-flow';
+import { GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, GLOW_MISSION_CLEAR_NODE_ID, GLOW_MISSION_CLEARED_EVENT, glowDiscoveryLessonReady } from './glow-discovery-flow';
 
 let pending: Promise<ContentFlowRun | null> | null = null;
 export function startGlowDiscovery() {
@@ -76,6 +76,20 @@ export async function recoverGlowEggHandoff(world: MergeWorldState) {
     await dispatchContentFlowCommand(GLOW_DISCOVERY_RUN_ID, { type: 'retry' });
     if (world.stepplingEgg?.hatchedAt || world.companionDiscovery.records.some((record) => record.characterId === 'steppling')) await acknowledgeGlowEggEntry();
   }
+}
+
+/**
+ * The mission board filled its bar: the story moves on to the paid reveal.
+ * Recorded when the final item strikes the tile, or on resume if the saved
+ * board already shows the bar full. The event id is scoped to the visit, so
+ * a replay on a later revisit is not ignored as a duplicate.
+ */
+export async function completeStepplingMission() {
+  const run = await loadContentFlowRun(GLOW_DISCOVERY_RUN_ID);
+  if (!run || run.nodeId !== GLOW_MISSION_CLEAR_NODE_ID || run.status !== 'active') return run;
+  return dispatchContentFlowCommand(run.runId, { type: 'record_event', event: {
+    eventId: `${run.runId}:${GLOW_MISSION_CLEAR_NODE_ID}:cleared:${run.revision}`, type: GLOW_MISSION_CLEARED_EVENT, runId: run.runId, nodeId: GLOW_MISSION_CLEAR_NODE_ID, payload: {}, occurredAt: Date.now(),
+  } });
 }
 
 export async function acknowledgeGlowEggEntry() {

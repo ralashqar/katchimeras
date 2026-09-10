@@ -142,7 +142,7 @@ export function visibleWorldUpgradeOffers(offers: WorldUpgradeOffer[], ftueStepI
   glowRun: { nodeId: string; status: string } | null) {
   return offers.filter((offer) => (offer.eligible || offer.markerSkinId != null || offer.sleepingSkinId != null) && (
     glowRun && glowRun.status !== 'completed'
-      ? ['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy'].includes(glowRun.nodeId) && offer.id === 'mist:steppling-home'
+      ? ['gateway.ready', 'gateway.return', 'gateway.offer'].includes(glowRun.nodeId) && offer.id === 'mist:steppling-home'
       // The six resting friends are the opening's whole point: they stay on the
       // map from the first frame (inert), while every other marker waits.
       : ftueStepId ? (['world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId) && offer.id === 'haven:mossprout') || offer.sleepingSkinId != null

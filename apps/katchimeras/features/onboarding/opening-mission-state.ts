@@ -20,7 +20,9 @@ export type StoredOpeningMission = { runId: string; state: MergeWorldState };
 export function createOpeningMissionState(now = Date.now()): MergeWorldState {
   const base = createMossproutOpeningState(now);
   const window = new Set(OPENING_MERGE_WINDOW_CELLS);
-  const board = base.board.map((cell, index) => (window.has(index) ? cell : { ...cell, occupant: null }));
+  // Everything outside the window is sealed, not just emptied: a spawner on a
+  // mission board must never drop an item where the window cannot show it.
+  const board = base.board.map((cell, index) => (window.has(index) ? cell : { ...cell, locked: true, blocker: null, mist: cell.mist ?? { kind: 'dormant' as const }, occupant: null }));
   return {
     ...base,
     board,

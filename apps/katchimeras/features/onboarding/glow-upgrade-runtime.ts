@@ -2,11 +2,15 @@ import type { ContentFlowCommand, ContentFlowRun } from '@/types/content-flow';
 import type { MergeWorldState } from '@/types/merge-world';
 import { loadContentFlowRun } from '@/features/content-flow/content-flow-repository';
 import { dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
-import { GLOW_DISCOVERY_RUN_ID } from './glow-discovery-flow';
+import { GLOW_DISCOVERY_RUN_ID, GLOW_GATEWAY_NODE_IDS, glowDiscoveryMissionNode } from './glow-discovery-flow';
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
 
 let queue: Promise<unknown> = Promise.resolve();
-/** The shared panel must advance the saved story, never start an ordinary purchase. */
+/**
+ * The bubble must advance the saved story, never start an ordinary purchase.
+ * Opening it lands on the mission board; there is no confirm step any more
+ * (the mission is the price), so `confirm` only ever repairs an old save.
+ */
 export function advanceGlowUpgrade(action: 'open' | 'confirm'): Promise<ContentFlowRun> {
   const operation = queue.then(async () => {
     let run = await loadContentFlowRun(GLOW_DISCOVERY_RUN_ID);
@@ -20,8 +24,8 @@ export function advanceGlowUpgrade(action: 'open' | 'confirm'): Promise<ContentF
     if (run.status === 'failed_recoverable' || run.nodeId === 'gateway.return') await dispatch({ type: 'retry' });
     if (run.nodeId === 'gateway.ready') await dispatch({ type: 'submit_scene', actionId: 'return' });
     if (run.nodeId === 'gateway.offer') await dispatch({ type: 'submit_scene', actionId: 'open_upgrade' });
-    if (action === 'confirm' && run.nodeId === 'gateway.buy') await dispatch({ type: 'submit_scene', actionId: 'unlock' });
-    if (run.nodeId !== 'gateway.buy' && !run.nodeId.startsWith('gateway.purchase.')
+    void action;
+    if (!glowDiscoveryMissionNode(run.nodeId) && !run.nodeId.startsWith('gateway.purchase.')
       && !['gateway.egg', 'egg.enter', 'complete'].includes(run.nodeId)) {
       throw new Error('Finish the Garden request before clearing this mist.');
     }
@@ -36,6 +40,6 @@ export function advanceGlowUpgrade(action: 'open' | 'confirm'): Promise<ContentF
 export async function recoverPaidGlowUpgrade(world: MergeWorldState) {
   if (!world.worldUnlocks?.[GLOW_GATEWAY_ID]) return null;
   const run = await loadContentFlowRun(GLOW_DISCOVERY_RUN_ID);
-  if (!run || run.status === 'completed' || !['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy'].includes(run.nodeId)) return null;
+  if (!run || run.status === 'completed' || !GLOW_GATEWAY_NODE_IDS.includes(run.nodeId)) return null;
   return advanceGlowUpgrade('confirm');
 }

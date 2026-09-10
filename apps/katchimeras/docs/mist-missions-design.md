@@ -1,6 +1,8 @@
 # Mist Missions: the opening board as a repeatable mini-game
 
-Status: design, not built. The opening currently plays on the persistent 7×9 board through a 5×4 window (`features/onboarding/opening-mist.ts`, `components/katchadeck/world/kingdom-opening-merge-dock.tsx`). This spec turns that beat into its own small board, a *mission*, whose reward arrives on the persistent board as a parcel, and makes the mission the template for clearing every misted island.
+Status: partly built (Sept 2026). Built: the opening plays on its own mission board (`features/onboarding/opening-mission-state.ts`, `use-opening-mission-board.ts`), and Steppling's misted clearing is cleared the same way (`features/onboarding/steppling-mission.ts`, `components/katchadeck/world/steppling-mission-dock.tsx`): tapping the bubble at `gateway.offer` frames the tile with the opening's camera and docks a 5×4 board with Steppling's walking gear and the Journey Locker (Sock-only, never rests); 12 merges fill the bar, the final item flies into the mist, and its impact records `glow.mission.cleared`, after which the paid reveal, the Egg and the hatch run unchanged. The shared dock is `MistMissionDock` in `kingdom-opening-merge-dock.tsx`; each mission keeps its own store with its own merge count. Not built: parcel rewards, a data-authored mission catalogue, missions for the six island campaigns.
+
+This spec turns the opening beat into its own small board, a *mission*, whose reward arrives on the persistent board as a parcel, and makes the mission the template for clearing every misted island.
 
 ## The causal chain the product teaches
 

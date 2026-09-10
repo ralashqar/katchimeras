@@ -151,7 +151,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(screen, /const openingGuidanceVisible = Boolean\(openingBoardStep && \(openingBoardStep\.cue \|\| openingBoardStep\.spotlight\)\)/);
   assert.match(screen, /const visibleUpgradeOffers = homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch');
   assert.doesNotMatch(screen, /MOSSPROUT_SLEEPING_OFFER/, 'the silhouette marker is gone from the opening');
-  assert.match(screen, /openingWeather=\{homeVeilForStep\(ftueStepId\) !== 'none'\}/, 'rain and sparkles while the veil is up');
+  assert.match(screen, /openingWeather=\{homeVeil !== 'none'\}/, 'rain and sparkles while the veil is up');
   assert.match(screen, /openingGuidanceVisible && ftueCameraSettled && openingDockSettled \?/, 'the spotlight waits for the dock to settle');
   assert.match(screen, /onEntranceSettled=\{markOpeningDockSettled\}/);
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
@@ -182,9 +182,12 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(dock, /const grew = progress > previous\.current;[\s\S]*?scale\.value = withSequence\(/, 'the bar swells once per landed Glow');
   assert.match(screen, /<MergeFtueOverlay blockedPulseNonce=\{openingBlockedNonce\}[\s\S]*?guide=\{openingBoardStep\?\.guide \?\? null\}[\s\S]*?spotlight=\{openingBoardStep\?\.spotlight \?\? null\}/);
   assert.match(screen, /if \(presentation\.veilLift\) \{[\s\S]*?commitFtueAction\(\{ actionId: OPENING_LIFTED_ACTION_ID, evidenceRef: 'mossprout-world:veil-lifted' \}\);\s*return;\s*\}\s*if \(tutorialUpgradeNonceRef\.current === presentation\.nonce\)/);
-  assert.match(screen, /if \(ftueStepId !== OPENING_MIST_LIFT_STEP_ID\) return;[\s\S]*?veilLiftKeyRef\.current = key;[\s\S]*?veilLift: true/);
+  assert.match(screen, /if \(homeVeil !== 'lifting'\) return;[\s\S]*?veilLiftKeyRef\.current = key;[\s\S]*?veilLift: true/, 'the crossblend starts when the veil enters lifting, not when the step changes');
+  // The mist clears on the frame the final item strikes the tile; the camera, caption and dock still wait for the burst to settle.
+  assert.match(screen, /const homeVeil = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow\.finaleActive && !openingGlow\.finaleLanded \? 'veiled' : homeVeilForStep\(routeFtueStepId\);/);
+  assert.match(dock, /if \(finale\) \{ setFinaleLanded\(true\); setFinaleLandedId\(id\); \}/, 'the landing flag is raised at impact, by id too');
   assert.match(screen, /Boolean\(upgradePresentation && !upgradePresentation\.veilLift\)/, 'the HUD stays hidden while the veil lifts');
-  assert.match(screen, /homeVeil=\{homeVeilForStep\(ftueStepId\)\}\s*homeSolo=\{homeSoloForStep\(ftueStepId\)\}/);
+  assert.match(screen, /homeVeil=\{homeVeil\}\s*homeSolo=\{homeSoloForStep\(ftueStepId\)\}/);
   assert.match(canvas, /return buildMossproutHexNeighborhoodScene\(fromSlots, fromNatureLevels, fromGarden, fromReveals, \{ homeVeiled: homeVeil === 'veiled' \|\| homeVeil === 'lifting', homeSolo \}\);/, 'the lift’s from-scene stays veiled and solo, so the world never flashes in during the crossblend');
   assert.match(canvas, /const joinedLater = layerJoinedLater\(layer\.id\);[\s\S]*?<Animated\.View entering=\{joinedLater \? FadeIn\.duration\(reduceMotion \? 120 : 720\) : undefined\}[\s\S]*?<KingdomTileArt/, 'tiles that join after mount fade in rather than snap');
   assert.match(screen, /: ftueStepId === OPENING_MIST_OPEN_STEP_ID\s*\? OPENING_CAMERA_ENTRY_ZOOM/, 'the first beat mounts further out and glides in');

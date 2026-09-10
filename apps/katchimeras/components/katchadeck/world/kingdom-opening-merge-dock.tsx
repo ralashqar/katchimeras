@@ -99,20 +99,10 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   runRef.current = run;
   stepRef.current = boardStep;
   const boardMetricsRef = useRef<MergeBoardScreenMetrics | null>(null);
-  // Set when the entrance finishes; cleared by the measurement it triggers.
-  // Guidance is told only then, so it never lays out on a mid-entrance frame.
-  const awaitingSettledMetricsRef = useRef(false);
-  const onEntranceSettledRef = useRef(onEntranceSettled);
-  onEntranceSettledRef.current = onEntranceSettled;
-  const handleMetrics = useCallback((metrics: MergeBoardScreenMetrics) => {
+  const handleMetrics = useCallback((metrics: MergeBoardScreenMetrics | null) => {
     boardMetricsRef.current = metrics;
     onBoardMetrics?.(metrics);
-    if (awaitingSettledMetricsRef.current) {
-      awaitingSettledMetricsRef.current = false;
-      onEntranceSettledRef.current?.();
-    }
   }, [onBoardMetrics]);
-  useEffect(() => () => onBoardMetrics?.(null), [onBoardMetrics]);
 
   // The final merge's item is hidden on the board the moment it exists and
   // flies into the mist instead; the board is left empty on purpose.
@@ -135,6 +125,54 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
     send, coordinator, sessionId, stateRef, runRef, stepRef, guided: true, deferEvent: true,
     onBlocked: onBlockedInteraction, onEvent: handleEvent,
   });
+
+  return <MistMissionDock
+    state={state} boardStep={boardStep} progress={progress} required={OPENING_MERGE_REQUIRED}
+    interactionKey={`${run?.runId ?? 'free'}:${boardStep?.id ?? 'open'}`} sessionId={sessionId} hiddenItemIds={hiddenItemIds}
+    width={width} bottomInset={bottomInset} impactKey={impactKey}
+    onCommand={dispatch} onBoardMetrics={handleMetrics} onBlockedInteraction={onBlockedInteraction} onEntranceSettled={onEntranceSettled} />;
+});
+
+/**
+ * A mist mission's docked board: the slim "Clear the Mist" bar above a 5×4
+ * board in the Merge page's own frame, fading and scaling in as one piece
+ * once the board has painted, then re-measuring so guidance and Glow flights
+ * land on the resting layout. Whose board it is, what counts, and what a
+ * merge does are the caller's: the dock only shows and forwards commands.
+ */
+export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, interactionKey, sessionId, hiddenItemIds, width, bottomInset, impactKey = 0, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
+  state: MergeWorldState;
+  /** The beat gating the board and pointing at it, if any. */
+  boardStep: FtueStepDefinition | null;
+  /** Counted merges, as the caller's checkpoint has them; the bar trails by one Glow flight. */
+  progress: number;
+  required: number;
+  interactionKey: string;
+  sessionId: string;
+  hiddenItemIds: ReadonlySet<string>;
+  width: number;
+  bottomInset: number;
+  /** Bumps once per landed Glow; the bar flashes on each. */
+  impactKey?: number;
+  onCommand: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
+  onBoardMetrics?: (metrics: MergeBoardScreenMetrics | null) => void;
+  onBlockedInteraction?: () => void;
+  /** Fired once the fade-in has finished and the board has re-measured: the moment guidance may point at it. */
+  onEntranceSettled?: () => void;
+}) {
+  // Set when the entrance finishes; cleared by the measurement it triggers.
+  // Guidance is told only then, so it never lays out on a mid-entrance frame.
+  const awaitingSettledMetricsRef = useRef(false);
+  const onEntranceSettledRef = useRef(onEntranceSettled);
+  onEntranceSettledRef.current = onEntranceSettled;
+  const handleMetrics = useCallback((metrics: MergeBoardScreenMetrics) => {
+    onBoardMetrics?.(metrics);
+    if (awaitingSettledMetricsRef.current) {
+      awaitingSettledMetricsRef.current = false;
+      onEntranceSettledRef.current?.();
+    }
+  }, [onBoardMetrics]);
+  useEffect(() => () => onBoardMetrics?.(null), [onBoardMetrics]);
 
   // The bar follows the checkpoint, but only once the Glow has landed.
   // Each step gets its own timer that later merges never cancel, so rapid
@@ -161,7 +199,6 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   const cell = Math.floor((boardWidth - OPENING_BOARD_LAYOUT.contentInset * 2) / OPENING_MERGE_WINDOW_COLUMNS);
   const boardHeight = cell * OPENING_MERGE_WINDOW_ROWS + OPENING_BOARD_LAYOUT.contentInset * 2 + 2;
   const gate = useMemo(() => mergeFtueBoardGate(boardStep, state), [boardStep, state]);
-  const interactionKey = `${run?.runId ?? 'free'}:${boardStep?.id ?? 'open'}`;
 
   // Entrance: the dock stays invisible until the board has painted its first
   // frame, then fades and scales up as one piece, and the board re-measures
@@ -195,7 +232,7 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
 
   return <Animated.View exiting={FadeOut.duration(260)} pointerEvents="box-none"
     style={[styles.dock, { paddingBottom: bottomInset + 14 }, entranceStyle]}>
-    <ClearTheMistBar progress={shownProgress} total={OPENING_MERGE_REQUIRED} width={boardWidth} impactKey={impactKey} />
+    <ClearTheMistBar progress={shownProgress} total={required} width={boardWidth} impactKey={impactKey} />
     <MergePlaySurface
       animateEntrance={false}
       boardLayout={OPENING_BOARD_LAYOUT}
@@ -212,7 +249,7 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
       interactionSessionKey={interactionKey}
       maxHeight={boardHeight + 8}
       onBlockedInteraction={onBlockedInteraction}
-      onCommand={dispatch}
+      onCommand={onCommand}
       onOpenChat={() => {}}
       onOpenParcel={() => {}}
       onReroll={() => {}}
@@ -341,6 +378,8 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   // True from the final merge until its item has landed, burst, and settled:
   // the Kingdom holds the clear beat on screen for exactly that long.
   const [finaleActive, setFinaleActive] = useState(false);
+  // True from the moment the final item strikes the tile: the mist clears on that frame.
+  const [finaleLanded, setFinaleLanded] = useState(false);
   const finaleIdRef = useRef<number | null>(null);
   const nextId = useRef(0);
   const targetRef = useRef(targetNode);
@@ -354,8 +393,10 @@ export function useOpeningGlow(targetNode: ViewType | null) {
     if (!target) { push({ x: from.x, y: from.y - 220 }); return; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.55 }));
   }, []);
+  const [finaleLandedId, setFinaleLandedId] = useState<number | null>(null);
   const arrive = useCallback((id: number) => {
     const finale = id === finaleIdRef.current;
+    if (finale) { setFinaleLanded(true); setFinaleLandedId(id); }
     setFlights((current) => {
       const landed = current.find((flight) => flight.id === id);
       // Every other landing bursts (the first and third of four): half the particle
@@ -372,17 +413,19 @@ export function useOpeningGlow(targetNode: ViewType | null) {
     if (id === finaleIdRef.current) setTimeout(() => setFinaleActive(false), OPENING_FINALE_SETTLE_MS);
   }, []);
   /** The final merge's item, large and alone, straight up into the mist. */
-  const launchFinale = useCallback((from: RewardFlightPoint, definitionId: string) => {
+  const launchFinale = useCallback((from: RewardFlightPoint, definitionId: string): number => {
     const id = ++nextId.current;
     finaleIdRef.current = id;
     setFinaleActive(true);
+    setFinaleLanded(false);
     const art = mergeWorldItemArt(definitionId) as number | undefined;
     const push = (to: RewardFlightPoint) => setFlights((current) => [...current, { id, index: 2, count: 5, from, to, art, size: 64 }]);
     const target = targetRef.current;
-    if (!target) { push({ x: from.x, y: from.y - 260 }); return; }
+    if (!target) { push({ x: from.x, y: from.y - 260 }); return id; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.5 }));
+    return id;
   }, []);
-  return { flights, impacts, landed, finaleActive, launch, launchFinale, arrive, impactDone };
+  return { flights, impacts, landed, finaleActive, finaleLanded, finaleLandedId, launch, launchFinale, arrive, impactDone };
 }
 
 const styles = StyleSheet.create({

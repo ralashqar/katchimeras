@@ -6,17 +6,31 @@ import type { MergeWorldState } from '@/types/merge-world';
 import type { FtueCameraDirective, FtueStepDefinition } from './ftue-types';
 import { mergeLessonRecipe, mergeLessonBoardStep, mergeLessonEvidenceReady, type MergeLessonBeat } from '@/features/content-flow/merge-lesson-recipe';
 import { GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS, glowGeneratorRule } from '@/utils/merge-world/glow-discovery-policy';
+import { OPENING_CAMERA_ANCHOR_Y, OPENING_CAMERA_ZOOM } from './opening-mist';
+import { STEPPLING_MISSION_CAMERA } from './steppling-mission';
 
 const MIST_CLOSE_UP = { zoom: 1.2, anchorY: 0.46, durationMs: 900 } as const;
 const MIST_UPGRADE_CAMERA: FtueCameraDirective = {
   kind: 'focus_target', target: { kind: 'haven_gateway' }, ...MIST_CLOSE_UP,
 };
+/**
+ * Steppling's mist mission: tapping the bubble frames the misted tile the way
+ * the opening did and docks a board beneath it; filling the bar records this
+ * event, and the paid reveal, the Egg and the hatch follow as before.
+ */
+export const GLOW_MISSION_FOCUS_NODE_ID = 'mission.focus';
+export const GLOW_MISSION_CLEAR_NODE_ID = 'mission.clear';
+export const GLOW_MISSION_CLEARED_EVENT = 'glow.mission.cleared';
+export const GLOW_GATEWAY_NODE_IDS: readonly string[] = ['gateway.ready', 'gateway.return', 'gateway.offer'];
+export function glowDiscoveryMissionNode(nodeId: string): boolean {
+  return nodeId === GLOW_MISSION_FOCUS_NODE_ID || nodeId === GLOW_MISSION_CLEAR_NODE_ID;
+}
 
 /** Rebuild framing from the saved checkpoint, without replaying a story action. */
 export function glowDiscoveryResumeCamera(run: Pick<ContentFlowRun, 'nodeId' | 'status'> | null): FtueCameraDirective | null {
-  return run && run.status !== 'completed'
-    && (glowDiscoveryAllowsGarden(run) || ['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy'].includes(run.nodeId))
-    ? MIST_UPGRADE_CAMERA : null;
+  if (!run || run.status === 'completed') return null;
+  if (glowDiscoveryMissionNode(run.nodeId)) return STEPPLING_MISSION_CAMERA;
+  return glowDiscoveryAllowsGarden(run) || GLOW_GATEWAY_NODE_IDS.includes(run.nodeId) ? MIST_UPGRADE_CAMERA : null;
 }
 
 /** The guided Garden destination remains available while world navigation is locked. */
@@ -41,7 +55,7 @@ export const GLOW_LESSON: readonly MergeLessonBeat[] = [
 ];
 export const GLOW_ALL_LESSON_BEATS = GLOW_LESSON;
 export const GLOW_DISCOVERY_FLOW = defineStory({
-  id: 'glow-steppling-discovery', version: 8, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
+  id: 'glow-steppling-discovery', version: 9, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
   nodes: [
     storyOperations.focusCamera({ id: 'gateway.focus', target: STEPPLING_STORY_TARGET, ...MIST_CLOSE_UP, next: 'garden.open' }),
     worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.single.prepare', view: { kind: 'garden', guide: { eyebrow: 'Someone’s in there', title: 'Back to the board.', body: 'One more request should be enough light.' }, actionLabel: 'Open Garden' } }),
@@ -50,8 +64,10 @@ export const GLOW_DISCOVERY_FLOW = defineStory({
     worldActionScene({ id: 'gateway.ready', actionId: 'return', next: 'gateway.offer', view: { kind: 'return', guide: { eyebrow: 'Enough light', title: 'That should do it.', body: 'Let’s see who’s in there.' }, actionLabel: 'Back to world' } }),
     // Returning to the world exposes the upgrade immediately. Camera framing
     // stays at the existing close-up and must never gate this actionable checkpoint.
-    worldActionScene({ id: 'gateway.offer', actionId: 'open_upgrade', next: 'gateway.buy', view: { kind: 'purchase', guide: { eyebrow: 'The mist', title: 'Tap the glowing bubble.', body: 'The light does the rest.' }, actionLabel: 'See the light' } }),
-    worldActionScene({ id: 'gateway.buy', actionId: 'unlock', next: 'gateway.purchase.focus', view: { kind: 'purchase', guide: { eyebrow: 'The mist', title: 'Clear it.', body: 'Something new wants room.' }, actionLabel: 'Clear the mist' } }),
+    worldActionScene({ id: 'gateway.offer', actionId: 'open_upgrade', next: GLOW_MISSION_FOCUS_NODE_ID, view: { kind: 'purchase', guide: { eyebrow: 'The mist', title: 'Tap the glowing bubble.', body: 'Something was left in there.' }, actionLabel: 'See the light' } }),
+    // The bubble opens the mission, not a purchase sheet: the opening's framing on this tile, the board beneath.
+    storyOperations.focusCamera({ id: GLOW_MISSION_FOCUS_NODE_ID, target: STEPPLING_STORY_TARGET, zoom: OPENING_CAMERA_ZOOM, anchorY: OPENING_CAMERA_ANCHOR_Y, durationMs: 900, next: GLOW_MISSION_CLEAR_NODE_ID }),
+    story.task({ id: GLOW_MISSION_CLEAR_NODE_ID, capability: 'glow.discovery.task', surface: 'haven', taskId: GLOW_MISSION_CLEAR_NODE_ID, requirements: [{ id: 'cleared', event: { type: GLOW_MISSION_CLEARED_EVENT } }], next: 'gateway.purchase.focus' }),
     ...upgradeWorldTargetRecipe({ id: 'gateway.purchase', target: STEPPLING_STORY_TARGET, toLevel: 1, economy: { mode: 'normal' }, cameraAlreadyFocused: true, presentation: { preset: 'mist-clear', reactionLine: '', showCoins: true }, next: 'gateway.egg' }),
     worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'egg.enter', view: { kind: 'discovery', guide: { eyebrow: 'An Egg', title: 'So someone is being noticed again.', body: 'You noticed something earlier, out in your world. This is what that did. Go on. That’s you.' }, actionLabel: 'Meet the Egg' } }),
     story.task({ id: 'egg.enter', capability: 'glow.discovery.task', surface: 'haven', taskId: 'egg.enter', requirements: [{ id: 'entered', event: { type: 'glow.egg.entered' } }], next: 'complete' }),
@@ -63,6 +79,8 @@ export const GLOW_DISCOVERY_FLOW = defineStory({
     'garden.focus': 'gateway.focus',
     ...Object.fromEntries(['lesson.prepare', 'lesson.spawn', 'lesson.seed', 'lesson.sprout', 'lesson.serve', 'lesson.repeat', 'lesson.repeat.prepare', 'lesson.repeat.spawn', 'lesson.repeat.match-1', 'lesson.repeat.match-2', 'lesson.repeat.match-3', 'lesson.repeat.match-4', 'lesson.repeat.match-5', 'lesson.repeat.serve'].map((id) => [id, 'lesson.single.prepare'])),
     'gateway.purchase': 'gateway.purchase.focus',
+    // The purchase sheet became the mission board: a save waiting to buy plays it instead.
+    'gateway.buy': GLOW_MISSION_FOCUS_NODE_ID,
     'egg.transfer': 'gateway.egg', 'world.choose': 'gateway.egg',
     'steppling.hatch': 'gateway.egg', 'steppling.claim': 'gateway.egg', 'steppling.welcome': 'complete',
   },
@@ -82,7 +100,7 @@ export function glowDiscoveryRevealLocked(run: Pick<ContentFlowRun, 'nodeId' | '
   return Boolean(run && run.status !== 'completed' && (
     run.nodeId === 'gateway.return'
     || run.nodeId === 'gateway.offer'
-    || run.nodeId === 'gateway.buy'
+    || glowDiscoveryMissionNode(run.nodeId)
     || run.nodeId.startsWith('gateway.purchase.')
     || run.nodeId === 'gateway.egg'
     || run.nodeId === 'egg.enter'
