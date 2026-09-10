@@ -12,11 +12,11 @@ const read = (relative: string) => readFileSync(resolve(root, relative), 'utf8')
 
 test('profile fixture catalog covers every planned discovery milestone', () => {
   const fixtures = buildPlayerProfileFixtures(NOW);
-  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 17);
-  assert.equal(fixtures.length, 17);
+  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 18);
+  assert.equal(fixtures.length, 18);
   assert.equal(new Set(fixtures.map((fixture) => fixture.id)).size, fixtures.length);
   assert.deepEqual(fixtures.map((fixture) => fixture.id), [
-    'fixture:fresh-first-launch', 'fixture:mossprout-merge-start', 'fixture:mossprout-haven-restore',
+    'fixture:fresh-first-launch', 'fixture:mossprout-opening', 'fixture:mossprout-merge-start', 'fixture:mossprout-haven-restore',
     'fixture:steppling-parcel', 'fixture:steppling-final-clue', 'fixture:steppling-first-order',
     'fixture:gate-3-fork', 'fixture:gate-3-feastle-parcel', 'fixture:gate-3-feastle-final', 'fixture:gate-4-queued',
     'fixture:gate-4-fork', 'fixture:gate-4-baristabbit-parcel', 'fixture:gate-4-baristabbit-final', 'fixture:gate-5-queued',

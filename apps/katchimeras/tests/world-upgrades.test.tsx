@@ -100,6 +100,22 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
   const levels = { ...restored().haven.mossproutNatureIslands };
   const build = () => module.buildMossproutHexNeighborhoodScene([], levels) as KingdomHexScene;
   const baseline = build();
+  // The opening veil: same frame, footprint, anchor and envelope; only art and draw order change.
+  const veiled = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeVeiled: true }) as KingdomHexScene;
+  const home = (scene: KingdomHexScene) => scene.tileArtLayers.find((layer) => layer.id === scene.centerTile.id)!;
+  const garden = (scene: KingdomHexScene) => scene.tileArtLayers.find((layer) => layer.id === 'structure:mossprout-hex-garden')!;
+  assert.equal(veiled.width, baseline.width); assert.equal(veiled.height, baseline.height);
+  assert.deepEqual(home(veiled).frame, home(baseline).frame);
+  assert.deepEqual(home(veiled).residentAnchor, home(baseline).residentAnchor);
+  assert.notEqual(home(veiled).source, home(baseline).source, 'the veiled home tile paints mist');
+  assert.equal(veiled.tileArtLayers.find((layer) => layer.id === 'structure:mossprout-hex-garden'), undefined, 'the Garden is part of what the Mist hides');
+  assert.equal(home(veiled).residentSource, undefined, 'nobody stands on the veiled tile');
+  assert.ok(home(baseline).residentSource, 'unveiled, Mossprout stands on the tile as before');
+  assert.ok(home(baseline).depth < garden(baseline).depth, 'unveiled, the Garden sits above the tile as before');
+  const solo = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeVeiled: true, homeSolo: true }) as KingdomHexScene;
+  assert.equal(solo.tileArtLayers.map((layer) => layer.id).join(','), home(baseline).id, 'the first beat draws Mossprout’s tile alone');
+  assert.equal(solo.width, baseline.width); assert.equal(solo.height, baseline.height);
+  assert.deepEqual(home(solo).frame, home(baseline).frame, 'alone, the tile still sits where the world will grow around it');
   for (const island of MOSSPROUT_NATURE_ISLANDS) {
     const id = `nature:mossprout:${island.id}`;
     const locked = baseline.tileArtLayers.find((layer) => layer.id === id)!;
@@ -300,6 +316,20 @@ test('mist upgrade stays available with a lagging FTUE or legacy chapter snapsho
     assert.deepEqual(visibleWorldUpgradeOffers(offers, 'companion.meditating', { nodeId, status: 'active' }).map((offer) => offer.id), ['mist:steppling-home']);
   }
   assert.deepEqual(visibleWorldUpgradeOffers(offers, undefined, { nodeId: 'lesson.spawn', status: 'active' }), []);
+});
+
+test('resting friends stay on the map through the whole FTUE while every other marker waits', () => {
+  const state = { ...createInitialMergeWorldState(NOW, []), coins: 45 };
+  const offers = worldUpgradeOffers(state);
+  assert.ok(offers.some((offer) => offer.sleepingSkinId != null), 'the fixture has resting friends');
+  assert.ok(offers.some((offer) => offer.eligible && offer.sleepingSkinId == null), 'and at least one open marker');
+  for (const stepId of ['world.mist_open', 'world.mist_clear', 'egg.opening', 'companion.first_rest']) {
+    const visible = visibleWorldUpgradeOffers(offers, stepId, null);
+    assert.ok(visible.length > 0, `${stepId}: silhouettes visible`);
+    assert.ok(visible.every((offer) => offer.sleepingSkinId != null), `${stepId}: only resting friends`);
+  }
+  const restoreBeat = visibleWorldUpgradeOffers([...offers, { ...offers[0]!, id: 'haven:mossprout', eligible: true, sleepingSkinId: undefined }], 'world.first_bloom_offer', null);
+  assert.ok(restoreBeat.some((offer) => offer.id === 'haven:mossprout'), 'the first restore keeps its own marker');
 });
 
 function mistUpgradeRuntime(initialNode = 'gateway.offer', initialStatus = 'active') {

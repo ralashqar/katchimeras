@@ -41,7 +41,9 @@ import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/nav
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { MergeWorldProvider, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
-import { advanceFtueActionDurably, commitFtueAction, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, ftueWispForRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { isMossproutOpeningStep } from '@/features/onboarding/opening-mist';
+import { installMossproutOnboardingMergeWorld } from '@/utils/merge-world/repository';
 import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
@@ -370,7 +372,8 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
   useEffect(() => {
     if (ftueRun?.status !== 'active') return;
     if (
-      ftueRun.stepId === 'world.egg_intro'
+      isMossproutOpeningStep(ftueRun.stepId)
+      || ftueRun.stepId === 'world.egg_intro'
       || ftueRun.stepId.startsWith('egg.')
       || ftueRun.stepId === 'world.garden_arrival'
       || ftueRun.stepId === 'world.seed_planted'
@@ -384,6 +387,20 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       publishWorldSession('mossprout');
     }
   }, [ftueRun?.status, ftueRun?.stepId, publishWorldSession]);
+  // The opening plays on the real board, so it is installed the moment a run
+  // starts. The later Merge handoff sees `mergeInstalled` and keeps this board.
+  const openingInstallRunRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (ftueRun?.status !== 'active' || ftueRun.mergeInstalled || !isMossproutOpeningStep(ftueRun.stepId)) return;
+    if (openingInstallRunRef.current === ftueRun.runId) return;
+    openingInstallRunRef.current = ftueRun.runId;
+    void installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(ftueRun), { preserveHaven: true, opening: true })
+      .then(() => { updateFtueRun({ mergeInstalled: true }); })
+      .catch((error) => {
+        openingInstallRunRef.current = null;
+        console.warn('The opening board could not be installed', error);
+      });
+  }, [ftueRun]);
   const closeWorld = useCallback(() => {
     if (havenNavigationLocked) return;
     transitionTo({
@@ -473,7 +490,9 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
           ftueStepId={ftueRun?.status === 'active' ? ftueRun.stepId : undefined}
           onFtueInspect={() => {
             const stepId = ftueRun?.status === 'active' ? ftueRun.stepId : null;
-            if (stepId === 'world.egg_intro') {
+            if (stepId === 'world.mist_open') {
+              commitFtueAction({ actionId: 'world.look_closer', evidenceRef: 'mossprout-world:look-closer' });
+            } else if (stepId === 'world.egg_intro') {
               commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-intro-seen' });
             } else if (stepId === 'world.seed_planted') {
               void openFtueGarden();

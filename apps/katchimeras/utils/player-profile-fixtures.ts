@@ -4,7 +4,8 @@ import type { MergeBoardItem, MergeCharacterId, MergeWorldState } from '@/types/
 import type { PlayerProfileSnapshot } from '@/types/player-profile-snapshot';
 import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
-import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
+import { createMossproutChapterZeroState, createMossproutOpeningState } from '@/utils/merge-world/onboarding';
+import { isMossproutOpeningStep } from '@/features/onboarding/opening-mist';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 
 const DAY = 86_400_000;
@@ -70,7 +71,7 @@ function ftueRun(stepId: string, now: number) {
     completedAt: complete ? timestamp : null,
     answers: {},
     receipts: [],
-    mergeInstalled: stepId.startsWith('merge.') || stepId.startsWith('discovery.') || stepId.startsWith('haven.') || complete,
+    mergeInstalled: stepId.startsWith('merge.') || stepId.startsWith('discovery.') || stepId.startsWith('haven.') || isMossproutOpeningStep(stepId) || complete,
     awardedMergeEnergy: null,
     objectiveProgress: {},
   };
@@ -289,6 +290,7 @@ function gateFive(now: number) {
 
 const FIXTURE_DEFINITIONS: readonly FixtureDefinition[] = [
   { id: 'fresh-first-launch', name: 'Fresh first launch', description: 'Before onboarding begins.', tags: ['FTUE'], ftueStep: null, meaningfulDays: 0, buildWorld: (now) => createInitialMergeWorldState(now) },
+  { id: 'mossprout-opening', name: 'Mossprout · Clear the Mist', description: 'The veiled opening with the docked board under Mossprout’s tile.', tags: ['FTUE', 'Mossprout'], ftueStep: 'world.mist_clear', buildWorld: (now) => createMossproutOpeningState(now) },
   { id: 'mossprout-merge-start', name: 'Mossprout · Merge begins', description: 'The first Mossprout board interaction.', tags: ['FTUE', 'Mossprout'], ftueStep: 'merge.seed_drag', buildWorld: (now) => createMossproutChapterZeroState(now) },
   { id: 'mossprout-haven-restore', name: 'Mossprout · Restore Haven', description: 'Right before restoring the Forgotten Clearing into the First Garden.', tags: ['FTUE', 'Mossprout', 'Haven'], ftueStep: 'haven.mossprout.restore', launchRoute: '/(tabs)/katchimeras', buildWorld: mossproutHavenRestore },
   { id: 'steppling-parcel', name: 'Steppling · Parcel waiting', description: 'Tests the forced parcel spotlight and tap.', tags: ['FTUE', 'Steppling', 'Parcel'], ftueStep: 'discovery.steppling.parcel', buildWorld: (now) => stepplingAtStage(-1, now) },

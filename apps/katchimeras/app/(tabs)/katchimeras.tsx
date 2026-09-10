@@ -128,7 +128,8 @@ export default function KatchimerasScreen() {
     });
   }, [router]);
 
-  const eggPresentationActive = ftueStep?.id === 'world.egg_intro'
+  const eggPresentationActive = ftueStep?.id === 'world.mist_lift'
+    || ftueStep?.id === 'world.egg_intro'
     || ftueStep?.id === 'egg.opening'
     || ftueStep?.id === 'egg.context'
     || ftueStep?.id === 'egg.mind'

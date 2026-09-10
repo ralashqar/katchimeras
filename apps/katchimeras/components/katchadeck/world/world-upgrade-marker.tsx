@@ -15,10 +15,12 @@ const MARKER_SIZE = 68;
 const MARKER_TILE_WIDTH_RATIO = 0.15;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY, sceneWidth, sceneHeight, moving, hidden = false, selected = false, onPress, onTargetChange }: {
+export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY, sceneWidth, sceneHeight, moving, hidden = false, selected = false, inert = false, onPress, onTargetChange }: {
   offer: WorldUpgradeOffer; frame: { left: number; top: number; width: number; height: number };
   cameraScale: SharedValue<number>; cameraX: SharedValue<number>; cameraY: SharedValue<number>;
   sceneWidth: number; sceneHeight: number; moving: boolean; hidden?: boolean; selected?: boolean;
+  /** Visible but not yet the player's business: a resting friend during the opening. */
+  inert?: boolean;
   onPress: (offer: WorldUpgradeOffer) => void; onTargetChange?: (id: string, node: View | null) => void;
 }) {
   const reduced = useReducedMotion(); const pulse = useSharedValue(1);
@@ -30,6 +32,7 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   const sleepingSkin = offer.sleepingSkinId ? katchimeraSkinById.get(offer.sleepingSkinId) : null;
   const sleepingPortrait = sleepingSkin?.visualKey ? getCreatureVisual(sleepingSkin.visualKey, 'grown') : null;
   const locked = Boolean(offer.lockedReason) && !sleepingPortrait;
+  const bare = Boolean(offer.bareMarker && sleepingPortrait);
   const markerSkin = offer.markerSkinId ? katchimeraSkinById.get(offer.markerSkinId) : null;
   const markerPortrait = markerSkin?.visualKey ? getCreatureVisual(markerSkin.visualKey, 'grown') : null;
   const paintedWidth = markerPortrait || sleepingPortrait ? 78 : MARKER_SIZE;
@@ -49,9 +52,9 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   const target = useCallback((view: View | null) => { node.current = view; onTargetChange?.(offer.id, moving || hidden ? null : view); }, [moving, hidden, offer.id, onTargetChange]);
   useEffect(() => { onTargetChange?.(offer.id, moving || hidden ? null : node.current); return () => onTargetChange?.(offer.id, null); }, [moving, hidden, offer.id, onTargetChange]);
   useEffect(() => {
-    pulse.value = offer.eligible && offer.affordable && !reduced ? withRepeat(withSequence(withTiming(1.045, { duration: 850 }), withTiming(1, { duration: 850 })), -1) : 1;
+    pulse.value = offer.eligible && offer.affordable && !reduced && !inert ? withRepeat(withSequence(withTiming(1.045, { duration: 850 }), withTiming(1, { duration: 850 })), -1) : 1;
     return () => cancelAnimation(pulse);
-  }, [offer.affordable, offer.eligible, pulse, reduced]);
+  }, [inert, offer.affordable, offer.eligible, pulse, reduced]);
   // Center the bubble just above the stairs in the lower part of the tile.
   // Artwork scales with the world; the screen-space hit target remains usable
   // when zoomed out. Tutorial measurement separately covers the painted badge.
@@ -68,7 +71,7 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   // unchanged at every zoom.
   const hitMotion = useAnimatedStyle(() => {
     const visual = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value * (reduced ? 1 : visibility.value);
-    return { opacity: visibility.value, transform: [{ scale: Math.max(1, visual) }] };
+    return { opacity: visibility.value * (inert ? 0.72 : 1), transform: [{ scale: Math.max(1, visual) }] };
   });
   const bubbleMotion = useAnimatedStyle(() => {
     const visual = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value * (reduced ? 1 : visibility.value);
@@ -89,18 +92,18 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
       <AnimatedPressable ref={button} collapsable={false} hitSlop={6} accessibilityRole="button" accessibilityLabel={sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
         accessibilityValue={locked || sleepingPortrait ? undefined : { min: 0, max: glowTotal, now: glowProgress, text: offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
         accessibilityHint={offer.lockedReason ?? (campaignPending ? 'Resumes this island story' : offer.affordable ? 'Opens upgrade details' : `${offer.missingGlow} more Glow needed. Opens upgrade details.`)}
-        disabled={moving || hidden} onPress={() => onPress(offer)} style={[styles.hitTarget, hitMotion]}>
+        disabled={moving || hidden || inert} accessibilityState={{ disabled: moving || hidden || inert }} onPress={() => onPress(offer)} style={[styles.hitTarget, hitMotion]}>
       <Animated.View pointerEvents="none" onLayout={(event) => setBubbleHeight(event.nativeEvent.layout.height)}
-        style={[styles.bubble, markerPortrait || sleepingPortrait ? styles.portraitBubble : null, sleepingPortrait ? styles.sleepingBubble : null, bubbleMotion]}>
+        style={[styles.bubble, markerPortrait || sleepingPortrait ? styles.portraitBubble : null, sleepingPortrait ? styles.sleepingBubble : null, bare ? styles.bareBubble : null, bubbleMotion]}>
         {/* Paint first so the seam it covers never sits above the icon/portrait
             content — it only fills the border gap, it isn't a foreground shape. */}
-        <View pointerEvents="none" style={styles.tail} />
+        {bare ? null : <View pointerEvents="none" style={styles.tail} />}
         {sleepingPortrait ? <>
           <View style={[styles.portraitFrame, styles.sleepingFrame]}>
             <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain"
               source={sleepingPortrait.source} style={[styles.portrait, styles.silhouette]} transition={0} accessible={false} />
           </View>
-          <Text style={styles.sleepingGlyph}>z z</Text>
+          {bare ? null : <Text style={styles.sleepingGlyph}>z z</Text>}
         </> : locked ? <Image accessibilityIgnoresInvertColors cachePolicy="memory-disk" contentFit="contain" source={LOCK_ART} style={styles.lockArt} transition={0} /> : <>
           {markerPortrait ? <View style={styles.portraitFrame}>
             <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain"
@@ -137,6 +140,7 @@ const styles = StyleSheet.create({
   percent: { color: '#654A26', fontSize: 12, lineHeight: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },
   // Resting friends sit in a dimmer bubble so the one open island reads as the next step.
   sleepingBubble: { backgroundColor: '#EFE6D2', borderColor: '#C9B48F' },
+  bareBubble: { minHeight: 0, paddingTop: 0, paddingBottom: 0, borderWidth: 0, backgroundColor: 'transparent', boxShadow: '0 0 0 rgba(0,0,0,0)' },
   sleepingFrame: { backgroundColor: '#D9DECF', borderColor: '#F3ECDD' },
   silhouette: { opacity: 0.78, tintColor: '#344238' },
   sleepingGlyph: { color: '#7B6544', fontSize: 11, lineHeight: 14, fontWeight: '900', letterSpacing: 1, marginTop: 1 },

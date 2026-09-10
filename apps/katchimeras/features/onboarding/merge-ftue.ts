@@ -50,7 +50,7 @@ export function residentFtueCanonicalStep(state: MergeWorldState) {
  * truth for these steps: it decides which beat is playable, and the run is
  * repaired to match (see `mossproutChapterZeroRepairTarget`).
  */
-export const CHAPTER_ZERO_MERGE_STEP_IDS = ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom', 'merge.serve_sprout'] as const;
+export const CHAPTER_ZERO_MERGE_STEP_IDS = ['merge.serve_sprout'] as const;
 export type ChapterZeroMergeStepId = typeof CHAPTER_ZERO_MERGE_STEP_IDS[number];
 export const CHAPTER_ZERO_ORDER_ID = 'mossprout:chapter-0:first-sprout';
 /** The authored scene that follows the served request. */
@@ -79,18 +79,28 @@ export function mossproutChapterZeroMergeStep(state: MergeWorldState): ChapterZe
   const served = state.externalRewardReceipts.some((receipt) => receipt.id.includes(CHAPTER_ZERO_ORDER_ID));
   if (!hasBasket || (!orderActive && !served)) return null;
   if (!orderActive) return { stepId: CHAPTER_ZERO_SERVED_STEP_ID, refill: false };
-  const seeds = chapterZeroCount(state, CHAPTER_ZERO_TIERS.seed);
-  const sprouts = chapterZeroCount(state, CHAPTER_ZERO_TIERS.sprout);
-  if (chapterZeroCount(state, CHAPTER_ZERO_TIERS.plant) >= 1) return { stepId: 'merge.serve_sprout', refill: false };
-  if (sprouts >= 2) return { stepId: 'merge.first_bloom', refill: false };
-  if (sprouts === 1) return { stepId: 'merge.second_seed_drag', refill: seeds < 2 };
-  return { stepId: 'merge.seed_drag', refill: seeds < 2 };
+  // Merging is taught by the opening; the request only needs the Plant to exist.
+  return { stepId: 'merge.serve_sprout', refill: chapterZeroCount(state, CHAPTER_ZERO_TIERS.plant) === 0 };
 }
 
-/** A lost Seed is replaced from the Basket before the authored drag resumes. */
+/**
+ * The request wants a Plant the board does not hold yet. Point at the next
+ * merge in Mossprout's voice without locking the board; only when nothing on
+ * the board can be merged does the Basket become the (exclusive) way forward.
+ */
 export function chapterZeroRefillStep(stepId: ChapterZeroMergeStepId, state: MergeWorldState): FtueStepDefinition {
   const target: FtueTarget = { kind: 'board_generator', generatorId: CHAPTER_ZERO_GENERATOR_ID };
   const base = { id: `${stepId}.refill`, surface: 'merge' as const, actions: [] };
+  const seeds = chapterZeroCount(state, CHAPTER_ZERO_TIERS.seed);
+  const sprouts = chapterZeroCount(state, CHAPTER_ZERO_TIERS.sprout);
+  if (sprouts >= 2) return {
+    ...base, guide: { eyebrow: 'The First Bloom', title: 'Now those two. Something bigger wants to happen.', body: 'Merge the two Sprouts into a Plant.' },
+    interaction: { mode: 'none' },
+  };
+  if (seeds >= 2) return {
+    ...base, guide: { eyebrow: 'The First Bloom', title: 'I asked for a Plant. Start with the Seeds.', body: 'Merge two Seeds, then merge the Sprouts.' },
+    interaction: { mode: 'none' },
+  };
   if (!state.board.some((cell) => !cell.locked && !cell.occupant && !cell.mist)) return {
     ...base, guide: { eyebrow: 'A little room', title: 'Make space in the Garden.', body: 'Merge or store an item, then we’ll continue.' },
   };

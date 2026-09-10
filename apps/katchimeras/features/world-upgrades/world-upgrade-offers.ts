@@ -40,6 +40,8 @@ export type WorldUpgradeOffer = WorldUpgradeDefinition & {
   markerSkinId?: KatchimeraSkinId;
   /** A friend still resting in the mist: the marker shows their silhouette. */
   sleepingSkinId?: KatchimeraSkinId;
+  /** Only the round portrait frame, no speech bubble around it (the opening's own tile). */
+  bareMarker?: boolean;
 };
 
 export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [
@@ -141,6 +143,8 @@ export function visibleWorldUpgradeOffers(offers: WorldUpgradeOffer[], ftueStepI
   return offers.filter((offer) => (offer.eligible || offer.markerSkinId != null || offer.sleepingSkinId != null) && (
     glowRun && glowRun.status !== 'completed'
       ? ['gateway.ready', 'gateway.return', 'gateway.offer', 'gateway.buy'].includes(glowRun.nodeId) && offer.id === 'mist:steppling-home'
-      : ftueStepId ? ['world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId) && offer.id === 'haven:mossprout'
+      // The six resting friends are the opening's whole point: they stay on the
+      // map from the first frame (inert), while every other marker waits.
+      : ftueStepId ? (['world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId) && offer.id === 'haven:mossprout') || offer.sleepingSkinId != null
         : true));
 }

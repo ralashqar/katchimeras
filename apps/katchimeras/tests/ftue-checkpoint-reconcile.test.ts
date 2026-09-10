@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
+import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import type { FtueRunState } from '@/features/onboarding/ftue-types';
 import { createContentFlowRun, stabilizeContentFlow } from '@/features/content-flow/content-flow-interpreter';
 
@@ -29,19 +30,22 @@ const repository = require('../features/content-flow/content-flow-repository') a
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const runtime = require('../features/content-flow/ftue-content-flow-runtime') as typeof import('../features/content-flow/ftue-content-flow-runtime');
 
-const MERGE_STEPS = ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom', 'merge.serve_sprout'] as const;
-const COMMIT_ACTIONS: Record<string, string> = {
-  'merge.seed_drag': 'merge.create_sprout', 'merge.second_seed_drag': 'merge.create_second_sprout',
-  'merge.first_bloom': 'merge.create_first_bloom', 'merge.serve_sprout': 'merge.serve_sprout',
+/** Every task node on the shipping path with the legacy receipt that proves it. */
+const TASK_COMMITS: Record<string, string> = Object.fromEntries(MOSSPROUT_FTUE_FLOW.nodes
+  .filter((node) => node.kind === 'task')
+  .map((node) => [node.id, MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === node.id)?.edges?.[0]?.commitActionId ?? node.id]));
+const taskCount = (nodeId: string) => {
+  const node = MOSSPROUT_FTUE_FLOW.nodes.find((candidate) => candidate.id === nodeId);
+  return node?.kind === 'task' ? node.requirements.reduce((total, requirement) => total + (requirement.count ?? 1), 0) : 0;
 };
 
 function ftueAt(runId: string, stepId: string, completedSteps: readonly string[]): FtueRunState {
   const now = new Date(1_000).toISOString();
   return {
-    schemaVersion: 6, runId, scriptId: 'mossprout-first-session', scriptVersion: 48, stepId, status: 'active',
+    schemaVersion: 6, runId, scriptId: MOSSPROUT_FTUE_SCRIPT.id, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId, status: 'active',
     startedAt: now, updatedAt: now, completedAt: null, answers: {}, mergeInstalled: true, awardedMergeEnergy: null, objectiveProgress: {},
     receipts: completedSteps.map((step) => ({
-      clientEventId: `${runId}:${COMMIT_ACTIONS[step]}`, actionId: COMMIT_ACTIONS[step], stepId: step, scriptId: 'mossprout-first-session', scriptVersion: 48,
+      clientEventId: `${runId}:${TASK_COMMITS[step]}`, actionId: TASK_COMMITS[step], stepId: step, scriptId: MOSSPROUT_FTUE_SCRIPT.id, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,
       surface: 'merge', status: 'committed', startedAt: now, committedAt: now, presentedAt: null, evidenceRef: null, syncAttempts: 0, syncedAt: null,
     })),
   };
@@ -57,34 +61,42 @@ async function parkFlowAt(runId: string, nodeId: string) {
   return run;
 }
 
-test('a checkpoint that outran the journal replays every task it proves, then waits at the next scene work', async () => {
-  const ftue = ftueAt('ftue-ahead', 'world.first_bloom_offer', MERGE_STEPS);
-  await parkFlowAt(ftue.runId, 'merge.seed_drag');
+test('a checkpoint that outran the journal replays every task it proves, counted requirements included, then waits at the next scene work', async () => {
+  assert.ok(taskCount('merge.serve_sprout') === 1, 'the request is a single serve');
+  const ftue = ftueAt('ftue-ahead', 'world.first_bloom_offer', ['merge.serve_sprout']);
+  await parkFlowAt(ftue.runId, 'merge.serve_sprout');
   const run = await runtime.reconcileFtueCheckpoint(ftue);
   assert.equal(run.status, 'active');
-  assert.equal(run.nodeId, 'garden.first-bloom-offer.focus', 'all four merge tasks replayed; the camera beat is the Kingdom screen’s to acknowledge');
-  assert.equal([...events].filter((id) => id.includes(':reconcile:')).length, 4);
+  assert.equal(run.nodeId, 'garden.first-bloom-offer.focus', 'the request replayed; the camera beat is the Kingdom screen’s to acknowledge');
+  assert.equal([...events].filter((id) => id.includes(':reconcile:')).length, 1);
   const again = await runtime.reconcileFtueCheckpoint(ftue);
   assert.equal(again.nodeId, run.nodeId, 'reconcile is idempotent');
 });
 
-test('replay stops exactly at the checkpoint and never fabricates evidence the checkpoint does not prove', async () => {
-  const partial = ftueAt('ftue-partial', 'merge.second_seed_drag', ['merge.seed_drag']);
-  await parkFlowAt(partial.runId, 'merge.seed_drag');
-  const run = await runtime.reconcileFtueCheckpoint(partial);
-  assert.equal(run.nodeId, 'merge.second_seed_drag');
-  assert.equal(run.phase, 'awaiting_event');
+test('every counted task on the shipping path is replayed in full when the checkpoint is past it', async () => {
+  const counted = MOSSPROUT_FTUE_FLOW.nodes.filter((node) => node.kind === 'task' && node.requirements.some((requirement) => (requirement.count ?? 1) > 1));
+  for (const node of counted) {
+    const after = MOSSPROUT_FTUE_FLOW.nodes[MOSSPROUT_FTUE_FLOW.nodes.findIndex((candidate) => candidate.id === node.id) + 1]!;
+    const ftue = ftueAt(`ftue-counted-${node.id}`, after.id, [node.id]);
+    await parkFlowAt(ftue.runId, node.id);
+    const run = await runtime.reconcileFtueCheckpoint(ftue);
+    assert.notEqual(run.nodeId, node.id, `${node.id}: a partially replayed counted task would park the flow forever`);
+    assert.equal([...events].filter((id) => id.startsWith(`ftue:${ftue.runId}:${node.id}:`)).length, taskCount(node.id));
+  }
+});
 
-  const inStep = ftueAt('ftue-in-step', 'merge.seed_drag', []);
-  await parkFlowAt(inStep.runId, 'merge.seed_drag');
+test('replay stops exactly at the checkpoint and never fabricates evidence the checkpoint does not prove', async () => {
+  const inStep = ftueAt('ftue-in-step', 'merge.serve_sprout', []);
+  await parkFlowAt(inStep.runId, 'merge.serve_sprout');
   const unchanged = await runtime.reconcileFtueCheckpoint(inStep);
-  assert.equal(unchanged.nodeId, 'merge.seed_drag');
+  assert.equal(unchanged.nodeId, 'merge.serve_sprout');
+  assert.equal(unchanged.phase, 'awaiting_event');
 
   // A rewound checkpoint (board write lost) sits before the flow; the flow
-  // waits where it is and the live merge catches it up.
-  const behind = ftueAt('ftue-behind', 'merge.seed_drag', []);
-  await parkFlowAt(behind.runId, 'merge.first_bloom');
+  // waits where it is and the live serve catches it up.
+  const behind = ftueAt('ftue-behind', 'world.seed_planted', []);
+  await parkFlowAt(behind.runId, 'merge.serve_sprout');
   const parked = await runtime.reconcileFtueCheckpoint(behind);
-  assert.equal(parked.nodeId, 'merge.first_bloom');
+  assert.equal(parked.nodeId, 'merge.serve_sprout');
   assert.equal([...events].filter((id) => id.startsWith('ftue:ftue-behind')).length, 0);
 });

@@ -125,12 +125,16 @@ export async function reconcileFtueCheckpoint(ftue: FtueRunState) {
       if (run.phase !== 'awaiting_event' || order(ftue.stepId) <= order(run.nodeId)) break;
       let replayed = run;
       for (const requirement of node.requirements) {
-        const occurredAt = Date.now();
-        replayed = await dispatchContentFlowCommand(run.runId, { type: 'record_event', event: {
-          eventId: `ftue:${ftue.runId}:${node.id}:${requirement.id}:reconcile:${occurredAt}`,
-          type: requirement.event.type, runId: run.runId, nodeId: run.nodeId,
-          payload: { ...(requirement.event.where ?? {}) }, occurredAt,
-        } }) ?? replayed;
+        // A counted requirement (the opening's eight merges) needs every one
+        // of its events, or the node parks at partial progress forever.
+        for (let index = 0; index < (requirement.count ?? 1) && replayed.nodeId === run.nodeId; index++) {
+          const occurredAt = Date.now();
+          replayed = await dispatchContentFlowCommand(run.runId, { type: 'record_event', event: {
+            eventId: `ftue:${ftue.runId}:${node.id}:${requirement.id}:reconcile:${index}:${occurredAt}`,
+            type: requirement.event.type, runId: run.runId, nodeId: run.nodeId,
+            payload: { ...(requirement.event.where ?? {}) }, occurredAt,
+          } }) ?? replayed;
+        }
         if (replayed.nodeId !== run.nodeId) break;
       }
       if (replayed.nodeId === run.nodeId) break;

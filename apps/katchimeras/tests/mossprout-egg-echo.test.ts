@@ -35,13 +35,13 @@ test('first-session copy stays short, in voice, and free of system nouns', () =>
     for (const page of ftueDialoguePages(line)) assert.ok(page.length <= FTUE_DIALOGUE_MAX_CHARACTERS, page);
   }
   assert.equal(ftueDialoguePages(MOSSPROUT_FTUE_COPY.farewell).length, 2, 'the farewell carries one idea per page');
-  const shippingMergeSteps = ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom', 'merge.serve_sprout', 'world.first_bloom_offer', 'world.first_bloom_restore', 'world.first_seed_grew'];
+  const shippingMergeSteps = ['merge.serve_sprout', 'world.first_bloom_offer', 'world.first_bloom_restore', 'world.first_seed_grew'];
   for (const stepId of shippingMergeSteps) {
     const guide = mossproutFtueStep(stepId)!.guide;
     assert.doesNotMatch(guide.title, SYSTEM_NOUNS, `${stepId} title speaks as Mossprout`);
     assert.ok(guide.title.length <= 60, `${stepId}: ${guide.title}`);
   }
-  const firstTenMinutes = MOSSPROUT_FTUE_SCRIPT.steps.filter((step) => ['world.egg_intro', 'egg.opening', 'egg.context', 'egg.ready', 'companion.first_meeting'].includes(step.id));
+  const firstTenMinutes = MOSSPROUT_FTUE_SCRIPT.steps.filter((step) => ['world.mist_open', 'world.mist_clear', 'world.mist_lift', 'world.egg_intro', 'egg.opening', 'egg.context', 'egg.ready', 'companion.first_meeting'].includes(step.id));
   for (const step of firstTenMinutes) {
     for (const action of step.actions) assert.doesNotMatch(`${action.title} ${action.description}`, /Katchimera/, `${step.id}: the brand word waits until after the hatch`);
   }

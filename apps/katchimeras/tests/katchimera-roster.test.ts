@@ -22,8 +22,11 @@ import {
 
 test('Mossprout never falls back to the Egg during post-hatch world and dialogue steps', () => {
   const companion = { companionVisible: true, hatchPresentation: null };
-  for (const step of ['world.egg_intro', 'egg.opening', 'egg.context', 'egg.mind', 'egg.ready']) {
+  for (const step of ['world.mist_lift', 'world.egg_intro', 'egg.opening', 'egg.context', 'egg.mind', 'egg.ready']) {
     assert.equal(mossproutWorldUsesEggRenderer(step, null), true, step);
+  }
+  for (const step of ['world.mist_open', 'world.mist_clear']) {
+    assert.equal(mossproutWorldUsesEggRenderer(step, null), false, `${step}: the Egg stays under the veil`);
   }
   assert.equal(mossproutWorldUsesEggRenderer('companion.first_meeting', companion), true);
   assert.equal(mossproutWorldUsesEggRenderer('companion.first_meeting', null), false);

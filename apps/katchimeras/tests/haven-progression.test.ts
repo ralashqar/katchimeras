@@ -349,7 +349,7 @@ test('Mossprout FTUE turns one Bond answer into a Garden upgrade and an intimate
   assert.equal(mossproutFtueStep('companion.garden_intro')?.actions[0]?.nextStepId, 'world.garden_arrival');
   assert.equal(mossproutFtueStep('companion.order_preview')?.actions[0]?.nextStepId, 'world.garden_arrival');
   assert.equal(mossproutFtueStep('world.garden_arrival')?.actions[0]?.nextStepId, 'world.seed_planted');
-  assert.equal(mossproutFtueStep('world.seed_planted')?.actions[0]?.nextStepId, 'merge.seed_drag');
+  assert.equal(mossproutFtueStep('world.seed_planted')?.actions[0]?.nextStepId, 'merge.serve_sprout');
   assert.equal(mossproutFtueStep('world.seed_planted')?.autoAdvanceMs, undefined);
   const gardenArrivalProjection = mossproutFtueStep('world.garden_arrival')?.camera;
   const gardenArrival = mossproutFtueStep('world.garden_arrival');
@@ -385,7 +385,7 @@ test('Mossprout FTUE turns one Bond answer into a Garden upgrade and an intimate
     assert.equal(preservedRestoreCamera.presentationType, 'world.camera');
     assert.deepEqual(preservedRestoreCamera.payload, { operation: 'preserve', holdWorldState: true, lockInput: true });
   }
-  assert.equal(mossproutFtueStep('world.garden_handoff')?.actions[0]?.nextStepId, 'merge.seed_drag');
+  assert.equal(mossproutFtueStep('world.garden_handoff')?.actions[0]?.nextStepId, 'merge.serve_sprout');
   assert.equal(mossproutFtueStep('merge.serve_sprout')?.edges?.[0]?.nextStepId, 'world.first_bloom_offer');
   assert.equal(mossproutFtueStep('world.first_bloom_restore')?.edges?.[0]?.nextStepId, 'world.first_seed_grew');
   assert.equal(mossproutFtueStep('world.first_seed_grew')?.actions[0]?.nextStepId, 'companion.water_together');

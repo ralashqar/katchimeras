@@ -88,5 +88,38 @@ test('a tap on a marker is never disabled by its own touch: the camera reads mov
   assert.match(pan, /\.onStart\(\(\) => \{\s*panActivated\.value = true;\s*runOnJS\(beginMotion\)\(\);/);
   assert.match(pan, /\.onFinalize\(\(\) => \{[\s\S]*?if \(panActivated\.value\) return;\s*runOnJS\(commitSnapshot\)\(tx\.value, ty\.value, scale\.value, false\);/);
   const marker = readFileSync('components/katchadeck/world/world-upgrade-marker.tsx', 'utf8');
-  assert.match(marker, /disabled=\{moving \|\| hidden\}/, 'the marker still yields while the camera is really moving');
+  assert.match(marker, /disabled=\{moving \|\| hidden \|\| inert\}/, 'the marker still yields while the camera is really moving');
+});
+
+test('an inert marker is visible but cannot be opened and does not pulse', async () => {
+  const host = (name: string) => name as unknown as React.ComponentType<Record<string, unknown>>;
+  const motion = nativeMotionHarness();
+  let repeats = 0;
+  const module = loadNativeModule('components/katchadeck/world/world-upgrade-marker.tsx', {
+    'react-native': { ...nativeViews, Pressable: 'Pressable', Text: 'Text', AccessibilityInfo: {}, findNodeHandle: () => null },
+    'react-native-reanimated': { ...motion.animated, withSpring: () => 1, withRepeat: () => { repeats++; return 1; } },
+    'expo-image': { Image: 'Image' },
+    '@/components/katchadeck/progress-bar': { ProgressBar: 'ProgressBar' },
+    '@/features/world-upgrades/world-upgrade-stories': { upgradePercent: () => 0 },
+    '@/constants/katchimera-skins': { katchimeraSkinById: new Map() },
+    '@/game/days/visuals': { getCreatureVisual: () => null },
+    '@incubator/art-world/ui/upgrade-toy-v1.png': 1,
+    '@incubator/art-world/ui/clear-mist-toy-v1.png': 2,
+    '@incubator/art-world/hex/kingdom_dream_mist_lock_v1_512.webp': 3,
+  });
+  const Marker = module.WorldUpgradeMarker as React.ComponentType<Record<string, unknown>>;
+  const props = { offer: { id: 'nature:pond-sanctuary', action: 'Restore', cost: 40, missingGlow: 40, affordable: true, eligible: true, name: 'Pond Sanctuary' },
+    frame: { left: 100, top: 100, width: 600, height: 500 }, cameraScale: { value: 1 }, cameraX: { value: 0 }, cameraY: { value: 0 },
+    sceneWidth: 1000, sceneHeight: 1000, moving: false, onPress() {} };
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Marker {...props} inert />); });
+  const pressable = tree!.root.findByType(host('Pressable'));
+  assert.equal(pressable.props.disabled, true);
+  assert.equal(pressable.props.accessibilityState.disabled, true);
+  assert.equal(repeats, 0, 'no pulse while inert');
+  assert.ok(pressable.props.style[1].read().opacity < 1, 'dimmed');
+  await act(async () => { tree!.update(<Marker {...props} />); });
+  assert.equal(tree!.root.findByType(host('Pressable')).props.disabled, false);
+  assert.ok(repeats > 0, 'pulses once it is the player’s business');
+  await act(async () => { tree!.unmount(); });
 });

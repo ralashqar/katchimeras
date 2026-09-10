@@ -34,6 +34,10 @@ export type MergePlaySurfaceProps = {
   animateEntrance?: boolean;
   boardInteractionGate?: MergeBoardInteractionGate;
   boardLayout?: MergeBoardLayout;
+  /** The opening's docked board shows only the board: no request rail, no counter. */
+  railHidden?: boolean;
+  counterHidden?: boolean;
+  inspectorHidden?: boolean;
   focusOrderId?: string;
   hiddenItemInstanceIds?: ReadonlySet<string>;
   inspectedCell: number | null;
@@ -78,6 +82,9 @@ export const MergePlaySurface = memo(function MergePlaySurface({
   animateEntrance = true,
   boardInteractionGate = { kind: 'open' },
   boardLayout,
+  railHidden = false,
+  counterHidden = false,
+  inspectorHidden = false,
   counterWidth,
   focusOrderId,
   hiddenItemInstanceIds,
@@ -137,7 +144,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
       onLayout={measureSurface}
       pointerEvents={interactionEnabled ? 'auto' : 'none'}
       style={[styles.surface, maxHeight == null ? styles.flexSurface : { height: maxHeight }, { width }, style]}>
-      <MergeOrderRail
+      {railHidden ? null : <MergeOrderRail
         active={effectsActive}
         servingOrderId={servingOrderId}
         entries={stableEntries}
@@ -150,8 +157,8 @@ export const MergePlaySurface = memo(function MergePlaySurface({
         onReroll={onReroll}
         onServe={onServe}
         parcelTargetRef={parcelTargetRef}
-      />
-      <ServiceCounter viewportWidth={counterWidth ?? width} />
+      />}
+      {counterHidden ? null : <ServiceCounter viewportWidth={counterWidth ?? width} />}
       <View onLayout={measureBoardArea} style={styles.boardStage}>
         {boardAreaHeight > 0 ? (
           <SubscribedMergeBoard
@@ -177,7 +184,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
           />
         ) : null}
       </View>
-      <MergeCellInspector cell={inspectedCell} onUseGrovelight={onUseGrovelight} state={state} />
+      {inspectorHidden ? null : <MergeCellInspector cell={inspectedCell} onUseGrovelight={onUseGrovelight} state={state} />}
     </View>
   );
 });

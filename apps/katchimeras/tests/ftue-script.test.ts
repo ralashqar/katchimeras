@@ -27,6 +27,7 @@ import {
   validateMossproutFtueScript,
   mossproutFtueShowsWorldGarden,
 } from '@/features/onboarding/mossprout-ftue-script';
+import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
 import { ftueNeedsV28QuestionnaireRestart, ftueV28QuestionnaireLoopRecoveryStep, streamlinedFtueStep } from '@/features/onboarding/ftue-migration-policy';
 import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_STYLE_OPTIONS, mossproutBondShareSelection, mossproutFirstSeedForIntent } from '@/features/onboarding/mossprout-bond-share';
 import { MOSSPROUT_GARDEN_INTRO_BEATS, mossproutGardenIntroBeat } from '@/features/onboarding/mossprout-garden-intro';
@@ -60,7 +61,6 @@ test('Merge speech guidance is one green line and appears only for first-use mec
     return guide ? [{ id: step.id, guide }] : [];
   });
   assert.deepEqual(visible.map(({ id }) => id), [
-    'merge.seed_drag',
     'merge.serve_sprout',
     'merge.plant.spawn',
     'merge.plant.seed_pairs',
@@ -178,7 +178,7 @@ test('terminal meditation restores Back and finishes FTUE before exiting interac
 
 test('Mossprout FTUE script has valid transitions and registered handlers', () => {
   assert.deepEqual(validateMossproutFtueScript(), []);
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.entryStepId, 'world.egg_intro');
+  assert.equal(MOSSPROUT_FTUE_SCRIPT.entryStepId, 'world.mist_open');
   assert.equal(MOSSPROUT_FTUE_SCRIPT.terminalStepId, 'complete');
   assert.equal(mossproutFtueStep('world.egg_intro')?.actions[0]?.nextStepId, 'egg.opening');
   assert.equal(mossproutFtueStep('grove.egg_inspect'), null);
@@ -413,17 +413,17 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
   assert.doesNotMatch(`${priorMigration}\n${migration}\n${v20Migration}\n${v24Migration}\n${v25Migration}\n${v26Migration}\n${v27Migration}\n${v28Migration}\n${v29Migration}\n${v30Migration}\n${v31Migration}\n${v32Migration}\n${v33Migration}`, /option_id|option_label|answer_text/);
 });
 
-test('Chapter 0 uses four Seeds, two Sprouts, a First Bloom, then one request', () => {
+test('Chapter 0 asks for one Plant on a free board; the guided drags are retired', () => {
   const mergeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.seed_drag');
   const serveStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_sprout');
   const spawnStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.spawn');
   const pairStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.seed_pairs');
   const finalServeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_plant');
   const sproutEchoStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.sprout_pair');
-  assert.equal(mossproutFtueAction('merge.seed_drag', 'merge.create_sprout')?.handlerId, 'merge_item_created');
-  assert.equal(mergeStep?.edges?.[0]?.nextStepId, 'merge.second_seed_drag');
-  assert.equal(mossproutFtueStep('merge.second_seed_drag')?.edges?.[0]?.nextStepId, 'merge.first_bloom');
-  assert.equal(mossproutFtueStep('merge.first_bloom')?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
+  assert.equal(mossproutFtueAction('world.seed_planted', 'world.acknowledge_seed_dormant')?.nextStepId, 'merge.serve_sprout');
+  assert.ok(mergeStep, 'retired beats stay authored for old fixtures');
+  assert.equal(MOSSPROUT_FTUE_FLOW.nodes.some((node: { id: string }) => ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom'].includes(node.id)), false);
+  for (const id of ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom']) assert.equal((MOSSPROUT_FTUE_FLOW.migrations as Record<string, string>)[id], 'merge.serve_sprout');
   assert.equal(sproutEchoStep?.edges?.[0]?.nextStepId, 'merge.serve_plant');
   assert.equal(spawnStep?.edges?.[0]?.requiredCount, undefined);
   assert.equal(pairStep?.edges?.[0]?.event.type, 'dream_echo_cleared');
@@ -462,13 +462,7 @@ test('Chapter 0 uses four Seeds, two Sprouts, a First Bloom, then one request', 
   const returnNote = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.return_note');
   assert.equal(returnNote?.interaction?.mode, 'exclusive');
   assert.deepEqual(returnNote?.spotlight?.targets, [{ kind: 'tray_chat_note', noteId: 'mossprout:chapter-0:return-note' }]);
-  assert.equal(mergeStep?.interaction?.mode, 'exclusive');
-  assert.equal(serveStep?.interaction?.mode, 'exclusive');
-  assert.deepEqual(mergeStep?.spotlight?.targets, [
-    { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 },
-    { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 },
-  ]);
-  assert.equal(mergeStep?.spotlight?.grouping, 'bounding_rect');
+  assert.equal(serveStep?.interaction?.mode, 'none', 'the request never locks the board');
   assert.deepEqual(serveStep?.spotlight?.targets, [
     { kind: 'order_card', orderId: 'mossprout:chapter-0:first-sprout' },
     { kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:first-sprout', requirementIndex: 0 },
@@ -1129,7 +1123,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.doesNotMatch(kingdomScreen, /\? 'Plant Seed'[\s\S]*?: ftueStep\.actions/);
   assert.match(kingdomScreen, /gardenWorldBottomCtaActive[\s\S]*?bottom: Math\.max\(insets\.bottom, 12\) \+ 22[\s\S]*?justifyContent: 'space-between'[\s\S]*?top: insets\.top \+ 18/);
   assert.match(kingdomScreen, /function FtueOpeningFade\(\)[\s\S]*?opacity\.value = withDelay\([\s\S]*?duration: reduceMotion \? 140 : 1_350/);
-  assert.match(kingdomScreen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
+  assert.match(kingdomScreen, /ftueStepId === OPENING_MIST_OPEN_STEP_ID \? <FtueOpeningFade/, 'the fade opens the first beat under the Mist');
   assert.match(nurture, /<EggHeroGuide guide=\{onboardingGuide\} topInset=\{topInset\}/);
   assert.match(readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8'), /top: topInset \+ topOffset/);
   assert.match(kingdomScreen, /!upgradePresentation && \(!ftueStepId \|\| ftueStepId === 'companion\.meditating'\)/);

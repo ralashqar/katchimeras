@@ -11,7 +11,7 @@ import { islandCampaignForIsland } from '@/constants/island-campaigns/registry';
 import { mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
 import type { HavenStage } from '@/constants/haven-catalog';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
-import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
+import { createMossproutChapterZeroState, createMossproutOpeningState } from '@/utils/merge-world/onboarding';
 import { completeMossproutChapterZeroSlice } from '@/utils/merge-world/chapter-zero-policy';
 import { MOSSPROUT_FTUE_JOURNAL_ENERGY } from '@/utils/merge-world/economy-policy';
 import { firstFtueMemoryForSource, reduceFirstFtueMemoryPlacement } from '@/utils/merge-world/first-ftue-memory';
@@ -675,6 +675,9 @@ export async function installMergeWorldStateForDebug(input: unknown, now = Date.
   return installed;
 }
 
+/** `opening`: the mist-veiled opening's board (eight Seeds, two Sprouts) instead of the classic lesson board. */
+export type MossproutInstallOptions = { opening?: boolean };
+
 /**
  * Installs Chapter 0's board. Live FTUE entry preserves the player's Haven;
  * debug/reset callers retain the historical destructive behavior by default.
@@ -682,12 +685,12 @@ export async function installMergeWorldStateForDebug(input: unknown, now = Date.
 export async function installMossproutOnboardingMergeWorld(
   now = Date.now(),
   rewardWispId: import('@/types/wisp').WispId = 'sprout',
-  options: { preserveHaven?: boolean } = {},
+  options: { preserveHaven?: boolean } & MossproutInstallOptions = {},
 ): Promise<MergeWorldState> {
   await serializeWrite(async () => undefined);
   resetGeneration += 1;
   resetInProgress = true;
-  let installedState = createMossproutChapterZeroState(now, rewardWispId);
+  let installedState = options.opening ? createMossproutOpeningState(now, rewardWispId) : createMossproutChapterZeroState(now, rewardWispId);
   try {
     await serializeWrite(async () => {
       const db = await database();

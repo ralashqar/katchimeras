@@ -28,7 +28,9 @@ export function mossproutWorldUsesEggRenderer(
   stepId: string | null | undefined,
   presentation?: Pick<WorldFtueSubjectPresentation, 'companionVisible' | 'hatchPresentation'> | null,
 ) {
-  const preHatch = stepId === 'world.egg_intro'
+  // The veil lift reveals the Egg on the nest, so it is an Egg beat too.
+  const preHatch = stepId === 'world.mist_lift'
+    || stepId === 'world.egg_intro'
     || stepId === 'egg.opening'
     || stepId === 'egg.context'
     || stepId === 'egg.mind'

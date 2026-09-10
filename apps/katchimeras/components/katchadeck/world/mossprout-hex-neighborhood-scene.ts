@@ -273,16 +273,33 @@ function shiftLayer(layer: KingdomTileArtLayer, dx: number, dy: number): Kingdom
   };
 }
 
+export type MossproutSceneOptions = {
+  /**
+   * The opening keeps Mossprout's own tile under the same mist as the
+   * islands until the player has made enough light. The veiled layer keeps
+   * the unveiled frame, footprint and resident anchor, so the envelope and
+   * every camera stay put; only its art and draw order change.
+   */
+  homeVeiled?: boolean;
+  /** The opening's first beat: Mossprout's tile alone, nothing else drawn. The envelope is unchanged. */
+  homeSolo?: boolean;
+};
+
 export function buildMossproutHexNeighborhoodScene(
   companionSlots: KingdomHexCompanionSlot[],
   natureIslandLevels: Record<MossproutNatureIslandId, MossproutNatureIslandLevel>,
   gardenState: MossproutGardenSceneState = { level: 0, plantableMemories: [] },
   natureIslandReveals: Partial<Record<MossproutNatureIslandId, boolean>> = {},
+  options: MossproutSceneOptions = {},
 ): KingdomHexScene {
   const mossprout = companionSlots.find((slot) => slot.familyId === 'mossprout')
     ?? { id: 'family:mossprout', familyId: 'mossprout', kind: 'locked' as const, coord: MAIN.coord };
-  const mainLayer = layerFor(mossprout.id, 'tile', MAIN);
-  mainLayer.residentSource = MAIN_RESIDENT_SOURCE;
+  const unveiledMain = layerFor(mossprout.id, 'tile', MAIN);
+  const mainLayer = options.homeVeiled
+    ? layerFor(mossprout.id, 'tile', { alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS, coord: MAIN.coord, sources: DREAM_MIST_LOCKED_NATURE_SOURCES }, MAIN.alphaBounds)
+    : unveiledMain;
+  // Under the veil nobody stands on the tile; the sleeping marker says who is there.
+  if (!options.homeVeiled) mainLayer.residentSource = MAIN_RESIDENT_SOURCE;
   mainLayer.residentAnchor = sharedResidentAnchor(mainLayer.frame);
   const gardenArtLevel: 0 | 1 | 2 = gardenState.level <= 0
     ? 0
@@ -329,8 +346,11 @@ export function buildMossproutHexNeighborhoodScene(
   const lockedSteppling = stepplingLayer(true);
   const revealedSteppling = stepplingLayer(false);
   revealedSteppling.residentAnchor = sharedResidentAnchor(revealedSteppling.frame);
-  const rawLayers = [
-    mainLayer, gardenLayer, ...plantLayers,
+  // Mist is opaque: while veiled, the home tile must paint over the Garden
+  // structure that normally sits above it.
+  if (options.homeVeiled) mainLayer.depth = gardenLayer.depth + 2;
+  // The Garden is part of what the Mist hides: it is not drawn until the veil lifts.
+  const neighbourLayers = options.homeSolo ? [] : [
     !gardenState.gateway || gardenState.gateway === 'locked' ? lockedSteppling : revealedSteppling,
     ...MOSSPROUT_NATURE_ISLANDS.map((island) => natureLayerFor(
       island.id,
@@ -338,12 +358,16 @@ export function buildMossproutHexNeighborhoodScene(
       Boolean(natureIslandReveals[island.id]),
     )),
   ];
+  const rawLayers = [
+    mainLayer, ...(options.homeVeiled ? [] : [gardenLayer, ...plantLayers]),
+    ...neighbourLayers,
+  ];
   // Reserve both art envelopes so changing mist to terrain never shifts the world.
   // Include every island's mist, fallback and authored stages in the bounds.
   // A reveal must never shift the scene origin (and every other island/camera).
   const natureBoundsLayers = MOSSPROUT_NATURE_ISLANDS.flatMap((island) =>
     [natureLayerFor(island.id, 0), natureLayerFor(island.id, 0, true), ...island.levels.map((level) => natureLayerFor(island.id, level.level, true))]);
-  const boundsLayers = [...rawLayers, lockedSteppling, revealedSteppling, ...natureBoundsLayers];
+  const boundsLayers = [...rawLayers, unveiledMain, gardenLayer, lockedSteppling, revealedSteppling, ...natureBoundsLayers];
   const { dx, dy, width, height } = mossproutSceneEnvelope(boundsLayers.map(layer => layer.frame));
   const layers = rawLayers.map((layer) => shiftLayer(layer, dx, dy)).sort((a, b) => a.depth - b.depth);
   const mainPoint = mossproutHexPoint(MAIN.coord);

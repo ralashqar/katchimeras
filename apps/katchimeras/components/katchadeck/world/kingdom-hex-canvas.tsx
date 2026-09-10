@@ -1,6 +1,7 @@
 import { playUpgradeSequence } from '@incubator/environments/upgrade-sequence';
 import {createHexTileRenderer} from '@incubator/environments/hex-tile';
 import { WorldUpgradeMarker } from './world-upgrade-marker';
+import type { HomeVeilState } from '@/features/onboarding/opening-mist';
 import { WorldUpgradeAnchor } from './world-upgrade-anchor';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
@@ -188,6 +189,14 @@ type Props = {
   discoveredEggPresentation?: WorldFtueSubjectPresentation | null;
   discoveredEggInteraction?: boolean;
   discoveredEggTargetRef?: RefObject<ViewType | null>;
+  /** Opening: Mossprout's tile under mist ('veiled'), crossblending away ('lifting'), or clear. */
+  homeVeil?: HomeVeilState;
+  /** Draw Mossprout's tile alone (the opening's first beat). */
+  homeSolo?: boolean;
+  /** Opening: resting friends are shown but cannot be opened yet. */
+  sleepingMarkersInert?: boolean;
+  /** Screen-space FTUE target for the home tile (wisp destination, spotlight). */
+  onHomeTileTargetChange?: (node: ViewType | null) => void;
 };
 
 type HavenUpgradeLayers = {
@@ -491,6 +500,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   discoveredEggPresentation,
   discoveredEggInteraction = false,
   discoveredEggTargetRef,
+  homeVeil = 'none',
+  homeSolo = false,
+  sleepingMarkersInert = false,
+  onHomeTileTargetChange,
 }: Props) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [settledImageScale, setSettledImageScale] = useState(initialCameraSnapshot?.scale ?? 1.25);
@@ -509,6 +522,17 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   useLayoutEffect(() => {
     if (revealingStepplingEgg) stepplingRevealProgress.value = 0;
   }, [revealingStepplingEgg, stepplingRevealProgress, upgradePresentation?.nonce]);
+  // The opening's veil lift follows the Steppling reveal: one clock owns the
+  // mist crossblend and the Egg beneath it, so the Egg fades in with the tile
+  // and never appears ahead of it (including while the lifted art settles).
+  const revealingVeiledHome = Boolean(upgradePresentation?.veilLift);
+  const homeVeilProgress = useSharedValue(0);
+  const veilLiftNonceRef = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (!revealingVeiledHome) return;
+    homeVeilProgress.value = 0;
+    veilLiftNonceRef.current = upgradePresentation?.nonce ?? null;
+  }, [homeVeilProgress, revealingVeiledHome, upgradePresentation?.nonce]);
   const [paintedTransitionKeys, setPaintedTransitionKeys] = useState<Record<string, string | null>>({});
   const [settledDiscoveryFamily, setSettledDiscoveryFamily] = useState<string | null>(null);
   const [settlingUpgrade, setSettlingUpgrade] = useState<{
@@ -552,9 +576,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           'orchard-grove': 0,
           'ancient-tree-grove': 0,
           'wildgrowth-grove': 0,
-        }, mossproutGarden, mossproutNatureIslandReveals)
+        }, mossproutGarden, mossproutNatureIslandReveals, { homeVeiled: homeVeil === 'veiled' || homeVeil === 'lifting', homeSolo })
       : buildKingdomHexScene(companionSlots, hexTileSelection.value, identity, verticalAlignmentSelection.value),
-    [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, verticalAlignmentSelection]
+    [companionSlots, focusedMossproutWorld, hexTileSelection, homeSolo, homeVeil, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, verticalAlignmentSelection]
   );
   const upgradeFromScene = useMemo(() => {
     if (!focusedMossproutWorld || !upgradePresentation || !mossproutNatureIslandLevels) return committedScene;
@@ -608,6 +632,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   );
   const upgradeLayers = useMemo(() => {
     if (!upgradePresentation) return null;
+    if (focusedMossproutWorld && upgradePresentation.veilLift && mossproutNatureIslandLevels) {
+      // The opening's mist lift is the ordinary tile crossblend between the
+      // veiled and unveiled home tile; nothing in the world changes.
+      const build = (homeVeiled: boolean) => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels, mossproutGarden, mossproutNatureIslandReveals, { homeVeiled });
+      const fromLayer = build(true).tileArtLayers.find((layer) => layer.id === scene.centerTile.id);
+      const toLayer = build(false).tileArtLayers.find((layer) => layer.id === scene.centerTile.id);
+      return fromLayer && toLayer ? { fromLayer, toLayer, tile: { id: toLayer.id, cx: scene.centerTile.cx, cy: scene.centerTile.cy } } : null;
+    }
     if (focusedMossproutWorld && upgradePresentation.visualTarget?.kind === 'haven_structure' && upgradePresentation.visualTarget.structureId === 'steppling-home') {
       const atStage = (gateway: 'locked' | 'egg') => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels!, { ...mossproutGarden, level: mossproutGarden?.level ?? 0, plantableMemories: mossproutGarden?.plantableMemories ?? [], gateway });
       const fromLayer = atStage(upgradePresentation.fromStage === 0 ? 'locked' : 'egg').tileArtLayers.find((layer) => layer.id === 'structure:steppling-home');
@@ -679,7 +711,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const toLayer = toScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const tile = toScene.tiles.find((candidate) => candidate.id === `family:${upgradePresentation.characterId}`);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, upgradePresentation, verticalAlignmentSelection]);
+  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, scene.centerTile, upgradePresentation, verticalAlignmentSelection]);
   const discoveryLayers = useMemo(() => {
     if (!discoveryRevealFamilyId) return null;
     const revealed = companionSlots.find((slot) => slot.familyId === discoveryRevealFamilyId && slot.kind === 'revealed_egg');
@@ -1472,6 +1504,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       if (tile.kind !== 'companion' || !tile.companion) continue;
       const artLayer = artLayerById.get(tile.id);
       const focusScale = tileFocusScale(tile.id);
+      // Under the opening's veil the home tile is mist: no locked friend, no resident.
+      if (homeVeil !== 'none' && tile.id === scene.centerTile.id) continue;
       if (tile.companion.kind === 'locked') {
         const lockedFamilyId = tile.companion.familyId;
         items.push({
@@ -1541,7 +1575,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
 
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, cameraLocked, creatureWorldSize, highlightedLockedFamilyId, ignoreFocus, interactionEnabled, interactionNatureIslandId, interactionResidentId, interactionRewardPulseKey, mossproutMeditating, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
+  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, cameraLocked, creatureWorldSize, highlightedLockedFamilyId, homeVeil, ignoreFocus, interactionEnabled, interactionNatureIslandId, interactionResidentId, interactionRewardPulseKey, mossproutMeditating, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.centerTile.id, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
 
   const home = homePreset(identity?.selectedHomeArchetypeId);
 
@@ -1638,7 +1672,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     <HavenUpgradeTileArt
                       key={`upgrade:${upgradeOwnsLayer ? upgradePresentation?.nonce : settlingUpgrade?.nonce}`}
                       fromLayer={transitionLayers.fromLayer}
-                      sharedRevealProgress={transitionLayers.toLayer.id === 'structure:steppling-home' ? stepplingRevealProgress : undefined}
+                      sharedRevealProgress={transitionLayers.toLayer.id === 'structure:steppling-home' ? stepplingRevealProgress
+                        : transitionLayers.toLayer.id === scene.centerTile.id && (upgradeOwnsLayer ? revealingVeiledHome : settlingUpgrade?.nonce === veilLiftNonceRef.current)
+                          ? homeVeilProgress : undefined}
                       imageLod={sceneTileImageLod}
                       takeoverConfirmed={transitionHasPainted}
                       onOutgoingReady={confirmOutgoingPainted}
@@ -1739,6 +1775,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 y={sceneHomeTile.cy - HEX_TILE_H * 0.38}
               />
             ) : null}
+            {onHomeTileTargetChange ? (() => {
+              // Screen-space anchor for the opening's wisps and spotlight: the
+              // home tile's painted frame, inside the camera-scaled scene.
+              const home = scene.tileArtLayers.find((layer) => layer.id === scene.centerTile.id);
+              return home ? <View collapsable={false} pointerEvents="none" ref={onHomeTileTargetChange}
+                style={{ position: 'absolute', left: home.frame.left, top: home.frame.top, width: home.frame.width, height: home.frame.height }} /> : null;
+            })() : null}
             {creatureNodes}
           </Animated.View>
           {/* Rendered inside the camera's own GestureDetector, not after it,
@@ -1759,16 +1802,18 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               selected={selectedUpgradeOffer?.id === offer.id}
               cameraScale={camera.scaleValue} cameraX={camera.translationXValue} cameraY={camera.translationYValue}
               sceneWidth={scene.width} sceneHeight={scene.height} moving={camera.isMoving}
+              inert={Boolean(sleepingMarkersInert && offer.sleepingSkinId)}
               onPress={onUpgradeOfferPress} onTargetChange={onUpgradeOfferTargetChange} /> : null;
           }) : null}
         </View>
       </GestureDetector>
-      {revealedEggProjection ? (
+      {revealedEggProjection && homeVeil !== 'veiled' ? (
         <RevealedCompanionEgg
           cameraScale={camera.scaleValue}
           cameraTranslateX={camera.translationXValue}
           cameraTranslateY={camera.translationYValue}
           eggSkinId={revealedEggProjection.eggSkinId}
+          revealProgress={homeVeil !== 'none' || settlingUpgrade?.nonce === veilLiftNonceRef.current ? homeVeilProgress : undefined}
           onPress={interactionEnabled ? () => onSelectLocked?.(revealedEggProjection.familyId) : undefined}
           presentation={worldSubjectPresentation}
           sceneHeight={scene.height}

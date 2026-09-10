@@ -3,6 +3,13 @@ import type { FtueChoiceOption } from './ftue-types';
 /** Shared by the authored graph and its native presentations. IDs are save data. */
 export const MOSSPROUT_FTUE_COPY = {
   opening: 'Nothing here has been noticed in a long while. Then you arrived.',
+  openingNoticed: 'Nothing here has been noticed in a long while.',
+  openingArrived: 'Then you arrived.',
+  lookCloser: 'Look closer',
+  mistClearTitle: 'Two of the same, put together.',
+  mistClearBody: 'Drag one onto the other.',
+  mistThins: 'The Mist thins where someone is being noticed.',
+  eggHeardYou: 'And this one heard you.',
   dayQuestion: 'How was your day, honestly?',
   helpQuestion: 'And what would help right now?',
   seedOrigin: 'What you told me is already something. Let’s give it soil.',

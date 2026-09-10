@@ -1,6 +1,11 @@
 import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
 import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
 import { advanceGlowUpgrade, recoverPaidGlowUpgrade } from '@/features/onboarding/glow-upgrade-runtime';
+import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, OPENING_CAMERA_ENTRY_ZOOM, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
+import { KingdomOpeningMergeDock, OpeningGlowLayer, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
+import { KingdomOpeningCaption } from '@/components/katchadeck/world/kingdom-opening-caption';
+import { isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
+import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { worldUpgradeRunId } from '@/features/world-upgrades/world-upgrade-flows';
 import { WORLD_UPGRADE_DEFINITIONS, worldUpgradeMaxLevel, visibleWorldUpgradeOffers, worldUpgradeOffers, worldUpgradeArchiveOffer, type WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { purchaseWorldUpgrade, useWorldUpgradeRun } from '@/features/world-upgrades/world-upgrade-runtime';
@@ -52,7 +57,7 @@ import { FTUE_SCENE_LAYERS } from '@/constants/ftue-scene-layers';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { GameCurrencyHud } from '@/components/katchadeck/ui/game-currency-hud';
-import { MergeFtueEggGuide } from '@/components/katchadeck/games/merge-ftue-overlay';
+import { MergeFtueEggGuide, MergeFtueOverlay } from '@/components/katchadeck/games/merge-ftue-overlay';
 import { GameHudBar } from '@/components/katchadeck/ui/game-primitives';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { ThemedText } from '@/components/themed-text';
@@ -74,7 +79,7 @@ import { mossproutNatureIslandById, mossproutNatureIslandLevelDefinition } from 
 import { havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
 import type { HavenTileUpgradePresentation } from '@/utils/haven-upgrade-presentation';
 import { deriveHavenTilePresentation } from '@/utils/haven-tile-presentation';
-import { advanceFtueActionDurably, commitFtueAction, dispatchFtueEvent, loadFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, dispatchFtueEvent, loadFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import {
   MOSSPROUT_WORLD_EGG_CLOSE_ZOOM,
   MOSSPROUT_WORLD_EGG_ENTRY_ZOOM,
@@ -140,6 +145,12 @@ type Props = {
 };
 
 const GARDEN_BUTTON_ART = require('@incubator/art-world/square/mossprout-garden-button-v1-256.webp');
+/** While the opening keeps Mossprout's tile under mist, the same resting marker the six islands wear says who is there. */
+const MOSSPROUT_SLEEPING_OFFER: WorldUpgradeOffer = {
+  id: 'sleeping:mossprout', target: { kind: 'haven_tile', familyId: 'mossprout' }, visualTarget: { kind: 'haven_tile', familyId: 'mossprout' },
+  name: 'Mossprout', nextName: 'Mossprout', description: 'Someone is resting under the Mist.', nextLevel: 0, cost: 0, action: 'Clear mist',
+  currentLevel: 0, maxLevel: 0, eligible: false, affordable: false, missingGlow: 0, lockedReason: 'Resting under the Mist', sleepingSkinId: 'mossprout', bareMarker: true,
+};
 const FIRST_SEED_GARDEN_PLANT_OFFER = {
   accessibilityHint: 'Plants your first Memory Seed in the highlighted Garden patch',
   placement: 'below',
@@ -415,6 +426,10 @@ export function KatchimeraKingdomScreen({
   const initialFtueCameraScale = mistResumeCamera?.kind === 'focus_target' ? mistResumeCamera.zoom
     : ftueStepId === 'world.egg_intro'
     ? MOSSPROUT_WORLD_EGG_ENTRY_ZOOM
+    : ftueStepId === OPENING_MIST_OPEN_STEP_ID
+      ? OPENING_CAMERA_ENTRY_ZOOM
+    : isMossproutOpeningStep(ftueStepId) && tutorialCamera?.kind === 'focus_target'
+      ? tutorialCamera.zoom
     : tutorialCamera?.kind === 'focus_target' && tutorialCamera.projectionOnly
       ? tutorialCamera.zoom
     : tutorialCamera?.kind === 'focus_target' && tutorialCamera.target.kind === 'haven_resident'
@@ -456,6 +471,26 @@ export function KatchimeraKingdomScreen({
     restoreButtonRef.current = node;
     registerFtueTarget('upgrade:mossprout', node);
   }, [registerFtueTarget]);
+  const [homeTileNode, setHomeTileNodeState] = useState<View | null>(null);
+  const setHomeTileNode = useCallback((node: View | null) => {
+    setHomeTileNodeState(node);
+    registerFtueTarget('tile:mossprout', node);
+  }, [registerFtueTarget]);
+  // The opening's docked board: the run's own progress drives the bar, each
+  // merge sends a Glow into the mist, and the finger shows only the first pairs.
+  const ftueRun = useFtueRun();
+  const openingRun = ftueRun?.status === 'active' && ftueRun.stepId === ftueStepId ? ftueRun : null;
+  const openingGlow = useOpeningGlow(homeTileNode);
+  const [openingBoardMetrics, setOpeningBoardMetrics] = useState<MergeBoardScreenMetrics | null>(null);
+  const [openingBlockedNonce, setOpeningBlockedNonce] = useState(0);
+  const openingRailRefs = useRef(new Map<string, View>());
+  const bumpOpeningBlocked = useCallback(() => setOpeningBlockedNonce((nonce) => nonce + 1), []);
+  const openingBoardActive = ftueStepId === OPENING_MIST_CLEAR_STEP_ID && Boolean(openingRun?.mergeInstalled) && isMossproutChapterZeroActive(mergeWorld);
+  const openingProgress = openingMistProgress(openingRun);
+  const openingStep = ftueStepId ? mossproutFtueStep(ftueStepId) ?? null : null;
+  // The same beat the dock projects: spotlight and finger on the first pairs, the Basket refill, or nothing.
+  const openingBoardStep = useMemo(() => openingBoardActive ? openingMistBoardStep(openingStep, mergeWorld, openingProgress) : null, [mergeWorld, openingBoardActive, openingProgress, openingStep]);
+  const openingGuidanceVisible = Boolean(openingBoardStep && (openingBoardStep.cue || openingBoardStep.spotlight));
   const setGardenButtonNode = useCallback((node: View | null) => {
     registerFtueTarget('garden-button:mossprout', node);
   }, [registerFtueTarget]);
@@ -524,7 +559,8 @@ export function KatchimeraKingdomScreen({
       saving: upgrading && upgradePresentation?.characterId === slot.familyId,
     })];
   }), [mergeWorld, upgradePresentation?.characterId, upgrading, visibleCompanionSlots]);
-  const havenOpeningActive = ftueStepId === 'world.egg_intro'
+  const havenOpeningActive = isMossproutOpeningStep(ftueStepId)
+    || ftueStepId === 'world.egg_intro'
     || ftueStepId === 'world.garden_arrival'
     || ftueStepId === 'world.seed_planted'
     || ftueStepId === 'world.garden_handoff'
@@ -722,6 +758,12 @@ export function KatchimeraKingdomScreen({
     // The canvas may report completion more than once; a single story owns the ack.
     if (revealedUpgradeRef.current === presentation.nonce) return;
     revealedUpgradeRef.current = presentation.nonce;
+    if (presentation.veilLift) {
+      // The opening's lift wrote nothing to the world; it only moves the run on.
+      setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
+      commitFtueAction({ actionId: OPENING_LIFTED_ACTION_ID, evidenceRef: 'mossprout-world:veil-lifted' });
+      return;
+    }
     if (tutorialUpgradeNonceRef.current === presentation.nonce) {
       finishUpgradePresentation(presentation);
       return;
@@ -750,6 +792,24 @@ export function KatchimeraKingdomScreen({
     }
     finishUpgradePresentation(presentation);
   }, [finishUpgradePresentation]);
+
+  // The opening's veil lift: one local crossblend per run at `world.mist_lift`,
+  // rebuilt on a cold resume and committed exactly once when the canvas finishes.
+  const veilLiftKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (ftueStepId !== OPENING_MIST_LIFT_STEP_ID) return;
+    const key = `${activeFtueRunId ?? 'current'}:${ftueStepId}`;
+    if (veilLiftKeyRef.current === key) return;
+    veilLiftKeyRef.current = key;
+    revealedUpgradeRef.current = null;
+    setUpgradePresentation({
+      cameraAlreadyFocused: true, characterId: 'mossprout', coinCost: 0, coinOrigin: { x: 0, y: 0 },
+      creatureId: 'companion:mossprout', creatureName: 'Mossprout', fromStage: 0, toStage: 0,
+      nonce: ++upgradeNonceRef.current,
+      palette: { accent: '#DDF6FF', glow: '#A9E4FF', mist: 'rgba(214,229,238,0.92)', primary: '#7FBFD9' },
+      reactionLine: '', showCoins: false, status: 'playing', upgradeName: 'clearing', veilLift: true,
+    });
+  }, [activeFtueRunId, ftueStepId]);
 
   const beginFirstSeedPlanting = useCallback(() => {
     if (ftueStepId !== 'world.garden_arrival' || firstSeedPlantStartedRef.current) return;
@@ -1208,6 +1268,8 @@ export function KatchimeraKingdomScreen({
 
   const openUpgradeOffer = useCallback(async (offer: WorldUpgradeOffer) => {
     if (upgradePressBusy.current || upgradePurchasing || upgradePresentation) return;
+    // Resting friends are on the map from the first frame, but not yet the player's business.
+    if (offer.sleepingSkinId && ftueStepId) return;
     upgradePressBusy.current = true;
     setUpgradeError(null); setUpgradeCommitted(false);
     try {
@@ -1260,7 +1322,10 @@ export function KatchimeraKingdomScreen({
   }, [flushMergeWorld, ftueStepId, glowRun, sharedUpgrade, upgradeCommitted, upgradeError]);
   // Sleeping islands arrive from the offers layer already locked, in wake order.
   const presentedUpgradeOffers = upgradeOffers;
-  const visibleUpgradeOffers = visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
+  const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? [MOSSPROUT_SLEEPING_OFFER]
+    : homeVeilForStep(ftueStepId) === 'veiled'
+      ? [MOSSPROUT_SLEEPING_OFFER, ...visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun)]
+      : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
 
   // Mount the camera with its saved framing, rather than initializing the overview first.
   if (!glowReady || !stepplingLesson.ready) return null;
@@ -1303,6 +1368,10 @@ export function KatchimeraKingdomScreen({
         onInteractionExitFocusComplete={closeResidentInteraction}
         onOpenGarden={openGarden}
         onGardenPlotTargetChange={setGardenPlotNode}
+        onHomeTileTargetChange={setHomeTileNode}
+        homeVeil={homeVeilForStep(ftueStepId)}
+        homeSolo={homeSoloForStep(ftueStepId)}
+        sleepingMarkersInert={Boolean(ftueStepId)}
         onTileUpgradeOfferPress={beginFirstSeedPlanting}
         upgradeOffers={screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingEggOpen && !ordinaryUpgradeRun && !upgradeHandoffPending
           ? kingdomGoalGuideActive ? visibleUpgradeOffers.filter((offer) => offer.id === `nature:${goalIslandId}`) : visibleUpgradeOffers
@@ -1398,7 +1467,7 @@ export function KatchimeraKingdomScreen({
           onEnergyTokenArrive={stepplingEncounter.feedController.handleEnergyTokenArrive}
         />
       </View>
-      {ftueGardenUpgradeActive || seedPlantingFtueActive || Boolean(selectedUpgrade) || Boolean(upgradePresentation)
+      {ftueGardenUpgradeActive || seedPlantingFtueActive || Boolean(selectedUpgrade) || Boolean(upgradePresentation && !upgradePresentation.veilLift)
         || (!upgradePresentation && (!ftueStepId || ftueStepId === 'companion.meditating')) ? (
         <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 360)} pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }, ftueGardenUpgradeActive && { zIndex: 90 }]}>
           <GameHudBar
@@ -1589,7 +1658,8 @@ export function KatchimeraKingdomScreen({
           </View>
         </KatchaSheet>
       ) : null}
-      {havenOpeningActive && ftueStep && !activeInteractionResidentId && ftueStepId !== 'world.first_bloom_restore' ? (
+      {havenOpeningActive && ftueStep && !activeInteractionResidentId && ftueStepId !== 'world.first_bloom_restore'
+        && ftueStepId !== OPENING_MIST_OPEN_STEP_ID && ftueStepId !== OPENING_MIST_CLEAR_STEP_ID ? (
         <View
           pointerEvents="box-none"
           style={[
@@ -1600,14 +1670,14 @@ export function KatchimeraKingdomScreen({
                   justifyContent: 'space-between',
                   top: insets.top + 18,
                 }
-              : gardenWorldGuidanceActive || ftueStepId === 'world.egg_intro'
+              : gardenWorldGuidanceActive || ftueStepId === 'world.egg_intro' || ftueStepId === OPENING_MIST_LIFT_STEP_ID
               ? { top: insets.top + 18 }
               : { bottom: Math.max(insets.bottom, 12) + 12 },
           ]}>
           <View collapsable={false} pointerEvents="none" ref={setHavenGuideNode} style={styles.discoveryCallout}>
             <FtueGuideCopy guide={ftueStep.guide} hero />
           </View>
-          {!['world.egg_intro', 'world.garden_arrival', 'world.garden_handoff', 'world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId ?? '')
+          {!['world.mist_lift', 'world.egg_intro', 'world.garden_arrival', 'world.garden_handoff', 'world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId ?? '')
             && (ftueStepId !== 'world.seed_planted' || firstSeedPlacementFailed)
             && (ftueStepId !== 'world.first_seed_grew' || firstSeedGrown) ? <View style={styles.discoveryCalloutButton}>
             <KatchaButton
@@ -1629,6 +1699,17 @@ export function KatchimeraKingdomScreen({
           </View> : null}
         </View>
       ) : null}
+      {ftueStepId === OPENING_MIST_OPEN_STEP_ID && ftueStep && screenFocused ? <KingdomOpeningCaption
+        step={ftueStep} bottomInset={insets.bottom} onLookCloser={advanceOpening} /> : null}
+      {openingBoardActive && ftueStep ? <KingdomOpeningMergeDock
+        run={openingRun} step={ftueStep} width={window.width} bottomInset={insets.bottom}
+        impactKey={openingGlow.landed} onGlow={openingGlow.launch} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked} /> : null}
+      {openingGuidanceVisible && ftueCameraSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
+        <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={openingBoardStep?.cue ?? null} guide={openingBoardStep?.guide ?? null}
+          layoutNonce={openingProgress} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={openingBoardStep?.spotlight ?? null} state={mergeWorld} targetRevision={openingProgress} />
+      </View> : null}
+      {openingGlow.flights.length || openingGlow.impacts.length ? <OpeningGlowLayer flights={openingGlow.flights} impacts={openingGlow.impacts}
+        onArrive={openingGlow.arrive} onImpactDone={openingGlow.impactDone} screenRef={screenRef} /> : null}
       {detailCreatureId ? (() => {
         const slot = visibleCompanionSlots.find((candidate) => candidate.kind === 'owned' && candidate.creature.creatureId === detailCreatureId);
         if (!slot || slot.kind !== 'owned') return null;
@@ -1702,7 +1783,7 @@ export function KatchimeraKingdomScreen({
           targetRevision={ftueTargetRevision}
         />
       ) : null}
-      {ftueStepId === 'world.egg_intro' ? <FtueOpeningFade /> : null}
+      {ftueStepId === OPENING_MIST_OPEN_STEP_ID ? <FtueOpeningFade /> : null}
       {screenFocused && ftueCameraSettled && glowRun?.status === 'active' && glowScene?.view.kind === 'garden' && !activeInteractionResidentId && !upgradePresentation ? (
         <View collapsable={false} ref={setHavenGuideNode} pointerEvents="none" style={{ position: 'absolute', right: 115, bottom: Math.max(insets.bottom, 12) + 30, width: Math.min(250, window.width - 131), zIndex: 85 }}>
           <MergeFtueEggGuide hideAvatar inlineWidth={Math.min(250, window.width - 131)}

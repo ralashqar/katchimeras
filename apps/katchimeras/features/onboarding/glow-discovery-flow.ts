@@ -53,7 +53,7 @@ export const GLOW_DISCOVERY_FLOW = defineStory({
     worldActionScene({ id: 'gateway.offer', actionId: 'open_upgrade', next: 'gateway.buy', view: { kind: 'purchase', guide: { eyebrow: 'The mist', title: 'Tap the glowing bubble.', body: 'The light does the rest.' }, actionLabel: 'See the light' } }),
     worldActionScene({ id: 'gateway.buy', actionId: 'unlock', next: 'gateway.purchase.focus', view: { kind: 'purchase', guide: { eyebrow: 'The mist', title: 'Clear it.', body: 'Something new wants room.' }, actionLabel: 'Clear the mist' } }),
     ...upgradeWorldTargetRecipe({ id: 'gateway.purchase', target: STEPPLING_STORY_TARGET, toLevel: 1, economy: { mode: 'normal' }, cameraAlreadyFocused: true, presentation: { preset: 'mist-clear', reactionLine: '', showCoins: true }, next: 'gateway.egg' }),
-    worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'egg.enter', view: { kind: 'discovery', guide: { eyebrow: 'An Egg', title: 'So someone is being noticed again.', body: 'Go on. That’s you.' }, actionLabel: 'Meet the Egg' } }),
+    worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'egg.enter', view: { kind: 'discovery', guide: { eyebrow: 'An Egg', title: 'So someone is being noticed again.', body: 'You noticed something earlier, out in your world. This is what that did. Go on. That’s you.' }, actionLabel: 'Meet the Egg' } }),
     story.task({ id: 'egg.enter', capability: 'glow.discovery.task', surface: 'haven', taskId: 'egg.enter', requirements: [{ id: 'entered', event: { type: 'glow.egg.entered' } }], next: 'complete' }),
     story.complete(),
   ],

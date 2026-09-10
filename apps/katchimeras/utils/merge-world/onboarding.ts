@@ -65,3 +65,38 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
     activityEnergyByDay: {},
   };
 }
+
+/**
+ * The mist-veiled opening's board: the Chapter 0 board with eight Seeds and
+ * two Sprouts placed inside the docked 5×4 window (columns 1–5, rows 2–5).
+ * Merging everything that is placed makes exactly eight merges and leaves one
+ * Plant (for "The First Bloom") and one Flower. The Basket stays as slack.
+ *
+ * The window shows plain cells only: its three misted cells open with the
+ * clearing, and the four dream echoes that sat inside it move to free cells
+ * just above and below it, where the full Merge page still finds them.
+ */
+export const MOSSPROUT_OPENING_SEED_CELLS: readonly number[] = [16, 17, 18, 22, 29, 30, 32, 33];
+export const MOSSPROUT_OPENING_SPROUT_CELLS: readonly number[] = [24, 36];
+export const MOSSPROUT_OPENING_WINDOW_CELLS: readonly number[] = [15, 16, 17, 18, 19, 22, 23, 24, 25, 26, 29, 30, 31, 32, 33, 36, 37, 38, 39, 40];
+const OPENING_ECHO_CELLS: Record<number, number> = { 23: 9, 25: 10, 37: 11, 39: 47 };
+
+export function createMossproutOpeningState(now = Date.now(), rewardWispId: WispId = 'sprout'): MergeWorldState {
+  const state = createMossproutChapterZeroState(now, rewardWispId);
+  const board = state.board.map((cell) => (cell.occupant?.kind === 'item' ? { ...cell, occupant: null } : cell));
+  for (const [from, to] of Object.entries(OPENING_ECHO_CELLS).map(([from, to]) => [Number(from), to] as const)) {
+    board[to] = { ...board[to], locked: false, blocker: null, regionId: 'inner-mist', mist: board[from].mist, occupant: null };
+  }
+  for (const cell of MOSSPROUT_OPENING_WINDOW_CELLS) {
+    if (cell === 31) continue;
+    board[cell] = { ...board[cell], locked: false, blocker: null, regionId: 'central-clearing', mist: null, occupant: null };
+  }
+  const legacyIds: Record<number, string> = { 29: 'onboarding-seed-a', 30: 'onboarding-seed-b', 32: 'onboarding-seed-c', 33: 'onboarding-seed-d' };
+  MOSSPROUT_OPENING_SEED_CELLS.forEach((cell, index) => {
+    board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId: legacyIds[cell] ?? `opening-seed-${index}`, definitionId: 'nature:garden:1' } };
+  });
+  MOSSPROUT_OPENING_SPROUT_CELLS.forEach((cell, index) => {
+    board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId: `opening-sprout-${index}`, definitionId: 'nature:garden:2' } };
+  });
+  return { ...state, board };
+}

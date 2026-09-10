@@ -54,8 +54,8 @@ function migrateLegacy(): FtueRunState | null {
   if (!legacy) return null;
   const run = freshRun(new Date(legacy.startedAt ?? Date.now()));
   run.mergeInstalled = Boolean(legacy.mergeInstalled);
-  if (legacy.stage === 'merge') run.stepId = 'merge.seed_drag';
-  if (legacy.stage === 'journal_for_energy') run.stepId = 'merge.seed_drag';
+  if (legacy.stage === 'merge') run.stepId = 'merge.serve_sprout';
+  if (legacy.stage === 'journal_for_energy') run.stepId = 'merge.serve_sprout';
   if (legacy.stage === 'complete') {
     run.stepId = 'complete';
     run.status = 'complete';
@@ -102,6 +102,26 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
   if (run.status === 'active' && run.scriptVersion < 42) {
     const stepId = streamlinedFtueStep(run);
     return { ...run, schemaVersion: 6, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: mossproutFtueStep(stepId) ? stepId : 'companion.meditating', objectiveProgress: run.objectiveProgress ?? {}, updatedAt: new Date().toISOString() };
+  }
+  // v49 opens under the Mist. A run that had only just begun (parked on the
+  // Egg intro with nothing inspected) restarts at the opening; anyone further
+  // along keeps their step and never sees the veil.
+  if (run.status === 'active' && run.scriptVersion < 49 && run.stepId === 'world.egg_intro'
+    && !run.receipts.some((receipt) => receipt.actionId === 'world.inspect_mossprout_egg')) {
+    return { ...run, schemaVersion: 6, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: 'world.mist_open', objectiveProgress: run.objectiveProgress ?? {}, updatedAt: new Date().toISOString() };
+  }
+  // v49 removed the three guided drags; a run parked on one continues at the
+  // request. Their receipts must go too, or the replayed edges never fire.
+  const trimmedMergeSteps = new Set(['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom']);
+  if (run.status === 'active' && run.scriptVersion < 49 && trimmedMergeSteps.has(run.stepId)) {
+    const cleared = new Set([...trimmedMergeSteps, 'merge.serve_sprout']);
+    return {
+      ...run, schemaVersion: 6, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: 'merge.serve_sprout',
+      receipts: run.receipts.filter((receipt) => !cleared.has(receipt.stepId)),
+      objectiveProgress: Object.fromEntries(Object.entries(run.objectiveProgress ?? {})
+        .filter(([key]) => ![...cleared].some((stepId) => key.includes(`${stepId}:`)))),
+      updatedAt: new Date().toISOString(),
+    };
   }
   const replayDreamMistChapter = run.scriptVersion < 10;
   const restartingLegacyMerge = run.status === 'active'
@@ -184,7 +204,7 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
               ? 'companion.meditating'
               : removedFrictionSteps.has(migratedStepId)
                 ? 'companion.resident_parcel_ready'
-                : removedMergeSteps.has(migratedStepId) ? 'merge.seed_drag' : migratedStepId,
+                : removedMergeSteps.has(migratedStepId) ? 'merge.serve_sprout' : migratedStepId,
     updatedAt: now,
     objectiveProgress: restartingLegacyMerge ? {} : run.objectiveProgress ?? {},
     mergeInstalled: restartingLegacyMerge ? false : run.mergeInstalled,

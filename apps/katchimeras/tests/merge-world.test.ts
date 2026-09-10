@@ -187,10 +187,11 @@ test('Merge FTUE serves the first Sprout after teaching the authored two-stage m
   merged = reduceMergeWorld(merged, { type: 'move', from: to, to: 33, now: NOW + 2 }).state;
   const step = mossproutFtueStep('merge.serve_sprout');
   const orderId = 'mossprout:chapter-0:first-sprout';
-  assert.deepEqual(mergeFtueBoardGate(step, merged), { kind: 'locked' });
-  assert.deepEqual(mergeFtueRailGate(step), { kind: 'serve', orderId });
+  // Merging was taught by the opening: the request only points at Serve and leaves the board free.
+  assert.deepEqual(mergeFtueBoardGate(step, merged), { kind: 'open' });
+  assert.deepEqual(mergeFtueRailGate(step), { kind: 'open' });
+  assert.deepEqual(step?.cue, { kind: 'tap', target: { kind: 'order_serve', orderId } });
   assert.equal(mergeFtueAllowsCommand(step, merged, { type: 'serveOrder', orderId, now: NOW + 3 }), true);
-  assert.equal(mergeFtueAllowsCommand(step, merged, { type: 'serveOrder', orderId: 'wrong', now: NOW + 3 }), false);
   const command = { type: 'serveOrder' as const, orderId, now: NOW + 3 };
   const result = reduceMergeWorld(merged, command);
   assert.deepEqual(mergeFtueEventForCommand(merged, command, result), { type: 'order_served', orderId, revision: result.state.revision });

@@ -10,7 +10,6 @@ type GuidanceMoment = {
  * spotlight and finger target, but no longer repeat an Egg speech bubble.
  */
 const GUIDANCE_MOMENTS: Readonly<Record<string, GuidanceMoment>> = {
-  'merge.seed_drag': { cue: 'drag', title: 'Two of the same, put together.' },
   'merge.serve_sprout': { cue: 'tap', title: 'Give it here.' },
   'merge.plant.spawn': { cue: 'tap', title: 'Tap the Wild Garden.' },
   'merge.plant.seed_pairs': { cue: 'drag', title: 'Match the Seed in the mist.' },

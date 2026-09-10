@@ -19,6 +19,12 @@ export type HavenTileUpgradePresentation = {
   cameraAlreadyFocused?: boolean;
   /** Some story upgrades are gifts, so their reveal should not imply payment. */
   showCoins?: boolean;
+  /**
+   * The opening's mist lift: the same tile crossblend, driven by a local
+   * presentation with no world write. Nothing is purchased or staged, so the
+   * finish path must not touch story resolvers, Glow or the tutorial nonce.
+   */
+  veilLift?: boolean;
   status: HavenUpgradePresentationStatus;
   storyPresentationKey?: string;
   toStage: HavenStage;

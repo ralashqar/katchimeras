@@ -60,8 +60,8 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
   // Independent from the legacy FTUE schema version. Bumping this lets v39
   // journal runs migrate onto the direct manifest without mutating a release.
-  version: 50,
-  entryNodeId: 'world.egg_intro',
+  version: 51,
+  entryNodeId: 'world.mist_open',
   metadata: {
     kind: 'ftue' as const,
     authoring: 'content-flow',
@@ -69,6 +69,9 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     variantId: 'first-bloom',
   },
   nodes: [
+    scene('world.mist_open', 'haven', [{ id: 'world.look_closer', next: 'world.mist_clear' }]),
+    task('world.mist_clear', 'haven', { id: 'world.clear_mist', event: ftueEvent('merge_completed'), count: 8, next: 'world.mist_lift' }),
+    scene('world.mist_lift', 'haven', [{ id: 'world.mist_lifted', next: 'world.egg_intro' }]),
     scene('world.egg_intro', 'haven', [{ id: 'world.inspect_mossprout_egg', next: 'egg.opening' }]),
     scene('egg.opening', 'haven', [{ id: 'egg.day_texture', next: 'egg.context' }]),
     scene('egg.context', 'haven', [{ id: 'egg.desired_help', next: 'egg.ready' }]),
@@ -97,22 +100,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
       capability: 'haven.place_first_memory',
       next: 'world.seed_planted',
     }),
-    scene('world.seed_planted', 'haven', [{ id: 'world.acknowledge_seed_dormant', next: 'merge.seed_drag' }]),
-    task('merge.seed_drag', 'merge', {
-      id: 'merge.create_sprout',
-      event: ftueEvent('merge_completed', { resultDefinitionId: 'nature:garden:2' }),
-      next: 'merge.second_seed_drag',
-    }),
-    task('merge.second_seed_drag', 'merge', {
-      id: 'merge.create_second_sprout',
-      event: ftueEvent('merge_completed', { resultDefinitionId: 'nature:garden:2' }),
-      next: 'merge.first_bloom',
-    }),
-    task('merge.first_bloom', 'merge', {
-      id: 'merge.create_first_bloom',
-      event: ftueEvent('merge_completed', { resultDefinitionId: 'nature:garden:3' }),
-      next: 'merge.serve_sprout',
-    }),
+    scene('world.seed_planted', 'haven', [{ id: 'world.acknowledge_seed_dormant', next: 'merge.serve_sprout' }]),
     task('merge.serve_sprout', 'merge', {
       id: 'merge.serve_sprout',
       event: ftueEvent('order_served', { orderId: 'mossprout:chapter-0:first-sprout' }),
@@ -167,6 +155,10 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     story.complete(),
   ],
   migrations: {
+    // v51: merging is taught by the opening, so the guided drags are gone.
+    'merge.seed_drag': 'merge.serve_sprout',
+    'merge.second_seed_drag': 'merge.serve_sprout',
+    'merge.first_bloom': 'merge.serve_sprout',
     'effect.haven.prepare_merge_handoff': 'effect.haven.start_glow_discovery',
     'merge.handoff.spawn': 'effect.haven.start_glow_discovery',
     'merge.handoff.merge': 'effect.haven.start_glow_discovery',

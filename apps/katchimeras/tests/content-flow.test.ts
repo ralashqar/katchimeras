@@ -94,19 +94,21 @@ test('streamlined introduction resumes at every boundary and hands off to the se
       run = reduceContentFlow(flow, run, { type: 'submit_scene', actionId: node.actions[0].id }).run;
     } else if (node.kind === 'task') {
       const requirement = node.requirements[0];
-      const event = { eventId: `command:${commands}`, type: requirement.event.type, runId: run.runId, nodeId: run.nodeId, payload: requirement.event.where ?? {}, occurredAt: commands };
-      assert.equal(reduceContentFlow(flow, run, { type: 'record_event', event: { ...event, runId: 'unrelated' } }).run.nodeId, run.nodeId);
-      events.push(event.type);
-      run = reduceContentFlow(flow, run, { type: 'record_event', event }).run;
+      for (let index = 0; index < (requirement.count ?? 1); index++) {
+        const event = { eventId: `command:${commands}:${index}`, type: requirement.event.type, runId: run.runId, nodeId: run.nodeId, payload: requirement.event.where ?? {}, occurredAt: commands };
+        assert.equal(reduceContentFlow(flow, run, { type: 'record_event', event: { ...event, runId: 'unrelated' } }).run.nodeId, run.nodeId);
+        events.push(event.type);
+        run = reduceContentFlow(flow, run, { type: 'record_event', event }).run;
+      }
     } else assert.fail(`Unhandled FTUE node ${node.id}`);
   }
   assert.equal(run.status, 'completed');
-  assert.equal(events.filter((type) => type === 'ftue.merge_completed').length, 3);
+  assert.equal(events.filter((type) => type === 'ftue.merge_completed').length, 8, 'the opening counts eight merges; the drag lesson is retired');
   assert.equal(events.filter((type) => type === 'ftue.item_spawned').length, 0);
   assert.ok(visited.has('effect.haven.start_glow_discovery'));
   assert.ok(visited.has('world.seed_planted'));
   assert.ok(visited.has('world.first_seed_grew'));
-  for (const removed of ['companion.day_one_action', 'companion.bond_spotlight', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.water_response', 'companion.first_insight'] as const) {
+  for (const removed of ['companion.day_one_action', 'companion.bond_spotlight', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.water_response', 'companion.first_insight', 'merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom'] as const) {
     assert.equal(visited.has(removed), false);
     assert.ok(flow.migrations?.[removed]);
   }
