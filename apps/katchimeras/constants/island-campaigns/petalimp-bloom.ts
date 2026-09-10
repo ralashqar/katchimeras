@@ -113,7 +113,8 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
       conversationId: 'mossprout:island:petalimp:wandering-walk',
       // The path: local pieces free the misted Flower and stop at a Rare Flower; the request's Rare Flower and Shoe finish the walk.
       // Every request only asks for what the Main Board can make by now: Seeds from the Garden Basket
-      // (its waterside branch waits for Shellio) and the Journey Locker's two chains, open since Steppling's Shoe.
+      // (its waterside branch waits for Shellio) and the Journey Locker's founding trail chain (its travel branch
+      // waits for a later friend too; the engine would reroute a Travel Journal onto a Boot, so the board never asks for one).
       restoration: {
         rows: 4, merges: 7,
         items: [
@@ -162,7 +163,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
       level: 4,
       title: 'Room for Every Bloom',
       conversationId: 'mossprout:island:petalimp:every-bloom',
-      // The last patch: the local pieces climb to a Magical Plant through the misted Rare Flower; the request's Magical Plant is its twin, its Travel Journal frees the misted keepsake.
+      // The last patch: the local pieces climb to a Magical Plant through the misted Rare Flower; the request's Magical Plant is its twin, its Boot frees the misted pair.
       restoration: {
         rows: 4, merges: 8,
         items: [
@@ -170,7 +171,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
           { cell: 22, definitionId: 'nature:garden:1' }, { cell: 26, definitionId: 'nature:garden:1' },
           { cell: 29, definitionId: 'nature:garden:3' }, { cell: 36, definitionId: 'nature:garden:4' },
         ],
-        echoes: [{ id: 'petalimp-4-rare', cell: 24, definitionId: 'nature:garden:5' }, { id: 'petalimp-4-journal', cell: 38, definitionId: 'adventure:travel:3' }],
+        echoes: [{ id: 'petalimp-4-rare', cell: 24, definitionId: 'nature:garden:5' }, { id: 'petalimp-4-boot', cell: 38, definitionId: 'adventure:trail:3' }],
         deliveryCells: [31, 37, 39],
       },
       callbackLine: {
@@ -179,12 +180,12 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
         together: 'A path wide enough for two—you were right. Even the butterflies walk it in pairs now.',
       },
       prompt: 'Some flowers have appeared far outside their beds. I nearly moved them back—then I wondered whether the garden was showing us a better ending.\n\nWhat would you want to remember when things grow differently than planned?',
-      fallbackOrder: order('The Garden Remembers', 'Make a Magical Plant and a Travel Journal for the garden’s final welcome.', 'major', 'comfort', [{ definitionId: 'adventure:travel:3', quantity: 1 }, { definitionId: 'nature:garden:6', quantity: 1 }]),
+      fallbackOrder: order('The Garden Remembers', 'Make a Magical Plant and a Boot for the garden’s final welcome.', 'major', 'comfort', [{ definitionId: 'adventure:trail:3', quantity: 1 }, { definitionId: 'nature:garden:6', quantity: 1 }]),
       choices: [
         {
           id: 'change-progress', label: 'Small progress still counts', reply: 'Even the wonky little bloom crossed a great deal of soil to reach us.',
           style: 'gentle', wispAffinity: { sprout: 2, heartlet: 1 },
-          order: order('Every Little Bloom', 'Make a Magical Plant and a Travel Journal to celebrate every piece of progress.', 'major', 'ease', [{ definitionId: 'adventure:travel:3', quantity: 1 }, { definitionId: 'nature:garden:6', quantity: 1 }]),
+          order: order('Every Little Bloom', 'Make a Magical Plant and a Boot to celebrate every piece of progress.', 'major', 'ease', [{ definitionId: 'adventure:trail:3', quantity: 1 }, { definitionId: 'nature:garden:6', quantity: 1 }]),
           openingConclusion: 'We will finish by honouring every small thing that made it this far.',
           returnLine: 'Every small piece is here. When the Glow comes, we can let the whole garden remember how far it has come.',
           resolutionLine: 'The garden did not become beautiful all at once. It became beautiful each time we returned and helped one more thing grow.',
@@ -192,7 +193,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
         {
           id: 'change-flexible', label: 'Plans can change', reply: 'Good. I am officially revising my plan to include flowers with their own opinions.',
           style: 'curious', wispAffinity: { giggle: 2, bloom: 1 },
-          order: order('The Beautiful Detour', 'Make a Magical Plant and a Travel Journal for the garden’s unexpected ending.', 'major', 'curiosity', [{ definitionId: 'adventure:travel:3', quantity: 1 }, { definitionId: 'nature:garden:6', quantity: 1 }]),
+          order: order('The Beautiful Detour', 'Make a Magical Plant and a Boot for the garden’s unexpected ending.', 'major', 'curiosity', [{ definitionId: 'adventure:trail:3', quantity: 1 }, { definitionId: 'nature:garden:6', quantity: 1 }]),
           openingConclusion: 'Let’s give the garden what it needs to become itself instead of my tidy first draft.',
           returnLine: 'The changed plan is ready—and much better dressed. The final bloom is only waiting on us now.',
           resolutionLine: 'It is nothing like my first plan. It is warmer, stranger, and alive. I am glad we listened when it changed.',
@@ -200,7 +201,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
         {
           id: 'change-help', label: 'We can ask for help', reply: 'Then the garden never has to prove it can grow alone. Neither do we.',
           style: 'together', wispAffinity: { heartlet: 2, bloom: 1 },
-          order: order('A Garden We Share', 'Make a Magical Plant and a Travel Journal for a welcome built together.', 'major', 'connection', [{ definitionId: 'adventure:travel:3', quantity: 1 }, { definitionId: 'nature:garden:6', quantity: 1 }]),
+          order: order('A Garden We Share', 'Make a Magical Plant and a Boot for a welcome built together.', 'major', 'connection', [{ definitionId: 'adventure:trail:3', quantity: 1 }, { definitionId: 'nature:garden:6', quantity: 1 }]),
           openingConclusion: 'One last shared task, then. We will finish the way we began: together.',
           returnLine: 'We have everything except the last of the Glow—and I know now that asking for that help is part of growing.',
           resolutionLine: 'Every bloom found room because this was never one creature’s garden. We made a welcome that can keep growing with us.',

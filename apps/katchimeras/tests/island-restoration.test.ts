@@ -4,7 +4,10 @@ import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
 import { islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers';
 import { PETALIMP_BLOOM_CAMPAIGN } from '@/constants/island-campaigns/petalimp-bloom';
 import type { IslandCampaignDefinition, RestorationBoardDefinition } from '@/constants/island-campaigns/types';
-import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
+import { MERGE_GENERATORS_BY_ID, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
+import { generatorChainOpen } from '@/utils/merge-world/generator-branches';
+import { openOrderChains } from '@/utils/merge-world/order-requirements';
+import { buildPlayerProfileFixtures } from '@/utils/player-profile-fixtures';
 import {
   createRestorationState, deliveriesToPlace, restorationBoardStep, restorationCheckpointReached, restorationComplete,
   restorationDeliveryCells, restorationEchoes, restorationNextMove, restorationProgress, restorationRunId, restorationWindowCells, restoreRestorationEchoes,
@@ -169,18 +172,27 @@ test('every authored restoration board needs its delivery on every path and fill
   assert.equal(petalimp.chapters.every((chapter) => chapter.restoration), true, 'Petalimp plays every chapter on the board');
 });
 
-test('every request a board sends to the Main Board can be made there: Petalimp comes before Shellio and the Nursery, so only Seeds and the Journey Locker’s chains', () => {
-  // The Garden Basket drops Seeds alone until Shellio (no waterside); hybrids need the Memory Nursery (day 15); the Locker's two chains open with Steppling's Shoe.
-  const chainsOpenBeforeShellio = new Set(['nature:garden', 'adventure:trail', 'adventure:travel']);
+test('every request a board sends to the Main Board can be made there, and the engine’s chain repair leaves it exactly as authored', () => {
+  // The world right before Petalimp: the friends home by then decide which generator branches are open
+  // (the Garden Basket's waterside waits for Shellio, the Journey Locker's travel branch for a later friend).
+  const world = buildPlayerProfileFixtures(NOW).find((fixture) => fixture.id === 'fixture:kingdom-before-petalimp')!.domains.mergeWorld.state;
+  const ownedChains = new Set(Object.keys(world.generators).flatMap((generatorId) => MERGE_GENERATORS_BY_ID.get(generatorId)?.chainIds ?? []));
   for (const chapter of petalimp.chapters) {
     const orders = [chapter.fallbackOrder, ...chapter.choices.map((choice) => choice.order)];
     for (const order of orders) {
       for (const requirement of order.requirements) {
         const definition = MERGE_ITEMS_BY_ID.get(requirement.definitionId);
         assert.ok(definition, `${order.title}: ${requirement.definitionId} exists`);
-        assert.equal(definition!.branchId !== 'hybrid' && chainsOpenBeforeShellio.has(definition!.chainId), true, `${order.title} asks for ${definition!.name} (${definition!.chainId}), which the Main Board cannot make before Shellio`);
+        assert.notEqual(definition!.branchId, 'hybrid', `${order.title} asks for ${definition!.name}, a hybrid the Nursery makes weeks later`);
+        assert.ok(ownedChains.has(definition!.chainId), `${order.title} asks for ${definition!.name}, whose basket the player does not own yet`);
+        assert.ok(generatorChainOpen(world, definition!.chainId), `${order.title} asks for ${definition!.name} (${definition!.chainId}), a branch no friend has opened yet`);
         assert.ok(definition!.tier <= 6, `${order.title}: ${definition!.name} is within reach`);
       }
+    }
+    // The saved order is repaired onto open chains on every load; the board's misted cells are not. They must agree.
+    for (const choice of chapter.choices) {
+      const authored = islandCampaignChapterOrder(petalimp, chapter.level, choice.id, NOW)!;
+      assert.deepEqual(openOrderChains(world, authored).requirements, authored.requirements, `level ${chapter.level} ${choice.id}: the repair would change the request`);
     }
     // What the request brings must be wanted: each delivered item merges with a twin on the spent board or frees a misted cell.
     const wanted = new Set(chapter.restoration!.echoes.map((echo) => echo.definitionId));
