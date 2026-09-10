@@ -26,6 +26,8 @@ export const OPENING_GLOWS_PER_MERGE = 4;
 export const OPENING_GLOW_FLIGHT_MS = 700 + (OPENING_GLOWS_PER_MERGE - 1) * 65;
 /** How long the impact burst lives at the veiled tile. */
 export const OPENING_IMPACT_BURST_MS = 640;
+/** After the final item's burst, before the Kingdom moves on to the lift. */
+const OPENING_FINALE_SETTLE_MS = 320;
 const GLOW_SIZE = 34;
 // Fewer, shadow-free motes: four impacts land per merge, and blurred shadows on
 // animating views re-rasterise every frame.
@@ -135,12 +137,23 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   });
 
   // The bar follows the checkpoint, but only once the Glow has landed.
+  // Each step gets its own timer that later merges never cancel, so rapid
+  // consecutive merges step the bar up one flight after another instead of
+  // waiting for the last one to land.
   const [shownProgress, setShownProgress] = useState(progress);
+  const barTimersRef = useRef(new Set<ReturnType<typeof setTimeout>>());
   useEffect(() => {
     if (progress <= shownProgress) { setShownProgress(progress); return; }
-    const timer = setTimeout(() => setShownProgress(progress), OPENING_GLOW_FLIGHT_MS);
-    return () => clearTimeout(timer);
-  }, [progress, shownProgress]);
+    const timers = barTimersRef.current;
+    const timer = setTimeout(() => {
+      timers.delete(timer);
+      setShownProgress((shown) => Math.max(shown, progress));
+    }, OPENING_GLOW_FLIGHT_MS);
+    timers.add(timer);
+    // Intentionally not cleared when `progress` moves again: only on unmount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progress]);
+  useEffect(() => () => { for (const timer of barTimersRef.current) clearTimeout(timer); }, []);
 
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const parcelRef = useRef<ViewType | null>(null);
@@ -325,6 +338,10 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   const [flights, setFlights] = useState<OpeningGlowFlight[]>([]);
   const [impacts, setImpacts] = useState<OpeningImpact[]>([]);
   const [landed, setLanded] = useState(0);
+  // True from the final merge until its item has landed, burst, and settled:
+  // the Kingdom holds the clear beat on screen for exactly that long.
+  const [finaleActive, setFinaleActive] = useState(false);
+  const finaleIdRef = useRef<number | null>(null);
   const nextId = useRef(0);
   const targetRef = useRef(targetNode);
   targetRef.current = targetNode;
@@ -338,27 +355,34 @@ export function useOpeningGlow(targetNode: ViewType | null) {
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.55 }));
   }, []);
   const arrive = useCallback((id: number) => {
+    const finale = id === finaleIdRef.current;
     setFlights((current) => {
       const landed = current.find((flight) => flight.id === id);
       // Every other landing bursts (the first and third of four): half the particle
-      // views for the same read, since the impacts land 65 ms apart.
-      if (landed && landed.index % 2 === 0) setImpacts((bursts) => [...bursts, { id, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 14, y: landed.to.y + (landed.index % 2) * 10 - 5 } }]);
+      // views for the same read, since the impacts land 65 ms apart. The finale always bursts.
+      if (landed && (finale || landed.index % 2 === 0)) setImpacts((bursts) => [...bursts, { id, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 14, y: landed.to.y + (landed.index % 2) * 10 - 5 } }]);
       return current.filter((flight) => flight.id !== id);
     });
     setLanded((count) => count + 1);
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(finale ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
   }, []);
-  const impactDone = useCallback((id: number) => setImpacts((current) => current.filter((impact) => impact.id !== id)), []);
+  const impactDone = useCallback((id: number) => {
+    setImpacts((current) => current.filter((impact) => impact.id !== id));
+    // The burst is over; let it settle before the lift beat takes the screen.
+    if (id === finaleIdRef.current) setTimeout(() => setFinaleActive(false), OPENING_FINALE_SETTLE_MS);
+  }, []);
   /** The final merge's item, large and alone, straight up into the mist. */
   const launchFinale = useCallback((from: RewardFlightPoint, definitionId: string) => {
     const id = ++nextId.current;
+    finaleIdRef.current = id;
+    setFinaleActive(true);
     const art = mergeWorldItemArt(definitionId) as number | undefined;
     const push = (to: RewardFlightPoint) => setFlights((current) => [...current, { id, index: 2, count: 5, from, to, art, size: 64 }]);
     const target = targetRef.current;
     if (!target) { push({ x: from.x, y: from.y - 260 }); return; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.5 }));
   }, []);
-  return { flights, impacts, landed, launch, launchFinale, arrive, impactDone };
+  return { flights, impacts, landed, finaleActive, launch, launchFinale, arrive, impactDone };
 }
 
 const styles = StyleSheet.create({

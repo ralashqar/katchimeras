@@ -140,7 +140,14 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(screen, /\{ftueStepId === OPENING_MIST_OPEN_STEP_ID \? <FtueOpeningFade \/> : null\}/);
   assert.doesNotMatch(screen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
   assert.match(screen, /<KingdomOpeningCaption[\s\S]*?onLookCloser=\{advanceOpening\}/);
-  assert.match(screen, /const openingBoardActive = Boolean\(mission\.state\) && \(ftueStepId === OPENING_MIST_CLEAR_STEP_ID \|\| \(ftueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow\.flights\.length > 0\)\)/);
+  assert.match(screen, /const openingBoardActive = Boolean\(mission\.state\) && ftueStepId === OPENING_MIST_CLEAR_STEP_ID;/);
+  // The lift beat waits for the final item: the Kingdom presents the clear beat until it has landed and burst.
+  assert.match(screen, /ftueStepId: routeFtueStepId,/, 'the route step is renamed so the presented step can be held');
+  assert.match(screen, /const ftueStepId = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow\.finaleActive \? OPENING_MIST_CLEAR_STEP_ID : routeFtueStepId;/, 'the clear beat is held while the finale flies');
+  assert.match(screen, /ftueRun\.stepId === routeFtueStepId \? ftueRun : null/, 'the run is matched against the real step, so the mission board stays alive through the hold');
+  assert.match(dock, /finaleIdRef\.current = id;\s*setFinaleActive\(true\);/, 'the finale flag is raised synchronously at launch, before the flight is measured');
+  assert.match(dock, /if \(id === finaleIdRef\.current\) setTimeout\(\(\) => setFinaleActive\(false\), OPENING_FINALE_SETTLE_MS\);/, 'and lowered only after the burst has finished and settled');
+  assert.match(dock, /if \(landed && \(finale \|\| landed\.index % 2 === 0\)\)/, 'the finale always bursts');
   assert.match(screen, /const openingGuidanceVisible = Boolean\(openingBoardStep && \(openingBoardStep\.cue \|\| openingBoardStep\.spotlight\)\)/);
   assert.match(screen, /const visibleUpgradeOffers = homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch');
   assert.doesNotMatch(screen, /MOSSPROUT_SLEEPING_OFFER/, 'the silhouette marker is gone from the opening');
@@ -160,11 +167,13 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(effects, /ambientEmber: \{ borderRadius: 999, position: 'absolute' \}/, 'ambient embers carry no blurred shadow');
   assert.match(route, /const openingSky = ftueRun\?\.status === 'active' && homeSoloForStep\(ftueRun\.stepId\);[\s\S]*?openingSky \? todayAtmosphereBackgroundForScene\(OPENING_SKY_SCENE_ID\)/, 'twilight sky until the hatch');
   assert.match(screen, /<KingdomOpeningMergeDock[\s\S]*?onGlow=\{openingGlow\.launch\} onFinale=\{openingGlow\.launchFinale\}/);
-  assert.match(screen, /ftueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow\.flights\.length > 0/, 'the dock waits for the final item to reach the mist');
+  assert.match(screen, /routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow\.finaleActive/, 'the dock, camera and caption all wait for the final item to reach the mist and burst');
   assert.match(dock, /const finale = openingMistProgress\(runRef\.current\) >= OPENING_MERGE_REQUIRED;[\s\S]*?setHiddenItemIds[\s\S]*?onFinale\?\.\(from, event\.resultDefinitionId\);/, 'the last merge’s item leaves the board for the mist');
   assert.match(screen, /<OpeningGlowLayer flights=\{openingGlow\.flights\} impacts=\{openingGlow\.impacts\}/, 'landed Glow bursts where it hits the mist');
   assert.match(dock, /<Image source=\{flight\.art \?\? GAME_CURRENCY_ART\.coins\}/, 'merges send Glow, not wisps; the finale sends the item itself');
-  assert.match(dock, /if \(landed && landed\.index % 2 === 0\) setImpacts\(/, 'the first and third landings burst; the others only tap');
+  assert.match(dock, /const timer = setTimeout\(\(\) => \{\s*timers\.delete\(timer\);\s*setShownProgress\(\(shown\) => Math\.max\(shown, progress\)\);\s*\}, OPENING_GLOW_FLIGHT_MS\);\s*timers\.add\(timer\);/, 'every merge schedules its own bar step; rapid merges never cancel an earlier one');
+  assert.doesNotMatch(dock, /return \(\) => clearTimeout\(timer\);\s*\}, \[progress, shownProgress\]\);/, 'no single cancel-and-restart timer for the bar');
+  assert.match(dock, /if \(landed && \(finale \|\| landed\.index % 2 === 0\)\) setImpacts\(/, 'the first and third landings burst, and the finale always; the others only tap');
   assert.match(dock, /export const OPENING_GLOWS_PER_MERGE = 4;/, 'a burst of Glow per merge');
   assert.match(dock, /Array\.from\(\{ length: OPENING_GLOWS_PER_MERGE \}, \(_, index\) => \(\{ id: \+\+nextId\.current, index, from, to \}\)\)/, 'the burst peels off one Glow per index');
   assert.match(dock, /count=\{flight\.count \?\? OPENING_GLOWS_PER_MERGE\} index=\{flight\.index\}/, 'the flight staggers by index');

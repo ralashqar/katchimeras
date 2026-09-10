@@ -184,7 +184,7 @@ export function KatchimeraKingdomScreen({
   onInteractionRequestConsumed,
   residentStatusGlyphs,
   mergeWorld,
-  ftueStepId,
+  ftueStepId: routeFtueStepId,
   onFtueRestore,
   onFtueInspect,
   onFtueOpenGarden,
@@ -194,6 +194,13 @@ export function KatchimeraKingdomScreen({
   worldSubjectPresentation,
 }: Props) {
   const router = useRouter();
+  // The final merge's item flies into the mist before the lift beat: the run
+  // is already at `world.mist_lift`, but the Kingdom keeps presenting the
+  // clear beat (its camera, the veiled tile, the dock, no caption) until the
+  // item has landed and its burst has settled. Only then does the lift begin.
+  const [homeTileNode, setHomeTileNodeState] = useState<View | null>(null);
+  const openingGlow = useOpeningGlow(homeTileNode);
+  const ftueStepId = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow.finaleActive ? OPENING_MIST_CLEAR_STEP_ID : routeFtueStepId;
   const { flush: flushMergeWorld } = useMergeWorldActions();
   const { transitionTo } = useGameScreenTransition();
   const { run: glowRun, ready: glowReady } = useGlowDiscoveryState();
@@ -467,7 +474,6 @@ export function KatchimeraKingdomScreen({
     restoreButtonRef.current = node;
     registerFtueTarget('upgrade:mossprout', node);
   }, [registerFtueTarget]);
-  const [homeTileNode, setHomeTileNodeState] = useState<View | null>(null);
   const setHomeTileNode = useCallback((node: View | null) => {
     setHomeTileNodeState(node);
     registerFtueTarget('tile:mossprout', node);
@@ -475,8 +481,7 @@ export function KatchimeraKingdomScreen({
   // The opening's docked board: the run's own progress drives the bar, each
   // merge sends a Glow into the mist, and the finger shows only the first pairs.
   const ftueRun = useFtueRun();
-  const openingRun = ftueRun?.status === 'active' && ftueRun.stepId === ftueStepId ? ftueRun : null;
-  const openingGlow = useOpeningGlow(homeTileNode);
+  const openingRun = ftueRun?.status === 'active' && ftueRun.stepId === routeFtueStepId ? ftueRun : null;
   const [openingBoardMetrics, setOpeningBoardMetrics] = useState<MergeBoardScreenMetrics | null>(null);
   const [openingBlockedNonce, setOpeningBlockedNonce] = useState(0);
   const openingRailRefs = useRef(new Map<string, View>());
@@ -488,7 +493,7 @@ export function KatchimeraKingdomScreen({
     // The mission is over once the mist has lifted: its store goes with it.
     if (ftueStepId === 'world.egg_intro') clearOpeningMission();
   }, [ftueStepId]);
-  const openingBoardActive = Boolean(mission.state) && (ftueStepId === OPENING_MIST_CLEAR_STEP_ID || (ftueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow.flights.length > 0));
+  const openingBoardActive = Boolean(mission.state) && ftueStepId === OPENING_MIST_CLEAR_STEP_ID;
   const openingProgress = openingMistProgress(openingRun);
   const openingStep = ftueStepId ? mossproutFtueStep(ftueStepId) ?? null : null;
   // The same beat the dock projects: spotlight and finger on the first pairs, the Basket refill, or nothing.
