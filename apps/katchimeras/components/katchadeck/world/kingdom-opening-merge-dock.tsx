@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View, type View as ViewType } from 'react-native';
-import Animated, { Easing, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 
@@ -140,6 +140,9 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
  * land on the resting layout. Whose board it is, what counts, and what a
  * merge does are the caller's: the dock only shows and forwards commands.
  */
+/** How far the header's bottom edge sits under the top of the bar. */
+const HEADER_TUCK = 24;
+
 export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Clear the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, impactKey = 0, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, overlay, rootRef }: {
   state: MergeWorldState;
   /** The window over the canonical board; the opening's 5×4 by default. */
@@ -241,16 +244,29 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
     opacity: entrance.value,
     transform: [{ translateY: (1 - entrance.value) * 28 }, { scale: 0.94 + entrance.value * 0.06 }],
   }));
+  // The header (a friend's request card) is an overlay, not a row of the column:
+  // it hangs above the bar, tucked a little under it, and fades in and out. The
+  // bar and board never move for it.
+  const headerIn = FadeIn.duration(reduceMotion ? 80 : 240);
+  const headerOut = FadeOut.duration(reduceMotion ? 60 : 180);
+  const [dockHeight, setDockHeight] = useState<number | null>(null);
+  const [barTop, setBarTop] = useState<number | null>(null);
+  const headerBottom = dockHeight != null && barTop != null ? dockHeight - barTop - HEADER_TUCK : null;
 
   return <Animated.View ref={rootRef} collapsable={false} exiting={FadeOut.duration(260)} pointerEvents="box-none"
+    onLayout={(event) => setDockHeight(Math.round(event.nativeEvent.layout.height))}
     style={[styles.dock, { paddingBottom: bottomInset + 14 }, entranceStyle]}>
     {onClose ? <View pointerEvents="box-none" style={[styles.closeRow, { width: boardWidth }]}>
       <Pressable accessibilityRole="button" accessibilityLabel={closeLabel ?? 'Put the board away'} hitSlop={8} onPress={onClose} style={styles.close}>
         <Text style={styles.closeText}>{closeLabel ?? 'Later'}</Text>
       </Pressable>
     </View> : null}
-    {header ? <View pointerEvents="box-none" style={{ width: boardWidth }}>{header}</View> : null}
-    <ClearTheMistBar progress={shownProgress} total={required} width={boardWidth} impactKey={impactKey} title={barTitle} />
+    {header && headerBottom != null ? <Animated.View entering={headerIn} exiting={headerOut} pointerEvents="box-none" style={[styles.headerSlot, { bottom: headerBottom }]}>
+      <View pointerEvents="box-none" style={{ width: boardWidth }}>{header}</View>
+    </Animated.View> : null}
+    <View pointerEvents="box-none" onLayout={(event) => setBarTop(Math.round(event.nativeEvent.layout.y))}>
+      <ClearTheMistBar progress={shownProgress} total={required} width={boardWidth} impactKey={impactKey} title={barTitle} />
+    </View>
     <MergePlaySurface
       animateEntrance={false}
       boardLayout={layout}
@@ -458,6 +474,8 @@ export function useOpeningGlow(targetNode: ViewType | null) {
 
 const styles = StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60, alignItems: 'center', gap: 10 },
+  // Above the bar, out of the column's flow; the bar that follows paints over its tucked edge.
+  headerSlot: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 0 },
   closeRow: { alignItems: 'flex-end', marginBottom: -4 },
   close: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF', boxShadow: '0 3px 10px rgba(20,40,60,0.14)' },
   closeText: { color: '#2E4A66', fontSize: 13, lineHeight: 16, fontWeight: '800' },

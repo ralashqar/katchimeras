@@ -110,8 +110,10 @@ Each chapter's existing order requirements are already the right delivery. The b
 | --- | --- | --- | --- | --- | --- |
 | 1 One Small Beginning (free) | 5×3 | one Seed Bed at centre (Flower) | Seeds ×4, Sprout ×1 → the bed reaches Plant locally | one Flower | — |
 | 2 Colours That Belong (60 Glow) | 5×3 | two beds: Flower, Sprout | Seeds ×4, Sprout ×2 → one bed to Plant, the other to Seed | Flower + Sprout | — |
-| 3 A Path at Your Pace (150) | 5×4 | path stones: Rare Flower, Shell | Plants ×2, Sprouts ×2; **a Tide Pool spawner found under the path** (Shell chain) | Rare Flower + Shell | the Tide Pool spawner arrives on the Main Board as a parcel |
-| 4 Room for Every Bloom (300) | 5×4 | two beds: Memory Bloom, Magical Plant | Flowers ×2, Rare Flower ×1 | Memory Bloom + Magical Plant | Petalimp's card, the payoff insight, wake handoff (as now) |
+| 3 A Path at Your Pace (150) | 5×4 | misted: Flower, Shoe | Seeds ×4, Plant ×1 | Rare Flower + Shoe | — |
+| 4 Room for Every Bloom (300) | 5×4 | misted: Rare Flower, Travel Journal | Seeds ×4, Plant, Flower | Magical Plant + Travel Journal | Petalimp's card, the payoff insight, wake handoff (as now) |
+
+**Built (Sept 2026):** a request only asks for what the Main Board owns by then. Petalimp comes before Shellio and the Memory Nursery, so her later deliveries are the Journey Locker's Shoe and Travel Journal, never a Shell or a Memory Bloom; a test pins this. The spawner-under-the-path idea below is not built.
 
 Chapter 3 is where §9 and §10 pay off together: the friend's board reveals a spawner that the Main Board then owns, and the chapter's own delivery (a Shell) needs it. The Wild Garden's second chain is already gated behind Shellio; if the Tide Pool is Shellio's, author chapter 3's discovery as a different waterside spawner or move the discovery to the friend whose island it belongs to. The point is the shape, not the specific spawner.
 

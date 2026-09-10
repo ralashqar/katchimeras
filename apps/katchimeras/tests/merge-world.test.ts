@@ -296,7 +296,7 @@ test('Merge board flattens its static cells into one native image without a Skia
   assert.match(radialSunburst, /SUNBURST_NATIVE_SURFACE_SCALE = 2/);
   assert.match(radialSunburst, /renderToHardwareTextureAndroid=\{false\}[\s\S]*?shouldRasterizeIOS=\{false\}/);
   assert.match(radialSunburst, /<Image[\s\S]*?allowDownscaling=\{false\}[\s\S]*?cachePolicy="memory"/);
-  assert.match(orderRail, /onPress=\{!interactionAllowed \? onBlockedInteraction : ready \? beginServe : undefined\}/);
+  assert.match(orderRail, /onPress=\{!interactionAllowed \? onBlockedInteraction : ready \? beginServe : onPressCard\}/);
   assert.match(orderRail, /if \(ready\) \{[\s\S]*?void beginServe\(\);[\s\S]*?return;/);
 });
 

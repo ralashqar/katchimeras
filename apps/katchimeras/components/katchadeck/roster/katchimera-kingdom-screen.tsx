@@ -80,7 +80,9 @@ import { acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCa
 import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import { IslandRestorationDock } from '@/components/katchadeck/world/island-restoration-dock';
 import { consumeIslandRestorationOpen, requestIslandRestorationOpen } from '@/features/island-restoration/restoration-intent';
-import { createRestorationState, deliveriesToPlace, restorationBoardStep, restorationCheckpointReached, restorationComplete, restorationDeliveryCells, restorationProgress, restorationStorageKey, restoreRestorationEchoes } from '@/features/island-restoration/island-restoration';
+import { PETALIMP_ISLAND_CAMPAIGN_ID } from '@/constants/island-campaigns/petalimp-bloom';
+import { getStoredJson, setStoredJson } from '@/utils/app-storage';
+import { createRestorationState, deliveriesToPlace, restorationBoardStep, restorationCheckpointReached, restorationComplete, restorationDeliveryCells, restorationProgress, restorationRunId, restorationStorageKey, restoreRestorationEchoes } from '@/features/island-restoration/island-restoration';
 import { useKatchimeraCards } from '@/hooks/use-katchimera-cards';
 import { mossproutNatureIslandById, mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
 import { havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
@@ -181,6 +183,13 @@ function FtueOpeningFade() {
 
   return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.openingFade, animatedStyle]} />;
 }
+
+/** Petalimp's checkpoint hint is shown once per player. */
+const RESTORATION_HINT_SEEN_KEY = 'katchimeras.island-restoration.hint-seen.petalimp.v1';
+/** How long the hint stays before a tap away can dismiss it. */
+const RESTORATION_HINT_ARM_MS = 2500;
+/** Under the docked board (60), so the card and board keep their taps; over the map, so a tap there puts the hint away. */
+const RESTORATION_HINT_CATCHER_Z = 59;
 
 export function KatchimeraKingdomScreen({
   background,
@@ -451,7 +460,17 @@ export function KatchimeraKingdomScreen({
     // "Meet me at Bloom Garden" from the Merge page: straight onto the board.
     if (screenFocused && restorationCampaignId && consumeIslandRestorationOpen(restorationCampaignId)) setRestorationOpen(true);
   }, [restorationCampaignId, screenFocused]);
-  const closeRestoration = useCallback(() => setRestorationOpen(false), []);
+  // Petalimp's one hint (the spent patch, the request on the tray) is shown once ever:
+  // a tap away from the board after a moment, the card, or Later puts it away for good.
+  const [restorationHintSeen, setRestorationHintSeen] = useState(() => getStoredJson<boolean>(RESTORATION_HINT_SEEN_KEY, false));
+  const [restorationHintArmed, setRestorationHintArmed] = useState(false);
+  const dismissRestorationHint = useCallback(() => {
+    setRestorationHintSeen((seen) => {
+      if (!seen) setStoredJson(RESTORATION_HINT_SEEN_KEY, true);
+      return true;
+    });
+  }, []);
+  const closeRestoration = useCallback(() => { setRestorationOpen(false); dismissRestorationHint(); }, [dismissRestorationHint]);
   const restorationCamera = useMemo((): FtueCameraDirective | null => restorationIslandId && restorationOpen && screenFocused ? {
     kind: 'focus_target' as const, target: { kind: 'haven_nature_island' as const, islandId: restorationIslandId },
     zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700,
@@ -1246,10 +1265,11 @@ export function KatchimeraKingdomScreen({
 
   // The restoration board itself: its store, its deliveries, its checkpoint and its finish.
   const restorationDefinition = islandRestoration?.chapter.restoration ?? null;
-  const restorationRunId = islandRestoration ? `${islandRestoration.campaign.campaignId}:${islandRestoration.level}` : null;
+  // The run names the stage's start and the board's authoring: a restarted or re-authored stage never inherits a saved board.
+  const restorationBoardRunId = islandRestoration && restorationDefinition ? restorationRunId(islandRestoration.campaign.campaignId, islandRestoration.level, islandRestoration.progress.startedAt, restorationDefinition) : null;
   const createRestorationBoard = useCallback((now: number) => createRestorationState(restorationDefinition!, now), [restorationDefinition]);
   const repairRestorationBoard = useCallback((state: MergeWorldState) => restorationDefinition ? restoreRestorationEchoes(restorationDefinition, state) : state, [restorationDefinition]);
-  const restorationStore = useMissionBoard(islandRestoration ? restorationStorageKey(islandRestoration.campaign.campaignId, islandRestoration.level) : 'katchimeras.mist-mission.none.v1', restorationRunId, createRestorationBoard, repairRestorationBoard);
+  const restorationStore = useMissionBoard(islandRestoration ? restorationStorageKey(islandRestoration.campaign.campaignId, islandRestoration.level) : 'katchimeras.mist-mission.none.v1', restorationBoardRunId, createRestorationBoard, repairRestorationBoard);
   const restorationChapterProgress = islandRestoration ? mergeWorld.islandCampaigns?.[islandRestoration.campaign.campaignId]?.chapters[String(islandRestoration.level)] ?? null : null;
   const restorationBoardVisible = Boolean(islandRestoration && restorationStore.state) && restorationOpen && screenFocused && !upgradePresentation && !interactionCreatureId && !pendingIslandCampaign && !stepplingMissionActive && !openingBoardActive;
   useEffect(() => {
@@ -1267,10 +1287,10 @@ export function KatchimeraKingdomScreen({
   const soloLayerId = stepplingBoardBusy ? 'structure:steppling-home' : restorationBoardBusy && restorationIslandId ? `nature:mossprout:${restorationIslandId}` : null;
   // No marker percentage while the board is up: the request lives on the dock's tray instead.
   const soloOfferId = stepplingBoardBusy ? 'mist:steppling-home' : null;
+  // No tutorial on a friend's board: the step only locks the board once its bar is full.
   const restorationStep = useMemo(() => islandRestoration && restorationStore.state
-    ? restorationBoardStep(islandRestoration.campaign, islandRestoration.level, restorationStore.state, restorationStore.merges, { afterDelivery: restorationStore.placedDeliveries > 0, selectedOptionId: restorationChapterProgress?.selectedOptionId ?? null })
-    : null, [islandRestoration, restorationChapterProgress?.selectedOptionId, restorationStore.merges, restorationStore.placedDeliveries, restorationStore.state]);
-  const restorationGuidanceVisible = Boolean(restorationStep && !restorationStep.id.endsWith('.free'));
+    ? restorationBoardStep(islandRestoration.campaign, islandRestoration.level, restorationStore.state, restorationStore.merges)
+    : null, [islandRestoration, restorationStore.merges, restorationStore.state]);
   // The tray's request: the chapter's order once the board has asked for it, served or not.
   const restorationOrder = useMemo(() => {
     if (!islandRestoration || !restorationChapterProgress || islandRestoration.progress.deliveryRequestedAt == null) return null;
@@ -1281,12 +1301,27 @@ export function KatchimeraKingdomScreen({
   }, [islandRestoration, mergeWorld.activeOrders, restorationChapterProgress]);
   const restorationOrderServed = Boolean(restorationChapterProgress && restorationChapterProgress.orderIds.length > 0 && restorationChapterProgress.orderIds.every((id) => restorationChapterProgress.servedOrderIds.includes(id)));
   const restorationPendingDeliveries = useMemo(() => islandRestoration ? deliveriesToPlace(islandRestoration.progress, restorationStore.placedDeliveries) : [], [islandRestoration, restorationStore.placedDeliveries]);
+  // The one hint a friend's board gives, and only Petalimp's: when the patch is
+  // spent and her request sits on the tray, the card is spotlit and explained.
+  const restorationCheckpointHint = Boolean(islandRestoration && islandRestoration.campaign.campaignId === PETALIMP_ISLAND_CAMPAIGN_ID
+    && restorationOrder && !restorationOrderServed && restorationBoardVisible && !restorationHintSeen);
+  useEffect(() => {
+    // A tap away dismisses it only after it has had a moment to be read.
+    if (!restorationCheckpointHint) { setRestorationHintArmed(false); return; }
+    const timer = setTimeout(() => setRestorationHintArmed(true), RESTORATION_HINT_ARM_MS);
+    return () => clearTimeout(timer);
+  }, [restorationCheckpointHint]);
+  useEffect(() => {
+    // Served: the hint has done its job, whether or not it was ever tapped away.
+    if (restorationOrderServed) dismissRestorationHint();
+  }, [dismissRestorationHint, restorationOrderServed]);
   const openRestorationOrder = useCallback(() => {
     if (!islandRestoration || !restorationOrder) return;
+    dismissRestorationHint();
     // Back from the Merge page lands on this board again.
     requestIslandRestorationOpen(islandRestoration.campaign.campaignId);
     openGarden(restorationOrder.id, 'mossprout');
-  }, [islandRestoration, openGarden, restorationOrder]);
+  }, [dismissRestorationHint, islandRestoration, openGarden, restorationOrder]);
   const restorationPlace = restorationStore.place;
   const placeRestorationDelivery = useCallback((entry: { cell: number; definitionId: string }) => restorationPlace([entry]), [restorationPlace]);
   // With the board put away, deliveries land quietly as they arrive (and on mount after a relaunch);
@@ -1954,11 +1989,18 @@ export function KatchimeraKingdomScreen({
         campaign={islandRestoration.campaign} level={islandRestoration.level} state={restorationStore.state} send={restorationStore.send} boardStep={restorationStep}
         merges={restorationStore.merges} mergesRef={restorationStore.mergesRef} width={window.width} bottomInset={insets.bottom}
         order={restorationOrder} orderServed={restorationOrderServed} pendingDeliveries={restorationPendingDeliveries} onOpenOrder={openRestorationOrder} onPlaceDelivery={placeRestorationDelivery}
+        railTargetRefs={openingRailRefs}
         impactKey={openingGlow.landed} onMerge={openingGlow.launchItem} onFinale={launchRestorationFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} onClose={closeRestoration} /> : null}
-      {restorationBoardVisible && restorationStore.state && restorationGuidanceVisible && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
-        <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={restorationStep?.cue ?? null} guide={restorationStep?.guide ?? null}
-          layoutNonce={restorationStore.state.revision} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={restorationStep?.spotlight ?? null} state={restorationStore.state} targetRevision={restorationStore.state.revision} />
+      {restorationCheckpointHint && restorationHintArmed ? <Pressable accessibilityRole="button" accessibilityLabel="Dismiss the hint" onPress={dismissRestorationHint}
+        style={[StyleSheet.absoluteFill, { zIndex: RESTORATION_HINT_CATCHER_Z }]} /> : null}
+      {restorationCheckpointHint && restorationOrder && restorationStore.state && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
+        <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics}
+          cue={{ kind: 'tap', target: { kind: 'order_card', orderId: restorationOrder.id } }}
+          guide={{ eyebrow: 'Requested in Merge', title: 'This patch has given all it had.', body: 'Serve Petalimp’s request on the Merge board, then come back: what you bring frees what the mist still holds.' }}
+          layoutNonce={restorationStore.state.revision} railTargetRefs={openingRailRefs} screenRef={screenRef}
+          spotlight={{ targets: [{ kind: 'order_card', orderId: restorationOrder.id }], grouping: 'bounding_rect', padding: 8, radius: 18, dimOpacity: 0.58 }}
+          state={restorationStore.state} targetRevision={restorationStore.state.revision} />
       </View> : null}
       {openingGlow.flights.length || openingGlow.impacts.length ? <OpeningGlowLayer flights={openingGlow.flights} impacts={openingGlow.impacts}
         onArrive={openingGlow.arrive} onImpactDone={openingGlow.impactDone} screenRef={screenRef} /> : null}

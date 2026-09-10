@@ -31,6 +31,7 @@ import { advanceGlowRequests, glowTutorialDrop, normalizeGlowDiscoveryFields, re
 import { normalizeStepplingEgg, reduceStepplingEgg } from '@/features/onboarding/steppling-egg-policy';
 import { sharedWorldPurchase } from '@/constants/shared-world';
 import { ISLAND_CAMPAIGNS, isIslandCampaignId, islandCampaignById, islandCampaignForIsland } from '@/constants/island-campaigns/registry';
+import { islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers';
 import { islandWakeLockedReason, islandWakeState } from '@/constants/island-campaigns/wake-order';
 import { COMPANION_JOURNEY_PROFILES, JOURNEY_MEDITATION_ORDER_GLOW, JOURNEY_MEDITATION_ORDER_MINUTES } from '@/constants/companion-journey-profiles';
 import {
@@ -1378,10 +1379,14 @@ function activateIslandCampaignChapter(
   if (!orders.length) return unchanged(state, 'That island chapter has no request.');
   // A restoration chapter is paid now (the first is the friend's gift) and opens
   // its board; its order only reaches the Main Board when the board asks for it.
-  const chapterDefinition = islandCampaignById.get(command.campaignId)?.chapters.find((candidate) => candidate.level === command.level);
+  const campaignDefinition = islandCampaignById.get(command.campaignId) ?? null;
+  const chapterDefinition = campaignDefinition?.chapters.find((candidate) => candidate.level === command.level);
   const restorationBoard = chapterDefinition?.restoration ?? null;
   const stageCost = restorationBoard && command.level > 1 ? mossproutNatureIslandLevelDefinition(command.islandId, command.level)?.coinCost ?? 0 : 0;
   if (state.coins < stageCost) return unchanged(state, 'Earn a few more Glow through Merge orders.');
+  // A board chapter's request is authored data, fixed here by the answer: its id
+  // is recorded now and the same order is published later, never re-derived.
+  const authoredRequest = restorationBoard && campaignDefinition ? islandCampaignChapterOrder(campaignDefinition, command.level, command.selectedOptionId ?? null, command.now) : null;
   const activeOrders = restorationBoard
     ? state.activeOrders
     : [...state.activeOrders, ...orders.filter((order) => !state.activeOrders.some((candidate) => candidate.id === order.id))];
@@ -1408,7 +1413,7 @@ function activateIslandCampaignChapter(
           [String(command.level)]: {
             level: command.level,
             selectedOptionId: command.selectedOptionId ?? null,
-            orderIds: restorationBoard ? [] : orders.map((order) => order.id),
+            orderIds: restorationBoard ? (authoredRequest ? [authoredRequest.id] : []) : orders.map((order) => order.id),
             servedOrderIds: [],
             startedAt: command.now,
             returnConversationSeenAt: null,
@@ -1453,13 +1458,17 @@ function requestIslandCampaignDelivery(
   if (!found) return unchanged(state, 'That island chapter has not started.');
   if (found.restoration.completedAt != null) return unchanged(state, 'This part of the garden is already restored.');
   if (found.restoration.deliveryRequestedAt != null) return unchanged(state);
-  const orders = command.orders.filter((order) => order.storyArcId === command.campaignId && order.storyTargetLevel === command.level);
-  if (!orders.length) return unchanged(state, 'That island chapter has no request.');
-  const activeOrders = [...state.activeOrders, ...orders.filter((order) => !state.activeOrders.some((candidate) => candidate.id === order.id))];
+  // The request is the chapter's authored order for the saved answer. The
+  // caller's orders are not trusted: a different one would strand the board.
+  const definition = islandCampaignById.get(command.campaignId);
+  const authored = definition ? islandCampaignChapterOrder(definition, command.level, found.chapter.selectedOptionId ?? null, command.now) : null;
+  const order = authored ?? command.orders.find((candidate) => candidate.storyArcId === command.campaignId && candidate.storyTargetLevel === command.level) ?? null;
+  if (!order) return unchanged(state, 'That island chapter has no request.');
+  const activeOrders = state.activeOrders.some((candidate) => candidate.id === order.id) ? state.activeOrders : [...state.activeOrders, order];
   return changed(touch(withIslandRestoration({ ...state, activeOrders }, command.campaignId, command.level, {
-    orderIds: orders.map((order) => order.id),
+    orderIds: [order.id],
     restoration: { ...found.restoration, deliveryRequestedAt: command.now },
-  }), command.now), `${orders[0]!.title} is ready in the Garden.`);
+  }), command.now), `${order.title} is ready in the Garden.`);
 }
 
 /** The board's summary for the marker and tracker; the board itself lives in its own store. */

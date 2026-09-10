@@ -100,14 +100,18 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     if (!current || !activeRunId || !entries.length) return;
     const board = [...current.board];
     let nextInstance = current.nextInstance;
+    let landed = 0;
     for (const entry of entries) {
       const cell = board[entry.cell];
       if (!cell || cell.locked || cell.mist || cell.occupant) continue;
       board[entry.cell] = { ...cell, occupant: { kind: 'item', instanceId: `delivery:${nextInstance}`, definitionId: entry.definitionId } };
       nextInstance += 1;
+      landed += 1;
     }
+    // Nothing landed (the cell was taken meanwhile): no revision bump, nothing counted, so guidance does not re-lay out.
+    if (!landed) return;
     const next: MergeWorldState = { ...current, board, nextInstance, revision: current.revision + 1 };
-    const placed = placedRef.current + entries.length;
+    const placed = placedRef.current + landed;
     stateRef.current = next;
     placedRef.current = placed;
     saveMission(storageKey, activeRunId, next, mergesRef.current, placed);

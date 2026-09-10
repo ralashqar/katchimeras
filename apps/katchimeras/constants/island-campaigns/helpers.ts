@@ -148,7 +148,9 @@ export function islandCampaignUpgradePanelState(world: MergeWorldState, campaign
   const orderId = chapterProgress?.orderIds[0];
   const savedOrder = orderId ? world.activeOrders.find((candidate) => candidate.id === orderId) : null;
   const authoredOrder = chapterProgress ? islandCampaignChapterOrder(campaign, chapter.level, chapterProgress.selectedOptionId) : null;
-  const order = savedOrder ?? (authoredOrder && orderId ? { ...authoredOrder, id: orderId } : null);
+  // A board chapter records its request's id at activation but only asks for it at the checkpoint.
+  const requested = !chapterProgress?.restoration || chapterProgress.restoration.deliveryRequestedAt != null;
+  const order = requested ? savedOrder ?? (authoredOrder && orderId ? { ...authoredOrder, id: orderId } : null) : null;
   const orderComplete = Boolean(orderId && chapterProgress?.servedOrderIds.includes(orderId));
   const action = PANEL_ACTIONS[status];
   const choice = islandCampaignChapterChoice(campaign, chapter.level, chapterProgress?.selectedOptionId);

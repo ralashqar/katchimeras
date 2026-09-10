@@ -11,7 +11,8 @@ import type { OnboardingProfile } from '@/utils/onboarding-state';
 import type { ContentFlowDefinition, ContentFlowRun } from '@/types/content-flow';
 import { createContentFlowRun, stabilizeContentFlow } from '@/features/content-flow/content-flow-interpreter';
 import { GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID } from '@/features/onboarding/glow-discovery-flow';
-import { prepareStepplingGarden, STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, STEPPLING_SHOE_ORDER_ID } from '@/features/onboarding/steppling-garden-lesson';
+import { STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, STEPPLING_PARCEL_ID, STEPPLING_SHOE_ORDER_ID } from '@/features/onboarding/steppling-garden-lesson';
+import { STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID, STEPPLING_PARCEL_REWARD_ID } from '@/features/content-flow/steppling-day-one-flow';
 import { advanceGlowRequests, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS } from '@/utils/merge-world/glow-discovery-policy';
 
 const DAY = 86_400_000;
@@ -213,20 +214,35 @@ function glowLessonServed(now: number) {
   };
 }
 
-/** Steppling home through the mist: the clearing paid for, the Egg carried home and hatched, his first Shoe served. */
+function step(state: MergeWorldState, command: Parameters<typeof reduceMergeWorld>[1], label: string): MergeWorldState {
+  const result = reduceMergeWorld(state, command);
+  if (!result.changed) throw new Error(`Fixture step "${label}" did not apply: ${result.message ?? 'no change'}`);
+  return result.state;
+}
+
+/**
+ * Steppling home through the mist, played out with the real commands: the
+ * clearing paid for, the Egg carried home and hatched, his day-one parcel
+ * opened so the Journey Locker stands on the Main Board, two Socks made from
+ * it and merged, and the Shoe served for its receipt and Glow.
+ */
 function stepplingHome(now: number) {
   const at = now - 4 * DAY;
+  const dayId = new Date(at).toISOString().slice(0, 10);
   let state = glowLessonServed(now);
-  state = reduceMergeWorld(state, { type: 'unlockWorldTarget', targetId: GLOW_GATEWAY_ID, receiptId: 'fixture:steppling:mist', now: at }).state;
-  state = reduceMergeWorld(state, { type: 'transferDiscoveryEgg', targetId: GLOW_GATEWAY_ID, now: at + 1 }).state;
-  state = reduceMergeWorld(state, { type: 'hatchWorldEgg', targetId: GLOW_GATEWAY_ID, now: at + 2 }).state;
-  state = prepareStepplingGarden(state, at + 3);
-  return {
-    ...state,
-    coins: Math.max(state.coins, 90),
-    stepplingGardenLesson: { ...state.stepplingGardenLesson!, servedAt: at + 4 },
-    activeOrders: state.activeOrders.filter((order) => order.id !== STEPPLING_SHOE_ORDER_ID),
-  };
+  state = step(state, { type: 'unlockWorldTarget', targetId: GLOW_GATEWAY_ID, receiptId: 'fixture:steppling:mist', now: at }, 'clear the mist');
+  state = step(state, { type: 'transferDiscoveryEgg', targetId: GLOW_GATEWAY_ID, now: at + 1 }, 'carry the Egg home');
+  state = step(state, { type: 'hatchWorldEgg', targetId: GLOW_GATEWAY_ID, now: at + 2 }, 'hatch Steppling');
+  state = step(state, { type: 'grantGeneratorParcel', generatorId: 'journey-locker', rewardId: STEPPLING_PARCEL_REWARD_ID, dayId, now: at + 3 }, 'grant the Locker parcel');
+  state = step(state, { type: 'prepareStepplingGardenLesson', now: at + 4 }, 'prepare the garden lesson');
+  state = step(state, { type: 'claimArrival', arrivalId: STEPPLING_PARCEL_ID, now: at + 5 }, 'open the parcel');
+  state = step(state, { type: 'tapGenerator', generatorId: 'journey-locker', now: at + 6, seed: 'fixture:sock:1', spendEnergy: false }, 'make the first Sock');
+  state = step(state, { type: 'tapGenerator', generatorId: 'journey-locker', now: at + 7, seed: 'fixture:sock:2', spendEnergy: false }, 'make the second Sock');
+  const socks = state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'adventure:trail:1' ? [index] : []);
+  if (socks.length < 2) throw new Error('Fixture could not find two Socks to merge.');
+  state = step(state, { type: 'move', from: socks[0]!, to: socks[1]!, now: at + 8 }, 'merge the Socks');
+  state = step(state, { type: 'serveOrder', orderId: STEPPLING_SHOE_ORDER_ID, now: at + 9 }, 'serve the Shoe');
+  return { ...state, coins: Math.max(state.coins, 90) };
 }
 
 function storyRunAt(definition: ContentFlowDefinition, runId: string, nodeId: string, now: number): ContentFlowRun {
@@ -349,7 +365,11 @@ const FIXTURE_DEFINITIONS: readonly FixtureDefinition[] = [
   { id: 'steppling-mist-ready', name: 'Steppling · Before the reveal', description: 'The Garden lesson done and the Glow earned; the misted clearing’s bubble waits to be tapped and open its mission board.', tags: ['Kingdom', 'Steppling', 'Mist'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: glowLessonServed,
     contentFlowRuns: (now) => [storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'gateway.offer', now - 5 * DAY + 3)] },
   { id: 'kingdom-before-petalimp', name: 'Kingdom · Before Petalimp', description: 'The first session over: Steppling home and his first Shoe served. Mossprout’s wish and Bloom Garden come next.', tags: ['Kingdom', 'Petalimp'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: stepplingHome,
-    contentFlowRuns: (now) => [storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'complete', now - 4 * DAY + 5), storyRunAt(STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, 'complete', now - 4 * DAY + 6)] },
+    contentFlowRuns: (now) => [
+      storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'complete', now - 4 * DAY + 5),
+      storyRunAt(STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID, 'complete', now - 4 * DAY + 6),
+      storyRunAt(STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, 'complete', now - 4 * DAY + 10),
+    ] },
   { id: 'gate-3-fork', name: 'Gate 3 · Choose a mystery', description: 'Feastle, Baristabbit, and Bedrotte paths are visible.', tags: ['Gate 3', 'Choice'], ftueStep: 'complete', buildWorld: gateThree },
   { id: 'gate-3-feastle-parcel', name: 'Gate 3 · Feastle parcel', description: 'Warm Table selected; discovery parcel awaits.', tags: ['Gate 3', 'Feastle', 'Parcel'], ftueStep: 'complete', buildWorld: (now) => selectedPathAtStage(gateThree(now), 'feastle', -1, now - 3 * DAY + 10) },
   { id: 'gate-3-feastle-final', name: 'Gate 3 · Feastle final clue', description: 'One merge before Feastle appears.', tags: ['Gate 3', 'Feastle', 'Reveal'], ftueStep: 'complete', buildWorld: (now) => selectedPathAtStage(gateThree(now), 'feastle', 2, now - 3 * DAY + 10) },

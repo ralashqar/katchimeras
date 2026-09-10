@@ -1,14 +1,14 @@
 import { memo, useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
-import { PersistentMergeItemArt } from '@/components/katchadeck/games/feastle-persistent-merge-board';
+import { MergeOrderTrayCard } from '@/components/katchadeck/games/merge-order-rail';
 import { MergeParcelFlightOverlay, type MergeParcelFlight } from '@/components/katchadeck/games/merge-parcel-overlay';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import type { IslandCampaignDefinition } from '@/constants/island-campaigns/types';
 import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
-import { KatchaDeckUI } from '@/constants/theme';
 import { restorationDeliveryCells, restorationLayout, restorationProgress } from '@/features/island-restoration/island-restoration';
 import type { FtueStepDefinition } from '@/features/onboarding/ftue-types';
 import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
@@ -17,19 +17,32 @@ import type { MergeOrder, MergeWorldCommand, MergeWorldCommandResult, MergeWorld
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
 import { MistMissionDock } from './kingdom-opening-merge-dock';
 
-const TRAY_ITEM_SIZE = 40;
+/**
+ * One delivered item's flight. The parcel flight restarts its animation
+ * whenever its callbacks change identity, so each flight gets callbacks that
+ * are stable for its lifetime; an inline closure here made the item hover
+ * forever, re-arriving on every render and re-placing itself each time.
+ */
+const DeliveryFlight = memo(function DeliveryFlight({ flight, onFinish, onItemArrive }: {
+  flight: MergeParcelFlight;
+  onFinish: (nonce: number) => void;
+  onItemArrive: (instanceId: string) => void;
+}) {
+  const finish = useCallback(() => onFinish(flight.nonce), [flight.nonce, onFinish]);
+  return <MergeParcelFlightOverlay flight={flight} opening={false} onFinish={finish} onItemArrive={onItemArrive} />;
+});
 
 /**
  * A friend's restoration board under their island: the same dock the mist
  * missions use, counting merges (a match into a misted cell counts too).
- * Above the bar sits the friend's request as a tray card: while it is open on
- * the Main Board it leads there; once served, the delivered items fly from
- * the tray into the board's free cells, the reverse of serving on the Merge
- * page, and only land on the board as each one arrives.
+ * Above the bar sits the friend's request as the Merge page's own tray card:
+ * while it is open on the Main Board a tap leads there; once served, the
+ * delivered items fly from the card's own item slots into the board's free
+ * cells, the reverse of serving, and land on the board as each one arrives.
  */
 export const IslandRestorationDock = memo(function IslandRestorationDock({
   campaign, level, state, send, merges, mergesRef, boardStep, order, orderServed, pendingDeliveries, width, bottomInset, impactKey = 0,
-  onMerge, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, onOpenOrder, onPlaceDelivery,
+  onMerge, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, onOpenOrder, onPlaceDelivery, railTargetRefs,
 }: {
   campaign: IslandCampaignDefinition;
   level: MossproutNatureIslandLevel;
@@ -60,7 +73,10 @@ export const IslandRestorationDock = memo(function IslandRestorationDock({
   onOpenOrder?: () => void;
   /** A delivered item has landed in its cell. */
   onPlaceDelivery: (entry: { cell: number; definitionId: string }) => void;
+  /** The Kingdom's rail target registry, so guidance can point at the request card. */
+  railTargetRefs?: RefObject<Map<string, View>>;
 }) {
+  const reduceMotion = useReducedMotion();
   const sessionRef = useRef<ReturnType<typeof createMergeBoardSession> | null>(null);
   if (!sessionRef.current) sessionRef.current = createMergeBoardSession();
   const sessionId = sessionRef.current.id;
@@ -103,75 +119,90 @@ export const IslandRestorationDock = memo(function IslandRestorationDock({
     return result;
   }, [mergesRef, onBlockedInteraction, onFinale, onMerge, required, send]);
 
-  // The delivery flight: from the tray's chips into the board's free cells,
-  // each item landing on the board the moment its copy arrives.
+  // The card's item slots, by index, so each delivered item can leave from its own slot.
+  const itemNodesRef = useRef(new Map<number, View | null>());
+  const registerRailTarget = useCallback((targetKey: string, view: View | null) => {
+    const match = /^order-item:.*:(\d+)$/.exec(targetKey);
+    if (match) itemNodesRef.current.set(Number(match[1]), view);
+    if (railTargetRefs?.current) {
+      if (view) railTargetRefs.current.set(targetKey, view);
+      else railTargetRefs.current.delete(targetKey);
+    }
+  }, [railTargetRefs]);
+
+  // The delivery flight: from the card's slots into the board's free cells,
+  // one flight per item, each landing on the board the moment its copy arrives.
   const rootRef = useRef<View | null>(null);
-  const chipRef = useRef<View | null>(null);
-  const [flight, setFlight] = useState<MergeParcelFlight | null>(null);
-  const flightRef = useRef<{ nonce: number; entries: Map<string, { cell: number; definitionId: string }> } | null>(null);
+  const [flights, setFlights] = useState<MergeParcelFlight[]>([]);
+  const flightRef = useRef<{ entries: Map<string, { cell: number; definitionId: string }>; remaining: number } | null>(null);
   const nonceRef = useRef(0);
-  const [flying, setFlying] = useState(false);
   const pendingKey = pendingDeliveries.join(',');
   useEffect(() => {
     if (!definition || !pendingDeliveries.length || !metricsReady || flightRef.current || !orderServed) return;
     const metrics = boardMetricsRef.current;
     const root = rootRef.current;
-    const chip = chipRef.current;
-    if (!metrics || !root || !chip) return;
+    const slots = pendingDeliveries.map((_, index) => itemNodesRef.current.get(index) ?? itemNodesRef.current.get(0) ?? null);
+    if (!metrics || !root) return;
     const cells = restorationDeliveryCells(definition, stateRef.current, pendingDeliveries.length);
     if (cells.length < pendingDeliveries.length) return;
+    // No card slot to fly from (the card was not measured): the items still land, quietly, rather than never.
+    if (slots.some((slot) => !slot)) {
+      pendingDeliveries.forEach((definitionId, index) => onPlaceDelivery({ cell: cells[index]!, definitionId }));
+      return;
+    }
     let cancelled = false;
     root.measureInWindow((rootX, rootY) => {
-      chip.measureInWindow((chipX, chipY, chipWidth, chipHeight) => {
+      Promise.all(slots.map((slot) => new Promise<{ x: number; y: number }>((resolve) => {
+        slot!.measureInWindow((x, y, slotWidth, slotHeight) => resolve({ x: x - rootX + slotWidth / 2, y: y - rootY + slotHeight / 2 }));
+      }))).then((origins) => {
         if (cancelled || flightRef.current) return;
-        const nonce = ++nonceRef.current;
         const entries = new Map<string, { cell: number; definitionId: string }>();
-        const items = pendingDeliveries.map((definitionId, index) => {
-          const instanceId = `delivery-flight:${nonce}:${index}`;
+        const launched = pendingDeliveries.map((definitionId, index) => {
+          const nonce = ++nonceRef.current;
+          const instanceId = `delivery-flight:${nonce}`;
           entries.set(instanceId, { cell: cells[index]!, definitionId });
           const center = mergeCellCenter(metrics.geometry, cells[index]!);
-          return { instanceId, definitionId, destinationSize: metrics.geometry.cellSize - 4, to: { x: metrics.x - rootX + center.x, y: metrics.y - rootY + center.y } };
+          return { nonce, from: origins[index]!, items: [{ instanceId, definitionId, destinationSize: metrics.geometry.cellSize - 4, to: { x: metrics.x - rootX + center.x, y: metrics.y - rootY + center.y } }] };
         });
-        flightRef.current = { nonce, entries };
-        setFlying(true);
-        setFlight({ nonce, from: { x: chipX - rootX + chipWidth / 2, y: chipY - rootY + chipHeight / 2 }, items });
+        flightRef.current = { entries, remaining: launched.length };
+        setFlights(launched);
         if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       });
     });
     return () => { cancelled = true; };
-  }, [definition, metricsReady, orderServed, pendingDeliveries, pendingKey]);
+  }, [definition, metricsReady, onPlaceDelivery, orderServed, pendingDeliveries, pendingKey]);
   const handleItemArrive = useCallback((instanceId: string) => {
     const entry = flightRef.current?.entries.get(instanceId);
-    if (entry) onPlaceDelivery(entry);
+    // Each copy lands once: the entry is consumed so a repeated arrival cannot place it twice.
+    if (entry) {
+      flightRef.current?.entries.delete(instanceId);
+      onPlaceDelivery(entry);
+    }
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, [onPlaceDelivery]);
-  const finishFlight = useCallback(() => {
-    flightRef.current = null;
-    setFlight(null);
-    setFlying(false);
+  const finishFlight = useCallback((nonce: number) => {
+    setFlights((current) => current.filter((flight) => flight.nonce !== nonce));
+    if (flightRef.current && --flightRef.current.remaining <= 0) flightRef.current = null;
   }, []);
 
-  const trayItems = orderServed && pendingDeliveries.length ? pendingDeliveries : order
-    ? order.requirements.flatMap((requirement) => Array.from({ length: requirement.quantity }, () => requirement.definitionId))
-    : [];
   const trayOpen = Boolean(order && !orderServed);
-  const tray = order && trayItems.length && (trayOpen || (orderServed && pendingDeliveries.length)) ? (
-    <Pressable
-      accessibilityRole={trayOpen ? 'button' : undefined}
-      accessibilityLabel={trayOpen ? `${campaign.residentName}’s request: ${order.title}. Opens the Merge board.` : `${campaign.residentName}’s delivery has arrived.`}
-      disabled={!trayOpen}
-      onPress={trayOpen ? onOpenOrder : undefined}
-      style={({ pressed }) => [styles.tray, pressed && trayOpen ? styles.trayPressed : null]}>
-      <View style={styles.trayText}>
-        <Text numberOfLines={1} style={styles.trayTitle}>{trayOpen ? order.title : 'Delivered'}</Text>
-        <Text numberOfLines={1} style={styles.trayHint}>{trayOpen ? 'Requested in Merge · Tap to go' : 'Into the patch it goes'}</Text>
-      </View>
-      <View ref={chipRef} collapsable={false} style={[styles.chips, flying ? styles.chipsFlying : null]}>
-        {trayItems.map((definitionId, index) => <View key={`${definitionId}:${index}`} style={styles.chip}>
-          <PersistentMergeItemArt definitionId={definitionId} size={TRAY_ITEM_SIZE - 8} />
-        </View>)}
-      </View>
-    </Pressable>
+  // Served: the card stays up until every delivered item has flown off it, then fades.
+  const trayDelivered = Boolean(order && orderServed && (pendingDeliveries.length || flights.length));
+  const tray = order && (trayOpen || trayDelivered) ? (
+    <View pointerEvents="box-none" style={styles.trayRow}>
+      <MergeOrderTrayCard
+        animateEntrance={false}
+        entry={{ id: order.id, kind: 'order', order, itemReadiness: order.requirements.flatMap((requirement) => Array.from({ length: requirement.quantity }, () => trayDelivered)), ready: false }}
+        index={0}
+        interactionAllowed
+        interactionLocked={false}
+        onPressCard={trayOpen ? onOpenOrder : undefined}
+        onRailTargetRef={registerRailTarget}
+        onReroll={() => {}}
+        onServe={() => false}
+        reduceMotion={reduceMotion}
+      />
+    </View>
   ) : null;
 
   const progress = definition ? restorationProgress(definition, merges) : { current: 0, total: 1 };
@@ -183,19 +214,10 @@ export const IslandRestorationDock = memo(function IslandRestorationDock({
     width={width} bottomInset={bottomInset} impactKey={impactKey}
     onCommand={dispatch} onBoardMetrics={handleMetrics} onBlockedInteraction={onBlockedInteraction} onEntranceSettled={onEntranceSettled}
     onClose={onClose} closeLabel="Later" rootRef={rootRef} header={tray}
-    overlay={<MergeParcelFlightOverlay flight={flight} opening={false} onFinish={finishFlight} onItemArrive={handleItemArrive} />} />;
+    overlay={flights.map((flight) => <DeliveryFlight key={flight.nonce} flight={flight} onFinish={finishFlight} onItemArrive={handleItemArrive} />)} />;
 });
 
 const styles = StyleSheet.create({
-  tray: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16,
-    backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF', boxShadow: '0 4px 14px rgba(20,40,60,0.16)',
-  },
-  trayPressed: { opacity: 0.86 },
-  trayText: { flex: 1, gap: 1 },
-  trayTitle: { ...KatchaDeckUI.typography.ftuePanelTitle, color: '#2E4A66' },
-  trayHint: { color: '#5B7390', fontSize: 12, lineHeight: 15, fontWeight: '700' },
-  chips: { flexDirection: 'row', gap: 6 },
-  chipsFlying: { opacity: 0 },
-  chip: { width: TRAY_ITEM_SIZE, height: TRAY_ITEM_SIZE, borderRadius: TRAY_ITEM_SIZE / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(143,211,255,0.22)', borderWidth: 1.5, borderColor: '#FFFFFF' },
+  // Centred; the dock hangs it above the bar as an overlay, so the board never moves for it.
+  trayRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center' },
 });

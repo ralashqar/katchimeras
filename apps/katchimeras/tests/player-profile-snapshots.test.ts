@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import { buildPlayerProfileFixtures, PLAYER_PROFILE_FIXTURE_COUNT } from '@/utils/player-profile-fixtures';
+import { stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
 
 const NOW = Date.parse('2026-08-17T12:00:00Z');
 const root = resolve(__dirname, '..');
@@ -42,11 +43,16 @@ test('the two Kingdom fixtures land right before the Steppling reveal and right 
   const world = before.domains.mergeWorld.state;
   assert.ok(world.unlockedCharacters.includes('steppling'), 'Steppling is home');
   assert.ok(world.worldUnlocks?.['mossprout:overgrown-trail']?.hatchedAt, 'hatched through the mist');
-  assert.ok(world.stepplingGardenLesson?.servedAt, 'his first Shoe served');
+  assert.ok(world.generators['journey-locker'], 'the Journey Locker is his spawner on the Main Board');
+  assert.ok(world.board.some((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'journey-locker'), 'and it stands on the board');
+  assert.equal(stepplingShoeServed(world), true, 'his first Shoe was served for real');
+  assert.ok(world.companionDiscovery.records.find((record) => record.characterId === 'steppling')?.firstOrderCompletedAt, 'and the serve is on his record');
+  assert.equal(world.activeOrders.some((order) => order.id === 'steppling:discovery:first-trail'), false, 'and is no longer on the board');
+  assert.equal(world.arrivals.filter((arrival) => arrival.claimedAt == null).length, 0, 'no parcel left waiting');
   assert.equal(world.kingdomGoal, undefined, 'Mossprout’s wish has not been told yet');
   assert.equal(world.haven.mossproutNatureIslands['bloom-garden'], 0, 'Bloom Garden is still misted');
   assert.ok(world.coins >= 40, 'enough Glow to clear it');
-  assert.deepEqual(before.domains.contentFlow?.runs.map((run) => [run.runId, run.status]), [['story:glow-steppling-v1', 'completed'], ['ftue:steppling-garden:1', 'completed']]);
+  assert.deepEqual(before.domains.contentFlow?.runs.map((run) => [run.runId, run.status]), [['story:glow-steppling-v1', 'completed'], ['journey:steppling:day-1', 'completed'], ['ftue:steppling-garden:1', 'completed']]);
 });
 
 test('Mossprout Haven fixture opens immediately before the first environment restore', () => {

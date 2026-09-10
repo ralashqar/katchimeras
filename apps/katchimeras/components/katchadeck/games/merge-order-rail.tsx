@@ -370,8 +370,10 @@ const StableOrderTray = memo(function StableOrderTray({ onReroll, onServe, ...pr
   return <MergeOrderTrayCard {...props} onReroll={reroll} onServe={serve} />;
 });
 
-export function MergeOrderTrayCard({ animateEntrance = true, effectsActive = true, surfaceActive = true, serveInFlight, entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onRailTargetRef, onReroll, onServe, reduceMotion }: {
+export function MergeOrderTrayCard({ animateEntrance = true, effectsActive = true, surfaceActive = true, serveInFlight, entry, index, interactionAllowed, interactionLocked, onBlockedInteraction, onPressCard, onRailTargetRef, onReroll, onServe, reduceMotion }: {
   effectsActive?: boolean;
+  /** A tap on a card that is not ready to serve (a friend's board leads to the Merge page from it). */
+  onPressCard?: () => void;
   surfaceActive?: boolean;
   serveInFlight?: boolean;
   animateEntrance?: boolean;
@@ -463,7 +465,7 @@ export function MergeOrderTrayCard({ animateEntrance = true, effectsActive = tru
       accessibilityRole="button"
       accessibilityState={{ disabled: interactionLocked && !interactionAllowed }}
       onLongPress={interactionLocked ? onBlockedInteraction : onReroll}
-      onPress={!interactionAllowed ? onBlockedInteraction : ready ? beginServe : undefined}
+      onPress={!interactionAllowed ? onBlockedInteraction : ready ? beginServe : onPressCard}
       ref={setOrderCardTargetRef}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       {ready ? (
@@ -497,6 +499,11 @@ export function MergeOrderTrayCard({ animateEntrance = true, effectsActive = tru
               void beginServe();
               return;
             }
+            if (onPressCard) {
+              // A card that leads somewhere (a friend's board): every tap goes there, no reward popup.
+              onPressCard();
+              return;
+            }
             if (interactionLocked) {
               onBlockedInteraction?.();
               return;
@@ -514,7 +521,7 @@ export function MergeOrderTrayCard({ animateEntrance = true, effectsActive = tru
           <Animated.View
             entering={!entryMotionEnabled ? undefined : reduceMotion ? FadeIn.duration(90) : ZoomIn.delay(itemDelay + itemIndex * 35).duration(190).easing(CONTROLLED_EASE)}
             key={`${definitionId}:${itemIndex}`}
-            ref={(node) => { itemRefs.current[itemIndex] = node as unknown as View; }}
+            ref={(node) => { itemRefs.current[itemIndex] = node as unknown as View; onRailTargetRef?.(`order-item:${order.id}:${itemIndex}`, node as unknown as View | null); }}
             style={styles.item}>
             <PersistentMergeItemArt definitionId={definitionId} size={TRAY_ITEM_SIZE} />
             {itemReadiness[itemIndex] ? (

@@ -1,3 +1,4 @@
+import { isIslandCampaignId } from '@/constants/island-campaigns/registry';
 import type { MergeOrder, MergeWorldState } from '@/types/merge-world';
 
 export type MergeOrderPresentationContext = {
@@ -75,10 +76,14 @@ export function prioritizedVisibleMergeOrders(
   // A guided tutorial owns the rail. In normal play, limiting the whole rail
   // to one request hides every other companion indefinitely behind Mossprout.
   if (ranked[0] && priority(ranked[0]) < 3) return [ranked[0]];
-  const visibleFamilies = new Set<MergeOrder['characterId']>();
+  // One request per companion, where an island friend's campaign request is
+  // its own companion: it is filed under Mossprout only for the board, and
+  // must never be hidden behind his journey or daily requests.
+  const visibleFamilies = new Set<string>();
   return ranked.filter((order) => {
-    if (visibleFamilies.has(order.characterId)) return false;
-    visibleFamilies.add(order.characterId);
+    const family = isIslandCampaignId(order.storyArcId) ? order.storyArcId! : order.characterId;
+    if (visibleFamilies.has(family)) return false;
+    visibleFamilies.add(family);
     return true;
   });
 }

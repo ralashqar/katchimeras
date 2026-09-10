@@ -7,12 +7,13 @@ import type { IslandCampaignDefinition, RestorationBoardDefinition } from '@/con
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import {
   createRestorationState, deliveriesToPlace, restorationBoardStep, restorationCheckpointReached, restorationComplete,
-  restorationDeliveryCells, restorationEchoes, restorationNextMove, restorationProgress, restorationWindowCells, restoreRestorationEchoes,
+  restorationDeliveryCells, restorationEchoes, restorationNextMove, restorationProgress, restorationRunId, restorationWindowCells, restoreRestorationEchoes,
 } from '@/features/island-restoration/island-restoration';
 import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
 import type { MergeWorldState } from '@/types/merge-world';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { greetIslandFriend, revealIsland } from './helpers/island-campaign';
+import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
 import { readFileSync } from './helpers/content-fs';
 
 const NOW = Date.UTC(2026, 8, 10, 12);
@@ -168,37 +169,59 @@ test('every authored restoration board needs its delivery on every path and fill
   assert.equal(petalimp.chapters.every((chapter) => chapter.restoration), true, 'Petalimp plays every chapter on the board');
 });
 
-test('the board’s guidance: a spotlit first move with nothing else allowed, a finger on the second, then free; the checkpoint points at Merge', () => {
+test('every request a board sends to the Main Board can be made there: Petalimp comes before Shellio and the Nursery, so only Seeds and the Journey Locker’s chains', () => {
+  // The Garden Basket drops Seeds alone until Shellio (no waterside); hybrids need the Memory Nursery (day 15); the Locker's two chains open with Steppling's Shoe.
+  const chainsOpenBeforeShellio = new Set(['nature:garden', 'adventure:trail', 'adventure:travel']);
+  for (const chapter of petalimp.chapters) {
+    const orders = [chapter.fallbackOrder, ...chapter.choices.map((choice) => choice.order)];
+    for (const order of orders) {
+      for (const requirement of order.requirements) {
+        const definition = MERGE_ITEMS_BY_ID.get(requirement.definitionId);
+        assert.ok(definition, `${order.title}: ${requirement.definitionId} exists`);
+        assert.equal(definition!.branchId !== 'hybrid' && chainsOpenBeforeShellio.has(definition!.chainId), true, `${order.title} asks for ${definition!.name} (${definition!.chainId}), which the Main Board cannot make before Shellio`);
+        assert.ok(definition!.tier <= 6, `${order.title}: ${definition!.name} is within reach`);
+      }
+    }
+    // What the request brings must be wanted: each delivered item merges with a twin on the spent board or frees a misted cell.
+    const wanted = new Set(chapter.restoration!.echoes.map((echo) => echo.definitionId));
+    for (const requirement of chapter.fallbackOrder.requirements) {
+      const definition = MERGE_ITEMS_BY_ID.get(requirement.definitionId)!;
+      const twinFromBoard = chapter.restoration!.echoes.some((echo) => MERGE_ITEMS_BY_ID.get(echo.definitionId)?.nextItemId === requirement.definitionId);
+      assert.ok(wanted.has(requirement.definitionId) || twinFromBoard, `level ${chapter.level}: the delivered ${definition.name} has nowhere to go on the board`);
+    }
+  }
+});
+
+test('a saved board belongs to one start of one authoring: a restarted stage or a re-authored board begins fresh', () => {
+  const chapter = petalimp.chapters[2]!;
+  const definition = chapter.restoration!;
+  const run = restorationRunId(petalimp.campaignId, 3, NOW, definition);
+  assert.equal(run, restorationRunId(petalimp.campaignId, 3, NOW, { ...definition, items: [...definition.items] }), 'the same authoring, the same run');
+  assert.notEqual(run, restorationRunId(petalimp.campaignId, 3, NOW + 1, definition), 'a new start is a new run');
+  assert.notEqual(run, restorationRunId(petalimp.campaignId, 3, NOW, { ...definition, echoes: [{ id: 'petalimp-3-shell', cell: 38, definitionId: 'nature:waterside:2' }] }), 'a re-authored board is a new run');
+  assert.notEqual(run, restorationRunId(petalimp.campaignId, 3, NOW, { ...definition, merges: definition.merges + 1 }), 'so is a new bar');
+  // The store keeps a board only for its own run: the old play is not loaded, and a fresh board with zero merges is created.
+  const store = readFileSync('features/onboarding/use-opening-mission-board.ts', 'utf8');
+  assert.match(store, /if \(!stored \|\| stored\.runId !== runId\) return null;/);
+});
+
+test('a friend’s board carries no tutorial: free from the first move, locked only once the bar is full', () => {
   const definition = boardOf(1);
   let state = createRestorationState(definition, NOW);
   const first = restorationBoardStep(petalimp, 1, state, 0)!;
-  assert.equal(first.id.endsWith('.first'), true);
-  assert.ok(first.spotlight && first.cue?.kind === 'drag');
-  const pointed = restorationNextMove(state, restorationWindowCells(3))!;
-  const other = [16, 18, 22, 26].filter((cell) => cell !== pointed.from && cell !== pointed.to);
-  assert.equal(mergeFtueAllowsCommand(first, state, { type: 'move', from: pointed.from, to: pointed.to, now: NOW }), true);
-  assert.equal(mergeFtueAllowsCommand(first, state, { type: 'move', from: other[0]!, to: other[1]!, now: NOW }), false, 'only the pointed-at move');
-  state = play(state, [[16, 18]]).state;
-  const second = restorationBoardStep(petalimp, 1, state, 1)!;
-  assert.equal(second.id.endsWith('.second'), true);
-  assert.equal(second.spotlight, undefined);
-  assert.equal(second.cue?.kind, 'drag');
-  assert.equal(mergeFtueAllowsCommand(second, state, { type: 'move', from: 26, to: 22, now: NOW }), true, 'any move now');
-  state = play(state, [[22, 26], [18, 26]], NOW + 1).state;
-  assert.equal(restorationBoardStep(petalimp, 1, state, 3)!.id.endsWith('.free'), true);
-  const freed = play(state, [[26, 24]], NOW + 3).state;
-  assert.equal(restorationCheckpointReached(definition, freed, 4), true);
-  const checkpoint = restorationBoardStep(petalimp, 1, freed, 4)!;
-  assert.equal(checkpoint.id.endsWith('.delivery'), true);
-  assert.equal(checkpoint.cue, undefined);
-  assert.equal(checkpoint.guide.eyebrow, 'Requested in Merge');
-  const board = [...freed.board];
-  board[17] = { ...board[17], occupant: { kind: 'item', instanceId: 'delivery', definitionId: 'nature:garden:4' } };
-  const delivered = restorationBoardStep(petalimp, 1, { ...freed, board }, 4, { afterDelivery: true, selectedOptionId: petalimp.chapters[0]!.choices[0]!.id })!;
-  assert.equal(delivered.guide.title, petalimp.chapters[0]!.choices[0]!.returnLine, 'the friend’s return line greets the delivery');
-  assert.deepEqual(delivered.cue, { kind: 'drag', from: { kind: 'board_cell', cell: 17 }, to: { kind: 'board_cell', cell: 24 } });
-  assert.equal(restorationBoardStep(petalimp, 1, freed, 5)!.interaction?.mode, 'blocked');
+  assert.equal(first.id.endsWith('.free'), true);
+  assert.equal(first.cue, undefined);
+  assert.equal(first.spotlight, undefined);
+  assert.equal(first.interaction?.mode, 'none');
+  assert.equal(mergeFtueAllowsCommand(first, state, { type: 'move', from: 16, to: 18, now: NOW }), true);
+  assert.equal(mergeFtueAllowsCommand(first, state, { type: 'move', from: 22, to: 26, now: NOW }), true, 'any move, from the start');
+  state = play(state, [[16, 18], [22, 26], [18, 26], [26, 24]]).state;
+  assert.equal(restorationCheckpointReached(definition, state, 4), true);
+  assert.equal(restorationBoardStep(petalimp, 1, state, 4)!.id.endsWith('.free'), true, 'the checkpoint shows on the tray, not as a guide');
+  assert.equal(restorationBoardStep(petalimp, 1, state, 5)!.interaction?.mode, 'blocked', 'the full bar locks the board while the last item flies');
   assert.equal(restorationBoardStep(petalimp, 1, null, 0), null);
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  assert.doesNotMatch(screen, /cue=\{restorationStep\?\.cue/, 'no finger or spotlight overlay for a friend’s board');
 });
 
 test('the chapter record follows the board: paid at activation, the delivery on serve, the free upgrade only once the bar is full', () => {
@@ -208,12 +231,26 @@ test('the chapter record follows the board: paid at activation, the delivery on 
   state = reduceMergeWorld(state, activate).state;
   const record = () => state.islandCampaigns![petalimp.campaignId]!.chapters['1']!;
   assert.deepEqual(record().restoration, { startedAt: NOW + 2, paidCoins: 0, progress: { current: 0, total: 5 }, deliveryRequestedAt: null, delivered: [], completedAt: null });
-  assert.deepEqual(record().orderIds, []);
+  assert.deepEqual(record().orderIds, [order.id], 'the request id is fixed by the answer at activation');
+  assert.equal(state.activeOrders.some((candidate) => candidate.id === order.id), false, 'but it is not on the Main Board yet');
   assert.equal(reduceMergeWorld(state, { type: 'recordIslandRestorationProgress', campaignId: petalimp.campaignId, level: 1, current: 9, total: 5, now: NOW + 3 }).state.islandCampaigns![petalimp.campaignId]!.chapters['1']!.restoration!.progress.current, 5, 'progress is clamped');
   assert.equal(reduceMergeWorld(state, { type: 'completeIslandRestoration', campaignId: petalimp.campaignId, level: 1, now: NOW + 3 }).changed, false, 'not until the bar is full');
   assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: petalimp.islandId, level: 1, economyMode: 'free', receiptId: 'early', now: NOW + 3 }).changed, false, 'no upgrade before the board');
-  state = reduceMergeWorld(state, { type: 'requestIslandCampaignDelivery', campaignId: petalimp.campaignId, level: 1, orders: [order], now: NOW + 4 }).state;
+  // Whatever the caller passes, the engine publishes the chapter's own authored order for the saved answer.
+  const stray = islandCampaignChapterOrder(petalimp, 1, petalimp.chapters[0]!.choices[2]!.id, NOW + 4)!;
+  state = reduceMergeWorld(state, { type: 'requestIslandCampaignDelivery', campaignId: petalimp.campaignId, level: 1, orders: [stray], now: NOW + 4 }).state;
   assert.deepEqual(record().orderIds, [order.id]);
+  assert.deepEqual(state.activeOrders.filter((candidate) => candidate.storyArcId === petalimp.campaignId).map((candidate) => [candidate.id, candidate.title]), [[order.id, order.title]], 'one order, the authored one');
+  assert.equal(reduceMergeWorld(state, { type: 'requestIslandCampaignDelivery', campaignId: petalimp.campaignId, level: 1, orders: [stray], now: NOW + 5 }).changed, false, 'asked once, never re-derived');
+  const relaunched = normalizeMergeWorldState(JSON.parse(JSON.stringify(state)), NOW + 6);
+  assert.deepEqual(relaunched.activeOrders.filter((candidate) => candidate.storyArcId === petalimp.campaignId).map((candidate) => candidate.id), [order.id], 'and the same order after a relaunch');
+  // The Merge page shows one request per companion; the island request is its own companion, never hidden behind Mossprout's own.
+  const daily = { ...order, id: 'mossprout:daily:1', title: 'A garden morning', storyArcId: 'companion:daily-garden', storyTargetLevel: undefined, chapterId: undefined, recipientSkinId: 'mossprout' as const };
+  const journey = { ...order, id: 'mossprout:journey:1', title: 'The day’s request', storyArcId: 'mossprout:dry-pond', storyTargetLevel: undefined, chapterId: undefined, recipientSkinId: 'mossprout' as const };
+  const crowded = { ...relaunched, activeOrders: [journey, daily, ...relaunched.activeOrders] };
+  const visible = prioritizedVisibleMergeOrders(crowded, { characterId: 'mossprout', journeyOrderIds: new Set([journey.id]) });
+  assert.ok(visible.some((candidate) => candidate.id === order.id), 'Petalimp’s request stays on the rail beside Mossprout’s');
+  assert.ok(visible.some((candidate) => candidate.id === journey.id));
   const board = [...state.board];
   let cursor = 0;
   for (const requirement of order.requirements) for (let count = 0; count < requirement.quantity; count += 1) {
@@ -248,15 +285,23 @@ test('the Kingdom docks the board under the island, sends the order at the check
   const engine = readFileSync('utils/merge-world/engine.ts', 'utf8');
   const boardFile = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
   assert.match(screen, /const islandRestoration = useMemo\(\(\) => activeIslandRestoration\(mergeWorld\), \[mergeWorld\]\);/);
-  assert.match(screen, /useMissionBoard\(islandRestoration \? restorationStorageKey\(islandRestoration\.campaign\.campaignId, islandRestoration\.level\) : 'katchimeras\.mist-mission\.none\.v1', restorationRunId, createRestorationBoard, repairRestorationBoard\)/, 'its own store per chapter, repaired on load');
+  assert.match(screen, /const restorationBoardRunId = islandRestoration && restorationDefinition \? restorationRunId\(islandRestoration\.campaign\.campaignId, islandRestoration\.level, islandRestoration\.progress\.startedAt, restorationDefinition\) : null;/, 'a restarted or re-authored stage never inherits a saved board');
+  assert.match(screen, /useMissionBoard\(islandRestoration \? restorationStorageKey\(islandRestoration\.campaign\.campaignId, islandRestoration\.level\) : 'katchimeras\.mist-mission\.none\.v1', restorationBoardRunId, createRestorationBoard, repairRestorationBoard\)/, 'its own store per chapter, repaired on load');
   assert.match(screen, /target: \{ kind: 'haven_nature_island' as const, islandId: restorationIslandId \},\s*zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y/, 'the board framing on the island');
   assert.match(screen, /const soloOfferId = stepplingBoardBusy \? 'mist:steppling-home' : null;/, 'no marker percentage while the board is up');
   // The request lives on the dock's tray: open on the Main Board it leads there; served, its items fly into the cells.
   assert.match(screen, /requestIslandRestorationOpen\(islandRestoration\.campaign\.campaignId\);\s*openGarden\(restorationOrder\.id, 'mossprout'\);/, 'the tray opens the Merge page and Back returns to the board');
   assert.match(screen, /if \(!islandRestoration \|\| !restorationDefinition \|\| !restorationStore\.state \|\| restorationBoardVisible\) return;/, 'quiet placement only while the board is put away');
   assert.match(screen, /order=\{restorationOrder\} orderServed=\{restorationOrderServed\} pendingDeliveries=\{restorationPendingDeliveries\} onOpenOrder=\{openRestorationOrder\} onPlaceDelivery=\{placeRestorationDelivery\}/);
-  assert.match(dock, /<MergeParcelFlightOverlay flight=\{flight\} opening=\{false\} onFinish=\{finishFlight\} onItemArrive=\{handleItemArrive\} \/>/, 'the delivery flies like a parcel, without the crate');
-  assert.match(dock, /const entry = flightRef\.current\?\.entries\.get\(instanceId\);\s*if \(entry\) onPlaceDelivery\(entry\);/, 'each item lands on the board as its copy arrives');
+  assert.match(dock, /flights\.map\(\(flight\) => <DeliveryFlight key=\{flight\.nonce\} flight=\{flight\} onFinish=\{finishFlight\} onItemArrive=\{handleItemArrive\} \/>\)/, 'each delivered item flies like a parcel item');
+  assert.match(dock, /const finish = useCallback\(\(\) => onFinish\(flight\.nonce\), \[flight\.nonce, onFinish\]\);\s*return <MergeParcelFlightOverlay flight=\{flight\} opening=\{false\} onFinish=\{finish\} onItemArrive=\{onItemArrive\} \/>;/, 'with callbacks stable for the flight lifetime, or the flight restarts every render and hovers forever');
+  assert.match(dock, /flightRef\.current\?\.entries\.delete\(instanceId\);\s*onPlaceDelivery\(entry\);/, 'each copy lands once');
+  assert.match(store, /if \(!landed\) return;/, 'a placement that placed nothing bumps nothing');
+  assert.match(dock, /<MergeOrderTrayCard[\s\S]*?onPressCard=\{trayOpen \? onOpenOrder : undefined\}[\s\S]*?onRailTargetRef=\{registerRailTarget\}/, 'the request is the Merge page’s own tray card, and a tap on it leads to Merge');
+  const rail = readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8');
+  assert.match(rail, /onRailTargetRef\?\.\(`order-item:\$\{order\.id\}:\$\{itemIndex\}`, node as unknown as View \| null\);/, 'the card exposes its item slots so deliveries leave from them');
+  assert.match(rail, /onPress=\{!interactionAllowed \? onBlockedInteraction : ready \? beginServe : onPressCard\}/);
+  assert.match(dock, /const entry = flightRef\.current\?\.entries\.get\(instanceId\);[\s\S]*?if \(entry\) \{\s*flightRef\.current\?\.entries\.delete\(instanceId\);\s*onPlaceDelivery\(entry\);/, 'each item lands on the board as its copy arrives, once');
   assert.match(dock, /destinationSize: metrics\.geometry\.cellSize - 4, to: \{ x: metrics\.x - rootX \+ center\.x, y: metrics\.y - rootY \+ center\.y \}/, 'position and scale interpolate to the exact cell');
   const parcel = readFileSync('components/katchadeck/games/merge-parcel-overlay.tsx', 'utf8');
   assert.match(parcel, /\{opening \? <ParcelOpening from=\{flight\.from\} rootMatch=\{Boolean\(flight\.rootMatch\)\} \/> : null\}/);
@@ -285,8 +330,34 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /if \(restorationCampaignId && islandCampaignForOffer\(offer\.id\)\?\.campaignId === restorationCampaignId\) \{\s*setRestorationOpen\(true\);\s*return;\s*\}/, 'the marker is the board while a stage is open');
   assert.match(dock, /if \(\(mergesRef\.current \?\? 0\) >= required\) \{[\s\S]*?setHiddenItemIds[\s\S]*?onFinale\?\.\(from, made\);\s*\} else \{\s*onMerge\?\.\(from, made\);/, 'every merge sends the thing it made into the tile; the last one leaves the board');
   assert.match(dock, /barTitle=\{`Restore \$\{islandName\}`\}/, 'the bar names the island, not the mist');
+
   assert.match(screen, /<IslandRestorationDock[\s\S]*?onMerge=\{openingGlow\.launchItem\}/, 'items, not Glow, fly into an island being restored');
   const glowDock = readFileSync('components/katchadeck/world/kingdom-opening-merge-dock.tsx', 'utf8');
+  assert.match(glowDock, /\{header && headerBottom != null \? <Animated\.View entering=\{headerIn\} exiting=\{headerOut\}/, 'the tray card fades in and out');
+  assert.match(glowDock, /const headerIn = FadeIn\.duration\(reduceMotion \? 80 : 240\);\s*const headerOut = FadeOut\.duration\(reduceMotion \? 60 : 180\);/);
+  // The card is an overlay hung above the bar by measured position, never a row of the column: the board stays put as it comes and goes.
+  assert.match(glowDock, /const headerBottom = dockHeight != null && barTop != null \? dockHeight - barTop - HEADER_TUCK : null;/);
+  assert.match(glowDock, /style=\{\[styles\.headerSlot, \{ bottom: headerBottom \}\]\}/);
+  assert.match(glowDock, /headerSlot: \{ position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 0 \}/);
+  assert.doesNotMatch(glowDock, /LinearTransition|layout=\{/, 'nothing in the column animates its layout');
+  assert.doesNotMatch(dock, /marginBottom: -24/, 'the tray row no longer pulls the bar up');
+  assert.match(dock, /const trayDelivered = Boolean\(order && orderServed && \(pendingDeliveries\.length \|\| flights\.length\)\);/, 'the card stays until its flights are done');
+  assert.match(dock, /if \(slots\.some\(\(slot\) => !slot\)\) \{\s*pendingDeliveries\.forEach\(\(definitionId, index\) => onPlaceDelivery\(\{ cell: cells\[index\]!, definitionId \}\)\);/, 'a delivery with no slot to fly from still lands');
+  // Petalimp's one hint: the spent patch spotlights her request card and says to serve it on the Merge board; any tap on the card goes there.
+  assert.match(screen, /const restorationCheckpointHint = Boolean\(islandRestoration && islandRestoration\.campaign\.campaignId === PETALIMP_ISLAND_CAMPAIGN_ID\s*&& restorationOrder && !restorationOrderServed && restorationBoardVisible && !restorationHintSeen\);/);
+  // Once per player: the seen flag is stored; a tap away (after a moment), the card, Later or the serve puts it away for good.
+  assert.match(screen, /const RESTORATION_HINT_SEEN_KEY = 'katchimeras\.island-restoration\.hint-seen\.petalimp\.v1';/);
+  assert.match(screen, /useState\(\(\) => getStoredJson<boolean>\(RESTORATION_HINT_SEEN_KEY, false\)\)/);
+  assert.match(screen, /if \(!seen\) setStoredJson\(RESTORATION_HINT_SEEN_KEY, true\);/);
+  assert.match(screen, /const RESTORATION_HINT_ARM_MS = 2500;/);
+  assert.match(screen, /\{restorationCheckpointHint && restorationHintArmed \? <Pressable accessibilityRole="button" accessibilityLabel="Dismiss the hint" onPress=\{dismissRestorationHint\}/, 'a tap away dismisses it');
+  assert.match(screen, /const RESTORATION_HINT_CATCHER_Z = 59;/, 'under the dock, so the card and board keep their taps');
+  assert.match(screen, /const closeRestoration = useCallback\(\(\) => \{ setRestorationOpen\(false\); dismissRestorationHint\(\); \}/);
+  assert.match(screen, /if \(restorationOrderServed\) dismissRestorationHint\(\);/);
+  assert.match(screen, /spotlight=\{\{ targets: \[\{ kind: 'order_card', orderId: restorationOrder\.id \}\], grouping: 'bounding_rect'/, 'the spotlight sits on the tray card');
+  assert.match(screen, /cue=\{\{ kind: 'tap', target: \{ kind: 'order_card', orderId: restorationOrder\.id \} \}\}/);
+  assert.match(dock, /railTargetRefs\.current\.set\(targetKey, view\)/, 'the dock shares the card’s targets with the overlay');
+  assert.match(rail, /if \(onPressCard\) \{[\s\S]*?onPressCard\(\);\s*return;\s*\}\s*if \(interactionLocked\)/, 'the portrait never opens the reward popup on a card that leads somewhere');
   assert.match(glowDock, /const launchItem = useCallback\(\(from: RewardFlightPoint, definitionId: string\) => \{[\s\S]*?\{ id, index: 0, count: 1, from, to, art, size: 44 \}/, 'one item flight per merge');
   assert.match(canvas, /if \(target\.kind === 'haven_nature_island'\) \{[\s\S]*?`nature:mossprout:\$\{target\.islandId\}`[\s\S]*?focusTutorialResident\(/, 'the island is a camera target');
   assert.match(canvas, /ref=\{natureIslandTargetRefs\.get\(islandId\)\}/, 'and a flight target');

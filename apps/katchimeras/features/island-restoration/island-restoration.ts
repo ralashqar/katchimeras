@@ -1,6 +1,6 @@
 import type { IslandCampaignDefinition, RestorationBoardDefinition } from '@/constants/island-campaigns/types';
-import { islandCampaignChapter, islandCampaignChapterChoice } from '@/constants/island-campaigns/helpers';
-import type { FtueStepDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
+import { islandCampaignChapter } from '@/constants/island-campaigns/helpers';
+import type { FtueStepDefinition } from '@/features/onboarding/ftue-types';
 import { createOpeningMissionState } from '@/features/onboarding/opening-mission-state';
 import { closestOpeningPair, OPENING_BOARD_LAYOUT, OPENING_MERGE_WINDOW_CELLS } from '@/features/onboarding/opening-mist';
 import type { IslandRestorationProgress, MergeBoardCell, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
@@ -34,6 +34,23 @@ export function restorationLayout(rows: 3 | 4) {
 
 export function restorationStorageKey(campaignId: string, level: MossproutNatureIslandLevel): string {
   return `katchimeras.mist-mission.${campaignId}.${level}.v1`;
+}
+
+/**
+ * The run a saved board belongs to. It carries the stage's start time and a
+ * fingerprint of the authored board, so a restarted stage (a new start time)
+ * or a re-authored board (new contents) begins fresh instead of resurrecting
+ * an earlier play's cells and merge count under a request they no longer fit.
+ */
+export function restorationRunId(campaignId: string, level: MossproutNatureIslandLevel, startedAt: number, definition: RestorationBoardDefinition): string {
+  return `${campaignId}:${level}:${Math.floor(startedAt)}:${restorationFingerprint(definition)}`;
+}
+
+function restorationFingerprint(definition: RestorationBoardDefinition): string {
+  const text = JSON.stringify([definition.rows, definition.merges, definition.items, definition.echoes, definition.deliveryCells]);
+  let hash = 5381;
+  for (let index = 0; index < text.length; index += 1) hash = ((hash * 33) ^ text.charCodeAt(index)) >>> 0;
+  return hash.toString(36);
 }
 
 /** The board a chapter starts with: sealed outside its window, the misted cells holding their items, the local pieces placed. */
@@ -128,68 +145,24 @@ export function restorationDeliveryCells(definition: RestorationBoardDefinition,
   return [...preferred, ...rest].slice(0, count);
 }
 
-const CELL = (cell: number): FtueTarget => ({ kind: 'board_cell', cell });
-
 /**
- * The beat the restoration board projects: the first move spotlit with
- * nothing else allowed, the second pointed at, then free. At the checkpoint
- * the guide says the Main Board is needed; once a delivery has landed the
- * friend's return line is the guide.
+ * The beat the restoration board projects. A friend's board carries no
+ * tutorial: the first two mist missions taught merging and misted cells, so
+ * here the board is free from the first move. The only step is the lock once
+ * the bar is full, while the last item flies into the tile.
  */
 export function restorationBoardStep(
   campaign: IslandCampaignDefinition,
   level: MossproutNatureIslandLevel,
   state: MergeWorldState | null,
   merges: number,
-  options: { afterDelivery?: boolean; selectedOptionId?: string | null } = {},
 ): FtueStepDefinition | null {
   const chapter = islandCampaignChapter(campaign, level);
   const definition = chapter?.restoration;
   if (!state || !chapter || !definition) return null;
-  const cells = restorationWindowCells(definition.rows);
-  const choice = islandCampaignChapterChoice(campaign, level, options.selectedOptionId ?? null);
   const id = `restoration.${campaign.campaignId}.${level}`;
   if (restorationComplete(definition, merges)) {
     return { id: `${id}.complete`, surface: 'merge', actions: [], guide: { eyebrow: campaign.residentName, title: 'The mist is clearing.', body: 'Watch the garden grow.' }, interaction: { mode: 'blocked' } };
   }
-  if (restorationCheckpointReached(definition, state, merges)) {
-    return {
-      id: `${id}.delivery`, surface: 'merge', actions: [],
-      guide: { eyebrow: 'Requested in Merge', title: `${campaign.residentName} needs more than this patch has.`, body: 'Make the request on the Merge board and bring it back here.' },
-      interaction: { mode: 'none' },
-    };
-  }
-  const move = restorationNextMove(state, cells);
-  if (options.afterDelivery) {
-    return {
-      id: `${id}.delivered`, surface: 'merge', actions: [],
-      guide: { eyebrow: campaign.residentName, title: choice?.returnLine ?? campaign.copy.fallbackReturn(chapter.title), body: 'Match what you brought to what the mist is holding.' },
-      interaction: { mode: 'none' },
-      cue: move ? { kind: 'drag', from: CELL(move.from), to: CELL(move.to) } : undefined,
-    };
-  }
-  if (move && merges === 0) {
-    const from = CELL(move.from);
-    const to = CELL(move.to);
-    return {
-      id: `${id}.first`, surface: 'merge', actions: [],
-      guide: { eyebrow: 'Clear the Mist', title: move.kind === 'unlock' ? 'Something is hidden in the mist.' : 'Two of the same, put together.', body: move.kind === 'unlock' ? 'Match it to set it free. Every match thins the mist.' : 'Drag one onto the other. Every merge thins the mist.' },
-      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from, to } },
-      cue: { kind: 'drag', from, to },
-      spotlight: { targets: [from, to], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.64 },
-    };
-  }
-  if (move && merges === 1) {
-    return {
-      id: `${id}.second`, surface: 'merge', actions: [],
-      guide: { eyebrow: 'Clear the Mist', title: 'Keep going.', body: 'Merge what you have; match the misted cells to free what they hold.' },
-      interaction: { mode: 'none' },
-      cue: { kind: 'drag', from: CELL(move.from), to: CELL(move.to) },
-    };
-  }
-  return {
-    id: `${id}.free`, surface: 'merge', actions: [],
-    guide: { eyebrow: 'Clear the Mist', title: 'Keep going.', body: 'Every merge fills the bar.' },
-    interaction: { mode: 'none' },
-  };
+  return { id: `${id}.free`, surface: 'merge', actions: [], guide: { eyebrow: '', title: '', body: '' }, interaction: { mode: 'none' } };
 }
