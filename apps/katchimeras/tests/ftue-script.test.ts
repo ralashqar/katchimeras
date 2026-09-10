@@ -1130,7 +1130,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(nurture, /<EggHeroGuide guide=\{onboardingGuide\} topInset=\{topInset\}/);
   assert.match(readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8'), /top: topInset \+ topOffset/);
   assert.match(kingdomScreen, /!upgradePresentation && \(!ftueStepId \|\| ftueStepId === 'companion\.meditating'\)/);
-  assert.match(kingdomScreen, /onPress=\{stepplingEncounter.open \? stepplingEncounter.close : interactionCreatureId \? requestResidentInteractionExit : onBackToHavenSelector\}/);
+  assert.match(kingdomScreen, /onPress=\{stepplingEncounter.open \? stepplingEncounter.close : restorationBoardVisible \? closeRestoration : interactionCreatureId \? requestResidentInteractionExit : onBackToHavenSelector\}/);
   assert.doesNotMatch(kingdomScreen, /cameraFallbackTimer/);
   assert.match(kingdomScreen, /onResidentFocusComplete=\{completeResidentFocus\}/);
   assert.match(kingdomScreen, /onCameraMotionChange=\{handleCameraMotionChange\}/);

@@ -93,6 +93,8 @@ function nextStep(world: MergeWorldState, friends: KingdomFriendEntry[]): Kingdo
     switch (status) {
       case 'available': return { ...base, kind: 'talk', label: `Plan with ${campaign.residentName} at ${islandName}` };
       case 'orders_active': return { ...base, kind: 'merge', label: `Make ${campaign.residentName}’s request in Merge` };
+      case 'board_open': return { ...base, kind: 'restore', label: `Restore ${islandName} with ${campaign.residentName}` };
+      case 'delivery_requested': return { ...base, kind: 'merge', label: `Make ${campaign.residentName}’s delivery in Merge` };
       case 'return_ready': return { ...base, kind: 'talk', label: `Meet ${campaign.residentName} at ${islandName}` };
       case 'restoration_ready': return { ...base, kind: 'restore', label: `Restore ${islandName}` };
       case 'resolution_ready': return { ...base, kind: 'story', label: `See what grew at ${islandName}` };

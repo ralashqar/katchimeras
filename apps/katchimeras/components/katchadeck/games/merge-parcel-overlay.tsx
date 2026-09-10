@@ -79,15 +79,17 @@ export const MergeParcelTrayCard = forwardRef<NativeView, {
   );
 });
 
-export function MergeParcelFlightOverlay({ flight, onFinish, onItemArrive }: {
+export function MergeParcelFlightOverlay({ flight, onFinish, onItemArrive, opening = true }: {
   flight: MergeParcelFlight | null;
   onFinish: () => void;
   onItemArrive: (instanceId: string) => void;
+  /** Items flown from somewhere other than a parcel (a friend's delivery tray) skip the opening crate. */
+  opening?: boolean;
 }) {
   if (!flight) return null;
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" pointerEvents="none" style={styles.flightOverlay}>
-      <ParcelOpening from={flight.from} rootMatch={Boolean(flight.rootMatch)} />
+      {opening ? <ParcelOpening from={flight.from} rootMatch={Boolean(flight.rootMatch)} /> : null}
       {flight.items.map((item, index) => <ParcelFlyingItem
         count={flight.items.length}
         flightNonce={flight.nonce}

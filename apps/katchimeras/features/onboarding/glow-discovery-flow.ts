@@ -6,7 +6,7 @@ import type { MergeWorldState } from '@/types/merge-world';
 import type { FtueCameraDirective, FtueStepDefinition } from './ftue-types';
 import { mergeLessonRecipe, mergeLessonBoardStep, mergeLessonEvidenceReady, type MergeLessonBeat } from '@/features/content-flow/merge-lesson-recipe';
 import { GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS, glowGeneratorRule } from '@/utils/merge-world/glow-discovery-policy';
-import { OPENING_CAMERA_ANCHOR_Y, OPENING_CAMERA_ZOOM } from './opening-mist';
+import { MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM } from './opening-mist';
 import { STEPPLING_MISSION_CAMERA } from './steppling-mission';
 
 const MIST_CLOSE_UP = { zoom: 1.2, anchorY: 0.46, durationMs: 900 } as const;
@@ -66,7 +66,7 @@ export const GLOW_DISCOVERY_FLOW = defineStory({
     // stays at the existing close-up and must never gate this actionable checkpoint.
     worldActionScene({ id: 'gateway.offer', actionId: 'open_upgrade', next: GLOW_MISSION_FOCUS_NODE_ID, view: { kind: 'purchase', guide: { eyebrow: 'The mist', title: 'Tap the glowing bubble.', body: 'Something was left in there.' }, actionLabel: 'See the light' } }),
     // The bubble opens the mission, not a purchase sheet: the opening's framing on this tile, the board beneath.
-    storyOperations.focusCamera({ id: GLOW_MISSION_FOCUS_NODE_ID, target: STEPPLING_STORY_TARGET, zoom: OPENING_CAMERA_ZOOM, anchorY: OPENING_CAMERA_ANCHOR_Y, durationMs: 900, next: GLOW_MISSION_CLEAR_NODE_ID }),
+    storyOperations.focusCamera({ id: GLOW_MISSION_FOCUS_NODE_ID, target: STEPPLING_STORY_TARGET, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 900, next: GLOW_MISSION_CLEAR_NODE_ID }),
     story.task({ id: GLOW_MISSION_CLEAR_NODE_ID, capability: 'glow.discovery.task', surface: 'haven', taskId: GLOW_MISSION_CLEAR_NODE_ID, requirements: [{ id: 'cleared', event: { type: GLOW_MISSION_CLEARED_EVENT } }], next: 'gateway.purchase.focus' }),
     ...upgradeWorldTargetRecipe({ id: 'gateway.purchase', target: STEPPLING_STORY_TARGET, toLevel: 1, economy: { mode: 'normal' }, cameraAlreadyFocused: true, presentation: { preset: 'mist-clear', reactionLine: '', showCoins: true }, next: 'gateway.egg' }),
     worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'egg.enter', view: { kind: 'discovery', guide: { eyebrow: 'An Egg', title: 'So someone is being noticed again.', body: 'You noticed something earlier, out in your world. This is what that did. Go on. That’s you.' }, actionLabel: 'Meet the Egg' } }),

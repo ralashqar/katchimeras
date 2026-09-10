@@ -47,8 +47,9 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
       return () => clearTimeout(timer);
     }
   }, [hidden, selected, reduced, visibility]);
-  const glowProgress = offer.cost > 0 ? Math.max(0, Math.min(offer.cost, offer.cost - offer.missingGlow)) : 1;
-  const glowTotal = Math.max(1, offer.cost);
+  // While a friend's restoration board is open the bar is the beds, not Glow.
+  const glowProgress = offer.restorationProgress ? offer.restorationProgress.current : offer.cost > 0 ? Math.max(0, Math.min(offer.cost, offer.cost - offer.missingGlow)) : 1;
+  const glowTotal = offer.restorationProgress ? Math.max(1, offer.restorationProgress.total) : Math.max(1, offer.cost);
   const target = useCallback((view: View | null) => { node.current = view; onTargetChange?.(offer.id, moving || hidden ? null : view); }, [moving, hidden, offer.id, onTargetChange]);
   useEffect(() => { onTargetChange?.(offer.id, moving || hidden ? null : node.current); return () => onTargetChange?.(offer.id, null); }, [moving, hidden, offer.id, onTargetChange]);
   useEffect(() => {
@@ -90,7 +91,7 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
       <Animated.View ref={target} collapsable={false} pointerEvents="none" accessible={false}
         onLayout={() => { onTargetChange?.(offer.id, null); if (!moving && !hidden) onTargetChange?.(offer.id, node.current); }} style={[styles.spotlightTarget, spotlightBounds]} />
       <AnimatedPressable ref={button} collapsable={false} hitSlop={6} accessibilityRole="button" accessibilityLabel={sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
-        accessibilityValue={locked || sleepingPortrait ? undefined : { min: 0, max: glowTotal, now: glowProgress, text: offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
+        accessibilityValue={locked || sleepingPortrait ? undefined : { min: 0, max: glowTotal, now: glowProgress, text: offer.restorationProgress ? `${glowProgress} of ${glowTotal} beds grown` : offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
         accessibilityHint={offer.lockedReason ?? (campaignPending ? 'Resumes this island story' : offer.affordable ? 'Opens upgrade details' : `${offer.missingGlow} more Glow needed. Opens upgrade details.`)}
         disabled={moving || hidden || inert} accessibilityState={{ disabled: moving || hidden || inert }} onPress={() => onPress(offer)} style={[styles.hitTarget, hitMotion]}>
       <Animated.View pointerEvents="none" onLayout={(event) => setBubbleHeight(event.nativeEvent.layout.height)}
@@ -113,7 +114,7 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
           <View pointerEvents="none" style={[styles.progress, markerPortrait ? styles.portraitProgress : null]}>
             <ProgressBar current={glowProgress} total={glowTotal} minimumPercent={0} variant="egg" />
           </View>
-          <Text style={styles.percent}>{upgradePercent(offer.cost - offer.missingGlow, offer.cost)}%</Text>
+          <Text style={styles.percent}>{offer.restorationProgress ? upgradePercent(glowProgress, glowTotal) : upgradePercent(offer.cost - offer.missingGlow, offer.cost)}%</Text>
         </>}
       </Animated.View>
       </AnimatedPressable>

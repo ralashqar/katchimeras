@@ -8,6 +8,11 @@ import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding'
 import { isMossproutOpeningStep } from '@/features/onboarding/opening-mist';
 import { createOpeningMissionState, OPENING_MISSION_STORAGE_KEY } from '@/features/onboarding/opening-mission-state';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
+import type { ContentFlowDefinition, ContentFlowRun } from '@/types/content-flow';
+import { createContentFlowRun, stabilizeContentFlow } from '@/features/content-flow/content-flow-interpreter';
+import { GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID } from '@/features/onboarding/glow-discovery-flow';
+import { prepareStepplingGarden, STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, STEPPLING_SHOE_ORDER_ID } from '@/features/onboarding/steppling-garden-lesson';
+import { advanceGlowRequests, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS } from '@/utils/merge-world/glow-discovery-policy';
 
 const DAY = 86_400_000;
 const COMPLETE_PROFILE: OnboardingProfile = {
@@ -43,6 +48,8 @@ type FixtureDefinition = {
   ftueStep: string | null;
   launchRoute?: PlayerProfileSnapshot['launchRoute'];
   buildWorld: (now: number) => MergeWorldState;
+  /** Durable story runs the snapshot restores alongside the world (the Glow story, Steppling's lesson). */
+  contentFlowRuns?: (now: number) => ContentFlowRun[];
   meaningfulDays?: number;
 };
 
@@ -186,6 +193,46 @@ function mossproutHavenRestore(now: number) {
   };
 }
 
+/** Mossprout's FTUE over: chapter zero done, the Little Garden restored. */
+function gardenRestored(now: number) {
+  const base = { ...chapterZeroReady(now - 6 * DAY), coins: 200 };
+  return reduceMergeWorld(base, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, economyMode: 'free', now: now - 6 * DAY + 1 }).state;
+}
+
+/** The Glow lesson played out on the Garden: both requests served, its misted cells matched, the Glow for the mist in hand. */
+function glowLessonServed(now: number) {
+  const at = now - 5 * DAY;
+  let state = reduceMergeWorld(gardenRestored(now), { type: 'prepareGlowDiscoveryLesson', now: at }).state;
+  state = advanceGlowRequests(advanceGlowRequests(state, GLOW_ORDER_IDS[0], at + 1), GLOW_ORDER_IDS[1], at + 2);
+  const echoIds: readonly string[] = GLOW_SINGLE_ECHO_IDS;
+  return {
+    ...state,
+    coins: Math.max(state.coins, 90),
+    board: state.board.map((cell) => (cell.mist?.kind === 'echo' && echoIds.includes(cell.mist.id) ? { ...cell, locked: false, blocker: null, mist: null } : cell)),
+    activeOrders: state.activeOrders.filter((order) => !(GLOW_ORDER_IDS as readonly string[]).includes(order.id)),
+  };
+}
+
+/** Steppling home through the mist: the clearing paid for, the Egg carried home and hatched, his first Shoe served. */
+function stepplingHome(now: number) {
+  const at = now - 4 * DAY;
+  let state = glowLessonServed(now);
+  state = reduceMergeWorld(state, { type: 'unlockWorldTarget', targetId: GLOW_GATEWAY_ID, receiptId: 'fixture:steppling:mist', now: at }).state;
+  state = reduceMergeWorld(state, { type: 'transferDiscoveryEgg', targetId: GLOW_GATEWAY_ID, now: at + 1 }).state;
+  state = reduceMergeWorld(state, { type: 'hatchWorldEgg', targetId: GLOW_GATEWAY_ID, now: at + 2 }).state;
+  state = prepareStepplingGarden(state, at + 3);
+  return {
+    ...state,
+    coins: Math.max(state.coins, 90),
+    stepplingGardenLesson: { ...state.stepplingGardenLesson!, servedAt: at + 4 },
+    activeOrders: state.activeOrders.filter((order) => order.id !== STEPPLING_SHOE_ORDER_ID),
+  };
+}
+
+function storyRunAt(definition: ContentFlowDefinition, runId: string, nodeId: string, now: number): ContentFlowRun {
+  return stabilizeContentFlow(definition, { ...createContentFlowRun(definition, { runId, now }), nodeId }, now).run;
+}
+
 function claimDiscoveryParcel(state: MergeWorldState, discoveryId: string, now: number) {
   return reduceMergeWorld(state, { type: 'claimArrival', arrivalId: `arrival:discovery:${discoveryId}`, now }).state;
 }
@@ -299,6 +346,10 @@ const FIXTURE_DEFINITIONS: readonly FixtureDefinition[] = [
   { id: 'steppling-parcel', name: 'Steppling · Parcel waiting', description: 'Tests the forced parcel spotlight and tap.', tags: ['FTUE', 'Steppling', 'Parcel'], ftueStep: 'discovery.steppling.parcel', buildWorld: (now) => stepplingAtStage(-1, now) },
   { id: 'steppling-final-clue', name: 'Steppling · Final clue', description: 'One Dreambound merge before Steppling appears.', tags: ['FTUE', 'Steppling', 'Reveal'], ftueStep: 'discovery.steppling.boot', buildWorld: (now) => stepplingAtStage(2, now) },
   { id: 'steppling-first-order', name: 'Steppling · First order', description: 'Steppling is revealed; Gate 3 remains blocked until the first order.', tags: ['FTUE', 'Steppling', 'Order'], ftueStep: 'discovery.steppling.spawn', buildWorld: (now) => stepplingAtStage(3, now) },
+  { id: 'steppling-mist-ready', name: 'Steppling · Before the reveal', description: 'The Garden lesson done and the Glow earned; the misted clearing’s bubble waits to be tapped and open its mission board.', tags: ['Kingdom', 'Steppling', 'Mist'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: glowLessonServed,
+    contentFlowRuns: (now) => [storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'gateway.offer', now - 5 * DAY + 3)] },
+  { id: 'kingdom-before-petalimp', name: 'Kingdom · Before Petalimp', description: 'The first session over: Steppling home and his first Shoe served. Mossprout’s wish and Bloom Garden come next.', tags: ['Kingdom', 'Petalimp'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: stepplingHome,
+    contentFlowRuns: (now) => [storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'complete', now - 4 * DAY + 5), storyRunAt(STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, 'complete', now - 4 * DAY + 6)] },
   { id: 'gate-3-fork', name: 'Gate 3 · Choose a mystery', description: 'Feastle, Baristabbit, and Bedrotte paths are visible.', tags: ['Gate 3', 'Choice'], ftueStep: 'complete', buildWorld: gateThree },
   { id: 'gate-3-feastle-parcel', name: 'Gate 3 · Feastle parcel', description: 'Warm Table selected; discovery parcel awaits.', tags: ['Gate 3', 'Feastle', 'Parcel'], ftueStep: 'complete', buildWorld: (now) => selectedPathAtStage(gateThree(now), 'feastle', -1, now - 3 * DAY + 10) },
   { id: 'gate-3-feastle-final', name: 'Gate 3 · Feastle final clue', description: 'One merge before Feastle appears.', tags: ['Gate 3', 'Feastle', 'Reveal'], ftueStep: 'complete', buildWorld: (now) => selectedPathAtStage(gateThree(now), 'feastle', 2, now - 3 * DAY + 10) },
@@ -329,6 +380,7 @@ export function buildPlayerProfileFixtures(now = Date.now()): PlayerProfileSnaps
       domains: {
         keyValue: { schemaVersion: 1, values: fixtureKeyValues(now, fixture.ftueStep, fixture.meaningfulDays ?? 4) },
         mergeWorld: { schemaVersion: 1, state },
+        ...(fixture.contentFlowRuns ? { contentFlow: { schemaVersion: 1 as const, runs: fixture.contentFlowRuns(now) } } : {}),
       },
     };
   });

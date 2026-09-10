@@ -12,16 +12,41 @@ const read = (relative: string) => readFileSync(resolve(root, relative), 'utf8')
 
 test('profile fixture catalog covers every planned discovery milestone', () => {
   const fixtures = buildPlayerProfileFixtures(NOW);
-  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 18);
-  assert.equal(fixtures.length, 18);
+  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 20);
+  assert.equal(fixtures.length, 20);
   assert.equal(new Set(fixtures.map((fixture) => fixture.id)).size, fixtures.length);
   assert.deepEqual(fixtures.map((fixture) => fixture.id), [
     'fixture:fresh-first-launch', 'fixture:mossprout-opening', 'fixture:mossprout-merge-start', 'fixture:mossprout-haven-restore',
     'fixture:steppling-parcel', 'fixture:steppling-final-clue', 'fixture:steppling-first-order',
+    'fixture:steppling-mist-ready', 'fixture:kingdom-before-petalimp',
     'fixture:gate-3-fork', 'fixture:gate-3-feastle-parcel', 'fixture:gate-3-feastle-final', 'fixture:gate-4-queued',
     'fixture:gate-4-fork', 'fixture:gate-4-baristabbit-parcel', 'fixture:gate-4-baristabbit-final', 'fixture:gate-5-queued',
     'fixture:gate-5-bedrotte-parcel', 'fixture:gate-5-bedrotte-final', 'fixture:early-pool-complete',
   ]);
+});
+
+test('the two Kingdom fixtures land right before the Steppling reveal and right before Petalimp', () => {
+  const fixtures = buildPlayerProfileFixtures(NOW);
+  const mist = fixtures.find((candidate) => candidate.id === 'fixture:steppling-mist-ready')!;
+  assert.equal(mist.launchRoute, '/(tabs)/katchimeras');
+  assert.equal(mist.summary.ftueStep, 'complete');
+  assert.ok(mist.domains.mergeWorld.state.coins >= 40, 'enough Glow for the mist');
+  assert.equal(mist.domains.mergeWorld.state.haven.tileStages.mossprout, 1, 'the Little Garden is restored');
+  assert.deepEqual(mist.domains.mergeWorld.state.glowDiscoveryLesson?.servedOrderIds.length, 2, 'the Garden lesson is served');
+  assert.equal(mist.domains.mergeWorld.state.worldUnlocks?.['mossprout:overgrown-trail'], undefined, 'the mist is still up');
+  const glow = mist.domains.contentFlow?.runs.find((run) => run.runId === 'story:glow-steppling-v1');
+  assert.equal(glow?.nodeId, 'gateway.offer');
+  assert.equal(glow?.status, 'active');
+  assert.equal(glow?.definitionVersion, 9);
+  const before = fixtures.find((candidate) => candidate.id === 'fixture:kingdom-before-petalimp')!;
+  const world = before.domains.mergeWorld.state;
+  assert.ok(world.unlockedCharacters.includes('steppling'), 'Steppling is home');
+  assert.ok(world.worldUnlocks?.['mossprout:overgrown-trail']?.hatchedAt, 'hatched through the mist');
+  assert.ok(world.stepplingGardenLesson?.servedAt, 'his first Shoe served');
+  assert.equal(world.kingdomGoal, undefined, 'Mossprout’s wish has not been told yet');
+  assert.equal(world.haven.mossproutNatureIslands['bloom-garden'], 0, 'Bloom Garden is still misted');
+  assert.ok(world.coins >= 40, 'enough Glow to clear it');
+  assert.deepEqual(before.domains.contentFlow?.runs.map((run) => [run.runId, run.status]), [['story:glow-steppling-v1', 'completed'], ['ftue:steppling-garden:1', 'completed']]);
 });
 
 test('Mossprout Haven fixture opens immediately before the first environment restore', () => {

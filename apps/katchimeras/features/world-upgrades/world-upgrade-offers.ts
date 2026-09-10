@@ -42,6 +42,8 @@ export type WorldUpgradeOffer = WorldUpgradeDefinition & {
   sleepingSkinId?: KatchimeraSkinId;
   /** Only the round portrait frame, no speech bubble around it (the opening's own tile). */
   bareMarker?: boolean;
+  /** A friend's restoration board in progress: the marker's bar shows the beds, not Glow. */
+  restorationProgress?: { current: number; total: number };
 };
 
 export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [
@@ -105,6 +107,7 @@ export function worldUpgradeOffers(world: MergeWorldState): WorldUpgradeOffer[] 
     let eligible = true;
     let cost = definition.cost;
     let economyMode = definition.economyMode;
+    let restorationProgress: WorldUpgradeOffer['restorationProgress'];
     if (campaign) {
       const level = definition.nextLevel as MossproutNatureIslandLevel;
       eligible = islandCampaignChapterStatus(world, campaign, level) === 'restoration_ready';
@@ -112,12 +115,19 @@ export function worldUpgradeOffers(world: MergeWorldState): WorldUpgradeOffer[] 
         cost = 0;
         economyMode = 'free';
       }
+      const restoration = world.islandCampaigns?.[campaign.campaignId]?.chapters[String(level)]?.restoration;
+      if (restoration) {
+        // Paid when the beds opened: the upgrade costs nothing more, and the marker's bar is the beds.
+        cost = 0;
+        economyMode = 'free';
+        restorationProgress = restoration.completedAt == null ? restoration.progress : undefined;
+      }
     }
     const markerSkinId = campaign && world.islandCampaigns?.[campaign.campaignId]?.discoveryRevealSeenAt != null
       ? campaign.residentSkinId
       : undefined;
     return [{ ...definition, cost, economyMode, currentLevel, maxLevel: worldUpgradeMaxLevel(definition), storyId: worldUpgradeStory(definition.id, definition.nextLevel)?.id, eligible, markerSkinId,
-      affordable: world.coins >= cost, missingGlow: Math.max(0, cost - world.coins) }];
+      affordable: world.coins >= cost, missingGlow: Math.max(0, cost - world.coins), ...(restorationProgress ? { restorationProgress } : {}) }];
   });
 }
 

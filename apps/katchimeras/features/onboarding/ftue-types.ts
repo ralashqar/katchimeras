@@ -1,6 +1,6 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { DayPromptKind, TodayGrowthSource } from '@/types/home';
-import type { MossproutGardenPlantSlotId } from '@/types/merge-world';
+import type { MossproutGardenPlantSlotId, MossproutNatureIslandId } from '@/types/merge-world';
 
 export type FtueSurface = 'today' | 'hatch' | 'companion' | 'merge' | 'haven';
 export type FtueResumeTarget =
@@ -88,6 +88,7 @@ export type FtueTarget =
   | { kind: 'haven_resident'; characterId: string }
   | { kind: 'haven_tile_hud'; characterId: string }
   | { kind: 'haven_upgrade_button'; characterId: string }
+  | { kind: 'haven_nature_island'; islandId: MossproutNatureIslandId }
   | { kind: 'haven_garden_tile'; characterId: 'mossprout' }
   | { kind: 'haven_garden_button'; characterId: 'mossprout' }
   | { kind: 'haven_garden_cluster'; characterId: 'mossprout' }

@@ -1,6 +1,6 @@
 import type { ConversationDefinition } from '@/types/companion-conversation';
 import type { KatchimeraSkinId } from '@/types/katchimera';
-import type { IslandCampaignProgress, MergeOrder, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
+import type { IslandCampaignProgress, IslandRestorationProgress, MergeOrder, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import { mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
 import { ISLAND_CAMPAIGNS } from './registry';
 import type {
@@ -53,9 +53,44 @@ export function islandCampaignChapterStatus(world: MergeWorldState, campaign: Is
   const progress = islandCampaignProgress(world, campaign)?.chapters[String(level)];
   if (!progress) return 'available';
   if (progress.completedAt != null) return 'complete';
+  const restored = (world.haven.mossproutNatureIslands[campaign.islandId] ?? 0) >= level;
+  if (progress.restoration) {
+    // A board chapter: paid up front, the board is the request, the Main Board is its delivery.
+    if (restored) return 'resolution_ready';
+    if (progress.restoration.completedAt != null) return 'restoration_ready';
+    if (progress.restoration.deliveryRequestedAt != null && !progress.orderIds.every((id) => progress.servedOrderIds.includes(id))) return 'delivery_requested';
+    return 'board_open';
+  }
   if (!progress.orderIds.every((id) => progress.servedOrderIds.includes(id))) return 'orders_active';
   if (progress.returnConversationSeenAt == null) return 'return_ready';
-  return (world.haven.mossproutNatureIslands[campaign.islandId] ?? 0) >= level ? 'resolution_ready' : 'restoration_ready';
+  return restored ? 'resolution_ready' : 'restoration_ready';
+}
+
+/** Shared labels for the restoration-board states, for friends whose copy does not voice them. */
+export const RESTORATION_ACTION_LABEL = 'Keep restoring';
+export const RESTORATION_STATE_LABELS: Record<'board_open' | 'delivery_requested', string> = {
+  board_open: 'Restoring',
+  delivery_requested: 'Requested in Merge',
+};
+export function islandCampaignActionLabel(campaign: IslandCampaignDefinition, action: IslandCampaignPanelAction): string {
+  return campaign.copy.actionLabels[action] ?? RESTORATION_ACTION_LABEL;
+}
+export function islandCampaignStateLabel(campaign: IslandCampaignDefinition, status: IslandCampaignChapterStatus): string {
+  return campaign.copy.stateLabels[status] ?? (status === 'board_open' || status === 'delivery_requested' ? RESTORATION_STATE_LABELS[status] : status);
+}
+
+/** The chapter whose restoration board is open right now (paid, not yet complete), if any. */
+export function activeIslandRestoration(world: MergeWorldState): { campaign: IslandCampaignDefinition; level: MossproutNatureIslandLevel; chapter: IslandCampaignChapter; progress: IslandRestorationProgress } | null {
+  for (const campaign of ISLAND_CAMPAIGNS) {
+    const record = islandCampaignProgress(world, campaign);
+    if (!record) continue;
+    for (const entry of Object.values(record.chapters)) {
+      if (!entry.restoration || entry.restoration.completedAt != null || entry.completedAt != null) continue;
+      const chapter = islandCampaignChapter(campaign, entry.level);
+      if (chapter?.restoration) return { campaign, level: entry.level, chapter, progress: entry.restoration };
+    }
+  }
+  return null;
 }
 
 export type IslandCampaignPanelRequest = {
@@ -87,12 +122,16 @@ export type IslandCampaignUpgradePanelState = {
   /** Resolved chapters, so the arc stays re-readable from the panel. */
   completedChapters: IslandCampaignChapterLogEntry[];
   status: IslandCampaignChapterStatus;
+  /** Glow the panel action spends: a restoration board opening (chapter 1 is the gift). */
+  actionCost: number;
 };
 
 const PANEL_ACTIONS: Record<IslandCampaignChapterStatus, IslandCampaignPanelAction | null> = {
   available: 'start_story',
   orders_active: 'open_merge',
   return_ready: 'continue_return',
+  board_open: 'continue_restoring',
+  delivery_requested: 'open_merge',
   restoration_ready: null,
   resolution_ready: 'continue_resolution',
   complete: null,
@@ -115,7 +154,9 @@ export function islandCampaignUpgradePanelState(world: MergeWorldState, campaign
   const choice = islandCampaignChapterChoice(campaign, chapter.level, chapterProgress?.selectedOptionId);
   const cost = chapter.level === 1 ? 0 : mossproutNatureIslandLevelDefinition(campaign.islandId, chapter.level)?.coinCost ?? 0;
   const voiced = campaign.copy.speech?.[status]?.({ chapter, choice, coins: world.coins, cost });
-  const speech = status === 'return_ready' || status === 'restoration_ready'
+  // A board chapter's return happens at the beds: the served delivery is greeted with the same line.
+  const deliveredToBeds = status === 'board_open' && orderComplete && chapterProgress?.restoration?.deliveryRequestedAt != null;
+  const speech = status === 'return_ready' || status === 'restoration_ready' || deliveredToBeds
     ? choice?.returnLine ?? campaign.copy.fallbackReturn(chapter.title)
     : null;
   const completedChapters = campaign.chapters
@@ -131,20 +172,22 @@ export function islandCampaignUpgradePanelState(world: MergeWorldState, campaign
     residentSkinId: campaign.residentSkinId,
     residentName: campaign.residentName,
     action,
-    actionLabel: action ? campaign.copy.actionLabels[action] : undefined,
+    actionLabel: action ? islandCampaignActionLabel(campaign, action) : undefined,
     level: chapter.level,
     order,
     orderComplete,
-    stateLabel: campaign.copy.stateLabels[status],
-    voicedStateLabel: voiced ?? campaign.copy.stateLabels[status],
+    stateLabel: islandCampaignStateLabel(campaign, status),
+    voicedStateLabel: voiced ?? islandCampaignStateLabel(campaign, status),
     speech,
     completedChapters,
     status,
+    actionCost: status === 'available' && chapter.restoration ? cost : 0,
   };
 }
 
 export type IslandCampaignPanelPresentation = {
   actionLabel?: string;
+  actionCost?: number;
   order: IslandCampaignPanelRequest | null;
   residentName: string;
   residentSkinId: KatchimeraSkinId;
@@ -159,6 +202,7 @@ export function islandCampaignPanelPresentation(world: MergeWorldState, campaign
   if (!state) return null;
   return {
     actionLabel: state.actionLabel,
+    actionCost: state.actionCost || undefined,
     order: state.order ? {
       id: state.order.id,
       title: state.order.title,
@@ -191,8 +235,16 @@ export function islandCampaignPreviousStyle(world: MergeWorldState, campaign: Is
 }
 
 export function islandCampaignReturnLevel(world: MergeWorldState, campaign: IslandCampaignDefinition): MossproutNatureIslandLevel | null {
-  if (!islandCampaignProgress(world, campaign)?.discoveryRevealSeenAt) return null;
-  return campaign.chapters.find((chapter) => islandCampaignChapterStatus(world, campaign, chapter.level) === 'return_ready')?.level ?? null;
+  const record = islandCampaignProgress(world, campaign);
+  if (!record?.discoveryRevealSeenAt) return null;
+  return campaign.chapters.find((chapter) => {
+    const status = islandCampaignChapterStatus(world, campaign, chapter.level);
+    if (status === 'return_ready') return true;
+    // A board chapter's served delivery is waiting on the beds: the note leads back to them.
+    const progress = record.chapters[String(chapter.level)];
+    return status === 'board_open' && progress?.restoration?.deliveryRequestedAt != null
+      && progress.orderIds.length > 0 && progress.orderIds.every((id) => progress.servedOrderIds.includes(id));
+  })?.level ?? null;
 }
 
 /** The island whose served request is waiting for its friend's return scene. */

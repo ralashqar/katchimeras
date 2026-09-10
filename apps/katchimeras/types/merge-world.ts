@@ -477,6 +477,20 @@ export type IslandCampaignChapterProgress = {
   startedAt: number;
   /** Set after Petalimp acknowledges the delivered request, before Glow restoration. */
   returnConversationSeenAt?: number | null;
+  /** A chapter played on the friend's docked restoration board (paid at activation; the order is its delivery). */
+  restoration?: IslandRestorationProgress;
+  completedAt: number | null;
+};
+
+export type IslandRestorationProgress = {
+  startedAt: number;
+  paidCoins: number;
+  /** Merges counted over merges needed; the marker's bar. */
+  progress: { current: number; total: number };
+  /** When the board could go no further and the chapter's order was published. */
+  deliveryRequestedAt: number | null;
+  /** Items served to the order, in order; the board places them as they arrive. */
+  delivered: { definitionId: string; deliveredAt: number }[];
   completedAt: number | null;
 };
 
@@ -631,6 +645,9 @@ export type MergeWorldCommand =
   | { type: 'ackIslandCampaignResidentCardReveal'; campaignId: string; now: number }
   | { type: 'activateIslandCampaignChapter'; campaignId: string; islandId: MossproutNatureIslandId; residentSkinId: KatchimeraSkinId; level: MossproutNatureIslandLevel; selectedOptionId?: string | null; orders: MergeOrder[]; now: number }
   | { type: 'ackIslandCampaignChapterReturn'; campaignId: string; level: MossproutNatureIslandLevel; now: number }
+  | { type: 'requestIslandCampaignDelivery'; campaignId: string; level: MossproutNatureIslandLevel; orders: MergeOrder[]; now: number }
+  | { type: 'recordIslandRestorationProgress'; campaignId: string; level: MossproutNatureIslandLevel; current: number; total: number; now: number }
+  | { type: 'completeIslandRestoration'; campaignId: string; level: MossproutNatureIslandLevel; now: number }
   | { type: 'completeIslandCampaignChapter'; campaignId: string; level: MossproutNatureIslandLevel; now: number }
   | { type: 'introduceKingdomGoal'; now: number }
   | { type: 'ackKingdomGoalCoachmark'; now: number }

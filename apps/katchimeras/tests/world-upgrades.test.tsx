@@ -13,7 +13,7 @@ import { MOSSPROUT_NATURE_ISLANDS, mossproutNatureIslandById } from '@/constants
 import { PETALIMP_ISLAND_CAMPAIGN_ID, petalimpIslandChapterOrder } from '@/constants/petalimp-island-campaign';
 import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
 import { ISLAND_WAKE_ORDER, islandWakeState } from '@/constants/island-campaigns/wake-order';
-import { acknowledgeChapterReturn, completeChapter, greetIslandFriend, startAndServeChapter } from './helpers/island-campaign';
+import { acknowledgeChapterReturn, completeChapter, completeRestoration, greetIslandFriend, startAndServeChapter } from './helpers/island-campaign';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import type { MergeWorldCommand, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import { readFileSync } from './helpers/content-fs';
@@ -62,19 +62,24 @@ test('every island level uses the shared purchase flow in wake order, survives r
     assert.equal(reduceMergeWorld(state, revealCommand).state.coins, state.coins, 'a replayed reveal never charges twice');
     state = greetIslandFriend(state, campaign, NOW);
     for (const level of island.levels) {
+      // A chapter with a restoration board pays its stage when the board opens, so its level costs nothing here.
+      const onBeds: boolean = campaign.chapters.some((entry) => entry.level === level.level && entry.restoration != null);
+      const beforeStage = state.coins;
       state = acknowledgeChapterReturn(startAndServeChapter(state, campaign, level.level, NOW), campaign, level.level, NOW);
+      if (onBeds) assert.equal(state.coins, beforeStage - (level.level === 1 ? 0 : level.coinCost), `${island.id} level ${level.level} is paid when its board opens`);
+      state = completeRestoration(state, campaign, level.level, NOW);
       const offer = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null).find((candidate) => candidate.id === `nature:${island.id}`)!;
       assert.ok(offer, `${island.id} level ${level.level} has a marker`);
-      assert.equal(offer.cost, level.level === 1 ? 0 : level.coinCost);
+      assert.equal(offer.cost, level.level === 1 || onBeds ? 0 : level.coinCost);
       assert.equal(offer.nextLevel, level.level);
       assert.equal(offer.eligible, true);
       assert.equal(offer.action, level.level === 1 ? 'Restore' : 'Upgrade');
       assert.ok(WORLD_UPGRADE_FLOWS.some((flow) => flow.id === worldUpgradeRunId(offer)));
       const command: MergeWorldCommand = { type: 'upgradeMossproutNatureIsland', islandId: island.id, level: level.level,
-        receiptId: worldUpgradeRunId(offer), now: NOW, ...(level.level === 1 ? { economyMode: 'free' } : {}) };
+        receiptId: worldUpgradeRunId(offer), now: NOW, ...(level.level === 1 || onBeds ? { economyMode: 'free' } : {}) };
       const before = state.coins;
       const paid = reduceMergeWorld(state, command);
-      assert.equal(paid.changed, true);
+      assert.equal(paid.changed, true, paid.message);
       assert.equal(paid.state.coins, before - offer.cost);
       state = normalizeMergeWorldState(JSON.parse(JSON.stringify(paid.state)), NOW);
       assert.equal(state.haven.mossproutNatureIslands[island.id], level.level);

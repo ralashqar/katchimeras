@@ -3,9 +3,27 @@ import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeOrder, MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
 
 export type IslandCampaignChapterLevel = Exclude<MossproutNatureIslandLevel, 0>;
-export type IslandCampaignChapterStatus = 'available' | 'orders_active' | 'return_ready' | 'restoration_ready' | 'resolution_ready' | 'complete';
+export type IslandCampaignChapterStatus = 'available' | 'orders_active' | 'return_ready' | 'board_open' | 'delivery_requested' | 'restoration_ready' | 'resolution_ready' | 'complete';
 export type IslandCampaignPhase = 'opening' | 'return' | 'resolution';
-export type IslandCampaignPanelAction = 'start_story' | 'open_merge' | 'continue_return' | 'continue_resolution';
+export type IslandCampaignPanelAction = 'start_story' | 'open_merge' | 'continue_return' | 'continue_restoring' | 'continue_resolution';
+
+/** A cell half-hidden in mist with an item inside: match it to set it free (an ordinary Dream Echo). */
+export type RestorationEcho = { id: string; cell: number; definitionId: string };
+/**
+ * A chapter's restoration board: merges fill the bar (a match into a misted
+ * cell counts too). Authored so the local pieces can never fill it alone,
+ * which is what makes the Main Board delivery (the chapter's own order) the
+ * deterministic missing piece.
+ */
+export type RestorationBoardDefinition = {
+  rows: 3 | 4;
+  /** Merges that fill the bar. */
+  merges: number;
+  items: readonly { cell: number; definitionId: string }[];
+  echoes: readonly RestorationEcho[];
+  /** Delivered items land here in order, then on any free window cell. */
+  deliveryCells: readonly number[];
+};
 
 export type IslandCampaignChapterOrder = Pick<MergeOrder, 'title' | 'description' | 'difficulty' | 'requirements' | 'narrativeSignal'>;
 
@@ -31,6 +49,8 @@ export type IslandCampaignChapter<S extends string = string> = {
   prompt: string;
   /** Optional line remembering the previous chapter's answer, keyed by its style. */
   callbackLine?: Partial<Record<S, string>>;
+  /** When authored, the chapter plays on the docked restoration board and the order becomes its delivery. */
+  restoration?: RestorationBoardDefinition;
   fallbackOrder: IslandCampaignChapterOrder;
   choices: readonly IslandCampaignChoice<S>[];
 };
@@ -66,9 +86,9 @@ export type IslandCampaignCopy = {
   returnNoteHint: string;
   /** Optional mechanics hint under the chapter question; empty keeps the moment personal. */
   helperText?: string;
-  actionLabels: Record<IslandCampaignPanelAction, string>;
-  /** Machine-readable panel states; `speech` voices the ones the friend cares about. */
-  stateLabels: Record<IslandCampaignChapterStatus, string>;
+  actionLabels: Record<Exclude<IslandCampaignPanelAction, 'continue_restoring'>, string> & Partial<Record<'continue_restoring', string>>;
+  /** Machine-readable panel states; `speech` voices the ones the friend cares about. Restoration-board states fall back to shared labels. */
+  stateLabels: Record<Exclude<IslandCampaignChapterStatus, 'board_open' | 'delivery_requested'>, string> & Partial<Record<'board_open' | 'delivery_requested', string>>;
   speech?: Partial<Record<IslandCampaignChapterStatus, (context: IslandCampaignSpeechContext) => string>>;
   fallbackReturn: (chapterTitle: string) => string;
   fallbackResolution: (level: IslandCampaignChapterLevel) => string;

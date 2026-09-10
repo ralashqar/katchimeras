@@ -57,6 +57,7 @@ import type {
   MergeWorldCommandResult,
   MergeWorldState,
   MossproutNatureIslandId,
+  IslandCampaignChapterProgress,
   MossproutNatureIslandLevel,
   MossproutGardenPlantSlotId,
   PlantableMemoryInstance,
@@ -495,6 +496,12 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       return activateIslandCampaignChapter(current, command);
     case 'ackIslandCampaignChapterReturn':
       return acknowledgeIslandCampaignChapterReturn(current, command.campaignId, command.level, command.now);
+    case 'requestIslandCampaignDelivery':
+      return requestIslandCampaignDelivery(current, command);
+    case 'recordIslandRestorationProgress':
+      return recordIslandRestorationProgress(current, command);
+    case 'completeIslandRestoration':
+      return completeIslandRestoration(current, command.campaignId, command.level, command.now);
     case 'completeIslandCampaignChapter':
       return completeIslandCampaignChapter(current, command.campaignId, command.level, command.now);
     case 'introduceKingdomGoal': {
@@ -971,6 +978,7 @@ function normalizeIslandCampaigns(value: unknown, now: number): NonNullable<Merg
         servedOrderIds: uniqueStrings(chapter.servedOrderIds),
         startedAt: finite(chapter.startedAt, now),
         returnConversationSeenAt: chapter.returnConversationSeenAt == null ? null : finite(chapter.returnConversationSeenAt, now),
+        ...(chapter.restoration && typeof chapter.restoration === 'object' ? { restoration: normalizeIslandRestoration(chapter.restoration, now) } : {}),
         completedAt: chapter.completedAt == null ? null : finite(chapter.completedAt, now),
       }]];
     }));
@@ -990,6 +998,28 @@ function normalizeIslandCampaigns(value: unknown, now: number): NonNullable<Merg
       chapters,
     }]];
   }));
+}
+
+function normalizeIslandRestoration(value: unknown, now: number): NonNullable<IslandCampaignChapterProgress['restoration']> {
+  const raw = value as Partial<NonNullable<IslandCampaignChapterProgress['restoration']>>;
+  const total = Math.max(0, Math.floor(finite(raw.progress?.total, 0)));
+  return {
+    startedAt: finite(raw.startedAt, now),
+    paidCoins: Math.max(0, Math.floor(finite(raw.paidCoins, 0))),
+    progress: { current: Math.max(0, Math.min(total, Math.floor(finite(raw.progress?.current, 0)))), total },
+    deliveryRequestedAt: raw.deliveryRequestedAt == null ? null : finite(raw.deliveryRequestedAt, now),
+    delivered: Array.isArray(raw.delivered)
+      ? raw.delivered.flatMap((entry) => entry && typeof entry === 'object' && typeof (entry as { definitionId?: unknown }).definitionId === 'string'
+        ? [{ definitionId: (entry as { definitionId: string }).definitionId, deliveredAt: finite((entry as { deliveredAt?: unknown }).deliveredAt, now) }] : [])
+      : [],
+    completedAt: raw.completedAt == null ? null : finite(raw.completedAt, now),
+  };
+}
+
+/** Merges a chapter's restoration board asks for: the bar's total. */
+export function islandRestorationTotal(campaignId: string, level: MossproutNatureIslandLevel): number {
+  const chapter = islandCampaignById.get(campaignId)?.chapters.find((candidate) => candidate.level === level);
+  return chapter?.restoration?.merges ?? 0;
 }
 
 /**
@@ -1145,20 +1175,30 @@ function upgradeMossproutNatureIsland(
     return unchanged(state, islandWakeLockedReason(state, islandId) ?? 'This part of the garden is still asleep.');
   }
   const campaignDefinition = islandCampaignForIsland(islandId);
+  // A restoration-board chapter was paid when its board opened: the island then
+  // grows for nothing, whatever economy the upgrade flow was authored with.
+  let paidStage = false;
   if (campaignDefinition) {
     const campaign = state.islandCampaigns?.[campaignDefinition.campaignId];
     if (!state.haven.mossproutNatureIslandReveals[islandId] || !campaign?.discoveryRevealSeenAt) {
       return unchanged(state, 'Clear the mist and discover the garden first.');
     }
     const chapter = campaign.chapters[String(requestedLevel)];
-    if (!chapter || !chapter.orderIds.every((id) => chapter.servedOrderIds.includes(id))) {
-      return unchanged(state, `Finish ${campaignDefinition.residentName}’s garden request first.`);
+    if (chapter?.restoration) {
+      // The board finishing is the whole condition.
+      if (chapter.restoration.completedAt == null) return unchanged(state, `Finish ${campaignDefinition.residentName}’s restoration board first.`);
+      paidStage = true;
+    } else {
+      if (!chapter || !chapter.orderIds.every((id) => chapter.servedOrderIds.includes(id))) {
+        return unchanged(state, `Finish ${campaignDefinition.residentName}’s garden request first.`);
+      }
+      if (chapter.returnConversationSeenAt == null) return unchanged(state, `Return to ${campaignDefinition.residentName} before restoring the garden.`);
+      if (requestedLevel === 1 && economyMode !== 'free') return unchanged(state, `The first restoration is a gift from ${campaignDefinition.residentName}.`);
     }
-    if (chapter.returnConversationSeenAt == null) return unchanged(state, `Return to ${campaignDefinition.residentName} before restoring the garden.`);
-    if (requestedLevel === 1 && economyMode !== 'free') return unchanged(state, `The first restoration is a gift from ${campaignDefinition.residentName}.`);
   }
-  const grant = economyMode === 'grant' ? Math.max(0, Math.floor(grantedCoins)) : 0;
-  const coinCost = economyMode === 'free' ? 0 : definition.coinCost;
+  const grant = economyMode === 'grant' && !paidStage ? Math.max(0, Math.floor(grantedCoins)) : 0;
+  const coinCost = economyMode === 'free' || paidStage ? 0 : definition.coinCost;
+  if (paidStage) economyMode = 'free';
   if (state.coins + grant < coinCost) {
     return unchanged(state, 'Earn a few more Glow through Merge orders.');
   }
@@ -1336,7 +1376,15 @@ function activateIslandCampaignChapter(
   if (existingChapter) return unchanged(state, 'That island request is already active.');
   const orders = command.orders.filter((order) => order.storyArcId === command.campaignId && order.storyTargetLevel === command.level);
   if (!orders.length) return unchanged(state, 'That island chapter has no request.');
-  const activeOrders = [...state.activeOrders, ...orders.filter((order) => !state.activeOrders.some((candidate) => candidate.id === order.id))];
+  // A restoration chapter is paid now (the first is the friend's gift) and opens
+  // its board; its order only reaches the Main Board when the board asks for it.
+  const chapterDefinition = islandCampaignById.get(command.campaignId)?.chapters.find((candidate) => candidate.level === command.level);
+  const restorationBoard = chapterDefinition?.restoration ?? null;
+  const stageCost = restorationBoard && command.level > 1 ? mossproutNatureIslandLevelDefinition(command.islandId, command.level)?.coinCost ?? 0 : 0;
+  if (state.coins < stageCost) return unchanged(state, 'Earn a few more Glow through Merge orders.');
+  const activeOrders = restorationBoard
+    ? state.activeOrders
+    : [...state.activeOrders, ...orders.filter((order) => !state.activeOrders.some((candidate) => candidate.id === order.id))];
   const campaign = existingCampaign ?? {
     campaignId: command.campaignId,
     islandId: command.islandId,
@@ -1349,6 +1397,7 @@ function activateIslandCampaignChapter(
   };
   return changed(touch({
     ...state,
+    coins: state.coins - stageCost,
     activeOrders,
     islandCampaigns: {
       ...(state.islandCampaigns ?? {}),
@@ -1359,16 +1408,85 @@ function activateIslandCampaignChapter(
           [String(command.level)]: {
             level: command.level,
             selectedOptionId: command.selectedOptionId ?? null,
-            orderIds: orders.map((order) => order.id),
+            orderIds: restorationBoard ? [] : orders.map((order) => order.id),
             servedOrderIds: [],
             startedAt: command.now,
             returnConversationSeenAt: null,
+            ...(restorationBoard ? { restoration: {
+              startedAt: command.now, paidCoins: stageCost,
+              progress: { current: 0, total: islandRestorationTotal(command.campaignId, command.level) },
+              deliveryRequestedAt: null, delivered: [], completedAt: null,
+            } } : {}),
             completedAt: null,
           },
         },
       },
     },
-  }, command.now), `${orders[0]!.title} is ready in the Garden.`);
+  }, command.now), restorationBoard ? `${campaign.residentSkinId} is ready to restore.` : `${orders[0]!.title} is ready in the Garden.`);
+}
+
+function islandRestorationChapter(state: MergeWorldState, campaignId: string, level: MossproutNatureIslandLevel) {
+  const campaign = state.islandCampaigns?.[campaignId];
+  const chapter = campaign?.chapters[String(level)];
+  return campaign && chapter?.restoration ? { campaign, chapter, restoration: chapter.restoration } : null;
+}
+
+function withIslandRestoration(state: MergeWorldState, campaignId: string, level: MossproutNatureIslandLevel,
+  patch: Partial<IslandCampaignChapterProgress> & { restoration: NonNullable<IslandCampaignChapterProgress['restoration']> }): MergeWorldState {
+  const campaign = state.islandCampaigns![campaignId]!;
+  const chapter = campaign.chapters[String(level)]!;
+  return {
+    ...state,
+    islandCampaigns: {
+      ...(state.islandCampaigns ?? {}),
+      [campaignId]: { ...campaign, chapters: { ...campaign.chapters, [String(level)]: { ...chapter, ...patch } } },
+    },
+  };
+}
+
+/** The board could go no further: the chapter's order becomes the Main Board delivery. Idempotent. */
+function requestIslandCampaignDelivery(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'requestIslandCampaignDelivery' }>,
+): MergeWorldCommandResult {
+  const found = islandRestorationChapter(state, command.campaignId, command.level);
+  if (!found) return unchanged(state, 'That island chapter has not started.');
+  if (found.restoration.completedAt != null) return unchanged(state, 'This part of the garden is already restored.');
+  if (found.restoration.deliveryRequestedAt != null) return unchanged(state);
+  const orders = command.orders.filter((order) => order.storyArcId === command.campaignId && order.storyTargetLevel === command.level);
+  if (!orders.length) return unchanged(state, 'That island chapter has no request.');
+  const activeOrders = [...state.activeOrders, ...orders.filter((order) => !state.activeOrders.some((candidate) => candidate.id === order.id))];
+  return changed(touch(withIslandRestoration({ ...state, activeOrders }, command.campaignId, command.level, {
+    orderIds: orders.map((order) => order.id),
+    restoration: { ...found.restoration, deliveryRequestedAt: command.now },
+  }), command.now), `${orders[0]!.title} is ready in the Garden.`);
+}
+
+/** The board's summary for the marker and tracker; the board itself lives in its own store. */
+function recordIslandRestorationProgress(
+  state: MergeWorldState,
+  command: Extract<MergeWorldCommand, { type: 'recordIslandRestorationProgress' }>,
+): MergeWorldCommandResult {
+  const found = islandRestorationChapter(state, command.campaignId, command.level);
+  if (!found) return unchanged(state, 'That island chapter has not started.');
+  const total = Math.max(0, Math.floor(command.total));
+  const current = Math.max(0, Math.min(total, Math.floor(command.current)));
+  if (found.restoration.progress.current === current && found.restoration.progress.total === total) return unchanged(state);
+  return changed(touch(withIslandRestoration(state, command.campaignId, command.level, {
+    restoration: { ...found.restoration, progress: { current, total } },
+  }), command.now));
+}
+
+/** Every bed at its target: the paid restoration may now grow the island for free. */
+function completeIslandRestoration(state: MergeWorldState, campaignId: string, level: MossproutNatureIslandLevel, now: number): MergeWorldCommandResult {
+  const found = islandRestorationChapter(state, campaignId, level);
+  if (!found) return unchanged(state, 'That island chapter has not started.');
+  if (found.restoration.completedAt != null) return unchanged(state);
+  if (found.restoration.progress.current < found.restoration.progress.total) return unchanged(state, 'The beds are not all planted yet.');
+  return changed(touch(withIslandRestoration(state, campaignId, level, {
+    returnConversationSeenAt: found.chapter.returnConversationSeenAt ?? now,
+    restoration: { ...found.restoration, completedAt: now },
+  }), now), 'The garden is ready to grow.');
 }
 
 function acknowledgeIslandCampaignChapterReturn(
@@ -2454,6 +2572,14 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
             [String(islandChapter.level)]: {
               ...islandChapter,
               servedOrderIds: [...new Set([...islandChapter.servedOrderIds, order.id])],
+              // The served items are the restoration board's delivery, in the same write that consumed them.
+              ...(islandChapter.restoration ? { restoration: {
+                ...islandChapter.restoration,
+                delivered: [
+                  ...islandChapter.restoration.delivered,
+                  ...order.requirements.flatMap((requirement) => Array.from({ length: Math.max(0, Math.floor(requirement.quantity)) }, () => ({ definitionId: requirement.definitionId, deliveredAt: now }))),
+                ],
+              } } : {}),
             },
           },
         },
@@ -4061,6 +4187,7 @@ function normalizeDreamMist(value: unknown, legacyLocked: boolean, index: number
   if (!value || typeof value !== 'object') return legacyLocked ? authoredDormantMistForCell(index) : null;
   const mist = value as { kind?: unknown; id?: unknown; definitionId?: unknown; generatorId?: unknown; ownerCharacterId?: unknown; discoveryId?: unknown; gateId?: unknown; residentId?: unknown; pathId?: unknown; sequenceIndex?: unknown; boundDefinitionId?: unknown; active?: unknown; candidateIds?: unknown; characterIds?: unknown; clearingId?: unknown; revealDay?: unknown; recommendedCharacterId?: unknown; chapter?: unknown; ready?: unknown };
   if (mist.kind === 'dormant') return authoredDormantMistForCell(index);
+
   if (mist.kind === 'garden_growth') {
     const authored = authoredDormantMistForCell(index);
     if (authored.kind === 'garden_growth') return authored;

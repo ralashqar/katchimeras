@@ -196,7 +196,8 @@ test('the docked board dispatches through the FTUE contract: Basket taps spend n
   assert.doesNotMatch(dock, /caughtUpRevisionRef/, 'no per-revision replay');
   assert.doesNotMatch(dock, /boxShadow: `0 0 \d+px \$\{GLOW_COLOR\}`/, 'no blurred shadows on the animating impact views');
   assert.doesNotMatch(dock, /entering=\{FadeIn/, 'no layout animation on the Glow tokens');
-  assert.match(dock, /boardLayout=\{OPENING_BOARD_LAYOUT\}[\s\S]*?railHidden[\s\S]*?counterHidden[\s\S]*?inspectorHidden[\s\S]*?trayEntries=\{\[\]\}/);
+  assert.match(dock, /layout = OPENING_BOARD_LAYOUT, barTitle = 'Clear the Mist'/, 'the opening window and title are the defaults');
+  assert.match(dock, /boardLayout=\{layout\}[\s\S]*?railHidden[\s\S]*?counterHidden[\s\S]*?inspectorHidden[\s\S]*?trayEntries=\{\[\]\}/);
   assert.match(dock, /animateEntrance=\{false\}/, 'one entrance, owned by the dock');
   assert.match(dock, /onVisualReady=\{markBoardReady\}[\s\S]*?screenMetricsRevision=\{metricsRevision\}/, 'the dock waits for the board and re-measures after settling');
   assert.match(dock, /if \(!boardReady\) return;\s*entrance\.value = withTiming\(1,/, 'fade and scale up only once the board has painted');

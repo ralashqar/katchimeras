@@ -22,22 +22,44 @@ export function startAndServeChapter(state: MergeWorldState, campaign: IslandCam
   const chapter = campaign.chapters.find((candidate) => candidate.level === level)!;
   const selectedOptionId = chapter.choices[choiceIndex]!.id;
   const order = islandCampaignChapterOrder(campaign, level, selectedOptionId, now)!;
-  const started = reduceMergeWorld(state, {
+  let started = reduceMergeWorld(state, {
     type: 'activateIslandCampaignChapter', campaignId: campaign.campaignId, islandId: campaign.islandId,
     residentSkinId: campaign.residentSkinId, level, selectedOptionId, orders: [order], now,
   }).state;
+  // A board chapter asks for its delivery once the beds are stuck; the ladder skips straight to that.
+  if (chapter.restoration) {
+    started = reduceMergeWorld(started, { type: 'requestIslandCampaignDelivery', campaignId: campaign.campaignId, level, orders: [order], now: now + 1 }).state;
+  }
   const progress = started.islandCampaigns![campaign.campaignId]!;
-  const chapterProgress = progress.chapters[String(level)]!;
+  const chapterProgress = progress.chapters[String(level)];
+  if (!chapterProgress) throw new Error(`${campaign.residentName} level ${level} did not start (Glow ${state.coins}, island level ${state.haven.mossproutNatureIslands[campaign.islandId] ?? 0})`);
+  const restoration = chapterProgress.restoration;
+  const served = {
+    ...chapterProgress,
+    servedOrderIds: [...chapterProgress.orderIds],
+    ...(restoration ? { restoration: {
+      ...restoration,
+      delivered: order.requirements.flatMap((requirement) => Array.from({ length: requirement.quantity }, () => ({ definitionId: requirement.definitionId, deliveredAt: now + 2 }))),
+    } } : {}),
+  };
   return {
     ...started,
     islandCampaigns: {
       ...started.islandCampaigns,
-      [campaign.campaignId]: {
-        ...progress,
-        chapters: { ...progress.chapters, [String(level)]: { ...chapterProgress, servedOrderIds: [...chapterProgress.orderIds] } },
-      },
+      [campaign.campaignId]: { ...progress, chapters: { ...progress.chapters, [String(level)]: served } },
     },
   };
+}
+
+/** Every bed at its target and the board closed; a no-op for a chapter without a board. */
+export function completeRestoration(state: MergeWorldState, campaign: IslandCampaignDefinition, level: MossproutNatureIslandLevel, now: number): MergeWorldState {
+  const progress = state.islandCampaigns?.[campaign.campaignId];
+  const chapter = progress?.chapters[String(level)];
+  if (!progress || !chapter?.restoration) return state;
+  const full = { ...state, islandCampaigns: { ...state.islandCampaigns, [campaign.campaignId]: { ...progress, chapters: { ...progress.chapters, [String(level)]: {
+    ...chapter, restoration: { ...chapter.restoration, progress: { current: chapter.restoration.progress.total, total: chapter.restoration.progress.total } },
+  } } } } };
+  return reduceMergeWorld(full, { type: 'completeIslandRestoration', campaignId: campaign.campaignId, level, now }).state;
 }
 
 export function acknowledgeChapterReturn(state: MergeWorldState, campaign: IslandCampaignDefinition, level: MossproutNatureIslandLevel, now: number): MergeWorldState {
@@ -45,9 +67,11 @@ export function acknowledgeChapterReturn(state: MergeWorldState, campaign: Islan
 }
 
 export function restoreIslandLevel(state: MergeWorldState, campaign: IslandCampaignDefinition, level: MossproutNatureIslandLevel, now: number): MergeWorldState {
+  // The first restoration is the friend's gift; a board chapter was paid when its board opened.
+  const board = Boolean(campaign.chapters.find((chapter) => chapter.level === level)?.restoration);
   return reduceMergeWorld(state, {
     type: 'upgradeMossproutNatureIsland', islandId: campaign.islandId, level,
-    ...(level === 1 ? { economyMode: 'free' as const } : {}), receiptId: `test:${campaign.islandId}:restore:${level}`, now,
+    ...(level === 1 || board ? { economyMode: 'free' as const } : {}), receiptId: `test:${campaign.islandId}:restore:${level}`, now,
   }).state;
 }
 
@@ -62,6 +86,7 @@ export function completeIslandCampaign(state: MergeWorldState, campaign: IslandC
     const at = now + 10 * (index + 1);
     next = startAndServeChapter(next, campaign, chapter.level, at);
     next = acknowledgeChapterReturn(next, campaign, chapter.level, at + 1);
+    next = completeRestoration(next, campaign, chapter.level, at + 1);
     next = restoreIslandLevel(next, campaign, chapter.level, at + 2);
     next = completeChapter(next, campaign, chapter.level, at + 3);
   });

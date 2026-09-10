@@ -26,6 +26,13 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
       level: 1,
       title: 'One Small Beginning',
       conversationId: 'mossprout:island:petalimp:first-welcome',
+      // Four Seeds become one Plant that frees the misted Plant; the Flower it becomes waits for the request's twin.
+      restoration: {
+        rows: 3, merges: 5,
+        items: [{ cell: 16, definitionId: 'nature:garden:1' }, { cell: 18, definitionId: 'nature:garden:1' }, { cell: 22, definitionId: 'nature:garden:1' }, { cell: 26, definitionId: 'nature:garden:1' }],
+        echoes: [{ id: 'petalimp-1-plant', cell: 24, definitionId: 'nature:garden:3' }],
+        deliveryCells: [17, 31, 19],
+      },
       prompt: 'This used to be a Welcome Garden. Right now it is just soil and one hopeful gardener.\n\nIf you could plant one small thing here today, what would it be for?',
       fallbackOrder: order('The First Bloom', 'Make one Flower for the garden’s first small beginning.', 'small', 'curiosity', [{ definitionId: 'nature:garden:4', quantity: 1 }]),
       choices: [
@@ -59,6 +66,13 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
       level: 2,
       title: 'Colours That Belong',
       conversationId: 'mossprout:island:petalimp:colours-belong',
+      // Two misted cells, a Sprout and a Plant: the local Sprouts can free either; the request's Flower and Sprout finish the rest.
+      restoration: {
+        rows: 3, merges: 6,
+        items: [{ cell: 16, definitionId: 'nature:garden:1' }, { cell: 18, definitionId: 'nature:garden:1' }, { cell: 22, definitionId: 'nature:garden:1' }, { cell: 26, definitionId: 'nature:garden:1' }],
+        echoes: [{ id: 'petalimp-2-plant', cell: 24, definitionId: 'nature:garden:3' }, { id: 'petalimp-2-sprout', cell: 31, definitionId: 'nature:garden:2' }],
+        deliveryCells: [17, 30, 19],
+      },
       callbackLine: {
         gentle: 'Last time you said small was enough. I have been trying that on the whole garden.',
         curious: 'You told me to let the first flower experiment. It has been experimenting with the neighbours.',
@@ -97,6 +111,17 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
       level: 3,
       title: 'A Path at Your Pace',
       conversationId: 'mossprout:island:petalimp:wandering-walk',
+      // The path: local pieces free the misted Flower and stop at a Rare Flower; the request's Rare Flower and Shell finish the walk.
+      restoration: {
+        rows: 4, merges: 7,
+        items: [
+          { cell: 16, definitionId: 'nature:garden:1' }, { cell: 18, definitionId: 'nature:garden:1' },
+          { cell: 22, definitionId: 'nature:garden:1' }, { cell: 26, definitionId: 'nature:garden:1' },
+          { cell: 29, definitionId: 'nature:garden:3' },
+        ],
+        echoes: [{ id: 'petalimp-3-flower', cell: 24, definitionId: 'nature:garden:4' }, { id: 'petalimp-3-shell', cell: 38, definitionId: 'nature:waterside:2' }],
+        deliveryCells: [31, 37, 39],
+      },
       callbackLine: {
         gentle: 'You wanted the beds to feel familiar first. Now I check on them like old friends.',
         curious: 'You let the colours change their minds. They have not stopped.',
@@ -135,6 +160,17 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
       level: 4,
       title: 'Room for Every Bloom',
       conversationId: 'mossprout:island:petalimp:every-bloom',
+      // The last patch: the local pieces climb to a Magical Plant through the misted Rare Flower; the request's Magical Plant is its twin, its Memory Bloom the keepsake.
+      restoration: {
+        rows: 4, merges: 7,
+        items: [
+          { cell: 16, definitionId: 'nature:garden:1' }, { cell: 18, definitionId: 'nature:garden:1' },
+          { cell: 22, definitionId: 'nature:garden:1' }, { cell: 26, definitionId: 'nature:garden:1' },
+          { cell: 29, definitionId: 'nature:garden:3' }, { cell: 36, definitionId: 'nature:garden:4' },
+        ],
+        echoes: [{ id: 'petalimp-4-rare', cell: 24, definitionId: 'nature:garden:5' }],
+        deliveryCells: [31, 37, 39],
+      },
       callbackLine: {
         gentle: 'One turn at a time, you said. The path taught me to stop looking for the end of it.',
         curious: 'You gave the path a place to pause. I have used it more than I expected.',
@@ -212,17 +248,26 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
       start_story: 'Plan with Petalimp',
       open_merge: 'Open Merge',
       continue_return: 'Talk to Petalimp',
+      continue_restoring: 'Back to the mist',
       continue_resolution: 'See what grew',
     },
     stateLabels: {
       available: 'Choose how this part of the garden should grow.',
       orders_active: 'Requested in Merge',
+      board_open: 'Clearing the mist',
+      delivery_requested: 'Requested in Merge',
       return_ready: 'Request complete',
       restoration_ready: 'Request complete · Ready to restore',
       resolution_ready: 'Restored · Story waiting',
       complete: 'Garden story complete',
     },
     speech: {
+      available: ({ coins, cost }) => cost <= 0
+        ? 'I know just where to begin.'
+        : coins >= cost
+          ? 'I know just where to begin. Whenever you are ready.'
+          : `${coins} of ${cost} Glow so far. The mist can wait a little.`,
+      delivery_requested: () => 'This patch has given all it had. What the mist still holds is waiting on your board.',
       restoration_ready: ({ coins, cost }) => cost <= 0
         ? 'Everything is ready. This one is my gift.'
         : coins >= cost

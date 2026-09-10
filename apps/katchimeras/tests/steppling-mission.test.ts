@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from './helpers/content-fs';
 import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
-import { OPENING_CAMERA_ANCHOR_Y, OPENING_CAMERA_ZOOM, OPENING_MERGE_WINDOW_CELLS } from '@/features/onboarding/opening-mist';
+import { MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_CAMERA_ZOOM, OPENING_MERGE_WINDOW_CELLS } from '@/features/onboarding/opening-mist';
 import {
   createStepplingMissionState, STEPPLING_MISSION_CAMERA, STEPPLING_MISSION_GENERATOR_ID, STEPPLING_MISSION_ITEMS, STEPPLING_MISSION_LOCKER_CELL,
   STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_SOCK_ID, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep, stepplingMissionItemsOnBoard, stepplingMissionProgress,
@@ -104,8 +104,9 @@ test('the Glow story opens the mission from the bubble and pays the reveal only 
   const focus = GLOW_DISCOVERY_FLOW.nodes.find((node) => node.id === GLOW_MISSION_FOCUS_NODE_ID)!;
   assert.equal(focus.kind, 'presentation');
   assert.deepEqual((focus.payload as { target: unknown }).target, STEPPLING_STORY_TARGET);
-  assert.equal((focus.payload as { zoom: number }).zoom, OPENING_CAMERA_ZOOM, 'the opening’s framing');
-  assert.equal((focus.payload as { anchorY: number }).anchorY, OPENING_CAMERA_ANCHOR_Y);
+  assert.equal((focus.payload as { zoom: number }).zoom, MISSION_CAMERA_ZOOM, 'closer than the opening, the rest of the map faded');
+  assert.ok(MISSION_CAMERA_ZOOM > OPENING_CAMERA_ZOOM);
+  assert.equal((focus.payload as { anchorY: number }).anchorY, MISSION_CAMERA_ANCHOR_Y);
   const clear = GLOW_DISCOVERY_FLOW.nodes.find((node) => node.id === GLOW_MISSION_CLEAR_NODE_ID)!;
   assert.equal(clear.kind, 'task');
   if (clear.kind !== 'task' || focus.kind !== 'presentation') return;
@@ -123,7 +124,17 @@ test('the Glow story opens the mission from the bubble and pays the reveal only 
     assert.equal(glowDiscoveryRevealLocked({ nodeId, status: 'active' }), true);
   }
   assert.equal(glowDiscoveryMissionNode('gateway.offer'), false);
-  assert.equal(STEPPLING_MISSION_CAMERA.kind === 'focus_target' ? STEPPLING_MISSION_CAMERA.zoom : null, OPENING_CAMERA_ZOOM);
+  assert.equal(STEPPLING_MISSION_CAMERA.kind === 'focus_target' ? STEPPLING_MISSION_CAMERA.zoom : null, MISSION_CAMERA_ZOOM);
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
+  assert.match(screen, /const soloLayerId = stepplingBoardBusy \? 'structure:steppling-home' : restorationBoardBusy && restorationIslandId \? `nature:mossprout:\$\{restorationIslandId\}` : null;/, 'only the board’s tile stays on the map');
+  assert.match(screen, /const stepplingBoardBusy = stepplingMissionActive && !stepplingMissionCleared;\s*const restorationBoardBusy = restorationBoardVisible && !restorationDone;/, 'the map comes back the moment the bar is full');
+  assert.match(canvas, /setFadeSolo\(soloLayerId\);\s*othersOpacity\.value = withTiming\(0, \{ duration, easing/, 'the other tiles fade out while a board is up');
+  assert.match(canvas, /<Animated\.View pointerEvents=\{soloLayerId \? 'none' : 'box-none'\} style=\{\[StyleSheet\.absoluteFill, othersStyle\]\}>\{creatureNodes\}<\/Animated\.View>/, 'and every Katchimera with them');
+  assert.match(canvas, /style=\{\[StyleSheet\.absoluteFill, othersStyle\]\}>\{memoryPlantProjections\.map/, 'and the planted memories');
+  assert.match(canvas, /style=\{fadeSolo && layer\.id !== fadeSolo \? \[StyleSheet\.absoluteFill, othersStyle\] : StyleSheet\.absoluteFill\}/, 'the fading style stays attached until the tiles are back');
+  assert.match(canvas, /othersOpacity\.value = withTiming\(1, \{ duration, easing: Easing\.inOut\(Easing\.quad\) \}, \(finished\) => \{\s*if \(finished\) runOnJS\(setFadeSolo\)\(null\);/, 'and only detaches once the fade-in has finished');
+  assert.match(canvas, /hidden=\{Boolean\(selectedUpgradeOffer\) \|\| Boolean\(soloLayerId && offer\.id !== soloOfferId\)\}/, 'markers hide while a board is up, except one the caller keeps');
 });
 
 test('the Kingdom docks the mission under Steppling’s tile and clears the mist when its final item lands', () => {
@@ -134,9 +145,9 @@ test('the Kingdom docks the mission under Steppling’s tile and clears the mist
   const upgrade = readFileSync('features/onboarding/glow-upgrade-runtime.ts', 'utf8');
   const offers = readFileSync('features/world-upgrades/world-upgrade-offers.ts', 'utf8');
   assert.match(screen, /const stepplingMissionActive = glowRun\?\.status === 'active' && glowRun\.nodeId === GLOW_MISSION_CLEAR_NODE_ID;/);
-  assert.match(screen, /useOpeningGlow\(stepplingMissionActive \? gatewayTileNode : homeTileNode\)/, 'Glow flies into the misted clearing during its mission');
+  assert.match(screen, /useOpeningGlow\(stepplingMissionActive \? gatewayTileNode : islandRestoration \? restorationTileNode : homeTileNode\)/, 'Glow flies into the misted clearing during its mission');
   assert.match(screen, /const stepplingMission = useMissionBoard\(STEPPLING_MISSION_STORAGE_KEY, stepplingMissionActive \? STEPPLING_MISSION_ID : null, createStepplingMissionState\);/, 'its own board and store');
-  assert.match(screen, /stepplingFinaleIdRef\.current = openingGlow\.launchFinale\(from, definitionId\);/);
+  assert.match(screen, /stepplingFinaleIdRef\.current = launchGlowFinale\(from, definitionId\);/);
   assert.match(screen, /if \(stepplingMissionActive && stepplingMissionCleared && stepplingFinaleIdRef\.current != null && openingGlow\.finaleLandedId === stepplingFinaleIdRef\.current\) finishStepplingMission\(\);/, 'the mist clears on the final item’s impact');
   assert.match(screen, /if \(stepplingMission\.merges >= STEPPLING_MISSION_MERGE_REQUIRED\) finishStepplingMission\(\);/, 'a board saved with a full bar clears on resume');
   assert.match(screen, /<StepplingMissionDock[\s\S]*?onFinale=\{launchStepplingFinale\}/);
@@ -146,7 +157,7 @@ test('the Kingdom docks the mission under Steppling’s tile and clears the mist
   assert.match(dock, /spendEnergy: false as const/, 'Locker taps cost nothing');
   assert.match(dock, /if \(\(mergesRef\.current \?\? 0\) >= STEPPLING_MISSION_MERGE_REQUIRED\) \{[\s\S]*?setHiddenItemIds[\s\S]*?onFinale\?\.\(from, event\.resultDefinitionId\);/, 'the merge that fills the bar sends its item into the mist');
   assert.match(dock, /<MistMissionDock[\s\S]*?required=\{STEPPLING_MISSION_MERGE_REQUIRED\}/);
-  assert.match(store, /const merged = command\.type === 'move' && result\.mergedCell != null;[\s\S]*?saveMission\(storageKey, activeRunId, result\.state, nextMerges\);/, 'every merge is counted and saved with the board');
+  assert.match(store, /const merged = command\.type === 'move' && result\.mergedCell != null;[\s\S]*?saveMission\(storageKey, activeRunId, result\.state, nextMerges, placedRef\.current\);/, 'every merge is counted and saved with the board');
   assert.match(runtime, /eventId: `\$\{run\.runId\}:\$\{GLOW_MISSION_CLEAR_NODE_ID\}:cleared:\$\{run\.revision\}`, type: GLOW_MISSION_CLEARED_EVENT/);
   assert.doesNotMatch(upgrade, /actionId: 'unlock'/, 'no confirm step: the mission is the price');
   assert.match(offers, /\['gateway\.ready', 'gateway\.return', 'gateway\.offer'\]\.includes\(glowRun\.nodeId\) && offer\.id === 'mist:steppling-home'/, 'no markers while the board is up');

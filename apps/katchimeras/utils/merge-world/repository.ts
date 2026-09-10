@@ -335,6 +335,24 @@ export function acknowledgeStoredIslandCampaignChapterReturn(campaignId: string,
   }), now);
 }
 
+export function requestStoredIslandCampaignDelivery(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, orders: import('@/types/merge-world').MergeOrder[], now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'requestIslandCampaignDelivery', campaignId, level, orders, now,
+  }), now);
+}
+
+export function recordStoredIslandRestorationProgress(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, progress: { current: number; total: number }, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'recordIslandRestorationProgress', campaignId, level, current: progress.current, total: progress.total, now,
+  }), now);
+}
+
+export function completeStoredIslandRestoration(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
+    type: 'completeIslandRestoration', campaignId, level, now,
+  }), now);
+}
+
 export function completeStoredIslandCampaignChapter(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'completeIslandCampaignChapter', campaignId, level, now,

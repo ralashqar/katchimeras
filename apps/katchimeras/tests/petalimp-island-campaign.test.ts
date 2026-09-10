@@ -8,7 +8,7 @@ import { MOSSPROUT_CAMPAIGN_EPISODES } from '@/constants/mossprout-campaign';
 import { PETALIMP_BLOOM_CAMPAIGN, PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_CHAPTERS, petalimpGrowthStyle, petalimpIslandChapterOrder, petalimpIslandChapterStatus, petalimpIslandResolutionConversationId, petalimpIslandReturnConversationId, petalimpIslandReturnLevel, petalimpIslandUpgradePanelState } from '@/constants/petalimp-island-campaign';
 import { ISLAND_WAKE_ORDER, islandWakeBlocker, islandWakeState } from '@/constants/island-campaigns/wake-order';
 import { islandCampaignOpeningConversationId, islandCampaignPreviousStyle } from '@/constants/island-campaigns/helpers';
-import { acknowledgeChapterReturn, completeChapter, completeIslandCampaign, greetIslandFriend, restoreIslandLevel, revealIsland, startAndServeChapter } from './helpers/island-campaign';
+import { acknowledgeChapterReturn, completeChapter, completeIslandCampaign, completeRestoration, greetIslandFriend, restoreIslandLevel, revealIsland, startAndServeChapter } from './helpers/island-campaign';
 import { visibleWorldUpgradeOffers, worldUpgradeOffers } from '@/features/world-upgrades/world-upgrade-offers';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import type { MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
@@ -98,19 +98,22 @@ test('Petalimp keeps prices out of her mouth and remembers the previous answer',
   assert.equal(islandCampaignOpeningConversationId(PETALIMP_BLOOM_CAMPAIGN, 2, 'gentle'), `${PETALIMP_ISLAND_CHAPTERS[1]!.conversationId}:after-gentle`);
   let state = greetIslandFriend(revealIsland({ ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 500 }, PETALIMP_BLOOM_CAMPAIGN, NOW), PETALIMP_BLOOM_CAMPAIGN, NOW);
   assert.equal(islandCampaignPreviousStyle(state, PETALIMP_BLOOM_CAMPAIGN, 2), null);
-  state = completeChapter(restoreIslandLevel(acknowledgeChapterReturn(startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, 1, NOW, 1), PETALIMP_BLOOM_CAMPAIGN, 1, NOW), PETALIMP_BLOOM_CAMPAIGN, 1, NOW), PETALIMP_BLOOM_CAMPAIGN, 1, NOW);
+  state = completeChapter(restoreIslandLevel(completeRestoration(acknowledgeChapterReturn(startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, 1, NOW, 1), PETALIMP_BLOOM_CAMPAIGN, 1, NOW), PETALIMP_BLOOM_CAMPAIGN, 1, NOW), PETALIMP_BLOOM_CAMPAIGN, 1, NOW), PETALIMP_BLOOM_CAMPAIGN, 1, NOW);
   assert.equal(islandCampaignPreviousStyle(state, PETALIMP_BLOOM_CAMPAIGN, 2), 'curious');
   const log = petalimpIslandUpgradePanelState(state)!;
   assert.deepEqual(log.completedChapters.map((entry) => entry.level), [1]);
   assert.equal(log.completedChapters[0]?.line, PETALIMP_ISLAND_CHAPTERS[0]!.choices[1]!.resolutionLine);
-  state = acknowledgeChapterReturn(startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, 2, NOW), PETALIMP_BLOOM_CAMPAIGN, 2, NOW);
+  // The Glow is asked for before the beds open, in her voice, never in a return line.
   const waiting = petalimpIslandUpgradePanelState({ ...state, coins: 10 })!;
-  assert.equal(waiting.status, 'restoration_ready');
-  assert.equal(waiting.speech, PETALIMP_ISLAND_CHAPTERS[1]!.choices[0]!.returnLine, 'the return line lives on the panel');
-  assert.equal(waiting.stateLabel, 'Request complete · Ready to restore');
+  assert.equal(waiting.status, 'available');
+  assert.equal(waiting.stateLabel, 'Choose how this part of the garden should grow.');
   assert.match(waiting.voicedStateLabel, /10 of 60 Glow/);
-  assert.match(petalimpIslandUpgradePanelState({ ...state, coins: 45 })!.voicedStateLabel, /close now/);
   assert.match(petalimpIslandUpgradePanelState({ ...state, coins: 60 })!.voicedStateLabel, /Whenever you are ready/);
+  state = acknowledgeChapterReturn(startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, 2, NOW), PETALIMP_BLOOM_CAMPAIGN, 2, NOW);
+  const beds = petalimpIslandUpgradePanelState(state)!;
+  assert.equal(beds.status, 'board_open');
+  assert.equal(beds.speech, PETALIMP_ISLAND_CHAPTERS[1]!.choices[0]!.returnLine, 'the return line greets the delivery on the panel');
+  assert.equal(beds.stateLabel, 'Clearing the mist');
 });
 
 test('Petalimp choices play as dialogue and the finale resolves the accumulated growth insight', () => {
@@ -276,36 +279,57 @@ test('mist reveal spends 40 Glow once and atomically queues the unknown resident
   assert.equal(replay.storyWorldMutationReceipt?.id, 'reveal-once');
 });
 
-test('every request and Petalimp return happen before its matching restoration', () => {
+test('every Petalimp chapter opens its beds first, asks the Main Board for the rest, and restores for free once the beds are full', () => {
   let state = revealBloom({ ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 500 });
   state = reduceMergeWorld(state, { type: 'ackIslandCampaignResidentDiscovery', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, now: NOW + 1 }).state;
-  state = startAndServe(state, 1);
-  assert.equal(petalimpIslandChapterStatus(state, 1), 'return_ready');
+  const order = petalimpIslandChapterOrder(1, PETALIMP_ISLAND_CHAPTERS[0]!.choices[0]!.id, NOW + 2)!;
+  const before = state.coins;
+  state = reduceMergeWorld(state, { type: 'activateIslandCampaignChapter', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, islandId: 'bloom-garden',
+    residentSkinId: 'petalimp', level: 1, selectedOptionId: order.id.split(':').pop(), orders: [order], now: NOW + 2 }).state;
+  assert.equal(state.coins, before, 'the first beds are the gift');
+  assert.equal(petalimpIslandChapterStatus(state, 1), 'board_open');
+  assert.equal(state.activeOrders.some((candidate) => candidate.id === order.id), false, 'the order waits for the beds to need it');
+  assert.equal(petalimpIslandUpgradePanelState(state)!.action, 'continue_restoring');
   assert.equal(worldUpgradeOffers(state).find((offer) => offer.id === 'nature:bloom-garden')!.eligible, false);
-  state = acknowledgeReturn(state, 1);
+  state = reduceMergeWorld(state, { type: 'requestIslandCampaignDelivery', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level: 1, orders: [order], now: NOW + 3 }).state;
+  assert.equal(petalimpIslandChapterStatus(state, 1), 'delivery_requested');
+  assert.equal(petalimpIslandUpgradePanelState(state)!.action, 'open_merge');
+  assert.ok(state.activeOrders.some((candidate) => candidate.id === order.id));
+  assert.equal(reduceMergeWorld(state, { type: 'requestIslandCampaignDelivery', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level: 1, orders: [order], now: NOW + 4 }).changed, false, 'asked once');
+  state = startAndServeChapter(greetIslandFriend(revealBloom({ ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 500 }), PETALIMP_BLOOM_CAMPAIGN, NOW + 1), PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 2);
+  assert.equal(petalimpIslandChapterStatus(state, 1), 'board_open', 'served, the delivery goes back to the beds');
+  assert.equal(petalimpIslandReturnLevel(state), 1);
+  assert.equal(state.islandCampaigns![PETALIMP_ISLAND_CAMPAIGN_ID]!.chapters['1']!.restoration!.delivered.length, 1);
+  state = completeRestoration(state, PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 5);
   assert.equal(petalimpIslandChapterStatus(state, 1), 'restoration_ready');
   const readyPanel = petalimpIslandUpgradePanelState(state)!;
   assert.equal(readyPanel.action, null);
   assert.equal(readyPanel.orderComplete, true);
-  assert.equal(readyPanel.stateLabel, 'Request complete · Ready to restore');
   const levelOne = worldUpgradeOffers(state).find((offer) => offer.id === 'nature:bloom-garden')!;
-  assert.equal(levelOne.nextLevel, 1); assert.equal(levelOne.cost, 0); assert.equal(levelOne.economyMode, 'free');
-  const before = state.coins;
-  state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 1,
-    economyMode: 'free', receiptId: 'restore:first', now: NOW + 2 }).state;
-  assert.equal(state.coins, before);
+  assert.equal(levelOne.nextLevel, 1); assert.equal(levelOne.cost, 0); assert.equal(levelOne.economyMode, 'free'); assert.equal(levelOne.eligible, true);
+  const paid = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 1, receiptId: 'restore:first', now: NOW + 6 });
+  assert.equal(paid.changed, true, paid.message);
+  assert.equal(paid.state.coins, state.coins, 'a board chapter never charges again at the upgrade, whatever the flow asks');
+  assert.equal(paid.storyWorldMutationReceipt?.coinCost, 0);
+  state = paid.state;
   assert.equal(petalimpIslandChapterStatus(state, 1), 'resolution_ready');
-  state = reduceMergeWorld(state, { type: 'completeIslandCampaignChapter', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level: 1, now: NOW + 3 }).state;
+  state = reduceMergeWorld(state, { type: 'completeIslandCampaignChapter', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level: 1, now: NOW + 7 }).state;
   const levelTwo = worldUpgradeOffers(state).find((offer) => offer.id === 'nature:bloom-garden')!;
-  assert.equal(levelTwo.nextLevel, 2); assert.equal(levelTwo.cost, 60); assert.equal(levelTwo.eligible, false);
-  state = startAndServe(state, 2);
-  assert.equal(petalimpIslandChapterStatus(state, 2), 'return_ready');
-  state = acknowledgeReturn(state, 2);
+  assert.equal(levelTwo.nextLevel, 2); assert.equal(levelTwo.cost, 60, 'the stage price shows before the beds open'); assert.equal(levelTwo.eligible, false);
+  const coins = state.coins;
+  state = startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 10);
+  assert.equal(state.coins, coins - 60, 'the second stage is paid when its beds open');
+  assert.equal(petalimpIslandChapterStatus(state, 2), 'board_open');
+  assert.equal(worldUpgradeOffers(state).find((offer) => offer.id === 'nature:bloom-garden')!.cost, 0, 'paid, so the marker asks for nothing more');
+  state = completeRestoration(state, PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 11);
   assert.equal(petalimpIslandChapterStatus(state, 2), 'restoration_ready');
-  state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 2,
-    receiptId: 'grow:two', now: NOW + 4 }).state;
-  assert.equal(state.coins, before - 60);
+  state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 2, economyMode: 'free', receiptId: 'grow:two', now: NOW + 12 }).state;
+  assert.equal(state.coins, coins - 60);
   assert.equal(petalimpIslandChapterStatus(state, 2), 'resolution_ready');
+  const broke = reduceMergeWorld({ ...state, coins: 10 }, { type: 'completeIslandCampaignChapter', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level: 2, now: NOW + 13 }).state;
+  const third = petalimpIslandChapterOrder(3, PETALIMP_ISLAND_CHAPTERS[2]!.choices[0]!.id, NOW + 14)!;
+  assert.equal(reduceMergeWorld(broke, { type: 'activateIslandCampaignChapter', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, islandId: 'bloom-garden',
+    residentSkinId: 'petalimp', level: 3, orders: [third], now: NOW + 14 }).changed, false, 'no Glow, no beds');
 });
 
 test('a served Petalimp request becomes one persistent island return note without waking legacy Mossprout story', () => {
@@ -314,6 +338,11 @@ test('a served Petalimp request becomes one persistent island return note withou
   const order = petalimpIslandChapterOrder(1, NOW + 2)!;
   state = reduceMergeWorld(state, { type: 'activateIslandCampaignChapter', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID,
     islandId: 'bloom-garden', residentSkinId: 'petalimp', level: 1, orders: [order], now: NOW + 2 }).state;
+  const bedsPanel = petalimpIslandUpgradePanelState(state)!;
+  assert.equal(bedsPanel.action, 'continue_restoring');
+  assert.equal(bedsPanel.order, null, 'no request until the beds need one');
+  assert.equal(bedsPanel.stateLabel, 'Clearing the mist');
+  state = reduceMergeWorld(state, { type: 'requestIslandCampaignDelivery', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level: 1, orders: [order], now: NOW + 2 }).state;
 
   const waitingOffer = worldUpgradeOffers(state).find((offer) => offer.id === 'nature:bloom-garden')!;
   assert.equal(waitingOffer.eligible, false);
@@ -334,11 +363,13 @@ test('a served Petalimp request becomes one persistent island return note withou
   }
   const served = reduceMergeWorld({ ...state, board }, { type: 'serveOrder', orderId: order.id, now: NOW + 3 }).state;
   assert.equal(petalimpIslandReturnLevel(served), 1);
+  assert.deepEqual(served.islandCampaigns![PETALIMP_ISLAND_CAMPAIGN_ID]!.chapters['1']!.restoration!.delivered.map((entry) => entry.definitionId),
+    order.requirements.flatMap((requirement) => Array.from({ length: requirement.quantity }, () => requirement.definitionId)), 'the served items are the beds’ delivery');
   const completePanel = petalimpIslandUpgradePanelState(served)!;
-  assert.equal(completePanel.action, 'continue_return');
+  assert.equal(completePanel.action, 'continue_restoring');
   assert.equal(completePanel.order?.id, order.id, 'served orders remain presentable after leaving the active-order queue');
   assert.equal(completePanel.orderComplete, true);
-  assert.equal(completePanel.stateLabel, 'Request complete');
+  assert.equal(completePanel.stateLabel, 'Clearing the mist');
   assert.ok(served.externalRewardReceipts.some((receipt) => receipt.kind === 'story_order_served' && receipt.sourceId === PETALIMP_ISLAND_CAMPAIGN_ID));
   assert.equal(served.externalRewardReceipts.some((receipt) => receipt.kind === 'conversation' && receipt.sourceId === order.chapterId), false);
 
@@ -369,10 +400,10 @@ test('Petalimp card is earned only after the complete four-level Welcome Garden 
   let state = revealBloom({ ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 1000 });
   state = reduceMergeWorld(state, { type: 'ackIslandCampaignResidentDiscovery', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, now: NOW + 1 }).state;
   for (const level of [1, 2, 3, 4] as const) {
-    state = startAndServe(state, level);
+    state = startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, level, NOW + level);
     state = acknowledgeReturn(state, level);
-    state = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level,
-      ...(level === 1 ? { economyMode: 'free' as const } : {}), now: NOW + 30 + level }).state;
+    state = completeRestoration(state, PETALIMP_BLOOM_CAMPAIGN, level, NOW + 20 + level);
+    state = restoreIslandLevel(state, PETALIMP_BLOOM_CAMPAIGN, level, NOW + 30 + level);
     assert.equal(petalimpIslandChapterStatus(state, level), 'resolution_ready');
     assert.equal(state.ownedKatchimeraCards.some((card) => card.cardId === 'petalimp'), false);
     state = reduceMergeWorld(state, { type: 'completeIslandCampaignChapter', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID,
@@ -398,6 +429,10 @@ test('legacy in-progress chapters resume at the correct return boundary', () => 
   state = reduceMergeWorld(state, { type: 'ackIslandCampaignResidentDiscovery', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, now: NOW + 1 }).state;
   state = startAndServe(state, 1);
   const raw = JSON.parse(JSON.stringify(state));
+  // A save from before the beds existed: no restoration record, the request served, the return still owed.
+  delete raw.islandCampaigns[PETALIMP_ISLAND_CAMPAIGN_ID].chapters['1'].restoration;
+  raw.islandCampaigns[PETALIMP_ISLAND_CAMPAIGN_ID].chapters['1'].orderIds = ['legacy-order'];
+  raw.islandCampaigns[PETALIMP_ISLAND_CAMPAIGN_ID].chapters['1'].servedOrderIds = ['legacy-order'];
   delete raw.islandCampaigns[PETALIMP_ISLAND_CAMPAIGN_ID].chapters['1'].selectedOptionId;
   delete raw.islandCampaigns[PETALIMP_ISLAND_CAMPAIGN_ID].chapters['1'].returnConversationSeenAt;
   const migrated = normalizeMergeWorldState(raw, NOW + 10);

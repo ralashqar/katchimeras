@@ -24,6 +24,8 @@ export type UpgradeCoachmarkState = { visible: boolean; revision: number };
 
 export type WorldUpgradeCampaignState = {
   actionLabel?: string;
+  /** Glow the action spends (a restoration stage opening); the button waits until the player has it. */
+  actionCost?: number;
   order?: CompanionMergeRequest | null;
   residentName: string;
   residentSkinId: KatchimeraSkinId;
@@ -126,7 +128,8 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
           onPress={() => { setHistory(false); leave(onConfirm); }} />
       </View>
       {!affordable ? <KatchaButton fullWidth label="Tend garden" disabled={busy || closing} onPress={() => { setHistory(false); leave(onGarden); }} /> : null}
-    </> : campaignState?.actionLabel && onCampaignAction ? <KatchaButton fullWidth label={campaignState.actionLabel} disabled={busy || closing}
+    </> : campaignState?.actionLabel && onCampaignAction ? <KatchaButton fullWidth label={campaignState.actionLabel} disabled={busy || closing || Boolean(campaignState.actionCost && world.coins < campaignState.actionCost)}
+      cost={campaignState.actionCost ? { currency: 'coins', amount: campaignState.actionCost } : undefined}
       onPress={() => { setHistory(false); leave(onCampaignAction); }} />
       : <Text style={styles.cost}>{offer.currentLevel >= offer.maxLevel ? 'Fully grown · ' : ''}Level {offer.currentLevel} / {offer.maxLevel}</Text>}
   </View>;

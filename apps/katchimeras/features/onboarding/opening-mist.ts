@@ -32,6 +32,12 @@ export const OPENING_CAMERA_ZOOM = 0.81;
 export const OPENING_CAMERA_ANCHOR_Y = 0.36;
 /** The first beat starts a little further out and glides in while the captions run. */
 export const OPENING_CAMERA_ENTRY_ZOOM = 0.67;
+/**
+ * Every later docked board (Steppling's mission, a friend's restoration) sits
+ * closer to its tile than the opening did, with the rest of the map faded out.
+ */
+export const MISSION_CAMERA_ZOOM = 0.96;
+export const MISSION_CAMERA_ANCHOR_Y = OPENING_CAMERA_ANCHOR_Y;
 
 /** The opening's sky: twilight, until the hatch. */
 export const OPENING_SKY_SCENE_ID: DayBackgroundSceneId = 'twilight_reflective';

@@ -74,6 +74,7 @@ import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { activeIslandCampaignReturn } from '@/constants/island-campaigns/helpers';
 import { islandCampaignReturnNoteId, parseIslandCampaignReturnNoteId } from '@/constants/island-campaigns/registry';
 import type { IslandCampaignDefinition } from '@/constants/island-campaigns/types';
+import { requestIslandRestorationOpen } from '@/features/island-restoration/restoration-intent';
 import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
 
 import type { MergeBoardScreenMetrics } from './feastle-persistent-merge-board';
@@ -168,6 +169,8 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   }, [creatureId, flushMergeWorld, router, source, transitionTo]);
   const returnToIslandCampaign = useCallback(async (campaign: IslandCampaignDefinition) => {
     await flushMergeWorld();
+    // Land on the friend's board with the island framed, not on the map with a marker to find.
+    requestIslandRestorationOpen(campaign.campaignId);
     transitionTo({
       announcement: `Returning to ${mossproutNatureIslandById.get(campaign.islandId)?.name ?? 'the island'}`,
       target: 'katchimeras',

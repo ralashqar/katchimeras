@@ -10,7 +10,7 @@ import { MOSSPROUT_NATURE_ISLAND_IDS, mossproutNatureIslandById } from '@/consta
 import { PETALIMP_BLOOM_CAMPAIGN, PETALIMP_ISLAND_CAMPAIGN_ID, petalimpIslandChapterOrder } from '@/constants/petalimp-island-campaign';
 import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
 import { ISLAND_WAKE_ORDER, islandWakeState } from '@/constants/island-campaigns/wake-order';
-import { acknowledgeChapterReturn, completeChapter, completeIslandCampaign, greetIslandFriend, restoreIslandLevel, revealIsland, startAndServeChapter } from './helpers/island-campaign';
+import { acknowledgeChapterReturn, completeChapter, completeIslandCampaign, completeRestoration, greetIslandFriend, restoreIslandLevel, revealIsland, startAndServeChapter } from './helpers/island-campaign';
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
 import { mossproutFtueGardenMissionOrder } from '@/utils/merge-world/chapter-zero-policy';
 import { GARDEN_PLANT_SLOT_POSITIONS, MOSSPROUT_FIRST_MEMORY_SLOT_ID, mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
@@ -203,10 +203,17 @@ test('authored Haven upgrades are atomic, economy-explicit, and idempotent by re
   let islandState = reduceMergeWorld(mossproutWorld(), { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW + 3 }).state;
   islandState = greetIslandFriend(revealIsland(islandState, PETALIMP_BLOOM_CAMPAIGN, NOW + 3), PETALIMP_BLOOM_CAMPAIGN, NOW + 3);
   islandState = acknowledgeChapterReturn(startAndServeChapter(islandState, PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 3), PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 3);
+  islandState = completeRestoration(islandState, PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 3);
   islandState = completeChapter(restoreIslandLevel(islandState, PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 3), PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 3);
+  // A restoration-board chapter is paid when its beds open; the island itself then grows only for free.
+  const beforeStage = islandState.coins;
   islandState = acknowledgeChapterReturn(startAndServeChapter(islandState, PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 4), PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 4);
+  assert.equal(islandState.coins, beforeStage - 60);
+  assert.equal(islandState.islandCampaigns![PETALIMP_ISLAND_CAMPAIGN_ID]!.chapters['2']!.restoration?.paidCoins, 60);
+  islandState = completeRestoration(islandState, PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 4);
   islandState = { ...islandState, coins: 0 };
-  const granted = reduceMergeWorld(islandState, {
+  // Whatever economy the authored flow carries, a paid stage neither charges nor grants.
+  const grown = reduceMergeWorld(islandState, {
     type: 'upgradeMossproutNatureIsland',
     islandId: 'bloom-garden',
     level: 2,
@@ -215,10 +222,10 @@ test('authored Haven upgrades are atomic, economy-explicit, and idempotent by re
     grantedCoins: 60,
     now: NOW + 5,
   });
-  assert.equal(granted.changed, true);
-  assert.equal(granted.state.coins, 0);
-  assert.equal(granted.storyWorldMutationReceipt?.coinCost, 60);
-  assert.equal(granted.storyWorldMutationReceipt?.economyMode, 'grant');
+  assert.equal(grown.changed, true);
+  assert.equal(grown.state.coins, 0);
+  assert.equal(grown.storyWorldMutationReceipt?.coinCost, 0);
+  assert.equal(grown.storyWorldMutationReceipt?.economyMode, 'free');
 });
 
 test('island friends come home in wake order, each island keeping the established Glow curve', () => {
@@ -261,15 +268,19 @@ test('nature island upgrades reject skips, duplicate commands, and insufficient 
   assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 3, now: NOW + 2 }).changed, false);
   assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 1, now: NOW + 2 }).changed, false,
     'the first restoration is a gift, never a purchase');
+  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 1, economyMode: 'free', now: NOW + 2 }).changed, false,
+    'the gift waits for the beds');
+  state = completeRestoration(state, PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 2);
   state = completeChapter(restoreIslandLevel(state, PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 2), PETALIMP_BLOOM_CAMPAIGN, 1, NOW + 2);
-  state = acknowledgeChapterReturn(startAndServeChapter(state, PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 3), PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 3);
-  state = { ...state, coins: 59 };
-  assert.equal(reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 2, now: NOW + 5 }).changed, false);
-  state = { ...state, coins: 60 };
+  // The second stage is paid when its beds open: short by one Glow, nothing starts.
+  assert.throws(() => startAndServeChapter({ ...state, coins: 59 }, PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 3), /did not start/);
+  state = acknowledgeChapterReturn(startAndServeChapter({ ...state, coins: 60 }, PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 3), PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 3);
+  assert.equal(state.coins, 0);
+  state = completeRestoration(state, PETALIMP_BLOOM_CAMPAIGN, 2, NOW + 4);
   const upgraded = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 2, now: NOW + 6 });
-  assert.equal(upgraded.changed, true);
-  assert.equal(upgraded.state.coins, 0);
-  assert.equal(reduceMergeWorld(upgraded.state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 2, now: NOW + 7 }).changed, false);
+  assert.equal(upgraded.changed, true, 'the level flow’s normal economy still grows a paid stage');
+  assert.equal(upgraded.state.coins, 0, 'never charged twice');
+  assert.equal(reduceMergeWorld(upgraded.state, { type: 'upgradeMossproutNatureIsland', islandId: 'bloom-garden', level: 2, economyMode: 'free', now: NOW + 7 }).changed, false);
 });
 
 test('v20 restored Havens keep their main stage but restart all new satellites at Level 1', () => {

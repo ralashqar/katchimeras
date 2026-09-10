@@ -38,8 +38,7 @@ import Animated, {
   withTiming,
   withRepeat,
   withDelay,
-  type SharedValue,
-} from 'react-native-reanimated';
+  type SharedValue, runOnJS } from 'react-native-reanimated';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { EggAvatarArtwork, eggAvatarBodyPresentationStyle } from '@/components/katchadeck/egg-avatar/egg-avatar-artwork';
@@ -62,7 +61,7 @@ import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunbur
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
-import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
+import { mossproutNatureIslandById, MOSSPROUT_NATURE_ISLAND_IDS } from '@/constants/mossprout-nature-islands';
 import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants/mossprout-memory-plants';
 import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
 import { Lantern } from '@/constants/theme';
@@ -185,6 +184,8 @@ type Props = {
   onSelectMemoryPlant?: (instanceId: string) => void;
   onSelectGateway?: () => void;
   onGatewayTargetChange?: (node: View | null) => void;
+  /** Screen-space node of an island's tile, for Glow flights into it during its restoration. */
+  onNatureIslandTargetChange?: (islandId: MossproutNatureIslandId, node: View | null) => void;
   storyOperationsEnabled?: boolean;
   worldEggTargetRef?: RefObject<ViewType | null>;
   worldSubjectPresentation?: WorldFtueSubjectPresentation | null;
@@ -201,6 +202,9 @@ type Props = {
   sleepingMarkersInert?: boolean;
   /** Screen-space FTUE target for the home tile (wisp destination, spotlight). */
   onHomeTileTargetChange?: (node: ViewType | null) => void;
+  /** A docked board's tile: every other tile, resident and marker fades out while it is set, and back in when it clears. */
+  soloLayerId?: string | null;
+  soloOfferId?: string | null;
 };
 
 type HavenUpgradeLayers = {
@@ -498,6 +502,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onSelectMemoryPlant,
   onSelectGateway,
   onGatewayTargetChange,
+  onNatureIslandTargetChange,
   storyOperationsEnabled = true,
   worldEggTargetRef,
   worldSubjectPresentation,
@@ -509,6 +514,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   openingWeather = false,
   sleepingMarkersInert = false,
   onHomeTileTargetChange,
+  soloLayerId = null,
+  soloOfferId = null,
 }: Props) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [settledImageScale, setSettledImageScale] = useState(initialCameraSnapshot?.scale ?? 1.25);
@@ -641,6 +648,24 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   );
   // Layers that join the scene after mount (the Garden and the islands after
   // the hatch) fade in instead of snapping; the mount set itself paints at once.
+  // Everything but a docked board's tile fades away while the board is up.
+  // `fadeSolo` outlives `soloLayerId` by one fade: the animated style must stay
+  // attached to the other tiles until they are fully back, because a view
+  // whose animated style is detached keeps its last applied opacity (0).
+  const othersOpacity = useSharedValue(soloLayerId ? 0 : 1);
+  const [fadeSolo, setFadeSolo] = useState<string | null>(soloLayerId);
+  useEffect(() => {
+    const duration = reduceMotion ? 120 : 520;
+    if (soloLayerId) {
+      setFadeSolo(soloLayerId);
+      othersOpacity.value = withTiming(0, { duration, easing: Easing.inOut(Easing.quad) });
+      return;
+    }
+    othersOpacity.value = withTiming(1, { duration, easing: Easing.inOut(Easing.quad) }, (finished) => {
+      if (finished) runOnJS(setFadeSolo)(null);
+    });
+  }, [othersOpacity, reduceMotion, soloLayerId]);
+  const othersStyle = useAnimatedStyle(() => ({ opacity: othersOpacity.value }));
   const mountedLayerIdsRef = useRef<Set<string> | null>(null);
   if (mountedLayerIdsRef.current === null) mountedLayerIdsRef.current = new Set(scene.tileArtLayers.map((layer) => layer.id));
   const layerJoinedLater = useCallback((id: string) => Boolean(mountedLayerIdsRef.current && !mountedLayerIdsRef.current.has(id)), []);
@@ -764,6 +789,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         slotId,
       }))
     : [], [gardenFocusFrame]);
+  // One stable ref callback per island: an inline arrow would be a new ref on every
+  // render, which React re-invokes with null then the node, and each call would set
+  // the Kingdom's state and render this canvas again, without end.
+  const natureIslandTargetRefs = useMemo(() => {
+    const refs = new Map<MossproutNatureIslandId, (node: View | null) => void>();
+    if (onNatureIslandTargetChange) for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) refs.set(islandId, (node) => onNatureIslandTargetChange(islandId, node));
+    return refs;
+  }, [onNatureIslandTargetChange]);
   const natureIslandFrames = useMemo(() => scene.tileArtLayers.flatMap((layer) => {
     if (!layer.id.startsWith('nature:mossprout:') || layer.id.endsWith(':growth') || !layer.interactionFrame) return [];
     return [{
@@ -1002,6 +1035,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       : null;
     if (target.kind === 'haven_gateway') {
       const frame = scene.tileArtLayers.find((layer) => layer.id === 'structure:steppling-home')?.frame;
+      if (!frame) return;
+      appliedTutorialCameraRef.current = applicationKey;
+      focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, { anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom });
+      return;
+    }
+    if (target.kind === 'haven_nature_island') {
+      // A friend's restoration board: the island framed the way the opening framed Mossprout's tile.
+      const frame = scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame;
       if (!frame) return;
       appliedTutorialCameraRef.current = applicationKey;
       focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, { anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom });
@@ -1666,7 +1707,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               const joinedLater = layerJoinedLater(layer.id);
               return (
                 <Fragment key={`tile-stack-${layer.id}`}>
-                  <Animated.View entering={joinedLater ? FadeIn.duration(reduceMotion ? 120 : 720) : undefined} pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+                  <Animated.View entering={joinedLater ? FadeIn.duration(reduceMotion ? 120 : 720) : undefined} pointerEvents="box-none"
+                    style={fadeSolo && layer.id !== fadeSolo ? [StyleSheet.absoluteFill, othersStyle] : StyleSheet.absoluteFill}>
                   <KingdomTileArt
                     hidden={transitionHasPainted}
                     focusAnchorX={scene.tileById.get(layer.id)?.cx ?? layer.frame.left + layer.frame.width / 2}
@@ -1766,6 +1808,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               return (
                 <Pressable
                   key={`nature-island-hit-target-${islandId}`}
+                  ref={natureIslandTargetRefs.get(islandId)}
+                  collapsable={false}
                   accessibilityHint="Opens this island's growth and upgrade details"
                   accessibilityLabel={`${definition?.name ?? 'Nature island'}, level ${level} of 4`}
                   accessibilityRole="button"
@@ -1805,7 +1849,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               return home ? <View collapsable={false} pointerEvents="none" ref={onHomeTileTargetChange}
                 style={{ position: 'absolute', left: home.frame.left, top: home.frame.top, width: home.frame.width, height: home.frame.height }} /> : null;
             })() : null}
-            {creatureNodes}
+            <Animated.View pointerEvents={soloLayerId ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle]}>{creatureNodes}</Animated.View>
           </Animated.View>
           {/* Rendered inside the camera's own GestureDetector, not after it,
               so a drag starting on a marker still pans/pinches the world —
@@ -1821,7 +1865,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               ? scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame
               : storyTargetFrame(target);
             return frame ? <WorldUpgradeMarker key={offer.id} offer={offer} frame={frame}
-              hidden={Boolean(selectedUpgradeOffer)}
+              hidden={Boolean(selectedUpgradeOffer) || Boolean(soloLayerId && offer.id !== soloOfferId)}
               selected={selectedUpgradeOffer?.id === offer.id}
               cameraScale={camera.scaleValue} cameraX={camera.translationXValue} cameraY={camera.translationYValue}
               sceneWidth={scene.width} sceneHeight={scene.height} moving={camera.isMoving}
@@ -1876,7 +1920,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           sceneHeight={scene.height} sceneWidth={scene.width} x={anchor.x} y={anchor.y - SHARED_RESIDENT_BASELINE_LIFT}
           onPress={interactionEnabled && !upgradePresentation && !storySceneGuard ? onSelectGateway : undefined} />;
       })() : null}
-      {memoryPlantProjections.map((plant) => (
+      {/* Planted memories fade with the rest of the map while a docked board is up. */}
+      <Animated.View pointerEvents={soloLayerId ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle]}>{memoryPlantProjections.map((plant) => (
         <ProjectedMemoryPlant
           animateReveal={!plant.preview && memoryPlantRevealKeys.has(plant.visualKey)}
           opacity={plant.preview ? 0.2 : 1}
@@ -1891,7 +1936,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           source={plant.source}
           visualKey={plant.visualKey}
         />
-      ))}
+      ))}</Animated.View>
       {selectedUpgradeOffer && upgradePanel && !upgradePresentation ? <>
         <Pressable style={[StyleSheet.absoluteFill, { zIndex: 31 }]} accessibilityRole="button" accessibilityLabel="Close upgrade" onPress={onDismissUpgrade} />
         {(() => {

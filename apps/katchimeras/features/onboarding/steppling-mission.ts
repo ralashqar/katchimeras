@@ -2,7 +2,7 @@ import type { FtueCameraDirective, FtueStepDefinition, FtueTarget } from './ftue
 import type { MergeWorldState } from '@/types/merge-world';
 import { createGeneratorState } from '@/utils/merge-world/engine';
 import { createOpeningMissionState } from './opening-mission-state';
-import { closestOpeningPair, OPENING_CAMERA_ANCHOR_Y, OPENING_CAMERA_ZOOM, OPENING_MERGE_WINDOW_CELLS } from './opening-mist';
+import { closestOpeningPair, MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_MERGE_WINDOW_CELLS } from './opening-mist';
 
 /**
  * Steppling's mist mission: the second misted tile is cleared the way the
@@ -29,9 +29,9 @@ export const STEPPLING_MISSION_ITEMS: readonly { cell: number; definitionId: str
   { cell: 26, definitionId: 'adventure:trail:2' },
   { cell: 24, definitionId: 'adventure:trail:3' },
 ];
-/** The opening's framing, on Steppling's tile: the tile above, the board beneath. */
+/** Steppling's tile close, the board beneath, the rest of the map faded. */
 export const STEPPLING_MISSION_CAMERA: FtueCameraDirective = {
-  kind: 'focus_target', target: { kind: 'haven_gateway' }, zoom: OPENING_CAMERA_ZOOM, anchorY: OPENING_CAMERA_ANCHOR_Y, durationMs: 900,
+  kind: 'focus_target', target: { kind: 'haven_gateway' }, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 900,
 };
 
 const LOCKER_TARGET: FtueTarget = { kind: 'board_generator', generatorId: STEPPLING_MISSION_GENERATOR_ID };

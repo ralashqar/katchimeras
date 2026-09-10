@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { StyleSheet, Text, View, type View as ViewType } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { Pressable, StyleSheet, Text, View, type View as ViewType } from 'react-native';
 import Animated, { Easing, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
@@ -14,7 +14,7 @@ import { KatchaDeckUI } from '@/constants/theme';
 import type { FtueEvent, FtueRunState, FtueStepDefinition } from '@/features/onboarding/ftue-types';
 import { mergeFtueBoardGate } from '@/features/onboarding/merge-ftue';
 import { createMergeBoardSession, MergeFtueInteractionCoordinator } from '@/features/onboarding/merge-ftue-interaction-coordinator';
-import { OPENING_BOARD_LAYOUT, OPENING_MERGE_REQUIRED, OPENING_MERGE_WINDOW_COLUMNS, OPENING_MERGE_WINDOW_ROWS, openingMergesOnBoard, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
+import { OPENING_BOARD_LAYOUT, OPENING_MERGE_REQUIRED, OPENING_MERGE_WINDOW_COLUMNS, openingMergesOnBoard, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
 import { dispatchFtueEvent } from '@/features/onboarding/ftue-runtime';
 import { useFtueMergeDispatch } from '@/features/onboarding/use-ftue-merge-dispatch';
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
@@ -140,8 +140,11 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
  * land on the resting layout. Whose board it is, what counts, and what a
  * merge does are the caller's: the dock only shows and forwards commands.
  */
-export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, interactionKey, sessionId, hiddenItemIds, width, bottomInset, impactKey = 0, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
+export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Clear the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, impactKey = 0, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, overlay, rootRef }: {
   state: MergeWorldState;
+  /** The window over the canonical board; the opening's 5×4 by default. */
+  layout?: typeof OPENING_BOARD_LAYOUT | (Omit<typeof OPENING_BOARD_LAYOUT, 'rows' | 'cellIndices' | 'accessibilityLabel'> & { rows: number; cellIndices: readonly number[]; accessibilityLabel: string });
+  barTitle?: string;
   /** The beat gating the board and pointing at it, if any. */
   boardStep: FtueStepDefinition | null;
   /** Counted merges, as the caller's checkpoint has them; the bar trails by one Glow flight. */
@@ -159,6 +162,15 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
   onBlockedInteraction?: () => void;
   /** Fired once the fade-in has finished and the board has re-measured: the moment guidance may point at it. */
   onEntranceSettled?: () => void;
+  /** An optional board (a friend's restoration) can be put away and reopened from its marker. */
+  onClose?: () => void;
+  closeLabel?: string;
+  /** A card above the bar (a friend's request tray). */
+  header?: ReactNode;
+  /** Drawn over the whole dock (a delivery flight into the board). */
+  overlay?: ReactNode;
+  /** The dock's root, for measuring flights relative to it. */
+  rootRef?: RefObject<ViewType | null>;
 }) {
   // Set when the entrance finishes; cleared by the measurement it triggers.
   // Guidance is told only then, so it never lays out on a mid-entrance frame.
@@ -196,8 +208,8 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const parcelRef = useRef<ViewType | null>(null);
   const boardWidth = Math.min(width - 28, 400);
-  const cell = Math.floor((boardWidth - OPENING_BOARD_LAYOUT.contentInset * 2) / OPENING_MERGE_WINDOW_COLUMNS);
-  const boardHeight = cell * OPENING_MERGE_WINDOW_ROWS + OPENING_BOARD_LAYOUT.contentInset * 2 + 2;
+  const cell = Math.floor((boardWidth - layout.contentInset * 2) / OPENING_MERGE_WINDOW_COLUMNS);
+  const boardHeight = cell * layout.rows + layout.contentInset * 2 + 2;
   const gate = useMemo(() => mergeFtueBoardGate(boardStep, state), [boardStep, state]);
 
   // Entrance: the dock stays invisible until the board has painted its first
@@ -230,12 +242,18 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
     transform: [{ translateY: (1 - entrance.value) * 28 }, { scale: 0.94 + entrance.value * 0.06 }],
   }));
 
-  return <Animated.View exiting={FadeOut.duration(260)} pointerEvents="box-none"
+  return <Animated.View ref={rootRef} collapsable={false} exiting={FadeOut.duration(260)} pointerEvents="box-none"
     style={[styles.dock, { paddingBottom: bottomInset + 14 }, entranceStyle]}>
-    <ClearTheMistBar progress={shownProgress} total={required} width={boardWidth} impactKey={impactKey} />
+    {onClose ? <View pointerEvents="box-none" style={[styles.closeRow, { width: boardWidth }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={closeLabel ?? 'Put the board away'} hitSlop={8} onPress={onClose} style={styles.close}>
+        <Text style={styles.closeText}>{closeLabel ?? 'Later'}</Text>
+      </Pressable>
+    </View> : null}
+    {header ? <View pointerEvents="box-none" style={{ width: boardWidth }}>{header}</View> : null}
+    <ClearTheMistBar progress={shownProgress} total={required} width={boardWidth} impactKey={impactKey} title={barTitle} />
     <MergePlaySurface
       animateEntrance={false}
-      boardLayout={OPENING_BOARD_LAYOUT}
+      boardLayout={layout}
       boardState={state}
       railHidden
       counterHidden
@@ -267,11 +285,12 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
       trayEntries={[]}
       width={boardWidth}
     />
+    {overlay}
   </Animated.View>;
 });
 
 /** The bar interpolates its fill, flashes its halo on every landed Glow, and swells once per counted merge. */
-export function ClearTheMistBar({ progress, total, width, impactKey = 0 }: { progress: number; total: number; width?: number; impactKey?: number }) {
+export function ClearTheMistBar({ progress, total, width, impactKey = 0, title = 'Clear the Mist' }: { progress: number; total: number; width?: number; impactKey?: number; title?: string }) {
   const reduceMotion = useReducedMotion();
   const scale = useSharedValue(1);
   const halo = useSharedValue(0);
@@ -294,11 +313,11 @@ export function ClearTheMistBar({ progress, total, width, impactKey = 0 }: { pro
   }, [progress, reduceMotion, scale]);
   const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const haloStyle = useAnimatedStyle(() => ({ opacity: halo.value }));
-  return <Animated.View accessibilityRole="progressbar" accessibilityLabel="Clear the Mist" accessibilityValue={{ min: 0, max: total, now: progress, text: `${progress} of ${total}` }}
+  return <Animated.View accessibilityRole="progressbar" accessibilityLabel={title} accessibilityValue={{ min: 0, max: total, now: progress, text: `${progress} of ${total}` }}
     style={[styles.bar, width != null ? { width } : null, pulseStyle]}>
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.barHalo, haloStyle]} />
     <View style={styles.barHeader}>
-      <Text style={styles.barTitle}>Clear the Mist</Text>
+      <Text style={styles.barTitle}>{title}</Text>
       <Text style={styles.barCount}>{progress}/{total}</Text>
     </View>
     <ProgressBar current={progress} total={total} minimumPercent={0} variant="egg" color={BAR_FILL_COLOR} trackColor={BAR_TRACK_COLOR} />
@@ -412,6 +431,15 @@ export function useOpeningGlow(targetNode: ViewType | null) {
     // The burst is over; let it settle before the lift beat takes the screen.
     if (id === finaleIdRef.current) setTimeout(() => setFinaleActive(false), OPENING_FINALE_SETTLE_MS);
   }, []);
+  /** One merge's item, alone, into the tile: a restoration board sends what it just made, not Glow. */
+  const launchItem = useCallback((from: RewardFlightPoint, definitionId: string) => {
+    const id = ++nextId.current;
+    const art = mergeWorldItemArt(definitionId) as number | undefined;
+    const push = (to: RewardFlightPoint) => setFlights((current) => [...current, { id, index: 0, count: 1, from, to, art, size: 44 }]);
+    const target = targetRef.current;
+    if (!target) { push({ x: from.x, y: from.y - 220 }); return; }
+    target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.55 }));
+  }, []);
   /** The final merge's item, large and alone, straight up into the mist. */
   const launchFinale = useCallback((from: RewardFlightPoint, definitionId: string): number => {
     const id = ++nextId.current;
@@ -425,11 +453,14 @@ export function useOpeningGlow(targetNode: ViewType | null) {
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.5 }));
     return id;
   }, []);
-  return { flights, impacts, landed, finaleActive, finaleLanded, finaleLandedId, launch, launchFinale, arrive, impactDone };
+  return { flights, impacts, landed, finaleActive, finaleLanded, finaleLandedId, launch, launchItem, launchFinale, arrive, impactDone };
 }
 
 const styles = StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60, alignItems: 'center', gap: 10 },
+  closeRow: { alignItems: 'flex-end', marginBottom: -4 },
+  close: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF', boxShadow: '0 3px 10px rgba(20,40,60,0.14)' },
+  closeText: { color: '#2E4A66', fontSize: 13, lineHeight: 16, fontWeight: '800' },
   bar: {
     gap: 5, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 16, overflow: 'visible',
     backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF',
