@@ -70,7 +70,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   },
   nodes: [
     scene('world.mist_open', 'haven', [{ id: 'world.look_closer', next: 'world.mist_clear' }]),
-    task('world.mist_clear', 'haven', { id: 'world.clear_mist', event: ftueEvent('merge_completed'), count: 8, next: 'world.mist_lift' }),
+    task('world.mist_clear', 'haven', { id: 'world.clear_mist', event: ftueEvent('merge_completed'), count: 7, next: 'world.mist_lift' }),
     scene('world.mist_lift', 'haven', [{ id: 'world.mist_lifted', next: 'world.egg_intro' }]),
     scene('world.egg_intro', 'haven', [{ id: 'world.inspect_mossprout_egg', next: 'egg.opening' }]),
     scene('egg.opening', 'haven', [{ id: 'egg.day_texture', next: 'egg.context' }]),

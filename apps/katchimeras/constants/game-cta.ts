@@ -8,6 +8,8 @@ export const GAME_CTA = {
   text: '#583617',
   face: ['#F5D37A', '#EDBD54', '#DFAA3D'] as const,
   shadow: '0 4px 8px rgba(83,52,17,0.22)',
+  /** The hero CTA's warm halo: the same drop plus a wide soft glow. */
+  haloShadow: '0 4px 8px rgba(83,52,17,0.22), 0 0 26px rgba(255,205,110,0.5)',
   bevel: 'inset 0 2px 0 rgba(255,245,198,0.55)',
   label: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 22, lineHeight: 27,
     fontWeight: 'normal' as const, textTransform: 'uppercase' as const, textAlign: 'center' as const },

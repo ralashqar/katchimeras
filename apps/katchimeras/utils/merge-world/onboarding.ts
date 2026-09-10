@@ -67,17 +67,22 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
 }
 
 /**
- * The mist-veiled opening's board: the Chapter 0 board with eight Seeds and
- * two Sprouts placed inside the docked 5×4 window (columns 1–5, rows 2–5).
- * Merging everything that is placed makes exactly eight merges and leaves one
- * Plant (for "The First Bloom") and one Flower. The Basket stays as slack.
+ * The mist-veiled opening's board: two mirrored chains inside the docked 5×4
+ * window (columns 1–5, rows 2–5), each two Seeds, a Sprout and a Plant, laid
+ * out as a pyramid. Each chain climbs to a Flower in three merges and the two
+ * Flowers meet in one final merge: seven merges, ending with a single Rare
+ * Flower that is given to the Mist. The board ends empty on purpose.
  *
  * The window shows plain cells only: its three misted cells open with the
  * clearing, and the four dream echoes that sat inside it move to free cells
- * just above and below it, where the full Merge page still finds them.
+ * just above and below it, where the full Merge page still finds them. The
+ * Basket is not part of the opening either: it waits just below the window
+ * for the persistent board's first request.
  */
-export const MOSSPROUT_OPENING_SEED_CELLS: readonly number[] = [16, 17, 18, 22, 29, 30, 32, 33];
-export const MOSSPROUT_OPENING_SPROUT_CELLS: readonly number[] = [24, 36];
+export const MOSSPROUT_OPENING_BASKET_CELL = 44;
+export const MOSSPROUT_OPENING_SEED_CELLS: readonly number[] = [16, 17, 18, 19];
+export const MOSSPROUT_OPENING_SPROUT_CELLS: readonly number[] = [23, 25];
+export const MOSSPROUT_OPENING_PLANT_CELLS: readonly number[] = [30, 32];
 export const MOSSPROUT_OPENING_WINDOW_CELLS: readonly number[] = [15, 16, 17, 18, 19, 22, 23, 24, 25, 26, 29, 30, 31, 32, 33, 36, 37, 38, 39, 40];
 const OPENING_ECHO_CELLS: Record<number, number> = { 23: 9, 25: 10, 37: 11, 39: 47 };
 
@@ -88,15 +93,18 @@ export function createMossproutOpeningState(now = Date.now(), rewardWispId: Wisp
     board[to] = { ...board[to], locked: false, blocker: null, regionId: 'inner-mist', mist: board[from].mist, occupant: null };
   }
   for (const cell of MOSSPROUT_OPENING_WINDOW_CELLS) {
-    if (cell === 31) continue;
     board[cell] = { ...board[cell], locked: false, blocker: null, regionId: 'central-clearing', mist: null, occupant: null };
   }
-  const legacyIds: Record<number, string> = { 29: 'onboarding-seed-a', 30: 'onboarding-seed-b', 32: 'onboarding-seed-c', 33: 'onboarding-seed-d' };
+  board[MOSSPROUT_OPENING_BASKET_CELL] = { ...board[MOSSPROUT_OPENING_BASKET_CELL], occupant: { kind: 'generator', generatorId: 'wild-garden' } };
+  const legacyIds: Record<number, string> = { 16: 'onboarding-seed-a', 17: 'onboarding-seed-b', 18: 'onboarding-seed-c', 19: 'onboarding-seed-d' };
   MOSSPROUT_OPENING_SEED_CELLS.forEach((cell, index) => {
     board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId: legacyIds[cell] ?? `opening-seed-${index}`, definitionId: 'nature:garden:1' } };
   });
   MOSSPROUT_OPENING_SPROUT_CELLS.forEach((cell, index) => {
     board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId: `opening-sprout-${index}`, definitionId: 'nature:garden:2' } };
+  });
+  MOSSPROUT_OPENING_PLANT_CELLS.forEach((cell, index) => {
+    board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId: `opening-plant-${index}`, definitionId: 'nature:garden:3' } };
   });
   return { ...state, board };
 }

@@ -22,8 +22,14 @@ export type KatchaButtonProps = {
   disabled?: boolean;
   fullWidth?: boolean;
   glow?: boolean;
+  /** A warm outer halo around the face (hero CTAs). */
+  halo?: boolean;
   icon?: IconSymbolName;
   label: string;
+  /** A small glyph at both ends of the label, mirrored on the right (hero CTAs). */
+  ornament?: IconSymbolName;
+  /** Fully rounded ends. */
+  pill?: boolean;
   loading?: boolean;
   onPress?: () => void;
   size?: KatchaButtonSize;
@@ -38,10 +44,13 @@ export function KatchaButton({
   disabled = false,
   fullWidth = false,
   glow = false,
+  halo = false,
   icon,
   label,
   loading = false,
   onPress,
+  ornament,
+  pill = false,
   size = 'regular',
   style,
   variant = 'primary',
@@ -55,7 +64,8 @@ export function KatchaButton({
   const foreground = primary ? GAME_CTA.text : destructive ? tokens.destructiveText : tokens.text;
   const fill = destructive ? tokens.destructive : tertiary ? 'transparent' : tokens.elevated;
   const rim = primary ? GAME_CTA.rim : destructive ? tokens.destructivePressed : tokens.borderStrong;
-  const radius = size === 'compact' ? GAME_CTA.compactRadius : GAME_CTA.radius;
+  const radius = pill ? 999 : size === 'compact' ? GAME_CTA.compactRadius : GAME_CTA.radius;
+  const ornamentColor = primary ? 'rgba(88,54,23,0.55)' : foreground;
 
   return (
     <Pressable
@@ -72,7 +82,7 @@ export function KatchaButton({
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       style={[styles.pressable, fullWidth && styles.fullWidth, style, (disabled || loading) && styles.disabled]}>
-      <Animated.View style={[styles.shadow, { borderRadius: radius }, fullWidth && styles.fullWidth, press.animatedStyle, primary && { boxShadow: GAME_CTA.shadow }]}>
+      <Animated.View style={[styles.shadow, { borderRadius: radius }, fullWidth && styles.fullWidth, press.animatedStyle, primary && { boxShadow: halo ? GAME_CTA.haloShadow : GAME_CTA.shadow }]}>
         <View style={[
           styles.rim,
           size === 'compact' && styles.compactRim,
@@ -84,6 +94,7 @@ export function KatchaButton({
             {primary ? <LinearGradient colors={GAME_CTA.face} end={{ x: 0.5, y: 1 }} start={{ x: 0.5, y: 0 }} style={StyleSheet.absoluteFill} /> : null}
             {primary ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius - 3, boxShadow: GAME_CTA.bevel }]} /> : null}
             <View style={[styles.labelRow, cost && styles.costRow]}>
+              {ornament && !loading ? <IconSymbol color={ornamentColor} name={ornament} size={size === 'compact' ? 14 : 18} style={styles.ornamentLeft} /> : null}
               <View style={[styles.labelRow, cost && styles.actionGroup]}>
                 {loading ? <ActivityIndicator color={foreground} size="small" /> : null}
                 {icon && icon !== 'sparkles' && !loading ? <IconSymbol color={foreground} name={icon} size={size === 'compact' ? 15 : 17} /> : null}
@@ -93,6 +104,7 @@ export function KatchaButton({
                 <Image source={GAME_CURRENCY_ART[cost.currency]} contentFit="contain" transition={0} style={[styles.currencyIcon, size === 'compact' && styles.compactCurrencyIcon]} />
                 <ThemedText style={[styles.label, size === 'compact' && styles.compactLabel]} lightColor={foreground} darkColor={foreground}>{cost.amount.toLocaleString()}</ThemedText>
               </View> : null}
+              {ornament && !loading ? <IconSymbol color={ornamentColor} name={ornament} size={size === 'compact' ? 14 : 18} style={styles.ornamentRight} /> : null}
             </View>
           </View>
         </View>
@@ -118,6 +130,8 @@ const styles = StyleSheet.create({
   costRow: { alignSelf: 'stretch', justifyContent: 'center', gap: 12 },
   actionGroup: { flexShrink: 1, justifyContent: 'center' },
   currencyGroup: { alignItems: 'center', flexDirection: 'row', gap: 6, flexShrink: 0 },
+  ornamentLeft: { marginRight: 14, transform: [{ rotate: '-18deg' }] },
+  ornamentRight: { marginLeft: 14, transform: [{ scaleX: -1 }, { rotate: '-18deg' }] },
   currencyIcon: { width: 40, height: 44 },
   compactCurrencyIcon: { width: 32, height: 36 },
   label: { ...GAME_CTA.label, flexShrink: 1 },

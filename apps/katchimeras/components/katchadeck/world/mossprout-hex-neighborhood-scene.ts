@@ -368,7 +368,9 @@ export function buildMossproutHexNeighborhoodScene(
   // A reveal must never shift the scene origin (and every other island/camera).
   const natureBoundsLayers = MOSSPROUT_NATURE_ISLANDS.flatMap((island) =>
     [natureLayerFor(island.id, 0), natureLayerFor(island.id, 0, true), ...island.levels.map((level) => natureLayerFor(island.id, level.level, true))]);
-  const boundsLayers = [...rawLayers, unveiledMain, gardenLayer, lockedSteppling, revealedSteppling, ...natureBoundsLayers];
+  const boundsLayers = [...rawLayers, lockedSteppling, revealedSteppling, ...natureBoundsLayers];
+  // Veiled or solo scenes leave layers out; their frames still shape the envelope.
+  boundsLayers.push(unveiledMain, gardenLayer);
   const { dx, dy, width, height } = mossproutSceneEnvelope(boundsLayers.map(layer => layer.frame));
   const layers = rawLayers.map((layer) => shiftLayer(layer, dx, dy)).sort((a, b) => a.depth - b.depth);
   const mainPoint = mossproutHexPoint(MAIN.coord);

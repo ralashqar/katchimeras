@@ -48,7 +48,7 @@ export function KingdomOpeningCaption({ step, bottomInset, onLookCloser }: {
     </Pressable>
     <View pointerEvents="box-none" style={styles.buttonSlot}>
       {page === 1 ? <Animated.View entering={FadeIn.delay(reduceMotion ? 0 : 320).duration(reduceMotion ? 80 : 420)} style={styles.button}>
-        <KatchaButton fullWidth glow icon={action?.icon ?? 'sparkles'} label={action?.title ?? 'Look closer'} onPress={onLookCloser} />
+        <KatchaButton fullWidth glow halo pill ornament="leaf.fill" label={action?.title ?? 'Look closer'} onPress={onLookCloser} />
       </Animated.View> : null}
     </View>
   </View>;

@@ -41,9 +41,8 @@ import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/nav
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { MergeWorldProvider, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
-import { advanceFtueActionDurably, commitFtueAction, ftueWispForRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { homeSoloForStep, isMossproutOpeningStep, OPENING_SKY_SCENE_ID } from '@/features/onboarding/opening-mist';
-import { installMossproutOnboardingMergeWorld } from '@/utils/merge-world/repository';
 import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 import { useEggAvatar } from '@/features/egg-avatar/egg-avatar-provider';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
@@ -389,20 +388,6 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       publishWorldSession('mossprout');
     }
   }, [ftueRun?.status, ftueRun?.stepId, publishWorldSession]);
-  // The opening plays on the real board, so it is installed the moment a run
-  // starts. The later Merge handoff sees `mergeInstalled` and keeps this board.
-  const openingInstallRunRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (ftueRun?.status !== 'active' || ftueRun.mergeInstalled || !isMossproutOpeningStep(ftueRun.stepId)) return;
-    if (openingInstallRunRef.current === ftueRun.runId) return;
-    openingInstallRunRef.current = ftueRun.runId;
-    void installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(ftueRun), { preserveHaven: true, opening: true })
-      .then(() => { updateFtueRun({ mergeInstalled: true }); })
-      .catch((error) => {
-        openingInstallRunRef.current = null;
-        console.warn('The opening board could not be installed', error);
-      });
-  }, [ftueRun]);
   const closeWorld = useCallback(() => {
     if (havenNavigationLocked) return;
     transitionTo({

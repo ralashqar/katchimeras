@@ -103,7 +103,7 @@ test('streamlined introduction resumes at every boundary and hands off to the se
     } else assert.fail(`Unhandled FTUE node ${node.id}`);
   }
   assert.equal(run.status, 'completed');
-  assert.equal(events.filter((type) => type === 'ftue.merge_completed').length, 8, 'the opening counts eight merges; the drag lesson is retired');
+  assert.equal(events.filter((type) => type === 'ftue.merge_completed').length, 7, 'the opening counts seven merges: two chains and the one that joins them');
   assert.equal(events.filter((type) => type === 'ftue.item_spawned').length, 0);
   assert.ok(visited.has('effect.haven.start_glow_discovery'));
   assert.ok(visited.has('world.seed_planted'));

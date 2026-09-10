@@ -16,9 +16,13 @@ export const OPENING_CLEAR_ACTION_ID = 'world.clear_mist';
 export const OPENING_LIFTED_ACTION_ID = 'world.mist_lifted';
 export const MOSSPROUT_OPENING_STEP_IDS: readonly string[] = [OPENING_MIST_OPEN_STEP_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID];
 
-/** Merges that fill the bar. Eight is what the opening board can make from its placed pieces. */
-export const OPENING_MERGE_REQUIRED = 8;
-/** The first merges keep the authored spotlight and finger; after that the board is free. */
+/** Merges that fill the bar: two chains of three, then the one merge that joins them. The board ends empty. */
+export const OPENING_MERGE_REQUIRED = 7;
+/**
+ * The first merges are guided the way the original full-board lesson was:
+ * an exclusive drag of one pair, nothing else allowed. The first shows the
+ * spotlight and the finger, the second only the finger, then the board is free.
+ */
 export const OPENING_GUIDED_MERGES = 2;
 /**
  * The opening camera: Mossprout's veiled tile close, its resting marker
@@ -91,27 +95,54 @@ export const OPENING_BOARD_LAYOUT = {
   rows: OPENING_MERGE_WINDOW_ROWS,
   cellIndices: OPENING_MERGE_WINDOW_CELLS,
   transparentSurface: false,
+  // The page's base art is a 7×9 checkerboard image that would stretch over a
+  // 5×4 window; the native per-cell checker gives the same read at any size.
   baseArtOpacity: 0,
+  checkerboardCellColor: 'rgba(222,232,170,0.17)',
   contentInset: 6,
 } as const;
 
-function pairExists(state: MergeWorldState, cells: readonly number[]) {
-  const counts = new Map<string, number>();
+/** The closest two cells in the window holding the same item; the guided drag points at these. */
+export function closestOpeningPair(state: MergeWorldState, cells: readonly number[] = OPENING_MERGE_WINDOW_CELLS): { from: number; to: number } | null {
+  const byDefinition = new Map<string, number[]>();
   for (const index of cells) {
     const cell = state.board[index];
     if (!cell || cell.locked || cell.mist || cell.occupant?.kind !== 'item') continue;
-    counts.set(cell.occupant.definitionId, (counts.get(cell.occupant.definitionId) ?? 0) + 1);
+    byDefinition.set(cell.occupant.definitionId, [...(byDefinition.get(cell.occupant.definitionId) ?? []), index]);
   }
-  return [...counts.values()].some((count) => count >= 2);
+  let best: { from: number; to: number; distance: number } | null = null;
+  for (const indices of byDefinition.values()) {
+    for (let a = 0; a < indices.length; a++) {
+      for (let b = a + 1; b < indices.length; b++) {
+        const [ax, ay] = [indices[a] % 7, Math.floor(indices[a] / 7)];
+        const [bx, by] = [indices[b] % 7, Math.floor(indices[b] / 7)];
+        const distance = Math.hypot(ax - bx, ay - by);
+        if (!best || distance < best.distance) best = { from: indices[a], to: indices[b], distance };
+      }
+    }
+  }
+  return best ? { from: best.from, to: best.to } : null;
+}
+
+/** Items placed on the opening board; every merge removes exactly one, and nothing else adds any. */
+export const OPENING_ITEMS_AT_START = 8;
+/** What the last merge makes and the Mist takes. */
+export const OPENING_FINAL_ITEM_ID = 'nature:garden:5';
+
+/** Merges the board itself shows: the checkpoint can trail this after a kill, never lead it by more than one. */
+export function openingMergesOnBoard(state: MergeWorldState): number {
+  const items = OPENING_MERGE_WINDOW_CELLS.reduce((count, index) => count + (state.board[index]?.occupant?.kind === 'item' ? 1 : 0), 0);
+  return Math.max(0, Math.min(OPENING_MERGE_REQUIRED, OPENING_ITEMS_AT_START - items));
 }
 
 /**
- * The beat the docked board projects. The authored step (spotlight and finger
- * on the first pair) for the first guided merges, then the same step with its
- * guidance removed so the board is free; when the window holds nothing that
- * can be merged before the bar is full (a kill left the board one merge ahead
- * of the checkpoint), the Basket refills it. The refill is a merge-surface
- * step so the board's gates and finger apply to it.
+ * The beat the docked board projects. For the first guided merges it is a
+ * merge-surface step that allows exactly one drag (the closest pair), with the
+ * spotlight and finger on the first and only the finger on the second, the
+ * same constraints the original full-board lesson used; then the authored
+ * haven step with its guidance removed, so the board is free. A board that
+ * ran ahead of the checkpoint is caught up by `openingMergesOnBoard`, not by
+ * a refill, so nothing else ever needs to be on the board.
  */
 export function openingMistBoardStep(
   authored: FtueStepDefinition | null,
@@ -119,21 +150,18 @@ export function openingMistBoardStep(
   count: number,
 ): FtueStepDefinition | null {
   if (!authored || !state) return authored;
-  if (count >= OPENING_MERGE_REQUIRED || pairExists(state, OPENING_MERGE_WINDOW_CELLS)) {
-    if (count < OPENING_GUIDED_MERGES || (!authored.cue && !authored.spotlight)) return authored;
-    return { ...authored, cue: undefined, spotlight: undefined };
+  const pair = count < OPENING_MERGE_REQUIRED ? closestOpeningPair(state) : null;
+  if (pair && count < OPENING_GUIDED_MERGES) {
+    const from: FtueTarget = { kind: 'board_cell', cell: pair.from };
+    const to: FtueTarget = { kind: 'board_cell', cell: pair.to };
+    const first = count === 0;
+    return {
+      ...authored, id: `${authored.id}.guided-${count + 1}`, surface: 'merge',
+      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from, to } },
+      cue: { kind: 'drag', from, to },
+      spotlight: first ? { targets: [from, to], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.64 } : undefined,
+    };
   }
-  const basket = state.board.findIndex((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'wild-garden');
-  if (basket < 0 || !OPENING_MERGE_WINDOW_CELLS.includes(basket)) return authored;
-  const target: FtueTarget = { kind: 'board_generator', generatorId: 'wild-garden' };
-  if (!OPENING_MERGE_WINDOW_CELLS.some((index) => { const cell = state.board[index]; return cell && !cell.locked && !cell.mist && !cell.occupant; })) return {
-    id: `${authored.id}.refill`, surface: 'merge', actions: [],
-    guide: { eyebrow: 'A little room', title: 'Make space first.', body: 'Merge two of the same, then we’ll continue.' },
-  };
-  return {
-    id: `${authored.id}.refill`, surface: 'merge', actions: [],
-    guide: { eyebrow: 'Making light', title: 'Nothing left to pair. Tap the Basket.', body: 'It grows another Seed.' },
-    cue: { kind: 'tap', target }, spotlight: { targets: [target] },
-    interaction: { mode: 'exclusive', allowed: { kind: 'generator_tap', target } },
-  };
+  if (!authored.cue && !authored.spotlight) return authored;
+  return { ...authored, cue: undefined, spotlight: undefined };
 }

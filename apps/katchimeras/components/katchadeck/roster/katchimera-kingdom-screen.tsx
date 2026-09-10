@@ -4,7 +4,7 @@ import { advanceGlowUpgrade, recoverPaidGlowUpgrade } from '@/features/onboardin
 import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, OPENING_CAMERA_ENTRY_ZOOM, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
 import { KingdomOpeningMergeDock, OpeningGlowLayer, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
 import { KingdomOpeningCaption } from '@/components/katchadeck/world/kingdom-opening-caption';
-import { isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
+import { clearOpeningMission, useOpeningMissionBoard } from '@/features/onboarding/use-opening-mission-board';
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { worldUpgradeRunId } from '@/features/world-upgrades/world-upgrade-flows';
 import { WORLD_UPGRADE_DEFINITIONS, worldUpgradeMaxLevel, visibleWorldUpgradeOffers, worldUpgradeOffers, worldUpgradeArchiveOffer, type WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
@@ -481,11 +481,18 @@ export function KatchimeraKingdomScreen({
   const [openingBlockedNonce, setOpeningBlockedNonce] = useState(0);
   const openingRailRefs = useRef(new Map<string, View>());
   const bumpOpeningBlocked = useCallback(() => setOpeningBlockedNonce((nonce) => nonce + 1), []);
-  const openingBoardActive = ftueStepId === OPENING_MIST_CLEAR_STEP_ID && Boolean(openingRun?.mergeInstalled) && isMossproutChapterZeroActive(mergeWorld);
+  // The mission board: its own state and store, alive for the clear beat (and the lift while the final item flies).
+  const missionRunId = openingRun && (ftueStepId === OPENING_MIST_CLEAR_STEP_ID || ftueStepId === OPENING_MIST_LIFT_STEP_ID) ? openingRun.runId : null;
+  const mission = useOpeningMissionBoard(missionRunId);
+  useEffect(() => {
+    // The mission is over once the mist has lifted: its store goes with it.
+    if (ftueStepId === 'world.egg_intro') clearOpeningMission();
+  }, [ftueStepId]);
+  const openingBoardActive = Boolean(mission.state) && (ftueStepId === OPENING_MIST_CLEAR_STEP_ID || (ftueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow.flights.length > 0));
   const openingProgress = openingMistProgress(openingRun);
   const openingStep = ftueStepId ? mossproutFtueStep(ftueStepId) ?? null : null;
   // The same beat the dock projects: spotlight and finger on the first pairs, the Basket refill, or nothing.
-  const openingBoardStep = useMemo(() => openingBoardActive ? openingMistBoardStep(openingStep, mergeWorld, openingProgress) : null, [mergeWorld, openingBoardActive, openingProgress, openingStep]);
+  const openingBoardStep = useMemo(() => openingBoardActive ? openingMistBoardStep(openingStep, mission.state, openingProgress) : null, [mission.state, openingBoardActive, openingProgress, openingStep]);
   const openingGuidanceVisible = Boolean(openingBoardStep && (openingBoardStep.cue || openingBoardStep.spotlight));
   // The spotlight and finger wait for the dock to finish fading in, or they point at a board still in motion.
   const [openingDockSettled, setOpeningDockSettled] = useState(false);
@@ -1700,13 +1707,13 @@ export function KatchimeraKingdomScreen({
       ) : null}
       {ftueStepId === OPENING_MIST_OPEN_STEP_ID && ftueStep && screenFocused ? <KingdomOpeningCaption
         step={ftueStep} bottomInset={insets.bottom} onLookCloser={advanceOpening} /> : null}
-      {openingBoardActive && ftueStep ? <KingdomOpeningMergeDock
-        run={openingRun} step={ftueStep} width={window.width} bottomInset={insets.bottom}
-        impactKey={openingGlow.landed} onGlow={openingGlow.launch} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
+      {openingBoardActive && ftueStep && mission.state ? <KingdomOpeningMergeDock
+        run={openingRun} step={ftueStep} state={mission.state} send={mission.send} width={window.width} bottomInset={insets.bottom}
+        impactKey={openingGlow.landed} onGlow={openingGlow.launch} onFinale={openingGlow.launchFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} /> : null}
       {openingGuidanceVisible && ftueCameraSettled && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
         <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={openingBoardStep?.cue ?? null} guide={openingBoardStep?.guide ?? null}
-          layoutNonce={openingProgress} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={openingBoardStep?.spotlight ?? null} state={mergeWorld} targetRevision={openingProgress} />
+          layoutNonce={openingProgress} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={openingBoardStep?.spotlight ?? null} state={mission.state ?? mergeWorld} targetRevision={openingProgress} />
       </View> : null}
       {openingGlow.flights.length || openingGlow.impacts.length ? <OpeningGlowLayer flights={openingGlow.flights} impacts={openingGlow.impacts}
         onArrive={openingGlow.arrive} onImpactDone={openingGlow.impactDone} screenRef={screenRef} /> : null}

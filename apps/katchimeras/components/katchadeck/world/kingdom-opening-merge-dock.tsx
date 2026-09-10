@@ -9,14 +9,15 @@ import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feas
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
 import { RewardTokenFlight, type RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
+import { mergeWorldItemArt } from '@/constants/merge-world-art';
 import { KatchaDeckUI } from '@/constants/theme';
-import { useMergeWorldActions, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
 import type { FtueEvent, FtueRunState, FtueStepDefinition } from '@/features/onboarding/ftue-types';
 import { mergeFtueBoardGate } from '@/features/onboarding/merge-ftue';
 import { createMergeBoardSession, MergeFtueInteractionCoordinator } from '@/features/onboarding/merge-ftue-interaction-coordinator';
-import { OPENING_BOARD_LAYOUT, OPENING_MERGE_REQUIRED, OPENING_MERGE_WINDOW_COLUMNS, OPENING_MERGE_WINDOW_ROWS, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
+import { OPENING_BOARD_LAYOUT, OPENING_MERGE_REQUIRED, OPENING_MERGE_WINDOW_COLUMNS, OPENING_MERGE_WINDOW_ROWS, openingMergesOnBoard, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
+import { dispatchFtueEvent } from '@/features/onboarding/ftue-runtime';
 import { useFtueMergeDispatch } from '@/features/onboarding/use-ftue-merge-dispatch';
-import type { MergeWorldCommandResult } from '@/types/merge-world';
+import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
 
 /** Glow per merge: a burst that peels off one after another, each landing with its own impact. */
@@ -30,20 +31,26 @@ const GLOW_SIZE = 34;
 // animating views re-rasterise every frame.
 const BURST_PARTICLES = 6;
 const GLOW_COLOR = '#8FD3FF';
+/** The bar reads dark against its pale panel: deep violet fill on a dusk track. */
+const BAR_FILL_COLOR = '#6A46C9';
+const BAR_TRACK_COLOR = 'rgba(84,66,128,0.24)';
 
-export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint };
+export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint; art?: number; size?: number; count?: number };
 type OpeningImpact = { id: number; at: RewardFlightPoint };
 
 /**
- * The opening's board: the real Merge board seen through a 5×4 window, in
- * the same frame the Merge page uses, sitting under Mossprout's veiled tile
- * with one slim "Clear the Mist" bar above it. Nothing else: the guidance is
- * the ordinary spotlight-and-finger overlay the Kingdom mounts over it.
- * Merges go through the same FTUE dispatch as the dedicated page; each
- * merged item sends a Glow (via `onGlow`) up into the mist.
+ * The opening's mission board: its own independent board (own state, own
+ * store, seeded for the mission alone) shown as a 5×4 grid in the same frame
+ * the Merge page uses, under Mossprout's veiled tile with one slim "Clear the
+ * Mist" bar above it. The guidance is the ordinary spotlight-and-finger
+ * overlay the Kingdom mounts over it. Merges go through the same FTUE
+ * dispatch as the dedicated page; each merged item sends Glow up into the mist.
  */
-export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ run, step, width, bottomInset, impactKey = 0, onGlow, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
+export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ run, step, state, send, width, bottomInset, impactKey = 0, onGlow, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
   run: FtueRunState | null;
+  /** The mission board's state and reducer, owned by the Kingdom's mission store. */
+  state: MergeWorldState;
+  send: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
   /** Bumps once per landed Glow; the bar flashes on each. */
   impactKey?: number;
   /** The authored opening step (`world.mist_clear`); the dock derives its own refill beat from the board. */
@@ -52,13 +59,13 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   bottomInset: number;
   /** Window-space origin of a merged item, for the Glow flight. */
   onGlow?: (from: RewardFlightPoint) => void;
+  /** The last merge's item leaves the board for the Mist: its origin and what it is. */
+  onFinale?: (from: RewardFlightPoint, definitionId: string) => void;
   onBoardMetrics?: (metrics: MergeBoardScreenMetrics | null) => void;
   onBlockedInteraction?: () => void;
   /** Fired once the fade-in has finished and the board has re-measured: the moment guidance may point at it. */
   onEntranceSettled?: () => void;
 }) {
-  const { state } = useMergeWorldState();
-  const { dispatch: send } = useMergeWorldActions();
   const sessionRef = useRef<ReturnType<typeof createMergeBoardSession> | null>(null);
   if (!sessionRef.current) sessionRef.current = createMergeBoardSession();
   const sessionId = sessionRef.current.id;
@@ -69,6 +76,20 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
 
   const progress = openingMistProgress(run);
   const boardStep = useMemo(() => openingMistBoardStep(step, state, progress), [progress, state, step]);
+  // A kill between the board write and the checkpoint leaves the board a merge
+  // ahead. The board is the truth: replay the missing merges into the run, but
+  // only for the board the dock mounted with. Every later revision comes from
+  // a live drag whose own event is deferred a frame, and a replay then would
+  // count that merge twice (the mist lifted one merge early).
+  const caughtUpRef = useRef(false);
+  useEffect(() => {
+    if (!run || run.status !== 'active' || caughtUpRef.current) return;
+    caughtUpRef.current = true;
+    const missing = openingMergesOnBoard(state) - progress;
+    for (let index = 0; index < missing; index++) {
+      dispatchFtueEvent({ type: 'merge_completed', fromInstanceId: `opening-catch-up:${index}`, targetInstanceId: `opening-catch-up:${index}`, resultDefinitionId: 'nature:garden:2', resultCell: -1, revision: state.revision }, `opening-catch-up:${state.revision}:${index}`);
+    }
+  }, [progress, run, state]);
   const stateRef = useRef(state);
   const runRef = useRef(run);
   const stepRef = useRef(boardStep);
@@ -91,13 +112,23 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   }, [onBoardMetrics]);
   useEffect(() => () => onBoardMetrics?.(null), [onBoardMetrics]);
 
+  // The final merge's item is hidden on the board the moment it exists and
+  // flies into the mist instead; the board is left empty on purpose.
+  const [hiddenItemIds, setHiddenItemIds] = useState<ReadonlySet<string>>(() => new Set());
   const handleEvent = useCallback((event: FtueEvent, result: MergeWorldCommandResult) => {
     const metrics = boardMetricsRef.current;
-    if (event.type !== 'merge_completed' || !metrics || !onGlow) return;
+    if (event.type !== 'merge_completed' || !metrics) return;
     const center = mergeCellCenter(metrics.geometry, event.resultCell);
-    onGlow({ x: metrics.x + center.x, y: metrics.y + center.y });
-    void result;
-  }, [onGlow]);
+    const from = { x: metrics.x + center.x, y: metrics.y + center.y };
+    const finale = openingMistProgress(runRef.current) >= OPENING_MERGE_REQUIRED;
+    if (finale) {
+      const occupant = result.state.board[event.resultCell]?.occupant;
+      if (occupant?.kind === 'item') setHiddenItemIds((current) => new Set([...current, occupant.instanceId]));
+      onFinale?.(from, event.resultDefinitionId);
+      return;
+    }
+    onGlow?.(from);
+  }, [onFinale, onGlow]);
   const dispatch = useFtueMergeDispatch({
     send, coordinator, sessionId, stateRef, runRef, stepRef, guided: true, deferEvent: true,
     onBlocked: onBlockedInteraction, onEvent: handleEvent,
@@ -116,7 +147,7 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   const boardWidth = Math.min(width - 28, 400);
   const cell = Math.floor((boardWidth - OPENING_BOARD_LAYOUT.contentInset * 2) / OPENING_MERGE_WINDOW_COLUMNS);
   const boardHeight = cell * OPENING_MERGE_WINDOW_ROWS + OPENING_BOARD_LAYOUT.contentInset * 2 + 2;
-  const gate = useMemo(() => state ? mergeFtueBoardGate(boardStep, state) : { kind: 'locked' as const }, [boardStep, state]);
+  const gate = useMemo(() => mergeFtueBoardGate(boardStep, state), [boardStep, state]);
   const interactionKey = `${run?.runId ?? 'free'}:${boardStep?.id ?? 'open'}`;
 
   // Entrance: the dock stays invisible until the board has painted its first
@@ -152,15 +183,17 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   return <Animated.View exiting={FadeOut.duration(260)} pointerEvents="box-none"
     style={[styles.dock, { paddingBottom: bottomInset + 14 }, entranceStyle]}>
     <ClearTheMistBar progress={shownProgress} total={OPENING_MERGE_REQUIRED} width={boardWidth} impactKey={impactKey} />
-    {state ? <MergePlaySurface
+    <MergePlaySurface
       animateEntrance={false}
       boardLayout={OPENING_BOARD_LAYOUT}
+      boardState={state}
       railHidden
       counterHidden
       inspectorHidden
       boardInteractionGate={gate}
       railInteractionGate={{ kind: 'locked' }}
       effectsActive
+      hiddenItemInstanceIds={hiddenItemIds}
       inspectedCell={null}
       interactionEnabled
       interactionSessionKey={interactionKey}
@@ -183,7 +216,7 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
       style={styles.surface}
       trayEntries={[]}
       width={boardWidth}
-    /> : null}
+    />
   </Animated.View>;
 });
 
@@ -218,7 +251,7 @@ export function ClearTheMistBar({ progress, total, width, impactKey = 0 }: { pro
       <Text style={styles.barTitle}>Clear the Mist</Text>
       <Text style={styles.barCount}>{progress}/{total}</Text>
     </View>
-    <ProgressBar current={progress} total={total} minimumPercent={0} variant="egg" color={GLOW_COLOR} trackColor="rgba(72,86,120,0.28)" />
+    <ProgressBar current={progress} total={total} minimumPercent={0} variant="egg" color={BAR_FILL_COLOR} trackColor={BAR_TRACK_COLOR} />
   </Animated.View>;
 }
 
@@ -235,11 +268,11 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
     screenRef.current?.measureInWindow((x, y) => setOrigin({ x, y }));
   }, [screenRef, flights.length]);
   return <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.glowLayer]}>
-    {flights.map((flight) => <RewardTokenFlight key={flight.id} count={OPENING_GLOWS_PER_MERGE} index={flight.index} tokenSize={GLOW_SIZE}
+    {flights.map((flight) => <RewardTokenFlight key={flight.id} count={flight.count ?? OPENING_GLOWS_PER_MERGE} index={flight.index} tokenSize={flight.size ?? GLOW_SIZE}
       from={{ x: flight.from.x - origin.x, y: flight.from.y - origin.y }} to={{ x: flight.to.x - origin.x, y: flight.to.y - origin.y }}
       onArrive={() => onArrive(flight.id)}>
-      <View style={styles.glow}>
-        <Image source={GAME_CURRENCY_ART.coins} contentFit="contain" style={styles.glowArt} accessible={false} />
+      <View style={[styles.glow, flight.size ? { width: flight.size, height: flight.size } : null]}>
+        <Image source={flight.art ?? GAME_CURRENCY_ART.coins} contentFit="contain" style={[styles.glowArt, flight.size ? { width: flight.size, height: flight.size } : null]} accessible={false} />
       </View>
     </RewardTokenFlight>)}
     {impacts.map((impact) => <ImpactBurst key={impact.id} x={impact.at.x - origin.x} y={impact.at.y - origin.y} onDone={() => onImpactDone(impact.id)} />)}
@@ -307,14 +340,25 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   const arrive = useCallback((id: number) => {
     setFlights((current) => {
       const landed = current.find((flight) => flight.id === id);
-      if (landed) setImpacts((bursts) => [...bursts, { id, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 14, y: landed.to.y + (landed.index % 2) * 10 - 5 } }]);
+      // Every other landing bursts (the first and third of four): half the particle
+      // views for the same read, since the impacts land 65 ms apart.
+      if (landed && landed.index % 2 === 0) setImpacts((bursts) => [...bursts, { id, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 14, y: landed.to.y + (landed.index % 2) * 10 - 5 } }]);
       return current.filter((flight) => flight.id !== id);
     });
     setLanded((count) => count + 1);
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
   const impactDone = useCallback((id: number) => setImpacts((current) => current.filter((impact) => impact.id !== id)), []);
-  return { flights, impacts, landed, launch, arrive, impactDone };
+  /** The final merge's item, large and alone, straight up into the mist. */
+  const launchFinale = useCallback((from: RewardFlightPoint, definitionId: string) => {
+    const id = ++nextId.current;
+    const art = mergeWorldItemArt(definitionId) as number | undefined;
+    const push = (to: RewardFlightPoint) => setFlights((current) => [...current, { id, index: 2, count: 5, from, to, art, size: 64 }]);
+    const target = targetRef.current;
+    if (!target) { push({ x: from.x, y: from.y - 260 }); return; }
+    target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.5 }));
+  }, []);
+  return { flights, impacts, landed, launch, launchFinale, arrive, impactDone };
 }
 
 const styles = StyleSheet.create({

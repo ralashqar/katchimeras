@@ -2,7 +2,9 @@ import { FTUE_SCENE_LAYERS } from '@/constants/ftue-scene-layers';
 import { normalizeSpeechText } from '@/utils/speech-text';
 import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 import { Meadow } from '@/constants/meadow-theme';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import type React from 'react';
 
 import { ThemedText } from '@/components/themed-text';
 import { KatchaDeckUI } from '@/constants/theme';
@@ -29,6 +31,9 @@ export function FtueGuideCopy({ guide, hero = false }: {
   hero?: boolean;
 }) {
   const titleStyle = hero ? styles.heroTitle : styles.inlineTitle;
+  // The hero panel wears a warm rim glow, a deeper gradient and sparkle
+  // ornaments; the inline panel stays plain so body copy reads cleanly.
+  const Panel = hero ? HeroPanelFrame : View;
   return (
     <View style={hero ? styles.heroCopy : styles.inlineCopy}>
       {guide.eyebrow ? (
@@ -41,21 +46,22 @@ export function FtueGuideCopy({ guide, hero = false }: {
           </ThemedText>
         </View>
       ) : null}
-      <View style={styles.contentPanel}>
-        <View accessibilityLabel={normalizeSpeechText(guide.title)} style={styles.titleStack}>
+      <Panel style={styles.contentPanel}>
+        {hero ? <>
+          <LinearGradient colors={['rgba(72,56,46,0.55)', 'rgba(20,15,13,0.7)']} end={{ x: 0.5, y: 1 }} pointerEvents="none" start={{ x: 0.5, y: 0 }} style={styles.heroGradient} />
+          <ThemedText accessibilityElementsHidden pointerEvents="none" style={[styles.heroSparkle, styles.heroSparkleLeft]} lightColor={KatchaDeckUI.ftue.gold} darkColor={KatchaDeckUI.ftue.gold}>✦</ThemedText>
+          <ThemedText accessibilityElementsHidden pointerEvents="none" style={[styles.heroSparkle, styles.heroSparkleRight]} lightColor={KatchaDeckUI.ftue.gold} darkColor={KatchaDeckUI.ftue.gold}>✦</ThemedText>
+          <ThemedText accessibilityElementsHidden pointerEvents="none" style={[styles.heroSparkleSmall, styles.heroSparkleSmallLeft]} lightColor={KatchaDeckUI.ftue.gold} darkColor={KatchaDeckUI.ftue.gold}>✦</ThemedText>
+          <ThemedText accessibilityElementsHidden pointerEvents="none" style={[styles.heroSparkleSmall, styles.heroSparkleSmallRight]} lightColor={KatchaDeckUI.ftue.gold} darkColor={KatchaDeckUI.ftue.gold}>✦</ThemedText>
+        </> : null}
+        <View style={styles.titleStack}>
+          {/* One text node: a second, absolutely placed copy for the drop shadow
+              fitted its font independently and could land on a different line
+              count, so the two overlapped. The shadow is a text shadow now, and
+              the title keeps its full size and wraps rather than shrinking. */}
           <ThemedText
-            accessibilityElementsHidden
             numberOfLines={hero ? 3 : 2}
-            adjustsFontSizeToFit={hero}
             style={[titleStyle, styles.titleShadow]}
-            lightColor={KatchaDeckUI.ftue.goldDeep}
-            darkColor={KatchaDeckUI.ftue.goldDeep}>
-            {normalizeSpeechText(guide.title)}
-          </ThemedText>
-          <ThemedText
-            numberOfLines={hero ? 3 : 2}
-            adjustsFontSizeToFit={hero}
-            style={titleStyle}
             lightColor={KatchaDeckUI.ftue.gold}
             darkColor={KatchaDeckUI.ftue.gold}>
             {normalizeSpeechText(guide.title)}
@@ -69,7 +75,16 @@ export function FtueGuideCopy({ guide, hero = false }: {
             {normalizeSpeechText(guide.body)}
           </ThemedText>
         ) : null}
-      </View>
+      </Panel>
+    </View>
+  );
+}
+
+/** The hero panel inside a warm halo: the glow lives on a wrapper so the panel's own surface is untouched. */
+function HeroPanelFrame({ children, style }: { children: React.ReactNode; style: StyleProp<ViewStyle> }) {
+  return (
+    <View style={styles.heroHalo}>
+      <View style={[style, styles.heroPanel]}>{children}</View>
     </View>
   );
 }
@@ -105,6 +120,15 @@ const styles = StyleSheet.create({
     paddingTop: 9,
     width: '100%',
   },
+  heroHalo: { borderCurve: 'continuous', borderRadius: 30, boxShadow: '0 0 28px rgba(255,196,102,0.42), 0 12px 26px rgba(31,22,16,0.32)', maxWidth: 350, width: '100%' },
+  heroPanel: { borderColor: 'rgba(255,214,140,0.62)', borderRadius: 30, borderWidth: 1.5, overflow: 'hidden', paddingHorizontal: 30 },
+  heroGradient: { ...StyleSheet.absoluteFillObject, borderRadius: 30 },
+  heroSparkle: { fontSize: 18, lineHeight: 22, opacity: 0.9, position: 'absolute', top: '50%', marginTop: -11 },
+  heroSparkleLeft: { left: 12 },
+  heroSparkleRight: { right: 12 },
+  heroSparkleSmall: { fontSize: 9, lineHeight: 12, opacity: 0.7, position: 'absolute', top: 10 },
+  heroSparkleSmallLeft: { left: 30 },
+  heroSparkleSmallRight: { right: 30 },
   titleStack: { alignItems: 'center', maxWidth: 350, overflow: 'visible', width: '100%' },
   heroTitle: {
     ...KatchaDeckUI.typography.ftueHeroTitle,
@@ -125,6 +149,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: '100%',
   },
-  titleShadow: { left: 0, opacity: 0.82, position: 'absolute', top: 3 },
+  titleShadow: { textShadowColor: 'rgba(117,69,10,0.82)', textShadowOffset: { height: 3, width: 0 }, textShadowRadius: 0 },
   body: { ...KatchaDeckUI.typography.ftueBody, paddingHorizontal: 6, textAlign: 'center' },
 });

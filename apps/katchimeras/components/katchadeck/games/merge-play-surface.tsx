@@ -15,8 +15,10 @@ import { reuseShallowRows, reuseShallowValue } from '@/utils/merge-world/selecto
 const selectBoard = (snapshot: { state: MergeWorldState | null }) => snapshot.state;
 const sameBoardPresentation = (a: MergeWorldState | null, b: MergeWorldState | null) => a === b || Boolean(a && b
   && a.board === b.board && a.generators === b.generators && a.activeOrders === b.activeOrders);
-const SubscribedMergeBoard = memo(function SubscribedMergeBoard(props: Omit<ComponentProps<typeof FeastlePersistentMergeBoard>, 'state'>) {
-  const state = useMergeWorldSelector(selectBoard, sameBoardPresentation);
+const SubscribedMergeBoard = memo(function SubscribedMergeBoard({ state: override, ...props }: Omit<ComponentProps<typeof FeastlePersistentMergeBoard>, 'state'> & { state?: MergeWorldState | null }) {
+  // An independent board (the opening's mission) renders its own state; the page renders the provider's.
+  const subscribed = useMergeWorldSelector(selectBoard, sameBoardPresentation);
+  const state = override ?? subscribed;
   return state ? <FeastlePersistentMergeBoard {...props} state={state} /> : null;
 });
 
@@ -38,6 +40,8 @@ export type MergePlaySurfaceProps = {
   railHidden?: boolean;
   counterHidden?: boolean;
   inspectorHidden?: boolean;
+  /** Render this board instead of the provider's: an independent board with its own state and store. */
+  boardState?: MergeWorldState | null;
   focusOrderId?: string;
   hiddenItemInstanceIds?: ReadonlySet<string>;
   inspectedCell: number | null;
@@ -85,6 +89,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
   railHidden = false,
   counterHidden = false,
   inspectorHidden = false,
+  boardState,
   counterWidth,
   focusOrderId,
   hiddenItemInstanceIds,
@@ -162,6 +167,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
       <View onLayout={measureBoardArea} style={styles.boardStage}>
         {boardAreaHeight > 0 ? (
           <SubscribedMergeBoard
+            state={boardState}
             animateEntrance={animateEntrance}
             hiddenItemInstanceIds={hiddenItemInstanceIds}
             interactionGate={boardInteractionGate}

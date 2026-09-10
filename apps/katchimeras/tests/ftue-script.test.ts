@@ -82,8 +82,11 @@ test('Merge speech guidance is one green line and appears only for first-use mec
 
 test('hero copy fits three lines without captions and Haven spotlight retries native layout', () => {
   const copy = readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8');
-  assert.equal(copy.match(/numberOfLines=\{hero \? 3 : 2\}/g)?.length, 2);
-  assert.equal(copy.match(/adjustsFontSizeToFit=\{hero\}/g)?.length, 2);
+  // One title node: two independently fitted copies could wrap differently and overlap.
+  assert.equal(copy.match(/numberOfLines=\{hero \? 3 : 2\}/g)?.length, 1);
+  assert.doesNotMatch(copy, /adjustsFontSizeToFit/, 'the title wraps at full size instead of shrinking');
+  assert.match(copy, /titleShadow: \{ textShadowColor: 'rgba\(117,69,10,0\.82\)', textShadowOffset: \{ height: 3, width: 0 \}, textShadowRadius: 0 \}/);
+  assert.doesNotMatch(copy, /accessibilityElementsHidden\s*numberOfLines/, 'no duplicate shadow text layer');
   assert.match(copy, /!hero && guide.body/);
   const overlay = readFileSync('components/katchadeck/onboarding/haven-ftue-overlay.tsx', 'utf8');
   assert.match(overlay, /requestAnimationFrame\(\(\) => \{ void measureTargets\(\); \}\)/);

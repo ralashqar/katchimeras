@@ -88,11 +88,11 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
   assert.equal(mossproutWorldUsesEggRenderer('world.mist_lift', null), true, 'the lift reveals the Egg');
 });
 
-test('a fresh run counts eight merges into the bar, lifts, and resumes at every boundary', () => {
+test('a fresh run counts the opening merges into the bar, lifts, and resumes at every boundary', () => {
   const { runtime, flowDispatches } = loadRuntime();
   const run = runtime.beginFtueRun({ restart: true });
   assert.equal(run.stepId, 'world.mist_open');
-  assert.equal(run.mergeInstalled, false, 'the Kingdom installs the opening board itself');
+  assert.equal(run.mergeInstalled, false, 'the persistent board is installed later, at the first meeting, as before');
   assert.equal(runtime.commitFtueAction({ actionId: 'world.look_closer' })?.stepId, 'world.mist_clear');
   for (let count = 1; count < OPENING_MERGE_REQUIRED; count++) {
     const next = runtime.dispatchFtueEvent(merge(count))!;
@@ -136,16 +136,19 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   const route = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
+  const dock = readFileSync('components/katchadeck/world/kingdom-opening-merge-dock.tsx', 'utf8');
   assert.match(screen, /\{ftueStepId === OPENING_MIST_OPEN_STEP_ID \? <FtueOpeningFade \/> : null\}/);
   assert.doesNotMatch(screen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
   assert.match(screen, /<KingdomOpeningCaption[\s\S]*?onLookCloser=\{advanceOpening\}/);
-  assert.match(screen, /const openingBoardActive = ftueStepId === OPENING_MIST_CLEAR_STEP_ID && Boolean\(openingRun\?\.mergeInstalled\) && isMossproutChapterZeroActive\(mergeWorld\)/);
+  assert.match(screen, /const openingBoardActive = Boolean\(mission\.state\) && \(ftueStepId === OPENING_MIST_CLEAR_STEP_ID \|\| \(ftueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow\.flights\.length > 0\)\)/);
   assert.match(screen, /const openingGuidanceVisible = Boolean\(openingBoardStep && \(openingBoardStep\.cue \|\| openingBoardStep\.spotlight\)\)/);
   assert.match(screen, /const visibleUpgradeOffers = homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch');
   assert.doesNotMatch(screen, /MOSSPROUT_SLEEPING_OFFER/, 'the silhouette marker is gone from the opening');
   assert.match(screen, /openingWeather=\{homeVeilForStep\(ftueStepId\) !== 'none'\}/, 'rain and sparkles while the veil is up');
   assert.match(screen, /openingGuidanceVisible && ftueCameraSettled && openingDockSettled \?/, 'the spotlight waits for the dock to settle');
   assert.match(screen, /onEntranceSettled=\{markOpeningDockSettled\}/);
+  const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
+  assert.match(overlay, /spotlightOpacity: spotlight \? spotlight\.dimOpacity \?\? 0\.64 : 0,/, 'a finger-only beat never dims the screen');
   assert.match(canvas, /const openingWeatherStyle = useAnimatedStyle\(\(\) => \(\{ opacity: 1 - homeVeilProgress\.value \}\)\);/, 'weather thins on the lift clock');
   assert.match(canvas, /<\/GestureDetector>\s*\{openingWeather \? <Animated\.View[\s\S]*?<AtmosphereLayer plane="foreground" settings=\{OPENING_RAIN\} \/>/, 'rain in front of the world');
   assert.doesNotMatch(canvas, /<AtmosphereLayer plane="background" settings=\{OPENING_RAIN\}/, 'one rain plane: the second halved the headroom for nothing visible');
@@ -156,14 +159,15 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(effects, /withRepeat\(withTiming\(1, \{ duration: particle\.duration \* 2\.4/, 'looping, slower than the reveal');
   assert.match(effects, /ambientEmber: \{ borderRadius: 999, position: 'absolute' \}/, 'ambient embers carry no blurred shadow');
   assert.match(route, /const openingSky = ftueRun\?\.status === 'active' && homeSoloForStep\(ftueRun\.stepId\);[\s\S]*?openingSky \? todayAtmosphereBackgroundForScene\(OPENING_SKY_SCENE_ID\)/, 'twilight sky until the hatch');
-  assert.match(screen, /<KingdomOpeningMergeDock[\s\S]*?onGlow=\{openingGlow\.launch\}/);
+  assert.match(screen, /<KingdomOpeningMergeDock[\s\S]*?onGlow=\{openingGlow\.launch\} onFinale=\{openingGlow\.launchFinale\}/);
+  assert.match(screen, /ftueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow\.flights\.length > 0/, 'the dock waits for the final item to reach the mist');
+  assert.match(dock, /const finale = openingMistProgress\(runRef\.current\) >= OPENING_MERGE_REQUIRED;[\s\S]*?setHiddenItemIds[\s\S]*?onFinale\?\.\(from, event\.resultDefinitionId\);/, 'the last merge’s item leaves the board for the mist');
   assert.match(screen, /<OpeningGlowLayer flights=\{openingGlow\.flights\} impacts=\{openingGlow\.impacts\}/, 'landed Glow bursts where it hits the mist');
-  const dock = readFileSync('components/katchadeck/world/kingdom-opening-merge-dock.tsx', 'utf8');
-  assert.match(dock, /<Image source=\{GAME_CURRENCY_ART\.coins\}/, 'merges send Glow, not wisps');
-  assert.match(dock, /if \(landed\) setImpacts\(/, 'every landing starts an impact burst');
+  assert.match(dock, /<Image source=\{flight\.art \?\? GAME_CURRENCY_ART\.coins\}/, 'merges send Glow, not wisps; the finale sends the item itself');
+  assert.match(dock, /if \(landed && landed\.index % 2 === 0\) setImpacts\(/, 'the first and third landings burst; the others only tap');
   assert.match(dock, /export const OPENING_GLOWS_PER_MERGE = 4;/, 'a burst of Glow per merge');
   assert.match(dock, /Array\.from\(\{ length: OPENING_GLOWS_PER_MERGE \}, \(_, index\) => \(\{ id: \+\+nextId\.current, index, from, to \}\)\)/, 'the burst peels off one Glow per index');
-  assert.match(dock, /count=\{OPENING_GLOWS_PER_MERGE\} index=\{flight\.index\}/, 'the flight staggers by index');
+  assert.match(dock, /count=\{flight\.count \?\? OPENING_GLOWS_PER_MERGE\} index=\{flight\.index\}/, 'the flight staggers by index');
   assert.match(dock, /setLanded\(\(count\) => count \+ 1\);\s*if \(process\.env\.EXPO_OS === 'ios'\) void Haptics\.impactAsync/, 'every impact flashes the bar and taps the phone');
   assert.match(screen, /impactKey=\{openingGlow\.landed\}/);
   assert.match(dock, /const grew = progress > previous\.current;[\s\S]*?scale\.value = withSequence\(/, 'the bar swells once per landed Glow');
@@ -178,7 +182,13 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(canvas, /const revealingVeiledHome = Boolean\(upgradePresentation\?\.veilLift\);\s*const homeVeilProgress = useSharedValue\(0\);/, 'the lift owns one reveal clock, like the Steppling reveal');
   assert.match(canvas, /transitionLayers\.toLayer\.id === scene\.centerTile\.id && \(upgradeOwnsLayer \? revealingVeiledHome : settlingUpgrade\?\.nonce === veilLiftNonceRef\.current\)\s*\? homeVeilProgress : undefined/, 'the mist crossblend drives that clock');
   assert.match(canvas, /eggSkinId=\{revealedEggProjection\.eggSkinId\}\s*revealProgress=\{homeVeil !== 'none' \|\| settlingUpgrade\?\.nonce === veilLiftNonceRef\.current \? homeVeilProgress : undefined\}/, 'the Egg fades in with the tile, never ahead of it');
-  assert.match(route, /if \(ftueRun\?\.status !== 'active' \|\| ftueRun\.mergeInstalled \|\| !isMossproutOpeningStep\(ftueRun\.stepId\)\) return;[\s\S]*?installMossproutOnboardingMergeWorld\(Date\.now\(\), ftueWispForRun\(ftueRun\), \{ preserveHaven: true, opening: true \}\)[\s\S]*?updateFtueRun\(\{ mergeInstalled: true \}\)/);
+  assert.doesNotMatch(route, /installMossproutOnboardingMergeWorld/, 'the opening never touches the persistent board');
+  assert.match(screen, /const mission = useOpeningMissionBoard\(missionRunId\);/, 'the Kingdom owns the mission board');
+  assert.match(screen, /if \(ftueStepId === 'world\.egg_intro'\) clearOpeningMission\(\);/, 'the mission store goes with the mist');
+  assert.match(screen, /<KingdomOpeningMergeDock[\s\S]*?state=\{mission\.state\} send=\{mission\.send\}/, 'the dock plays the mission board, not the provider');
+  assert.doesNotMatch(dock, /useMergeWorldState|useMergeWorldActions/, 'the dock has no link to the persistent board');
+  const surface = readFileSync('components/katchadeck/games/merge-play-surface.tsx', 'utf8');
+  assert.match(surface, /const state = override \?\? subscribed;/, 'the surface renders an explicit board over the provider one');
   assert.match(route, /if \(stepId === 'world\.mist_open'\) \{\s*commitFtueAction\(\{ actionId: 'world\.look_closer'/);
   const tab = readFileSync('app/(tabs)/katchimeras.tsx', 'utf8');
   assert.match(tab, /const eggPresentationActive = ftueStep\?\.id === 'world\.mist_lift'/);

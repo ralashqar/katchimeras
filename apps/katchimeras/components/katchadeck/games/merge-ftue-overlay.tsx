@@ -185,7 +185,8 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
           cuePoints,
           screen: { height: screen.height, width: screen.width },
           spotlightFrames,
-          spotlightOpacity: spotlight?.dimOpacity ?? 0.64,
+          // No spotlight, no dim: a finger-only beat must not darken the screen.
+          spotlightOpacity: spotlight ? spotlight.dimOpacity ?? 0.64 : 0,
           spotlightRadius: spotlight?.radius ?? 12,
         });
       }
