@@ -76,7 +76,7 @@ export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [
   ...SHARED_WORLD_PURCHASES.map((purchase): WorldUpgradeDefinition => ({
     id: `mist:${purchase.tileId}`, target: { kind: 'haven_structure', structureId: purchase.tileId },
     visualTarget: { kind: 'haven_structure', structureId: purchase.tileId }, name: purchase.name,
-    nextName: 'A new clearing', description: 'Clear the mist and discover who is waiting here.',
+    nextName: 'A new clearing', description: 'Spend light here and see who the Mist was keeping.',
     nextLevel: 1, cost: purchase.price, action: 'Clear mist', unlockId: purchase.unlockId,
   })),
 ];

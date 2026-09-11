@@ -16,8 +16,8 @@ test('Mossprout plants the wish at his farewell and the resting card keeps the g
   const pages = MOSSPROUT_FTUE_COPY.farewell.split('\n\n');
   assert.equal(pages.length, 2, 'one idea per page: rest, then the others');
   assert.match(pages[0]!, /rest/i);
-  assert.match(pages[1]!, /others/);
-  assert.match(pages[1]!, /mist/);
+  assert.match(pages[1]!, /more of us/);
+  assert.match(pages[1]!, /Mist/);
   assert.equal(mossproutFtueStep('companion.meditating')?.guide?.body, MOSSPROUT_FTUE_COPY.meditationHelp);
 });
 
@@ -95,7 +95,7 @@ test('the goal scene tells the wish once and hands over exactly once per tap bur
   });
   const Scene = module.KingdomGoalScene as React.ComponentType<{ onDone: () => void }>;
   assert.match(module.KINGDOM_GOAL_LINE as unknown as string, /friend home/);
-  assert.match(module.KINGDOM_GOAL_PREMISE as unknown as string, /tending/);
+  assert.match(module.KINGDOM_GOAL_PREMISE as unknown as string, /held where they were/);
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<Scene onDone={() => { done += 1; }} />); });
   const button = tree!.root.findByProps({ label: 'Find the first one' });

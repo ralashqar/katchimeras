@@ -1,6 +1,7 @@
 import type { ConversationInsightResultDefinition, ConversationOption } from '@/types/companion-conversation';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeOrder, MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
+import type { CorruptionWispLines } from '@/features/onboarding/corruption-wisps';
 
 export type IslandCampaignChapterLevel = Exclude<MossproutNatureIslandLevel, 0>;
 export type IslandCampaignChapterStatus = 'available' | 'orders_active' | 'return_ready' | 'board_open' | 'delivery_requested' | 'restoration_ready' | 'resolution_ready' | 'complete';
@@ -96,6 +97,8 @@ export type IslandCampaignCopy = {
   wakeHandoffLine: string;
   /** Shown on a sleeping island's panel before its turn. */
   sleepingHint: string;
+  /** What the friend says as the wisps over their island fall; the shared island lines when absent. */
+  wispLines?: CorruptionWispLines;
 };
 
 export type IslandCampaignDefinition<S extends string = string> = {

@@ -9,11 +9,11 @@ export const MOSSPROUT_FIRST_REST_CONVERSATION_ID = 'mossprout:ftue:first-rest';
 const openingLines: Record<string, string> = {
   trying_to_start: 'Oh! Getting started can be tricky. Hatching took me a while too.',
   too_much_at_once: 'There was a lot happening outside my shell. We can start with one thing.',
-  radiant: 'I felt a little burst of sunshine in there. I’m glad we get to share it.',
-  light: 'There was a gentle warmth around my shell. I think that was you.',
+  radiant: 'I felt a burst of sunshine through the shell. The Mist hates that. I’m glad we get to share it.',
+  light: 'There was a gentle warmth around my shell, right through the Mist. I think that was you.',
   meh: 'A quiet sort of day? We don’t have to make it into anything bigger.',
-  heavy: 'A heavy day. We can take our time here. I’m glad you came.',
-  stormy: 'Sounds like there’s a lot moving around inside. We can start with one small thing.',
+  heavy: 'A heavy day. The Mist is made of those. We can take our time here. I’m glad you came.',
+  stormy: 'Sounds like there’s a lot moving around inside. Even that is light to me. We can start with one small thing.',
   pretty_good: 'So that little patch of sunshine was you.',
   mostly_drifting: 'Oh! I felt the breeze carrying us along. Drifting can still bring you somewhere new.',
   taking_today_as_it_comes: 'Seeing where the day takes us? I’ve only just acquired feet. Excellent timing.',
@@ -33,7 +33,7 @@ const openingLines: Record<string, string> = {
   tired: 'You are tired. We will grow something small.',
   rough: 'That day had thorns. Thank you for sharing a piece of it.',
   home: 'Home reached me first. That seems like a good place to start.',
-  default: 'Your answers found me in the dark. That is how I knew where to hatch.',
+  default: 'Your answers found me in the Mist. That’s how I knew where to hatch.',
 };
 
 function definition(key: string, opening: string): ConversationDefinition {
@@ -56,7 +56,7 @@ function definition(key: string, opening: string): ConversationDefinition {
     entryNodeId: 'hello',
     nodes: [
       {
-        id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout. I think I was the last one awake.`,
+        id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout. I was the last one the Mist took, so I was the first one out.`,
         options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'followup' })),
       },
       { id: 'followup', kind: 'choice', prompt: mossproutFollowup('progress').prompt, options: mossproutFollowup('progress').options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) },
@@ -126,14 +126,14 @@ const firstRestDefinition: ConversationDefinition = {
     {
       id: 'seed-settles', kind: 'choice', phase: 'opening',
       prompt: 'There. Now the garden remembers what we started.',
-      options: [{ id: 'continue', label: 'Stay with Mossprout', reply: 'That was a lot of growing for one day.', nextNodeId: 'roots' }],
+      options: [{ id: 'continue', label: 'Stay with Mossprout', reply: 'That was a lot of growing for one day. A lot of remembering, too.', nextNodeId: 'roots' }],
     },
     {
       id: 'roots', kind: 'choice', phase: 'deepen',
       prompt: 'I need to rest. Roots do, after they grow.',
-      options: [{ id: 'rest', label: 'Rest, Mossprout', reply: 'When I wake up, tell me what you’d like us to grow next.', nextNodeId: 'end' }],
+      options: [{ id: 'rest', label: 'Rest, Mossprout', reply: 'When I wake, tell me what you’d like us to grow next. And keep looking. It’s what holds the Mist off.', nextNodeId: 'end' }],
     },
-    { id: 'end', kind: 'end', message: 'I’ll keep your Memory close.' },
+    { id: 'end', kind: 'end', message: 'I’ll keep your Memory close. It won’t be forgotten here.' },
   ],
 };
 

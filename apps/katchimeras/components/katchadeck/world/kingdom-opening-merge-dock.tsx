@@ -165,7 +165,7 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
 /** How far the header's bottom edge sits under the top of the bar. */
 const HEADER_TUCK = 24;
 
-export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Clear the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, impactKey = 0, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, overlay, rootRef }: {
+export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, impactKey = 0, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, headerGap, overlay, rootRef }: {
   state: MergeWorldState;
   /** The window over the canonical board; the opening's 5×4 by default. */
   layout?: typeof OPENING_BOARD_LAYOUT | (Omit<typeof OPENING_BOARD_LAYOUT, 'rows' | 'cellIndices' | 'accessibilityLabel'> & { rows: number; cellIndices: readonly number[]; accessibilityLabel: string });
@@ -192,6 +192,8 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
   closeLabel?: string;
   /** A card above the bar (a friend's request tray). */
   header?: ReactNode;
+  /** How far the header's bottom edge sits above the top of the bar; negative tucks it under. Default: tucked by HEADER_TUCK. */
+  headerGap?: number;
   /** Drawn over the whole dock (a delivery flight into the board). */
   overlay?: ReactNode;
   /** The dock's root, for measuring flights relative to it. */
@@ -273,7 +275,7 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
   const headerOut = FadeOut.duration(reduceMotion ? 60 : 180);
   const [dockHeight, setDockHeight] = useState<number | null>(null);
   const [barTop, setBarTop] = useState<number | null>(null);
-  const headerBottom = dockHeight != null && barTop != null ? dockHeight - barTop - HEADER_TUCK : null;
+  const headerBottom = dockHeight != null && barTop != null ? dockHeight - barTop + (headerGap ?? -HEADER_TUCK) : null;
 
   return <Animated.View ref={rootRef} collapsable={false} exiting={FadeOut.duration(260)} pointerEvents="box-none"
     onLayout={(event) => setDockHeight(Math.round(event.nativeEvent.layout.height))}
@@ -328,7 +330,7 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
 });
 
 /** The bar interpolates its fill, flashes its halo on every landed Glow, and swells once per counted merge. */
-export function ClearTheMistBar({ progress, total, width, impactKey = 0, title = 'Clear the Mist' }: { progress: number; total: number; width?: number; impactKey?: number; title?: string }) {
+export function ClearTheMistBar({ progress, total, width, impactKey = 0, title = 'Drive off the Mist' }: { progress: number; total: number; width?: number; impactKey?: number; title?: string }) {
   const reduceMotion = useReducedMotion();
   const scale = useSharedValue(1);
   const halo = useSharedValue(0);

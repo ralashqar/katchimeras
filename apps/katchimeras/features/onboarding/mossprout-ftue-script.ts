@@ -159,8 +159,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.mist_clear', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Making light', title: COPY.mistClearTitle, body: COPY.mistClearBody },
-      actions: [{ id: 'world.clear_mist', title: 'Clear the Mist', description: 'Merge eight pairs.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', nextStepId: 'world.mist_lift' }],
+      guide: { eyebrow: 'Something is holding it', title: COPY.mistClearTitle, body: COPY.mistClearBody },
+      actions: [{ id: 'world.clear_mist', title: 'Drive off the Mist', description: 'Every merge strikes a wisp. Fell all three.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', nextStepId: 'world.mist_lift' }],
       // A tutorial objective, not a receipt the backend needs: no Glow, no sync.
       // The docked board is free; the spotlight and finger show the first pairs
       // through the ordinary Merge overlay, then step aside.
@@ -194,20 +194,20 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.first_meeting', surface: 'haven', navigation: mossproutHavenHostedCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'A friend', title: 'Meet Mossprout.', body: '' },
+      guide: { eyebrow: 'Out of the Mist', title: 'Meet Mossprout.', body: '' },
       actions: [{ id: 'companion.complete_first_meeting', title: 'Continue', description: COPY.seedOrigin, icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.garden_intro', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
     },
     {
       id: 'companion.nickname', surface: 'companion', navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'A new friend', title: 'What should Mossprout call you?', body: 'A nickname is optional and stays on this device.' },
+      guide: { eyebrow: 'A name to keep', title: 'What should Mossprout call you?', body: 'The Mist takes names first. A nickname is optional and stays on this device.' },
       actions: [{ id: 'companion.save_nickname', title: 'Save nickname', description: 'Tell Mossprout what to call you.', icon: 'person.2.fill', presentation: 'nickname_input', handlerId: 'player_profile', nextStepId: 'companion.bond_intro', backendEvent: true }],
     },
     {
       id: 'companion.bond_intro', surface: 'companion', navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'You are friends now', title: 'Your Bond grew.', body: 'Bond grows when you spend time together.' },
+      guide: { eyebrow: 'Remembered', title: 'Your Bond grew.', body: 'Bond is the part the Mist can’t take. It grows when you spend time together.' },
       actions: [{ id: 'companion.acknowledge_friendship', title: 'Continue', description: 'Listen to Mossprout.', icon: 'heart.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'companion.bond_spotlight', backendEvent: true }],
     },
     {
@@ -223,13 +223,13 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.order_preview', surface: 'companion', navigation: mossproutHavenHostedCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'Seed of your intention', title: 'Let’s plant it before we fix anything.', body: 'The Garden is still neglected, but there is one patch of open soil.' },
-      actions: [{ id: 'companion.open_garden', title: 'Plant the Seed', description: 'Go to the Garden and choose its first growing place.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'companion_order_preview', nextStepId: 'world.garden_arrival', backendEvent: true }],
+      guide: { eyebrow: 'Your Memory', title: 'Let’s plant it before we do anything else.', body: 'The Mist still has most of the garden. There’s one patch of soil it let go of.' },
+      actions: [{ id: 'companion.open_garden', title: 'Plant the Seed', description: 'Give it the one patch the Mist let go of.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'companion_order_preview', nextStepId: 'world.garden_arrival', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
     },
     {
       id: 'world.garden_arrival', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Your Memory', title: 'Here. The soil’s still soft.', body: '' },
+      guide: { eyebrow: 'Your Memory', title: 'Here. The soil’s still soft where the Mist lifted.', body: '' },
       actions: [{ id: 'world.plant_first_seed', title: 'Plant it', description: 'Give your Memory a place in the garden.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'world.seed_planted', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_garden_plant_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_garden_plant_button', characterId: 'mossprout' } },
@@ -260,8 +260,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.garden_handoff', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Mossprout’s Garden', title: 'Let’s earn some Glow.', body: 'Complete requests in the Garden to help restore this place.' },
-      actions: [{ id: 'world.open_garden', title: 'Open Garden', description: 'Enter the Garden and earn Glow for restoration.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'merge.serve_sprout', backendEvent: true }],
+      guide: { eyebrow: 'Mossprout’s Garden', title: 'Let’s make some light.', body: 'Every request you serve here is light. Light is what pushes the Mist back.' },
+      actions: [{ id: 'world.open_garden', title: 'Open Garden', description: 'Serve requests. Make light.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'merge.serve_sprout', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_garden_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_garden_button', characterId: 'mossprout' } },
       spotlight: {
@@ -278,7 +278,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.seed_drag', surface: 'merge',
-      guide: { eyebrow: 'Making light', title: 'Two of the same, put together. Go on.', body: 'Drag one Seed onto the other.' },
+      guide: { eyebrow: 'Making light', title: 'Two of the same, together. You know this one.', body: 'Drag one Seed onto the other.' },
       actions: [{ id: 'merge.create_sprout', title: 'Make a Sprout', description: 'Drag one Seed onto the other.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
       interaction: {
         mode: 'exclusive',
@@ -323,7 +323,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.first_bloom', surface: 'merge',
-      guide: { coaching: 'practice', eyebrow: 'Making light', title: 'Now those two. Something bigger wants to happen.', body: 'Merge the two Sprouts.' },
+      guide: { coaching: 'practice', eyebrow: 'Making light', title: 'Now those two. Something bigger is trying to come back.', body: 'Merge the two Sprouts.' },
       actions: [{ id: 'merge.create_first_bloom', title: 'Grow the first bloom', description: 'Merge the two Sprouts.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 1 } } },
       cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 1 } },
@@ -332,7 +332,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.serve_sprout', surface: 'merge',
-      guide: { eyebrow: 'First Bloom', title: 'That’s what I asked for. Give it here and watch.', body: 'Serve the request.' },
+      guide: { eyebrow: 'First Bloom', title: 'That’s what I asked for. Give it here and watch.', body: 'Serve the request. Watch what it turns into.' },
       actions: [{ id: 'merge.serve_sprout', title: 'Give Mossprout the Plant', description: 'Serve the request.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
       // Merging was taught by the opening. The request only points at Serve;
       // the board stays free so the player grows the Plant their own way.
@@ -357,7 +357,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'world.first_bloom_offer', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: 'First light', title: 'See that? Light.', body: 'That came from your day. It’s the only kind of light that works here. Tap the glowing bubble.' },
-      actions: [{ id: 'world.open_first_bloom_upgrade', title: 'See the light', description: '', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_restore' }],
+      actions: [{ id: 'world.open_first_bloom_upgrade', title: 'See what the light does', description: '', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_restore' }],
       cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
       spotlight: { targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }], padding: 7, radius: 18, dimOpacity: 0.58 },
       camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
@@ -366,7 +366,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'world.first_bloom_restore', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: 'First light', title: 'Enough to wake this patch.', body: 'Tap to wake the garden.' },
       actions: [
-        { id: 'world.restore_with_first_bloom', title: 'Wake the garden', description: 'Spend the light on this patch.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_restore', backendEvent: true },
+        { id: 'world.restore_with_first_bloom', title: 'Wake the garden', description: 'Spend the light here. The Mist gives ground where it’s spent.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_restore', backendEvent: true },
         { id: 'world.complete_first_bloom_restore', title: 'Garden awake', description: 'Continue after the garden wakes.', icon: 'checkmark.circle.fill', presentation: 'observed_game_action', handlerId: 'haven_upgrade', nextStepId: 'world.first_seed_grew', backendEvent: true },
       ],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } } },
@@ -384,14 +384,14 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.first_seed_grew', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Your Memory', title: 'Look. Your day is growing in my garden.', body: 'That’s how this works.' },
+      guide: { eyebrow: 'Your Memory', title: 'Look. Your day is growing here.', body: 'The Mist can’t hold a place someone is watching.' },
       actions: [{ id: 'world.acknowledge_first_seed_growth', title: 'Continue', description: 'A moment with Mossprout.', icon: 'arrow.right', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'companion.water_together', backendEvent: true }],
       camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
       blockingBeat: 'chapter_complete',
     },
     {
       id: 'merge.plant.spawn', surface: 'merge',
-      guide: { eyebrow: 'Something in the mist', title: 'Grow one more Seed.', body: 'Mossprout can see something waiting nearby.' },
+      guide: { eyebrow: 'Something in the Mist', title: 'Grow one more Seed.', body: 'The Mist is keeping a shape near here. Mossprout can almost see it.' },
       actions: [{ id: 'merge.spawn_echo_seed', title: 'Grow a Seed', description: 'Tap the Wild Garden once.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_generator_spawned', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'generator_tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } } },
       cue: { kind: 'tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } },
@@ -400,7 +400,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.plant.seed_pairs', surface: 'merge',
-      guide: { eyebrow: 'A Dream Echo', title: 'Merge with its match in the mist.', body: 'The cell will wake, and the Seed will keep growing.' },
+      guide: { eyebrow: 'A Dream Echo', title: 'The Mist has a Seed. Give it its twin.', body: 'Two of the same, and the Mist has to let go. The cell wakes, and the Seed keeps growing.' },
       actions: [{ id: 'merge.clear_seed_echo', title: 'Wake the Seed Echo', description: 'Drag the Seed into its Dream Echo.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-seed-echo' } } },
       cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-seed-echo' } },
@@ -409,7 +409,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.plant.sprout_pair', surface: 'merge',
-      guide: { eyebrow: 'A half-remembered Plant', title: 'Wake the Sprout Echo.', body: 'Dream Echoes hold shapes the garden remembers. Match this one with your Sprout.' },
+      guide: { eyebrow: 'Half remembered', title: 'Wake the Sprout Echo.', body: 'A Dream Echo is a shape the Mist hasn’t finished forgetting. Match it with your Sprout and it comes back whole.' },
       actions: [{ id: 'merge.clear_sprout_echo', title: 'Wake the Sprout Echo', description: 'Drag the Sprout into its Dream Echo.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-sprout-echo' } } },
       cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-sprout-echo' } },
@@ -418,7 +418,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.serve_plant', surface: 'merge',
-      guide: { eyebrow: 'The first planting', title: 'Bring it home.', body: 'Give the remembered Plant to Mossprout.' },
+      guide: { eyebrow: 'Brought back', title: 'Bring it home.', body: 'Give Mossprout the Plant you pulled out of the Mist.' },
       actions: [{ id: 'merge.serve_home_plant', title: 'Serve the Plant', description: 'Give Mossprout the Plant you woke.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' } } },
       cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:first-sprout' } },
@@ -427,7 +427,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.energy.spawn_pair', surface: 'merge',
-      guide: { eyebrow: 'One more sleeping cell', title: 'Start with two Seeds.', body: 'The last nearby Echo needs a Plant.' },
+      guide: { eyebrow: 'One more held cell', title: 'Start with two Seeds.', body: 'The last Echo near here is a Plant. The Mist won’t give it up for less.' },
       actions: [{ id: 'merge.energy.spawn_pair', title: 'Grow two Seeds', description: 'Tap the Wild Garden twice.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_generator_spawned', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'generator_tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } } },
       cue: { kind: 'tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } },
@@ -454,14 +454,14 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.energy_exhausted', surface: 'merge',
-      guide: { eyebrow: 'Mossprout noticed', title: 'Weâ€™re running low.', body: 'Your day made this Energy before.' },
+      guide: { eyebrow: 'Mossprout noticed', title: 'We’re running low.', body: 'The Energy we’ve been spending came from your day. Tell me a little more of it.' },
       actions: [{ id: 'merge.tell_me_more', title: 'Tell me something else', description: 'Bring a new memory back.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'energy.capture', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'generator_tap', target: { kind: 'board_generator', generatorId: '__locked__' } } },
       blockingBeat: 'energy_connection',
     },
     {
       id: 'energy.capture', surface: 'today',
-      guide: { eyebrow: 'A little more of today', title: 'Share one quick reflection.', body: 'One answer is enough.' },
+      guide: { eyebrow: 'A little more of today', title: 'Share one quick reflection.', body: 'One honest answer is enough. That’s how light gets made.' },
       actions: [{
         id: 'energy.reflect', title: 'What kind of day has it been?', description: 'One quick answer is enough.', icon: 'sparkles',
         presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'day_word', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
@@ -477,19 +477,19 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'energy.journal_reward', surface: 'today',
-      guide: { eyebrow: 'Your memory became Energy', title: '+20 Energy', body: 'Your memories give us energy.' },
+      guide: { eyebrow: 'Noticed', title: '+20 Energy', body: 'You looked at your day, and it became something we can spend.' },
       actions: [{ id: 'energy.check_steps', title: 'Check yesterday\'s steps', description: 'See whether yesterday made more Energy.', icon: 'figure.walk', presentation: 'acknowledgement', handlerId: 'pedometer_steps', nextStepId: 'energy.steps_offer', backendEvent: true }],
       blockingBeat: 'energy_awarded',
     },
     {
       id: 'energy.steps_offer', surface: 'today',
-      guide: { eyebrow: 'Yesterday can help too', title: 'Turn your steps into Energy?', body: 'Your movement can give Mossprout a little more.' },
+      guide: { eyebrow: 'Yesterday can help too', title: 'Turn your steps into Energy?', body: 'Yesterday’s steps were light too, even if nobody counted them.' },
       actions: [{ id: 'energy.convert_steps', title: 'Turn steps into Energy', description: 'Convert yesterday\'s steps.', icon: 'figure.walk', presentation: 'acknowledgement', handlerId: 'pedometer_steps', nextStepId: 'energy.steps_reward', backendEvent: true }],
       blockingBeat: 'energy_awarded',
     },
     {
       id: 'energy.steps_reward', surface: 'today',
-      guide: { eyebrow: 'Energy is ready', title: 'Let\'s get back to Mossprout.', body: 'The garden is waiting for you.' },
+      guide: { eyebrow: 'Energy is ready', title: 'Let\'s get back to Mossprout.', body: 'The garden is waiting, and so is the last held cell.' },
       actions: [{ id: 'energy.return', title: 'Back to Mossprout', description: 'Bring the Energy to the garden.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'merge.energy.finish_seed', backendEvent: true }],
       blockingBeat: 'energy_awarded',
     },
@@ -522,7 +522,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.energy.clear_plant_echo', surface: 'merge',
-      guide: { eyebrow: 'Your day reached the mist', title: 'Wake the Plant Echo.', body: 'The Plant will bloom as the cell opens.' },
+      guide: { eyebrow: 'Your day reached the Mist', title: 'Wake the Plant Echo.', body: 'Give the Mist its twin and it lets go. The Plant blooms as the cell opens.' },
       actions: [{ id: 'merge.energy.clear_plant_echo', title: 'Wake the Plant Echo', description: 'Drag the Plant into its Dream Echo.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:3', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-plant-echo' } } },
       cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:3', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-plant-echo' } },
@@ -531,7 +531,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.energy.serve_plant', surface: 'merge',
-      guide: { eyebrow: 'You did it', title: 'Give Mossprout the Flower.', body: 'Your memory woke this part of the garden.' },
+      guide: { eyebrow: 'Remembered', title: 'Give Mossprout the Flower.', body: 'Your day did this. The Mist has no hold on this part of the garden now.' },
       actions: [{ id: 'merge.energy.serve_plant', title: 'Serve the Plant', description: 'Finish Mossprout’s home.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_order_served', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:energy-plant' } } },
       cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'mossprout:chapter-0:energy-plant' } },
@@ -540,7 +540,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.return_note', surface: 'merge',
-      guide: { eyebrow: 'A note from Mossprout', title: 'The garden is ready.', body: 'Read what Mossprout left for you.' },
+      guide: { eyebrow: 'A note from Mossprout', title: 'The garden is awake.', body: 'Read what Mossprout left for you.' },
       actions: [{ id: 'merge.open_mossprout_note', title: 'Read Mossprout’s note', description: 'Return to Mossprout.', icon: 'envelope.fill', presentation: 'observed_game_action', handlerId: 'merge_chat_note_opened', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'chat_note_tap', target: { kind: 'tray_chat_note', noteId: MOSSPROUT_FTUE_RETURN_NOTE_ID } } },
       cue: { kind: 'tap', target: { kind: 'tray_chat_note', noteId: MOSSPROUT_FTUE_RETURN_NOTE_ID } },
@@ -551,14 +551,14 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'companion.chapter_zero_return', surface: 'companion',
       navigation: { ...mossproutCompanionResume, resume: { ...mossproutCompanionResume.resume, ftue: 'chapter-zero-return' } },
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'First Bloom', title: 'The Grove changed.', body: 'See what you and Mossprout grew together.' },
-      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'See what changed', description: 'Notice how your First Bloom changed the Grove.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.water_together', backendEvent: true }],
+      guide: { eyebrow: 'First Bloom', title: 'The Grove remembers.', body: 'See what you and Mossprout brought back.' },
+      actions: [{ id: 'companion.complete_chapter_zero_return', title: 'See what changed', description: 'Notice what your First Bloom brought back to the Grove.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.water_together', backendEvent: true }],
     },
     {
       id: 'companion.bond_spotlight', surface: 'companion',
       navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'Your time together', title: 'This is your Bond.', body: 'It grows through meaningful moments with Mossprout across real days. Merge play cannot grind it.' },
+      guide: { eyebrow: 'Your time together', title: 'This is your Bond.', body: 'It grows through real moments with Mossprout, across real days. The Mist can’t take it, and Merge play can’t grind it.' },
       actions: [{ id: 'companion.acknowledge_bond', title: 'Grow the Garden', description: 'Turn what Mossprout learned into something you can grow together.', icon: 'heart.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'companion.garden_intro', backendEvent: true }],
     },
     {
@@ -620,7 +620,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.water_response', surface: 'companion', navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'Mossprout heard you', title: 'A small answer is enough', body: 'Mossprout responds before turning the moment into your first Seed.' },
+      guide: { eyebrow: 'Mossprout heard you', title: 'A small answer is enough', body: 'Mossprout keeps what you noticed. That’s one more thing the Mist doesn’t get.' },
       actions: [{ id: 'companion.ack_water_response', title: 'Keep going', description: 'See what Mossprout noticed.', icon: 'leaf.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'companion.first_insight', backendEvent: true }],
     },
     {
@@ -647,24 +647,24 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'companion.meditating', surface: 'companion', navigation: { ...mossproutCompanionResume, lock: false },
       camera: mossproutMeditationCamera,
       guide: { eyebrow: 'Resting', title: COPY.meditation, body: COPY.meditationHelp },
-      actions: [{ id: 'companion.tend_garden', title: 'Look at the mist', description: 'Someone is close.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete', backendEvent: true }],
+      actions: [{ id: 'companion.tend_garden', title: 'Look at the Mist', description: 'Someone’s still in there.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
     },
     {
       id: 'companion.resident_affinity', surface: 'companion', navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'Someone else heard us', title: 'Who feels closest to your nature?', body: 'Your answers prepare a veiled parcel without giving away who is inside.' },
+      guide: { eyebrow: 'Someone else heard us', title: 'Who feels closest to your nature?', body: 'Your answers reach whoever the Mist is keeping nearest. A veiled parcel comes back, without giving away who sent it.' },
       actions: [{ id: 'companion.complete_resident_affinity', title: 'Find the closest resident', description: 'Answer a few quick nature questions.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.resident_parcel_ready', backendEvent: true }],
     },
     {
       id: 'companion.resident_parcel_ready', surface: 'companion', navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'Someone heard the Grove', title: 'A parcel is waiting.', body: 'Something small answered the First Bloom.' },
+      guide: { eyebrow: 'Someone heard the Grove', title: 'A parcel is waiting.', body: 'Something small answered the light. It came through the Mist to get here.' },
       actions: [{ id: 'companion.open_resident_parcel', title: 'Go to the Garden', description: 'Open the resident parcel on the Merge board.', icon: 'shippingbox.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'merge.resident_parcel', backendEvent: true }],
     },
     {
       id: 'merge.resident_parcel', surface: 'merge', navigation: mossproutMergeResume,
-      guide: { eyebrow: 'A veiled parcel', title: 'Open what the resident sent.', body: 'There is a sealed card waiting inside.' },
+      guide: { eyebrow: 'A veiled parcel', title: 'Open what the resident sent.', body: 'There’s a sealed card inside. The Mist couldn’t read it.' },
       actions: [{ id: 'merge.claim_resident_parcel', title: 'Open the parcel', description: 'Place the sealed card on the board.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_parcel_claimed', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'parcel_tap', target: { kind: 'active_resident_parcel' } } },
       cue: { kind: 'tap', target: { kind: 'active_resident_parcel' } },
@@ -673,7 +673,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.resident_card', surface: 'merge', navigation: mossproutMergeResume,
-      guide: { eyebrow: 'The Grove noticed a match', title: 'Bring the two cards together.', body: 'Drag the sealed card onto the glowing mystery card.' },
+      guide: { eyebrow: 'Two of the same', title: 'Bring the two cards together.', body: 'Drag the sealed card onto the glowing mystery card.' },
       actions: [{ id: 'merge.reveal_resident', title: 'Reveal the resident', description: 'Match the sealed card to the mystery card.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'active_resident_card_item' }, to: { kind: 'active_resident_card_node' } } },
       cue: { kind: 'drag', from: { kind: 'active_resident_card_item' }, to: { kind: 'active_resident_card_node' } },
@@ -682,7 +682,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.resident_dialogue', surface: 'merge', navigation: mossproutMergeResume,
-      guide: { eyebrow: 'A new voice', title: 'Meet the resident.', body: 'They have their own request for the garden.' },
+      guide: { eyebrow: 'A new voice', title: 'Meet the resident.', body: 'They’ve been in the Mist a while. They have a request of their own.' },
       actions: [{ id: 'merge.meet_resident', title: 'Meet the resident', description: 'Hear what they need.', icon: 'bubble.left.fill', presentation: 'observed_game_action', handlerId: 'acknowledgement', backendEvent: true }],
       edges: [{ event: { type: 'resident_dialogue_acknowledged' }, commitActionId: 'merge.meet_resident', nextStepId: 'merge.resident_seed_spawn' }],
     },
@@ -697,7 +697,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.resident_seed_echo', surface: 'merge', navigation: mossproutMergeResume,
-      guide: { eyebrow: 'A Seed in the mist', title: 'Match the locked Seed.', body: 'Drag your Seed onto the identical Seed under the clouds.' },
+      guide: { eyebrow: 'A Seed in the Mist', title: 'The Mist has a Seed. Give it its twin.', body: 'Drag your Seed onto the identical Seed under the Mist.' },
       actions: [{ id: 'merge.clear_resident_seed_echo', title: 'Make a Sprout', description: 'Drag the Seed into its locked match.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-seed-echo' } } },
       cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-seed-echo' } },
@@ -706,7 +706,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.resident_sprout_echo', surface: 'merge', navigation: mossproutMergeResume,
-      guide: { eyebrow: 'A Sprout in the mist', title: 'Match the locked Sprout.', body: 'Drag your new Sprout onto the identical Sprout under the clouds.' },
+      guide: { eyebrow: 'A Sprout in the Mist', title: 'And a Sprout. Same again.', body: 'Drag your new Sprout onto the identical Sprout under the Mist.' },
       actions: [{ id: 'merge.clear_resident_sprout_echo', title: 'Make a Plant', description: 'Drag the Sprout into its locked match.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_item_created', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-sprout-echo' } } },
       cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'mossprout-sprout-echo' } },
@@ -724,7 +724,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'merge.resident_card_reward', surface: 'merge', navigation: mossproutMergeResume,
-      guide: { eyebrow: 'Card earned', title: 'Reveal the card in your deck.', body: 'This resident is now part of Mossprout’s garden set.' },
+      guide: { eyebrow: 'Card earned', title: 'Reveal the card in your deck.', body: 'Remembered, and kept. This resident is part of Mossprout’s garden set now.' },
       actions: [{ id: 'merge.ack_resident_card', title: 'Reveal the card', description: 'Watch it turn over in the deck.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', backendEvent: true }],
       edges: [{ event: { type: 'resident_card_reveal_acknowledged' }, commitActionId: 'merge.ack_resident_card', nextStepId: 'companion.resident_match_result' }],
       blockingBeat: 'chapter_complete',
@@ -732,13 +732,13 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.resident_match_result', surface: 'companion', navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'Petalimp found a home', title: 'Your first resident card is here.', body: 'Return to Mossprout’s world and see the Garden together.' },
+      guide: { eyebrow: 'Petalimp, remembered', title: 'Your first resident card is here.', body: 'Return to Mossprout’s world and see the Garden together.' },
       actions: [{ id: 'companion.ack_resident_match_result', title: 'Return to Mossprout’s world', description: 'Finish the first-session story with Mossprout.', icon: 'checkmark.circle.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'companion.meditating', backendEvent: true }],
       blockingBeat: 'chapter_complete',
     },
     {
       id: 'haven.mossprout.focus', surface: 'haven',
-      guide: { eyebrow: 'A little place to begin', title: 'Mossprout has a home here.', body: 'Tap the garden marker to see what your Glow can restore.' },
+      guide: { eyebrow: 'A little place to begin', title: 'Mossprout has a home here.', body: 'Tap the garden marker to see what your light can bring back.' },
       actions: [{ id: 'haven.open_mossprout_upgrade', title: 'Open Mossprout’s Haven', description: 'See the first permanent garden upgrade.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'haven.mossprout.restore' }],
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: 1.25, anchorY: 0.46, durationMs: 420 },
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_tile_hud', characterId: 'mossprout' } } },
@@ -748,8 +748,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'haven.mossprout.restore', surface: 'haven',
-      guide: { eyebrow: 'A little place to begin', title: 'Restore the Little Garden', body: 'Glow earned through Merge can permanently change this place.' },
-      actions: [{ id: 'haven.restore_mossprout', title: 'Restore · 20 Glow', description: 'Turn the forgotten clearing into Mossprout’s first garden.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'haven_upgrade', nextStepId: 'companion.meditating', backendEvent: true }],
+      guide: { eyebrow: 'A little place to begin', title: 'Restore the Little Garden', body: 'Light you made in Merge, spent here. The Mist doesn’t come back where it’s been spent.' },
+      actions: [{ id: 'haven.restore_mossprout', title: 'Restore · 20 Glow', description: 'Bring the clearing back as Mossprout’s first garden.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'haven_upgrade', nextStepId: 'companion.meditating', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
       spotlight: { targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }], padding: 6, radius: 16, dimOpacity: 0.62 },
@@ -758,7 +758,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'discovery.steppling.parcel', surface: 'merge',
-      guide: { eyebrow: 'A delivery from the Mist', title: 'Open the Trail-Worn Parcel.', body: 'Something inside matches the object beneath the clouds.' },
+      guide: { eyebrow: 'A delivery from the Mist', title: 'Open the Trail-Worn Parcel.', body: 'Something inside matches the object the Mist is holding.' },
       actions: [{ id: 'discovery.steppling.parcel', title: 'Open the parcel', description: 'Place its item on the board.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'merge_parcel_claimed', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'parcel_tap', target: { kind: 'tray_parcel', arrivalId: `arrival:discovery:${STEPPLING_DISCOVERY_ID}` } } },
       cue: { kind: 'tap', target: { kind: 'tray_parcel', arrivalId: `arrival:discovery:${STEPPLING_DISCOVERY_ID}` } },

@@ -56,8 +56,8 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
   assert.equal(open.camera?.kind === 'focus_target' ? open.camera.durationMs : null, OPENING_CAMERA_ENTRY_MS, 'the glide runs for the length of the captions');
   assert.equal(open.actions[0]?.id, 'world.look_closer');
   assert.equal(open.actions[0]?.nextStepId, 'world.mist_clear');
-  assert.equal(open.guide.title, 'Nothing here has been noticed in a long while.');
-  assert.equal(open.guide.body, 'Then you arrived.');
+  assert.equal(open.guide.title, 'Nobody has looked at this place in a very long time.');
+  assert.equal(open.guide.body, 'The Mist came in behind them and stayed. Then you looked.');
   const clear = mossproutFtueStep('world.mist_clear')!;
   assert.equal(clear.surface, 'haven', 'a haven step keeps the docked board ungated and resumes to the Kingdom');
   assert.equal(clear.interaction?.mode, 'none');
@@ -68,8 +68,8 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
   const lift = mossproutFtueStep('world.mist_lift')!;
   assert.equal(lift.actions[0]?.id, 'world.mist_lifted');
   assert.equal(lift.actions[0]?.nextStepId, 'world.egg_intro');
-  assert.equal(lift.guide.title, 'The Mist thins where someone is being noticed.');
-  assert.equal(mossproutFtueStep('world.egg_intro')?.guide.title, 'And this one heard you.');
+  assert.equal(lift.guide.title, 'The last one goes, and the Mist has nothing left to hold with.');
+  assert.equal(mossproutFtueStep('world.egg_intro')?.guide.title, 'And something under it heard you looking.');
   assert.equal(mossproutFtueStep('world.egg_intro')?.actions[0]?.nextStepId, 'egg.opening');
   for (const stepId of MOSSPROUT_OPENING_STEP_IDS) {
     const step = mossproutFtueStep(stepId)!;
@@ -149,7 +149,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(dock, /if \(id === finaleIdRef\.current\) setTimeout\(\(\) => setFinaleActive\(false\), OPENING_FINALE_SETTLE_MS\);/, 'and lowered only after the burst has finished and settled');
   assert.match(dock, /if \(landed && \(finale \|\| landed\.index % 2 === 0\)\)/, 'the finale always bursts');
   assert.match(screen, /const openingGuidanceVisible = Boolean\(openingBoardStep && \(openingBoardStep\.cue \|\| openingBoardStep\.spotlight\)\)/);
-  assert.match(screen, /const visibleUpgradeOffers = homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch, nor while a board hands off to its story');
+  assert.match(screen, /const visibleUpgradeOffers = homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS : missionBoardDocked \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch, nor while a board hands off to its story');
   assert.doesNotMatch(screen, /MOSSPROUT_SLEEPING_OFFER/, 'the silhouette marker is gone from the opening');
   assert.match(screen, /openingWeather=\{homeVeil !== 'none'\}/, 'rain and sparkles while the veil is up');
   assert.match(screen, /openingGuidanceVisible && ftueCameraSettled && openingDockSettled \?/, 'the spotlight waits for the dock to settle');

@@ -150,7 +150,9 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
         const fromFrame = await resolve(cue.kind === 'drag' ? cue.from : cue.target);
         const toFrame = cue.kind === 'drag' ? await resolve(cue.to) : fromFrame;
         if (fromFrame && toFrame) {
-          cuePoints = { from: frameCenter(fromFrame), to: frameCenter(toFrame) };
+          const offset = cue.kind === 'tap' ? cue.offset : undefined;
+          const shift = (point: Point): Point => offset ? { x: point.x + (offset.x ?? 0), y: point.y + (offset.y ?? 0) } : point;
+          cuePoints = { from: shift(frameCenter(fromFrame)), to: shift(frameCenter(toFrame)) };
         }
       }
 

@@ -78,7 +78,7 @@ export function stepplingMissionBoardStep(state: MergeWorldState | null, merges:
   if (!spawnedOnce) {
     return {
       id: 'mission.steppling.spawn', surface: 'merge', actions: [],
-      guide: { eyebrow: 'Left in the mist', title: 'A Journey Locker.', body: 'Tap it to make a Sock.' },
+      guide: { eyebrow: 'Left in the Mist', title: 'A Journey Locker, still packed.', body: 'Tap it. Whoever packed it isn’t far.' },
       interaction: { mode: 'exclusive', allowed: { kind: 'generator_tap', target: LOCKER_TARGET } },
       cue: { kind: 'tap', target: LOCKER_TARGET },
       spotlight: { targets: [LOCKER_TARGET], padding: 4, radius: 12, dimOpacity: 0.62 },
@@ -90,14 +90,14 @@ export function stepplingMissionBoardStep(state: MergeWorldState | null, merges:
     const to: FtueTarget = { kind: 'board_cell', cell: pair.to };
     return {
       id: 'mission.steppling.merge', surface: 'merge', actions: [],
-      guide: { eyebrow: 'Clear the Mist', title: 'Walking gear, put together.', body: 'Every merge thins the mist. The Locker makes more Socks.' },
+      guide: { eyebrow: 'Four of them hold the trail', title: 'Walking gear, put together.', body: 'Every merge strikes one. The Locker makes more Socks.' },
       interaction: { mode: 'none' },
       cue: { kind: 'drag', from, to },
     };
   }
   return {
     id: 'mission.steppling.free', surface: 'merge', actions: [],
-    guide: { eyebrow: 'Clear the Mist', title: 'Keep merging.', body: 'Tap the Locker whenever you run short of Socks.' },
+    guide: { eyebrow: 'Keep striking', title: 'Keep merging.', body: 'Tap the Locker whenever you run short.' },
     interaction: { mode: 'none' },
   };
 }

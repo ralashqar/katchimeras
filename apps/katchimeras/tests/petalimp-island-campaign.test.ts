@@ -113,7 +113,7 @@ test('Petalimp keeps prices out of her mouth and remembers the previous answer',
   const beds = petalimpIslandUpgradePanelState(state)!;
   assert.equal(beds.status, 'board_open');
   assert.equal(beds.speech, PETALIMP_ISLAND_CHAPTERS[1]!.choices[0]!.returnLine, 'the return line greets the delivery on the panel');
-  assert.equal(beds.stateLabel, 'Clearing the mist');
+  assert.equal(beds.stateLabel, 'Driving off the Mist');
 });
 
 test('Petalimp choices play as dialogue and the finale resolves the accumulated growth insight', () => {
@@ -341,7 +341,7 @@ test('a served Petalimp request becomes one persistent island return note withou
   const bedsPanel = petalimpIslandUpgradePanelState(state)!;
   assert.equal(bedsPanel.action, 'continue_restoring');
   assert.equal(bedsPanel.order, null, 'no request until the beds need one');
-  assert.equal(bedsPanel.stateLabel, 'Clearing the mist');
+  assert.equal(bedsPanel.stateLabel, 'Driving off the Mist');
   state = reduceMergeWorld(state, { type: 'requestIslandCampaignDelivery', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level: 1, orders: [order], now: NOW + 2 }).state;
 
   const waitingOffer = worldUpgradeOffers(state).find((offer) => offer.id === 'nature:bloom-garden')!;
@@ -369,7 +369,7 @@ test('a served Petalimp request becomes one persistent island return note withou
   assert.equal(completePanel.action, 'continue_restoring');
   assert.equal(completePanel.order?.id, order.id, 'served orders remain presentable after leaving the active-order queue');
   assert.equal(completePanel.orderComplete, true);
-  assert.equal(completePanel.stateLabel, 'Clearing the mist');
+  assert.equal(completePanel.stateLabel, 'Driving off the Mist');
   assert.ok(served.externalRewardReceipts.some((receipt) => receipt.kind === 'story_order_served' && receipt.sourceId === PETALIMP_ISLAND_CAMPAIGN_ID));
   assert.equal(served.externalRewardReceipts.some((receipt) => receipt.kind === 'conversation' && receipt.sourceId === order.chapterId), false);
 
@@ -455,4 +455,26 @@ test('Petalimp is available immediately while every other island sleeps until sh
   const home = completeIslandCampaign(fresh, PETALIMP_BLOOM_CAMPAIGN, NOW);
   assert.equal(islandWakeState(home, 'bloom-garden'), 'revealed');
   assert.equal(islandWakeBlocker(home, 'wildgrowth-grove'), null, 'Petalimp being home is what lets the next island wake');
+});
+
+test('Petalimp speaks in the Mist’s voice rules: no exclamation near the Mist, the wisps named once per chapter, the Mist always capitalised', () => {
+  const campaign = PETALIMP_BLOOM_CAMPAIGN;
+  const lines = (chapter: (typeof campaign.chapters)[number], choice: (typeof chapter.choices)[number]) =>
+    [chapter.prompt, ...Object.values(chapter.callbackLine ?? {}), choice.reply, choice.openingConclusion, choice.returnLine, choice.resolutionLine];
+  for (const chapter of campaign.chapters) {
+    for (const choice of chapter.choices) {
+      for (const line of lines(chapter, choice)) {
+        if (/Mist/.test(line)) assert.doesNotMatch(line, /!/, `${chapter.title} · ${choice.id}: ${line}`);
+        assert.doesNotMatch(line, /\bmist\b/, `${chapter.title} · ${choice.id} names the Mist as weather: ${line}`);
+      }
+      const named = [chapter.prompt, choice.openingConclusion].join('\n').match(/Mistwisps?/g)?.length ?? 0;
+      assert.ok(named <= 1, `${chapter.title} · ${choice.id} names the Mistwisps ${named} times before the board`);
+    }
+  }
+  const copy = campaign.copy;
+  for (const line of [copy.discoveryDialogue, copy.revealReactionLine, copy.mistDescription, copy.wakeHandoffLine, copy.sleepingHint, copy.fallbackReturn('x'), copy.fallbackResolution(1), copy.fallbackResolution(4), ...(copy.wispLines ? [copy.wispLines.firstStrike, ...copy.wispLines.fell, copy.wispLines.last] : [])]) {
+    assert.doesNotMatch(line, /\bmist\b/, line);
+    if (/Mist/.test(line)) assert.doesNotMatch(line, /!/, line);
+  }
+  assert.ok(copy.wispLines && copy.wispLines.fell.length >= 3, 'four wisps need three falling lines before the last');
 });

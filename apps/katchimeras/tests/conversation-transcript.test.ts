@@ -119,7 +119,7 @@ for (const intent of ['calm', 'progress', 'unsure'] as const) {
     const ending = resolved.nodes.find((node) => node.id === 'end');
     assert.ok(ending?.kind === 'end');
     // The Seed invitation is one spoken line: what was shared, and where it goes.
-    assert.match(ending.message, /already something/);
+    assert.match(ending.message, /first light/);
     assert.match(ending.message, /soil/);
     session = continueConversation(session, resolved, 4);
     assert.equal(session.status, 'completed');

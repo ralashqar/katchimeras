@@ -45,31 +45,31 @@ export function glowDiscoveryResumeWorld(run: Pick<ContentFlowRun, 'status'> | n
 
 export const GLOW_DISCOVERY_RUN_ID = 'story:glow-steppling-v1';
 export const GLOW_LESSON: readonly MergeLessonBeat[] = [
-  { id: 'lesson.single.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'Someone’s in there', title: 'Let’s make enough light to see them.', body: 'Tap the Basket twice.' } },
-  { id: 'lesson.single.seeds', kind: 'pair', definitionId: 'nature:garden:1', guide: { eyebrow: 'Making light', title: 'Put the two Seeds together.', body: 'Drag one onto the other.' } },
+  { id: 'lesson.single.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'Someone’s in there', title: 'Let’s make enough light to see who it’s holding.', body: 'Tap the Basket twice.' } },
+  { id: 'lesson.single.seeds', kind: 'pair', definitionId: 'nature:garden:1', guide: { eyebrow: 'Making light', title: 'Two of the same, together.', body: 'Drag one onto the other.' } },
   ...['Sprout', 'Plant', 'Flower'].map((name, index): MergeLessonBeat => ({
     id: `lesson.single.match-${index + 2}`, kind: 'match', definitionId: `nature:garden:${index + 2}`, echoId: GLOW_SINGLE_ECHO_IDS[index],
-    guide: { coaching: index === 0 ? undefined : 'practice', eyebrow: 'In the grey', title: `There’s a ${name} stuck in the grey. Bring it its twin.`, body: `Drag your ${name} onto it.` },
+    guide: { coaching: index === 0 ? undefined : 'practice', eyebrow: 'In the grey', title: `The Mist has a ${name}. Its twin will pull it free.`, body: `Drag your ${name} onto it.` },
   })),
-  { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: 'Enough light', title: 'That’s the one. Give it here.', body: 'Serve the request.' } },
+  { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: 'Enough light', title: 'That’s the one. Give it here, and I’ll turn it into light.', body: 'Serve the request.' } },
 ];
 export const GLOW_ALL_LESSON_BEATS = GLOW_LESSON;
 export const GLOW_DISCOVERY_FLOW = defineStory({
   id: 'glow-steppling-discovery', version: 9, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
   nodes: [
     storyOperations.focusCamera({ id: 'gateway.focus', target: STEPPLING_STORY_TARGET, ...MIST_CLOSE_UP, next: 'garden.open' }),
-    worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.single.prepare', view: { kind: 'garden', guide: { eyebrow: 'Someone’s in there', title: 'Back to the board.', body: 'One more request should be enough light.' }, actionLabel: 'Open Garden' } }),
+    worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.single.prepare', view: { kind: 'garden', guide: { eyebrow: 'Someone’s in there', title: 'Back to the board.', body: 'The trail past the garden is held too. One more request’s light should reach it.' }, actionLabel: 'Open Garden' } }),
     story.effect({ id: 'lesson.single.prepare', capability: 'glow.lesson.prepare', next: 'lesson.single.spawn' }),
     ...mergeLessonRecipe(GLOW_LESSON, 'gateway.ready', 'glow'),
-    worldActionScene({ id: 'gateway.ready', actionId: 'return', next: 'gateway.offer', view: { kind: 'return', guide: { eyebrow: 'Enough light', title: 'That should do it.', body: 'Let’s see who’s in there.' }, actionLabel: 'Back to world' } }),
+    worldActionScene({ id: 'gateway.ready', actionId: 'return', next: 'gateway.offer', view: { kind: 'return', guide: { eyebrow: 'Enough light', title: 'That should reach.', body: 'Come and see who the trail was hiding.' }, actionLabel: 'Back to world' } }),
     // Returning to the world exposes the upgrade immediately. Camera framing
     // stays at the existing close-up and must never gate this actionable checkpoint.
-    worldActionScene({ id: 'gateway.offer', actionId: 'open_upgrade', next: GLOW_MISSION_FOCUS_NODE_ID, view: { kind: 'purchase', guide: { eyebrow: 'The mist', title: 'Tap the glowing bubble.', body: 'Something was left in there.' }, actionLabel: 'See the light' } }),
+    worldActionScene({ id: 'gateway.offer', actionId: 'open_upgrade', next: GLOW_MISSION_FOCUS_NODE_ID, view: { kind: 'purchase', guide: { eyebrow: 'Held', title: 'Tap the glowing bubble.', body: 'Four Mistwisps have the trail. Spend the light and they’ll show themselves.' }, actionLabel: 'See the light' } }),
     // The bubble opens the mission, not a purchase sheet: the opening's framing on this tile, the board beneath.
     storyOperations.focusCamera({ id: GLOW_MISSION_FOCUS_NODE_ID, target: STEPPLING_STORY_TARGET, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 900, next: GLOW_MISSION_CLEAR_NODE_ID }),
     story.task({ id: GLOW_MISSION_CLEAR_NODE_ID, capability: 'glow.discovery.task', surface: 'haven', taskId: GLOW_MISSION_CLEAR_NODE_ID, requirements: [{ id: 'cleared', event: { type: GLOW_MISSION_CLEARED_EVENT } }], next: 'gateway.purchase.focus' }),
     ...upgradeWorldTargetRecipe({ id: 'gateway.purchase', target: STEPPLING_STORY_TARGET, toLevel: 1, economy: { mode: 'normal' }, cameraAlreadyFocused: true, presentation: { preset: 'mist-clear', reactionLine: '', showCoins: true }, next: 'gateway.egg' }),
-    worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'egg.enter', view: { kind: 'discovery', guide: { eyebrow: 'An Egg', title: 'So someone is being noticed again.', body: 'You noticed something earlier, out in your world. This is what that did. Go on. That’s you.' }, actionLabel: 'Meet the Egg' } }),
+    worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'egg.enter', view: { kind: 'discovery', guide: { eyebrow: 'An Egg', title: 'So the trail was keeping someone.', body: 'You noticed something out in your world today. This is what that did. Go on. That’s you.' }, actionLabel: 'Meet the Egg' } }),
     story.task({ id: 'egg.enter', capability: 'glow.discovery.task', surface: 'haven', taskId: 'egg.enter', requirements: [{ id: 'entered', event: { type: 'glow.egg.entered' } }], next: 'complete' }),
     story.complete(),
   ],

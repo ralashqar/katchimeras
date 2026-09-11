@@ -5,7 +5,7 @@ import { defineStory, story } from '@/features/content-flow/story-manifest';
 export const STEPPLING_GARDEN_RUN_ID = 'ftue:steppling-garden:1';
 export const STEPPLING_PARCEL_ID = 'journey:steppling:day-1:journey-locker';
 export const STEPPLING_SHOE_ORDER_ID = 'steppling:discovery:first-trail';
-export const STEPPLING_GARDEN_CLOSING = 'A Shoe, some Glow, and our first little adventure. We can keep growing this place together, at your pace.';
+export const STEPPLING_GARDEN_CLOSING = 'A Shoe, some light, and the first stretch of trail the Mist doesn’t own. We can keep going, at your pace.';
 /**
  * Scene nodes after the merge tasks; the board is unlocked and the companion
  * surface owns the screen. The Kingdom goal that follows the summary is owned
@@ -27,7 +27,7 @@ export const STEPPLING_GARDEN_FLOW = defineStory({
     { id: 'closing', kind: 'scene', capability: 'journey.reflection', surface: 'companion', sceneId: 'closing',
       payload: { text: STEPPLING_GARDEN_CLOSING }, actions: [{ id: 'summary', next: 'summary' }] },
     { id: 'summary', kind: 'scene', capability: 'journey.reflection', surface: 'companion', sceneId: 'summary',
-      payload: { text: 'Your world grows with you' },
+      payload: { text: 'Your world grows where you look' },
       actions: [{ id: 'finish', next: 'complete' }] },
     story.complete(),
   ],
@@ -70,13 +70,13 @@ export function stepplingGardenBoardStep(nodeId: string, state: MergeWorldState)
     return { ...base, guide: { eyebrow: '', title: 'Make a Shoe.', body: 'Merge the two Socks.' }, cue: { kind: 'drag', from, to },
       spotlight: { targets: [from, to], grouping: 'bounding_rect' }, interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from, to } } };
   }
-  if (nodeId === 'serve') return { ...base, guide: { eyebrow: '', title: 'Steppling needs a Shoe.', body: 'Serve his request to earn Glow.' },
+  if (nodeId === 'serve') return { ...base, guide: { eyebrow: '', title: 'Steppling needs a Shoe.', body: 'Serve it, and the light is yours to spend.' },
     cue: { kind: 'tap', target: { kind: 'order_serve', orderId: STEPPLING_SHOE_ORDER_ID } }, spotlight: { targets: [{ kind: 'order_card', orderId: STEPPLING_SHOE_ORDER_ID }] },
     interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: STEPPLING_SHOE_ORDER_ID } } } };
   const parcel = nodeId === 'parcel';
   const target: FtueTarget = parcel ? { kind: 'tray_parcel', arrivalId: STEPPLING_PARCEL_ID } : { kind: 'board_generator', generatorId: 'journey-locker' };
-  return { ...base, guide: parcel ? { eyebrow: '', title: 'A parcel from Steppling!', body: 'Tap to see what he brought.' }
-    : nodeId === 'spawn.first' ? { eyebrow: '', title: 'Steppling’s Journey Locker.', body: 'Tap it to make walking gear.' }
+  return { ...base, guide: parcel ? { eyebrow: '', title: 'A parcel from Steppling!', body: 'He kept it through the whole Mist. Tap to open it.' }
+    : nodeId === 'spawn.first' ? { eyebrow: '', title: 'Steppling’s Journey Locker.', body: 'Yours now. Tap it to make walking gear.' }
     : { eyebrow: '', title: 'One more Sock!', body: 'Tap the Locker again.' }, cue: { kind: 'tap', target }, spotlight: { targets: [target] },
     interaction: parcel ? { mode: 'exclusive', allowed: { kind: 'parcel_tap', target } } : { mode: 'exclusive', allowed: { kind: 'generator_tap', target } } };
 }

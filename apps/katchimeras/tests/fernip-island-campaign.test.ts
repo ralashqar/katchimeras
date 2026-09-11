@@ -68,12 +68,12 @@ test('Fernip’s boards grow with the grove and only ever ask for what the Locke
   }
 });
 
-test('Fernip keeps prices out of his mouth, remembers the previous answer, and speaks of the mist in every stage', () => {
+test('Fernip keeps prices out of his mouth, remembers the previous answer, and speaks of the Mist in every stage', () => {
   for (const chapter of fernip.chapters) {
-    assert.match(chapter.prompt, /mist/, `level ${chapter.level} sets its scene in the mist`);
+    assert.match(chapter.prompt, /Mist/, `level ${chapter.level} sets its scene in the Mist`);
     for (const choice of chapter.choices) {
       assert.doesNotMatch(choice.returnLine, /\d+ Glow/, `${choice.id} leaves the cost to the panel`);
-      assert.match(choice.returnLine, /mist/, `${choice.id} tells the player the delivery frees the mist`);
+      assert.match(choice.returnLine, /Mist/, `${choice.id} tells the player the delivery frees the Mist`);
     }
     if (chapter.level === 1) {
       assert.equal(chapter.callbackLine, undefined);
@@ -93,7 +93,7 @@ test('Fernip keeps prices out of his mouth, remembers the previous answer, and s
     }
   }
   assert.equal(fernip.copy.actionLabels.continue_restoring, 'Back to the ferns');
-  assert.equal(fernip.copy.stateLabels.board_open, 'Clearing the mist');
+  assert.equal(fernip.copy.stateLabels.board_open, 'Driving off the Mist');
   assert.equal(fernip.copy.stateLabels.delivery_requested, 'Requested in Merge');
   assert.ok(fernip.copy.speech?.available && fernip.copy.speech.delivery_requested, 'he voices the board states');
   assert.equal(islandCampaignOpeningConversationId(fernip, 1, null), fernip.chapters[0]!.conversationId);
@@ -114,7 +114,7 @@ test('the grove sleeps until Petalimp is home, then plays every stage on the boa
   state = startAndServeChapter(state, fernip, 1, NOW + 2, 2);
   assert.equal(islandCampaignChapterStatus(state, fernip, 1), 'board_open');
   const panel = islandCampaignUpgradePanelState(state, fernip)!;
-  assert.equal(panel.stateLabel, 'Clearing the mist');
+  assert.equal(panel.stateLabel, 'Driving off the Mist');
   assert.equal(panel.speech, fernip.chapters[0]!.choices[2]!.returnLine, 'the return line greets the delivery on the panel');
   state = completeChapter(restoreIslandLevel(completeRestoration(acknowledgeChapterReturn(state, fernip, 1, NOW + 3), fernip, 1, NOW + 4), fernip, 1, NOW + 5), fernip, 1, NOW + 6);
   assert.equal(islandCampaignChapterStatus(state, fernip, 1), 'complete');
@@ -131,4 +131,26 @@ test('the grove sleeps until Petalimp is home, then plays every stage on the boa
   assert.equal(home.haven.mossproutNatureIslands[FERNIP_ISLAND_ID], 4);
   assert.deepEqual(([1, 2, 3, 4] as const).map((level) => islandCampaignChapterStatus(home, fernip, level)), ['complete', 'complete', 'complete', 'complete']);
   assert.equal(islandWakeState(home, 'seed-nursery'), 'open', 'the nursery wakes next');
+});
+
+test('Fernip speaks in the Mist’s voice rules: no exclamation near the Mist, the wisps named once per chapter, the Mist always capitalised', () => {
+  const campaign = FERNIP_WILDGROWTH_CAMPAIGN;
+  const lines = (chapter: (typeof campaign.chapters)[number], choice: (typeof chapter.choices)[number]) =>
+    [chapter.prompt, ...Object.values(chapter.callbackLine ?? {}), choice.reply, choice.openingConclusion, choice.returnLine, choice.resolutionLine];
+  for (const chapter of campaign.chapters) {
+    for (const choice of chapter.choices) {
+      for (const line of lines(chapter, choice)) {
+        if (/Mist/.test(line)) assert.doesNotMatch(line, /!/, `${chapter.title} · ${choice.id}: ${line}`);
+        assert.doesNotMatch(line, /\bmist\b/, `${chapter.title} · ${choice.id} names the Mist as weather: ${line}`);
+      }
+      const named = [chapter.prompt, choice.openingConclusion].join('\n').match(/Mistwisps?/g)?.length ?? 0;
+      assert.ok(named <= 1, `${chapter.title} · ${choice.id} names the Mistwisps ${named} times before the board`);
+    }
+  }
+  const copy = campaign.copy;
+  for (const line of [copy.discoveryDialogue, copy.revealReactionLine, copy.mistDescription, copy.wakeHandoffLine, copy.sleepingHint, copy.fallbackReturn('x'), copy.fallbackResolution(1), copy.fallbackResolution(4), ...(copy.wispLines ? [copy.wispLines.firstStrike, ...copy.wispLines.fell, copy.wispLines.last] : [])]) {
+    assert.doesNotMatch(line, /\bmist\b/, line);
+    if (/Mist/.test(line)) assert.doesNotMatch(line, /!/, line);
+  }
+  assert.ok(copy.wispLines && copy.wispLines.fell.length >= 3, 'four wisps need three falling lines before the last');
 });

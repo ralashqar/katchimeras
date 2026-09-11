@@ -1,11 +1,11 @@
 import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { StyleSheet, View, type View as ViewType } from 'react-native';
-import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
+import { StyleSheet, Text, View, type View as ViewType } from 'react-native';
+import Animated, { cancelAnimation, Easing, FadeInDown, FadeOut, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import type { GlowSink } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
-import { wispHitPlan, wispStates, wispTargetIndex, type CorruptionWispSpec } from '@/features/onboarding/corruption-wisps';
+import { wispHitPlan, wispLineForFall, wispStates, wispTargetIndex, type CorruptionWispLines, type CorruptionWispSpec } from '@/features/onboarding/corruption-wisps';
 
 const WISP_ART = require('@incubator/art-cutouts/corruption-wisp.png');
 const SOFT_GLOW = require('@incubator/art-characters/soft-glow.png');
@@ -18,6 +18,13 @@ const DEATH_MS = 440;
 /** A wisp's arrival: it swells up out of nothing with a little overshoot, then shivers into place. */
 const ENTRANCE_MS = 460;
 const ENTRANCE_STAGGER_MS = 150;
+/**
+ * A board put away mid-mission: the wisps still standing shrink and fade out
+ * with the dock (its fade is 260ms), moving from the first frame; the stagger
+ * is only a ripple, so the last starts well before the first has finished.
+ */
+const EXIT_MS = 260;
+const EXIT_STAGGER_MS = 40;
 const EMBERS = [
   { dx: -0.22, rise: 0.95, duration: 2_300, delay: 0, size: 5, light: true },
   { dx: 0.14, rise: 1.05, duration: 2_700, delay: 500, size: 4, light: false },
@@ -34,12 +41,22 @@ export type CorruptionWispTarget = {
   required: number;
   merges: number;
   specs: readonly CorruptionWispSpec[];
+  /** What the board says as the wisps are struck and fall. */
+  lines?: CorruptionWispLines;
+  /** False while the camera is still gliding onto the tile: the wisps wait, and measure where it stops. */
+  settled?: boolean;
 };
+/** A board opening asks the camera to frame its tile; this is how long to give it to start moving before a measurement is trusted. */
+const SETTLE_GRACE_MS = 200;
+/** How long a wisp line stays under the tile. */
+const CAPTION_MS = 1_700;
 
 type WispFrame = { x: number; y: number; width: number; height: number };
 
 export type CorruptionWisps = {
   visible: boolean;
+  /** The mission's target is gone while the layer lingers: standing wisps play their exit. */
+  leaving: boolean;
   frame: WispFrame | null;
   specs: readonly CorruptionWispSpec[];
   states: readonly { hits: number; hp: number; alive: boolean }[];
@@ -47,6 +64,8 @@ export type CorruptionWisps = {
   strikes: Readonly<Record<number, number>>;
   /** The Glow hook's aim: where the next burst goes, and what each landing does. */
   sink: GlowSink | null;
+  /** The line under the tile right now, if one is showing. */
+  caption: { id: number; text: string } | null;
 };
 
 /**
@@ -64,11 +83,16 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
   // Held from the mission's first frame until a beat after its last: the layer never unmounts in
   // between, so a wisp that fell stays gone through the mist's lift instead of replaying its death.
   const [held, setHeld] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const assignedRef = useRef(0);
   const keyRef = useRef<string | null>(null);
   const lastRef = useRef<{ specs: readonly CorruptionWispSpec[]; plan: number[] } | null>(null);
   const key = target?.key ?? null;
   const node = target?.node ?? null;
+  const settled = target?.settled ?? true;
+  // Whether the camera has been seen moving since the last measurement: a settle after motion is measured at once.
+  const movedRef = useRef(false);
+  useEffect(() => { if (!settled) movedRef.current = true; }, [settled]);
   const plan = useMemo(() => target ? wispHitPlan(target.required, target.specs.length) : lastRef.current?.plan ?? [], [target]);
   const specs = target?.specs ?? lastRef.current?.specs ?? [];
   if (target) lastRef.current = { specs: target.specs, plan };
@@ -82,27 +106,61 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
     setLanded(target.merges);
     setStrikes({});
   }, [key, target]);
-  // The tile on screen, measured once it is here and again after the camera has settled on it.
+  // The tile on screen, measured only while the camera is still: a board opening sends the camera onto its
+  // tile, so the first measurement waits a beat for that glide to begin, and is made again once it has ended.
+  // The wisps therefore first appear where the tile will stay, instead of appearing early and jumping.
   useEffect(() => {
-    if (!key || !node) return;
+    if (!key || !node || !settled) return;
     let cancelled = false;
     const measure = () => node.measureInWindow((x, y, width, height) => {
       if (cancelled || !(width > 0 && height > 0)) return;
       setFrame((current) => current && current.x === x && current.y === y && current.width === width && current.height === height ? current : { x, y, width, height });
     });
-    measure();
-    const timers = [setTimeout(measure, 400), setTimeout(measure, 1_100)];
+    const grace = movedRef.current ? 0 : SETTLE_GRACE_MS;
+    movedRef.current = false;
+    const timers = [setTimeout(measure, grace), setTimeout(measure, grace + 400), setTimeout(measure, grace + 1_100)];
     return () => { cancelled = true; for (const timer of timers) clearTimeout(timer); };
-  }, [key, node]);
+  }, [key, node, settled]);
   // The mission ends on the last wisp's fall: the layer stays a beat for that death to play, then goes.
+  // Put away early (Back), the standing wisps leave the way they came during that same beat.
   useEffect(() => {
-    if (target) { setHeld(true); return; }
-    const timer = setTimeout(() => { setHeld(false); lastRef.current = null; keyRef.current = null; setFrame(null); }, LINGER_MS);
+    if (target) { setHeld(true); setLeaving(false); return; }
+    setLeaving(true);
+    const timer = setTimeout(() => { setHeld(false); setLeaving(false); lastRef.current = null; keyRef.current = null; setFrame(null); }, LINGER_MS);
     return () => clearTimeout(timer);
   }, [target]);
 
   const shownFrame = frame;
   const states = useMemo(() => wispStates(plan, landed), [landed, plan]);
+  // The wisps answer back: once on the first strike, once as each falls, once more for the last.
+  const [caption, setCaption] = useState<{ id: number; text: string } | null>(null);
+  const captionSeq = useRef(0);
+  const spokenStrikeRef = useRef<string | null>(null);
+  const fallenRef = useRef<number>(0);
+  const struckCount = Object.values(strikes).reduce((sum, count) => sum + count, 0);
+  const fallen = states.filter((wisp) => !wisp.alive).length;
+  const lines = target?.lines ?? null;
+  useEffect(() => {
+    if (!key) { fallenRef.current = 0; spokenStrikeRef.current = null; return; }
+    if (keyRef.current !== key) return;
+    // Nothing to say for wisps already down when the board came back: the count starts where it is.
+    if (fallenRef.current === 0 && fallen > 0 && struckCount === 0) { fallenRef.current = fallen; return; }
+    let text: string | null = null;
+    if (fallen > fallenRef.current) {
+      fallenRef.current = fallen;
+      text = lines ? wispLineForFall(lines, fallen, plan.length) : null;
+    } else if (struckCount > 0 && spokenStrikeRef.current !== key) {
+      spokenStrikeRef.current = key;
+      text = lines?.firstStrike ?? null;
+    }
+    if (!text) return;
+    setCaption({ id: ++captionSeq.current, text });
+  }, [fallen, key, lines, plan.length, struckCount]);
+  useEffect(() => {
+    if (!caption) return;
+    const timer = setTimeout(() => setCaption((current) => current?.id === caption.id ? null : current), CAPTION_MS);
+    return () => clearTimeout(timer);
+  }, [caption]);
   const sink = useMemo<GlowSink | null>(() => {
     if (!target || !shownFrame || !plan.length) return null;
     const point = (index: number): RewardFlightPoint => {
@@ -124,11 +182,13 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
 
   return {
     visible: Boolean(shownFrame && specs.length && (target || held)),
+    leaving: !target && leaving,
     frame: shownFrame,
     specs,
     states,
     strikes,
     sink,
+    caption,
   };
 }
 
@@ -145,12 +205,16 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
       key={spec.id} index={index}
       x={frame.x + spec.fx * frame.width - origin.x} y={frame.y + spec.fy * frame.height - origin.y}
       size={Math.max(48, spec.size * frame.width)}
-      alive={wisps.states[index]?.alive ?? true} strikeNonce={wisps.strikes[index] ?? 0} />)}
+      alive={wisps.states[index]?.alive ?? true} leaving={wisps.leaving} strikeNonce={wisps.strikes[index] ?? 0} />)}
+    {wisps.caption ? <Animated.View key={wisps.caption.id} entering={FadeInDown.duration(220)} exiting={FadeOut.duration(260)} pointerEvents="none"
+      style={[styles.caption, { left: frame.x - origin.x, width: frame.width, top: frame.y + frame.height * 0.62 - origin.y }]}>
+      <Text style={styles.captionText}>{wisps.caption.text}</Text>
+    </Animated.View> : null}
   </View>;
 });
 
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */
-function CorruptionWisp({ index, x, y, size, alive, strikeNonce }: { index: number; x: number; y: number; size: number; alive: boolean; strikeNonce: number }) {
+function CorruptionWisp({ index, x, y, size, alive, leaving, strikeNonce }: { index: number; x: number; y: number; size: number; alive: boolean; leaving: boolean; strikeNonce: number }) {
   const reduceMotion = useReducedMotion();
   const hover = useSharedValue(0);
   const shake = useSharedValue(0);
@@ -192,6 +256,20 @@ function CorruptionWisp({ index, x, y, size, alive, strikeNonce }: { index: numb
       withTiming(0, { duration: 40 }),
     );
   }, [shake, strikeNonce]);
+  // Leaving: the entrance runs backwards, staggered; back within the linger, it runs forward again.
+  const leftRef = useRef(false);
+  useEffect(() => {
+    if (!alive) return;
+    if (leaving) {
+      leftRef.current = true;
+      cancelAnimation(entrance);
+      entrance.value = withDelay(reduceMotion ? 0 : index * EXIT_STAGGER_MS, withTiming(0, { duration: reduceMotion ? 120 : EXIT_MS, easing: Easing.out(Easing.cubic) }));
+    } else if (leftRef.current) {
+      leftRef.current = false;
+      cancelAnimation(entrance);
+      entrance.value = withTiming(1, { duration: reduceMotion ? 80 : ENTRANCE_MS, easing: Easing.out(Easing.back(1.6)) });
+    }
+  }, [alive, entrance, index, leaving, reduceMotion]);
   useEffect(() => {
     if (alive) return;
     death.value = withTiming(1, { duration: reduceMotion ? 160 : DEATH_MS, easing: Easing.in(Easing.cubic) });
@@ -275,7 +353,10 @@ function DeathMote({ index, size, t }: { index: number; size: number; t: SharedV
 }
 
 const styles = StyleSheet.create({
-  layer: { zIndex: 90 },
+  // Over the map and its markers, under the docked board (60) and everything the board's beats draw; the Glow (100) strikes them from above.
+  layer: { zIndex: 58 },
+  caption: { position: 'absolute', alignItems: 'center', zIndex: 4 },
+  captionText: { fontFamily: 'FredokaBold', fontSize: 17, color: '#FFF4D6', textAlign: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, backgroundColor: 'rgba(38,18,58,0.72)', overflow: 'hidden' },
   wisp: { position: 'absolute', alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
   rim: { zIndex: 0 },
   ember: { position: 'absolute', zIndex: 1 },

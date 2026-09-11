@@ -6,7 +6,7 @@ import { KingdomOpeningMergeDock, OpeningGlowLayer, useOpeningGlow } from '@/com
 import { StepplingMissionDock } from '@/components/katchadeck/world/steppling-mission-dock';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import { createStepplingMissionState, STEPPLING_MISSION_ID, STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep } from '@/features/onboarding/steppling-mission';
-import { OPENING_WISPS, STEPPLING_WISPS, wispsForClearing } from '@/features/onboarding/corruption-wisps';
+import { ISLAND_WISP_LINES, OPENING_WISP_LINES, OPENING_WISPS, STEPPLING_WISP_LINES, STEPPLING_WISPS, wispsForClearing } from '@/features/onboarding/corruption-wisps';
 import { CorruptionWispLayer, useCorruptionWisps, type CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
 import { KingdomOpeningCaption } from '@/components/katchadeck/world/kingdom-opening-caption';
 import { clearMission, clearOpeningMission, useMissionBoard, useOpeningMissionBoard } from '@/features/onboarding/use-opening-mission-board';
@@ -79,11 +79,9 @@ import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { ConversationSession } from '@/types/companion-conversation';
 import { HAVEN_ENVIRONMENTS, type HavenStage } from '@/constants/haven-catalog';
 import { acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, ensureStoredFirstFtueMemoryPlacement, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead } from '@/utils/merge-world/repository';
-import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
+import type { FtueCameraDirective, FtueCueDefinition } from '@/features/onboarding/ftue-types';
 import { IslandRestorationDock } from '@/components/katchadeck/world/island-restoration-dock';
 import { consumeIslandRestorationOpen, requestIslandRestorationOpen } from '@/features/island-restoration/restoration-intent';
-import { PETALIMP_ISLAND_CAMPAIGN_ID } from '@/constants/island-campaigns/petalimp-bloom';
-import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { createRestorationState, deliveriesToPlace, restorationBoardStep, restorationCheckpointReached, restorationComplete, restorationDeliveryCells, restorationProgress, restorationRunId, restorationStorageKey, restoreRestorationEchoes } from '@/features/island-restoration/island-restoration';
 import { useKatchimeraCards } from '@/hooks/use-katchimera-cards';
 import { mossproutNatureIslandById, mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
@@ -186,12 +184,10 @@ function FtueOpeningFade() {
   return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.openingFade, animatedStyle]} />;
 }
 
-/** Petalimp's checkpoint hint is shown once per player. */
-const RESTORATION_HINT_SEEN_KEY = 'katchimeras.island-restoration.hint-seen.petalimp.v1';
-/** How long the hint stays before a tap away can dismiss it. */
-const RESTORATION_HINT_ARM_MS = 2500;
-/** Under the docked board (60), so the card and board keep their taps; over the map, so a tap there puts the hint away. */
-const RESTORATION_HINT_CATCHER_Z = 59;
+/** The checkpoint hint is one finger, under the card's item slots rather than on its face (the card is 120 tall). */
+/** After the dock has settled: the card's fade-in and the friend's bubble come first, then the finger. */
+const RESTORATION_HINT_DELAY_MS = 900;
+const RESTORATION_HINT_FINGER_DROP = 40;
 
 /** After a finale lands: the struck wisp's fall (shrink, burst) before the mission is declared over. */
 const WISP_FALL_MS = 640;
@@ -478,17 +474,7 @@ export function KatchimeraKingdomScreen({
     // "Meet me at Bloom Garden" from the Merge page: straight onto the board.
     if (screenFocused && restorationCampaignId && consumeIslandRestorationOpen(restorationCampaignId)) setRestorationOpen(true);
   }, [restorationCampaignId, screenFocused]);
-  // Petalimp's one hint (the spent patch, the request on the tray) is shown once ever:
-  // a tap away from the board after a moment, the card, or Later puts it away for good.
-  const [restorationHintSeen, setRestorationHintSeen] = useState(() => getStoredJson<boolean>(RESTORATION_HINT_SEEN_KEY, false));
-  const [restorationHintArmed, setRestorationHintArmed] = useState(false);
-  const dismissRestorationHint = useCallback(() => {
-    setRestorationHintSeen((seen) => {
-      if (!seen) setStoredJson(RESTORATION_HINT_SEEN_KEY, true);
-      return true;
-    });
-  }, []);
-  const closeRestoration = useCallback(() => { setRestorationOpen(false); dismissRestorationHint(); }, [dismissRestorationHint]);
+  const closeRestoration = useCallback(() => setRestorationOpen(false), []);
   const restorationCamera = useMemo((): FtueCameraDirective | null => restorationIslandId && restorationOpen && screenFocused ? {
     kind: 'focus_target' as const, target: { kind: 'haven_nature_island' as const, islandId: restorationIslandId },
     zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700,
@@ -1306,6 +1292,8 @@ export function KatchimeraKingdomScreen({
 
   // The restoration board itself: its store, its deliveries, its checkpoint and its finish.
   const restorationDefinition = islandRestoration?.chapter.restoration ?? null;
+  // The friend's own voice over their board when authored; module constants, so the wisp target stays stable.
+  const restorationWispLines = islandRestoration?.campaign.copy.wispLines ?? ISLAND_WISP_LINES;
   // The run names the stage's start and the board's authoring: a restarted or re-authored stage never inherits a saved board.
   const restorationBoardRunId = islandRestoration && restorationDefinition ? restorationRunId(islandRestoration.campaign.campaignId, islandRestoration.level, islandRestoration.progress.startedAt, restorationDefinition) : null;
   const createRestorationBoard = useCallback((now: number) => createRestorationState(restorationDefinition!, now), [restorationDefinition]);
@@ -1316,12 +1304,12 @@ export function KatchimeraKingdomScreen({
   // The mist, given faces: wisps over the veiled tile take the merges' Glow; the last falls on the final item, and the mist lifts with it.
   // A friend's board has them too, over the island, for as long as the board is up; their hits come from the board's saved merges.
   const wispTarget = useMemo((): CorruptionWispTarget | null => stepplingMissionActive
-    ? { key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission.merges, specs: STEPPLING_WISPS }
+    ? { key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission.merges, specs: STEPPLING_WISPS, lines: STEPPLING_WISP_LINES, settled: ftueCameraSettled }
     : openingBoardActive
-      ? { key: 'opening-mist', node: homeTileNode, required: OPENING_MERGE_REQUIRED, merges: openingProgress, specs: OPENING_WISPS }
+      ? { key: 'opening-mist', node: homeTileNode, required: OPENING_MERGE_REQUIRED, merges: openingProgress, specs: OPENING_WISPS, lines: OPENING_WISP_LINES, settled: ftueCameraSettled }
       : restorationBoardVisible && restorationDefinition && restorationBoardRunId
-        ? { key: restorationBoardRunId, node: restorationTileNode, required: restorationDefinition.merges, merges: restorationStore.merges, specs: wispsForClearing(restorationDefinition.merges) }
-        : null, [gatewayTileNode, homeTileNode, openingBoardActive, openingProgress, restorationBoardRunId, restorationBoardVisible, restorationDefinition, restorationStore.merges, restorationTileNode, stepplingMission.merges, stepplingMissionActive]);
+        ? { key: restorationBoardRunId, node: restorationTileNode, required: restorationDefinition.merges, merges: restorationStore.merges, specs: wispsForClearing(restorationDefinition.merges), lines: restorationWispLines, settled: ftueCameraSettled }
+        : null, [ftueCameraSettled, gatewayTileNode, homeTileNode, openingBoardActive, openingProgress, restorationBoardRunId, restorationBoardVisible, restorationDefinition, restorationStore.merges, restorationTileNode, restorationWispLines, stepplingMission.merges, stepplingMissionActive]);
   const wisps = useCorruptionWisps(wispTarget);
   openingGlow.sinkRef.current = wisps.sink;
   useEffect(() => {
@@ -1367,27 +1355,37 @@ export function KatchimeraKingdomScreen({
   }, [islandRestoration, mergeWorld.activeOrders, restorationChapterProgress]);
   const restorationOrderServed = Boolean(restorationChapterProgress && restorationChapterProgress.orderIds.length > 0 && restorationChapterProgress.orderIds.every((id) => restorationChapterProgress.servedOrderIds.includes(id)));
   const restorationPendingDeliveries = useMemo(() => islandRestoration ? deliveriesToPlace(islandRestoration.progress, restorationStore.placedDeliveries) : [], [islandRestoration, restorationStore.placedDeliveries]);
-  // The one hint a friend's board gives, and only Petalimp's: when the patch is
-  // spent and her request sits on the tray, the card is spotlit and explained.
-  const restorationCheckpointHint = Boolean(islandRestoration && islandRestoration.campaign.campaignId === PETALIMP_ISLAND_CAMPAIGN_ID
-    && restorationOrder && !restorationOrderServed && restorationBoardVisible && !restorationHintSeen);
+  // What the friend says beside the tray: the panel's own voice for the stage (the request's line while it
+  // is open on the Main Board, the answer's return line once the delivery is in).
+  const restorationSpeech = useMemo(() => {
+    if (!islandRestoration) return null;
+    const panel = islandCampaignUpgradePanelState(mergeWorld, islandRestoration.campaign);
+    if (!panel) return null;
+    return panel.speech ?? (panel.status === 'delivery_requested' ? panel.voicedStateLabel : null);
+  }, [islandRestoration, mergeWorld]);
+  // The one hint a friend's board gives, every friend, every time: while the patch is spent and the
+  // request sits on the tray unserved, a finger under the card points the way to the Merge board.
+  const restorationCheckpointHint = Boolean(islandRestoration && restorationOrder && !restorationOrderServed && restorationBoardVisible);
+  // Settled is per showing: put away and reopened, the dock plays its entrance again and the finger waits for it again.
+  useEffect(() => { if (islandRestoration && !restorationBoardVisible) setOpeningDockSettled(false); }, [islandRestoration, restorationBoardVisible]);
+  // The finger comes last: the board has settled, the card has faded in and the bubble has spoken.
+  const [restorationHintReady, setRestorationHintReady] = useState(false);
   useEffect(() => {
-    // A tap away dismisses it only after it has had a moment to be read.
-    if (!restorationCheckpointHint) { setRestorationHintArmed(false); return; }
-    const timer = setTimeout(() => setRestorationHintArmed(true), RESTORATION_HINT_ARM_MS);
+    if (!(restorationCheckpointHint && openingDockSettled)) { setRestorationHintReady(false); return; }
+    const timer = setTimeout(() => setRestorationHintReady(true), RESTORATION_HINT_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [restorationCheckpointHint]);
-  useEffect(() => {
-    // Served: the hint has done its job, whether or not it was ever tapped away.
-    if (restorationOrderServed) dismissRestorationHint();
-  }, [dismissRestorationHint, restorationOrderServed]);
+  }, [openingDockSettled, restorationCheckpointHint]);
+  // One cue object per request: a new object each render would re-measure the card on every board move and restart the finger.
+  const restorationOrderId = restorationOrder?.id ?? null;
+  const restorationHintCue = useMemo<FtueCueDefinition | null>(() => restorationOrderId
+    ? { kind: 'tap', target: { kind: 'order_card', orderId: restorationOrderId }, offset: { y: RESTORATION_HINT_FINGER_DROP } }
+    : null, [restorationOrderId]);
   const openRestorationOrder = useCallback(() => {
     if (!islandRestoration || !restorationOrder) return;
-    dismissRestorationHint();
     // Back from the Merge page lands on this board again.
     requestIslandRestorationOpen(islandRestoration.campaign.campaignId);
     openGarden(restorationOrder.id, 'mossprout');
-  }, [dismissRestorationHint, islandRestoration, openGarden, restorationOrder]);
+  }, [islandRestoration, openGarden, restorationOrder]);
   const restorationPlace = restorationStore.place;
   const placeRestorationDelivery = useCallback((entry: { cell: number; definitionId: string }) => restorationPlace([entry]), [restorationPlace]);
   // With the board put away, deliveries land quietly as they arrive (and on mount after a relaunch);
@@ -1655,8 +1653,10 @@ export function KatchimeraKingdomScreen({
   }, [flushMergeWorld, ftueStepId, glowRun, sharedUpgrade, upgradeCommitted, upgradeError]);
   // Sleeping islands arrive from the offers layer already locked, in wake order.
   const presentedUpgradeOffers = upgradeOffers;
-  // Alone until the hatch: no markers at all until the islands are drawn.
-  const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
+  // Alone until the hatch: no markers at all until the islands are drawn. And none while any mini board is
+  // docked (the opening's, Steppling's, a friend's): the board is the only thing to do until it is put away.
+  const missionBoardDocked = openingBoardActive || stepplingMissionActive || restorationBoardVisible;
+  const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : missionBoardDocked ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
 
   // Mount the camera with its saved framing, rather than initializing the overview first.
   if (!glowReady || !stepplingLesson.ready) return null;
@@ -2056,19 +2056,17 @@ export function KatchimeraKingdomScreen({
       {restorationBoardVisible && islandRestoration && restorationStore.state ? <IslandRestorationDock
         campaign={islandRestoration.campaign} level={islandRestoration.level} state={restorationStore.state} send={restorationStore.send} boardStep={restorationStep}
         merges={restorationStore.merges} mergesRef={restorationStore.mergesRef} width={window.width} bottomInset={insets.bottom}
-        order={restorationOrder} orderServed={restorationOrderServed} pendingDeliveries={restorationPendingDeliveries} onOpenOrder={openRestorationOrder} onPlaceDelivery={placeRestorationDelivery}
+        order={restorationOrder} orderServed={restorationOrderServed} pendingDeliveries={restorationPendingDeliveries} speech={restorationSpeech} onOpenOrder={openRestorationOrder} onPlaceDelivery={placeRestorationDelivery}
         railTargetRefs={openingRailRefs}
         impactKey={openingGlow.landed} onMerge={openingGlow.launchItem} onFinale={launchRestorationFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
-        onEntranceSettled={markOpeningDockSettled} onClose={closeRestoration} /> : null}
-      {restorationCheckpointHint && restorationHintArmed ? <Pressable accessibilityRole="button" accessibilityLabel="Dismiss the hint" onPress={dismissRestorationHint}
-        style={[StyleSheet.absoluteFill, { zIndex: RESTORATION_HINT_CATCHER_Z }]} /> : null}
-      {restorationCheckpointHint && restorationOrder && restorationStore.state && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
-        <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics}
-          cue={{ kind: 'tap', target: { kind: 'order_card', orderId: restorationOrder.id } }}
-          guide={{ eyebrow: 'Requested in Merge', title: 'This patch has given all it had.', body: 'Serve Petalimp’s request on the Merge board, then come back: what you bring frees what the mist still holds.' }}
-          layoutNonce={restorationStore.state.revision} railTargetRefs={openingRailRefs} screenRef={screenRef}
-          spotlight={{ targets: [{ kind: 'order_card', orderId: restorationOrder.id }], grouping: 'bounding_rect', padding: 8, radius: 18, dimOpacity: 0.58 }}
-          state={restorationStore.state} targetRevision={restorationStore.state.revision} />
+        onEntranceSettled={markOpeningDockSettled} /> : null}
+      {restorationCheckpointHint && restorationHintCue && restorationStore.state && restorationHintReady ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
+        <MergeFtueOverlay blockedPulseNonce={0} boardMetrics={openingBoardMetrics}
+          cue={restorationHintCue}
+          guide={null}
+          layoutNonce={0} railTargetRefs={openingRailRefs} screenRef={screenRef}
+          spotlight={null}
+          state={restorationStore.state} targetRevision={0} />
       </View> : null}
       {wisps.visible ? <CorruptionWispLayer wisps={wisps} screenRef={screenRef} /> : null}
       {openingGlow.flights.length || openingGlow.impacts.length ? <OpeningGlowLayer flights={openingGlow.flights} impacts={openingGlow.impacts}

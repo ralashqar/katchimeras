@@ -30,7 +30,7 @@ function conversationFromFlow(flow: ContentFlowDefinition): ConversationDefiniti
         })),
       }];
     }),
-    { id: 'end', kind: 'end', message: 'A little parcel is waiting in our Garden.' },
+    { id: 'end', kind: 'end', message: 'A little parcel is waiting in our Garden. I carried it the whole way through.' },
   ],
 };
 

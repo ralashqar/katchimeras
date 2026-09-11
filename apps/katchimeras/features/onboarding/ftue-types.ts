@@ -101,7 +101,8 @@ export type FtueTarget =
 
 export type FtueCueDefinition =
   | { kind: 'drag'; from: FtueTarget; to: FtueTarget }
-  | { kind: 'tap'; target: FtueTarget };
+  /** `offset` moves the fingertip from the target's centre, in screen points. */
+  | { kind: 'tap'; target: FtueTarget; offset?: { x?: number; y?: number } };
 
 export type FtueSpotlightDefinition = {
   targets: readonly FtueTarget[];

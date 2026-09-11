@@ -37,6 +37,38 @@ export function wispsForClearing(merges: number): readonly CorruptionWispSpec[] 
   return merges >= 7 ? STEPPLING_WISPS : OPENING_WISPS;
 }
 
+/**
+ * What the board says as the wisps go: one line the first time a wisp is
+ * struck, one as each falls, and one for the last. Short, sly, never scary;
+ * the Mist is named once per mission at most, in the guide, not here.
+ */
+export type CorruptionWispLines = { firstStrike: string; fell: readonly string[]; last: string };
+
+export const OPENING_WISP_LINES: CorruptionWispLines = {
+  firstStrike: 'It felt that.',
+  fell: ['One gone. Two still hold it.', 'One left, and it knows.'],
+  last: 'Now look.',
+};
+
+export const STEPPLING_WISP_LINES: CorruptionWispLines = {
+  firstStrike: 'It felt that.',
+  fell: ['One gone. The trail’s already brighter.', 'Two gone. It’s thinning.', 'One left.'],
+  last: 'The last one falls. Look what it was sitting on.',
+};
+
+/** A friend's board: the same beats, in nobody's voice but the Mist's. */
+export const ISLAND_WISP_LINES: CorruptionWispLines = {
+  firstStrike: 'It felt that.',
+  fell: ['One gone.', 'Another gone.', 'One left.'],
+  last: 'The last one goes. Look.',
+};
+
+/** The line for the wisp that just fell: its own, or the last line when it was the last. */
+export function wispLineForFall(lines: CorruptionWispLines, fallen: number, total: number): string {
+  if (fallen >= total) return lines.last;
+  return lines.fell[fallen - 1] ?? `${total - fallen} still hold it.`;
+}
+
 /** How many merges each wisp takes, summing to the clearing's requirement; the first wisps take the remainder. */
 export function wispHitPlan(required: number, count: number): number[] {
   const total = Math.max(0, Math.floor(required));
