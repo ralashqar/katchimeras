@@ -419,12 +419,13 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   const nextId = useRef(0);
   const targetRef = useRef(targetNode);
   targetRef.current = targetNode;
-  const launch = useCallback((from: RewardFlightPoint) => {
+  /** A burst of Glow into the tile the hook is aimed at, or into the node given (a spend that lands before the screen has re-aimed). */
+  const launch = useCallback((from: RewardFlightPoint, targetNode?: ViewType | null) => {
     const push = (to: RewardFlightPoint) => setFlights((current) => [
       ...current,
       ...Array.from({ length: OPENING_GLOWS_PER_MERGE }, (_, index) => ({ id: ++nextId.current, index, from, to })),
     ]);
-    const target = targetRef.current;
+    const target = targetNode ?? targetRef.current;
     if (!target) { push({ x: from.x, y: from.y - 220 }); return; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.55 }));
   }, []);

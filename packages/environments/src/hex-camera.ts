@@ -41,6 +41,8 @@ type UseKingdomHexCameraArgs = {
     screenY: number;
     x: number;
     y: number;
+    /** Frame the target exactly where asked, past the scene's bounds if need be. */
+    unbounded?: boolean;
   } | null;
   initialSnapshot?: KingdomCameraSnapshot | null;
   interactionEnabled?: boolean;
@@ -233,7 +235,7 @@ export function useKingdomHexCamera({
   }, [pendingMove, scale, tx, ty]);
 
   const animateTo = useCallback(
-    (x: number, y: number, zoom: number, screenY: number, duration: number, onComplete?: () => void) => {
+    (x: number, y: number, zoom: number, screenY: number, duration: number, onComplete?: () => void, unbounded = false) => {
       if (!cameraViewport.width || !cameraViewport.height) {
         onComplete?.();
         return;
@@ -245,7 +247,9 @@ export function useKingdomHexCamera({
       const clampedZoom = clampHavenCameraScale(zoom, minScale, maxScale);
       const nextTx = cameraViewport.width / 2 - cameraScene.width / 2 - (x - cameraScene.width / 2) * clampedZoom;
       const nextTy = screenY - cameraScene.height / 2 - (y - cameraScene.height / 2) * clampedZoom;
-      const clamped = clampCameraTranslation({ tx: nextTx, ty: nextTy }, cameraViewport, cameraScene, clampedZoom);
+      // A focused tile (a docked board under it) is framed exactly where it was asked to be: the scene's
+      // bounds would otherwise pull an edge tile back toward the middle and leave the board over the wrong place.
+      const clamped = unbounded ? { tx: nextTx, ty: nextTy } : clampCameraTranslation({ tx: nextTx, ty: nextTy }, cameraViewport, cameraScene, clampedZoom);
       const moveId = pendingMove.begin({ ...clamped, scale: clampedZoom }, onComplete);
       const timing = { duration, easing: Easing.out(Easing.cubic) };
       tx.value = withTiming(clamped.tx, timing);
@@ -303,6 +307,7 @@ export function useKingdomHexCamera({
             { x: initialFocus.x, y: initialFocus.y },
             initialScale,
             { x: cameraViewport.width / 2, y: initialFocus.screenY },
+            initialFocus.unbounded,
           )
         : initialSnapshot
           ? { ...clampCameraTranslation(initialSnapshot, cameraViewport, cameraScene, initialScale), scale: initialScale }
@@ -341,6 +346,8 @@ export function useKingdomHexCamera({
           initialFocus.scale,
           initialFocus.screenY,
           initialFocus.durationMs!,
+          undefined,
+          initialFocus.unbounded,
         );
       }
       return;
@@ -529,7 +536,7 @@ export function useKingdomHexCamera({
   }, [animateTo, baseScale, center.x, center.y, centerId, clearFrameFocus, initialFitWorld, minScale, scene.height, scene.width, viewport.height, viewport.width]);
 
   const focusResident = useCallback(
-    (x: number, y: number, options?: { anchorY?: number; durationMs?: number; id?: string; onComplete?: () => void; zoom?: number }) => {
+    (x: number, y: number, options?: { anchorY?: number; durationMs?: number; id?: string; onComplete?: () => void; zoom?: number; unbounded?: boolean }) => {
       clearFrameFocus();
       if (options?.id) setFocusedTileId(options.id);
       // An explicit scripted zoom is a destination, not a minimum. The former
@@ -539,7 +546,7 @@ export function useKingdomHexCamera({
         ? maxScale
         : Math.min(maxScale, Math.max(minScale, options.zoom));
       const anchorY = options?.anchorY ?? 0.42;
-      animateTo(x, y, zoom, viewport.height * anchorY, options?.durationMs ?? 420, options?.onComplete);
+      animateTo(x, y, zoom, viewport.height * anchorY, options?.durationMs ?? 420, options?.onComplete, options?.unbounded);
     },
     [animateTo, clearFrameFocus, maxScale, minScale, viewport.height]
   );

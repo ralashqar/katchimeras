@@ -375,11 +375,21 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /const closeRestoration = useCallback\(\(\) => \{ setRestorationOpen\(false\); dismissRestorationHint\(\); \}/);
   assert.match(screen, /if \(restorationOrderServed\) dismissRestorationHint\(\);/);
   assert.match(screen, /spotlight=\{\{ targets: \[\{ kind: 'order_card', orderId: restorationOrder\.id \}\], grouping: 'bounding_rect'/, 'the spotlight sits on the tray card');
+  // A paid stage shows its Glow leaving: the counter holds the old balance until the write lands, then coins fly from the top bar into the island as it counts down.
+  assert.match(screen, /const stageCost = chapter\.restoration && chapter\.level > 1 \? mossproutNatureIslandLevelDefinition\(campaign\.islandId, chapter\.level\)\?\.coinCost \?\? 0 : 0;\s*if \(stageCost > 0\) setGlowSpend\(\{ amount: stageCost, counting: false \}\);/);
+  assert.match(screen, /const node = islandTileNodesRef\.current\[campaign\.islandId\] \?\? null;\s*if \(!node && attempt < 30\) \{ requestAnimationFrame\(\(\) => aim\(attempt \+ 1\)\); return; \}\s*openingGlow\.launch\(origin, node\);\s*setGlowSpend\(\{ amount: stageCost, counting: true \}\);\s*setDisplayedGlow\(spent\);/, 'aimed at the island’s own node, never at whatever tile the hook last pointed at');
+  assert.match(glowDock, /const launch = useCallback\(\(from: RewardFlightPoint, targetNode\?: ViewType \| null\) => \{[\s\S]*?const target = targetNode \?\? targetRef\.current;/);
+  assert.match(screen, /if \(upgradePurchasing \|\| upgradeCommitted \|\| glowSpend\) return;/, 'the counter is not re-synced under the spend');
+  assert.match(screen, /animateValue: Boolean\(upgradePresentation\?\.showCoins && upgradePresentation\.coinCost > 0\) \|\| Boolean\(glowSpend\?\.counting\),/);
   assert.match(screen, /cue=\{\{ kind: 'tap', target: \{ kind: 'order_card', orderId: restorationOrder\.id \} \}\}/);
   assert.match(dock, /railTargetRefs\.current\.set\(targetKey, view\)/, 'the dock shares the card’s targets with the overlay');
   assert.match(rail, /if \(onPressCard\) \{[\s\S]*?onPressCard\(\);\s*return;\s*\}\s*if \(interactionLocked\)/, 'the portrait never opens the reward popup on a card that leads somewhere');
   assert.match(glowDock, /const launchItem = useCallback\(\(from: RewardFlightPoint, definitionId: string\) => \{[\s\S]*?\{ id, index: 0, count: 1, from, to, art, size: 44 \}/, 'one item flight per merge');
-  assert.match(canvas, /if \(target\.kind === 'haven_nature_island'\) \{[\s\S]*?`nature:mossprout:\$\{target\.islandId\}`[\s\S]*?focusTutorialResident\(/, 'the island is a camera target');
+  assert.match(canvas, /if \(target\.kind === 'haven_nature_island'\) \{[\s\S]*?`nature:mossprout:\$\{target\.islandId\}`[\s\S]*?focusTutorialResident\([^;]*?unbounded: true \}\);/, 'the island is a camera target, framed exactly where asked: the scene bounds never pull an edge island back');
+  const hexCamera = readFileSync('../../packages/environments/src/hex-camera.ts', 'utf8');
+  assert.match(hexCamera, /const clamped = unbounded \? \{ tx: nextTx, ty: nextTy \} : clampCameraTranslation\(\{ tx: nextTx, ty: nextTy \}, cameraViewport, cameraScene, clampedZoom\);/);
+  assert.match(hexCamera, /animateTo\(x, y, zoom, viewport\.height \* anchorY, options\?\.durationMs \?\? 420, options\?\.onComplete, options\?\.unbounded\);/);
+  assert.equal((canvas.match(/unbounded: true/g) ?? []).length, 7, 'every focus_target directive, live and on a cold launch');
   assert.match(canvas, /ref=\{natureIslandTargetRefs\.get\(islandId\)\}/, 'and a flight target');
   assert.match(canvas, /const natureIslandTargetRefs = useMemo\(\(\) => \{[\s\S]*?\}, \[onNatureIslandTargetChange\]\);/, 'one stable ref per island: an inline arrow ref re-fires on every render and loops the Kingdom');
   assert.doesNotMatch(canvas, /ref=\{onNatureIslandTargetChange \?/);

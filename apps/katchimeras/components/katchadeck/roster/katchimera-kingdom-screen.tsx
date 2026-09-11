@@ -223,6 +223,8 @@ export function KatchimeraKingdomScreen({
   // A friend's restoration board: the chapter whose beds are open, on its own store under the island.
   const islandRestoration = useMemo(() => activeIslandRestoration(mergeWorld), [mergeWorld]);
   const [islandTileNodes, setIslandTileNodes] = useState<Partial<Record<MossproutNatureIslandId, View | null>>>({});
+  const islandTileNodesRef = useRef(islandTileNodes);
+  islandTileNodesRef.current = islandTileNodes;
   const setNatureIslandTileNode = useCallback((islandId: MossproutNatureIslandId, node: View | null) => {
     setIslandTileNodes((current) => (current[islandId] === node ? current : { ...current, [islandId]: node }));
   }, []);
@@ -287,6 +289,9 @@ export function KatchimeraKingdomScreen({
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradePresentation, setUpgradePresentation] = useState<HavenTileUpgradePresentation | null>(null);
   const [displayedGlow, setDisplayedGlow] = useState(mergeWorld.coins);
+  // A friend's paid stage: the Glow leaves the top bar for the tile as the counter counts it down, the way a purchase shows.
+  // Primed before the write (the counter holds the old balance), counting once the write has landed.
+  const [glowSpend, setGlowSpend] = useState<{ amount: number; counting: boolean } | null>(null);
   const [requiredUpgradeStory, setRequiredUpgradeStory] = useState<{ offer: WorldUpgradeOffer; presentation: HavenTileUpgradePresentation } | null>(null);
   const prepareEggEntry = useCallback(() => { setFtueCameraSettled(false); setGlowPanelOpen(false); }, []);
   const eggHandoff = useGlowEggHandoff({ run: glowRun, world: mergeWorld, focused: screenFocused,
@@ -704,9 +709,9 @@ export function KatchimeraKingdomScreen({
 
   useEffect(() => {
     if (upgradePresentation?.showCoins && upgradePresentation.coinCost > 0) return;
-    if (upgradePurchasing || upgradeCommitted) return;
+    if (upgradePurchasing || upgradeCommitted || glowSpend) return;
     setDisplayedGlow(mergeWorld.coins);
-  }, [mergeWorld.coins, upgradeCommitted, upgradePresentation, upgradePurchasing]);
+  }, [glowSpend, mergeWorld.coins, upgradeCommitted, upgradePresentation, upgradePurchasing]);
 
   useEffect(() => {
     if (!upgradePresentation?.showCoins || upgradePresentation.coinCost <= 0) return;
@@ -1241,19 +1246,41 @@ export function KatchimeraKingdomScreen({
     if (!selectedOptionId) throw new Error('Choose how this part of the garden should grow.');
     const order = islandCampaignChapterOrder(campaign, chapter.level, selectedOptionId);
     if (!order) return;
-    const result = await activateStoredIslandCampaignChapter({
-      campaignId: campaign.campaignId,
-      islandId: campaign.islandId,
-      residentSkinId: campaign.residentSkinId,
-      level: chapter.level,
-      selectedOptionId,
-      orders: [order],
-    });
+    // A board stage is paid as it opens (the first is the gift): hold the counter until the write lands.
+    const stageCost = chapter.restoration && chapter.level > 1 ? mossproutNatureIslandLevelDefinition(campaign.islandId, chapter.level)?.coinCost ?? 0 : 0;
+    if (stageCost > 0) setGlowSpend({ amount: stageCost, counting: false });
+    let result: Awaited<ReturnType<typeof activateStoredIslandCampaignChapter>>;
+    try {
+      result = await activateStoredIslandCampaignChapter({
+        campaignId: campaign.campaignId,
+        islandId: campaign.islandId,
+        residentSkinId: campaign.residentSkinId,
+        level: chapter.level,
+        selectedOptionId,
+        orders: [order],
+      });
+    } catch (error) { setGlowSpend(null); throw error; }
     const campaignProgress = result.state.islandCampaigns?.[campaign.campaignId]
       ?.chapters[String(chapter.level)];
     if (chapter.restoration) {
       // Paid here (the first is the gift); the board docks under the island once the conversation closes.
-      if (!campaignProgress?.restoration) throw new Error(result.message ?? 'Earn a few more Glow through Merge orders.');
+      if (!campaignProgress?.restoration) { setGlowSpend(null); throw new Error(result.message ?? 'Earn a few more Glow through Merge orders.'); }
+      if (stageCost > 0) {
+        // The Glow flies from the top bar into this island (aimed at its own node: the shared hook has not
+        // re-aimed yet when the write lands) as the counter counts it down.
+        const spent = result.state.coins;
+        void measureGlowCurrencyOrigin().then((origin) => {
+          const aim = (attempt: number) => {
+            const node = islandTileNodesRef.current[campaign.islandId] ?? null;
+            if (!node && attempt < 30) { requestAnimationFrame(() => aim(attempt + 1)); return; }
+            openingGlow.launch(origin, node);
+            setGlowSpend({ amount: stageCost, counting: true });
+            setDisplayedGlow(spent);
+            setTimeout(() => setGlowSpend(null), 900);
+          };
+          aim(0);
+        });
+      }
       setRestorationOpen(true);
       requestResidentInteractionExit();
       return;
@@ -1261,7 +1288,7 @@ export function KatchimeraKingdomScreen({
     if (!campaignProgress?.orderIds[0]) throw new Error(`${campaign.residentName}’s request could not be opened. Please try again.`);
     const activeOrderId = campaignProgress.orderIds[0];
     openGarden(activeOrderId, 'mossprout');
-  }, [openGarden, pendingIslandCampaign, requestResidentInteractionExit]);
+  }, [measureGlowCurrencyOrigin, openGarden, openingGlow, pendingIslandCampaign, requestResidentInteractionExit]);
 
   // The restoration board itself: its store, its deliveries, its checkpoint and its finish.
   const restorationDefinition = islandRestoration?.chapter.restoration ?? null;
@@ -1753,7 +1780,7 @@ export function KatchimeraKingdomScreen({
               ? <View style={styles.progressPill}><KingdomProgressPill progress={progressSummary} onPress={() => setProgressSheetOpen(true)} /></View>
               : <View />}
             trailing={<GameCurrencyHud balances={[{
-              animateValue: Boolean(upgradePresentation?.showCoins && upgradePresentation.coinCost > 0),
+              animateValue: Boolean(upgradePresentation?.showCoins && upgradePresentation.coinCost > 0) || Boolean(glowSpend?.counting),
               art: GAME_CURRENCY_ART.coins,
               artTargetRef: glowCurrencyArtRef,
               id: 'coins',

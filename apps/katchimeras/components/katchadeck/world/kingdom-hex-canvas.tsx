@@ -850,6 +850,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         initialScale: initialTutorialCameraScale,
         scale: tutorialCamera.zoom ?? initialTutorialCameraScale,
         screenY: viewport.height * (tutorialCamera.anchorY ?? 0.5),
+        unbounded: true,
         x: frame.left + frame.width / 2, y: frame.top + frame.height / 2,
       } : null;
     }
@@ -860,6 +861,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         initialScale: initialTutorialCameraScale,
         scale: tutorialCamera.zoom ?? initialTutorialCameraScale,
         screenY: viewport.height * (tutorialCamera.anchorY ?? 0.5),
+        unbounded: true,
         x: gardenFocusFrame.left + gardenFocusFrame.width / 2,
         y: gardenFocusFrame.top + gardenFocusFrame.height / 2,
       };
@@ -880,6 +882,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       initialScale: initialTutorialCameraScale,
       scale: tutorialCamera.zoom ?? initialTutorialCameraScale,
       screenY: viewport.height * (tutorialCamera.anchorY ?? 0.5),
+      unbounded: true,
       x: residentAnchor?.x ?? tile.cx,
       y: residentAnchor
         ? target.kind === 'haven_resident'
@@ -1021,6 +1024,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     // cold launch. Their live transitions are owned by Content Flow and must
     // never restart from this legacy compatibility effect.
     if (tutorialCamera.kind === 'focus_target' && tutorialCamera.projectionOnly) return;
+    // A focused tile is framed exactly where asked (`unbounded`): the scene's bounds never pull an edge tile back.
     const applicationKey = tutorialCameraKey;
     if (!tutorialCameraReady || appliedTutorialCameraRef.current === applicationKey) return;
     const durationMs = tutorialCamera.durationMs;
@@ -1037,7 +1041,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const frame = scene.tileArtLayers.find((layer) => layer.id === 'structure:steppling-home')?.frame;
       if (!frame) return;
       appliedTutorialCameraRef.current = applicationKey;
-      focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, { anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom });
+      focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, { anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom, unbounded: true });
       return;
     }
     if (target.kind === 'haven_nature_island') {
@@ -1045,7 +1049,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const frame = scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame;
       if (!frame) return;
       appliedTutorialCameraRef.current = applicationKey;
-      focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, { anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom });
+      focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, { anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom, unbounded: true });
       return;
     }
     if (target.kind === 'haven_garden_tile' && gardenFrame) {
@@ -1057,6 +1061,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           anchorY: tutorialCamera.anchorY,
           durationMs,
           zoom: tutorialCamera.zoom,
+          unbounded: true,
         },
       );
       return;
@@ -1085,6 +1090,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       anchorY: tutorialCamera.anchorY,
       durationMs,
       zoom: tutorialCamera.zoom,
+      unbounded: true,
     });
   }, [fitTutorialWorld, focusTutorialResident, gardenFrame, scene.tileArtLayers, scene.tiles, sceneHomeTile, tutorialCamera, tutorialCameraKey, tutorialCameraReady, worldSubjectPresentation?.growthProgress]);
   const storyCameraSnapshotsRef = useRef(new Map<string, KingdomCameraSnapshot>());

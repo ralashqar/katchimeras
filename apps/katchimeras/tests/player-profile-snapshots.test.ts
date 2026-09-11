@@ -5,7 +5,6 @@ import test from 'node:test';
 import type { IslandCampaignChapterProgress } from '@/types/merge-world';
 import { islandWakeState } from '@/constants/island-campaigns/wake-order';
 
-import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import { buildPlayerProfileFixtures, PLAYER_PROFILE_FIXTURE_COUNT } from '@/utils/player-profile-fixtures';
 import { stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
 
@@ -13,22 +12,21 @@ const NOW = Date.parse('2026-08-17T12:00:00Z');
 const root = resolve(__dirname, '..');
 const read = (relative: string) => readFileSync(resolve(root, relative), 'utf8');
 
-test('profile fixture catalog covers every planned discovery milestone', () => {
+test('the profile fixture catalog is three Kingdom snapshots, one right before each friend', () => {
   const fixtures = buildPlayerProfileFixtures(NOW);
-  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 21);
-  assert.equal(fixtures.length, 21);
-  assert.equal(new Set(fixtures.map((fixture) => fixture.id)).size, fixtures.length);
-  assert.deepEqual(fixtures.map((fixture) => fixture.id), [
-    'fixture:fresh-first-launch', 'fixture:mossprout-opening', 'fixture:mossprout-merge-start', 'fixture:mossprout-haven-restore',
-    'fixture:steppling-parcel', 'fixture:steppling-final-clue', 'fixture:steppling-first-order',
-    'fixture:steppling-mist-ready', 'fixture:kingdom-before-petalimp', 'fixture:kingdom-before-fernip',
-    'fixture:gate-3-fork', 'fixture:gate-3-feastle-parcel', 'fixture:gate-3-feastle-final', 'fixture:gate-4-queued',
-    'fixture:gate-4-fork', 'fixture:gate-4-baristabbit-parcel', 'fixture:gate-4-baristabbit-final', 'fixture:gate-5-queued',
-    'fixture:gate-5-bedrotte-parcel', 'fixture:gate-5-bedrotte-final', 'fixture:early-pool-complete',
+  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 3);
+  assert.deepEqual(fixtures.map((fixture) => [fixture.id, fixture.name]), [
+    ['fixture:steppling-mist-ready', 'Kingdom · Before Steppling'],
+    ['fixture:kingdom-before-petalimp', 'Kingdom · Before Petalimp'],
+    ['fixture:kingdom-before-fernip', 'Kingdom · Before Fernip'],
   ]);
+  for (const fixture of fixtures) {
+    assert.equal(fixture.launchRoute, '/(tabs)/katchimeras', `${fixture.id} opens on the Kingdom`);
+    assert.equal(fixture.summary.ftueStep, 'complete', `${fixture.id} is past the FTUE`);
+  }
 });
 
-test('the two Kingdom fixtures land right before the Steppling reveal and right before Petalimp', () => {
+test('the Before-Steppling and Before-Petalimp fixtures land right before each reveal', () => {
   const fixtures = buildPlayerProfileFixtures(NOW);
   const mist = fixtures.find((candidate) => candidate.id === 'fixture:steppling-mist-ready')!;
   assert.equal(mist.launchRoute, '/(tabs)/katchimeras');
@@ -82,26 +80,6 @@ test('the Before-Fernip fixture has Petalimp home for real and the grove open, m
   assert.equal(world.islandCampaigns?.['island-campaign:fernip-wildgrowth'], undefined, 'Fernip has not been met');
 });
 
-test('Mossprout Haven fixture opens immediately before the first environment restore', () => {
-  const fixture = buildPlayerProfileFixtures(NOW).find((candidate) => candidate.id === 'fixture:mossprout-haven-restore');
-  assert.ok(fixture);
-  assert.equal(fixture.launchRoute, '/(tabs)/katchimeras');
-  assert.equal(fixture.summary.ftueStep, 'haven.mossprout.restore');
-  assert.equal(fixture.domains.mergeWorld.state.coins, 170);
-  assert.equal(fixture.domains.mergeWorld.state.haven.tileStages.mossprout, 0);
-  assert.equal(fixture.domains.mergeWorld.state.haven.revealState, 'hidden');
-  assert.ok(fixture.domains.mergeWorld.state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0'));
-  assert.equal(fixture.summary.pendingParcelCount, 1);
-
-  const run = JSON.parse(fixture.domains.keyValue.values['katchimeras.ftue-run.v4'] ?? '{}') as {
-    mergeInstalled?: boolean;
-    scriptVersion?: number;
-    stepId?: string;
-  };
-  assert.equal(run.stepId, 'haven.mossprout.restore');
-  assert.equal(run.scriptVersion, MOSSPROUT_FTUE_SCRIPT.version);
-  assert.equal(run.mergeInstalled, true);
-});
 
 test('every authored profile fixture is internally coherent and synthetic', () => {
   for (const fixture of buildPlayerProfileFixtures(NOW)) {
@@ -118,20 +96,6 @@ test('every authored profile fixture is internally coherent and synthetic', () =
   }
 });
 
-test('parcel and final-clue fixtures land on the requested discovery stages', () => {
-  const byId = new Map(buildPlayerProfileFixtures(NOW).map((fixture) => [fixture.id, fixture]));
-  for (const id of ['fixture:steppling-parcel', 'fixture:gate-3-feastle-parcel', 'fixture:gate-4-baristabbit-parcel', 'fixture:gate-5-bedrotte-parcel']) {
-    assert.equal(byId.get(id)?.summary.pendingParcelCount, 1, id);
-    assert.equal(byId.get(id)?.summary.discoveryStage, 0, id);
-  }
-  for (const id of ['fixture:steppling-final-clue', 'fixture:gate-3-feastle-final', 'fixture:gate-4-baristabbit-final', 'fixture:gate-5-bedrotte-final']) {
-    assert.equal(byId.get(id)?.summary.pendingParcelCount, 0, id);
-    assert.equal(byId.get(id)?.summary.discoveryStage, 2, id);
-  }
-  assert.deepEqual(byId.get('fixture:early-pool-complete')?.summary.unlockedCharacters, [
-    'mossprout', 'steppling', 'feastle', 'baristabbit', 'bedrotte',
-  ]);
-});
 
 test('checked-in fixtures rebase their clocks at load time', () => {
   const first = buildPlayerProfileFixtures(NOW);

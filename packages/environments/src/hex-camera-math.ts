@@ -149,16 +149,14 @@ export function kingdomCameraSnapshotForTarget(
     x: viewport.width / 2,
     y: viewport.height / 2,
   },
+  /** A focused tile is framed exactly where it was asked to be, even past the scene's edge; the bounds never move it. */
+  unbounded = false,
 ): KingdomCameraSnapshot {
-  const translation = clampCameraTranslation(
-    {
-      tx: screenPoint.x - scene.width / 2 - (target.x - scene.width / 2) * scale,
-      ty: screenPoint.y - scene.height / 2 - (target.y - scene.height / 2) * scale,
-    },
-    viewport,
-    scene,
-    scale,
-  );
+  const raw = {
+    tx: screenPoint.x - scene.width / 2 - (target.x - scene.width / 2) * scale,
+    ty: screenPoint.y - scene.height / 2 - (target.y - scene.height / 2) * scale,
+  };
+  const translation = unbounded ? raw : clampCameraTranslation(raw, viewport, scene, scale);
   return { ...translation, scale };
 }
 
