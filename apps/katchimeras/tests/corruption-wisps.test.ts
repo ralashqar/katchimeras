@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from './helpers/content-fs';
 
-import { OPENING_WISPS, STEPPLING_WISPS, wispHitPlan, wispStates, wispTargetIndex } from '@/features/onboarding/corruption-wisps';
+import { OPENING_WISPS, STEPPLING_WISPS, wispHitPlan, wispStates, wispTargetIndex, wispsForClearing } from '@/features/onboarding/corruption-wisps';
+import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
 import { OPENING_MERGE_REQUIRED } from '@/features/onboarding/opening-mist';
 import { STEPPLING_MISSION_MERGE_REQUIRED } from '@/features/onboarding/steppling-mission';
 
@@ -20,6 +21,16 @@ test('the clearing is dealt across the wisps in order: each takes its share, the
   assert.deepEqual([0, 1, 2, 3, 4, 5, 6].map((assigned) => wispTargetIndex(plan, assigned)), [0, 0, 0, 1, 1, 2, 2], 'every merge strikes the first wisp still standing');
   assert.equal(wispTargetIndex(plan, 99), 2, 'with every hit spoken for, the last wisp takes the rest');
   assert.equal(wispTargetIndex([], 0), null);
+  // A friend's board: three wisps over a short bar, four over a long one, and every authored stage gets a set whose hits sum to its bar.
+  assert.equal(wispsForClearing(5), OPENING_WISPS);
+  assert.equal(wispsForClearing(7), STEPPLING_WISPS);
+  for (const campaign of ISLAND_CAMPAIGNS) {
+    for (const chapter of campaign.chapters) {
+      if (!chapter.restoration) continue;
+      const specs = wispsForClearing(chapter.restoration.merges);
+      assert.equal(wispHitPlan(chapter.restoration.merges, specs.length).reduce((sum, hp) => sum + hp, 0), chapter.restoration.merges, `${campaign.campaignId} level ${chapter.level}`);
+    }
+  }
   for (const spec of [...OPENING_WISPS, ...STEPPLING_WISPS]) {
     assert.ok(spec.fx > 0.15 && spec.fx < 0.85 && spec.fy >= 0.1 && spec.fy <= 0.5, `${spec.id} hangs over the upper half of the tile, clear of the bar and board`);
     assert.ok(spec.size >= 0.15 && spec.size <= 0.22, `${spec.id} is small against the tile`);
@@ -32,10 +43,19 @@ test('the Glow aims at the wisps: every burst at the first standing, the finale 
   assert.match(dock, /const aimed = targetNode \? null : sinkRef\.current\?\.aim\('glow'\) \?\? null;[\s\S]*?if \(aimed\) \{ push\(aimed\.point\); return; \}/, 'a burst goes to the wisp the sink names');
   assert.match(dock, /const aimed = sinkRef\.current\?\.aim\('finale'\) \?\? null;[\s\S]*?if \(aimed\) \{ push\(aimed\.point\); return id; \}/, 'the finale item strikes the last wisp');
   assert.match(dock, /if \(struck\?\.key != null\) \{\s*sinkRef\.current\?\.struck\(struck\.key\);\s*if \(struck\.group != null && !landedGroups\.current\.has\(struck\.group\)\) \{\s*landedGroups\.current\.add\(struck\.group\);\s*sinkRef\.current\?\.landed\(struck\.key, finale \? 'finale' : 'glow'\);/, 'a flinch per token, a hit per burst');
+  // A strike on a wisp bursts as light meeting corruption: hot core, magenta ring, a dark puff, sparks and ember shards; the mist's own burst is untouched.
+  assert.match(dock, /\{ id, wisp: landed\.key != null, at: \{/);
+  assert.match(dock, /impact\.wisp\s*\? <WispStrikeBurst key=\{impact\.id\}[\s\S]*?: <ImpactBurst key=\{impact\.id\}/);
+  assert.match(dock, /function WispStrikeBurst\(\{ x, y, onDone \}/);
+  assert.match(dock, /const reach = 1 - Math\.pow\(1 - t\.value, 2\.2\);/, 'shards fly out with drag');
+  assert.match(dock, /tintColor=\{STRIKE_PUFF\}/, 'the dark puff is the wisp’s own colour');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   assert.match(screen, /\? \{ key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission\.merges, specs: STEPPLING_WISPS \}/);
   assert.match(screen, /\? \{ key: 'opening-mist', node: homeTileNode, required: OPENING_MERGE_REQUIRED, merges: openingProgress, specs: OPENING_WISPS \}/);
   assert.match(screen, /const wisps = useCorruptionWisps\(wispTarget\);\s*openingGlow\.sinkRef\.current = wisps\.sink;/, 'the screen hands the wisps to the Glow every render');
+  // A friend's board: wisps over the island for as long as the board is up, keyed to the stage's run, their hits from the board's saved merges.
+  assert.match(screen, /: restorationBoardVisible && restorationDefinition && restorationBoardRunId\s*\? \{ key: restorationBoardRunId, node: restorationTileNode, required: restorationDefinition\.merges, merges: restorationStore\.merges, specs: wispsForClearing\(restorationDefinition\.merges\) \}/);
+  assert.match(dock, /const aimed = sinkRef\.current\?\.aim\('glow'\) \?\? null;\s*const push = \(to: RewardFlightPoint\) => setFlights\(\(current\) => \[\.\.\.current, \{ id, index: 0, count: 1, from, to, art, size: 44/, 'a restoration merge’s item strikes a wisp too');
   assert.match(screen, /\{wisps\.visible \? <CorruptionWispLayer wisps=\{wisps\} screenRef=\{screenRef\} \/> : null\}\s*\{openingGlow\.flights\.length/, 'the wisps sit under the Glow flights');
   const layer = readFileSync('components/katchadeck/world/corruption-wisp-layer.tsx', 'utf8');
   assert.match(layer, /const WISP_ART = require\('@incubator\/art-cutouts\/corruption-wisp\.png'\);/);

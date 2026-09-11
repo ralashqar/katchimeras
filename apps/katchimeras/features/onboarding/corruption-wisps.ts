@@ -28,6 +28,15 @@ export const STEPPLING_WISPS: readonly CorruptionWispSpec[] = [
   { id: 'wisp-low', fx: 0.56, fy: 0.46, size: 0.18 },
 ];
 
+/**
+ * A friend's restoration board: the same wisps over the island, three for a
+ * short bar and four for a long one. Their hits are dealt from the board's
+ * saved merge count, so they persist with the board and pick up where it left off.
+ */
+export function wispsForClearing(merges: number): readonly CorruptionWispSpec[] {
+  return merges >= 7 ? STEPPLING_WISPS : OPENING_WISPS;
+}
+
 /** How many merges each wisp takes, summing to the clearing's requirement; the first wisps take the remainder. */
 export function wispHitPlan(required: number, count: number): number[] {
   const total = Math.max(0, Math.floor(required));

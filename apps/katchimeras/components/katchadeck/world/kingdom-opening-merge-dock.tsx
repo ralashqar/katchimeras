@@ -49,7 +49,18 @@ export type GlowSink = {
   struck: (key: number) => void;
   landed: (key: number, kind: 'glow' | 'finale') => void;
 };
-type OpeningImpact = { id: number; at: RewardFlightPoint };
+type OpeningImpact = { id: number; at: RewardFlightPoint; wisp?: boolean };
+const SOFT_GLOW = require('@incubator/art-characters/soft-glow.png');
+/** A strike on a wisp: light meeting corruption. */
+const STRIKE_CORE = '#F6EBFF';
+const STRIKE_RING = '#E2A9FF';
+const STRIKE_HALO = 'rgba(193,92,255,0.5)';
+const STRIKE_PUFF = '#4B1F78';
+const STRIKE_SPARK = '#FFF1B8';
+const STRIKE_SPARK_HOT = '#FFFFFF';
+const STRIKE_EMBER = '#6A2FA0';
+const STRIKE_EMBER_DEEP = '#3B1657';
+const STRIKE_PARTICLES = 10;
 
 /**
  * The opening's mission board: its own independent board (own state, own
@@ -371,7 +382,9 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
         <Image source={flight.art ?? GAME_CURRENCY_ART.coins} contentFit="contain" style={[styles.glowArt, flight.size ? { width: flight.size, height: flight.size } : null]} accessible={false} />
       </View>
     </RewardTokenFlight>)}
-    {impacts.map((impact) => <ImpactBurst key={impact.id} x={impact.at.x - origin.x} y={impact.at.y - origin.y} onDone={() => onImpactDone(impact.id)} />)}
+    {impacts.map((impact) => impact.wisp
+      ? <WispStrikeBurst key={impact.id} x={impact.at.x - origin.x} y={impact.at.y - origin.y} onDone={() => onImpactDone(impact.id)} />
+      : <ImpactBurst key={impact.id} x={impact.at.x - origin.x} y={impact.at.y - origin.y} onDone={() => onImpactDone(impact.id)} />)}
   </View>;
 }
 
@@ -400,6 +413,72 @@ function ImpactBurst({ x, y, onDone }: { x: number; y: number; onDone: () => voi
     <Animated.View style={[styles.burstRing, ringStyle]} />
     {Array.from({ length: reduceMotion ? 0 : BURST_PARTICLES }, (_, index) => <ImpactMote key={index} index={index} t={t} />)}
   </View>;
+}
+
+/**
+ * Glow striking a wisp: a hot white-violet core that flashes and is gone, a
+ * magenta ring that races outward, a dark puff of the wisp's own colour that
+ * swells and thins, and a spray of bright sparks and dark ember shards thrown
+ * out with drag and a little lift. Translucent discs and dots only, no blur.
+ */
+function WispStrikeBurst({ x, y, onDone }: { x: number; y: number; onDone: () => void }) {
+  const reduceMotion = useReducedMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    const duration = reduceMotion ? 220 : OPENING_IMPACT_BURST_MS;
+    t.value = withTiming(1, { duration, easing: Easing.out(Easing.cubic) });
+    const timer = setTimeout(onDone, duration + 40);
+    return () => clearTimeout(timer);
+  }, [onDone, reduceMotion, t]);
+  const coreStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, 1 - t.value * 2.4),
+    transform: [{ scale: 0.5 + t.value * 1.3 }],
+  }));
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, 0.9 - t.value * 1.5),
+    transform: [{ scale: 0.4 + t.value * 2.1 }],
+  }));
+  const ringStyle = useAnimatedStyle(() => ({
+    opacity: 0.95 * (1 - t.value),
+    transform: [{ scale: 0.3 + t.value * 2.5 }],
+  }));
+  const puffStyle = useAnimatedStyle(() => ({
+    // The dark puff lags the flash: the corruption gives way after the light lands.
+    opacity: Math.max(0, Math.min(1, (t.value - 0.08) * 3)) * (1 - t.value) * 0.75,
+    transform: [{ scale: 0.6 + t.value * 1.5 }],
+  }));
+  return <View pointerEvents="none" style={[styles.burst, { left: x, top: y }]}>
+    <Animated.View style={[styles.strikePuff, puffStyle]}>
+      <Image source={SOFT_GLOW} contentFit="contain" style={StyleSheet.absoluteFill} tintColor={STRIKE_PUFF} accessible={false} />
+    </Animated.View>
+    <Animated.View style={[styles.strikeHalo, haloStyle]} />
+    <Animated.View style={[styles.strikeCore, coreStyle]} />
+    <Animated.View style={[styles.strikeRing, ringStyle]} />
+    {Array.from({ length: reduceMotion ? 0 : STRIKE_PARTICLES }, (_, index) => <StrikeShard key={index} index={index} t={t} />)}
+  </View>;
+}
+
+/** One shard of the strike: a bright spark or a dark ember, flung out and slowed by drag, lifting a little, turning as it goes. */
+function StrikeShard({ index, t }: { index: number; t: SharedValue<number> }) {
+  const ember = index % 2 === 1;
+  const angle = (index / STRIKE_PARTICLES) * Math.PI * 2 + (index % 3) * 0.37;
+  const distance = (ember ? 28 : 36) + (index % 4) * 9;
+  const spin = (index % 2 ? -1 : 1) * (90 + (index % 3) * 40);
+  const style = useAnimatedStyle(() => {
+    // Drag: most of the distance in the first third, then a drift; embers sink, sparks float.
+    const reach = 1 - Math.pow(1 - t.value, 2.2);
+    const lift = ember ? 10 * t.value * t.value : -12 * t.value;
+    return {
+      opacity: t.value < 0.5 ? 1 : Math.max(0, 1 - (t.value - 0.5) / 0.5),
+      transform: [
+        { translateX: Math.cos(angle) * distance * reach },
+        { translateY: Math.sin(angle) * distance * reach + lift },
+        { rotate: `${spin * t.value}deg` },
+        { scale: ember ? 1 - t.value * 0.35 : 1.1 - t.value * 0.7 },
+      ],
+    };
+  });
+  return <Animated.View style={[ember ? styles.strikeEmber : styles.strikeSpark, index % 4 === 0 && styles.strikeSparkHot, index % 4 === 3 && styles.strikeEmberDeep, style]} />;
 }
 
 function ImpactMote({ index, t }: { index: number; t: SharedValue<number> }) {
@@ -466,7 +545,7 @@ export function useOpeningGlow(targetNode: ViewType | null) {
       const landed = current.find((flight) => flight.id === id);
       // Every other landing bursts (the first and third of four): half the particle
       // views for the same read, since the impacts land 65 ms apart. The finale always bursts.
-      if (landed && (finale || landed.index % 2 === 0)) setImpacts((bursts) => [...bursts, { id, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 14, y: landed.to.y + (landed.index % 2) * 10 - 5 } }]);
+      if (landed && (finale || landed.index % 2 === 0)) setImpacts((bursts) => [...bursts, { id, wisp: landed.key != null, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 14, y: landed.to.y + (landed.index % 2) * 10 - 5 } }]);
       return current.filter((flight) => flight.id !== id);
     });
     setLanded((count) => count + 1);
@@ -532,5 +611,13 @@ const styles = StyleSheet.create({
   burstFlash: { position: 'absolute', width: 54, height: 54, marginLeft: -27, marginTop: -27, borderRadius: 27, backgroundColor: 'rgba(214,240,255,0.95)' },
   burstRing: { position: 'absolute', width: 48, height: 48, marginLeft: -24, marginTop: -24, borderRadius: 24, borderWidth: 3, borderColor: GLOW_COLOR },
   mote: { position: 'absolute', width: 9, height: 9, marginLeft: -4.5, marginTop: -4.5, borderRadius: 4.5, backgroundColor: '#DDF4FF' },
+  strikePuff: { position: 'absolute', width: 110, height: 110, marginLeft: -55, marginTop: -55 },
+  strikeHalo: { position: 'absolute', width: 84, height: 84, marginLeft: -42, marginTop: -42, borderRadius: 42, backgroundColor: STRIKE_HALO },
+  strikeCore: { position: 'absolute', width: 40, height: 40, marginLeft: -20, marginTop: -20, borderRadius: 20, backgroundColor: STRIKE_CORE },
+  strikeRing: { position: 'absolute', width: 44, height: 44, marginLeft: -22, marginTop: -22, borderRadius: 22, borderWidth: 2.5, borderColor: STRIKE_RING },
+  strikeSpark: { position: 'absolute', width: 7, height: 7, marginLeft: -3.5, marginTop: -3.5, borderRadius: 3.5, backgroundColor: STRIKE_SPARK },
+  strikeSparkHot: { width: 9, height: 9, marginLeft: -4.5, marginTop: -4.5, borderRadius: 4.5, backgroundColor: STRIKE_SPARK_HOT },
+  strikeEmber: { position: 'absolute', width: 7, height: 7, marginLeft: -3.5, marginTop: -3.5, borderRadius: 2, backgroundColor: STRIKE_EMBER },
+  strikeEmberDeep: { width: 6, height: 9, marginLeft: -3, marginTop: -4.5, borderRadius: 2, backgroundColor: STRIKE_EMBER_DEEP },
   moteLarge: { width: 12, height: 12, marginLeft: -6, marginTop: -6, borderRadius: 6 },
 });

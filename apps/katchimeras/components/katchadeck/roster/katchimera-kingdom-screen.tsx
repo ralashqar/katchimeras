@@ -6,7 +6,7 @@ import { KingdomOpeningMergeDock, OpeningGlowLayer, useOpeningGlow } from '@/com
 import { StepplingMissionDock } from '@/components/katchadeck/world/steppling-mission-dock';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import { createStepplingMissionState, STEPPLING_MISSION_ID, STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep } from '@/features/onboarding/steppling-mission';
-import { OPENING_WISPS, STEPPLING_WISPS } from '@/features/onboarding/corruption-wisps';
+import { OPENING_WISPS, STEPPLING_WISPS, wispsForClearing } from '@/features/onboarding/corruption-wisps';
 import { CorruptionWispLayer, useCorruptionWisps, type CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
 import { KingdomOpeningCaption } from '@/components/katchadeck/world/kingdom-opening-caption';
 import { clearMission, clearOpeningMission, useMissionBoard, useOpeningMissionBoard } from '@/features/onboarding/use-opening-mission-board';
@@ -575,14 +575,6 @@ export function KatchimeraKingdomScreen({
   const stepplingMission = useMissionBoard(STEPPLING_MISSION_STORAGE_KEY, stepplingMissionActive ? STEPPLING_MISSION_ID : null, createStepplingMissionState);
   const stepplingMissionStep = useMemo(() => stepplingMissionActive ? stepplingMissionBoardStep(stepplingMission.state, stepplingMission.merges) : null, [stepplingMission.merges, stepplingMission.state, stepplingMissionActive]);
   const stepplingMissionGuidanceVisible = Boolean(stepplingMissionStep && (stepplingMissionStep.cue || stepplingMissionStep.spotlight));
-  // The mist, given faces: wisps over the veiled tile take the merges' Glow; the last falls on the final item, and the mist lifts with it.
-  const wispTarget = useMemo((): CorruptionWispTarget | null => stepplingMissionActive
-    ? { key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission.merges, specs: STEPPLING_WISPS }
-    : openingBoardActive
-      ? { key: 'opening-mist', node: homeTileNode, required: OPENING_MERGE_REQUIRED, merges: openingProgress, specs: OPENING_WISPS }
-      : null, [gatewayTileNode, homeTileNode, openingBoardActive, openingProgress, stepplingMission.merges, stepplingMissionActive]);
-  const wisps = useCorruptionWisps(wispTarget);
-  openingGlow.sinkRef.current = wisps.sink;
   const stepplingMissionCleared = stepplingMission.merges >= STEPPLING_MISSION_MERGE_REQUIRED;
   const stepplingFinaleIdRef = useRef<number | null>(null);
   const { launchFinale: launchGlowFinale } = openingGlow;
@@ -1309,6 +1301,17 @@ export function KatchimeraKingdomScreen({
   const restorationStore = useMissionBoard(islandRestoration ? restorationStorageKey(islandRestoration.campaign.campaignId, islandRestoration.level) : 'katchimeras.mist-mission.none.v1', restorationBoardRunId, createRestorationBoard, repairRestorationBoard);
   const restorationChapterProgress = islandRestoration ? mergeWorld.islandCampaigns?.[islandRestoration.campaign.campaignId]?.chapters[String(islandRestoration.level)] ?? null : null;
   const restorationBoardVisible = Boolean(islandRestoration && restorationStore.state) && restorationOpen && screenFocused && !upgradePresentation && !interactionCreatureId && !pendingIslandCampaign && !stepplingMissionActive && !openingBoardActive;
+  // The mist, given faces: wisps over the veiled tile take the merges' Glow; the last falls on the final item, and the mist lifts with it.
+  // A friend's board has them too, over the island, for as long as the board is up; their hits come from the board's saved merges.
+  const wispTarget = useMemo((): CorruptionWispTarget | null => stepplingMissionActive
+    ? { key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission.merges, specs: STEPPLING_WISPS }
+    : openingBoardActive
+      ? { key: 'opening-mist', node: homeTileNode, required: OPENING_MERGE_REQUIRED, merges: openingProgress, specs: OPENING_WISPS }
+      : restorationBoardVisible && restorationDefinition && restorationBoardRunId
+        ? { key: restorationBoardRunId, node: restorationTileNode, required: restorationDefinition.merges, merges: restorationStore.merges, specs: wispsForClearing(restorationDefinition.merges) }
+        : null, [gatewayTileNode, homeTileNode, openingBoardActive, openingProgress, restorationBoardRunId, restorationBoardVisible, restorationDefinition, restorationStore.merges, restorationTileNode, stepplingMission.merges, stepplingMissionActive]);
+  const wisps = useCorruptionWisps(wispTarget);
+  openingGlow.sinkRef.current = wisps.sink;
   useEffect(() => {
     // Back puts the board away; it never leaves the Kingdom from here.
     if (!restorationBoardVisible) return;
