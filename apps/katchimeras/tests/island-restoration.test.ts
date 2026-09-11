@@ -384,7 +384,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /cue=\{\{ kind: 'tap', target: \{ kind: 'order_card', orderId: restorationOrder\.id \} \}\}/);
   assert.match(dock, /railTargetRefs\.current\.set\(targetKey, view\)/, 'the dock shares the card’s targets with the overlay');
   assert.match(rail, /if \(onPressCard\) \{[\s\S]*?onPressCard\(\);\s*return;\s*\}\s*if \(interactionLocked\)/, 'the portrait never opens the reward popup on a card that leads somewhere');
-  assert.match(glowDock, /const launchItem = useCallback\(\(from: RewardFlightPoint, definitionId: string\) => \{[\s\S]*?\{ id, index: 0, count: 1, from, to, art, size: 44 \}/, 'one item flight per merge');
+  assert.match(glowDock, /const launchItem = useCallback\(\(from: RewardFlightPoint, definitionId: string\) => \{[\s\S]*?\{ id, index: 0, count: 1, from, to, art, size: 44, group: \+\+groupSeq\.current, key: aimed\?\.key \}/, 'one item flight per merge');
   assert.match(canvas, /if \(target\.kind === 'haven_nature_island'\) \{[\s\S]*?`nature:mossprout:\$\{target\.islandId\}`[\s\S]*?focusTutorialResident\([^;]*?unbounded: true \}\);/, 'the island is a camera target, framed exactly where asked: the scene bounds never pull an edge island back');
   const hexCamera = readFileSync('../../packages/environments/src/hex-camera.ts', 'utf8');
   assert.match(hexCamera, /const clamped = unbounded \? \{ tx: nextTx, ty: nextTy \} : clampCameraTranslation\(\{ tx: nextTx, ty: nextTy \}, cameraViewport, cameraScene, clampedZoom\);/);

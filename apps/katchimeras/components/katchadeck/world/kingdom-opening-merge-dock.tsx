@@ -37,7 +37,18 @@ const GLOW_COLOR = '#8FD3FF';
 const BAR_FILL_COLOR = '#6A46C9';
 const BAR_TRACK_COLOR = 'rgba(84,66,128,0.24)';
 
-export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint; art?: number; size?: number; count?: number };
+export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint; art?: number; size?: number; count?: number; group?: number; key?: number };
+
+/**
+ * Something over the mist that takes the Glow instead of the tile (the
+ * corruption wisps). It aims each burst and hears each landing: every token
+ * strikes, and once per burst the first to land counts a hit.
+ */
+export type GlowSink = {
+  aim: (kind: 'glow' | 'finale') => { point: RewardFlightPoint; key: number } | null;
+  struck: (key: number) => void;
+  landed: (key: number, kind: 'glow' | 'finale') => void;
+};
 type OpeningImpact = { id: number; at: RewardFlightPoint };
 
 /**
@@ -417,14 +428,23 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   const [finaleLanded, setFinaleLanded] = useState(false);
   const finaleIdRef = useRef<number | null>(null);
   const nextId = useRef(0);
+  const groupSeq = useRef(0);
   const targetRef = useRef(targetNode);
   targetRef.current = targetNode;
-  /** A burst of Glow into the tile the hook is aimed at, or into the node given (a spend that lands before the screen has re-aimed). */
+  // Set by the screen each render: whoever is taking the Glow right now (the wisps over a misted tile), or nothing for the tile itself.
+  const sinkRef = useRef<GlowSink | null>(null);
+  const flightsRef = useRef<OpeningGlowFlight[]>([]);
+  flightsRef.current = flights;
+  const landedGroups = useRef(new Set<number>());
+  /** A burst of Glow into the wisp the sink names, else the tile the hook is aimed at, else the node given (a spend that lands before the screen has re-aimed). */
   const launch = useCallback((from: RewardFlightPoint, targetNode?: ViewType | null) => {
+    const group = ++groupSeq.current;
+    const aimed = targetNode ? null : sinkRef.current?.aim('glow') ?? null;
     const push = (to: RewardFlightPoint) => setFlights((current) => [
       ...current,
-      ...Array.from({ length: OPENING_GLOWS_PER_MERGE }, (_, index) => ({ id: ++nextId.current, index, from, to })),
+      ...Array.from({ length: OPENING_GLOWS_PER_MERGE }, (_, index) => ({ id: ++nextId.current, index, from, to, group, key: aimed?.key })),
     ]);
+    if (aimed) { push(aimed.point); return; }
     const target = targetNode ?? targetRef.current;
     if (!target) { push({ x: from.x, y: from.y - 220 }); return; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.55 }));
@@ -432,6 +452,15 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   const [finaleLandedId, setFinaleLandedId] = useState<number | null>(null);
   const arrive = useCallback((id: number) => {
     const finale = id === finaleIdRef.current;
+    // A token that struck a wisp: the wisp flinches on every token and takes one hit per burst.
+    const struck = flightsRef.current.find((flight) => flight.id === id);
+    if (struck?.key != null) {
+      sinkRef.current?.struck(struck.key);
+      if (struck.group != null && !landedGroups.current.has(struck.group)) {
+        landedGroups.current.add(struck.group);
+        sinkRef.current?.landed(struck.key, finale ? 'finale' : 'glow');
+      }
+    }
     if (finale) { setFinaleLanded(true); setFinaleLandedId(id); }
     setFlights((current) => {
       const landed = current.find((flight) => flight.id === id);
@@ -452,7 +481,9 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   const launchItem = useCallback((from: RewardFlightPoint, definitionId: string) => {
     const id = ++nextId.current;
     const art = mergeWorldItemArt(definitionId) as number | undefined;
-    const push = (to: RewardFlightPoint) => setFlights((current) => [...current, { id, index: 0, count: 1, from, to, art, size: 44 }]);
+    const aimed = sinkRef.current?.aim('glow') ?? null;
+    const push = (to: RewardFlightPoint) => setFlights((current) => [...current, { id, index: 0, count: 1, from, to, art, size: 44, group: ++groupSeq.current, key: aimed?.key }]);
+    if (aimed) { push(aimed.point); return; }
     const target = targetRef.current;
     if (!target) { push({ x: from.x, y: from.y - 220 }); return; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.55 }));
@@ -464,13 +495,16 @@ export function useOpeningGlow(targetNode: ViewType | null) {
     setFinaleActive(true);
     setFinaleLanded(false);
     const art = mergeWorldItemArt(definitionId) as number | undefined;
-    const push = (to: RewardFlightPoint) => setFlights((current) => [...current, { id, index: 2, count: 5, from, to, art, size: 64 }]);
+    // The last merge's item strikes the last wisp standing; its landing is the one that lifts the mist.
+    const aimed = sinkRef.current?.aim('finale') ?? null;
+    const push = (to: RewardFlightPoint) => setFlights((current) => [...current, { id, index: 2, count: 5, from, to, art, size: 64, group: ++groupSeq.current, key: aimed?.key }]);
+    if (aimed) { push(aimed.point); return id; }
     const target = targetRef.current;
     if (!target) { push({ x: from.x, y: from.y - 260 }); return id; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.5 }));
     return id;
   }, []);
-  return { flights, impacts, landed, finaleActive, finaleLanded, finaleLandedId, launch, launchItem, launchFinale, arrive, impactDone };
+  return { flights, impacts, landed, finaleActive, finaleLanded, finaleLandedId, launch, launchItem, launchFinale, arrive, impactDone, sinkRef };
 }
 
 const styles = StyleSheet.create({

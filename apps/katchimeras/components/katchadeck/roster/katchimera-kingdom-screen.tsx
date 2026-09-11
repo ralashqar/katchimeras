@@ -1,11 +1,13 @@
 import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
 import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
 import { advanceGlowUpgrade, recoverPaidGlowUpgrade } from '@/features/onboarding/glow-upgrade-runtime';
-import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_CAMERA_ENTRY_ZOOM, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
+import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_MERGE_REQUIRED, OPENING_CAMERA_ENTRY_ZOOM, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
 import { KingdomOpeningMergeDock, OpeningGlowLayer, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
 import { StepplingMissionDock } from '@/components/katchadeck/world/steppling-mission-dock';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import { createStepplingMissionState, STEPPLING_MISSION_ID, STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep } from '@/features/onboarding/steppling-mission';
+import { OPENING_WISPS, STEPPLING_WISPS } from '@/features/onboarding/corruption-wisps';
+import { CorruptionWispLayer, useCorruptionWisps, type CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
 import { KingdomOpeningCaption } from '@/components/katchadeck/world/kingdom-opening-caption';
 import { clearMission, clearOpeningMission, useMissionBoard, useOpeningMissionBoard } from '@/features/onboarding/use-opening-mission-board';
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
@@ -573,6 +575,14 @@ export function KatchimeraKingdomScreen({
   const stepplingMission = useMissionBoard(STEPPLING_MISSION_STORAGE_KEY, stepplingMissionActive ? STEPPLING_MISSION_ID : null, createStepplingMissionState);
   const stepplingMissionStep = useMemo(() => stepplingMissionActive ? stepplingMissionBoardStep(stepplingMission.state, stepplingMission.merges) : null, [stepplingMission.merges, stepplingMission.state, stepplingMissionActive]);
   const stepplingMissionGuidanceVisible = Boolean(stepplingMissionStep && (stepplingMissionStep.cue || stepplingMissionStep.spotlight));
+  // The mist, given faces: wisps over the veiled tile take the merges' Glow; the last falls on the final item, and the mist lifts with it.
+  const wispTarget = useMemo((): CorruptionWispTarget | null => stepplingMissionActive
+    ? { key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission.merges, specs: STEPPLING_WISPS }
+    : openingBoardActive
+      ? { key: 'opening-mist', node: homeTileNode, required: OPENING_MERGE_REQUIRED, merges: openingProgress, specs: OPENING_WISPS }
+      : null, [gatewayTileNode, homeTileNode, openingBoardActive, openingProgress, stepplingMission.merges, stepplingMissionActive]);
+  const wisps = useCorruptionWisps(wispTarget);
+  openingGlow.sinkRef.current = wisps.sink;
   const stepplingMissionCleared = stepplingMission.merges >= STEPPLING_MISSION_MERGE_REQUIRED;
   const stepplingFinaleIdRef = useRef<number | null>(null);
   const { launchFinale: launchGlowFinale } = openingGlow;
@@ -2029,6 +2039,7 @@ export function KatchimeraKingdomScreen({
           spotlight={{ targets: [{ kind: 'order_card', orderId: restorationOrder.id }], grouping: 'bounding_rect', padding: 8, radius: 18, dimOpacity: 0.58 }}
           state={restorationStore.state} targetRevision={restorationStore.state.revision} />
       </View> : null}
+      {wisps.visible ? <CorruptionWispLayer wisps={wisps} screenRef={screenRef} /> : null}
       {openingGlow.flights.length || openingGlow.impacts.length ? <OpeningGlowLayer flights={openingGlow.flights} impacts={openingGlow.impacts}
         onArrive={openingGlow.arrive} onImpactDone={openingGlow.impactDone} screenRef={screenRef} /> : null}
       {detailCreatureId ? (() => {
