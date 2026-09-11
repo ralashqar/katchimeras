@@ -193,6 +193,11 @@ const RESTORATION_HINT_ARM_MS = 2500;
 /** Under the docked board (60), so the card and board keep their taps; over the map, so a tap there puts the hint away. */
 const RESTORATION_HINT_CATCHER_Z = 59;
 
+/** After a finale lands: the struck wisp's fall (shrink, burst) before the mission is declared over. */
+const WISP_FALL_MS = 640;
+/** The longest the screen is held still between a board's finale and its resolution story. */
+const RESTORATION_HANDOFF_MAX_MS = 12_000;
+
 export function KatchimeraKingdomScreen({
   background,
   companionSlots,
@@ -233,6 +238,12 @@ export function KatchimeraKingdomScreen({
   const restorationTileNode = islandRestoration ? islandTileNodes[islandRestoration.campaign.islandId] ?? null : null;
   // Glow flies into whichever misted tile the live board sits under.
   const openingGlow = useOpeningGlow(stepplingMissionActive ? gatewayTileNode : islandRestoration ? restorationTileNode : homeTileNode);
+  // A board's finale is its last item striking the last wisp. Nothing moves on until that landing,
+  // and then only once the wisp has fallen: the mission is over when the player has seen it end.
+  const stepplingFinaleIdRef = useRef<number | null>(null);
+  const restorationFinaleIdRef = useRef<number | null>(null);
+  const stepplingMissionLanded = stepplingFinaleIdRef.current != null && openingGlow.finaleLandedId === stepplingFinaleIdRef.current;
+  const restorationLanded = restorationFinaleIdRef.current != null && openingGlow.finaleLandedId === restorationFinaleIdRef.current;
   const ftueStepId = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow.finaleActive ? OPENING_MIST_CLEAR_STEP_ID : routeFtueStepId;
   // The mist itself starts clearing the frame the item strikes the tile; only
   // the camera, the caption and the dock wait for the burst to settle.
@@ -576,7 +587,6 @@ export function KatchimeraKingdomScreen({
   const stepplingMissionStep = useMemo(() => stepplingMissionActive ? stepplingMissionBoardStep(stepplingMission.state, stepplingMission.merges) : null, [stepplingMission.merges, stepplingMission.state, stepplingMissionActive]);
   const stepplingMissionGuidanceVisible = Boolean(stepplingMissionStep && (stepplingMissionStep.cue || stepplingMissionStep.spotlight));
   const stepplingMissionCleared = stepplingMission.merges >= STEPPLING_MISSION_MERGE_REQUIRED;
-  const stepplingFinaleIdRef = useRef<number | null>(null);
   const { launchFinale: launchGlowFinale } = openingGlow;
   const launchStepplingFinale = useCallback((from: RewardFlightPoint, definitionId: string) => {
     stepplingFinaleIdRef.current = launchGlowFinale(from, definitionId);
@@ -591,10 +601,12 @@ export function KatchimeraKingdomScreen({
       console.warn('The mist could not clear', error);
     });
   }, []);
-  // Live: the mist clears when the mission's own final item lands on the tile.
+  // Live: the mist clears when the mission's own final item has struck the last wisp and the wisp has fallen.
   useEffect(() => {
-    if (stepplingMissionActive && stepplingMissionCleared && stepplingFinaleIdRef.current != null && openingGlow.finaleLandedId === stepplingFinaleIdRef.current) finishStepplingMission();
-  }, [finishStepplingMission, openingGlow.finaleLandedId, stepplingMissionActive, stepplingMissionCleared]);
+    if (!(stepplingMissionActive && stepplingMissionCleared && stepplingMissionLanded)) return;
+    const timer = setTimeout(finishStepplingMission, WISP_FALL_MS);
+    return () => clearTimeout(timer);
+  }, [finishStepplingMission, stepplingMissionActive, stepplingMissionCleared, stepplingMissionLanded]);
   // Resume: a board saved with its bar already full (killed while the item flew) clears the mist on arrival.
   const stepplingMissionCheckedRef = useRef(false);
   useEffect(() => {
@@ -1322,8 +1334,22 @@ export function KatchimeraKingdomScreen({
   const restorationDone = Boolean(restorationDefinition && restorationComplete(restorationDefinition, restorationStore.merges));
   // While a docked board is up, only its tile stays on the map (the opening uses `homeSolo` instead).
   // The map comes back the moment the bar is full: clearing the mist is done, so everything is shown again for the reveal.
-  const stepplingBoardBusy = stepplingMissionActive && !stepplingMissionCleared;
-  const restorationBoardBusy = restorationBoardVisible && !restorationDone;
+  // Busy until the finale has landed, not until the count is full: the map stays faded while the last item is still in the air.
+  const stepplingBoardBusy = stepplingMissionActive && !stepplingMissionLanded;
+  const restorationBoardBusy = restorationBoardVisible && !restorationLanded;
+  // From the finale's landing until the resolution story is up, the screen holds still: no marker, no Back,
+  // no progress pill flashing through while the island grows and the story opens.
+  const [restorationHandoff, setRestorationHandoff] = useState<string | null>(null);
+  useEffect(() => {
+    if (restorationLanded && restorationBoardRunId) setRestorationHandoff(restorationBoardRunId);
+  }, [restorationBoardRunId, restorationLanded]);
+  useEffect(() => {
+    if (!restorationHandoff) return;
+    if (pendingIslandCampaign?.phase === 'resolution' || upgradeError) { setRestorationHandoff(null); return; }
+    // Whatever happens, the screen is never held for long.
+    const timer = setTimeout(() => setRestorationHandoff(null), RESTORATION_HANDOFF_MAX_MS);
+    return () => clearTimeout(timer);
+  }, [pendingIslandCampaign?.phase, restorationHandoff, upgradeError]);
   const soloLayerId = stepplingBoardBusy ? 'structure:steppling-home' : restorationBoardBusy && restorationIslandId ? `nature:mossprout:${restorationIslandId}` : null;
   // No marker percentage while the board is up: the request lives on the dock's tray instead.
   const soloOfferId = stepplingBoardBusy ? 'mist:steppling-home' : null;
@@ -1391,8 +1417,7 @@ export function KatchimeraKingdomScreen({
     if (!order) return;
     void requestStoredIslandCampaignDelivery(islandRestoration.campaign.campaignId, islandRestoration.level, [order]).catch((error) => console.warn('The request could not be sent', error));
   }, [islandRestoration, restorationChapterProgress?.selectedOptionId, restorationDefinition, restorationStore.merges, restorationStore.state]);
-  // Finish: the last planting's bloom strikes the tile (or a board saved full finishes on arrival).
-  const restorationFinaleIdRef = useRef<number | null>(null);
+  // Finish: the last planting's bloom strikes the last wisp (or a board saved full finishes on arrival).
   const restorationFinishedRef = useRef<string | null>(null);
   const finishIslandRestoration = useCallback(() => {
     if (!islandRestoration) return;
@@ -1408,8 +1433,11 @@ export function KatchimeraKingdomScreen({
     restorationFinaleIdRef.current = launchGlowFinale(from, definitionId);
   }, [launchGlowFinale]);
   useEffect(() => {
-    if (restorationDone && restorationFinaleIdRef.current != null && openingGlow.finaleLandedId === restorationFinaleIdRef.current) finishIslandRestoration();
-  }, [finishIslandRestoration, openingGlow.finaleLandedId, restorationDone]);
+    if (!(restorationDone && restorationLanded)) return;
+    // The wisp falls first; the island grows once it has gone.
+    const timer = setTimeout(finishIslandRestoration, WISP_FALL_MS);
+    return () => clearTimeout(timer);
+  }, [finishIslandRestoration, restorationDone, restorationLanded]);
   const restorationCheckedRef = useRef<string | null>(null);
   useEffect(() => {
     if (!islandRestoration || !restorationStore.state) return;
@@ -1628,7 +1656,7 @@ export function KatchimeraKingdomScreen({
   // Sleeping islands arrive from the offers layer already locked, in wake order.
   const presentedUpgradeOffers = upgradeOffers;
   // Alone until the hatch: no markers at all until the islands are drawn.
-  const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
+  const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
 
   // Mount the camera with its saved framing, rather than initializing the overview first.
   if (!glowReady || !stepplingLesson.ready) return null;
@@ -1779,7 +1807,7 @@ export function KatchimeraKingdomScreen({
         || (!upgradePresentation && (!ftueStepId || ftueStepId === 'companion.meditating')) ? (
         <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 360)} pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }, ftueGardenUpgradeActive && { zIndex: 90 }]}>
           <GameHudBar
-            leading={ftueGardenUpgradeActive || seedPlantingFtueActive || upgradePresentation || kingdomGoalGuideActive
+            leading={ftueGardenUpgradeActive || seedPlantingFtueActive || upgradePresentation || kingdomGoalGuideActive || restorationHandoff
               // The lesson owns Back only while it has a surface up. Hiding it
               // for an active run with nothing on screen strands the player.
               || (stepplingLesson.active && Boolean(interactionCreatureId)) ? undefined : <KatchimeraBackButton
@@ -1789,7 +1817,7 @@ export function KatchimeraKingdomScreen({
               disabled={stepplingEncounter.busy || stepplingEncounter.hatching || interactionExiting || (!interactionCreatureId && (navigationLocked || glowDiscoveryLocksCamera(glowRun)))}
               onPress={stepplingEncounter.open ? stepplingEncounter.close : restorationBoardVisible ? closeRestoration : interactionCreatureId ? requestResidentInteractionExit : onBackToHavenSelector}
             />}
-            content={kingdomGoal?.introducedAt && !kingdomGoalGuideActive && !ftueStepId && !stepplingLesson.active && !upgradePresentation && !interactionCreatureId && !stepplingEncounter.open
+            content={kingdomGoal?.introducedAt && !kingdomGoalGuideActive && !ftueStepId && !stepplingLesson.active && !upgradePresentation && !restorationHandoff && !interactionCreatureId && !stepplingEncounter.open
               ? <View style={styles.progressPill}><KingdomProgressPill progress={progressSummary} onPress={() => setProgressSheetOpen(true)} /></View>
               : <View />}
             trailing={<GameCurrencyHud balances={[{

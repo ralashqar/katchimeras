@@ -328,7 +328,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /: null, \[restorationIslandId, restorationOpen, screenFocused\]\);/, 'the camera directive only changes with the island and whether the board is open, never per merge');
   assert.match(screen, /if \(!restorationCheckpointReached\(restorationDefinition, restorationStore\.state, restorationStore\.merges\)\) return;[\s\S]*?requestStoredIslandCampaignDelivery\(islandRestoration\.campaign\.campaignId, islandRestoration\.level, \[order\]\)/, 'the checkpoint publishes the chapter’s order');
   assert.match(screen, /const pending = deliveriesToPlace\(islandRestoration\.progress, restorationStore\.placedDeliveries\);[\s\S]*?restorationPlace\(entries\)/, 'deliveries land on the board');
-  assert.match(screen, /if \(restorationDone && restorationFinaleIdRef\.current != null && openingGlow\.finaleLandedId === restorationFinaleIdRef\.current\) finishIslandRestoration\(\);/, 'the last merge’s impact finishes the board');
+  assert.match(screen, /if \(!\(restorationDone && restorationLanded\)\) return;[\s\S]*?setTimeout\(finishIslandRestoration, WISP_FALL_MS\)/, 'the last merge’s impact finishes the board, once the wisp it struck has fallen');
   assert.match(screen, /if \(restorationDefinition && restorationComplete\(restorationDefinition, restorationStore\.merges\)\) finishIslandRestoration\(\);/, 'a board saved full finishes on arrival');
   assert.match(screen, /if \(status === 'restoration_ready' && chapter\.restoration\) \{[\s\S]*?const key = `restore-board:\$\{campaign\.campaignId\}:\$\{status\}`;[\s\S]*?purchaseWorldUpgrade\(offer, \{ beforeValidation: flushMergeWorld \}\)/, 'the finished board grows the island for free');
   assert.match(screen, /if \(chapter\.restoration\) \{[\s\S]*?requestResidentInteractionExit\(\);\s*return;\s*\}\s*if \(!campaignProgress\?\.orderIds\[0\]\)/, 'the answer opens the board, not the Garden');
@@ -365,6 +365,16 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(dock, /if \(slots\.some\(\(slot\) => !slot\)\) \{\s*pendingDeliveries\.forEach\(\(definitionId, index\) => onPlaceDelivery\(\{ cell: cells\[index\]!, definitionId \}\)\);/, 'a delivery with no slot to fly from still lands');
   // Petalimp's one hint: the spent patch spotlights her request card and says to serve it on the Merge board; any tap on the card goes there.
   assert.match(screen, /const restorationCheckpointHint = Boolean\(islandRestoration && islandRestoration\.campaign\.campaignId === PETALIMP_ISLAND_CAMPAIGN_ID\s*&& restorationOrder && !restorationOrderServed && restorationBoardVisible && !restorationHintSeen\);/);
+  // The finale: nothing moves on before the last item has struck the last wisp, and the island grows only once the wisp has fallen.
+  assert.match(screen, /const restorationLanded = restorationFinaleIdRef\.current != null && openingGlow\.finaleLandedId === restorationFinaleIdRef\.current;/);
+  assert.match(screen, /const restorationBoardBusy = restorationBoardVisible && !restorationLanded;/, 'the map stays faded while the last item is in the air');
+  assert.match(screen, /if \(!\(restorationDone && restorationLanded\)\) return;\s*\/\/ The wisp falls first[^\n]*\n\s*const timer = setTimeout\(finishIslandRestoration, WISP_FALL_MS\);/);
+  // From that landing until the resolution story is up, the screen holds still: no marker, no Back, no progress pill.
+  assert.match(screen, /if \(restorationLanded && restorationBoardRunId\) setRestorationHandoff\(restorationBoardRunId\);/);
+  assert.match(screen, /if \(pendingIslandCampaign\?\.phase === 'resolution' \|\| upgradeError\) \{ setRestorationHandoff\(null\); return; \}/);
+  assert.match(screen, /homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS :/, 'no marker during the hand-off');
+  assert.match(screen, /\|\| kingdomGoalGuideActive \|\| restorationHandoff/, 'no Back during the hand-off');
+  assert.match(screen, /!upgradePresentation && !restorationHandoff && !interactionCreatureId/, 'no progress pill during the hand-off');
   // Once per player: the seen flag is stored; a tap away (after a moment), the card, Later or the serve puts it away for good.
   assert.match(screen, /const RESTORATION_HINT_SEEN_KEY = 'katchimeras\.island-restoration\.hint-seen\.petalimp\.v1';/);
   assert.match(screen, /useState\(\(\) => getStoredJson<boolean>\(RESTORATION_HINT_SEEN_KEY, false\)\)/);

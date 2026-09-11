@@ -151,14 +151,18 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
     </Animated.View>
   </View> : null;
   return <Modal transparent visible={visible} statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={dismiss}>
-    <Animated.View style={[styles.scrim, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 12 }, scrimMotion]}>
+    {/* The card runs to the bottom edge: no strip of scrim under it. The transcript keeps the home indicator clear itself. */}
+    <Animated.View style={[styles.scrim, { paddingTop: insets.top + 24 }, scrimMotion]}>
       <Animated.View accessibilityViewIsModal onAccessibilityEscape={dismiss} style={[styles.splash, motion]}>
         <View style={styles.banner}>
           <View style={[styles.ribbon, styles.ribbonLeft]} /><View style={[styles.ribbon, styles.ribbonRight]} />
           <Text accessibilityRole="header" style={styles.title}>{title}</Text>
           {!required ? <Pressable disabled={busy} accessibilityRole="button" accessibilityLabel="Close conversation and keep my place" onPress={dismiss} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable> : null}
         </View>
-        <ScrollView ref={scroll} style={styles.scroll} contentContainerStyle={styles.transcript} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator persistentScrollbar
+        {/* While the story is still arriving the reader cannot scroll: the transcript follows the lines on its own, and the
+            scroll only opens once the controls are in. */}
+        <ScrollView ref={scroll} style={styles.scroll} contentContainerStyle={[styles.transcript, { paddingBottom: insets.bottom + 22 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator persistentScrollbar
+          scrollEnabled={controlsVisible}
           onScroll={({ nativeEvent: e }) => { nearBottom.current = e.contentOffset.y + e.layoutMeasurement.height >= e.contentSize.height - 48; setLatest(!nearBottom.current); }} scrollEventThrottle={32}
           onContentSizeChange={() => {
             if (!nearBottom.current && !autoScrollPending.current) return;
@@ -187,7 +191,7 @@ export function ConversationNarrativeOverlay({ title, entries, checkpoint, requi
             </View> : null}
           {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>Could not save. Please try again.</Text> : null}
         </ScrollView>
-        {latest ? <Pressable accessibilityRole="button" onPress={() => { nearBottom.current = true; scroll.current?.scrollToEnd({ animated: !reduced }); }}><Text style={styles.error}>Latest ↓</Text></Pressable> : null}
+        {latest && controlsVisible ? <Pressable accessibilityRole="button" onPress={() => { nearBottom.current = true; scroll.current?.scrollToEnd({ animated: !reduced }); }}><Text style={styles.error}>Latest ↓</Text></Pressable> : null}
 
       </Animated.View>
       {paced && !controlsVisible && !busy ? <Pressable accessibilityRole="button" accessibilityLabel="Continue dialogue"

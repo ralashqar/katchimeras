@@ -63,6 +63,8 @@ test('overlay keeps FTUE modal, uses player portrait, guards taps and finishes e
   await act(async () => { tree = create(<Overlay {...props} paced />); });
   assert.equal(tree.root.findAllByType(host('Dialogue')).length, 1, 'paced narrative starts with one speech bubble');
   assert.equal(tree.root.findAllByType(host('ResultCard')).length, 0, 'the result or choices wait behind the dialogue');
+  assert.equal(tree.root.findByType(host('ScrollView')).props.scrollEnabled, false, 'no scrolling while the story is still arriving');
+  assert.equal(tree.root.findByType(host('ScrollView')).props.contentContainerStyle[1].paddingBottom, 12 + 22, 'the transcript keeps the home indicator clear itself');
   const advanceTimer = async () => {
     const callback = [...timers.values()].at(-1);
     assert.ok(callback, 'paced dialogue schedules an automatic reading fallback');
@@ -74,6 +76,7 @@ test('overlay keeps FTUE modal, uses player portrait, guards taps and finishes e
   assert.equal(tree.root.findAllByType(host('ResultCard')).length, 0);
   await advanceTimer();
   assert.equal(tree.root.findAllByType(host('ResultCard')).length, 1, 'controls animate in after the final reading beat');
+  assert.equal(tree.root.findByType(host('ScrollView')).props.scrollEnabled, true, 'scrolling opens once the controls are in');
   await act(async () => tree.unmount());
   assert.equal(timers.size, 0);
 });
@@ -320,7 +323,8 @@ test('a reply arrives with the answer, later lines pace quickly, and new speech 
   const before = scrolled.length;
   await act(async () => { scrollView().props.onContentSizeChange(); });
   assert.equal(scrolled.length, before, 'no new content: their place is kept');
-  assert.equal(tree.root.findAll((node) => node.props.children === 'Latest ↓').length, 1, 'the Latest pill offers the way back');
+  assert.equal(tree.root.findAll((node) => node.props.children === 'Latest ↓').length, 0, 'no way back while the story is still arriving: scrolling is off until the controls are in');
+  assert.equal(scrollView().props.scrollEnabled, false);
 
   // Their answer and its reply arrive: the transcript comes down to them.
   const answered = [...transcript, { id: 'answer-one', speaker: 'player', text: 'A gentler pace.' }, { id: 'reply-one', speaker: 'mossprout', text: 'Then we can leave room to breathe.' }, { id: 'prompt-two', speaker: 'mossprout', text: 'What next?' }];

@@ -128,7 +128,7 @@ test('the Glow story opens the mission from the bubble and pays the reveal only 
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   assert.match(screen, /const soloLayerId = stepplingBoardBusy \? 'structure:steppling-home' : restorationBoardBusy && restorationIslandId \? `nature:mossprout:\$\{restorationIslandId\}` : null;/, 'only the board’s tile stays on the map');
-  assert.match(screen, /const stepplingBoardBusy = stepplingMissionActive && !stepplingMissionCleared;\s*const restorationBoardBusy = restorationBoardVisible && !restorationDone;/, 'the map comes back the moment the bar is full');
+  assert.match(screen, /const stepplingBoardBusy = stepplingMissionActive && !stepplingMissionLanded;\s*const restorationBoardBusy = restorationBoardVisible && !restorationLanded;/, 'the map comes back the moment the last item lands');
   assert.match(canvas, /setFadeSolo\(soloLayerId\);\s*othersOpacity\.value = withTiming\(0, \{ duration, easing/, 'the other tiles fade out while a board is up');
   assert.match(canvas, /<Animated\.View pointerEvents=\{soloLayerId \? 'none' : 'box-none'\} style=\{\[StyleSheet\.absoluteFill, othersStyle\]\}>\{creatureNodes\}<\/Animated\.View>/, 'and every Katchimera with them');
   assert.match(canvas, /style=\{\[StyleSheet\.absoluteFill, othersStyle\]\}>\{memoryPlantProjections\.map/, 'and the planted memories');
@@ -148,7 +148,9 @@ test('the Kingdom docks the mission under Steppling’s tile and clears the mist
   assert.match(screen, /useOpeningGlow\(stepplingMissionActive \? gatewayTileNode : islandRestoration \? restorationTileNode : homeTileNode\)/, 'Glow flies into the misted clearing during its mission');
   assert.match(screen, /const stepplingMission = useMissionBoard\(STEPPLING_MISSION_STORAGE_KEY, stepplingMissionActive \? STEPPLING_MISSION_ID : null, createStepplingMissionState\);/, 'its own board and store');
   assert.match(screen, /stepplingFinaleIdRef\.current = launchGlowFinale\(from, definitionId\);/);
-  assert.match(screen, /if \(stepplingMissionActive && stepplingMissionCleared && stepplingFinaleIdRef\.current != null && openingGlow\.finaleLandedId === stepplingFinaleIdRef\.current\) finishStepplingMission\(\);/, 'the mist clears on the final item’s impact');
+  assert.match(screen, /const stepplingMissionLanded = stepplingFinaleIdRef\.current != null && openingGlow\.finaleLandedId === stepplingFinaleIdRef\.current;/);
+  assert.match(screen, /if \(!\(stepplingMissionActive && stepplingMissionCleared && stepplingMissionLanded\)\) return;\s*const timer = setTimeout\(finishStepplingMission, WISP_FALL_MS\);/, 'the mist clears once the final item has struck the last wisp and it has fallen');
+  assert.match(screen, /const stepplingBoardBusy = stepplingMissionActive && !stepplingMissionLanded;/, 'the map stays faded while the last item is in the air');
   assert.match(screen, /if \(stepplingMission\.merges >= STEPPLING_MISSION_MERGE_REQUIRED\) finishStepplingMission\(\);/, 'a board saved with a full bar clears on resume');
   assert.match(screen, /<StepplingMissionDock[\s\S]*?onFinale=\{launchStepplingFinale\}/);
   assert.match(screen, /if \(glowRun && glowDiscoveryMissionNode\(glowRun\.nodeId\)\) return;/, 'tile taps are inert while the board is up');
