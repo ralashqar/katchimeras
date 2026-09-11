@@ -91,12 +91,14 @@ export async function loadMergeWorldState(now = Date.now()): Promise<MergeWorldS
   if (!row) return createInitialMergeWorldState(now);
   try {
     return normalizeMergeWorldState(JSON.parse(row.state_json), now);
-  } catch {
+  } catch (error) {
+    // Never silent: a fallback here is the player losing progress.
+    console.warn('Merge world: the stored world could not be read; falling back', error);
     if (row.backup_json) {
       try {
         return normalizeMergeWorldState(JSON.parse(row.backup_json), now);
-      } catch {
-        // Fall through to a recoverable new world.
+      } catch (backupError) {
+        console.warn('Merge world: the backup could not be read either; starting a new world', backupError);
       }
     }
     return createInitialMergeWorldState(now);

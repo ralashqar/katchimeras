@@ -10,6 +10,7 @@ import { flushStoredHomeStateWrites } from '@/utils/home-storage';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { normalizeMergeWorldState } from '@/utils/merge-world/engine';
 import { installMergeWorldStateForDebug, loadMergeWorldState } from '@/utils/merge-world/repository';
+import { markMossproutCampaignMigrated } from '@/utils/mossprout-campaign-v2-migration';
 import { captureKeyValueProfileDomain, replaceKeyValueProfileDomain, validateKeyValueProfileDomain } from '@/utils/player-profile-domain-registry';
 import { setJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { captureContentFlowJournal, installContentFlowJournalForDebug } from '@/features/content-flow/content-flow-repository';
@@ -117,6 +118,8 @@ async function installSnapshot(snapshot: PlayerProfileSnapshot) {
     { validate: () => {}, install: () => installMergeWorldStateForDebug(snapshot.domains.mergeWorld.state) },
     { validate: () => {}, install: () => installContentFlowJournalForDebug(snapshot.domains.contentFlow ?? { schemaVersion: 1, runs: [] }) },
   ]);
+  // The world just installed is on the current campaign: the boot migration must never reset it.
+  markMossproutCampaignMigrated();
 }
 
 export async function replacePlayerProfileSnapshot(snapshot: PlayerProfileSnapshot, options: { createRollback?: boolean } = {}): Promise<void> {

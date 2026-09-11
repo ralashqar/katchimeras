@@ -14,6 +14,7 @@ import { resetKatchimeraWardrobeForDebug } from '@/utils/katchimera-wardrobe-sto
 import { resetCompanionQuestsForDebug } from '@/utils/katchimera-quests';
 import { resetMergeWorldStateForDebug } from '@/utils/merge-world/repository';
 import { resetContentFlowJournalForDebug } from '@/features/content-flow/content-flow-repository';
+import { markMossproutCampaignMigrated } from '@/utils/mossprout-campaign-v2-migration';
 
 export async function resetKatchimeraProgressForDebug({
   resetAt = Date.now(),
@@ -43,4 +44,6 @@ export async function resetKatchimeraProgressForDebug({
 
   await resetMergeWorldStateForDebug(resetAt);
   await resetContentFlowJournalForDebug();
+  // A reset world is a fresh one on the current campaign; the boot migration has nothing to do to it.
+  markMossproutCampaignMigrated(resetAt);
 }

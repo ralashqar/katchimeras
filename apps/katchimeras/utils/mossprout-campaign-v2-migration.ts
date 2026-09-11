@@ -10,10 +10,17 @@ import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/co
 import { loadCompanionQuickGoalState, saveCompanionQuickGoalState } from '@/utils/companion-quick-goal-storage';
 import { loadCompanionQuests, saveCompanionQuests } from '@/utils/katchimera-quests';
 import { installMossproutOnboardingMergeWorld, loadMergeWorldState, saveMergeWorldState } from '@/utils/merge-world/repository';
+import { worldAlreadyOnMossproutCampaignV2 } from '@/utils/merge-world/mossprout-campaign-v2-guard';
 
-const MARKER_KEY = 'katchimeras.mossprout-campaign-migration';
+export const MOSSPROUT_CAMPAIGN_MIGRATION_MARKER_KEY = 'katchimeras.mossprout-campaign-migration';
+const MARKER_KEY = MOSSPROUT_CAMPAIGN_MIGRATION_MARKER_KEY;
 
 type MigrationMarker = { version: number; completedAt: number };
+
+/** Records that the stored world is on the current campaign, so the reset below never runs on it. */
+export function markMossproutCampaignMigrated(now = Date.now()): void {
+  setStoredJson<MigrationMarker>(MARKER_KEY, { version: MOSSPROUT_CAMPAIGN_VERSION, completedAt: now });
+}
 type FamilyRecord = { familyId?: string; companionId?: string; creatureId?: string; characterId?: string; definitionId?: string | null; id?: string };
 
 function isMossprout(value: FamilyRecord) {
@@ -37,6 +44,14 @@ function withoutMossprout<T extends FamilyRecord>(values: readonly T[]) {
 export async function runMossproutCampaignV2Migration(now = Date.now()): Promise<boolean> {
   const marker = getStoredJson<MigrationMarker | null>(MARKER_KEY, null);
   if (marker?.version === MOSSPROUT_CAMPAIGN_VERSION) return false;
+  // A missing marker is not proof of a pre-campaign world: a dev reset cleared storage, a snapshot
+  // was loaded, or this is a fresh install. Only a world with nothing of the campaign in it is reset;
+  // any other is simply marked, and the player's islands, board and story stay exactly as they are.
+  const previousWorld = await loadMergeWorldState(now);
+  if (worldAlreadyOnMossproutCampaignV2(previousWorld)) {
+    markMossproutCampaignMigrated(now);
+    return false;
+  }
 
   const content = loadCompanionContentState();
   saveCompanionContentState({
@@ -109,7 +124,6 @@ export async function runMossproutCampaignV2Migration(now = Date.now()): Promise
 
   relationshipProgressionRepository.save(emptyRelationshipProgressState());
 
-  const previousWorld = await loadMergeWorldState(now);
   const freshWorld = await installMossproutOnboardingMergeWorld(now);
   const previousFavourite = previousWorld.favouriteCharacterId !== 'mossprout'
     ? previousWorld.favouriteCharacterId
@@ -157,6 +171,6 @@ export async function runMossproutCampaignV2Migration(now = Date.now()): Promise
     revision: freshWorld.revision + 1,
   });
 
-  setStoredJson<MigrationMarker>(MARKER_KEY, { version: MOSSPROUT_CAMPAIGN_VERSION, completedAt: now });
+  markMossproutCampaignMigrated(now);
   return true;
 }
