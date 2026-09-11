@@ -1,6 +1,6 @@
 # Friend Restoration: mini boards for the island campaigns
 
-Status: built for Petalimp (Sept 2026). After a device pass the user rejected the "bed" idea; the board now works like the opening's: **merges fill the bar**, some cells are **half-hidden in mist holding an item** (ordinary Dream Echoes: match the item to set it free, and that match counts), the local pieces can never fill the bar alone, and when the board is spent the chapter's order brings what unlocks the rest. Built: the chapter's `restoration` record and the three engine commands (`requestIslandCampaignDelivery`, `recordIslandRestorationProgress`, `completeIslandRestoration`), the pure helpers in `features/island-restoration/island-restoration.ts`, `IslandRestorationDock` over the shared `MistMissionDock`, the Kingdom wiring (camera on the island, checkpoint → order, deliveries placed from the store, the last bloom's impact → free upgrade), the marker's beds bar and the panel's stage cost. Petalimp's four boards are authored in `petalimp-bloom.ts` and proven by exhaustive search in `tests/island-restoration.test.ts`. Other friends keep the panel-only flow until their boards are authored. Device verification pending.
+Status: built for Petalimp (Sept 2026). After a device pass the user rejected the "bed" idea; the board now works like the opening's: **merges fill the bar**, some cells are **half-hidden in mist holding an item** (ordinary Dream Echoes: match the item to set it free, and that match counts), the local pieces can never fill the bar alone, and when the board is spent the chapter's order brings what unlocks the rest. Built: the chapter's `restoration` record and the three engine commands (`requestIslandCampaignDelivery`, `recordIslandRestorationProgress`, `completeIslandRestoration`), the pure helpers in `features/island-restoration/island-restoration.ts`, `IslandRestorationDock` over the shared `MistMissionDock`, the Kingdom wiring (camera on the island, checkpoint → order, deliveries placed from the store, the last bloom's impact → free upgrade), the marker's beds bar and the panel's stage cost. Petalimp's four boards are authored in `petalimp-bloom.ts` and proven by exhaustive search in `tests/island-restoration.test.ts`. Fernip's four boards followed on Sept 11, 2026 (`fernip-wildgrowth.ts`, same supply, larger boards; `tests/fernip-island-campaign.test.ts`). The other four friends keep the panel-only flow until their boards are authored. Device verification pending.
 
 Original recommendation (Sept 2026) follows. Adapts the "Friend Restoration System" spec to what the Kingdom already has: the six island campaigns (`constants/island-campaigns/`), the two built mist missions (`docs/mist-missions-design.md`), dream echoes, parcels, and the static per-level island art.
 
@@ -116,6 +116,19 @@ Each chapter's existing order requirements are already the right delivery. The b
 **Built (Sept 2026):** a request only asks for what the Main Board owns by then. Petalimp comes before Shellio and the Memory Nursery, so her later deliveries are the Journey Locker's Shoe and Boot (its founding trail chain; the travel branch is gated too, and the engine reroutes a gated request onto the open chain on load), never a Shell, a Travel Journal or a Memory Bloom; a test asks the engine's own gate. The spawner-under-the-path idea below is not built.
 
 Chapter 3 is where §9 and §10 pay off together: the friend's board reveals a spawner that the Main Board then owns, and the chapter's own delivery (a Shell) needs it. The Wild Garden's second chain is already gated behind Shellio; if the Tide Pool is Shellio's, author chapter 3's discovery as a different waterside spawner or move the discovery to the friend whose island it belongs to. The point is the shape, not the specific spawner.
+
+## Fernip, concretely
+
+Second in the wake order, so the Main Board can make exactly what it could for Petalimp: the Seeds chain and the Journey Locker's trail chain. The boards grow with the grove: wider window, longer bar, more misted cells. Every stage's request is the delivery; every path is proven by the exhaustive search.
+
+| Stage (Glow) | Window | Misted cells | Local pieces | Delivery | Bar |
+| --- | --- | --- | --- | --- | --- |
+| 1 Somewhere Soft to Spread (free) | 5×3 | Sprout, Flower | Seeds ×4 | Plant | 5 |
+| 2 Neighbours at Ankle Height (75) | 5×3 | Sprout, Plant | Seeds ×4, Plant | Flower + Sprout | 7 |
+| 3 An Enthusiastic Thicket (150) | 5×4 | Flower, Plant, Boot | Seeds ×4, Plants ×2 | Rare Flower + Boot | 8 |
+| 4 Room to Be Yourself (300) | 5×4 | Rare Flower, Flower, Hiking Gear | Seeds ×4, Plant, Flowers ×2 | Magical Plant + Hiking Gear | 9 |
+
+The dev page's `Kingdom · Before Fernip` snapshot plays Petalimp's whole arc with real commands (wish told, mist paid, four stages opened, served, cleared, grown and resolved, her card revealed) and lands with Wildgrowth Grove open, misted and affordable.
 
 ## Kingdom wiring
 

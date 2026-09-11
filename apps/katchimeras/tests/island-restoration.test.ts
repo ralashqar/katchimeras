@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
 import { islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers';
+import { FERNIP_WILDGROWTH_CAMPAIGN } from '@/constants/island-campaigns/fernip-wildgrowth';
 import { PETALIMP_BLOOM_CAMPAIGN } from '@/constants/island-campaigns/petalimp-bloom';
 import type { IslandCampaignDefinition, RestorationBoardDefinition } from '@/constants/island-campaigns/types';
 import { MERGE_GENERATORS_BY_ID, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
@@ -173,11 +174,17 @@ test('every authored restoration board needs its delivery on every path and fill
 });
 
 test('every request a board sends to the Main Board can be made there, and the engine’s chain repair leaves it exactly as authored', () => {
-  // The world right before Petalimp: the friends home by then decide which generator branches are open
+  // The world right before each friend: the friends home by then decide which generator branches are open
   // (the Garden Basket's waterside waits for Shellio, the Journey Locker's travel branch for a later friend).
-  const world = buildPlayerProfileFixtures(NOW).find((fixture) => fixture.id === 'fixture:kingdom-before-petalimp')!.domains.mergeWorld.state;
+  const fixtures = buildPlayerProfileFixtures(NOW);
+  const worldBefore: Record<string, string> = { [petalimp.campaignId]: 'fixture:kingdom-before-petalimp', [FERNIP_WILDGROWTH_CAMPAIGN.campaignId]: 'fixture:kingdom-before-fernip' };
+  for (const campaign of ISLAND_CAMPAIGNS) {
+  if (!campaign.chapters.some((chapter) => chapter.restoration)) continue;
+  const fixtureId = worldBefore[campaign.campaignId];
+  assert.ok(fixtureId, `${campaign.campaignId} plays on the board: name the fixture of the world right before it`);
+  const world = fixtures.find((fixture) => fixture.id === fixtureId)!.domains.mergeWorld.state;
   const ownedChains = new Set(Object.keys(world.generators).flatMap((generatorId) => MERGE_GENERATORS_BY_ID.get(generatorId)?.chainIds ?? []));
-  for (const chapter of petalimp.chapters) {
+  for (const chapter of campaign.chapters) {
     const orders = [chapter.fallbackOrder, ...chapter.choices.map((choice) => choice.order)];
     for (const order of orders) {
       for (const requirement of order.requirements) {
@@ -191,16 +198,17 @@ test('every request a board sends to the Main Board can be made there, and the e
     }
     // The saved order is repaired onto open chains on every load; the board's misted cells are not. They must agree.
     for (const choice of chapter.choices) {
-      const authored = islandCampaignChapterOrder(petalimp, chapter.level, choice.id, NOW)!;
-      assert.deepEqual(openOrderChains(world, authored).requirements, authored.requirements, `level ${chapter.level} ${choice.id}: the repair would change the request`);
+      const authored = islandCampaignChapterOrder(campaign, chapter.level, choice.id, NOW)!;
+      assert.deepEqual(openOrderChains(world, authored).requirements, authored.requirements, `${campaign.campaignId} level ${chapter.level} ${choice.id}: the repair would change the request`);
     }
     // What the request brings must be wanted: each delivered item merges with a twin on the spent board or frees a misted cell.
     const wanted = new Set(chapter.restoration!.echoes.map((echo) => echo.definitionId));
     for (const requirement of chapter.fallbackOrder.requirements) {
       const definition = MERGE_ITEMS_BY_ID.get(requirement.definitionId)!;
       const twinFromBoard = chapter.restoration!.echoes.some((echo) => MERGE_ITEMS_BY_ID.get(echo.definitionId)?.nextItemId === requirement.definitionId);
-      assert.ok(wanted.has(requirement.definitionId) || twinFromBoard, `level ${chapter.level}: the delivered ${definition.name} has nowhere to go on the board`);
+      assert.ok(wanted.has(requirement.definitionId) || twinFromBoard, `${campaign.campaignId} level ${chapter.level}: the delivered ${definition.name} has nowhere to go on the board`);
     }
+  }
   }
 });
 

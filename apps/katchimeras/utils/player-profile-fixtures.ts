@@ -14,6 +14,8 @@ import { GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID } from '@/features/onboardin
 import { STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, STEPPLING_PARCEL_ID, STEPPLING_SHOE_ORDER_ID } from '@/features/onboarding/steppling-garden-lesson';
 import { STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID, STEPPLING_PARCEL_REWARD_ID } from '@/features/content-flow/steppling-day-one-flow';
 import { advanceGlowRequests, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS } from '@/utils/merge-world/glow-discovery-policy';
+import { islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers';
+import { PETALIMP_BLOOM_CAMPAIGN, PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_ID } from '@/constants/island-campaigns/petalimp-bloom';
 
 const DAY = 86_400_000;
 const COMPLETE_PROFILE: OnboardingProfile = {
@@ -245,6 +247,53 @@ function stepplingHome(now: number) {
   return { ...state, coins: Math.max(state.coins, 90) };
 }
 
+/** Puts finished items on free Main Board cells, the way a player would have made them. */
+function placeFixtureItems(state: MergeWorldState, definitionIds: readonly string[]): MergeWorldState {
+  const board = [...state.board];
+  let nextInstance = state.nextInstance;
+  for (const definitionId of definitionIds) {
+    const cell = board.findIndex((candidate) => !candidate.locked && !candidate.mist && !candidate.blocker && !candidate.occupant);
+    if (cell < 0) throw new Error(`Fixture has no free cell for ${definitionId}.`);
+    board[cell] = { ...board[cell]!, occupant: { kind: 'item', instanceId: `fixture-item-${nextInstance}`, definitionId } };
+    nextInstance += 1;
+  }
+  return { ...state, board, nextInstance };
+}
+
+/**
+ * Petalimp home, played out with the real commands: Mossprout's wish told,
+ * Bloom Garden's mist paid for, and each of her four stages opened, its board
+ * spent, its request served on the Main Board, its bar filled, the garden
+ * grown and the chapter resolved. Her card is revealed; Wildgrowth Grove,
+ * next in the wake order, is open and still misted.
+ */
+function petalimpHome(now: number) {
+  const at = now - 3 * DAY;
+  let state: MergeWorldState = { ...stepplingHome(now), coins: 900 };
+  state = step(state, { type: 'introduceKingdomGoal', now: at }, 'tell Mossprout’s wish');
+  state = step(state, { type: 'ackKingdomGoalCoachmark', now: at + 1 }, 'see the wish');
+  state = step(state, { type: 'revealMossproutNatureIsland', islandId: PETALIMP_ISLAND_ID, campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, residentSkinId: 'petalimp', cost: 40, receiptId: 'fixture:bloom:reveal', now: at + 2 }, 'clear Bloom Garden’s mist');
+  state = step(state, { type: 'ackIslandCampaignResidentDiscovery', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, now: at + 3 }, 'meet Petalimp');
+  PETALIMP_BLOOM_CAMPAIGN.chapters.forEach((chapter, index) => {
+    const base = at + 10 * (index + 1);
+    const { level } = chapter;
+    const choice = chapter.choices[index % chapter.choices.length]!;
+    const order = islandCampaignChapterOrder(PETALIMP_BLOOM_CAMPAIGN, level, choice.id, base)!;
+    state = step(state, { type: 'activateIslandCampaignChapter', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, islandId: PETALIMP_ISLAND_ID, residentSkinId: 'petalimp', level, selectedOptionId: choice.id, orders: [order], now: base }, `open Petalimp stage ${level}`);
+    state = step(state, { type: 'requestIslandCampaignDelivery', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level, orders: [order], now: base + 1 }, `request stage ${level}`);
+    state = placeFixtureItems(state, order.requirements.flatMap((requirement) => Array.from({ length: requirement.quantity }, () => requirement.definitionId)));
+    state = step(state, { type: 'serveOrder', orderId: order.id, now: base + 2 }, `serve stage ${level}`);
+    const merges = chapter.restoration!.merges;
+    state = step(state, { type: 'recordIslandRestorationProgress', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level, current: merges, total: merges, now: base + 3 }, `fill stage ${level}`);
+    state = step(state, { type: 'completeIslandRestoration', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level, now: base + 4 }, `clear stage ${level}`);
+    state = step(state, { type: 'upgradeMossproutNatureIsland', islandId: PETALIMP_ISLAND_ID, level, economyMode: 'free', receiptId: `fixture:bloom:restore:${level}`, now: base + 5 }, `grow stage ${level}`);
+    state = step(state, { type: 'completeIslandCampaignChapter', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, level, now: base + 6 }, `resolve stage ${level}`);
+  });
+  state = step(state, { type: 'ackIslandCampaignResidentCardReveal', campaignId: PETALIMP_ISLAND_CAMPAIGN_ID, now: at + 60 }, 'reveal Petalimp’s card');
+  // Enough Glow for the grove's mist, and no more: the next arc starts where a player would.
+  return { ...state, coins: 90 };
+}
+
 function storyRunAt(definition: ContentFlowDefinition, runId: string, nodeId: string, now: number): ContentFlowRun {
   return stabilizeContentFlow(definition, { ...createContentFlowRun(definition, { runId, now }), nodeId }, now).run;
 }
@@ -365,6 +414,12 @@ const FIXTURE_DEFINITIONS: readonly FixtureDefinition[] = [
   { id: 'steppling-mist-ready', name: 'Steppling · Before the reveal', description: 'The Garden lesson done and the Glow earned; the misted clearing’s bubble waits to be tapped and open its mission board.', tags: ['Kingdom', 'Steppling', 'Mist'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: glowLessonServed,
     contentFlowRuns: (now) => [storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'gateway.offer', now - 5 * DAY + 3)] },
   { id: 'kingdom-before-petalimp', name: 'Kingdom · Before Petalimp', description: 'The first session over: Steppling home and his first Shoe served. Mossprout’s wish and Bloom Garden come next.', tags: ['Kingdom', 'Petalimp'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: stepplingHome,
+    contentFlowRuns: (now) => [
+      storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'complete', now - 4 * DAY + 5),
+      storyRunAt(STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID, 'complete', now - 4 * DAY + 6),
+      storyRunAt(STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, 'complete', now - 4 * DAY + 10),
+    ] },
+  { id: 'kingdom-before-fernip', name: 'Kingdom · Before Fernip', description: 'Petalimp home and her card revealed after all four Bloom Garden stages. Wildgrowth Grove’s mist is next, with the Glow to clear it.', tags: ['Kingdom', 'Fernip'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: petalimpHome,
     contentFlowRuns: (now) => [
       storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'complete', now - 4 * DAY + 5),
       storyRunAt(STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID, 'complete', now - 4 * DAY + 6),

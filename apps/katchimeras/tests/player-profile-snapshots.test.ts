@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from './helpers/content-fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import type { IslandCampaignChapterProgress } from '@/types/merge-world';
+import { islandWakeState } from '@/constants/island-campaigns/wake-order';
 
 import { MOSSPROUT_FTUE_SCRIPT } from '@/features/onboarding/mossprout-ftue-script';
 import { buildPlayerProfileFixtures, PLAYER_PROFILE_FIXTURE_COUNT } from '@/utils/player-profile-fixtures';
@@ -13,13 +15,13 @@ const read = (relative: string) => readFileSync(resolve(root, relative), 'utf8')
 
 test('profile fixture catalog covers every planned discovery milestone', () => {
   const fixtures = buildPlayerProfileFixtures(NOW);
-  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 20);
-  assert.equal(fixtures.length, 20);
+  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 21);
+  assert.equal(fixtures.length, 21);
   assert.equal(new Set(fixtures.map((fixture) => fixture.id)).size, fixtures.length);
   assert.deepEqual(fixtures.map((fixture) => fixture.id), [
     'fixture:fresh-first-launch', 'fixture:mossprout-opening', 'fixture:mossprout-merge-start', 'fixture:mossprout-haven-restore',
     'fixture:steppling-parcel', 'fixture:steppling-final-clue', 'fixture:steppling-first-order',
-    'fixture:steppling-mist-ready', 'fixture:kingdom-before-petalimp',
+    'fixture:steppling-mist-ready', 'fixture:kingdom-before-petalimp', 'fixture:kingdom-before-fernip',
     'fixture:gate-3-fork', 'fixture:gate-3-feastle-parcel', 'fixture:gate-3-feastle-final', 'fixture:gate-4-queued',
     'fixture:gate-4-fork', 'fixture:gate-4-baristabbit-parcel', 'fixture:gate-4-baristabbit-final', 'fixture:gate-5-queued',
     'fixture:gate-5-bedrotte-parcel', 'fixture:gate-5-bedrotte-final', 'fixture:early-pool-complete',
@@ -53,6 +55,31 @@ test('the two Kingdom fixtures land right before the Steppling reveal and right 
   assert.equal(world.haven.mossproutNatureIslands['bloom-garden'], 0, 'Bloom Garden is still misted');
   assert.ok(world.coins >= 40, 'enough Glow to clear it');
   assert.deepEqual(before.domains.contentFlow?.runs.map((run) => [run.runId, run.status]), [['story:glow-steppling-v1', 'completed'], ['journey:steppling:day-1', 'completed'], ['ftue:steppling-garden:1', 'completed']]);
+});
+
+test('the Before-Fernip fixture has Petalimp home for real and the grove open, misted and affordable', () => {
+  const fixture = buildPlayerProfileFixtures(NOW).find((candidate) => candidate.id === 'fixture:kingdom-before-fernip')!;
+  assert.equal(fixture.launchRoute, '/(tabs)/katchimeras');
+  const world = fixture.domains.mergeWorld.state;
+  const petalimp = world.islandCampaigns?.['island-campaign:petalimp-bloom'];
+  assert.ok(petalimp?.cardEarnedAt && petalimp.cardRevealSeenAt, 'Petalimp’s card is earned and its reveal seen');
+  assert.ok(world.ownedKatchimeraCards.some((card) => card.cardId === 'petalimp' && card.acquisition === 'island_campaign'));
+  assert.deepEqual([1, 2, 3, 4].map((level) => Boolean(petalimp?.chapters[String(level)]?.completedAt)), [true, true, true, true], 'all four stages resolved');
+  assert.equal(world.haven.mossproutNatureIslands['bloom-garden'], 4, 'Bloom Garden fully grown');
+  for (const level of [1, 2, 3, 4]) {
+    const chapter: IslandCampaignChapterProgress = petalimp!.chapters[String(level)]!;
+    assert.ok(chapter.restoration?.completedAt, `stage ${level}'s board was cleared`);
+    assert.deepEqual(chapter.servedOrderIds, chapter.orderIds, `stage ${level}'s request was served`);
+    assert.ok(world.externalRewardReceipts.some((receipt) => receipt.id === `merge-story-served:${chapter.orderIds[0]}`), `and served for real`);
+  }
+  assert.equal(world.activeOrders.some((order) => order.storyArcId === 'island-campaign:petalimp-bloom'), false, 'no Petalimp request left on the board');
+  assert.ok(world.kingdomGoal?.introducedAt && world.kingdomGoal.coachmarkSeenAt, 'Mossprout’s wish has been told');
+  assert.equal(world.haven.mossproutNatureIslands['wildgrowth-grove'], 0, 'Wildgrowth Grove is still misted');
+  assert.equal(world.haven.mossproutNatureIslandReveals['wildgrowth-grove'], undefined);
+  assert.equal(islandWakeState(world, 'wildgrowth-grove'), 'open', 'and next in the wake order');
+  assert.equal(islandWakeState(world, 'seed-nursery'), 'sleeping');
+  assert.ok(world.coins >= 40, 'enough Glow to clear it');
+  assert.equal(world.islandCampaigns?.['island-campaign:fernip-wildgrowth'], undefined, 'Fernip has not been met');
 });
 
 test('Mossprout Haven fixture opens immediately before the first environment restore', () => {
