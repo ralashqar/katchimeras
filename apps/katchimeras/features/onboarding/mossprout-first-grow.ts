@@ -10,11 +10,11 @@ export const MOSSPROUT_GARDEN_RETURN = {
 };
 export const MOSSPROUT_FIRST_NOTICE = {
   id: 'first-notice',
-  prompt: 'What’s there, around you?',
+  prompt: 'Quick, before the Mist notices. What’s one thing near you it would love you to forget?',
   choices: [
-    { id: 'light', label: 'Some light', reply: 'An ordinary corner, looked at. The Mist never gets those. I like that you caught it.' },
-    { id: 'sound', label: 'A small sound', reply: 'There’s a whole little world going on when we stop to listen. Listening counts as looking.' },
-    { id: 'growing', label: 'Something growing', reply: 'A neighbour of mine, perhaps. Thank you for noticing it. Things grow better noticed.' },
+    { id: 'light', label: 'A small good thing', reply: 'A small good thing, looked at. That is exactly what the Mist can’t take.' },
+    { id: 'sound', label: 'A sound I’d miss', reply: 'A sound you’d miss. Listening counts as looking.' },
+    { id: 'growing', label: 'Something alive', reply: 'Something alive. A neighbour of mine, perhaps. Things grow better noticed.' },
   ],
 };
 export const MOSSPROUT_FIRST_GROW_STEPS = ['companion.water_together', 'companion.first_grow', 'companion.first_notice'] as const;

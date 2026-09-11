@@ -159,7 +159,9 @@ import { reconcileConversationJournalSignals } from '@/utils/companion-conversat
 import { loadCompanionContentState, saveCompanionContentState, subscribeCompanionContentResets } from '@/utils/companion-content-storage';
 import { resolveMossproutFtueConversation } from '@/constants/mossprout-ftue-conversations';
 import { legacyStepplingDayOneConversation, legacyStepplingDayOneConversationV2 } from '@/constants/steppling-day-one-conversation';
-import { recordLifeConversation } from '@/utils/companion-life-recording';
+import { recordLifeConversation, recordScenarioAnswer } from '@/utils/companion-life-recording';
+import { nextMossproutTheory } from '@/utils/companion-theory';
+import { MOSSPROUT_THEORY_TITLE } from '@/constants/mossprout-theory-conversations';
 import { loadOnboardingProfile as loadLifeOnboardingProfile } from '@/utils/onboarding-state';
 import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/companion-journey-storage';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
@@ -1039,7 +1041,10 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     );
   }, [homeResidentSkinIds, selectedConversationSession]);
   useEffect(() => {
-    if (selectedConversationSession && selectedConversationDefinition) recordLifeConversation(selectedConversationSession, selectedConversationDefinition);
+    if (selectedConversationSession && selectedConversationDefinition) {
+      recordLifeConversation(selectedConversationSession, selectedConversationDefinition);
+      recordScenarioAnswer(selectedConversationSession, selectedConversationDefinition);
+    }
   }, [selectedConversationSession, selectedConversationDefinition]);
   useEffect(() => {
     if (!selectedConversationSession || selectedConversationSession.preview || selectedConversationSession.status !== 'completed') return;
@@ -1158,6 +1163,9 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       }
     };
     const questions = collectPool('nature-question');
+    // Once the scenario answers add up to something, Mossprout says what he thinks first, and asks if he is right.
+    const theory = nextMossproutTheory({ sessions: companionContentState.conversationSessions, definitions: companionConversationDefinitionById, bondLevel: selectedBondProgress.level, dayId: today.isoDate });
+    const theoryRows = theory ? [{ mode: 'talk' as const, definitionId: theory.definitionId, title: MOSSPROUT_THEORY_TITLE, questionCount: 1, label: MOSSPROUT_THEORY_TITLE, description: 'He has put a few of your answers together. Tell him if he is right.' }] : [];
     const insights = collectMode('discover');
     const journals = collectPool('nature-journal');
     const focusDirection = {
@@ -1170,6 +1178,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       description: 'Three practical questions, then keep up to three small ideas.',
     };
     return [
+      ...theoryRows,
       ...questions.map((question) => ({ mode: 'talk' as const, definitionId: question.id, title: question.title, questionCount: conversationQuestionCount(question), label: question.actionTitle ?? question.title, description: 'A short garden scene—one or two choices.' })),
       ...journals.map((journal) => ({ mode: 'talk' as const, actionKind: 'journal_prompt' as const, definitionId: journal.id, title: journal.title, questionCount: conversationQuestionCount(journal), label: journal.actionTitle ?? journal.title, description: 'Two quick choices become an editable field note.' })),
       ...insights.map((insight) => ({ mode: 'discover' as const, definitionId: insight.id, title: insight.title, questionCount: conversationQuestionCount(insight), label: 'Find your outside instinct', description: 'Three questions, then a result you can keep or leave.' })),

@@ -10,8 +10,8 @@ export const MOSSPROUT_FTUE_COPY = {
   mistClearBody: 'Two of the same, together: that’s light. Drag one Seed onto the other.',
   mistThins: 'The last one goes, and the Mist has nothing left to hold with.',
   eggHeardYou: 'And something under it heard you looking.',
-  dayQuestion: 'How was your day, honestly?',
-  helpQuestion: 'And what would help right now?',
+  dayQuestion: 'If today were weather over this garden, what was it?',
+  helpQuestion: 'And the first thing we grow. What should it be for?',
   seedOrigin: 'You looked, and the Mist let go of me. What you just told me is the first light I’ve felt in years. Let’s give it soil.',
   bond: 'Every honest answer is light. That’s how I got out.',
   planted: 'There. It’ll grow if we keep looking at it. Light, then.',
@@ -32,17 +32,17 @@ export const MOSSPROUT_FTUE_COPY = {
 } as const;
 
 export const MOSSPROUT_DAY_OPTIONS = [
-  { id: 'radiant', label: 'Radiant', icon: 'face.very_happy', domainChoiceId: 'energized' },
-  { id: 'light', label: 'Light', icon: 'face.happy', domainChoiceId: 'good' },
-  { id: 'meh', label: 'Meh', icon: 'face.neutral', domainChoiceId: 'meh' },
-  { id: 'heavy', label: 'Heavy', icon: 'face.sad', domainChoiceId: 'drained' },
-  { id: 'stormy', label: 'Stormy', icon: 'face.very_sad', domainChoiceId: 'stressed' },
+  { id: 'radiant', label: 'Full sun', icon: 'face.very_happy', domainChoiceId: 'energized' },
+  { id: 'light', label: 'Mostly bright', icon: 'face.happy', domainChoiceId: 'good' },
+  { id: 'meh', label: 'Grey and still', icon: 'face.neutral', domainChoiceId: 'meh' },
+  { id: 'heavy', label: 'Heavy rain', icon: 'face.sad', domainChoiceId: 'drained' },
+  { id: 'stormy', label: 'A proper storm', icon: 'face.very_sad', domainChoiceId: 'stressed' },
 ] as const satisfies readonly FtueChoiceOption[];
 
 export const MOSSPROUT_HELP_OPTIONS = [
-  { id: 'progress', label: 'A little progress', icon: 'leaf.fill' },
-  { id: 'calm', label: 'A little calm', icon: 'wind' },
-  { id: 'unsure', label: 'I’m not sure yet', icon: 'questionmark' },
+  { id: 'progress', label: 'Getting something moving', icon: 'leaf.fill' },
+  { id: 'calm', label: 'A bit of quiet', icon: 'wind' },
+  { id: 'unsure', label: 'Surprise me. I don’t know yet', icon: 'questionmark' },
 ] as const satisfies readonly FtueChoiceOption[];
 
 export const MOSSPROUT_GREETING_OPTIONS = [

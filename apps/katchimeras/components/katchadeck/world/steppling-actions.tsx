@@ -17,15 +17,17 @@ import { DayActionCardSurface, DayActionRewardChip } from '@/components/katchade
 import { DayActionGoalRow } from '@/components/katchadeck/ui/day-action-goal-row';
 import { DayActionActiveRow, DayActionCompletedRow, DayActionReplacementSlot, DAY_ACTION_MOTION, type DayActionSourceRect } from '@/components/katchadeck/ui/day-action-row';
 import { katchimeraActionArt } from '@/constants/katchimera-action-art';
-import { STEPPLING_TRAIL_CHATS } from '@/constants/steppling-activities';
+import { STEPPLING_SCENARIO_POLLS } from '@/constants/steppling-scenario-polls';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
 import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
-import { loadCompanionLife } from '@/utils/companion-life-storage';
 import { claimStepplingMilestone, nextStepplingMilestone } from '@/utils/steppling-activities';
 import { localDayId } from '@/utils/world-identity';
 import { type CompanionMergeRequest } from './companion-merge-request-tray';
 
-const chatId = (chat: typeof STEPPLING_TRAIL_CHATS[number]) => `steppling:trail-chat:${chat.id}`;
+/** Steppling's daily question is one of his scenario polls; each comes back once its fortnight is up. */
+const QUESTION_CANDIDATES = STEPPLING_SCENARIO_POLLS.map((poll) => ({ id: poll.id, title: poll.title ?? poll.prompt }));
+const QUESTION_REPEAT_MS = 14 * 24 * 60 * 60 * 1000;
+const chatId = (chat: { id: string }) => `steppling:poll:${chat.id}`;
 export function StepplingActions({ onReaction, onOpenConversation, requests, onOpenMerge, onSubmenuChange, onStory, storyLabel, onBondRewardRequest, externalGesture }: {
   onReaction?: (text: string) => void;
   onOpenConversation?: (definitionId: string, origin: KatchimeraActionOrigin) => void;
@@ -44,11 +46,15 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
   const goal = completing ?? nextStepplingMilestone(bond, dayId);
   const ready = Boolean(goal && steps >= goal.steps);
   const content = loadCompanionContentState();
-  // Respect the previous release's saved answers without maintaining a second chat engine.
-  const legacyAnswers = loadCompanionLife().entries;
-  const completedChats = new Set(STEPPLING_TRAIL_CHATS.filter((item) => legacyAnswers.some((entry) => entry.id === chatId(item))
-    || content.conversationSessions.some((session) => session.definitionId === chatId(item) && !session.preview && session.status === 'completed')).map((item) => item.id));
-  const nextChat = useDailyCompanionConversation('steppling', STEPPLING_TRAIL_CHATS, completedChats);
+  // When each question was last answered; one answered within the fortnight stays out of the rotation.
+  const answeredAt: Record<string, number> = {};
+  for (const session of content.conversationSessions) {
+    if (session.preview || session.status !== 'completed' || !session.definitionId.startsWith('steppling:poll:')) continue;
+    const id = session.definitionId.slice('steppling:poll:'.length);
+    answeredAt[id] = Math.max(answeredAt[id] ?? 0, session.completedAt ?? session.updatedAt);
+  }
+  const completedChats = new Set(QUESTION_CANDIDATES.filter((item) => (answeredAt[item.id] ?? 0) > Date.now() - QUESTION_REPEAT_MS).map((item) => item.id));
+  const nextChat = useDailyCompanionConversation('steppling-questions', QUESTION_CANDIDATES, completedChats, answeredAt);
   const chatComplete = Boolean(nextChat && completedChats.has(nextChat.id));
   const presentations = relationships.actionPresentations.filter((item) => item.status !== 'dismissed'
     && relationships.actionCompletions.some((completion) => completion.id === item.completionId && completion.familyId === 'steppling'));
@@ -67,7 +73,7 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
     const id = chatId(nextChat);
     onOpenConversation?.(id, {
       dayId, familyId: 'steppling', actionId: id, instanceId: id, sourceSlotId: 'together', slotId: 'together', sequence: 0,
-      kind: 'fun_chat', title: nextChat.title, subtitle: 'A little discovery for our trail', icon: 'bubble.left.and.bubble.right.fill',
+      kind: 'fun_chat', title: nextChat.title, subtitle: 'One quick scene. The village answers too.', icon: 'bubble.left.and.bubble.right.fill',
       artKey: 'today:reflection', artworkDefinitionIds: [], reward: { kind: 'bond', amount: 8 }, rotationEffect: 'preserve', presentation: 'action_card',
     });
   };

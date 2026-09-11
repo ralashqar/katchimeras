@@ -4,7 +4,9 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { emptyCompanionBondState } from '../utils/companion-bond';
 import { claimStepplingMilestone, nextStepplingMilestone } from '../utils/steppling-activities';
-import { STEPPLING_STEP_MILESTONES, STEPPLING_TRAIL_CHATS, STEPPLING_TRAIL_CONVERSATIONS } from '../constants/steppling-activities';
+import { STEPPLING_STEP_MILESTONES, STEPPLING_TRAIL_CONVERSATIONS } from '../constants/steppling-activities';
+import { STEPPLING_SCENARIO_POLLS } from '../constants/steppling-scenario-polls';
+import { companionConversationDefinitionById } from '../constants/companion-conversations-v2';
 import { loadNativeModule, nativeViews, nativeMotionHarness } from './helpers/native-motion-harness';
 import { createConversationSession, answerConversation, continueConversation } from '../utils/companion-conversation';
 import type { ConversationSession } from '../types/companion-conversation';
@@ -68,7 +70,7 @@ test('Steppling keeps the claimed row through its flight, restores Garden naviga
     '@/storage/repositories/relationship-progression-repository': { relationshipProgressionRepository: { update: (work: (state: typeof relationships) => typeof relationships) => { relationships = work(relationships); } } },
     '@/utils/world-identity': { localDayId: () => '2026-09-04' },
     './companion-garden-action': { CompanionGardenAction: ({ children, ...props }: { children: (card: React.ReactNode) => React.ReactNode }) => children(React.createElement('GardenCard', props)) },
-    '@/hooks/use-daily-companion-conversation': { useDailyCompanionConversation: () => STEPPLING_TRAIL_CHATS[0] },
+    '@/hooks/use-daily-companion-conversation': { useDailyCompanionConversation: () => ({ id: STEPPLING_SCENARIO_POLLS[0].id, title: STEPPLING_SCENARIO_POLLS[0].title }) },
     './companion-merge-request-tray': { CompanionMergeRequestTray: 'Tray', COMPANION_MERGE_REQUEST_PALETTE: {}, COMPANION_STORY_PANEL_STYLE: panel },
   }, { setInterval, clearInterval });
   const Cards = module.StepplingActions as React.ComponentType<Record<string, unknown>>;
@@ -106,21 +108,18 @@ test('Steppling keeps the claimed row through its flight, restores Garden naviga
   assert.equal(garden.props.storyRequests[0].id, 'order-one');
   await act(async () => garden.props.onOpenMerge('order-one'));
   assert.deepEqual(opened, ['order-one']);
-  for (const chat of STEPPLING_TRAIL_CHATS.slice(0, 1)) {
-    await press(chat.title);
+  for (const chat of STEPPLING_SCENARIO_POLLS.slice(0, 1)) {
+    await press(chat.title!);
     assert.equal(tree!.root.findAllByType('Choices' as React.ElementType).length, 0, 'no bespoke chat panel');
-    const definition = STEPPLING_TRAIL_CONVERSATIONS.find((item) => item.id === definitionId)!;
+    assert.equal(definitionId, `steppling:poll:${chat.id}`, 'the daily question is a scenario poll');
+    const definition = companionConversationDefinitionById.get(definitionId)!;
     let session = createConversationSession({ definition, dayId: '2026-09-04', formId: 'steppling' as never, actionOrigin: origin! });
-    session = answerConversation(session, definition, chat.options[0].id).session;
-    session = continueConversation(session, definition);
-    assert.equal(session.currentNodeId, 'insight');
-    assert.equal(session.insightResult?.summary, chat.options[0].insight);
-    assert.equal(session.status, 'active');
-    session = continueConversation(session, definition);
-    assert.equal(session.currentNodeId, 'finish');
+    const poll = definition.nodes.find((node) => node.kind === 'poll')!;
+    assert.ok(poll.kind === 'poll');
+    session = answerConversation(session, definition, poll.options[0]!.id).session;
+    assert.ok(session.pollResult, 'the village answers too');
+    for (let guard = 0; session.status === 'active' && guard < 6; guard += 1) session = continueConversation(session, definition);
     assert.equal(session.status, 'completed', 'the normal end page owns the return to the action board');
-    session = continueConversation(session, definition);
-    assert.equal(session.status, 'completed');
     sessions.push(session);
     relationships = commitActionCompletion(relationships, actionCommandFromOrigin(origin!, Date.now()));
     const completion = relationships.actionCompletions.at(-1)!;
@@ -135,9 +134,9 @@ test('Steppling keeps the claimed row through its flight, restores Garden naviga
     assert.equal(relationships.actionPresentations.at(-1)?.status, 'dismissed');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 380)));
   }
-  assert.equal(tree!.root.findAllByType('Card' as React.ElementType).some((card) => card.props.title === STEPPLING_TRAIL_CHATS[0].title), false);
+  assert.equal(tree!.root.findAllByType('Card' as React.ElementType).some((card) => card.props.title === STEPPLING_SCENARIO_POLLS[0].title), false);
   await act(async () => { tree!.unmount(); tree = create(<Cards {...props} />); });
-  assert.equal(tree!.root.findAllByType('Card' as React.ElementType).some((card) => card.props.title === STEPPLING_TRAIL_CHATS[0].title), false, 'completed conversation stays gone after reopening');
+  assert.equal(tree!.root.findAllByType('Card' as React.ElementType).some((card) => card.props.title === STEPPLING_SCENARIO_POLLS[0].title), false, 'completed conversation stays gone after reopening');
   assert.equal(row().props.title, 'Walk 2,000 steps');
   await act(async () => tree!.unmount());
 });

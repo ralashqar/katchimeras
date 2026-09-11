@@ -1,7 +1,11 @@
 import { STEPPLING_TRAIL_CONVERSATIONS } from '@/constants/steppling-activities';
+import { STEPPLING_SCENARIO_POLLS } from '@/constants/steppling-scenario-polls';
+import { mossproutTheoryConversationDefinitions } from '@/constants/mossprout-theory-conversations';
+import { spokenAnswerText } from '@/utils/companion-conversation';
 import type {
   ConversationDefinition,
   ConversationOption,
+  ConversationPollSeed,
   ConversationProfileQuestion,
   ConversationV2FamilyId,
 } from '@/types/companion-conversation';
@@ -32,7 +36,9 @@ export type LegacyStorySeed = JournalSeed & {
   followOptions: readonly (readonly [string, string, string])[];
 };
 
-type PollSeed = { id: string; prompt: string; labels: readonly [string, string, string] };
+type PollSeed = ConversationPollSeed;
+/** Fictional village splits by answer count; rotated per poll so the same slot does not always win. */
+const POLL_WEIGHTS: Readonly<Record<number, readonly number[]>> = { 2: [58, 42], 3: [42, 34, 24], 4: [36, 28, 21, 15], 5: [30, 24, 19, 15, 12] };
 
 const endNode = (message: string) => ({ id: 'end', kind: 'end' as const, message });
 const options = (
@@ -45,31 +51,38 @@ function poll(
   seed: PollSeed,
   index: number
 ): ConversationDefinition {
-  const pollOptions = seed.labels.map((label, optionIndex) => ({
-    id: `choice-${optionIndex + 1}`,
-    label,
-    reply: optionIndex === 0
-      ? `I thought ${label.toLowerCase()} might win you over.`
-      : optionIndex === 1
-        ? `A good choice. ${label} has a loyal little corner of the village.`
-        : `You picked ${label.toLowerCase()}. I like the less obvious answer.`,
-    nextNodeId: 'end',
-    villageWeight: [42, 34, 24][(optionIndex + index) % 3]!,
-  }));
+  const weights = POLL_WEIGHTS[seed.labels.length] ?? POLL_WEIGHTS[3]!;
+  const pollOptions = seed.labels.map((label, optionIndex) => {
+    const traits = seed.traits?.[optionIndex];
+    const spokenText = spokenAnswerText(label);
+    return {
+      id: `choice-${optionIndex + 1}`,
+      label,
+      ...(spokenText ? { spokenText } : {}),
+      reply: seed.replies?.[optionIndex] ?? (optionIndex === 0
+        ? `I thought ${label.toLowerCase()} might win you over.`
+        : optionIndex === 1
+          ? `A good choice. ${label} has a loyal little corner of the village.`
+          : `You picked ${label.toLowerCase()}. I like the less obvious answer.`),
+      nextNodeId: 'end',
+      villageWeight: weights[(optionIndex + index) % weights.length]!,
+      ...(traits ? { traits } : {}),
+    };
+  });
   return {
     id: `${familyId}:poll:${seed.id}`,
     version: 2,
     familyId,
-    title: seed.prompt,
+    title: seed.title ?? seed.prompt,
     trigger: 'poll',
-    minimumBondLevel: 1,
+    minimumBondLevel: seed.bond ?? 1,
     cooldownDays: 14,
     tags: ['play', 'preferences'],
     format: 'poll',
     entryNodeId: 'poll',
     nodes: [
-      { id: 'poll', kind: 'poll', prompt: seed.prompt, helperText: 'Pick quickly. The village result is just for fun.', options: pollOptions, nextNodeId: 'end' },
-      endNode('That one belongs in the village ledger now.'),
+      { id: 'poll', kind: 'poll', prompt: seed.prompt, helperText: seed.replies ? 'The village answers too. Just for fun.' : 'Pick quickly. The village result is just for fun.', options: pollOptions, nextNodeId: 'end' },
+      endNode(seed.ending ?? 'That one belongs in the village ledger now.'),
     ],
   };
 }
@@ -847,9 +860,7 @@ const BARISTA_POLLS: readonly PollSeed[] = ([
   ['first', 'The first drink of the day should be…', ['Reliable', 'Strong', 'Slow']], ['cup', 'Pick the cup.', ['Favourite mug', 'Tiny cafe cup', 'Tall cold glass']], ['milk', 'Choose the finish.', ['No milk', 'A little', 'Cloud-like']], ['sweet', 'Choose the sweetness.', ['None', 'A hint', 'Dessert-level']], ['seat', 'Choose the cafe seat.', ['Window', 'Corner', 'Counter']], ['sound', 'Choose the background.', ['Quiet', 'Soft music', 'Busy chatter']], ['order', 'How do you order?', ['The usual', 'Seasonal special', 'Ask for a surprise']], ['tea', 'Tea should be…', ['Dark and strong', 'Fresh and green', 'Herbal and soft']], ['coffee', 'Coffee should be…', ['Short and bold', 'Milky and gentle', 'Cold and bright']], ['bubbles', 'Bubble tea mood?', ['Fruit tea', 'Milk tea', 'No bubbles today']], ['time', 'Best drink hour?', ['Early morning', 'Afternoon pause', 'Late evening']], ['weather', 'Rainy-day cup?', ['Coffee', 'Tea', 'Hot chocolate']], ['summer', 'Hot-day rescue?', ['Iced coffee', 'Iced tea', 'Something fruity']], ['share', 'A shared drink needs…', ['Good conversation', 'A treat beside it', 'Plenty of time']], ['home', 'Home ritual essential?', ['A good kettle', 'A favourite method', 'The right mug']], ['cafe-food', 'Cafe companion?', ['Pastry', 'Toast', 'Nothing']], ['new', 'Try one unusual note.', ['Floral', 'Spiced', 'Smoky']], ['pace', 'How long should the pause last?', ['Five minutes', 'Half an hour', 'Lose track of time']], ['walk', 'Drink destination?', ['Neighbourhood cafe', 'Park kiosk', 'Kitchen']], ['temperature', 'Absolute loyalty?', ['Always hot', 'Always cold', 'Season decides']], ['foam', 'Foam opinion?', ['Essential', 'Nice extra', 'No thank you']], ['ritual', 'The ritual is mostly about…', ['Beginning', 'Stopping', 'Connecting']], ['refill', 'Second cup?', ['Obviously', 'Sometimes', 'One is enough']], ['last', 'The last sip should be…', ['Still hot', 'Long forgotten', 'Saved for later']],
 ] as const).map(([id, prompt, labels]) => ({ id, prompt, labels }));
 
-const STEPPLING_POLLS: readonly PollSeed[] = ([
-  ['pace', 'Choose the pace.', ['Stroll', 'Steady', 'Fast']], ['route', 'Choose the route.', ['Familiar', 'One detour', 'Entirely new']], ['ground', 'Choose the ground.', ['Pavement', 'Park path', 'Trail']], ['company', 'Choose the company.', ['Solo', 'One person', 'A group']], ['sound', 'Choose the sound.', ['The world', 'Music', 'Podcast']], ['distance', 'Choose the distance.', ['One block', 'A proper loop', 'All-day route']], ['weather', 'Choose the weather.', ['Sun', 'Light rain', 'Crisp cold']], ['time', 'Choose the hour.', ['Dawn', 'Afternoon', 'Evening']], ['destination', 'Choose the destination.', ['A drink', 'A view', 'Nowhere']], ['hill', 'A hill appears.', ['Avoid it', 'Accept it', 'Race it']], ['map', 'Navigation style?', ['Know the route', 'Check sometimes', 'Wander']], ['shoes', 'Route priority?', ['Comfort', 'Speed', 'Grip']], ['city', 'City walk detail?', ['Architecture', 'People', 'Hidden corners']], ['nature', 'Trail detail?', ['Trees', 'Water', 'Wide views']], ['break', 'Mid-route pause?', ['Never', 'Quick stop', 'Long sit']], ['return', 'Come home by…', ['Same way', 'A loop', 'Transit']], ['errand', 'Best useful walk?', ['Groceries', 'Coffee', 'Visiting']], ['photo', 'Stop for a photo?', ['Often', 'Only special ones', 'Keep moving']], ['steps', 'Numbers after the walk?', ['Show me', 'A glance', 'Do not care']], ['rain', 'Rain equipment?', ['Umbrella', 'Good coat', 'Stay in']], ['run', 'Running rhythm?', ['Run-walk', 'Steady', 'Intervals']], ['hike', 'Trail reward?', ['Summit', 'Picnic', 'The route itself']], ['thought', 'Walking is best for…', ['Thinking', 'Not thinking', 'Talking']], ['end', 'Best ending?', ['Tired', 'Energised', 'Calm']],
-] as const).map(([id, prompt, labels]) => ({ id, prompt, labels }));
+// Steppling's daily questions are scenarios, authored in constants/steppling-scenario-polls.ts.
 
 const FLEXEL_POLLS: readonly PollSeed[] = ([
   ['start', 'Best way to start?', ['Warm-up ritual', 'Favourite movement', 'Just begin']], ['space', 'Choose the space.', ['Gym', 'Home', 'Outside']], ['style', 'Choose the style.', ['Strength', 'Cardio', 'Mobility']], ['company', 'Choose the company.', ['Solo', 'Partner', 'Team']], ['music', 'Training soundtrack?', ['Silence', 'One playlist', 'Maximum energy']], ['length', 'Ideal session?', ['Ten minutes', 'Forty minutes', 'Long and varied']], ['progress', 'Best progress sign?', ['More weight', 'Better skill', 'Returning']], ['sport', 'Sport is mostly about…', ['Competition', 'Skill', 'Play']], ['court', 'Choose the court.', ['Basketball', 'Tennis', 'No court']], ['cardio', 'Choose the cardio.', ['Steady rhythm', 'Intervals', 'Dance']], ['mobility', 'Mobility moment?', ['Morning', 'Warm-up', 'Recovery']], ['rest', 'Recovery priority?', ['Sleep', 'Food and water', 'Gentle movement']], ['numbers', 'Training numbers?', ['All of them', 'A few', 'Go by feel']], ['coach', 'Best coaching voice?', ['Direct', 'Encouraging', 'Curious']], ['challenge', 'Choose the challenge.', ['Heavier', 'Longer', 'More precise']], ['team', 'Team role?', ['Lead', 'Support', 'Adapt']], ['racket', 'Racket joy?', ['Serve', 'Rally', 'Match']], ['basketball', 'Court joy?', ['Shooting', 'Passing', 'Defence']], ['gym', 'Gym favourite?', ['Free weights', 'Machines', 'Open floor']], ['finish', 'Best finish?', ['One last effort', 'Cool down', 'Stop on a high']], ['weather', 'Outdoor training weather?', ['Clear', 'Cool', 'Light rain']], ['energy', 'Low-energy choice?', ['Rest', 'Mobility', 'Tiny session']], ['skill', 'Practise by…', ['Repeating', 'Playing', 'Watching then trying']], ['after', 'Afterwards I want…', ['Energy', 'Pride', 'Calm']],
@@ -928,10 +939,11 @@ export const companionConversationDefinitionsV2: readonly ConversationDefinition
   ...mossproutCampaignConversationDefinitions,
   ...ALL_ISLAND_CAMPAIGN_CONVERSATION_DEFINITIONS,
   ...mossproutStoryConversationDefinitions,
+  ...mossproutTheoryConversationDefinitions,
   ...familyPack('baristabbit', BARISTA_POLLS, BARISTA_PROFILE),
   ...baristabbitStoryConversationDefinitions,
   ...journeyCohortStoryConversationDefinitions,
-  ...familyPack('steppling', STEPPLING_POLLS, STEPPLING_PROFILE),
+  ...familyPack('steppling', STEPPLING_SCENARIO_POLLS, STEPPLING_PROFILE),
   ...familyPack('flexel', FLEXEL_POLLS, FLEXEL_PROFILE),
   ...authoredFamilyConversationDefinitions,
   feastleFirstMeetingConversationDefinition,

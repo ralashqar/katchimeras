@@ -196,17 +196,17 @@ test('the Egg asks two meaningful real-life questions before Hatch', () => {
   assert.equal(step?.actions[0]?.handlerId, 'player_profile');
   assert.equal(step?.actions[0]?.options?.length, 5);
   assert.equal(mossproutFtueAction('egg.opening', 'egg.day_texture')?.nextStepId, 'egg.context');
-  assert.equal(step?.actions[0]?.title, 'How was your day, honestly?');
+  assert.equal(step?.actions[0]?.title, 'If today were weather over this garden, what was it?');
   assert.deepEqual(step?.actions[0]?.options?.map((option) => option.label), [
-    'Radiant', 'Light', 'Meh', 'Heavy', 'Stormy',
+    'Full sun', 'Mostly bright', 'Grey and still', 'Heavy rain', 'A proper storm',
   ]);
   const desiredHelp = mossproutFtueStep('egg.context')?.actions[0];
   assert.equal(desiredHelp?.id, 'egg.desired_help');
   assert.equal(desiredHelp?.options?.length, 3);
   assert.deepEqual(desiredHelp?.options?.map((option) => option.label), [
-    'A little progress',
-    'A little calm',
-    'I’m not sure yet',
+    'Getting something moving',
+    'A bit of quiet',
+    'Surprise me. I don’t know yet',
   ]);
   assert.equal(desiredHelp?.nextStepId, 'egg.ready');
   const eggSequenceStepIds = ['world.egg_intro', 'egg.opening', 'egg.context', 'egg.ready'];
@@ -257,8 +257,8 @@ test('the first Bond action turns a soft intention into a Seed direction', () =>
   assert.equal(MOSSPROUT_BOND_SHARE_PROMPTS.every((prompt) => prompt.options.length === 3), true);
   assert.equal(MOSSPROUT_SUPPORT_STYLE_OPTIONS.length, 4);
   const selection = mossproutBondShareSelection('desired-help:progress');
-  assert.equal(selection?.prompt.prompt, 'What would help most right now?');
-  assert.equal(selection?.answer.label, 'Making a little progress');
+  assert.equal(selection?.prompt.prompt, 'You get one magical garden plot. What does it grow for you?');
+  assert.equal(selection?.answer.label, 'Something that gets me moving');
   assert.equal(mossproutBondShareSelection('desired-help:energy')?.answer.label, 'Getting some energy back');
   assert.equal(mossproutBondShareSelection('desired-help:good_day')?.answer.label, 'Just having a good day');
   assert.equal(mossproutBondShareSelection('desired-help:not-an-answer'), null);
@@ -560,9 +560,9 @@ test('Mossprout remembers the day, reflects it back, then offers one narrative G
   assert.doesNotMatch(mossproutStage, /eyebrow="MEMORY SEED"|accessibilityLabel="Your memory seed"/);
   assert.doesNotMatch(mossproutStage, /seedName:|seedDescription:|seedEyebrow:/);
   assert.match(mossproutStage, /onContinue=\{\(id\) => onContinue\?\.\(id\)\}/);
-  assert.match(bondShare, /What would help most right now\?/);
-  assert.match(bondShare, /Making a little progress[\s\S]*?Finding a little calm[\s\S]*?Feeling more like myself/);
-  assert.match(bondShare, /Give me one small thing to try[\s\S]*?Help me think it through[\s\S]*?Give me a push[\s\S]*?Mostly just keep me company/);
+  assert.match(bondShare, /You get one magical garden plot\. What does it grow for you\?/);
+  assert.match(bondShare, /Something that gets me moving[\s\S]*?Somewhere quiet to sit[\s\S]*?Something that feels like me again/);
+  assert.match(bondShare, /Point at the next step[\s\S]*?Talk it through with me[\s\S]*?A push[\s\S]*?Just walk with me/);
   assert.match(mossproutStage, /ref=\{actionStackTargetRef\}[\s\S]*?style=\{styles\.bondChoiceStack\}/);
   assert.match(companionRoute, /stepId === 'companion\.bond_spotlight' \|\| ftueRun\.stepId === 'companion\.day_one_action'[\s\S]*?\? 'bond_choice'/);
   assert.match(interaction, /activeBondQuestionId=\{ftueBondQuestionId\}[\s\S]*?onBondQuestionChange=\{setFtueBondQuestionId\}/);

@@ -656,6 +656,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Restart first-session onboarding · keep profile" onPress={handleRestartFirstSession} variant="primary" />
                 <KatchaButton label="Profile Snapshots" onPress={() => router.push('/dev-profile-snapshots' as Href)} variant="primary" />
                 <KatchaButton label="Content Flow Inspector" onPress={() => router.push('/dev-content-flow' as Href)} variant="secondary" />
+                <KatchaButton label="Question Lab" onPress={() => router.push('/dev-question-lab' as Href)} variant="secondary" />
                 <KatchaButton label={currencyToolsOpen ? 'Hide currency tools' : 'Currency tools'} onPress={() => setCurrencyToolsOpen((open) => !open)} variant="primary" />
                 {currencyToolsOpen ? <View style={styles.journeyTools}>
                   <View style={styles.devToggleCopy}>

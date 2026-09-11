@@ -31,7 +31,7 @@ export const STEPPLING_DAY_ONE_FLOW = defineStory({
     { id: 'reflection', kind: 'scene', capability: 'journey.reflection', surface: 'companion', sceneId: 'reflection',
       payload: { text: STEPPLING_DAY_ONE_OPENING, options: STEPPLING_DAY_ONE_CHOICES },
       actions: STEPPLING_DAY_ONE_CHOICES.map(({ id, label }) => ({ id, next: `handoff.${id}`,
-        set: { movementChoice: id, 'fact.reflection': `You chose “${label}”.` } })) },
+        set: { movementChoice: id, 'fact.reflection': `You chose “${label.replace(/^\S+\s+/, '')}”.` } })) },
     ...STEPPLING_DAY_ONE_CHOICES.map(({ id }) => ({ id: `handoff.${id}`, kind: 'scene' as const,
       capability: 'journey.reflection', surface: 'companion' as const, sceneId: `handoff.${id}`,
       payload: { text: STEPPLING_DAY_ONE_HANDOFFS[id], options: [{ id: 'garden', label: 'Tend garden' }] },

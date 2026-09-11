@@ -20,10 +20,12 @@ import { DayActionCardSurface, DayActionIcon, DayActionRewardChip, DayActionComp
 import { lifeHabitById, type LifeCompanionFamily } from '@/constants/companion-life-content';
 import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
 import { localDayId } from '@/utils/world-identity';
-import { journalSummary, selectedStoryHabit } from '@/utils/companion-life';
+import { journalSummary, scenarioJournalEntry, selectedStoryHabit } from '@/utils/companion-life';
 import { acceptDailyStoryHabit, editCompanionMoment, loadCompanionLife, rememberCompanionMoment, subscribeCompanionLife } from '@/utils/companion-life-storage';
 import { loadCompanionQuickGoalState } from '@/utils/companion-quick-goal-storage';
 import { loadCompanionContentState } from '@/utils/companion-content-storage';
+import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
+import { conversationTraitPortrait, conversationTraitTally } from '@/utils/companion-conversation';
 
 const families: readonly LifeCompanionFamily[] = ['mossprout', 'steppling'];
 const ink = '#352F23';
@@ -94,6 +96,12 @@ function CompanionJournalSheet({ familyId, onClose, onVisitSeed }: { familyId: L
       if (insight.familyId !== 'mossprout' && insight.familyId !== 'steppling') continue;
       rememberCompanionMoment({ id: `insight:${insight.id}`, familyId: insight.familyId, title: insight.title, kind: 'conversation', createdAt: insight.discoveredAt, updatedAt: insight.updatedAt, facts: { insight: insight.summary } });
     }
+    // Answers given before this journal learned to keep them, and any the day's hand-off missed.
+    for (const session of loadCompanionContentState().conversationSessions) {
+      const definition = companionConversationDefinitionById.get(session.definitionId);
+      const entry = definition ? scenarioJournalEntry(session, definition) : null;
+      if (entry) rememberCompanionMoment(entry);
+    }
     for (const cycle of relationshipProgressionRepository.load().journeyCycles ?? []) {
       if (cycle.returnedAt == null || cycle.migrated || (cycle.familyId !== 'mossprout' && cycle.familyId !== 'steppling')) continue;
       rememberCompanionMoment({ id: `keepsake:${cycle.id}`, familyId: cycle.familyId, title: cycle.title, kind: 'chapter', createdAt: cycle.returnedAt, updatedAt: cycle.returnedAt, facts: { keepsake: cycle.finale ? 'We reached the end of this chapter together.' : 'A keepsake from our journey together.' } });
@@ -108,6 +116,8 @@ function CompanionJournalSheet({ familyId, onClose, onVisitSeed }: { familyId: L
   useEffect(() => subscribeCompanionLife(() => setState(loadCompanionLife())), []);
   const goals = loadCompanionQuickGoalState();
   const entries = state.entries.filter((entry) => entry.removedAt == null && (filter === 'all' || entry.familyId === filter)).sort((a, b) => b.createdAt - a.createdAt);
+  // Drawn from every scenario answered so far, across both friends: the journal's map of who the player is.
+  const portrait = conversationTraitPortrait(conversationTraitTally(loadCompanionContentState().conversationSessions, companionConversationDefinitionById));
 
   const modify = (id: string, update: Parameters<typeof editCompanionMoment>[1]) => {
     try { editCompanionMoment(id, update); setEditing(null); setError(null); } catch { setError('Your change could not be saved. Please try again.'); }
@@ -117,6 +127,7 @@ function CompanionJournalSheet({ familyId, onClose, onVisitSeed }: { familyId: L
       <View style={{ padding: 16, gap: 10 }}>
         <ThemedText accessibilityRole="header" lightColor={ink} darkColor={ink} style={{ fontSize: 25, fontWeight: '700' }}>Journal</ThemedText>
         <JournalCopy>Saved from our conversations. You can edit or remove any entry.</JournalCopy>
+        {portrait.length ? <JournalCopy>{`So far, you’re someone who ${portrait.join(', ')}.`}</JournalCopy> : null}
         <KatchaButton label="Close Journal" onPress={onClose} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{(['all', ...families] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: filter === value }} onPress={() => { setFilter(value); setEditing(null); }} style={{ padding: 10, minHeight: 44, borderRadius: 12, backgroundColor: filter === value ? '#DDE9C5' : '#F4E9CF' }}><JournalCopy>{value === 'all' ? 'All companions' : value === 'mossprout' ? 'Mossprout' : 'Steppling'}</JournalCopy></Pressable>)}</View>
       </View>

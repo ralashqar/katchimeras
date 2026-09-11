@@ -137,8 +137,8 @@ test('Petalimp choices play as dialogue and the finale resolves the accumulated 
   finalSession = answerConversation(finalSession, finalDefinition, 'see-growth-insight', NOW + 1).session;
   assert.equal(finalSession.currentNodeId, 'insight');
   assert.equal(finalSession.insightResult?.resultId, 'gentle-grower');
-  assert.match(finalSession.insightResult?.reflection ?? '', /small, kind next step/);
-  assert.deepEqual(finalSession.insightResult?.supportingTraits, ['We began with small steps']);
+  assert.match(finalSession.insightResult?.reflection ?? '', /One small flower at a time/);
+  assert.deepEqual(finalSession.insightResult?.supportingTraits, ['We went small']);
   finalSession = continueConversation(finalSession, finalDefinition, NOW + 2);
   assert.equal(finalSession.currentNodeId, 'end');
 });

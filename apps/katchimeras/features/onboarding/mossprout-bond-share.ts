@@ -28,21 +28,21 @@ export const MOSSPROUT_BOND_SHARE_PROMPTS = [
     id: 'desired-help',
     cardLabel: 'What would help',
     icon: 'leaf.fill',
-    prompt: 'What would help most right now?',
+    prompt: 'You get one magical garden plot. What does it grow for you?',
     reply: 'Good. We do not have to grow a whole forest today.',
     options: [
-      { id: 'progress', icon: 'leaf.fill', label: 'Making a little progress', reply: 'Then we will begin with one small, living thing.' },
-      { id: 'calm', icon: 'wind', label: 'Finding a little calm', reply: 'Then let us make a little room for quiet.' },
-      { id: 'feel_like_myself', icon: 'sun.max.fill', label: 'Feeling more like myself', reply: 'Then let us grow a little more light for whatever today needs.' },
+      { id: 'progress', icon: 'leaf.fill', label: 'Something that gets me moving', reply: 'Then we will begin with one small, living thing.' },
+      { id: 'calm', icon: 'wind', label: 'Somewhere quiet to sit', reply: 'Then let us make a little room for quiet.' },
+      { id: 'feel_like_myself', icon: 'sun.max.fill', label: 'Something that feels like me again', reply: 'Then let us grow a little more light for whatever today needs.' },
     ],
   },
 ] as const satisfies readonly MossproutBondSharePrompt[];
 
 export const MOSSPROUT_SUPPORT_STYLE_OPTIONS = [
-  { id: 'tiny_step', icon: 'leaf.fill', label: 'Give me one small thing to try', reply: 'Small is good. Tiny roots still count.' },
-  { id: 'reflect', icon: 'bubble.left.fill', label: 'Help me think it through', reply: 'Oh, good. I like thinking. Possibly too much.' },
-  { id: 'push', icon: 'bolt.fill', label: 'Give me a push', reply: 'All right. I can be surprisingly stern for something this leafy.' },
-  { id: 'company', icon: 'heart.fill', label: 'Mostly just keep me company', reply: 'I can do that. We do not always need to turn everything into a project.' },
+  { id: 'tiny_step', icon: 'leaf.fill', label: 'Point at the next step', reply: 'Small is good. Tiny roots still count.' },
+  { id: 'reflect', icon: 'bubble.left.fill', label: 'Talk it through with me', reply: 'Oh, good. I like thinking. Possibly too much.' },
+  { id: 'push', icon: 'bolt.fill', label: 'A push', reply: 'All right. I can be surprisingly stern for something this leafy.' },
+  { id: 'company', icon: 'heart.fill', label: 'Just walk with me', reply: 'I can do that. We do not always need to turn everything into a project.' },
 ] as const;
 
 export const MOSSPROUT_WATER_TOGETHER_OPTIONS = MOSSPROUT_WATER_OPTIONS;

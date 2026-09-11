@@ -68,12 +68,12 @@ test('Fernip’s boards grow with the grove and only ever ask for what the Locke
   }
 });
 
-test('Fernip keeps prices out of his mouth, remembers the previous answer, and speaks of the Mist in every stage', () => {
+test('Fernip keeps prices out of his mouth, remembers the previous answer, and sets every stage against the Mist', () => {
   for (const chapter of fernip.chapters) {
-    assert.match(chapter.prompt, /Mist/, `level ${chapter.level} sets its scene in the Mist`);
+    assert.match(chapter.prompt, /Mist|\bthem\b|\bthey\b/, `level ${chapter.level} sets its scene against the Mist (by name, or as "them")`);
     for (const choice of chapter.choices) {
       assert.doesNotMatch(choice.returnLine, /\d+ Glow/, `${choice.id} leaves the cost to the panel`);
-      assert.match(choice.returnLine, /Mist/, `${choice.id} tells the player the delivery frees the Mist`);
+      assert.match(choice.returnLine, /(^|\. )Set (it|them) /, `${choice.id} tells the player to set the delivery down`);
     }
     if (chapter.level === 1) {
       assert.equal(chapter.callbackLine, undefined);

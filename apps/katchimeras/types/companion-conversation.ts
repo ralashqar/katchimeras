@@ -34,9 +34,38 @@ export type ConversationTransition =
   | { kind: 'pool'; poolId: string }
   | { kind: 'continuation'; destination?: 'menu' | 'memory' };
 
+/**
+ * What a projective answer quietly measures. Scenario questions ("a path off
+ * the trail isn't on the map") tag one or two of these per answer; they are
+ * tallied across answered turns, never shown as a score, and ground later
+ * insights in what the player actually chose.
+ */
+export type ConversationTraitId =
+  | 'spontaneity' | 'planning' | 'curiosity' | 'caution' | 'social' | 'solitude' | 'rest' | 'making'
+  | 'ambition' | 'resilience' | 'overthinking' | 'optimism' | 'routine' | 'novelty' | 'avoidance'
+  | 'support_listen' | 'support_fix' | 'support_cheer' | 'support_stay';
+export type ConversationTraitTags = Partial<Record<ConversationTraitId, 1 | 2>>;
+
+/** One daily scenario poll, authored as data: the prompt, its answers, the friend's reply to each, and what each quietly tags. */
+export type ConversationPollSeed = {
+  id: string;
+  prompt: string;
+  /** Short card title; the prompt when absent. */
+  title?: string;
+  /** Two to five answers. */
+  labels: readonly string[];
+  /** The friend's reply per answer; a generic reply when absent. */
+  replies?: readonly string[];
+  traits?: readonly (ConversationTraitTags | null)[];
+  ending?: string;
+  bond?: 1 | 2 | 3 | 4;
+};
+
 export type ConversationOption = {
   /** Optional natural spoken wording; otherwise the exact choice label is used. */
   spokenText?: string;
+  /** What choosing this quietly tags; see ConversationTraitId. */
+  traits?: ConversationTraitTags;
   id: string;
   label: string;
   reply: string;

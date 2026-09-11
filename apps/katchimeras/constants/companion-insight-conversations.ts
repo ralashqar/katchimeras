@@ -5,6 +5,7 @@ import type {
   ConversationProfileQuestion,
   ConversationV2FamilyId,
 } from '@/types/companion-conversation';
+import { spokenAnswerText } from '@/utils/companion-conversation';
 
 type Answer = readonly [id: string, label: string, reply: string];
 type Question = readonly [
@@ -15,7 +16,10 @@ type Question = readonly [
 ];
 type Result = ConversationInsightResultDefinition;
 
-const option = ([id, label, reply]: Answer): ConversationOption => ({ id, label, reply, nextNodeId: null });
+const option = ([id, label, reply]: Answer): ConversationOption => {
+  const spokenText = spokenAnswerText(label);
+  return { id, label, reply, nextNodeId: null, ...(spokenText ? { spokenText } : {}) };
+};
 const question = ([id, prompt, answers, promptByPriorOptionId]: Question): ConversationProfileQuestion => ({
   id,
   prompt,
@@ -247,39 +251,62 @@ const flexelRecoveryLanguage = fourAxisFlow({
   ],
 });
 
+/**
+ * A scenario flow: five tiny situations, three ways to meet each, one axis per
+ * way. The player answers a story, not a questionnaire; the result is what
+ * their five instincts had in common.
+ */
+function scenarioFlow(input: {
+  familyId: 'steppling' | 'flexel'; id: string; title: string; category: string; tags: readonly string[];
+  axis: readonly [string, string, string];
+  questions: readonly [id: string, prompt: string, answers: readonly [readonly [string, string], readonly [string, string], readonly [string, string]]][];
+  summaries: readonly [readonly [string, string, string], readonly [string, string, string], readonly [string, string, string]];
+}): ConversationDefinition {
+  const questions: Question[] = input.questions.map(([id, prompt, answers]) => [id, prompt, answers.map(([label, reply], axisIndex) => [`${input.id}-${id}-${axisIndex}`, label, reply])]);
+  const results = input.axis.map((axis, axisIndex): Result => ({
+    id: input.summaries[axisIndex]![0],
+    title: axis,
+    reflection: input.summaries[axisIndex]![1],
+    summary: input.summaries[axisIndex]![2],
+    emblemId: `${input.familyId}-${input.id}-${axisIndex}`,
+    matchOptionIds: input.questions.map(([id]) => `${input.id}-${id}-${axisIndex}`),
+  }));
+  return insightGame({ familyId: input.familyId, id: input.id, title: input.title, category: input.category, tags: input.tags, questions, results });
+}
+
 const stepplingFlows = [
-  movementFlow({ familyId: 'steppling', id: 'route-instinct', title: 'Find your route instinct', category: 'Routes', tags: ['route', 'exploration'], axis: ['The Familiar Pathfinder', 'The Purposeful Traveller', 'The Curious Detour'], questions: [
-    ['start', 'What gets you out of the door?', ['A route I already trust', 'Having somewhere useful to reach', 'Wondering what is around the next turn']],
-    ['map', 'How much should the map decide?', ['Enough to keep things comfortable', 'Enough to get me there efficiently', 'As little as possible']],
-    ['turn', 'An unfamiliar turning appears. What is the pull?', ['Save it for another day', 'Take it if it still serves the destination', 'Take it because it is unfamiliar']],
-    ['reward', 'What makes the route worth repeating?', ['It reliably clears my head', 'It fits naturally into real life', 'It keeps revealing something new']],
-    ['ending', 'How should arriving feel?', ['Like returning to myself', 'Like completing something useful', 'Like coming home with a story']],
+  scenarioFlow({ familyId: 'steppling', id: 'setting-out', title: 'How you set out', category: 'Routes', tags: ['route', 'exploration'], axis: ['The Straight-In', 'The Look-First', 'The Bring-Someone'], questions: [
+    ['path', 'A path off the trail isn’t on the map.', [['👀 I’m already halfway down it', 'Halfway down already. I’ll catch up.'], ['🧭 I check where it goes first', 'Check first, then go. That’s how you get back for tea.'], ['👥 Only if someone comes with me', 'Company makes a path braver.']]],
+    ['box', 'A box on the trail, marked OPEN WHEN READY.', [['📦 Open it now', 'Open. Ready is a state of mind.'], ['👀 Shake it, weigh it, then decide', 'Science first. Then opening.'], ['👥 Ask who else has seen it', 'A box is more fun with witnesses.']]],
+    ['circle', 'A map with one place circled and no explanation.', [['🏃 I go', 'You go. I’m lacing up.'], ['🔎 I find out what’s there first', 'Maps can lie. Worth a look before the walk.'], ['👥 I bring a friend', 'Circles are better shared.']]],
+    ['stranger', 'A stranger says the best view is off the marked path.', [['🔥 I’m gone', 'Gone. Leave a note for the rest of us.'], ['🤔 I ask how far, and how safe', 'How far, how safe. Then probably gone.'], ['👯 I’d go if they came too', 'You’d go with a guide. Sensible and sociable.']]],
+    ['fork', 'The trail forks. One way is signposted, one isn’t.', [['🌲 The unsigned one, obviously', 'Unsigned. Obviously.'], ['🪧 The signed one, then maybe the other', 'Signed first. The other one will keep.'], ['👣 Whichever the people ahead took', 'Follow the footprints. Paths are made by company.']]],
   ], summaries: [
-    ['familiar', 'You use familiar routes as dependable mental space. Knowing the ground frees your attention to breathe.', 'Trusted paths are not boring to you; they are reliable containers for headspace. You value routes that feel comfortable enough to repeat and restorative enough to matter.'],
-    ['purpose', 'Movement comes alive for you when it belongs to real life and carries you somewhere that matters.', 'You are a destination-led mover who likes usefulness, efficiency, and the satisfaction of arriving. The best route earns its place by fitting naturally into your day.'],
-    ['detour', 'A route becomes memorable when it reveals something you did not plan to find.', 'Curiosity is a genuine movement fuel for you. Unfamiliar turns, light navigation, and returning with a story matter more than perfect efficiency.'],
+    ['straight-in', 'You set out first and find out on the way.', 'Given a path, a box, or a circle on a map, your instinct is to move. You trust that the route will explain itself once you are on it, and it usually does. The thing to watch is only that you tell someone where you went.'],
+    ['look-first', 'You like to know the ground before you give it your feet.', 'Curiosity is there every time, but it waits for a quick check first: how far, how safe, what is in the box. That is not hesitation. It is how you get to go more often and get home for tea.'],
+    ['bring-someone', 'A path gets braver with company, and so do you.', 'You will take the unmapped path, the circled place, the stranger’s view. You would just rather not take them alone. Company is not a condition for you; it is what makes the going good.'],
   ] }),
-  movementFlow({ familyId: 'steppling', id: 'movement-gift', title: 'What does movement give you?', category: 'Wellbeing', tags: ['headspace', 'pace'], axis: ['The Clearer Mind', 'The Living Spark', 'The Walking Conversation'], questions: [
-    ['need', 'What usually needs to change before you move?', ['My thoughts feel crowded', 'My energy feels flat', 'I feel disconnected or stuck inside']],
-    ['during', 'When does the route begin working?', ['When my thoughts fall into order', 'When my body finds a rhythm', 'When I notice or talk to someone']],
-    ['without', 'What do you miss most when movement disappears?', ['Thinking space', 'Momentum and physical aliveness', 'Contact with people and the outside world']],
-    ['best', 'What is the best surprise after moving?', ['A problem feels simpler', 'I have more energy than I expected', 'I feel part of the world again']],
-    ['return', 'What should come home with you?', ['Clarity', 'A spark', 'Connection']],
+  scenarioFlow({ familyId: 'steppling', id: 'free-day', title: 'What a free day is for', category: 'Wellbeing', tags: ['headspace', 'pace'], axis: ['The Quiet Corner', 'The Maker', 'The Wanderer'], questions: [
+    ['first', 'A whole free day, nothing planned. First move?', [['🌿 Somewhere peaceful', 'Trees, no signal, snacks. I’ll come.'], ['🎨 The thing I’ve been meaning to make or do', 'The thing has been waiting. Good.'], ['🗺️ Somewhere I’ve never been', 'Somewhere new. Boots on.']]],
+    ['room', 'A beautiful empty room. What goes in first?', [['🛋️ Somewhere comfortable', 'Comfort first. A room is for sitting in.'], ['🎨 Something that feels like me', 'Something that’s yours. Rooms should know who lives there.'], ['🪟 A window I can leave through', 'A window to leave through. That’s a walker’s room.']]],
+    ['week', 'At the end of a really good week, what happened?', [['🌿 I actually felt calm', 'Calm. Your good weeks have air in them.'], ['✅ I made or finished something', 'Made or finished. Your good weeks have a shape.'], ['🎁 Something unexpected happened', 'Unexpected. Your good weeks have a twist.']]],
+    ['full', 'You can keep one thing permanently full.', [['⏳ My free time', 'Free time. The rarest one.'], ['🔋 My energy for projects', 'Energy for projects. Enough for one more.'], ['🧠 My curiosity', 'Curiosity. Never runs out anyway, but nice.']]],
+    ['hour', 'An hour appears in the middle of the day.', [['🛋️ I sit down properly', 'Sit down properly. An underrated skill.'], ['🔧 I pick up the thing I left half-done', 'Back to the half-done thing. It missed you.'], ['🚶 I go out and see what’s about', 'Out to see what’s about. Same.']]],
   ], summaries: [
-    ['clarity', 'For you, movement is a thinking room with changing scenery. Your mind often finds order after your feet begin.', 'You turn to movement for clarity and mental space. The strongest reward is not distance but returning with simpler thoughts and room around a problem.'],
-    ['spark', 'Movement gives you evidence that energy can be made, not only waited for.', 'Rhythm and physical aliveness are central rewards for you. Even when energy begins low, moving can create the momentum you hoped to find first.'],
-    ['connection', 'A route helps you re-enter the world: through company, noticing, and the feeling of being among other lives.', 'Movement works as connection for you. Conversation, nearby details, and contact with the outside world keep it from feeling like an isolated task.'],
+    ['quiet-corner', 'Free time, for you, is for turning the volume down.', 'Given an empty day, a room, or an hour, you reach for peace first: comfort, quiet, a calmer week. That is not laziness. It is how you refill, and it is worth protecting from the things that would fill it for you.'],
+    ['maker', 'A free hour is a workbench to you.', 'Space shows up and you fill it with the thing you have been meaning to make or finish. Your good weeks have a shape you built. The trick is remembering the walk in between, so the workbench does not become the whole day.'],
+    ['wanderer', 'You spend free time finding out what is out there.', 'The empty day goes somewhere new, the room gets a window to leave through, the good week had a twist. Curiosity is your rest. Just keep a little of it back for the day after.'],
   ] }),
-  movementFlow({ familyId: 'steppling', id: 'natural-pace', title: 'Discover your natural pace', category: 'Pace', tags: ['pace', 'challenge'], axis: ['The Noticing Pace', 'The Steady Rhythm', 'The Earned Horizon'], questions: [
-    ['speed', 'Which pace feels most honest?', ['Slow enough to notice', 'Steady enough to settle into', 'Strong enough to feel the effort']],
-    ['ground', 'Which ground helps that pace?', ['Streets, parks, and nearby details', 'Smooth paths with room for rhythm', 'Trails, hills, and changing terrain']],
-    ['length', 'How long should the route ask of you?', ['A short pocket that is easy to begin', 'Long enough to find flow', 'Long enough to become an expedition']],
-    ['measure', 'Which measure matters?', ['What I noticed', 'Whether I held my rhythm', 'What I reached or overcame']],
-    ['finish', 'Choose the satisfying finish.', ['Calmer and more present', 'Comfortably used', 'Tired with a view or story']],
+  scenarioFlow({ familyId: 'steppling', id: 'when-it-goes-wrong', title: 'When the plan goes wrong', category: 'Pace', tags: ['pace', 'challenge'], axis: ['The Other Way', 'The Slow Recovery', 'The Day-Taker'], questions: [
+    ['closed', 'The route you wanted is closed.', [['🔧 Find another way', 'Another way. There’s always another way.'], ['😤 Be annoyed, then get over it', 'Annoyed, then fine. Honest.'], ['🌊 Shrug and see where the day goes', 'Shrug. Days have their own ideas.']]],
+    ['behind', 'You’ve fallen behind on something important.', [['🌱 Just do one bit', 'One bit. That’s how everything gets done.'], ['💭 Sit with it a while first', 'Sit with it. Then a bit. That works too.'], ['🙈 Tomorrow-me can handle it', 'Tomorrow-you. Leave them a note.']]],
+    ['cant', 'Someone says “You can’t do that.”', [['🧠 I start working out how', 'Figuring out how. Already.'], ['🤔 Maybe they have a point. I’ll think.', 'Maybe they’re right. Listening is underrated.'], ['🍃 Depends whether I cared', 'Depends if you cared. Not every hill.']]],
+    ['rain', 'Rain, halfway out.', [['🧥 Coat on, keep going', 'Coat on. The view is still there.'], ['⛺ Shelter and wait it out', 'Shelter. Rain is a good excuse for a sit.'], ['💦 Get wet. It’s only water.', 'Only water. I like you.']]],
+    ['bother', 'Which bothers you longer?', [['🔧 Not finding the workaround', 'The workaround you missed. It nags.'], ['🌀 How you felt in the moment', 'The feeling. It fades slower than the rain.'], ['🍃 Neither, for long', 'Neither, for long. Enviable.']]],
   ], summaries: [
-    ['notice', 'Your natural pace protects attention. You want enough movement to change the moment without rushing past it.', 'Short, accessible routes and nearby details suit you. Presence and calm are better measures than speed, making this a pace you can return to often.'],
-    ['rhythm', 'You are drawn to the middle distance where repetition becomes flow and the body finds a dependable rhythm.', 'Steady pace, smooth ground, and enough time to settle in create your best movement experience. Consistency feels more satisfying than extremes.'],
-    ['horizon', 'Effort becomes meaningful for you when the ground asks a question and the route eventually answers it.', 'Changing terrain, longer routes, and visible arrival points give your pace purpose. You enjoy returning physically used and carrying evidence of where you went.'],
+    ['other-way', 'A closed route is a puzzle to you, not a verdict.', 'When the plan breaks, you look for the other way through: one bit now, a workaround, a coat. Setbacks cost you time, not confidence. What lingers is a fix you did not find, so it is worth noticing when there was not one to find.'],
+    ['slow-recovery', 'You feel the setback first, then you move.', 'Annoyance, a sit, a think: you let the moment land before you answer it. That is not weakness. It is honesty, and it means the recovery, when it comes, is real. The one thing to watch is the sitting turning into staying.'],
+    ['day-taker', 'When the plan goes, you let the day have its say.', 'Closed route, rain, someone doubting you: you shrug and see where it goes. Very little sticks to you. Just make sure tomorrow-you gets the note, and that the shrug is a choice and not a habit of not caring.'],
   ] }),
 ];
 

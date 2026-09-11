@@ -100,7 +100,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
     guide: { eyebrow: 'Question 3 of 3', title: 'Each answer helps it wake.', body: '' },
     camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.mind'), anchorY: 0.51, durationMs: 520 },
     actions: [{
-      id: 'egg.support_style', title: 'What would you like a little more of lately?', description: '', icon: 'sparkles',
+      id: 'egg.support_style', title: 'The Egg can keep one thing full for you. Which?', description: '', icon: 'sparkles',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'day_focus', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
       nextStepId: 'egg.ready', backendEvent: true,
       options: [
@@ -114,14 +114,14 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
     id: 'egg.nature_theme', surface: 'today',
     guide: { eyebrow: 'Question 4 of 5', title: 'Your answer is taking root.', body: '' },
     actions: [{
-      id: 'egg.life_priority', title: 'What would you like to make more room for?', description: '', icon: 'leaf.fill',
+      id: 'egg.life_priority', title: 'You wake up with a whole free day. What gets it first?', description: '', icon: 'leaf.fill',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'activity', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
       nextStepId: 'egg.companion_identity', backendEvent: true,
       options: [
         { id: 'looking_after_myself', label: 'Looking after myself', icon: 'heart.fill' },
         { id: 'getting_things_done', label: 'Getting things done', icon: 'checkmark.circle.fill' },
-        { id: 'friends_and_family', label: 'Friends and family', icon: 'person.2.fill' },
-        { id: 'creativity_and_play', label: 'Creativity and play', icon: 'paintbrush.fill' },
+        { id: 'friends_and_family', label: 'The people I like', icon: 'person.2.fill' },
+        { id: 'creativity_and_play', label: 'Making or playing', icon: 'paintbrush.fill' },
       ],
     }],
   },
@@ -129,14 +129,14 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
     id: 'egg.companion_identity', surface: 'today',
     guide: { eyebrow: 'Question 5 of 5', title: 'One spark before we meet.', body: '' },
     actions: [{
-      id: 'egg.companion_place', title: 'Which kind of place feels most like you?', description: '', icon: 'map.fill',
+      id: 'egg.companion_place', title: 'Four paths lead off into the Mist. Which one do you take?', description: '', icon: 'map.fill',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'activity', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
       nextStepId: 'egg.ready', backendEvent: true,
       options: [
-        { id: 'mossy_forest', label: 'A mossy forest', icon: 'leaf.fill' },
-        { id: 'flower_meadow', label: 'A flower meadow', icon: 'paintbrush.fill' },
-        { id: 'rainy_pond', label: 'A rainy pond', icon: 'cloud.rain.fill' },
-        { id: 'windy_hill', label: 'A windy hill', icon: 'cloud.sun.fill' },
+        { id: 'mossy_forest', label: 'Into the mossy forest', icon: 'leaf.fill' },
+        { id: 'flower_meadow', label: 'Across the flower meadow', icon: 'paintbrush.fill' },
+        { id: 'rainy_pond', label: 'Down to the rainy pond', icon: 'cloud.rain.fill' },
+        { id: 'windy_hill', label: 'Up the windy hill', icon: 'cloud.sun.fill' },
       ],
     }],
   },
@@ -463,11 +463,11 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'energy.capture', surface: 'today',
       guide: { eyebrow: 'A little more of today', title: 'Share one quick reflection.', body: 'One honest answer is enough. That’s how light gets made.' },
       actions: [{
-        id: 'energy.reflect', title: 'What kind of day has it been?', description: 'One quick answer is enough.', icon: 'sparkles',
+        id: 'energy.reflect', title: 'If today had been a walk, what kind was it?', description: 'One quick answer is enough.', icon: 'sparkles',
         presentation: 'inline_choice', handlerId: 'day_prompt', promptKind: 'day_word', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
         nextStepId: 'energy.journal_reward', backendEvent: true,
         options: [
-          { id: 'good', label: 'Pretty good', icon: 'heart.fill', domainChoiceId: 'lovely' },
+          { id: 'good', label: 'A good one', icon: 'heart.fill', domainChoiceId: 'lovely' },
           { id: 'quiet', label: 'Quiet', icon: 'cloud.fill', domainChoiceId: 'quiet' },
           { id: 'busy', label: 'Busy', icon: 'sun.max.fill', domainChoiceId: 'full' },
           { id: 'rough', label: 'A bit rough', icon: 'cloud.rain.fill', domainChoiceId: 'hard' },
@@ -568,18 +568,18 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       guide: { eyebrow: 'Mossprout understands', title: 'What are we growing?', body: 'Choose the shape that feels closest. It does not need to be a precise goal.' },
       actions: [
         {
-          id: 'companion.choose_growth_intent', title: 'Is it something you want more of… or something you’re trying to fix?', description: '', icon: 'heart.fill',
+          id: 'companion.choose_growth_intent', title: 'You get one magical garden plot. What does it grow for you?', description: '', icon: 'heart.fill',
           presentation: 'inline_choice', handlerId: 'player_profile', nextStepId: 'companion.day_one_action',
           options: MOSSPROUT_BOND_SHARE_PROMPTS[0].options.map((option) => ({ id: `${MOSSPROUT_BOND_SHARE_PROMPTS[0].id}:${option.id}`, label: option.label, icon: option.icon })),
         },
         {
-          id: 'companion.choose_support_style', title: 'What kind of help do you usually want when something feels stuck?', description: '', icon: 'heart.fill',
+          id: 'companion.choose_support_style', title: 'You’re stuck halfway up a hill. What do you want from the friend beside you?', description: '', icon: 'heart.fill',
           presentation: 'inline_choice', handlerId: 'player_profile', nextStepId: 'companion.day_one_action',
           options: [
-            { id: 'tiny_step', label: 'Give me one small thing to try', icon: 'leaf.fill' },
-            { id: 'reflect', label: 'Help me think it through', icon: 'bubble.left.fill' },
-            { id: 'push', label: 'Give me a push', icon: 'bolt.fill' },
-            { id: 'company', label: 'Mostly just keep me company', icon: 'heart.fill' },
+            { id: 'tiny_step', label: 'Point at the next step', icon: 'leaf.fill' },
+            { id: 'reflect', label: 'Talk it through with me', icon: 'bubble.left.fill' },
+            { id: 'push', label: 'A push', icon: 'bolt.fill' },
+            { id: 'company', label: 'Just walk with me', icon: 'heart.fill' },
           ],
         },
         { id: 'companion.complete_day_one_action', title: 'Grow it bit by bit', description: 'Mossprout understands you a little better.', icon: 'heart.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.bond_spotlight', backendEvent: true },

@@ -388,7 +388,7 @@ export function islandCampaignConversationDefinitions(campaign: IslandCampaignDe
             id: 'payoff', kind: 'choice', phase: 'resolve', prompt: choice.resolutionLine,
             options: [{
               id: 'see-growth-insight', label: campaign.payoff.insightChoices[style]!.label,
-              reply: `${campaign.payoff.insightChoices[style]!.reply} I noticed something about your way of growing, too.`, nextNodeId: 'insight',
+              reply: `${campaign.payoff.insightChoices[style]!.reply} And I noticed how you did it.`, nextNodeId: 'insight',
             }],
           },
           {

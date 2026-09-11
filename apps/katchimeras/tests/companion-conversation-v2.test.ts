@@ -111,7 +111,7 @@ test('Mossprout optional narrative endings preserve the exact launching action o
 
 test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gated', () => {
   assert.deepEqual(validateConversationDefinitions(companionConversationDefinitionsV2), []);
-  assert.equal(companionConversationDefinitionsV2.length, 1376);
+  assert.equal(companionConversationDefinitionsV2.length, 1446);
   assert.deepEqual(CONVERSATION_V2_ENABLED_FAMILIES, CONVERSATION_V2_FAMILIES);
   assert.deepEqual(CONVERSATION_V2_IDEAL_SKIN_FAMILIES, familyIds);
   assert.equal(isConversationV2Family('feastle'), true);
@@ -129,8 +129,8 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length >= 6, `${familyId} needs at least six forms`);
     assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.length <= 12, `${familyId} catalog has grown beyond reviewable scope`);
     if (familyId === 'mossprout') {
-      assert.equal(pack.length, 64);
-      assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, 55);
+      assert.equal(pack.length, 107);
+      assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, 98);
       assert.equal(pack.filter((item) => item.trigger === 'journal').length, 3);
       assert.equal(pack.filter((item) => item.trigger === 'goal_debrief').length, 0);
       assert.equal(pack.filter((item) => item.trigger === 'quest_debrief').length, 0);
@@ -142,14 +142,14 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
       assert.ok(pack.every((item) => item.purpose && item.returnTarget && item.repeatPolicy));
       continue;
     }
-    assert.equal(pack.length, familyId === 'feastle' ? 73 : authoredStoryFamilies.has(familyId) ? 57 : 53);
+    assert.equal(pack.length, (familyId === 'feastle' ? 73 : authoredStoryFamilies.has(familyId) ? 57 : 53) + (familyId === 'steppling' ? 27 : 0));
     assert.equal(pack.filter((item) => item.trigger === 'evergreen').length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 12 : 11);
     assert.equal(pack.filter((item) => item.isOpener).length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 9 : 8);
     assert.equal(pack.filter((item) => item.trigger === 'journal').length, 6);
     assert.equal(pack.filter((item) => item.trigger === 'goal_debrief').length, 2);
     assert.equal(pack.filter((item) => item.trigger === 'quest_debrief').length, 2);
     assert.equal(pack.filter((item) => item.trigger === 'bond').length, familyId === 'feastle' ? 22 : authoredStoryFamilies.has(familyId) ? 6 : 3);
-    assert.equal(pack.filter((item) => item.trigger === 'poll').length, 24);
+    assert.equal(pack.filter((item) => item.trigger === 'poll').length, familyId === 'steppling' ? 51 : 24);
     assert.equal(pack.filter((item) => item.trigger === 'signature_game').length, 5);
     assert.equal(pack.filter((item) => item.format === 'insight_game').length, familyId === 'feastle' || authoredStoryFamilies.has(familyId) ? 5 : 4);
   }
@@ -165,12 +165,12 @@ test('Mossprout keeps only the current Journey extras and offers a concise daily
   assert.equal(definitions.some((definition) => definition.id.includes('dry-pond:day-')), false);
 
   const dailyQuestions = definitions.filter((definition) => definition.tags?.includes('nature-question'));
-  assert.equal(dailyQuestions.length, 8);
+  assert.equal(dailyQuestions.length, 34);
   assert.ok(dailyQuestions.every((definition) => Boolean(definition.actionTitle)));
   assert.equal(new Set(dailyQuestions.map((definition) => definition.actionTitle)).size, dailyQuestions.length);
   assert.equal(dailyQuestions.some((definition) => definition.actionTitle === 'Mossprout has a question'), false);
   assert.ok(dailyQuestions.every((definition) => !definition.contextualOnly && definition.repeatPolicy === 'after_cooldown'));
-  assert.equal(dailyQuestions.filter((definition) => definition.format === 'poll').length, 4);
+  assert.equal(dailyQuestions.filter((definition) => definition.format === 'poll').length, 30);
   assert.equal(dailyQuestions.filter((definition) => definition.format === 'narrative').length, 4);
   assert.equal(dailyQuestions.filter((definition) => definition.format === 'insight_game').length, 0);
   assert.ok(dailyQuestions.filter((definition) => definition.format === 'poll')
@@ -240,7 +240,7 @@ test('Mossprout optional copy stays short and avoids questionnaire filler', () =
     for (const node of definition.nodes) {
       if (node.kind === 'choice' || node.kind === 'poll') {
         assert.ok(node.prompt.split(/\s+/).length <= 24, `${definition.id}:${node.id} prompt is too long`);
-        assert.ok(node.options.every((option) => option.label.split(/\s+/).length <= 8), `${definition.id}:${node.id} has a long answer`);
+        assert.ok(node.options.every((option) => (option.spokenText ?? option.label).split(/\s+/).length <= 8), `${definition.id}:${node.id} has a long answer`);
       }
     }
   }

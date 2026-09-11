@@ -4,7 +4,7 @@ import { rememberCompanionMoment, acceptDailyStoryHabit, loadCompanionLife } fro
 import { loadOnboardingProfile } from './onboarding-state';
 import { mossproutFirstSeedForIntent } from '@/features/onboarding/mossprout-bond-share';
 import { MOSSPROUT_DAY_OPTIONS, MOSSPROUT_HELP_OPTIONS } from '@/features/onboarding/mossprout-ftue-copy';
-import { selectedStoryHabit } from './companion-life';
+import { scenarioJournalEntry, selectedStoryHabit } from './companion-life';
 import { loadCompanionQuickGoalState } from './companion-quick-goal-storage';
 
 export const MOSSPROUT_LIFE_ENTRY = 'mossprout:ftue';
@@ -49,6 +49,11 @@ export function recordLifeConversation(session: ConversationSession, definition:
     }
   }
 
+}
+
+export function recordScenarioAnswer(session: ConversationSession, definition: ConversationDefinition) {
+  const entry = scenarioJournalEntry(session, definition);
+  if (entry) rememberCompanionMoment(entry);
 }
 
 export function recordLifeFlow(run: ContentFlowRun) {

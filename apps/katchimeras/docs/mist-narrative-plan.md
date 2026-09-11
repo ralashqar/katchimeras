@@ -237,6 +237,10 @@ Set once the first session is over, so Petalimp and Fernip inherit it.
 
 ### 4.1 Petalimp and Fernip, line by line (Sept 11, 2026)
 
+Superseded the same day by the smaller-friends pass in `docs/small-friends-arcs.md`: shorter, funnier,
+the wisps as characters, no reflective questions, a guest-book and a last-light through-line. The rules
+below still hold; the lines below are the intermediate draft.
+
 Both campaigns now speak the bible. The personal question in every chapter is untouched; the Mist is
 in the situation around it. Each chapter names the Mistwisps once, in the prompt or in the line that
 hands off to the board, with the count the board actually shows (three over a short bar, four over a

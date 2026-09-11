@@ -3,11 +3,12 @@ import type { KatchimeraSkinId } from '@/types/katchimera';
 import type {
   ConversationDefinition,
   ConversationFormResult,
+  ConversationMode,
   ConversationNode,
   ConversationOption,
   ConversationPollResult,
   ConversationSession,
-  ConversationMode,
+  ConversationTraitId,
   ConversationV2FamilyId,
   QueuedConversationSignal,
 } from '@/types/companion-conversation';
@@ -868,6 +869,76 @@ function calendarDayDistance(fromDayId: string, toDayId: string): number {
   const to = Date.parse(`${toDayId}T12:00:00Z`);
   if (!Number.isFinite(from) || !Number.isFinite(to)) return Number.POSITIVE_INFINITY;
   return Math.max(0, Math.floor((to - from) / 86_400_000));
+}
+
+/**
+ * What the player's answers have quietly tagged, tallied across every answered
+ * turn of every non-preview session. A profile in the player's own choices, not
+ * a score: later insights and voice can lean on it, nothing displays it raw.
+ */
+export function conversationTraitTally(
+  sessions: readonly ConversationSession[],
+  definitions: ReadonlyMap<string, ConversationDefinition> | readonly ConversationDefinition[],
+): Partial<Record<ConversationTraitId, number>> {
+  const byId = definitions instanceof Map ? definitions : new Map((definitions as readonly ConversationDefinition[]).map((definition) => [definition.id, definition]));
+  const tally: Partial<Record<ConversationTraitId, number>> = {};
+  for (const session of sessions) {
+    if (session.preview) continue;
+    const definition = byId.get(session.definitionId);
+    if (!definition) continue;
+    for (const turn of session.turns) {
+      const node = conversationNode(definition, turn.nodeId);
+      if (!node) continue;
+      const option = node.kind === 'choice' || node.kind === 'poll'
+        ? node.options.find((candidate) => candidate.id === turn.optionId)
+        : node.kind === 'profile_game' || node.kind === 'insight_game'
+          ? node.questions.flatMap((question) => question.options).find((candidate) => candidate.id === turn.optionId)
+          : undefined;
+      for (const [trait, weight] of Object.entries(option?.traits ?? {}) as [ConversationTraitId, 1 | 2][]) {
+        tally[trait] = (tally[trait] ?? 0) + weight;
+      }
+    }
+  }
+  return tally;
+}
+
+/** A leading emoji on an answer is for the eye; the spoken and transcribed form drops it. */
+const LEADING_EMOJI = /^(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)\s+(.+)$/u;
+export function spokenAnswerText(label: string): string | undefined {
+  const match = LEADING_EMOJI.exec(label);
+  return match ? match[2] : undefined;
+}
+
+/** How each trait reads in the player's journal: a small habit, in plain words, never a score or a type. */
+export const CONVERSATION_TRAIT_PHRASES: Readonly<Record<ConversationTraitId, string>> = {
+  spontaneity: 'jumps in',
+  planning: 'plans it first',
+  curiosity: 'wants to know',
+  caution: 'looks before leaping',
+  social: 'likes company',
+  solitude: 'likes their own company',
+  rest: 'protects the quiet',
+  making: 'makes things',
+  ambition: 'aims high',
+  resilience: 'finds another way',
+  overthinking: 'turns it over',
+  optimism: 'expects good',
+  routine: 'trusts the known path',
+  novelty: 'wants somewhere new',
+  avoidance: 'leaves it for tomorrow',
+  support_listen: 'listens',
+  support_fix: 'fixes it',
+  support_cheer: 'lifts the mood',
+  support_stay: 'stays close',
+};
+
+/** The player's strongest few habits so far, as phrases, for a "who you are" line. Empty until they have answered anything. */
+export function conversationTraitPortrait(tally: Partial<Record<ConversationTraitId, number>>, limit = 3): string[] {
+  return (Object.entries(tally) as [ConversationTraitId, number][])
+    .filter(([, count]) => count > 0)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, limit)
+    .map(([trait]) => CONVERSATION_TRAIT_PHRASES[trait]);
 }
 
 function stableHash(value: string): number {
