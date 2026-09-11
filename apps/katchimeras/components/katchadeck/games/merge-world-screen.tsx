@@ -26,7 +26,8 @@ import {
   MERGE_ITEMS_BY_ID,
   MERGE_CHARACTER_NAMES,
 } from '@/constants/merge-world-catalog';
-import { mergeWorldGeneratorArt } from '@/constants/merge-world-art';
+import { mergeWorldGeneratorArt, mergeWorldItemArt } from '@/constants/merge-world-art';
+import { spawnerRewardChains } from '@/utils/merge-world/spawner-reward';
 import { MEMORY_CARDS_BY_ID } from '@/constants/memory-card-catalog';
 import { RARE_MEMORY_CARD_REVEAL_ART, VEILED_MEMORY_CARD_ART, memoryCardArt } from '@/constants/memory-card-art';
 import { COMPANION_DISCOVERY_CATALOG } from '@/constants/companion-discovery-catalog';
@@ -334,18 +335,21 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
         .filter((name): name is string => Boolean(name)))];
       return [{
         id: receipt.id,
-        eyebrow: 'New item maker',
+        eyebrow: 'New spawner',
         title: generator.name,
         description: generator.unlockDescription,
         image: art,
         imageAccessibilityLabel: generator.name,
         detail: firstItems.length ? `Makes ${firstItems.join(' and ')}` : 'Ready to make new items',
         rewardTitle: 'Ready on your Merge board',
-        rewardBody: 'Tap it whenever you want to make something new.',
+        rewardBody: 'Tap it to make its first tier; merge two of a kind to climb the ladder below.',
         tint: generator.color,
         tier: 2,
+        // Everything it can make, tier one to the top; a branch a later friend opens is shown dimmed with their name.
+        chains: spawnerRewardChains({ unlockedCharacters: state?.unlockedCharacters ?? [] }, receipt.generatorId)
+          .map((chain) => ({ ...chain, items: chain.items.map((entry) => ({ ...entry, image: (mergeWorldItemArt(entry.id) as number | null) ?? null })) })),
       }];
-    }), [state?.generatorUnlockReceipts]);
+    }), [state?.generatorUnlockReceipts, state?.unlockedCharacters]);
   const companionDiscoveryRewards = useMemo<RewardSplashItem[]>(() => (state?.companionDiscovery.records ?? [])
     .filter((record) => record.source === 'board_discovery' && record.revealSeenAt == null)
     .flatMap((record) => {
@@ -366,7 +370,10 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
         nextLabel: 'See what changed',
       }];
     }), [state?.companionDiscovery.records]);
-  const mergeCelebrationRewards = useMemo(() => [...companionDiscoveryRewards, ...generatorUnlockRewards], [companionDiscoveryRewards, generatorUnlockRewards]);
+  // While a lesson is guiding the board (the Mossprout FTUE, Steppling's garden lesson), only a spawner that
+  // just landed gets its page; every other celebration waits so it never lands between two guided taps.
+  const lessonGuidingBoard = Boolean(ftueStep) || stepplingLesson.active;
+  const mergeCelebrationRewards = useMemo(() => lessonGuidingBoard ? generatorUnlockRewards : [...companionDiscoveryRewards, ...generatorUnlockRewards], [companionDiscoveryRewards, generatorUnlockRewards, lessonGuidingBoard]);
   const discoveryFork = state?.companionDiscovery.active?.selectedCharacterId == null
     && state?.companionDiscovery.active?.discoveryId.startsWith('fork:')
       ? state.companionDiscovery.active
@@ -1188,11 +1195,13 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
           if (creatureId) router.back();
         }}
       />
-      {active && mergeCelebrationRewards.length ? <RewardSplash
+      {/* A spawner's reward waits for its parcel to land on the board: the page greets what the player just saw arrive. */}
+      {active && !parcelFlight && mergeCelebrationRewards.length ? <RewardSplash
         items={mergeCelebrationRewards}
         onItemSeen={(receiptId) => receiptId.startsWith('companion-discovery:')
-          ? dispatch({ type: 'ackCompanionDiscoveryReveal', characterId: receiptId.slice('companion-discovery:'.length) as MergeOrder['characterId'], now: Date.now() })
-          : dispatch({ type: 'ackGeneratorUnlock', receiptId, now: Date.now() })}
+          ? send({ type: 'ackCompanionDiscoveryReveal', characterId: receiptId.slice('companion-discovery:'.length) as MergeOrder['characterId'], now: Date.now() })
+          // Bookkeeping, not play: it goes straight to the world so a lesson's exclusive step never blocks it (which would show the page again).
+          : send({ type: 'ackGeneratorUnlock', receiptId, now: Date.now() })}
       /> : null}
     </View>
   );

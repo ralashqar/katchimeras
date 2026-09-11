@@ -313,6 +313,8 @@ test('parcel persists and remains unopened on a full board; installs only once i
   const opened = reduceMergeWorld(state, command);
   assert.deepEqual(opened.spawnedGenerator, { generatorId: 'journey-locker', cell: freeCell });
   assert.equal(opened.state.unlockedChains.includes('adventure:trail'), true);
+  assert.deepEqual(opened.state.generatorUnlockReceipts.filter((receipt) => receipt.generatorId === 'journey-locker').map((receipt) => [receipt.id, receipt.seenAt]), [['generator-unlock:journey-locker', null]], 'the Locker waits for its reward page');
+  assert.equal(reduceMergeWorld(opened.state, { type: 'ackGeneratorUnlock', receiptId: 'generator-unlock:journey-locker', now: NOW + 1 }).state.generatorUnlockReceipts[0]?.seenAt, NOW + 1);
   assert.equal(reduceMergeWorld(reload(opened.state), command).changed, false);
   assert.equal(grant(reload(opened.state)).changed, false);
   assert.equal(opened.state.board.filter((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'journey-locker').length, 1);

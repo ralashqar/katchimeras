@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from './helpers/content-fs';
+import { chainLadder, spawnerRewardChains } from '@/utils/merge-world/spawner-reward';
 import test from 'node:test';
 
 import { KATCHIMERA_MERGE_PROFILES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
@@ -2203,3 +2204,28 @@ function withItems(state: MergeWorldState, placements: [number, MergeBoardItem][
   for (const [cell, boardItem] of placements) board[cell] = { ...board[cell], locked: false, occupant: boardItem };
   return { ...state, board };
 }
+
+test('a spawner reward shows everything it can make: each chain tier one to the top, a branch a later friend opens dimmed with their name, once the parcel has landed', () => {
+  const beforeVoyagle = spawnerRewardChains({ unlockedCharacters: ['mossprout', 'steppling'] }, 'journey-locker');
+  assert.deepEqual(beforeVoyagle.map((chain) => [chain.id, chain.open, chain.note, chain.items.map((item) => item.tier)]), [
+    ['adventure:trail', true, null, [1, 2, 3, 4, 5, 6]],
+    ['adventure:travel', false, 'Opens when Voyagle arrives', [1, 2, 3, 4, 5, 6]],
+  ]);
+  assert.equal(beforeVoyagle[0]?.title, 'Sock to Expedition Kit');
+  assert.deepEqual(chainLadder('adventure:trail').map((item) => item.name), ['Sock', 'Shoe', 'Boot', 'Hiking Gear', 'Adventure Pack', 'Expedition Kit']);
+  assert.equal(spawnerRewardChains({ unlockedCharacters: ['mossprout', 'steppling', 'voyagle'] }, 'journey-locker')[1]?.open, true);
+  assert.deepEqual(spawnerRewardChains({ unlockedCharacters: ['mossprout'] }, 'wild-garden').map((chain) => [chain.open, chain.note]), [[true, null], [false, 'Opens when Shellio arrives']]);
+  assert.deepEqual(spawnerRewardChains({ unlockedCharacters: [] }, 'no-such-spawner'), []);
+  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
+  assert.match(screen, /chains: spawnerRewardChains\(\{ unlockedCharacters: state\?\.unlockedCharacters \?\? \[\] \}, receipt\.generatorId\)\s*\.map\(\(chain\) => \(\{ \.\.\.chain, items: chain\.items\.map\(\(entry\) => \(\{ \.\.\.entry, image: \(mergeWorldItemArt\(entry\.id\) as number \| null\) \?\? null \}\)\) \}\)\),/, 'the screen attaches each tier’s art');
+  assert.match(screen, /\{active && !parcelFlight && mergeCelebrationRewards\.length \? <RewardSplash/, 'the reward page waits for the parcel to land');
+  // In the first session only the spawner's page shows, and its ack goes straight to the world so a lesson's exclusive step never blocks it.
+  assert.match(screen, /const lessonGuidingBoard = Boolean\(ftueStep\) \|\| stepplingLesson\.active;\s*const mergeCelebrationRewards = useMemo\(\(\) => lessonGuidingBoard \? generatorUnlockRewards : \[\.\.\.companionDiscoveryRewards, \.\.\.generatorUnlockRewards\]/);
+  assert.match(screen, /: send\(\{ type: 'ackGeneratorUnlock', receiptId, now: Date\.now\(\) \}\)\}/);
+  assert.doesNotMatch(screen, /dispatch\(\{ type: 'ackGeneratorUnlock'/);
+  const achievements = readFileSync('hooks/use-companion-achievements.ts', 'utf8');
+  assert.match(achievements, /const firstSessionOver = Boolean\(world && stepplingShoeServed\(world\)\);/, 'no achievement celebration until the first session is over');
+  const splash = readFileSync('components/katchadeck/ui/reward-splash.tsx', 'utf8');
+  assert.match(splash, /\{item\.chains\?\.length \? <ChainLadders chains=\{item\.chains\} compact=\{compact\} width=\{width\} \/> : null\}/);
+  assert.match(splash, /const heroShare = item\?\.chains\?\.length \? 0\.66 : 1;/, 'the ladder takes its room from the hero, never from the buttons');
+});

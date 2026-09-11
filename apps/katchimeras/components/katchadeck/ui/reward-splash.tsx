@@ -45,6 +45,16 @@ export type RewardSplashItem = {
   tier?: number;
   shareMessage?: string;
   nextLabel?: string;
+  /** A spawner's reward: each chain it makes, tier one to the top; a closed branch dimmed with who opens it. */
+  chains?: readonly RewardSplashChain[];
+};
+
+export type RewardSplashChain = {
+  id: string;
+  title: string;
+  open: boolean;
+  note: string | null;
+  items: readonly { id: string; name: string; tier: number; image: number | null }[];
 };
 
 type Props = {
@@ -73,7 +83,9 @@ export function RewardSplash({ items, onItemSeen, onComplete, preview = false }:
   const tier = item?.tier ?? 2;
   const tint = item?.tint ?? '#B9872F';
   const compact = height < 760;
-  const stageSize = Math.max(150, Math.min(compact ? 220 : 280, width * 0.68, height * 0.29));
+  // A ladder below the hero takes its room from the hero, never from the buttons.
+  const heroShare = item?.chains?.length ? 0.66 : 1;
+  const stageSize = Math.max(120, Math.min(compact ? 220 : 280, width * 0.68, height * 0.29) * heroShare);
   const raySize = stageSize + (compact ? 64 : 88);
 
   useEffect(() => {
@@ -127,6 +139,7 @@ export function RewardSplash({ items, onItemSeen, onComplete, preview = false }:
               <ResolutionBoundRewardImage accessibilityLabel={item.imageAccessibilityLabel ?? item.title} maximumSize={stageSize} source={item.image} />
             </BreathingRewardHero>
           </View>
+          {item.chains?.length ? <ChainLadders chains={item.chains} compact={compact} width={width} /> : null}
           <View style={styles.bottomDock}>
             <View style={styles.bottomBlock}>
               <View style={styles.detailChip}><ThemedText lightColor={INK} darkColor={INK} style={styles.detail}>{item.detail}</ThemedText></View>
@@ -144,6 +157,31 @@ export function RewardSplash({ items, onItemSeen, onComplete, preview = false }:
       </Animated.View> : null}
     </View>
   </Modal>;
+}
+
+/** Everything a spawner makes: one row per chain, tier one to the top, each tile numbered. A closed branch is dimmed and says who opens it. */
+function ChainLadders({ chains, compact, width }: { chains: readonly RewardSplashChain[]; compact: boolean; width: number }) {
+  const longest = Math.max(1, ...chains.map((chain) => chain.items.length));
+  const tile = Math.max(30, Math.min(compact ? 40 : 46, Math.floor((Math.min(width, 520) - 44 - 28 - (longest - 1) * 5) / longest)));
+  return <View style={styles.ladders}>
+    <ThemedText lightColor={GOLD_DEEP} darkColor={GOLD_DEEP} style={styles.laddersTitle}>Everything it can make</ThemedText>
+    {chains.map((chain) => <View key={chain.id} style={[styles.ladder, !chain.open && styles.ladderClosed]}>
+      <View style={styles.ladderHeading}>
+        {!chain.open ? <IconSymbol color={GOLD_DEEP} name="lock.fill" size={12} /> : null}
+        <ThemedText lightColor={INK} darkColor={INK} numberOfLines={1} style={styles.ladderTitle}>{chain.title}</ThemedText>
+        {chain.note ? <ThemedText lightColor={GOLD_DEEP} darkColor={GOLD_DEEP} numberOfLines={1} style={styles.ladderNote}>{chain.note}</ThemedText> : null}
+      </View>
+      <View style={styles.ladderRow}>
+        {chain.items.map((entry, index) => <View key={entry.id} style={styles.ladderStep}>
+          {index > 0 ? <View style={[styles.ladderLink, { width: 5 }]} /> : null}
+          <View accessibilityLabel={`Tier ${entry.tier}, ${entry.name}`} style={[styles.ladderTile, { height: tile, width: tile, borderRadius: tile * 0.32 }]}>
+            {entry.image != null ? <Image accessibilityIgnoresInvertColors contentFit="contain" source={entry.image} style={{ height: tile - 8, width: tile - 8 }} transition={0} /> : null}
+            <View style={styles.ladderTier}><ThemedText lightColor="#FFFFFF" darkColor="#FFFFFF" style={styles.ladderTierText}>{entry.tier}</ThemedText></View>
+          </View>
+        </View>)}
+      </View>
+    </View>)}
+  </View>;
 }
 
 function BreathingRewardHero({ children, reduceMotion }: { children: ReactNode; reduceMotion: boolean }) {
@@ -248,4 +286,14 @@ const styles = StyleSheet.create({
   rewardCard: { alignItems: 'center', backgroundColor: 'rgba(255,246,219,0.93)', borderColor: 'rgba(255,255,255,0.78)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1.5, boxShadow: '0 12px 28px rgba(52,94,118,0.2)', flexDirection: 'row', gap: 10, minHeight: 92, paddingHorizontal: 14, paddingVertical: 10, width: '100%' }, supportingImage: { height: 86, marginVertical: -7, width: 86 }, fallback: { alignItems: 'center', height: 62, justifyContent: 'center', width: 62 }, rewardCopy: { flex: 1, gap: 2 }, rewardTitle: { fontFamily: 'FredokaBold', fontSize: 16, lineHeight: 20 }, rewardBody: { fontFamily: 'Manrope', fontSize: 12.5, fontWeight: '700', lineHeight: 17 },
   actions: { flexDirection: 'row', gap: 10, width: '100%' }, shareButton: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.44)', borderColor: 'rgba(36,88,125,0.2)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 50, paddingHorizontal: 16 }, shareLabel: { ...KatchaUI.type.action }, pressed: { opacity: 0.88, transform: [{ scale: 0.98 }] },
   particles: { alignItems: 'center', height: 1, justifyContent: 'center', left: '50%', position: 'absolute', top: '46%', width: 1, zIndex: 2 }, spark: { borderRadius: 4, position: 'absolute' },
+  ladders: { alignItems: 'stretch', backgroundColor: 'rgba(255,246,219,0.93)', borderColor: 'rgba(255,255,255,0.78)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1.5, boxShadow: '0 12px 28px rgba(52,94,118,0.2)', gap: 8, maxWidth: 520, paddingHorizontal: 14, paddingVertical: 10, width: '100%', zIndex: 5 },
+  laddersTitle: { fontFamily: 'Manrope', fontSize: 11, fontWeight: '900', letterSpacing: 1.2, textAlign: 'center', textTransform: 'uppercase' },
+  ladder: { gap: 5 }, ladderClosed: { opacity: 0.55 },
+  ladderHeading: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  ladderTitle: { flexShrink: 1, fontFamily: 'FredokaBold', fontSize: 14, lineHeight: 18 }, ladderNote: { flexShrink: 1, fontFamily: 'Manrope', fontSize: 11, fontWeight: '800', marginLeft: 'auto' },
+  ladderRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  ladderStep: { alignItems: 'center', flexDirection: 'row' }, ladderLink: { backgroundColor: 'rgba(117,69,10,0.28)', borderRadius: 1, height: 2 },
+  ladderTile: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.75)', borderColor: 'rgba(214,166,72,0.55)', borderCurve: 'continuous', borderWidth: 1, justifyContent: 'center', overflow: 'visible' },
+  ladderTier: { alignItems: 'center', backgroundColor: '#75450A', borderRadius: 999, bottom: -6, height: 15, justifyContent: 'center', minWidth: 15, paddingHorizontal: 3, position: 'absolute', right: -5 },
+  ladderTierText: { fontFamily: 'Manrope', fontSize: 9, fontWeight: '900', lineHeight: 11 },
 });

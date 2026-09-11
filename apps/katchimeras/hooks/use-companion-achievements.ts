@@ -28,6 +28,7 @@ import { loadDiscoveryState } from '@/utils/discoveries-storage';
 import { kingdomProgress } from '@/features/kingdom-progress/kingdom-progress';
 import type { MergeWorldState } from '@/types/merge-world';
 import { loadMergeWorldState, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
+import { stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
 
 const COMPANION_ACHIEVEMENT_CATALOG_VERSION = 3;
 
@@ -116,11 +117,14 @@ export function useCompanionAchievements() {
     );
   }, [contexts, state.unlocked]);
 
-  const pending = useMemo<CompanionAchievementDef[]>(() =>
-    COMPANION_ACHIEVEMENT_CATALOG.filter((def) => {
+  // Nothing celebrates during the first session (until Steppling's first Shoe is served): the lessons own the screen.
+  const firstSessionOver = Boolean(world && stepplingShoeServed(world));
+  const pending = useMemo<CompanionAchievementDef[]>(() => firstSessionOver
+    ? COMPANION_ACHIEVEMENT_CATALOG.filter((def) => {
       const record = state.unlocked[def.id];
       return record && !record.seenCelebration;
-    }), [state.unlocked]);
+    })
+    : [], [firstSessionOver, state.unlocked]);
 
   const markSeen = useCallback((ids: readonly string[]) => {
     setState((current) => {

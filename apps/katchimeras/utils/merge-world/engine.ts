@@ -2858,8 +2858,14 @@ function claimArrival(state: MergeWorldState, arrivalId: string, now: number): M
     if (!alreadyInstalled && cell < 0) return unchanged(state, `Make one space in the Garden for the ${MERGE_GENERATORS_BY_ID.get(generatorId)!.name}.`);
     const board = [...state.board];
     if (!alreadyInstalled) board[cell] = { ...board[cell], occupant: { kind: 'generator', generatorId } };
+    // A spawner that arrives by parcel is greeted like any other: its unlock receipt waits for the reward page.
+    const unlockReceiptId = `generator-unlock:${generatorId}`;
+    const generatorUnlockReceipts = alreadyInstalled || state.generatorUnlockReceipts.some((receipt) => receipt.id === unlockReceiptId)
+      ? state.generatorUnlockReceipts
+      : [...state.generatorUnlockReceipts, { id: unlockReceiptId, generatorId, createdAt: now, seenAt: null }];
     const installed = reconcileUnlockedCatalog({ ...state, board,
       generators: state.generators[generatorId] ? state.generators : { ...state.generators, [generatorId]: generatorState(generatorId) },
+      generatorUnlockReceipts,
       arrivals: state.arrivals.map((entry) => entry.id === arrivalId ? { ...entry, claimedAt: now, seenAt: now } : entry),
     });
     return { ...changed(touch(ensureProceduralOrders(installed, now), now)), spawnedGenerator: alreadyInstalled ? undefined : { generatorId, cell } };
