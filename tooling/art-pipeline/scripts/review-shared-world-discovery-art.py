@@ -14,6 +14,7 @@ TILES = [
     ("Mossprout reference", "mossprout_focused_v1_main_hex_tile"),
     ("Steppling trailhead", BRIEFS["tiles"]["steppling"]["assetKey"]),
     ("Fully covered mist", BRIEFS["tiles"]["mist"]["assetKey"]),
+    ("Baristabbit lit window", BRIEFS["tiles"]["baristabbit"]["assetKey"]),
 ]
 
 
@@ -40,7 +41,7 @@ def validate() -> None:
 def review_sheet(size: int, suffix: str, output: str) -> None:
     label_height = 32
     backgrounds = [("cream", "#fff5df"), ("dark", "#243b42"), ("magenta", "#df70cb"), ("checker", "#dedede")]
-    sheet = Image.new("RGB", (size * 3, (size + label_height) * len(backgrounds)))
+    sheet = Image.new("RGB", (size * len(TILES), (size + label_height) * len(backgrounds)))
     draw = ImageDraw.Draw(sheet)
     for row, (background, color) in enumerate(backgrounds):
         for column, (name, key) in enumerate(TILES):
