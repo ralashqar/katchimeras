@@ -31,7 +31,7 @@ import {
   MERGE_WORLD_ROWS,
 } from '@/constants/merge-world-catalog';
 import { advanceGlowRequests, glowTutorialDrop, normalizeGlowDiscoveryFields, reduceGlowDiscovery } from './glow-discovery-policy';
-import { normalizeStepplingEgg, reduceStepplingEgg } from '@/features/onboarding/steppling-egg-policy';
+import { normalizeHatchableEgg, reduceHatchableEgg } from '@/features/onboarding/hatchable-egg-policy';
 import { sharedWorldPurchase } from '@/constants/shared-world';
 import { ISLAND_CAMPAIGNS, isIslandCampaignId, islandCampaignById, islandCampaignForIsland } from '@/constants/island-campaigns/registry';
 import { islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers';
@@ -332,7 +332,11 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
     case 'claimInbox':
       return claimInbox(current, command.entryId, command.now);
     case 'stepplingEgg':
-      return reduceStepplingEgg(current, command.action, command.now);
+    case 'hatchableEgg': {
+      const definition = hatchableByCompanion(command.type === 'hatchableEgg' ? command.companion : 'steppling');
+      if (!definition) return unchanged(current, 'This friend has no Egg.');
+      return reduceHatchableEgg(current, definition, command.action, command.now);
+    }
     case 'grantGeneratorParcel': {
       const definition = MERGE_GENERATORS_BY_ID.get(command.generatorId);
       if (!definition || current.arrivals.some((arrival) => arrival.id === command.rewardId) || current.generators[command.generatorId]) return unchanged(current);
@@ -851,7 +855,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     ...source,
     ...normalizeGlowDiscoveryFields(source),
     companionDailyGardenVersion: source.companionDailyGardenVersion,
-    stepplingEgg: normalizeStepplingEgg(source.stepplingEgg),
+    ...normalizeHatchableEggs(source),
     openingGlow: normalizeOpeningGlow(source.openingGlow),
     version: 24,
     ownerCharacterId: 'mossprout',
@@ -4256,6 +4260,21 @@ function orthogonalNeighbours(cell: number): number[] {
  * Steppling's in its own field; both are read, and Steppling's stays mirrored
  * so an older build can still read the save.
  */
+/**
+ * Each hatchable companion's Egg, validated against that companion's policy.
+ * Saves from before the map carry Steppling's in its own field; both are
+ * read, and Steppling's stays mirrored so an older build can still read it.
+ */
+function normalizeHatchableEggs(source: Partial<MergeWorldState>): Pick<MergeWorldState, 'hatchableEggs' | 'stepplingEgg'> {
+  const hatchableEggs: NonNullable<MergeWorldState['hatchableEggs']> = {};
+  for (const definition of HATCHABLE_COMPANIONS) {
+    const raw = source.hatchableEggs?.[definition.companion] ?? (definition.companion === 'steppling' ? source.stepplingEgg : undefined);
+    const normalized = normalizeHatchableEgg(definition.egg, raw);
+    if (normalized) hatchableEggs[definition.companion] = normalized;
+  }
+  return { hatchableEggs, stepplingEgg: hatchableEggs.steppling };
+}
+
 function normalizeGardenLessons(source: Partial<MergeWorldState>): Pick<MergeWorldState, 'gardenLessons' | 'stepplingGardenLesson'> {
   const record = (value: unknown) => {
     const raw = value as { preparedAt?: unknown; servedAt?: unknown } | undefined;

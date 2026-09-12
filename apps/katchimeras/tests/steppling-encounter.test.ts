@@ -112,7 +112,7 @@ test('Steppling uses shared prompt, Bond landing and hatch phase haptics', () =>
   assert.match(steppling, /value !== 'active'\) hatchHaptics.stop\(\)/);
   const haptics = readFileSync('features/today/egg-haptics.ts', 'utf8');
   assert.match(haptics, /cue === 'shake' \? Haptics.ImpactFeedbackStyle.Soft : Haptics.ImpactFeedbackStyle.Heavy/);
-  assert.match(steppling, /readyToHatch: stepplingEggReady\(feedingEgg \?\? egg\) && !hatching && !egg\?\.hatchedAt/);
+  assert.match(steppling, /readyToHatch: hatchableEggReady\(policy, feedingEgg \?\? egg\) && !hatching && !egg\?\.hatchedAt/);
 });
 
 const NOW = Date.UTC(2026, 8, 4, 12);
@@ -263,7 +263,7 @@ test('second Egg beat has only the steps card or automatic shared fallback', () 
   assert.match(panel, /movementFallback = displayedSteps != null && stepOffer.steps === 0/);
   assert.match(panel, /stepCount=\{stepOffer.steps\} stepEnergy=\{stepOffer.bond\}/);
   const repository = readFileSync('utils/merge-world/repository.ts', 'utf8');
-  assert.match(repository, /syncCompanionBondEvent\(bond, \{ id: 'steppling:egg:steps'[\s\S]*?points: stepplingStepsBond/);
+  assert.match(repository, /syncCompanionBondEvent\(bond, \{ id: `\$\{companion\}:egg:steps`[\s\S]*?points: eggFeedBond\(definition\.egg, egg\.bondFedSteps!\)/);
 });
 
 test('steps launch the shared Bond batch from the right-hand reward section into the Egg', () => {
@@ -273,7 +273,7 @@ test('steps launch the shared Bond batch from the right-hand reward section into
   assert.match(card, /action.id === 'egg.feed_steps' \? bondSourceRef : cardRef/);
   assert.match(card, /sourceRef.current\?\.measureInWindow/);
   assert.match(card, /<View collapsable=\{false\} ref=\{bondSourceRef\} style=\{styles.energyValueGroup\}>/);
-  assert.match(controller, /stepplingStepFeedOffer\(egg, action.observedSteps\).bond/);
+  assert.match(controller, /eggFeedOffer\(policy, egg, action.observedSteps\).bond/);
   assert.match(controller, /startEggFeed\(from, eggBondFeedPayload\(bondAmount, from\), arrive\)/);
   assert.match(payload, /currencyFrom, energyAmount: amount, energyOnly: true/);
   assert.match(controller, /feedExpressionKey: eggFeedLaunchKey/);

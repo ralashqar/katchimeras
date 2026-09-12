@@ -549,26 +549,31 @@ export function recordStoredMovementEggProgress(input: {
   }, now);
 }
 
-export async function applyStoredStepplingEgg(action: import('@/features/onboarding/steppling-egg-policy').StepplingEggAction) {
+export async function applyStoredHatchableEgg(definition: import('@/types/hatchable-companion').HatchableCompanionDefinition, action: import('@/features/onboarding/hatchable-egg-policy').HatchableEggAction) {
   const now = Date.now();
-  const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'stepplingEgg', action, now }), now);
+  const { companion } = definition;
+  const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'hatchableEgg', companion, action, now }), now);
   // Reconcile advertised question rewards from saved answers, including retry
   // after interruption between the two stores. Stable IDs prevent double pay.
-  const egg = result.state.stepplingEgg;
+  const [{ loadCompanionBondState, saveCompanionBondState }, { recordCompanionBondEvent, syncCompanionBondEvent }, { eggFeedBond, hatchableEggProgress }] = await Promise.all([
+    import('@/utils/companion-bond-storage'), import('@/utils/companion-bond'), import('@/features/onboarding/hatchable-egg-policy'),
+  ]);
+  const egg = hatchableEggProgress(result.state, definition);
   if (egg?.intent) {
-    const [{ loadCompanionBondState, saveCompanionBondState }, { recordCompanionBondEvent, syncCompanionBondEvent }, { STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, stepplingStepsBond }] = await Promise.all([
-      import('@/utils/companion-bond-storage'), import('@/utils/companion-bond'), import('@/features/onboarding/steppling-egg-policy'),
-    ]);
     let bond = loadCompanionBondState();
-    for (const [id, points] of [['intent', STEPPLING_INTENT_BOND], ...(egg.alternative ? [['movement', STEPPLING_MOVEMENT_BOND] as const] : [])] as const) {
-      bond = recordCompanionBondEvent(bond, { id: `steppling:egg:${id}`, creatureId: 'companion:steppling', kind: 'reflection_saved', points, occurredAt: now, dayId: egg.sourceDayId }).state;
+    for (const [id, points] of [['intent', definition.egg.intent.bond], ...(egg.alternative ? [['movement', definition.egg.alternative.bond] as const] : [])] as const) {
+      bond = recordCompanionBondEvent(bond, { id: `${companion}:egg:${id}`, creatureId: `companion:${companion}`, kind: 'reflection_saved', points, occurredAt: now, dayId: egg.sourceDayId }).state;
     }
     if ((egg.bondFedSteps ?? 0) > 0) {
-      bond = syncCompanionBondEvent(bond, { id: 'steppling:egg:steps', creatureId: 'companion:steppling', kind: 'check_in_completed', points: stepplingStepsBond(egg.bondFedSteps!), occurredAt: now, dayId: egg.sourceDayId }).state;
+      bond = syncCompanionBondEvent(bond, { id: `${companion}:egg:steps`, creatureId: `companion:${companion}`, kind: 'check_in_completed', points: eggFeedBond(definition.egg, egg.bondFedSteps!), occurredAt: now, dayId: egg.sourceDayId }).state;
     }
     saveCompanionBondState(bond);
   }
   return result;
+}
+export async function applyStoredStepplingEgg(action: import('@/features/onboarding/hatchable-egg-policy').HatchableEggAction) {
+  const { STEPPLING_HATCHABLE } = await import('@/constants/hatchable-companions/registry');
+  return applyStoredHatchableEgg(STEPPLING_HATCHABLE, action);
 }
 
 /**

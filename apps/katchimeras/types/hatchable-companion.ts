@@ -117,6 +117,29 @@ export type HatchableLessonDefinition = {
   copy: { parcel: FtueGuide; room: FtueGuide; grow: FtueGuide; serve: FtueGuide; finale: FtueGuide };
 };
 
+/** One answer the Egg can be given, drawn as a question card. */
+export type HatchableEggOption = { id: string; label: string; icon?: string; domainChoiceId?: string };
+/**
+ * What the Egg is fed with. Steps are counted whole from yesterday (a Motion
+ * ask first); a photo of today fills the Egg with one matching capture; an
+ * answer-only Egg hatches on its alternative question alone.
+ */
+export type HatchableEggFeed =
+  | { kind: 'steps'; target: number; perBond: number; actionTitle: string; readingTitle: string }
+  | { kind: 'photo'; category: string; bond: number; actionTitle: string }
+  | { kind: 'answer' };
+export type HatchableEggPolicy = {
+  /** The Egg's glow while it hatches. */
+  accentColor: string;
+  guides: { intent: FtueGuide; reading: FtueGuide; feed: FtueGuide; permission: FtueGuide; alternative: FtueGuide; ready: FtueGuide };
+  intent: { actionId: string; title: string; bond: number; options: readonly HatchableEggOption[] };
+  alternative: { actionId: string; title: string; bond: number; options: readonly HatchableEggOption[] };
+  /** The spoken ask before a system permission prompt, when the feed needs one. */
+  access?: { allow: { id: string; title: string; description: string; icon?: string }; decline: { id: string; title: string; description: string; icon?: string } };
+  feed: HatchableEggFeed;
+  hatch: { actionId: string; title: string; description: string };
+};
+
 export type HatchableCompanionDefinition = {
   companion: MergeCharacterId;
   displayName: string;
@@ -128,5 +151,6 @@ export type HatchableCompanionDefinition = {
   discoveryFlow: HatchableDiscoveryFlowDefinition;
   dayOne: HatchableDayOneDefinition;
   lesson: HatchableLessonDefinition;
+  egg: HatchableEggPolicy;
   economy: { generatorId: string };
 };
