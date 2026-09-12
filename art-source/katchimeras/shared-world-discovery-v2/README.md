@@ -3,7 +3,6 @@
 User-requested fal Nano Banana regeneration, using the existing project pipeline.
 
 - **Steppling:** a developed blue/ochre/timber trailhead, broad hiking steps, pines, backpack and lantern. The quiet center is reserved for the live Egg/character; no character or chair is baked into the art. This replaces the level-0 art used by the shared-world reveal, not the legacy haven progression series.
-- **Baristabbit (Sept 12, 2026):** the lit window: a cream cafe kiosk with a terracotta roof and one amber-lit window at the rear, a blank sign, two lanterns, a teapot, a round table and a sage bench, on honey plank flooring over warm sandstone and terracotta cliffs. The quiet centre is reserved for the live Egg/character. Generated with the same recipe (`--tile baristabbit`), Mossprout's main hex as the geometry reference and the floating-neighborhood Baristabbit render as the identity guide.
 - **Mist:** opaque pearl/blue/lavender cloud forms covering the whole upper surface and rim. No environment props, exposed hedge ring or character silhouettes. The lower cliff remains visible to preserve the floating-hex silhouette.
 
 Both use Mossprout's main hex as the camera/geometry/style reference. Steppling also uses its previous regular environment for identity and palette. Existing Mossprout images and its protected generation manifest are unchanged.

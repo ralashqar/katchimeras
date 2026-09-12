@@ -1,9 +1,10 @@
-import { useHatchableRuns } from '@/features/onboarding/hatchable-runtime';
-import { hatchableByCompanion, isHatchableCompanion } from '@/constants/hatchable-companions/registry';
+import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
+import { useGlowDiscoveryState } from '@/features/onboarding/glow-discovery-runtime';
 import { glowDiscoveryResumeWorld } from '@/features/onboarding/glow-discovery-flow';
 import { useCompanionCameraCover } from '@/hooks/use-companion-camera-cover';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
 import { sharedWorldIncludesCompanion } from '@/constants/shared-world';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 
@@ -199,11 +200,8 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
 }) {
   const router = useRouter();
   const ftueRun = useFtueRun();
-  // Any hatchable companion's live discovery or garden lesson keeps the shared world on screen.
-  const hatchableRuns = useHatchableRuns();
-  const glowReady = hatchableRuns.ready;
-  const glowRun = Object.values(hatchableRuns.discovery).find((run) => run && run.status !== 'completed') ?? null;
-  const stepplingLesson = { ready: hatchableRuns.ready, active: Object.values(hatchableRuns.lessons).some((run) => run && run.status !== 'completed') };
+  const { run: glowRun, ready: glowReady } = useGlowDiscoveryState();
+  const stepplingLesson = useStepplingGardenLesson();
   const requiredWorldFamilyId = glowDiscoveryResumeWorld(glowRun) ?? (stepplingLesson.active ? 'mossprout' : null);
   const { transitionTo } = useGameScreenTransition();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
@@ -214,7 +212,7 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
   const [persistentSnapshot, setPersistentSnapshot] = useState(loadRosterPersistentSnapshot);
   const [contentReady, setContentReady] = useState(false);
   const [selectedWorldFamilyId, setActiveWorldFamilyId] = useState<KatchimeraFamilyId | null>(
-    worldSession.activeWorldFamilyId && isHatchableCompanion(worldSession.activeWorldFamilyId) ? 'mossprout' : worldSession.activeWorldFamilyId ?? (ftueRun?.status === 'active' || interactionRequest ? 'mossprout' : null),
+    worldSession.activeWorldFamilyId === 'steppling' ? 'mossprout' : worldSession.activeWorldFamilyId ?? (ftueRun?.status === 'active' || interactionRequest ? 'mossprout' : null),
   );
   const activeWorldFamilyId = requiredWorldFamilyId ?? selectedWorldFamilyId;
   const cameraSnapshotRef = useRef<KingdomCameraSnapshot | null>(worldSession.cameraSnapshot);
@@ -426,11 +424,10 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
     });
   }, [router, transitionTo]);
   const openFamilyWorld = useCallback((familyId: KatchimeraFamilyId) => {
-    const hatchable = hatchableByCompanion(familyId);
-    if (hatchable) {
-      if (!mergeWorld?.worldUnlocks?.[hatchable.tile.unlockId] && !discovery.records.some((record) => record.characterId === familyId)) return;
+    if (familyId === 'steppling') {
+      if (!mergeWorld?.worldUnlocks?.[GLOW_GATEWAY_ID] && !discovery.records.some((record) => record.characterId === 'steppling')) return;
     }
-    if (familyId !== 'mossprout' && !hatchable) return;
+    if (familyId !== 'mossprout' && familyId !== 'steppling') return;
     // Start resolving the focused-world bundle while the universal curtain is
     // moving down. The destination mounts only once the curtain is opaque.
     void loadKatchimeraKingdomScreenModule();

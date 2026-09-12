@@ -8,12 +8,9 @@ import { ProgressBar } from '@/components/katchadeck/progress-bar';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { getCreatureVisual } from '@/game/days/visuals';
 
-import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
-
 const UPGRADE_ART = require('@incubator/art-world/ui/upgrade-toy-v1.png');
 const CLEAR_MIST_ART = require('@incubator/art-world/ui/clear-mist-toy-v1.png');
 const LOCK_ART = require('@incubator/art-world/hex/kingdom_dream_mist_lock_v1_512.webp');
-const EGG_SILHOUETTE_ART = require('@incubator/art-cutouts/egg-base.webp');
 const MARKER_SIZE = 68;
 const MARKER_TILE_WIDTH_RATIO = 0.15;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -38,9 +35,7 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   const bare = Boolean(offer.bareMarker && sleepingPortrait);
   const markerSkin = offer.markerSkinId ? katchimeraSkinById.get(offer.markerSkinId) : null;
   const markerPortrait = markerSkin?.visualKey ? getCreatureVisual(markerSkin.visualKey, 'grown') : null;
-  const hatchable = offer.hatchable;
-  const hatchableAsleep = hatchable?.state === 'sleeping';
-  const paintedWidth = markerPortrait || sleepingPortrait || hatchable ? 78 : MARKER_SIZE;
+  const paintedWidth = markerPortrait || sleepingPortrait ? 78 : MARKER_SIZE;
   const campaignPending = Boolean(markerSkin && !offer.eligible);
   useEffect(() => {
     visibility.value = hidden ? withTiming(0, { duration: reduced ? 80 : 140 })
@@ -95,17 +90,16 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   return <Animated.View pointerEvents={hidden ? 'none' : 'box-none'} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} style={[styles.position, projection]}>
       <Animated.View ref={target} collapsable={false} pointerEvents="none" accessible={false}
         onLayout={() => { onTargetChange?.(offer.id, null); if (!moving && !hidden) onTargetChange?.(offer.id, node.current); }} style={[styles.spotlightTarget, spotlightBounds]} />
-      <AnimatedPressable ref={button} collapsable={false} hitSlop={6} accessibilityRole="button" accessibilityLabel={hatchableAsleep ? `${offer.name}, still under the Mist` : hatchable ? `${offer.name}, an Egg under the Mist, ${offer.cost} Glow to clear` : sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
-        accessibilityValue={locked || sleepingPortrait || hatchableAsleep ? undefined : { min: 0, max: glowTotal, now: glowProgress, text: offer.restorationProgress ? `${glowProgress} of ${glowTotal} beds grown` : offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
+      <AnimatedPressable ref={button} collapsable={false} hitSlop={6} accessibilityRole="button" accessibilityLabel={sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
+        accessibilityValue={locked || sleepingPortrait ? undefined : { min: 0, max: glowTotal, now: glowProgress, text: offer.restorationProgress ? `${glowProgress} of ${glowTotal} beds grown` : offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
         accessibilityHint={offer.lockedReason ?? (campaignPending ? 'Resumes this island story' : offer.affordable ? 'Opens upgrade details' : `${offer.missingGlow} more Glow needed. Opens upgrade details.`)}
         disabled={moving || hidden || inert} accessibilityState={{ disabled: moving || hidden || inert }} onPress={() => onPress(offer)} style={[styles.hitTarget, hitMotion]}>
       <Animated.View pointerEvents="none" onLayout={(event) => setBubbleHeight(event.nativeEvent.layout.height)}
-        style={[styles.bubble, markerPortrait || sleepingPortrait || hatchable ? styles.portraitBubble : null, sleepingPortrait || hatchableAsleep ? styles.sleepingBubble : null, bare ? styles.bareBubble : null, bubbleMotion]}>
+        style={[styles.bubble, markerPortrait || sleepingPortrait ? styles.portraitBubble : null, sleepingPortrait ? styles.sleepingBubble : null, bare ? styles.bareBubble : null, bubbleMotion]}>
         {/* Paint first so the seam it covers never sits above the icon/portrait
             content — it only fills the border gap, it isn't a foreground shape. */}
         {bare ? null : <View pointerEvents="none" style={styles.tail} />}
-        {hatchable ? <HatchableEggFace state={hatchable.state} active={!moving && !hidden && !inert && !reduced} glowProgress={glowProgress} glowTotal={glowTotal} cost={offer.cost} missingGlow={offer.missingGlow} />
-        : sleepingPortrait ? <>
+        {sleepingPortrait ? <>
           <View style={[styles.portraitFrame, styles.sleepingFrame]}>
             <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain"
               source={sleepingPortrait.source} style={[styles.portrait, styles.silhouette]} transition={0} accessible={false} />
@@ -126,33 +120,6 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
       </AnimatedPressable>
   </Animated.View>;
 }
-/**
- * A hatchable companion's tile: a silhouette of the Egg the Mist is keeping,
- * rays turning slowly behind it once the tile has woken, faster and warmer
- * once the light is enough. Asleep, it is dim and still. The Glow ring below
- * is the same bar every marker draws. Nothing here casts a shadow, and the
- * rays stop whenever the marker is moving, hidden or under reduced motion.
- */
-function HatchableEggFace({ state, active, glowProgress, glowTotal, cost, missingGlow }: {
-  state: NonNullable<WorldUpgradeOffer['hatchable']>['state']; active: boolean; glowProgress: number; glowTotal: number; cost: number; missingGlow: number;
-}) {
-  const asleep = state === 'sleeping';
-  const ready = state === 'ready';
-  return <>
-    <View style={[styles.portraitFrame, styles.eggFrame, asleep ? styles.eggFrameAsleep : ready ? styles.eggFrameReady : null]}>
-      {asleep ? null : <RotatingRadialSunburst active={active} baseOpacity={ready ? 0.9 : 0.55} rotationDurationMs={ready ? 11_000 : 26_000} size={92} style={styles.eggRays} />}
-      <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain"
-        source={EGG_SILHOUETTE_ART} style={[styles.eggSilhouette, asleep ? styles.eggSilhouetteAsleep : ready ? styles.eggSilhouetteReady : null]} transition={0} accessible={false} />
-    </View>
-    {asleep ? <Text style={styles.sleepingGlyph}>· · ·</Text> : <>
-      <View pointerEvents="none" style={[styles.progress, styles.portraitProgress]}>
-        <ProgressBar current={glowProgress} total={glowTotal} minimumPercent={0} variant="egg" />
-      </View>
-      <Text style={styles.percent}>{upgradePercent(cost - missingGlow, cost)}%</Text>
-    </>}
-  </>;
-}
-
 const styles = StyleSheet.create({
   spotlightTarget: { position: 'absolute' },
   position: { position: 'absolute', left: 0, top: 0, width: 68, height: 68, zIndex: 18 },
@@ -178,12 +145,4 @@ const styles = StyleSheet.create({
   sleepingFrame: { backgroundColor: '#D9DECF', borderColor: '#F3ECDD' },
   silhouette: { opacity: 0.78, tintColor: '#344238' },
   sleepingGlyph: { color: '#7B6544', fontSize: 11, lineHeight: 14, fontWeight: '900', letterSpacing: 1, marginTop: 1 },
-  // The Egg under the Mist: a night-blue well for the silhouette, warming to amber once the light is enough.
-  eggFrame: { backgroundColor: '#2F3550', borderColor: '#FFF6D8' },
-  eggFrameAsleep: { backgroundColor: '#3A3F4D', borderColor: '#E9E1CF' },
-  eggFrameReady: { backgroundColor: '#5A3E1E' },
-  eggRays: { position: 'absolute', left: -15, top: -15 },
-  eggSilhouette: { width: 46, height: 46, tintColor: '#171A26', opacity: 0.92 },
-  eggSilhouetteAsleep: { tintColor: '#20232C', opacity: 0.55 },
-  eggSilhouetteReady: { tintColor: '#F2B457', opacity: 1 },
 });

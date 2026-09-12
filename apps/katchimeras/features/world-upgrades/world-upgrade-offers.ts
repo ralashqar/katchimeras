@@ -1,8 +1,6 @@
 import { HAVEN_ENVIRONMENTS } from '@/constants/haven-catalog';
 import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
 import { SHARED_WORLD_PURCHASES } from '@/constants/shared-world';
-import { hatchableByTile } from '@/constants/hatchable-companions/registry';
-import { hatchableTileState, type HatchableTileState } from '@/utils/merge-world/glow-discovery-policy';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { StoryWorldUpgradeEffectPayload, StoryTarget } from '@/types/content-flow';
@@ -46,8 +44,6 @@ export type WorldUpgradeOffer = WorldUpgradeDefinition & {
   bareMarker?: boolean;
   /** A friend's restoration board in progress: the marker's bar shows the beds, not Glow. */
   restorationProgress?: { current: number; total: number };
-  /** A hatchable companion's misted tile: the marker is a silhouette Egg, lit by where the tile stands. */
-  hatchable?: { companion: MergeCharacterId; state: HatchableTileState; sleepingLine: string };
 };
 
 export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [
@@ -130,17 +126,8 @@ export function worldUpgradeOffers(world: MergeWorldState): WorldUpgradeOffer[] 
     const markerSkinId = campaign && world.islandCampaigns?.[campaign.campaignId]?.discoveryRevealSeenAt != null
       ? campaign.residentSkinId
       : undefined;
-    // A hatchable companion's tile: asleep under the Mist until its turn, in the tile's own words.
-    const hatchableDefinition = target.kind === 'haven_structure' ? hatchableByTile(target.structureId) : null;
-    const hatchable: WorldUpgradeOffer['hatchable'] = hatchableDefinition
-      ? { companion: hatchableDefinition.companion, state: hatchableTileState(world, hatchableDefinition), sleepingLine: hatchableDefinition.tile.markerLines.sleeping }
-      : undefined;
-    if (hatchable?.state === 'sleeping') {
-      eligible = false;
-    }
     return [{ ...definition, cost, economyMode, currentLevel, maxLevel: worldUpgradeMaxLevel(definition), storyId: worldUpgradeStory(definition.id, definition.nextLevel)?.id, eligible, markerSkinId,
-      affordable: world.coins >= cost, missingGlow: Math.max(0, cost - world.coins), ...(restorationProgress ? { restorationProgress } : {}),
-      ...(hatchable ? { hatchable, ...(hatchable.state === 'sleeping' ? { lockedReason: hatchable.sleepingLine, lockedLabel: 'Held' } : {}) } : {}) }];
+      affordable: world.coins >= cost, missingGlow: Math.max(0, cost - world.coins), ...(restorationProgress ? { restorationProgress } : {}) }];
   });
 }
 
@@ -160,15 +147,12 @@ export function worldUpgradeArchiveOffer(world: MergeWorldState, id: string): Wo
 }
 
 
-/**
- * A pending mist lesson owns its upgrade UI even if an old FTUE snapshot lags.
- * `activeTileId` is the hatchable tile whose discovery `glowRun` belongs to.
- */
+/** A pending mist lesson owns its upgrade UI even if an old FTUE snapshot lags. */
 export function visibleWorldUpgradeOffers(offers: WorldUpgradeOffer[], ftueStepId: string | undefined,
-  glowRun: { nodeId: string; status: string } | null, activeTileId = 'steppling-home') {
-  return offers.filter((offer) => (offer.eligible || offer.markerSkinId != null || offer.sleepingSkinId != null || offer.hatchable?.state === 'sleeping') && (
+  glowRun: { nodeId: string; status: string } | null) {
+  return offers.filter((offer) => (offer.eligible || offer.markerSkinId != null || offer.sleepingSkinId != null) && (
     glowRun && glowRun.status !== 'completed'
-      ? ['gateway.ready', 'gateway.return', 'gateway.offer'].includes(glowRun.nodeId) && offer.id === `mist:${activeTileId}`
+      ? ['gateway.ready', 'gateway.return', 'gateway.offer'].includes(glowRun.nodeId) && offer.id === 'mist:steppling-home'
       // The six resting friends are the opening's whole point: they stay on the
       // map from the first frame (inert), while every other marker waits.
       : ftueStepId ? (['world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId) && offer.id === 'haven:mossprout') || offer.sleepingSkinId != null

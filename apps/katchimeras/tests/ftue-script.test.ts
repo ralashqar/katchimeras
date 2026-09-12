@@ -1227,7 +1227,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCanvas, /renderToHardwareTextureAndroid=\{false\}[\s\S]*?shouldRasterizeIOS=\{false\}[\s\S]*?styles\.worldFtueCreatureNativeSurface/);
   assert.match(kingdomCanvas, /WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE = 2[\s\S]*?hatchPulseRingSize/);
   assert.match(kingdomCanvas, /worldFtueRewardGlow[\s\S]*?borderWidth: 2 \* WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE[\s\S]*?creatureRewardGlowSize/);
-  assert.match(kingdomCanvas, /accessibilityLabel=\{`\$\{\(presentation\?\.hatchFamilyId && hatchableByCompanion\(presentation\.hatchFamilyId\)\?\.displayName\) \?\? 'Mossprout'\} animated`\}[\s\S]*?allowDownscaling=\{false\}/, 'the hatched friend is named from its definition');
+  assert.match(kingdomCanvas, /accessibilityLabel=\{`\$\{presentation\?\.hatchFamilyId === 'steppling' \? 'Steppling' : 'Mossprout'\} animated`\}[\s\S]*?allowDownscaling=\{false\}/);
   assert.match(mossproutOpening, /handleFtueEnergyTokenArrive[\s\S]*?index === count - 1[\s\S]*?pulseEgg\(\)/);
   assert.match(mossproutOpening, /onEnergyTokenArrive=\{handleFtueEnergyTokenArrive\}/);
   assert.match(mossproutOpening, /companionStageActive && subjectHandoffSettled[\s\S]*?<CompanionHomeEnvironmentStage/);

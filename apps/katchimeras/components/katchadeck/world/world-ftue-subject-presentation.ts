@@ -1,10 +1,9 @@
 import type { TodayHatchPresentation } from '@/utils/today-hatch-presentation';
-import type { MergeCharacterId } from '@/types/merge-world';
 
 export type WorldFtueSubjectPresentation = {
   /** Load the resident behind the Egg without starting hatch expressions. */
   preloadHatch?: boolean;
-  hatchFamilyId?: MergeCharacterId;
+  hatchFamilyId?: 'mossprout' | 'steppling';
   companionVisible: boolean;
   feedbackKey: number;
   feedExpressionKey: number;

@@ -2,14 +2,13 @@ import { localDayId } from '@/utils/world-identity-rules';
 import { GLOW } from '@/constants/glow';
 import { MOSSPROUT_DREAM_ECHOES, MERGE_GENERATORS_BY_ID, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { SHARED_WORLD_PURCHASES } from '@/constants/shared-world';
-import { hatchableByUnlock, STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
-import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import type { TutorialGeneratorRule } from './tutorial-generator-policy';
 import type { MergeOrder, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 
-import { GLOW_GATEWAY_ID, GLOW_ORDER_IDS, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/constants/glow-discovery-ids';
-
-export { GLOW_GATEWAY_ID, GLOW_ORDER_IDS, MOSSPROUT_BASKET_ARRIVAL_ID };
+export const GLOW_GATEWAY_ID = 'mossprout:overgrown-trail' as const;
+export const GLOW_ORDER_IDS = ['mossprout:glow:plant-1', 'mossprout:glow:plant-2'] as const;
+/** The parcel the Garden Basket arrives in: the first thing the player opens on the Garden board. */
+export const MOSSPROUT_BASKET_ARRIVAL_ID = 'arrival:ftue:garden-basket';
 /** The lesson's board layout: 3 is the Basket by parcel on a board with no loose items. An older layout is re-prepared. */
 export const GLOW_LESSON_LAYOUT_VERSION = 3 as const;
 export const GLOW_ECHO_IDS = ['glow:seed', 'glow:sprout'] as const;
@@ -40,32 +39,10 @@ export function glowTutorialDrop(state: MergeWorldState, generatorId: string) {
 export const WORLD_UNLOCK_CATALOG = Object.fromEntries(SHARED_WORLD_PURCHASES.map((tile) => [tile.unlockId, { ...tile, destination: tile.companion }]));
 
 /** Paid exploration is independent of relationship-based environment stages. */
-export function hatchableGatewayState(state: MergeWorldState, definition: HatchableCompanionDefinition): 'egg' | 'open' | 'locked' {
-  if (state.companionDiscovery.records.some((record) => record.characterId === definition.companion)) return 'open';
-  if (state.worldUnlocks?.[definition.tile.unlockId]) return 'egg';
-  return 'locked';
-}
 export function glowGatewayState(state: MergeWorldState): 'egg' | 'open' | 'locked' | undefined {
-  return hatchableGatewayState(state, STEPPLING_HATCHABLE);
-}
-/** Whether a hatchable tile has woken: its definition says what has to have happened first. */
-export function hatchableAvailable(state: MergeWorldState, definition: HatchableCompanionDefinition): boolean {
-  const { availability } = definition;
-  if (availability.kind === 'after_ftue') return true;
-  if (availability.kind === 'kingdom_goal_introduced') return state.kingdomGoal?.introducedAt != null;
-  return state.companionDiscovery.records.some((record) => record.characterId === availability.companion);
-}
-export type HatchableTileState = 'sleeping' | 'saving' | 'ready' | 'egg' | 'open';
-/**
- * Where a hatchable tile stands for the marker and the engine: asleep under
- * the Mist until its turn, then saving light toward the price, ready when the
- * light is enough, an Egg once paid, open once the friend has hatched.
- */
-export function hatchableTileState(state: MergeWorldState, definition: HatchableCompanionDefinition): HatchableTileState {
-  const gateway = hatchableGatewayState(state, definition);
-  if (gateway !== 'locked') return gateway;
-  if (!hatchableAvailable(state, definition)) return 'sleeping';
-  return state.coins >= definition.tile.price ? 'ready' : 'saving';
+  if (state.companionDiscovery.records.some((record) => record.characterId === 'steppling')) return 'open';
+  if (state.worldUnlocks?.[GLOW_GATEWAY_ID]) return 'egg';
+  return 'locked';
 }
 
 export function glowDiscoveryOrder(index: 0 | 1, now: number): MergeOrder {
@@ -141,8 +118,6 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
     if (savedReceipt) return { ...no(), storyWorldMutationReceipt: savedReceipt };
     if (existing && !command.receiptId) return no();
     const owned = state.companionDiscovery.records.some((record) => record.characterId === definition.destination);
-    const hatchable = hatchableByUnlock(command.targetId);
-    if (hatchable && !existing && !owned && !hatchableAvailable(state, hatchable)) return no(hatchable.tile.markerLines.sleeping);
     const cost = existing || owned ? 0 : definition.price;
     if (state.coins < cost) return no('Complete requests to earn more Glow.');
     const receipt = command.receiptId ? {
@@ -166,19 +141,17 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
   if (!existing.transferredAt) return no('Follow the glow to this Egg’s home first.');
   if (existing.hatchedAt) return no();
   const records = state.companionDiscovery.records;
-  // The hatch records what the companion's definition says it resolves: Steppling his own gate, later friends a shared one.
-  const discovery = hatchableByUnlock(command.targetId)?.discovery ?? STEPPLING_HATCHABLE.discovery;
   return changed(state, {
     ...state, worldUnlocks: { ...state.worldUnlocks, [command.targetId]: { ...existing, hatchedAt: command.now } },
     unlockedCharacters: [...new Set([...state.unlockedCharacters, definition.destination])],
     companionDiscovery: {
       ...state.companionDiscovery,
       records: records.some((record) => record.characterId === definition.destination) ? records : [...records, {
-        characterId: definition.destination, source: 'ftue_hatch', gateId: discovery.gateId, pathId: discovery.pathId,
+        characterId: definition.destination, source: 'ftue_hatch', gateId: 'gate-2-steppling', pathId: 'overgrown-trail',
         discoveredAt: command.now, revealSeenAt: command.now, firstOrderCompletedAt: null, permanentFeatureId: null,
       }],
-      openedGateIds: [...new Set([...state.companionDiscovery.openedGateIds, discovery.gateId])],
-      completedGateIds: [...new Set([...state.companionDiscovery.completedGateIds, discovery.gateId])],
+      openedGateIds: [...new Set([...state.companionDiscovery.openedGateIds, 'gate-2-steppling'])],
+      completedGateIds: [...new Set([...state.companionDiscovery.completedGateIds, 'gate-2-steppling'])],
     },
   }, command.now);
 }

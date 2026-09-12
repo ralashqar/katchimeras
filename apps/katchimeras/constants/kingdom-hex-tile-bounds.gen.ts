@@ -142,7 +142,6 @@ export const KINGDOM_HEX_TILE_ALPHA_BOUNDS = {
   'resident_steppling_hex_tile_v3.webp': { left: 17, top: 47, right: 1009, bottom: 891 },
   'resident_tasklet_hex_tile.webp': { left: 14, top: 82, right: 1010, bottom: 942 },
   'resident_vesperitt_hex_tile.webp': { left: 14, top: 137, right: 1010, bottom: 887 },
-  'shared_world_baristabbit_window_hex_tile_v1.webp': { left: 43, top: 44, right: 980, bottom: 952 },
   'shared_world_steppling_trailhead_hex_tile_v1.webp': { left: 43, top: 36, right: 980, bottom: 952 },
   'zodiac_aquarius_hex_tile.webp': { left: 14, top: 70, right: 1010, bottom: 953 },
   'zodiac_aries_hex_tile.webp': { left: 14, top: 88, right: 1010, bottom: 935 },

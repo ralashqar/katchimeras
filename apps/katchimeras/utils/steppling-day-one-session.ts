@@ -7,11 +7,7 @@ export function migrateStepplingDayOneSession(session: ConversationSession): Con
   return { ...session, definitionVersion: 3, currentNodeId: answer ? `handoff.${answer.optionId}` : 'reflection',
     pendingReply: undefined, pendingNextNodeId: undefined, lastReply: undefined, exitTransition: undefined };
 }
-/** A completed day-one conversation whose garden handoff has not been taken up yet. */
-export function gardenHandoffPendingFor(session: ConversationSession, definitionId: string, minimumVersion = 3): boolean {
-  return session.definitionId === definitionId && session.definitionVersion >= minimumVersion && !session.preview
-    && session.status === 'completed' && session.gardenHandoffAt == null;
-}
 export function stepplingGardenHandoffPending(session: ConversationSession): boolean {
-  return gardenHandoffPendingFor(session, DEFINITION_ID);
+  return session.definitionId === DEFINITION_ID && session.definitionVersion >= 3 && !session.preview
+    && session.status === 'completed' && session.gardenHandoffAt == null;
 }

@@ -7,7 +7,6 @@ import { GLOW_DISCOVERY_FLOW, glowDiscoveryScene, glowDiscoveryLocksCamera } fro
 import { createContentFlowRun, reduceContentFlow } from '../features/content-flow/content-flow-interpreter';
 import { createMossproutChapterZeroState } from '../utils/merge-world/onboarding';
 import type { ContentFlowRun } from '../types/content-flow';
-import { STEPPLING_HATCHABLE } from '../constants/hatchable-companions/registry';
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const reveal = (): ContentFlowRun => ({ ...createContentFlowRun(GLOW_DISCOVERY_FLOW, { runId: 'handoff' }), nodeId: 'gateway.egg', phase: 'awaiting_input' });
 
@@ -28,35 +27,28 @@ test('Meet the egg saves acceptance once and waits for encounter readiness acros
 });
 
 test('legacy accepted reveal resumes an unopened egg but never replays a visited or hatched encounter', () => {
-  const runtime = loadNativeModule('features/onboarding/hatchable-runtime.ts', {
-    'react': {},
-    '@/features/content-flow/content-flow-catalog': {}, '@/features/content-flow/content-flow-director': {}, '@/features/content-flow/content-flow-repository': {},
-    '@/utils/merge-world/repository': {}, '@/utils/merge-world/glow-discovery-policy': { hatchableGatewayState: () => 'egg' },
-    '@/constants/hatchable-companions/registry': { HATCHABLE_COMPANIONS: [STEPPLING_HATCHABLE], hatchableByCompanion: () => null },
-    './steppling-egg-policy': { hatchableEggProgress: (world: { stepplingEgg?: unknown }) => world.stepplingEgg },
-    './glow-discovery-flow': {}, './steppling-garden-lesson': {},
-    './hatchable-flows': { hatchableFlows: () => ({ discovery: GLOW_DISCOVERY_FLOW }), HATCHABLE_LESSON_FINALE_NODE_IDS: ['closing', 'summary'], HATCHABLE_MISSION_CLEAR_NODE_ID: 'mission.clear', HATCHABLE_MISSION_CLEARED_EVENT: 'glow.mission.cleared', HATCHABLE_EGG_ENTERED_EVENT: 'glow.egg.entered' },
+  const runtime = loadNativeModule('features/onboarding/glow-discovery-runtime.ts', {
+    '@/features/content-flow/content-flow-director': {}, '@/features/content-flow/content-flow-repository': {},
+    '@/utils/merge-world/repository': {}, '@/utils/merge-world/glow-discovery-policy': { glowGatewayState: () => 'egg' },
+    './glow-discovery-flow': { GLOW_DISCOVERY_FLOW },
   });
   const world = createMossproutChapterZeroState();
   const old = { ...reveal(), definitionVersion: 4, nodeId: 'complete', phase: 'completed', status: 'completed', completedAt: 123 };
-  const migrate = (run: unknown, current: unknown) => runtime.migrateHatchableEggHandoff(STEPPLING_HATCHABLE, run, current);
-  const pending = migrate(old, world);
+  const pending = runtime.migrateGlowEggHandoff(old, world);
   assert.equal(pending.nodeId, 'egg.enter'); assert.equal(pending.completedAt, null);
-  assert.equal(migrate(pending, world), pending);
-  assert.equal(migrate({ ...old, definitionVersion: 5 }, world).status, 'completed');
-  assert.equal(migrate(old, { ...world, stepplingEgg: { sourceDayId: '2026-09-04' } }), old);
-  assert.equal(migrate(old, { ...world, companionDiscovery: { records: [{ characterId: 'steppling' }] } }), old);
+  assert.equal(runtime.migrateGlowEggHandoff(pending, world), pending);
+  assert.equal(runtime.migrateGlowEggHandoff({ ...old, definitionVersion: 5 }, world).status, 'completed');
+  assert.equal(runtime.migrateGlowEggHandoff(old, { ...world, stepplingEgg: { sourceDayId: '2026-09-04' } }), old);
+  assert.equal(runtime.migrateGlowEggHandoff(old, { ...world, companionDiscovery: { records: [{ characterId: 'steppling' }] } }), old);
 });
 
 test('egg handoff waits for the host, opens once, and retries a failed readiness save without replaying entry', async () => {
   let entries = 0; let acknowledgements = 0; let preparations = 0; let fail = true;
   const module = loadNativeModule('features/onboarding/use-glow-egg-handoff.ts', {
-    './hatchable-runtime': {
-      recoverHatchableEggHandoff: async () => {},
-      acknowledgeHatchableEggEntry: async () => { acknowledgements++; if (fail) throw new Error('disk'); },
+    './glow-discovery-runtime': {
+      recoverGlowEggHandoff: async () => {},
+      acknowledgeGlowEggEntry: async () => { acknowledgements++; if (fail) throw new Error('disk'); },
     },
-    './steppling-egg-policy': { hatchableEggProgress: (world: { stepplingEgg?: unknown }) => world.stepplingEgg },
-    '@/constants/hatchable-companions/registry': { STEPPLING_HATCHABLE },
   });
   let result: { error: boolean; retry: () => void; onReady: () => void };
   const world = createMossproutChapterZeroState();

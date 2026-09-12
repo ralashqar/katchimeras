@@ -24,12 +24,6 @@ export const COMPANION_JOURNEY_PROFILES: Partial<Record<KatchimeraFamilyId, Comp
     requestTitles: ['Pack a little comfort', 'Prepare the next path'],
     lifeRequest: '500 new steps, adapted movement, or a rest check-in',
   },
-  baristabbit: {
-    tracker: 'water', dailyGardenTitles: ['Something for the counter', 'A pour worth keeping'],
-    name: 'Baristabbit', worldName: 'our counter', mergeChainId: 'drink:hot', theme: 'rest',
-    requestTitles: ['A warm beginning', 'A reset in a cup'],
-    lifeRequest: 'One slow pause, with or without a drink',
-  },
   mossprout: {
     tracker: 'water', dailyGardenTitles: ['A little garden company', 'Something worth growing'],
     name: 'Mossprout', worldName: 'our Garden', mergeChainId: 'nature:garden', theme: 'nature',

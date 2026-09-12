@@ -39,7 +39,7 @@ export function prioritizedVisibleMergeOrders(
   const position = (order: MergeOrder, sourceIndex: number) => {
     const journeyIndex = journeyIds.indexOf(order.id);
     if (journeyIndex >= 0) return journeyIndex;
-    const batch = state.companionDailyGarden?.[order.characterId];
+    const batch = state.companionDailyGarden?.[order.characterId as 'mossprout' | 'steppling'];
     const dailyIndex = batch?.orders.findIndex((candidate) => candidate.id === order.id) ?? -1;
     if (dailyIndex >= 0) return dailyIndex;
     const legacyIndex = state.mossproutDailyGardenOrders?.offeredOrderIds.indexOf(order.id) ?? -1;

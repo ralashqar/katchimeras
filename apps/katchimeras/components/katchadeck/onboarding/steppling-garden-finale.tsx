@@ -9,12 +9,10 @@ import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { CompanionCinematicStage } from '@/components/katchadeck/world/companion-cinematic-stage';
 import { GameLoopSummary } from './game-loop-summary';
-import { hatchableCutoutArt } from '@/constants/hatchable-companions/tile-art';
-import { advanceGardenFinale } from '@/features/onboarding/hatchable-runtime';
-import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
-import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
+import { STEPPLING_GARDEN_CLOSING } from '@/features/onboarding/steppling-garden-lesson';
+import { advanceStepplingFinale } from '@/features/onboarding/steppling-garden-runtime';
 
-export function StepplingGardenFinale({ summary, hosted, definition = STEPPLING_HATCHABLE }: { summary: boolean; hosted: boolean; definition?: HatchableCompanionDefinition }) {
+export function StepplingGardenFinale({ summary, hosted }: { summary: boolean; hosted: boolean }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -33,7 +31,7 @@ export function StepplingGardenFinale({ summary, hosted, definition = STEPPLING_
     if (pending.current) return;
     pending.current = true; setBusy(true); setFailed(false);
     try {
-      const next = await advanceGardenFinale(definition, summary ? 'finish' : 'summary');
+      const next = await advanceStepplingFinale(summary ? 'finish' : 'summary');
       if (!next || (summary ? next.status !== 'completed' : next.nodeId !== 'summary')) throw new Error('Not saved');
     } catch { setFailed(true); }
     finally { pending.current = false; setBusy(false); }
@@ -48,12 +46,12 @@ export function StepplingGardenFinale({ summary, hosted, definition = STEPPLING_
     void advance();
   };
   return <View style={StyleSheet.absoluteFill}>
-    <CompanionCinematicStage creature={hatchableCutoutArt(definition.companion)}
-      environmentKey={null} lifted={false} name={definition.displayName} visualKey={definition.companion}
-      stagePresentation={hosted ? 'speech-only' : 'full'} title={summary ? '' : definition.lesson.closing} />
+    <CompanionCinematicStage creature={require('@incubator/art-cutouts/steppling.png')}
+      environmentKey={null} lifted={false} name="Steppling" visualKey="steppling"
+      stagePresentation={hosted ? 'speech-only' : 'full'} title={summary ? '' : STEPPLING_GARDEN_CLOSING} />
     {!summary ? <View style={[styles.footer, { bottom: insets.bottom + 24 }]}>
       {failed ? <ThemedText accessibilityRole="alert">Couldn’t save. Please try again.</ThemedText> : null}
-      <KatchaButton fullWidth label={definition.lesson.copy.finaleAction} loading={busy} onPress={() => void advance()} />
+      <KatchaButton fullWidth label="Our adventure" loading={busy} onPress={() => void advance()} />
     </View> : <KatchaSheet size="full" fullBleed surface="parchment" showClose={false} entranceMotion="fade" scroll={summaryScrolls}
       scrollContentStyle={{ paddingBottom: 0 }}
       onRequestClose={() => {}}

@@ -109,11 +109,8 @@ function settlement(initial?: ContentFlowRun) {
     return run;
   };
   const module = loadNativeModule('features/companion/use-steppling-day-one.ts', {
-    '@/features/onboarding/hatchable-runtime': { ensureGardenLesson: async () => {}, hatchableForCompanion: () => null },
-    '@/utils/steppling-day-one-session': { gardenHandoffPendingFor: (session: Parameters<typeof stepplingGardenHandoffPending>[0]) => stepplingGardenHandoffPending(session) },
-    '@/features/onboarding/hatchable-flows': { hatchableFlows: () => ({ dayOne: STEPPLING_DAY_ONE_FLOW }) },
-    '@/features/onboarding/steppling-egg-policy': { hatchableEggProgress: (world: { stepplingEgg?: unknown }) => world.stepplingEgg },
-    '@/constants/hatchable-companions/registry': { STEPPLING_HATCHABLE: { companion: 'steppling', displayName: 'Steppling', dayOne: { conversationId: stepplingDayOneConversation.id, flow: { runId: 'journey:steppling:day-1', version: STEPPLING_DAY_ONE_FLOW.version }, choiceVariable: 'movementChoice' } } },
+    '@/features/onboarding/steppling-garden-runtime': { ensureStepplingGardenLesson: async () => {} },
+    '@/utils/steppling-day-one-session': { stepplingGardenHandoffPending },
     '@/features/content-flow/steppling-day-one-flow-v2': { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 },
     '@/utils/companion-life-recording': { recordLifeFlow() {} },
     '@/constants/steppling-day-one-conversation': { STEPPLING_DAY_ONE_CONVERSATION_ID: stepplingDayOneConversation.id },

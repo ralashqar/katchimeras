@@ -58,7 +58,6 @@ import { CompanionStepsValue } from '@/components/katchadeck/world/companion-ste
 import { worldEggReadyEffectsVisible, type WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
-import { hatchableByCompanion, hatchableByTile } from '@/constants/hatchable-companions/registry';
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
@@ -193,8 +192,6 @@ type Props = {
   discoveredEggPresentation?: WorldFtueSubjectPresentation | null;
   discoveredEggInteraction?: boolean;
   discoveredEggTargetRef?: RefObject<ViewType | null>;
-  /** The hatchable companion's tile the gateway camera, the docked mission and the discovered Egg belong to. */
-  gatewayTileId?: string;
   /** Opening: Mossprout's tile under mist ('veiled'), crossblending away ('lifting'), or clear. */
   homeVeil?: HomeVeilState;
   /** Draw Mossprout's tile alone (the opening's first beat). */
@@ -517,7 +514,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   discoveredEggPresentation,
   discoveredEggInteraction = false,
   discoveredEggTargetRef,
-  gatewayTileId = 'steppling-home',
   homeVeil = 'none',
   homeSolo = false,
   openingWeather = false,
@@ -537,10 +533,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const [assetRevision, setAssetRevision] = useState(0);
   const [upgradePhaseState, setUpgradePhaseState] = useState<HavenUpgradePhaseState>({ nonce: null, phase: 'armed' });
   const upgradePhase = havenUpgradePhaseForPresentation(upgradePhaseState, upgradePresentation?.nonce);
-  // A hatchable companion's tile clearing from the Mist: the Egg is revealed with it.
-  const revealingHatchableTileId = upgradePresentation?.visualTarget?.kind === 'haven_structure' && hatchableByTile(upgradePresentation.visualTarget.structureId)
-    ? upgradePresentation.visualTarget.structureId : null;
-  const revealingStepplingEgg = revealingHatchableTileId != null && upgradePresentation?.fromStage === 0;
+  const revealingStepplingEgg = upgradePresentation?.visualTarget?.kind === 'haven_structure'
+    && upgradePresentation.visualTarget.structureId === 'steppling-home' && upgradePresentation.fromStage === 0;
   // One clock owns both the restored tile and its Egg, including slow art loads.
   const stepplingRevealProgress = useSharedValue(0);
   useLayoutEffect(() => {
@@ -629,8 +623,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const fromNatureLevels = upgradePresentation.natureIslandId
       ? { ...mossproutNatureIslandLevels, [upgradePresentation.natureIslandId]: upgradePresentation.fromStage as MossproutNatureIslandLevel }
       : mossproutNatureIslandLevels;
-    const fromGarden = revealingHatchableTileId
-      ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), hatchableTiles: { ...mossproutGarden?.hatchableTiles, [revealingHatchableTileId]: upgradePresentation.fromStage === 0 ? 'locked' as const : 'egg' as const } }
+    const fromGarden = upgradePresentation.visualTarget?.kind === 'haven_structure' && upgradePresentation.visualTarget.structureId === 'steppling-home'
+      ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), gateway: upgradePresentation.fromStage === 0 ? 'locked' as const : 'egg' as const }
       : upgradePresentation.visualTarget?.kind === 'haven_structure'
       && upgradePresentation.visualTarget.structureId === 'mossprout-hex-garden'
       ? { ...(mossproutGarden ?? { plantableMemories: [] }), level: upgradePresentation.fromStage }
@@ -645,7 +639,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     // The opening's lift keeps the veiled, solo world: the from-scene must not
     // bring the Garden and the islands in for the length of the crossblend.
     return buildMossproutHexNeighborhoodScene(fromSlots, fromNatureLevels, fromGarden, fromReveals, { homeVeiled: homeVeil === 'veiled' || homeVeil === 'lifting', homeSolo });
-  }, [committedScene, companionSlots, focusedMossproutWorld, homeSolo, homeVeil, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingHatchableTileId, upgradePresentation]);
+  }, [committedScene, companionSlots, focusedMossproutWorld, homeSolo, homeVeil, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, upgradePresentation]);
   const scene = upgradePresentation
     ? upgradeFromScene
     : storySceneGuard?.scene ?? committedScene;
@@ -704,11 +698,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const toLayer = build(false).tileArtLayers.find((layer) => layer.id === scene.centerTile.id);
       return fromLayer && toLayer ? { fromLayer, toLayer, tile: { id: toLayer.id, cx: scene.centerTile.cx, cy: scene.centerTile.cy } } : null;
     }
-    if (focusedMossproutWorld && revealingHatchableTileId) {
-      const layerId = `structure:${revealingHatchableTileId}`;
-      const atStage = (state: 'locked' | 'egg') => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels!, { ...mossproutGarden, level: mossproutGarden?.level ?? 0, plantableMemories: mossproutGarden?.plantableMemories ?? [], hatchableTiles: { ...mossproutGarden?.hatchableTiles, [revealingHatchableTileId]: state } });
-      const fromLayer = atStage(upgradePresentation.fromStage === 0 ? 'locked' : 'egg').tileArtLayers.find((layer) => layer.id === layerId);
-      const toLayer = atStage('egg').tileArtLayers.find((layer) => layer.id === layerId);
+    if (focusedMossproutWorld && upgradePresentation.visualTarget?.kind === 'haven_structure' && upgradePresentation.visualTarget.structureId === 'steppling-home') {
+      const atStage = (gateway: 'locked' | 'egg') => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels!, { ...mossproutGarden, level: mossproutGarden?.level ?? 0, plantableMemories: mossproutGarden?.plantableMemories ?? [], gateway });
+      const fromLayer = atStage(upgradePresentation.fromStage === 0 ? 'locked' : 'egg').tileArtLayers.find((layer) => layer.id === 'structure:steppling-home');
+      const toLayer = atStage('egg').tileArtLayers.find((layer) => layer.id === 'structure:steppling-home');
       return fromLayer && toLayer ? { fromLayer, toLayer, tile: { id: toLayer.id, cx: toLayer.frame.left + toLayer.frame.width / 2, cy: toLayer.frame.top + toLayer.frame.height / 2 } } : null;
     }
     if (focusedMossproutWorld && upgradePresentation.natureIslandId && mossproutNatureIslandLevels) {
@@ -776,7 +769,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const toLayer = toScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const tile = toScene.tiles.find((candidate) => candidate.id === `family:${upgradePresentation.characterId}`);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingHatchableTileId, scene.centerTile, upgradePresentation, verticalAlignmentSelection]);
+  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, scene.centerTile, upgradePresentation, verticalAlignmentSelection]);
   const discoveryLayers = useMemo(() => {
     if (!discoveryRevealFamilyId) return null;
     const revealed = companionSlots.find((slot) => slot.familyId === discoveryRevealFamilyId && slot.kind === 'revealed_egg');
@@ -870,7 +863,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (!initialTutorialCameraScale || !tutorialCamera || tutorialCamera.kind !== 'focus_target') return null;
     const target = tutorialCamera.target;
     if (target.kind === 'haven_gateway') {
-      const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${gatewayTileId}`)?.frame;
+      const frame = scene.tileArtLayers.find((layer) => layer.id === 'structure:steppling-home')?.frame;
       return frame ? {
         durationMs: tutorialCamera.durationMs,
         initialScale: initialTutorialCameraScale,
@@ -916,7 +909,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           : sharedResidentCenterY(residentAnchor.y, eggGrowthScale)
         : tile.cy,
     };
-  }, [gardenFocusFrame, gatewayTileId, initialTutorialCameraScale, scene.tileArtLayers, scene.tiles, tutorialCamera, viewport.height, worldSubjectPresentation?.growthProgress]);
+  }, [gardenFocusFrame, initialTutorialCameraScale, scene.tileArtLayers, scene.tiles, tutorialCamera, viewport.height, worldSubjectPresentation?.growthProgress]);
   const tutorialCameraKey = tutorialCamera
     ? `${JSON.stringify(tutorialCamera)}:${worldSubjectPresentation?.growthProgress ?? 'none'}`
     : 'none';
@@ -1031,7 +1024,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       return;
     }
     if (discoveredEggOriginRef.current) return;
-    const layer = scene.tileArtLayers.find((candidate) => candidate.id === `structure:${gatewayTileId}`);
+    const layer = scene.tileArtLayers.find((candidate) => candidate.id === 'structure:steppling-home');
     if (!layer) return;
     const anchor = layer.residentAnchor ?? { x: layer.frame.left + layer.frame.width / 2, y: layer.frame.top + layer.frame.height / 2 };
     discoveredEggOriginRef.current = readLiveCameraSnapshot();
@@ -1040,7 +1033,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       zoom: SHARED_EGG_REST_ZOOM,
       durationMs: reduceMotion ? 0 : SHARED_RESIDENT_FOCUS_DURATION_MS,
     });
-  }, [animateToCameraSnapshot, discoveredEggInteraction, focusTutorialResident, gatewayTileId, interactionResidentId, readLiveCameraSnapshot, reduceMotion, scene.tileArtLayers, tutorialCameraReady]);
+  }, [animateToCameraSnapshot, discoveredEggInteraction, focusTutorialResident, interactionResidentId, readLiveCameraSnapshot, reduceMotion, scene.tileArtLayers, tutorialCameraReady]);
   useEffect(() => {
     if (!tutorialCamera) {
       appliedTutorialCameraRef.current = 'none';
@@ -1064,7 +1057,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       ? target.characterId
       : null;
     if (target.kind === 'haven_gateway') {
-      const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${gatewayTileId}`)?.frame;
+      const frame = scene.tileArtLayers.find((layer) => layer.id === 'structure:steppling-home')?.frame;
       if (!frame) return;
       appliedTutorialCameraRef.current = applicationKey;
       focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, { anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom, unbounded: true });
@@ -1118,7 +1111,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       zoom: tutorialCamera.zoom,
       unbounded: true,
     });
-  }, [fitTutorialWorld, focusTutorialResident, gardenFrame, gatewayTileId, scene.tileArtLayers, scene.tiles, sceneHomeTile, tutorialCamera, tutorialCameraKey, tutorialCameraReady, worldSubjectPresentation?.growthProgress]);
+  }, [fitTutorialWorld, focusTutorialResident, gardenFrame, scene.tileArtLayers, scene.tiles, sceneHomeTile, tutorialCamera, tutorialCameraKey, tutorialCameraReady, worldSubjectPresentation?.growthProgress]);
   const storyCameraSnapshotsRef = useRef(new Map<string, KingdomCameraSnapshot>());
   const storyTargetFrame = useCallback((target: StoryTarget) => {
     if (target.kind === 'haven_world') return { left: 0, top: 0, width: scene.width, height: scene.height };
@@ -1769,7 +1762,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     <HavenUpgradeTileArt
                       key={`upgrade:${upgradeOwnsLayer ? upgradePresentation?.nonce : settlingUpgrade?.nonce}`}
                       fromLayer={transitionLayers.fromLayer}
-                      sharedRevealProgress={transitionLayers.toLayer.id === `structure:${gatewayTileId}` ? stepplingRevealProgress
+                      sharedRevealProgress={transitionLayers.toLayer.id === 'structure:steppling-home' ? stepplingRevealProgress
                         : transitionLayers.toLayer.id === scene.centerTile.id && (upgradeOwnsLayer ? revealingVeiledHome : settlingUpgrade?.nonce === veilLiftNonceRef.current)
                           ? homeVeilProgress : undefined}
                       imageLod={sceneTileImageLod}
@@ -1850,8 +1843,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 />
               );
             }) : null}
-            {focusedMossproutWorld && (mossproutGarden?.hatchableTiles?.[gatewayTileId] ?? mossproutGarden?.gateway) ? scene.tileArtLayers.filter((layer) => layer.id === `structure:${gatewayTileId}`).map((layer) => (
-              <Pressable ref={onGatewayTargetChange} collapsable={false} key={gatewayTileId} accessibilityRole="button" accessibilityLabel={(mossproutGarden.hatchableTiles?.[gatewayTileId] ?? mossproutGarden.gateway) === 'locked' ? `${hatchableByTile(gatewayTileId)?.tile.name ?? 'Misty clearing'}, clear mist for ${hatchableByTile(gatewayTileId)?.tile.price ?? 40} Glow` : 'A new friend is resting here'} onPress={interactionEnabled && !upgradePresentation ? onSelectGateway : undefined} style={[styles.natureIslandHitTarget, layer.frame]}>
+            {focusedMossproutWorld && mossproutGarden?.gateway ? scene.tileArtLayers.filter((layer) => layer.id === 'structure:steppling-home').map((layer) => (
+              <Pressable ref={onGatewayTargetChange} collapsable={false} key="steppling-home" accessibilityRole="button" accessibilityLabel={mossproutGarden.gateway === 'locked' ? 'Misty clearing, clear mist for 40 Glow' : 'A new friend is resting here'} onPress={interactionEnabled && !upgradePresentation ? onSelectGateway : undefined} style={[styles.natureIslandHitTarget, layer.frame]}>
               </Pressable>
             )) : null}
             {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onSelectMemoryPlant
@@ -1940,14 +1933,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           source={interactionResidentProjection.source}
         />
       ) : null}
-      {focusedMossproutWorld && (revealingStepplingEgg || (((mossproutGarden?.hatchableTiles?.[gatewayTileId] ?? mossproutGarden?.gateway) === 'egg' || discoveredEggInteraction) && !upgradePresentation && !storySceneGuard)) ? (() => {
+      {focusedMossproutWorld && (revealingStepplingEgg || ((mossproutGarden?.gateway === 'egg' || discoveredEggInteraction) && !upgradePresentation && !storySceneGuard)) ? (() => {
         // The guarded scene still contains mist; anchor the Egg to the incoming tile.
         const layer = revealingStepplingEgg ? upgradeLayers?.toLayer
-          : scene.tileArtLayers.find((candidate) => candidate.id === `structure:${gatewayTileId}`);
+          : scene.tileArtLayers.find((candidate) => candidate.id === 'structure:steppling-home');
         if (!layer) return null;
         const anchor = layer.residentAnchor ?? { x: layer.frame.left + layer.frame.width / 2, y: layer.frame.top + layer.frame.height / 2 };
         return <RevealedCompanionEgg idleDiscovery={!discoveredEggInteraction} fullSize eggSkinId="moss" presentation={discoveredEggPresentation} targetRef={discoveredEggTargetRef}
-          revealProgress={revealingStepplingEgg || settlingUpgrade?.layers.toLayer.id === `structure:${gatewayTileId}` ? stepplingRevealProgress : undefined}
+          revealProgress={revealingStepplingEgg || settlingUpgrade?.layers.toLayer.id === 'structure:steppling-home' ? stepplingRevealProgress : undefined}
           cameraScale={camera.scaleValue} cameraTranslateX={camera.translationXValue} cameraTranslateY={camera.translationYValue}
           sceneHeight={scene.height} sceneWidth={scene.width} x={anchor.x} y={anchor.y - SHARED_RESIDENT_BASELINE_LIFT}
           onPress={interactionEnabled && !upgradePresentation && !storySceneGuard ? onSelectGateway : undefined} />;
@@ -2350,7 +2343,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
         style={[StyleSheet.absoluteFill, eggMotionStyle]}>
         <Animated.View style={[StyleSheet.absoluteFill, eggFadeStyle]}>
         <View collapsable={false} ref={targetRef} style={StyleSheet.absoluteFill}>
-        <Pressable accessibilityLabel={idleDiscovery || (presentation?.hatchFamilyId && presentation.hatchFamilyId !== 'mossprout') ? 'Discovered Egg' : 'Mossprout Egg'} accessibilityRole="button" disabled={!onPress} onPress={onPress} style={StyleSheet.absoluteFill}>
+        <Pressable accessibilityLabel={idleDiscovery || presentation?.hatchFamilyId === 'steppling' ? 'Discovered Egg' : 'Mossprout Egg'} accessibilityRole="button" disabled={!onPress} onPress={onPress} style={StyleSheet.absoluteFill}>
           <Animated.View
             collapsable={false}
             renderToHardwareTextureAndroid={false}
@@ -2452,7 +2445,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
                 priority="high"
                 source={WORLD_FTUE_SOFT_GLOW}
                 style={[styles.worldFtueHatchGlow, hatchGlowStyle]}
-                tintColor={(presentation?.hatchFamilyId && hatchableByCompanion(presentation.hatchFamilyId)?.egg.accentColor) ?? FTUE_MOSSPROUT_CREATURE.accentColor}
+                tintColor={presentation?.hatchFamilyId === 'steppling' ? '#FFD76A' : FTUE_MOSSPROUT_CREATURE.accentColor}
                 transition={0}
               />
             </> : null}
@@ -2466,10 +2459,9 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
             }, rewardGlowStyle]} />
             <CreatureGroundShadow frameSize={creatureNativeWidth} stage="grown" visualKey={presentation?.hatchFamilyId ?? 'mossprout'} widthMultiplier={1.6} />
             <CreatureAnimatedArt
-              accessibilityLabel={`${(presentation?.hatchFamilyId && hatchableByCompanion(presentation.hatchFamilyId)?.displayName) ?? 'Mossprout'} animated`}
+              accessibilityLabel={`${presentation?.hatchFamilyId === 'steppling' ? 'Steppling' : 'Mossprout'} animated`}
               allowDownscaling={false}
-              fallbackSource={presentation?.hatchFamilyId === 'steppling' ? require('@incubator/art-world/square/steppling-standing-resident-512.webp')
-                : presentation?.hatchFamilyId && presentation.hatchFamilyId !== 'mossprout' ? resolveCreatureArtSource(presentation.hatchFamilyId) : WORLD_FTUE_MOSSPROUT_SOURCE}
+              fallbackSource={presentation?.hatchFamilyId === 'steppling' ? require('@incubator/art-world/square/steppling-standing-resident-512.webp') : WORLD_FTUE_MOSSPROUT_SOURCE}
               onLoad={presentation.onHatchAssetsReady}
               style={StyleSheet.absoluteFill}
               visualKey={presentation?.hatchFamilyId ?? 'mossprout'}

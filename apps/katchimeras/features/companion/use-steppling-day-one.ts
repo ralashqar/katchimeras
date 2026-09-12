@@ -1,69 +1,46 @@
-import { ensureGardenLesson, hatchableForCompanion } from '@/features/onboarding/hatchable-runtime';
-import { gardenHandoffPendingFor } from '@/utils/steppling-day-one-session';
+import { ensureStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
+import { stepplingGardenHandoffPending } from '@/utils/steppling-day-one-session';
 import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from '@/features/content-flow/steppling-day-one-flow-v2';
 import { recordLifeFlow } from '@/utils/companion-life-recording';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { STEPPLING_DAY_ONE_CONVERSATION_ID } from '@/constants/steppling-day-one-conversation';
 import { loadCompanionContentState, saveCompanionContentState } from '@/utils/companion-content-storage';
 import { loadMergeWorldState } from '@/utils/merge-world/repository';
 import { localDayId } from '@/utils/world-identity';
 import { bootstrapContentFlowCatalog } from '@/features/content-flow/content-flow-bootstrap';
 import { startContentFlow, dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
 import { loadContentFlowRun, reduceContentFlowRunAtomically } from '@/features/content-flow/content-flow-repository';
+import { STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID } from '@/features/content-flow/steppling-day-one-flow';
 import { LEGACY_STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/steppling-day-one-flow-v1';
 import { contentFlowDefinition } from '@/features/content-flow/content-flow-catalog';
-import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
-import { hatchableEggProgress } from '@/features/onboarding/steppling-egg-policy';
-import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
-import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
-import type { ContentFlowDefinition } from '@/types/content-flow';
 
-/**
- * A hatchable companion's day one: the first conversation's answers replayed
- * into its journey flow, whose last node hands over the spawner parcel. The
- * conversation owns presentation and answers; the journey journal owns its
- * one-shot parcel effect. Everything is keyed by the companion's definition.
- */
-
-/** Released flows a companion's older conversation sessions may still be on. Steppling shipped two before the definition existed. */
-const LEGACY_DAY_ONE_FLOWS: Partial<Record<string, readonly ContentFlowDefinition[]>> = {
-  steppling: [LEGACY_STEPPLING_DAY_ONE_FLOW, LEGACY_STEPPLING_DAY_ONE_FLOW_V2],
-};
-
-export function acknowledgeHatchableDayOneGarden(definition: HatchableCompanionDefinition) {
-  const state = loadCompanionContentState();
-  const pending = (session: Parameters<typeof gardenHandoffPendingFor>[0]) => gardenHandoffPendingFor(session, definition.dayOne.conversationId);
-  if (!state.conversationSessions.some(pending)) return;
-  saveCompanionContentState({ ...state, conversationSessions: state.conversationSessions.map((session) =>
-    pending(session) ? { ...session, gardenHandoffAt: Date.now() } : session) });
-}
 export function acknowledgeStepplingDayOneGarden() {
-  return acknowledgeHatchableDayOneGarden(STEPPLING_HATCHABLE);
+  const state = loadCompanionContentState();
+  if (!state.conversationSessions.some(stepplingGardenHandoffPending)) return;
+  saveCompanionContentState({ ...state, conversationSessions: state.conversationSessions.map((session) =>
+    stepplingGardenHandoffPending(session) ? { ...session, gardenHandoffAt: Date.now() } : session) });
 }
 
-export async function settleHatchableDayOne(definition: HatchableCompanionDefinition) {
-  const { conversationId } = definition.dayOne;
-  const { runId } = definition.dayOne.flow;
-  const flow = hatchableFlows(definition).dayOne;
-  const legacy = LEGACY_DAY_ONE_FLOWS[definition.companion] ?? [];
+/** Conversation owns presentation/answers; the journey journal owns its one-shot parcel effect. */
+export async function settleStepplingDayOne() {
   const session = [...loadCompanionContentState().conversationSessions].reverse().find((candidate) =>
-    candidate.definitionId === conversationId && candidate.status === 'completed' && !candidate.preview);
+    candidate.definitionId === STEPPLING_DAY_ONE_CONVERSATION_ID && candidate.status === 'completed' && !candidate.preview);
   if (!session) return false;
   bootstrapContentFlowCatalog();
-  const flowForSession = legacy.find((candidate) => candidate.version === session.definitionVersion) ?? flow;
-  let run = await loadContentFlowRun(runId)
-    ?? await startContentFlow(session.definitionVersion < flow.version ? flowForSession : flow, { runId, variables: { dayId: localDayId() } });
-  if (session.definitionVersion >= flow.version && run.definitionVersion < flow.version && run.status !== 'completed') {
+  let run = await loadContentFlowRun(STEPPLING_DAY_ONE_RUN_ID)
+    ?? await startContentFlow(session.definitionVersion < 2 ? LEGACY_STEPPLING_DAY_ONE_FLOW : session.definitionVersion === 2 ? LEGACY_STEPPLING_DAY_ONE_FLOW_V2 : STEPPLING_DAY_ONE_FLOW, { runId: STEPPLING_DAY_ONE_RUN_ID, variables: { dayId: localDayId() } });
+  if (session.definitionVersion >= 3 && run.definitionVersion < 3 && run.status !== 'completed') {
     const answer = [...session.turns].reverse().find((turn) => turn.nodeId === 'reflection')?.optionId;
-    const migrated = await reduceContentFlowRunAtomically({ runId: run.runId, reduce: (current) => current.status === 'completed' || current.definitionVersion >= flow.version ? current : {
-      ...current, definitionVersion: flow.version, nodeId: current.nodeId === 'parcel' ? 'parcel' : answer ? `handoff.${answer}` : 'reflection',
-      variables: { ...current.variables, ...(answer ? { [definition.dayOne.choiceVariable]: answer } : {}) },
+    const migrated = await reduceContentFlowRunAtomically({ runId: run.runId, reduce: (current) => current.status === 'completed' || current.definitionVersion >= 3 ? current : {
+      ...current, definitionVersion: 3, nodeId: current.nodeId === 'parcel' ? 'parcel' : answer ? `handoff.${answer}` : 'reflection',
+      variables: { ...current.variables, ...(answer ? { movementChoice: answer } : {}) },
       phase: 'entering', status: 'active', error: null,
     } });
     if (migrated.run) run = migrated.run;
   }
-  const flowDefinition = contentFlowDefinition(run.definitionId, run.definitionVersion)!;
-  for (let guard = 0; guard < flowDefinition.nodes.length * 2 && run.status !== 'completed'; guard += 1) {
-    const node = flowDefinition.nodes.find((candidate) => candidate.id === run.nodeId);
+  const definition = contentFlowDefinition(run.definitionId, run.definitionVersion)!;
+  for (let guard = 0; guard < definition.nodes.length * 2 && run.status !== 'completed'; guard += 1) {
+    const node = definition.nodes.find((candidate) => candidate.id === run.nodeId);
     // A process can stop after the closing answer was saved but before its
     // parcel effect ran. Resume that effect too, not only explicit failures.
     if (run.status === 'failed_recoverable' || node?.kind === 'effect') {
@@ -83,57 +60,44 @@ export async function settleHatchableDayOne(definition: HatchableCompanionDefini
   }
   if (run.status !== 'completed') throw new Error('Journey reward is still pending');
   recordLifeFlow(run);
-  if (gardenHandoffPendingFor(session, conversationId)) await ensureGardenLesson(definition);
+  if (stepplingGardenHandoffPending(session)) await ensureStepplingGardenLesson();
   return true;
 }
-export function settleStepplingDayOne() {
-  return settleHatchableDayOne(STEPPLING_HATCHABLE);
-}
 
-export function useHatchableDayOne(definition: HatchableCompanionDefinition | null, enabled: boolean) {
-  const on = enabled && definition != null;
-  const [ready, setReady] = useState(!on);
+export function useStepplingDayOne(enabled: boolean) {
+  const [ready, setReady] = useState(!enabled);
   const [definitionId, setDefinitionId] = useState<string>();
   const [gardenHandoffPending, setGardenHandoffPending] = useState(false);
   const [error, setError] = useState(false);
   const [revision, setRevision] = useState(0);
   const pending = useRef<Promise<boolean> | null>(null);
-  const conversationId = definition?.dayOne.conversationId;
-  const handoffPending = useCallback(() => Boolean(conversationId) && loadCompanionContentState().conversationSessions.some((session) => gardenHandoffPendingFor(session, conversationId!)), [conversationId]);
   const complete = useCallback(() => {
-    if (!on || !definition) return Promise.resolve(false);
-    pending.current ??= settleHatchableDayOne(definition).then((settled) => {
+    if (!enabled) return Promise.resolve(false);
+    pending.current ??= settleStepplingDayOne().then((settled) => {
       if (settled) {
         setDefinitionId(undefined);
-        setGardenHandoffPending(handoffPending());
+        setGardenHandoffPending(loadCompanionContentState().conversationSessions.some(stepplingGardenHandoffPending));
       }
       setError(false);
       return settled;
     }).catch((cause) => { setError(true); throw cause; }).finally(() => { pending.current = null; });
     return pending.current;
-  }, [definition, handoffPending, on]);
+  }, [enabled]);
   useEffect(() => {
-    if (!on || !definition) { setGardenHandoffPending(false); setReady(true); setDefinitionId(undefined); return; }
+    if (!enabled) { setGardenHandoffPending(false); setReady(true); setDefinitionId(undefined); return; }
     let live = true;
     setReady(false); setError(false);
-    void Promise.all([loadMergeWorldState(), loadContentFlowRun(definition.dayOne.flow.runId)]).then(async ([world, run]) => {
+    void Promise.all([loadMergeWorldState(), loadContentFlowRun(STEPPLING_DAY_ONE_RUN_ID)]).then(async ([world, run]) => {
       if (!live) return;
-      const hatched = Boolean(hatchableEggProgress(world, definition)?.hatchedAt);
-      if (!hatched || run?.status === 'completed') {
-        if (hatched && handoffPending()) await ensureGardenLesson(definition);
-        setGardenHandoffPending(hatched && handoffPending());
+      if (!world.stepplingEgg?.hatchedAt || run?.status === 'completed') {
+        if (world.stepplingEgg?.hatchedAt && loadCompanionContentState().conversationSessions.some(stepplingGardenHandoffPending)) await ensureStepplingGardenLesson();
+        setGardenHandoffPending(Boolean(world.stepplingEgg?.hatchedAt) && loadCompanionContentState().conversationSessions.some(stepplingGardenHandoffPending));
         setReady(true); return;
       }
       const settled = await complete();
-      if (live) { setDefinitionId(settled ? undefined : definition.dayOne.conversationId); setReady(true); }
+      if (live) { setDefinitionId(settled ? undefined : STEPPLING_DAY_ONE_CONVERSATION_ID); setReady(true); }
     }).catch(() => { if (live) setError(true); });
     return () => { live = false; };
-  }, [complete, definition, handoffPending, on, revision]);
+  }, [complete, enabled, revision]);
   return { ready, definitionId, error, complete, gardenHandoffPending, retry: () => setRevision((value) => value + 1) };
 }
-
-export function useStepplingDayOne(enabled: boolean) {
-  return useHatchableDayOne(STEPPLING_HATCHABLE, enabled);
-}
-
-export { hatchableForCompanion };

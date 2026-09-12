@@ -57,6 +57,6 @@ test('the provider registers its flush, adopts store writes, and never retries a
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.match(screen, /send\(effectiveCommand, currentStep\?\.surface === 'merge' \? \{ persist: 'immediate' \} : undefined\)/);
   assert.match(screen, /const chapterZeroTarget = mossproutChapterZeroRepairTarget\(ftueRun, state\);[\s\S]*?repairFtueStep\(ftueRun\.stepId, chapterZeroTarget, \{ clearStepIds: chapterZeroStepsFrom\(chapterZeroTarget\) \}\);/);
-  const glow = readFileSync('features/onboarding/hatchable-runtime.ts', 'utf8');
+  const glow = readFileSync('features/onboarding/glow-discovery-runtime.ts', 'utf8');
   assert.match(glow, /eventId: `\$\{run\.runId\}:\$\{run\.nodeId\}:domain-complete:\$\{run\.revision\}`/);
 });

@@ -8,8 +8,6 @@ import { createContentFlowRun, reduceContentFlow } from '@/features/content-flow
 import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
 import type { MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
 import { loadNativeModule } from './helpers/native-motion-harness';
-import { lessonCheckpoint } from '@/features/onboarding/steppling-garden-lesson';
-import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 import type { ContentFlowRun } from '@/types/content-flow';
 
 const NOW = Date.UTC(2026, 8, 5, 12);
@@ -93,13 +91,8 @@ test('full board releases the interaction gate without destroying board contents
 });
 test('journal recovery follows saved board evidence and preserves the summary and completion receipts', async () => {
   let run = createContentFlowRun(STEPPLING_GARDEN_FLOW, { runId: 'ftue:steppling-garden:1', now: NOW });
-  const runtime = loadNativeModule('features/onboarding/hatchable-runtime.ts', {
-    'react': {},
-    './steppling-garden-lesson': { lessonCheckpoint },
-    './steppling-egg-policy': {}, './glow-discovery-flow': {},
-    './hatchable-flows': { hatchableFlows: () => ({ gardenLesson: STEPPLING_GARDEN_FLOW }), HATCHABLE_LESSON_FINALE_NODE_IDS: STEPPLING_FINALE_NODE_IDS, HATCHABLE_MISSION_CLEAR_NODE_ID: 'mission.clear', HATCHABLE_MISSION_CLEARED_EVENT: 'glow.mission.cleared', HATCHABLE_EGG_ENTERED_EVENT: 'glow.egg.entered' },
-    '@/constants/hatchable-companions/registry': { HATCHABLE_COMPANIONS: [STEPPLING_HATCHABLE], hatchableByCompanion: () => null },
-    '@/utils/merge-world/repository': {}, '@/utils/merge-world/glow-discovery-policy': {},
+  const runtime = loadNativeModule('features/onboarding/steppling-garden-runtime.ts', {
+    './steppling-garden-lesson': { STEPPLING_FINALE_NODE_IDS, STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID: 'ftue:steppling-garden:1', stepplingGardenCheckpoint },
     '@/features/content-flow/content-flow-catalog': { registerContentFlowDefinition() {} },
     '@/features/content-flow/content-flow-director': {},
     '@/features/content-flow/content-flow-repository': {
@@ -107,25 +100,24 @@ test('journal recovery follows saved board evidence and preserves the summary an
       reduceContentFlowRunAtomically: async ({ reduce }: { reduce: (run: ContentFlowRun) => ContentFlowRun }) => { run = reduce(run); return { run }; },
     },
   });
-  const reconcile = (state: MergeWorldState) => runtime.reconcileGardenLesson(STEPPLING_HATCHABLE, state);
   let state = prepared();
   state = apply(state, { type: 'claimArrival', arrivalId: STEPPLING_PARCEL_ID, now: NOW });
-  await reconcile(state); assert.equal(run.nodeId, 'grow');
+  await runtime.reconcileStepplingGarden(state); assert.equal(run.nodeId, 'grow');
   for (const nodeId of ['summary', 'complete']) {
     run = { ...run, nodeId, status: nodeId === 'complete' ? 'completed' : 'active' };
-    await reconcile(state); assert.equal(run.nodeId, nodeId);
+    await runtime.reconcileStepplingGarden(state); assert.equal(run.nodeId, nodeId);
   }
   // An interim build authored the Kingdom goal inside this run. A save left on
   // that node has no surface that could ever dispatch, so the lesson would stay
   // active forever and hold the Kingdom's camera locked. Repair it on read.
   run = { ...run, nodeId: 'kingdom.goal', status: 'active', definitionVersion: 2 };
-  await reconcile(state);
+  await runtime.reconcileStepplingGarden(state);
   assert.equal(run.nodeId, 'summary');
   assert.equal(run.definitionVersion, STEPPLING_GARDEN_FLOW.version);
   assert.equal(STEPPLING_GARDEN_FLOW.migrations?.['kingdom.goal'], 'summary');
   for (const old of ['spawn.first', 'spawn.second', 'merge']) assert.equal((STEPPLING_GARDEN_FLOW.migrations as Record<string, string>)[old], 'grow', 'a save parked on a retired guided beat grows');
   const completed = { ...run, nodeId: 'kingdom.goal', status: 'completed' as const };
   run = completed;
-  await reconcile(state);
+  await runtime.reconcileStepplingGarden(state);
   assert.equal(run.nodeId, 'kingdom.goal', 'a finished run is never rewound');
 });

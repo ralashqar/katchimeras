@@ -1,36 +1,111 @@
-import type { MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
-import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
-import {
-  eggFeedBond, eggFeedOffer, hatchableEggHasBeenFed, hatchableEggProgress, hatchableEggReady, normalizeHatchableEgg, reduceHatchableEgg,
-  type HatchableEggAction, type HatchableEggProgress,
-} from './hatchable-egg-policy';
+import type { MergeWorldState, MergeWorldCommandResult } from '@/types/merge-world';
+import { GLOW_GATEWAY_ID, reduceGlowDiscovery } from '@/utils/merge-world/glow-discovery-policy';
 
-/**
- * Steppling's Egg, by its old names: the shared Egg policy called with his
- * definition. His copy lives in `constants/steppling-egg-copy.ts`.
- */
-export {
-  STEPPLING_EGG_GUIDES, STEPPLING_STEP_ACCESS_OPTIONS, STEPPLING_EGG_TARGET, STEPPLING_STEPS_PER_BOND,
-  STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, STEPPLING_INTENT_OPTIONS, STEPPLING_MOVEMENT_OPTIONS,
-} from '@/constants/steppling-egg-copy';
-export { hatchableEggProgress };
-export type StepplingEggProgress = HatchableEggProgress;
-export type StepplingEggAction = HatchableEggAction;
+export const STEPPLING_EGG_GUIDES = {
+  intent: { eyebrow: 'Under the Mist', title: 'This one moves when you do.', body: '' },
+  reading: { eyebrow: 'Yesterday’s steps', title: 'Counting yesterday’s steps…', body: '' },
+  steps: { eyebrow: 'Yesterday’s steps', title: 'Steps are light the Mist never got. Feed them in.', body: '' },
+  permission: { eyebrow: 'Yesterday’s steps', title: 'Your steps are light too. May it count them?', body: '' },
+  movement: { eyebrow: 'Your own rhythm', title: 'Steps are one way to make light. Not the only one.', body: '' },
+  ready: { eyebrow: 'Awake', title: 'The Mist is off it. Someone’s waking.', body: '' },
+} as const;
 
-export const stepplingStepsBond = (steps: number) => eggFeedBond(STEPPLING_HATCHABLE.egg, steps);
+/** Spoken before the system Motion prompt; both answers keep the Egg hatchable. */
+export const STEPPLING_STEP_ACCESS_OPTIONS = {
+  allow: { id: 'egg.steppling.allow_steps', title: 'Count my steps', description: 'Steps stay on your phone. They only wake the Egg.' },
+  decline: { id: 'egg.steppling.decline_steps', title: 'Not today', description: 'Steppling will ask what moved you instead.' },
+} as const;
+export const STEPPLING_EGG_TARGET = 500;
+export const STEPPLING_STEPS_PER_BOND = 300;
+const safeSteps = (steps: number) => Number.isFinite(steps) ? Math.max(0, Math.floor(steps)) : 0;
+export const stepplingStepsBond = (steps: number) => Math.ceil(safeSteps(steps) / STEPPLING_STEPS_PER_BOND);
+
 /** Round the cumulative total, not each tap, so partial feeds cannot farm Bond. */
 export function stepplingStepFeedOffer(egg: StepplingEggProgress | undefined, observedSteps: number) {
-  return eggFeedOffer(STEPPLING_HATCHABLE.egg, egg, observedSteps);
+  const previous = safeSteps(egg?.bondFedSteps ?? egg?.fedSteps ?? 0);
+  const total = Math.max(previous, safeSteps(observedSteps));
+  return { steps: total - previous, bond: stepplingStepsBond(total) - stepplingStepsBond(previous) };
 }
+export const STEPPLING_INTENT_BOND = 10;
+export const STEPPLING_MOVEMENT_BOND = 20;
+export const STEPPLING_INTENT_OPTIONS = [
+  { id: 'breaks', label: 'Out and back, between everything else' },
+  { id: 'exploring', label: 'Wherever the path goes' },
+  { id: 'own-pace', label: 'Slowly, and only my way' },
+] as const;
+export const STEPPLING_MOVEMENT_OPTIONS = [
+  { id: 'walk', label: 'A walk, even a short one' },
+  { id: 'adapted', label: 'A stretch, sitting or standing' },
+  { id: 'rest', label: 'Nothing much, on purpose' },
+] as const;
+export type StepplingEggProgress = {
+  sourceDayId: string;
+  intent: string | null;
+  fedSteps: number;
+  /** Full observed total explicitly fed for Bond; hatch progress stays capped at 500. */
+  bondFedSteps?: number;
+  alternative: string | null;
+  hatchStartedAt: number | null;
+  hatchedAt: number | null;
+};
+export type StepplingEggAction =
+  | { kind: 'begin'; sourceDayId: string }
+  | { kind: 'intent'; answer: string }
+  | { kind: 'feed'; sourceDayId: string; observedSteps: number }
+  | { kind: 'alternative'; answer: string }
+  | { kind: 'hatch' }
+  | { kind: 'finish' };
 // A discovered Egg sleeps until a saved answer/feed gives it its first Bond.
-export const stepplingEggHasBeenFed = hatchableEggHasBeenFed;
-export const stepplingEggReady = (egg?: StepplingEggProgress) => hatchableEggReady(STEPPLING_HATCHABLE.egg, egg);
+export const stepplingEggHasBeenFed = (egg?: StepplingEggProgress) => Boolean(egg && (egg.intent || egg.fedSteps > 0 || egg.alternative));
+export const stepplingEggReady = (egg?: StepplingEggProgress) => Boolean(egg && (egg.fedSteps >= STEPPLING_EGG_TARGET || egg.alternative));
 
 export function normalizeStepplingEgg(raw: StepplingEggProgress | undefined): StepplingEggProgress | undefined {
-  return normalizeHatchableEgg(STEPPLING_HATCHABLE.egg, raw);
+  if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw.sourceDayId)) return undefined;
+  const date = new Date(`${raw.sourceDayId}T12:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== raw.sourceDayId) return undefined;
+  const intent = STEPPLING_INTENT_OPTIONS.some((option) => option.id === raw.intent) ? raw.intent : null;
+  const alternative = STEPPLING_MOVEMENT_OPTIONS.some((option) => option.id === raw.alternative) ? raw.alternative : null;
+  const fedSteps = Number.isFinite(raw.fedSteps) ? Math.max(0, Math.min(STEPPLING_EGG_TARGET, Math.floor(raw.fedSteps))) : 0;
+  const ready = Boolean(intent && (alternative || fedSteps >= STEPPLING_EGG_TARGET));
+  const validTime = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
+  return { sourceDayId: raw.sourceDayId, intent, alternative, fedSteps,
+    bondFedSteps: Math.max(fedSteps, safeSteps(raw.bondFedSteps ?? fedSteps)),
+    hatchStartedAt: ready && validTime(raw.hatchStartedAt) ? raw.hatchStartedAt : null,
+    hatchedAt: ready && validTime(raw.hatchedAt) ? raw.hatchedAt : null };
 }
 
 /** Steps are explicitly fed, never inferred from the legacy observed-step field. */
 export function reduceStepplingEgg(state: MergeWorldState, action: StepplingEggAction, now: number): MergeWorldCommandResult {
-  return reduceHatchableEgg(state, STEPPLING_HATCHABLE, action, now);
+  const no = (message?: string) => ({ state, changed: false, message });
+  if (!state.worldUnlocks?.[GLOW_GATEWAY_ID]) return no('Clear the mist first.');
+  if (state.companionDiscovery.records.some((record) => record.characterId === 'steppling')) return no();
+  let egg = state.stepplingEgg;
+  if (action.kind === 'begin') {
+    if (egg) return no();
+    egg = normalizeStepplingEgg({ sourceDayId: action.sourceDayId, intent: null, fedSteps: 0, alternative: null, hatchStartedAt: null, hatchedAt: null });
+    if (!egg) return no('The source day is invalid.');
+  } else {
+    if (!egg) return no('Open the Egg first.');
+    if (action.kind === 'intent') {
+      if (egg.intent || !STEPPLING_INTENT_OPTIONS.some((option) => option.id === action.answer)) return no();
+      egg = { ...egg, intent: action.answer };
+    } else if (action.kind === 'feed') {
+      if (!egg.intent || egg.hatchStartedAt || action.sourceDayId !== egg.sourceDayId || !Number.isFinite(action.observedSteps)) return no();
+      const fedSteps = Math.max(egg.fedSteps, Math.min(STEPPLING_EGG_TARGET, Math.max(0, Math.floor(action.observedSteps))));
+      if (fedSteps === egg.fedSteps) return no();
+      egg = { ...egg, fedSteps, bondFedSteps: Math.max(egg.bondFedSteps ?? egg.fedSteps, safeSteps(action.observedSteps)) };
+    } else if (action.kind === 'alternative') {
+      if (!egg.intent || egg.hatchStartedAt || egg.alternative || !STEPPLING_MOVEMENT_OPTIONS.some((option) => option.id === action.answer)) return no();
+      egg = { ...egg, alternative: action.answer };
+    } else if (action.kind === 'hatch') {
+      if (!egg.intent || !stepplingEggReady(egg) || egg.hatchStartedAt) return no();
+      egg = { ...egg, hatchStartedAt: now };
+    } else {
+      if (!egg.hatchStartedAt || !stepplingEggReady(egg)) return no('This Egg is not ready yet.');
+      const transferred = reduceGlowDiscovery(state, { type: 'transferDiscoveryEgg', targetId: GLOW_GATEWAY_ID, now });
+      const hatched = reduceGlowDiscovery(transferred.state, { type: 'hatchWorldEgg', targetId: GLOW_GATEWAY_ID, now });
+      return { ...hatched, state: { ...hatched.state, stepplingEgg: { ...egg, hatchedAt: now } } };
+    }
+  }
+  return { state: { ...state, stepplingEgg: egg, revision: state.revision + 1, updatedAt: now }, changed: true };
 }

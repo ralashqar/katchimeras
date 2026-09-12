@@ -46,7 +46,7 @@ test('enough Glow highlights the HUD with an actionable Egg bubble instead of a 
   assert.doesNotMatch(screen, /40 Glow ready/);
   assert.match(screen, /view.kind === 'return' && !serveFlight \? <MergeGlowReadyGuide/);
   assert.match(screen, /currencyRef=\{coinHudRef\}/);
-  assert.match(screen, /await submitHatchableAction\(activeHatchable, glowScene.actionId\);\s*returnFromGarden\(\);/);
+  assert.match(screen, /await submitGlowAction\(glowScene.actionId\);\s*returnFromGarden\(\);/);
   assert.match(guide, /roundedMultiCutoutSegments\(\[layout.target\]/);
   assert.match(guide, /<MergeFtueEggGuide anchor=\{layout.target\}/);
   assert.match(guide, /label="Let’s go!" loading=\{busy\}/);
@@ -427,11 +427,11 @@ test('shared-world tile layout and presentation keep one map and one Egg reveal'
   assert.equal(SHARED_WORLD_TILES['steppling-home'].residentVisible, false);
   assert.deepEqual(SHARED_WORLD_TILES['mossprout-home'].coord, { q: 0, r: 1 });
   const scene = readFileSync('components/katchadeck/world/mossprout-hex-neighborhood-scene.ts', 'utf8');
-  assert.match(scene, /boundsLayers = \[\.\.\.rawLayers, \.\.\.hatchableLayers\.flatMap\(\(\{ locked, revealed \}\) => \[locked, revealed\]\), \.\.\.natureBoundsLayers\]/, 'both envelopes of every hatchable tile are reserved');
+  assert.match(scene, /boundsLayers = \[\.\.\.rawLayers, lockedSteppling, revealedSteppling, \.\.\.natureBoundsLayers\]/);
   assert.match(scene, /'residentVisible' in entry && !entry.residentVisible/);
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   assert.match(canvas, /tutorialCameraReady && storyOperationsEnabled/);
-  assert.match(canvas, /\(mossproutGarden\?\.hatchableTiles\?\.\[gatewayTileId\] \?\? mossproutGarden\?\.gateway\) === 'egg' \|\| discoveredEggInteraction\) && !upgradePresentation && !storySceneGuard/, 'the Egg shows on whichever hatchable tile is the gateway');
+  assert.match(canvas, /gateway === 'egg' \|\| discoveredEggInteraction\) && !upgradePresentation && !storySceneGuard/);
   assert.match(canvas, /<RevealedCompanionEgg\s+idleDiscovery/);
   const route = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
   assert.doesNotMatch(route, /StepplingWorldScreen|world\.choose|Following the glow/);

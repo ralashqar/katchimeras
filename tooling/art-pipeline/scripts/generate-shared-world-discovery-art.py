@@ -24,12 +24,10 @@ DESIGN = content_path(ROOT, "design/shared-world-discovery-v2")
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["generate", "matte", "package"])
-    parser.add_argument("--tile", required=True, help="A tile key from briefs.json.")
+    parser.add_argument("--tile", choices=["steppling", "mist"], required=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     brief = json.loads((DESIGN / "briefs.json").read_text(encoding="utf-8"))
-    if args.tile not in brief["tiles"]:
-        raise SystemExit(f"Unknown tile {args.tile!r}; briefs.json knows: {', '.join(brief['tiles'])}")
     tile = brief["tiles"][args.tile]
     folder = DESIGN / args.tile
     source = folder / "source.png"
