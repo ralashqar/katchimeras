@@ -10,9 +10,11 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { CompanionCinematicStage } from '@/components/katchadeck/world/companion-cinematic-stage';
 import { GameLoopSummary } from './game-loop-summary';
 import { STEPPLING_GARDEN_CLOSING } from '@/features/onboarding/steppling-garden-lesson';
-import { advanceStepplingFinale } from '@/features/onboarding/steppling-garden-runtime';
+import { advanceGardenFinale } from '@/features/onboarding/hatchable-runtime';
+import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
+import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 
-export function StepplingGardenFinale({ summary, hosted }: { summary: boolean; hosted: boolean }) {
+export function StepplingGardenFinale({ summary, hosted, definition = STEPPLING_HATCHABLE }: { summary: boolean; hosted: boolean; definition?: HatchableCompanionDefinition }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -31,7 +33,7 @@ export function StepplingGardenFinale({ summary, hosted }: { summary: boolean; h
     if (pending.current) return;
     pending.current = true; setBusy(true); setFailed(false);
     try {
-      const next = await advanceStepplingFinale(summary ? 'finish' : 'summary');
+      const next = await advanceGardenFinale(definition, summary ? 'finish' : 'summary');
       if (!next || (summary ? next.status !== 'completed' : next.nodeId !== 'summary')) throw new Error('Not saved');
     } catch { setFailed(true); }
     finally { pending.current = false; setBusy(false); }

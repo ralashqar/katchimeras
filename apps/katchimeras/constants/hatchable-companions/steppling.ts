@@ -13,6 +13,7 @@ import { MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM } from '@/features/onboard
  */
 export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
   companion: 'steppling',
+  displayName: 'Steppling',
   tile: {
     id: 'steppling-home', coord: MOSSPROUT_LAYOUT.gate.coord,
     unlockId: 'mossprout:overgrown-trail', price: GLOW.mistUnlockCost,
@@ -122,6 +123,7 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
         ])),
       },
     },
+    conversationId: 'steppling:journey:day-one',
     opening: STEPPLING_DAY_ONE_OPENING,
     choices: STEPPLING_DAY_ONE_CHOICES,
     handoffs: STEPPLING_DAY_ONE_HANDOFFS,

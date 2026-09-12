@@ -1,4 +1,5 @@
 import type { ContentFlowNode } from '@/types/content-flow';
+import type { WorldActionView } from '@/features/content-flow/story-world-operations';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { defineStory, story } from '@/features/content-flow/story-manifest';
 import { storyOperations, upgradeWorldTargetRecipe, worldActionScene } from '@/features/content-flow/story-world-operations';
@@ -116,4 +117,10 @@ export function hatchableFlows(definition: HatchableCompanionDefinition): Hatcha
     cache.set(definition, flows);
   }
   return flows;
+}
+
+/** A scene node of a companion's discovery, with its world-action view and the action that leaves it. */
+export function hatchableDiscoveryScene(definition: HatchableCompanionDefinition, nodeId: string) {
+  const node = hatchableFlows(definition).discovery.nodes.find((candidate) => candidate.id === nodeId);
+  return node?.kind === 'scene' ? { view: node.payload?.worldAction as WorldActionView, actionId: node.actions[0].id } : null;
 }

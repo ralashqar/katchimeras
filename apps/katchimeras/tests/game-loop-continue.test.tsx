@@ -20,7 +20,8 @@ test('splash counts from its own appearance, requires two early taps, and accept
     '@/components/katchadeck/world/companion-cinematic-stage': { CompanionCinematicStage: 'Stage' },
     './game-loop-summary': { GameLoopSummary: 'Art' },
     '@/features/onboarding/steppling-garden-lesson': { STEPPLING_GARDEN_CLOSING: 'Closing' },
-    '@/features/onboarding/steppling-garden-runtime': { advanceStepplingFinale: async (id: string) => { saves.push(id); return { status: 'completed' }; } },
+    '@/features/onboarding/hatchable-runtime': { advanceGardenFinale: async (_definition: unknown, id: string) => { saves.push(id); return { status: 'completed' }; } },
+    '@/constants/hatchable-companions/registry': { STEPPLING_HATCHABLE: { companion: 'steppling' } },
     '@incubator/art-cutouts/steppling.png': 1,
   }, { Date: { now: () => now } });
   const Finale = module.StepplingGardenFinale as React.ComponentType<{ summary: boolean; hosted: boolean }>;

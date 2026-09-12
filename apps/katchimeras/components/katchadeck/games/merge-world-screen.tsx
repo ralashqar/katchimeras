@@ -1,6 +1,8 @@
-import { useStepplingGardenLesson, reconcileStepplingGarden } from '@/features/onboarding/steppling-garden-runtime';
-import { STEPPLING_FINALE_NODE_IDS, STEPPLING_PARCEL_ID, STEPPLING_SHOE_ORDER_ID, stepplingGardenBoardStep, stepplingGardenCheckpoint } from '@/features/onboarding/steppling-garden-lesson';
-import { acknowledgeStepplingDayOneGarden } from '@/features/companion/use-steppling-day-one';
+import { reconcileGardenLesson, reconcileHatchableLesson, submitHatchableAction, useActiveHatchable } from '@/features/onboarding/hatchable-runtime';
+import { HATCHABLE_LESSON_FINALE_NODE_IDS, hatchableDiscoveryScene } from '@/features/onboarding/hatchable-flows';
+import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
+import { lessonBoardStep, lessonCheckpoint } from '@/features/onboarding/steppling-garden-lesson';
+import { acknowledgeHatchableDayOneGarden } from '@/features/companion/use-steppling-day-one';
 import * as Haptics from 'expo-haptics';
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import { Image } from 'expo-image';
@@ -35,10 +37,9 @@ import { Lantern } from '@/constants/theme';
 import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldSelector, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
 import { advanceFtueActionDurably, commitFtueAction, completeFtueRun, dispatchFtueEvent, flushFtuePersistence, loadFtueRun, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MOSSPROUT_FTUE_COPY } from '@/features/onboarding/mossprout-ftue-copy';
-import { useGlowDiscovery, reconcileGlowLesson, submitGlowAction } from '@/features/onboarding/glow-discovery-runtime';
 import { IDLE_FINGER_THEME } from '@/features/content-flow/merge-lesson-recipe';
 import { GLOW_ORDER_IDS, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/utils/merge-world/glow-discovery-policy';
-import { glowDiscoveryBoardStep, glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
+import { glowDiscoveryBoardStep } from '@/features/onboarding/glow-discovery-flow';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, mergeFtueStepForBoard, chapterZeroStepsFrom, mossproutChapterZeroRepairTarget, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
 import { mergeFtueDisplayGuide } from '@/features/onboarding/merge-ftue-guidance';
@@ -112,20 +113,23 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   const { state, loading, error } = useMergeWorldState();
   const { dispatch: send, flush: flushMergeWorld } = useMergeWorldActions();
   useEffect(() => {
-    if (!active || loading || !state?.arrivals.some((arrival) => arrival.id === 'journey:steppling:day-1:journey-locker')) return;
-    try { acknowledgeStepplingDayOneGarden(); }
-    catch (cause) { console.warn('Could not save the Steppling Garden handoff', cause); }
+    if (!active || loading || !state) return;
+    // A friend's day-one parcel on the tray means their garden handoff has been taken up.
+    for (const definition of HATCHABLE_COMPANIONS) {
+      if (!state.arrivals.some((arrival) => arrival.id === definition.dayOne.parcel.rewardId)) continue;
+      try { acknowledgeHatchableDayOneGarden(definition); }
+      catch (cause) { console.warn(`Could not save ${definition.displayName}'s Garden handoff`, cause); }
+    }
   }, [active, loading, state]);
   const ftueRun = useFtueRun();
-  const glowRun = useGlowDiscovery();
-  const stepplingLesson = useStepplingGardenLesson();
+  const { discovery: activeHatchable, lesson: activeLessonHatchable, discoveryRun: glowRun, gardenLesson: stepplingLesson } = useActiveHatchable(state ?? null);
   const stepplingReturning = useRef(false);
   const [stepplingLessonError, setStepplingLessonError] = useState(false);
-  const glowScene = glowRun ? glowDiscoveryScene(glowRun.nodeId) : null;
+  const glowScene = glowRun ? hatchableDiscoveryScene(activeHatchable, glowRun.nodeId) : null;
   // The Garden lesson: the tray holds only the Basket's parcel, then only Mossprout's request.
   const glowLessonActive = Boolean(glowRun && glowRun.status !== 'completed' && glowRun.nodeId.startsWith('lesson.'));
   const navigation = useNavigation();
-  const stepplingBoardLocked = active && stepplingLesson.active && !STEPPLING_FINALE_NODE_IDS.includes(stepplingLesson.run?.nodeId ?? '');
+  const stepplingBoardLocked = active && stepplingLesson.active && !HATCHABLE_LESSON_FINALE_NODE_IDS.includes(stepplingLesson.run?.nodeId ?? '');
   usePreventRemove(stepplingBoardLocked, () => {});
   const handoffActive = ftueRun?.status === 'active' && ftueRun.stepId.startsWith('merge.handoff.');
   const handoffFeedback = useGameFeedback();
@@ -148,7 +152,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   const ftueActive = ftueRun?.status === 'active';
   const ftueNavigationLocked = useFtueNavigationLock(ftueRun, 'merge', active);
   const scriptedFtueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId)
-    : stepplingLesson.active && state && stepplingLesson.run ? stepplingGardenBoardStep(stepplingGardenCheckpoint(state), state)
+    : stepplingLesson.active && state && stepplingLesson.run ? lessonBoardStep(lessonCheckpoint(state, activeLessonHatchable), state, activeLessonHatchable)
     : glowRun?.status === 'active' ? glowDiscoveryBoardStep(glowRun.nodeId, state) : null;
   const ftueStep = useMemo(() => mergeFtueStepForBoard(state, scriptedFtueStep), [scriptedFtueStep, state]);
   const residentFtueActive = Boolean(ftueStep?.id.startsWith('merge.resident_'));
@@ -228,32 +232,32 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   useEffect(() => {
     if (!active || !state || serveFlight || !glowRun?.nodeId.startsWith('lesson.')) return;
     let alive = true;
-    void flushMergeWorld().then(() => { if (alive) return reconcileGlowLesson(state); }).catch(() => {});
+    void flushMergeWorld().then(() => { if (alive) return reconcileHatchableLesson(activeHatchable, state); }).catch(() => {});
     return () => { alive = false; };
-  }, [active, flushMergeWorld, glowRun?.nodeId, serveFlight, state]);
+  }, [active, activeHatchable, flushMergeWorld, glowRun?.nodeId, serveFlight, state]);
   const [serveHiddenItemIds, setServeHiddenItemIds] = useState<Set<string>>(() => new Set());
   const [parcelFlight, setParcelFlight] = useState<MergeParcelFlight | null>(null);
   useEffect(() => {
     if (!active || !state || !stepplingLesson.active || parcelFlight || serveFlight) return;
     let live = true;
-    const setup = send({ type: 'prepareStepplingGardenLesson', now: Date.now() });
-    void flushMergeWorld().then(() => { if (live) return reconcileStepplingGarden(setup?.state ?? state); }).catch(() => { if (live) setStepplingLessonError(true); });
+    const setup = send({ type: 'prepareGardenLesson', companion: activeLessonHatchable.companion, now: Date.now() });
+    void flushMergeWorld().then(() => { if (live) return reconcileGardenLesson(activeLessonHatchable, setup?.state ?? state); }).catch(() => { if (live) setStepplingLessonError(true); });
     return () => { live = false; };
-  }, [active, state, stepplingLesson.active, parcelFlight, serveFlight, send, flushMergeWorld]);
+  }, [active, activeLessonHatchable, state, stepplingLesson.active, parcelFlight, serveFlight, send, flushMergeWorld]);
   useEffect(() => {
     if (!stepplingBoardLocked) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
     return () => subscription.remove();
   }, [stepplingBoardLocked]);
   useEffect(() => {
-    if (!active || !stepplingLesson.active || !STEPPLING_FINALE_NODE_IDS.includes(stepplingLesson.run?.nodeId ?? '') || parcelFlight || serveFlight || stepplingReturning.current) return;
+    if (!active || !stepplingLesson.active || !HATCHABLE_LESSON_FINALE_NODE_IDS.includes(stepplingLesson.run?.nodeId ?? '') || parcelFlight || serveFlight || stepplingReturning.current) return;
     stepplingReturning.current = true;
     void flushMergeWorld().then(() => {
-      transitionTo({ announcement: 'Returning to Steppling', target: 'katchimeras', navigate: () => {
+      transitionTo({ announcement: `Returning to ${activeLessonHatchable.displayName}`, target: 'katchimeras', navigate: () => {
         if (router.canGoBack()) router.back(); else router.replace('/(tabs)/katchimeras');
       } });
     }).catch(() => { stepplingReturning.current = false; setStepplingLessonError(true); });
-  }, [active, stepplingLesson.active, stepplingLesson.run?.nodeId, parcelFlight, serveFlight, flushMergeWorld, router, transitionTo]);
+  }, [active, activeLessonHatchable.displayName, stepplingLesson.active, stepplingLesson.run?.nodeId, parcelFlight, serveFlight, flushMergeWorld, router, transitionTo]);
   const [parcelHiddenItemIds, setParcelHiddenItemIds] = useState<Set<string>>(() => new Set());
   const [parcelShakeNonce, setParcelShakeNonce] = useState(0);
   // Only the HUD subscribes; token contacts must not rerender this screen.
@@ -704,7 +708,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     && (arrival.kind === 'discovery_parcel' || arrival.kind === 'root_match_parcel' || arrival.kind === 'resident_card_parcel' || arrival.kind === 'contextual_parcel' || arrival.kind === 'goal_chest')
     && (arrival.itemDefinitionIds.length > 0 || Boolean(arrival.generatorId))
   )).sort((left, right) => left.createdAt - right.createdAt) ?? [], [state?.arrivals]);
-  const pendingParcel = (stepplingLesson.active ? pendingParcels.find((arrival) => arrival.id === STEPPLING_PARCEL_ID)
+  const pendingParcel = (stepplingLesson.active ? pendingParcels.find((arrival) => arrival.id === activeLessonHatchable.lesson.parcelArrivalId)
     : glowLessonActive ? pendingParcels.find((arrival) => arrival.id === MOSSPROUT_BASKET_ARRIVAL_ID) ?? pendingParcels[0]
     : pendingParcels[0]) ?? null;
   const pendingMemoryCard = state?.ownedMemoryCards.find((card) => card.revealedAt == null) ?? null;
@@ -716,7 +720,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     if (stepplingLesson.active) {
       if (pendingParcel) return [{ id: 'parcel-stack', kind: 'parcel', arrival: pendingParcel, count: 1,
         disabled: !active || Boolean(parcelFlight) || Boolean(serveFlight), shakeNonce: parcelShakeNonce }];
-      const order = state.activeOrders.find((entry) => entry.id === STEPPLING_SHOE_ORDER_ID);
+      const order = state.activeOrders.find((entry) => entry.id === activeLessonHatchable.lesson.order.id);
       return order ? [{ id: order.id, kind: 'order', order, itemReadiness: mergeOrderItemReadiness(state, order), ready: readyOrderIds.has(order.id) }] : [];
     }
     if (glowLessonActive) {
@@ -802,7 +806,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     // Midpoint notes sit before the remaining requests so the story beat is
     // immediately visible without replacing or hiding any unserved order.
     return [...parcelEntries, ...returnEntries, ...orderEntries];
-  }, [stepplingLesson.active, glowLessonActive, active, activeResidentDiscovery?.id, activityFamilyId, requestCharacterId, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+  }, [stepplingLesson.active, activeLessonHatchable, glowLessonActive, active, activeResidentDiscovery?.id, activityFamilyId, requestCharacterId, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
     const state = stateRef.current;
@@ -1026,7 +1030,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       {stepplingLessonError ? <View style={{ position: 'absolute', top: insets.top + 60, left: 20, right: 20, zIndex: 200 }}>
         <KatchaButton label="Continue lesson · Try again" onPress={() => {
           setStepplingLessonError(false);
-          void flushMergeWorld().then(() => reconcileStepplingGarden(state)).catch(() => setStepplingLessonError(true));
+          void flushMergeWorld().then(() => reconcileGardenLesson(activeLessonHatchable, state)).catch(() => setStepplingLessonError(true));
         }} />
       </View> : null}
       <View style={[styles.game, { paddingTop: Math.max(insets.top + 3, 7), paddingBottom: Math.max(insets.bottom + 3, 7), width: contentWidth }]}>
@@ -1106,7 +1110,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       {active && glowScene?.view.kind === 'return' && !serveFlight ? <MergeGlowReadyGuide
         screenRef={screenRef} currencyRef={coinHudRef} currencyPillRef={coinHudPillRef} layoutNonce={screenLayoutNonce}
         onProceed={async () => {
-          await submitGlowAction(glowScene.actionId);
+          await submitHatchableAction(activeHatchable, glowScene.actionId);
           returnFromGarden();
         }}
       /> : null}

@@ -60,13 +60,13 @@ test('the Glow aims at the wisps: every burst at the first standing, the finale 
   assert.match(dock, /tintColor=\{STRIKE_PUFF\}/, 'the dark puff is the wisp’s own colour');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const layerSource = readFileSync('components/katchadeck/world/corruption-wisp-layer.tsx', 'utf8');
-  assert.match(screen, /\? \{ key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission\.merges, specs: STEPPLING_WISPS, lines: STEPPLING_WISP_LINES, settled: ftueCameraSettled, revealNonce: stepplingRevealNonce \}/);
+  assert.match(screen, /\? \{ key: activeHatchable\.mission\.id, node: gatewayTileNode, required: activeHatchable\.mission\.required, merges: stepplingMission\.merges, specs: activeHatchable\.mission\.wisps, lines: activeHatchable\.mission\.lines, settled: ftueCameraSettled, revealNonce: stepplingRevealNonce \}/);
   assert.match(screen, /\? \{ key: 'opening-mist', node: homeTileNode, required: OPENING_MERGE_REQUIRED, merges: openingProgress, specs: OPENING_WISPS, lines: OPENING_WISP_LINES, settled: ftueCameraSettled \}/);
   // The wisps own their state in their own component: a strike or a measurement re-renders it, never the screen. It hands the Glow its sink on every render.
   assert.match(layerSource, /export const MissionWisps = memo\(function MissionWisps\([\s\S]*?const wisps = useCorruptionWisps\(target\);\s*glow\.sinkRef\.current = wisps\.sink;\s*return wisps\.visible \? <CorruptionWispLayer wisps=\{wisps\} screenRef=\{screenRef\} \/> : null;/);
   assert.match(screen, /<MissionWisps target=\{wispTarget\} glow=\{openingGlow\.store\} screenRef=\{screenRef\} \/>/);
   assert.doesNotMatch(screen, /useCorruptionWisps\(/, 'the screen no longer subscribes to the wisps');
-  assert.match(screen, /specs: STEPPLING_WISPS, lines: STEPPLING_WISP_LINES, settled: ftueCameraSettled, revealNonce: stepplingRevealNonce \}/);
+  assert.match(screen, /specs: activeHatchable\.mission\.wisps, lines: activeHatchable\.mission\.lines, settled: ftueCameraSettled, revealNonce: stepplingRevealNonce \}/);
   // Full mist bursting open on the board: the dock reports it, the Kingdom bumps the nonce, the wisps say the line once, a beat after the strike.
   assert.equal(STEPPLING_WISP_LINES.reveal, 'It was holding more.');
   assert.match(readFileSync('components/katchadeck/world/steppling-mission-dock.tsx', 'utf8'), /if \(result\?\.revealedMistCells\?\.length\) onReveal\?\.\(result\.revealedMistCells\.length\);/);

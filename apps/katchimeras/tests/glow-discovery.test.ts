@@ -46,7 +46,7 @@ test('enough Glow highlights the HUD with an actionable Egg bubble instead of a 
   assert.doesNotMatch(screen, /40 Glow ready/);
   assert.match(screen, /view.kind === 'return' && !serveFlight \? <MergeGlowReadyGuide/);
   assert.match(screen, /currencyRef=\{coinHudRef\}/);
-  assert.match(screen, /await submitGlowAction\(glowScene.actionId\);\s*returnFromGarden\(\);/);
+  assert.match(screen, /await submitHatchableAction\(activeHatchable, glowScene.actionId\);\s*returnFromGarden\(\);/);
   assert.match(guide, /roundedMultiCutoutSegments\(\[layout.target\]/);
   assert.match(guide, /<MergeFtueEggGuide anchor=\{layout.target\}/);
   assert.match(guide, /label="Let’s go!" loading=\{busy\}/);
