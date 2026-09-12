@@ -171,7 +171,7 @@ test('both world residents share tile placement, full-size Egg framing and the h
   assert.equal(residentArtLayerId('family:mossprout', 'mossprout'), 'family:mossprout');
   const scene = readFileSync('components/katchadeck/world/mossprout-hex-neighborhood-scene.ts', 'utf8');
   assert.match(scene, /mainLayer\.residentAnchor = sharedResidentAnchor\(mainLayer\.frame\)/);
-  assert.match(scene, /revealedSteppling\.residentAnchor = sharedResidentAnchor\(revealedSteppling\.frame\)/);
+  assert.match(scene, /if \(!locked\) layer\.residentAnchor = sharedResidentAnchor\(layer\.frame\);/, 'every cleared hatchable tile seats its resident the shared way');
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   assert.match(canvas, /if \(interactionResidentId\) interactionOriginSnapshotRef\.current = origin;\s*else animateToCameraSnapshot/);
   assert.match(canvas, /focusTutorialResident\(anchor.x, sharedResidentCenterY\(anchor.y\), \{\s*anchorY: SHARED_EGG_SCREEN_ANCHOR_Y,\s*zoom: SHARED_EGG_REST_ZOOM/);

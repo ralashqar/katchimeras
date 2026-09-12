@@ -6,6 +6,9 @@ import { sharedResidentAnchor } from './shared-resident-presentation';
 import type { KingdomHexScene, KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { KINGDOM_HEX_TILE_ALPHA_BOUNDS } from '@/constants/kingdom-hex-tile-bounds.gen';
 import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
+import { HATCHABLE_COMPANIONS, hatchableByCompanion } from '@/constants/hatchable-companions/registry';
+import { hatchableTileArt } from '@/constants/hatchable-companions/tile-art';
+import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { STEPPLING_TILE, SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants/mossprout-memory-plants';
 import type { MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel, PlantableMemoryInstance } from '@/types/merge-world';
@@ -84,7 +87,10 @@ const GARDEN_LAYOUT_BOUNDS = Object.values(GARDEN_LEVELS).reduce<ArtSpec['alphaB
 );
 
 export type MossproutGardenSceneState = {
+  /** Steppling's tile, kept for callers from before `hatchableTiles`; the map wins when both are given. */
   gateway?: 'locked' | 'egg' | 'open';
+  /** Every hatchable companion's tile by tile id: misted, an Egg on it, or open with the friend home. */
+  hatchableTiles?: Partial<Record<string, 'locked' | 'egg' | 'open'>>;
   level: number;
   plantableMemories: readonly PlantableMemoryInstance[];
   previewMemoryId?: string;
@@ -334,24 +340,26 @@ export function buildMossproutHexNeighborhoodScene(
       sourceSize: { width: 384, height: 384 },
     }];
   });
-  const stepplingLayer = (locked: boolean) => layerFor('structure:steppling-home', 'structure', {
-      coord: STEPPLING_TILE.coord,
-      alphaBounds: locked ? DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS : KINGDOM_HEX_TILE_ALPHA_BOUNDS['shared_world_steppling_trailhead_hex_tile_v1.webp'],
-      sources: locked ? DREAM_MIST_LOCKED_NATURE_SOURCES : {
-        full: require('@incubator/art-world/hex/shared_world_steppling_trailhead_hex_tile_v1.webp'),
-        medium: require('@incubator/art-world/hex/shared_world_steppling_trailhead_hex_tile_v1_512.webp'),
-        thumb: require('@incubator/art-world/hex/shared_world_steppling_trailhead_hex_tile_v1_256.webp'),
-      },
+  // Every hatchable companion's tile, from its definition: full mist while locked, its own art once cleared.
+  const hatchableTileState = (definition: HatchableCompanionDefinition): 'locked' | 'egg' | 'open' =>
+    gardenState.hatchableTiles?.[definition.tile.id] ?? (definition.companion === 'steppling' ? gardenState.gateway : undefined) ?? 'locked';
+  const hatchableLayer = (definition: HatchableCompanionDefinition, locked: boolean) => {
+    const bounds = KINGDOM_HEX_TILE_ALPHA_BOUNDS[definition.tile.alphaBoundsKey as keyof typeof KINGDOM_HEX_TILE_ALPHA_BOUNDS];
+    const layer = layerFor(`structure:${definition.tile.id}`, 'structure', {
+      coord: definition.tile.coord,
+      alphaBounds: locked ? DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS : bounds,
+      sources: locked ? DREAM_MIST_LOCKED_NATURE_SOURCES : hatchableTileArt(definition.tile.id),
     });
-  const lockedSteppling = stepplingLayer(true);
-  const revealedSteppling = stepplingLayer(false);
-  revealedSteppling.residentAnchor = sharedResidentAnchor(revealedSteppling.frame);
+    if (!locked) layer.residentAnchor = sharedResidentAnchor(layer.frame);
+    return layer;
+  };
+  const hatchableLayers = HATCHABLE_COMPANIONS.map((definition) => ({ definition, locked: hatchableLayer(definition, true), revealed: hatchableLayer(definition, false) }));
   // Mist is opaque: while veiled, the home tile must paint over the Garden
   // structure that normally sits above it.
   if (options.homeVeiled) mainLayer.depth = gardenLayer.depth + 2;
   // The Garden is part of what the Mist hides: it is not drawn until the veil lifts.
   const neighbourLayers = options.homeSolo ? [] : [
-    !gardenState.gateway || gardenState.gateway === 'locked' ? lockedSteppling : revealedSteppling,
+    ...hatchableLayers.map(({ definition, locked, revealed }) => (hatchableTileState(definition) === 'locked' ? locked : revealed)),
     ...MOSSPROUT_NATURE_ISLANDS.map((island) => natureLayerFor(
       island.id,
       natureIslandLevels[island.id] ?? 0,
@@ -368,7 +376,7 @@ export function buildMossproutHexNeighborhoodScene(
   // A reveal must never shift the scene origin (and every other island/camera).
   const natureBoundsLayers = MOSSPROUT_NATURE_ISLANDS.flatMap((island) =>
     [natureLayerFor(island.id, 0), natureLayerFor(island.id, 0, true), ...island.levels.map((level) => natureLayerFor(island.id, level.level, true))]);
-  const boundsLayers = [...rawLayers, lockedSteppling, revealedSteppling, ...natureBoundsLayers];
+  const boundsLayers = [...rawLayers, ...hatchableLayers.flatMap(({ locked, revealed }) => [locked, revealed]), ...natureBoundsLayers];
   // Veiled or solo scenes leave layers out; their frames still shape the envelope.
   boundsLayers.push(unveiledMain, gardenLayer);
   const { dx, dy, width, height } = mossproutSceneEnvelope(boundsLayers.map(layer => layer.frame));
@@ -386,7 +394,8 @@ export function buildMossproutHexNeighborhoodScene(
   const residentTiles: KingdomTileRender[] = Object.values(SHARED_WORLD_TILES).flatMap((entry) => {
     if (entry.companion === 'mossprout') return [];
     // Discovery-only tiles never inherit an owned/dev resident projection.
-    if ('residentVisible' in entry && !entry.residentVisible && !(entry.companion === 'steppling' && gardenState.gateway === 'open')) return [];
+    const hatchable = hatchableByCompanion(entry.companion);
+    if ('residentVisible' in entry && !entry.residentVisible && !(hatchable && hatchableTileState(hatchable) === 'open')) return [];
     const slot = companionSlots.find((candidate) => candidate.familyId === entry.companion && candidate.kind === 'owned');
     if (!slot) return [];
     const point = mossproutHexPoint(entry.coord);

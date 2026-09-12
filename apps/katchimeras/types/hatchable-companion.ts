@@ -26,11 +26,7 @@ export type HatchableTileDefinition = {
   price: number;
   name: string;
   revealPreset: 'mist-clear';
-  /**
-   * The cleared tile's bundled art by LOD, resolved on demand: a definition is data that tests and
-   * the engine load, and bundled images are only for the scene that draws them.
-   */
-  art: () => HatchableTileArt;
+  /** The key its cleared art's alpha bounds are generated under; the art itself is in `tile-art.ts`, by tile id. */
   alphaBoundsKey: string;
   markerLines: { sleeping: string };
 };

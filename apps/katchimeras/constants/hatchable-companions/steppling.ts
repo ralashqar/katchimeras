@@ -17,11 +17,6 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
     id: 'steppling-home', coord: MOSSPROUT_LAYOUT.gate.coord,
     unlockId: 'mossprout:overgrown-trail', price: GLOW.mistUnlockCost,
     name: 'Misty clearing', revealPreset: 'mist-clear',
-    art: () => ({
-      full: require('@incubator/art-world/hex/shared_world_steppling_trailhead_hex_tile_v1.webp'),
-      medium: require('@incubator/art-world/hex/shared_world_steppling_trailhead_hex_tile_v1_512.webp'),
-      thumb: require('@incubator/art-world/hex/shared_world_steppling_trailhead_hex_tile_v1_256.webp'),
-    }),
     alphaBoundsKey: 'shared_world_steppling_trailhead_hex_tile_v1.webp',
     markerLines: { sleeping: 'The Mist still holds this one.' },
   },

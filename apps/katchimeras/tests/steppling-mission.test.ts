@@ -245,5 +245,5 @@ test('the Kingdom docks the mission under Steppling’s tile and clears the mist
   assert.match(store, /const merged = command\.type === 'move' && result\.mergedCell != null;[\s\S]*?saveMission\(storageKey, activeRunId, result\.state, nextMerges, placedRef\.current\);/, 'every merge is counted and saved with the board');
   assert.match(runtime, /eventId: `\$\{run\.runId\}:\$\{GLOW_MISSION_CLEAR_NODE_ID\}:cleared:\$\{run\.revision\}`, type: GLOW_MISSION_CLEARED_EVENT/);
   assert.doesNotMatch(upgrade, /actionId: 'unlock'/, 'no confirm step: the mission is the price');
-  assert.match(offers, /\['gateway\.ready', 'gateway\.return', 'gateway\.offer'\]\.includes\(glowRun\.nodeId\) && offer\.id === 'mist:steppling-home'/, 'no markers while the board is up');
+  assert.match(offers, /\['gateway\.ready', 'gateway\.return', 'gateway\.offer'\]\.includes\(glowRun\.nodeId\) && offer\.id === `mist:\$\{activeTileId\}`/, 'no markers while the board is up');
 });
