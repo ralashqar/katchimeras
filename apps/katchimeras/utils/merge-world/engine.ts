@@ -532,6 +532,17 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
     case 'hatchWorldEgg':
     case 'prepareGlowDiscoveryLesson':
       return reduceGlowDiscovery(current, command);
+    case 'grantOpeningGlow': {
+      // Once per run: the flow's effect after the lift and the world screen's repair at the first
+      // restore both ask with the run's receipt; whichever comes first grants, the other changes nothing.
+      if (current.openingGlow) return unchanged(current);
+      const amount = Math.max(0, Math.floor(command.amount));
+      return changed(touch({
+        ...current,
+        coins: Math.min(999_999, current.coins + amount),
+        openingGlow: { receiptId: command.receiptId, amount, grantedAt: command.now },
+      }, command.now));
+    }
     case 'revealMovementEgg':
       return mutateMovementEgg(current, command.receiptId, command.now, (egg) => ({ ...egg, status: 'revealed', updatedAt: command.now }));
     case 'recordMovementEggProgress':
@@ -835,6 +846,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     ...normalizeGlowDiscoveryFields(source),
     companionDailyGardenVersion: source.companionDailyGardenVersion,
     stepplingEgg: normalizeStepplingEgg(source.stepplingEgg),
+    openingGlow: normalizeOpeningGlow(source.openingGlow),
     version: 24,
     ownerCharacterId: 'mossprout',
     revision: finite(source.revision, 0),
@@ -4057,6 +4069,13 @@ function finite(value: unknown, fallback: number) {
 
 function uniqueStrings(value: unknown): string[] {
   return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === 'string'))] : [];
+}
+
+function normalizeOpeningGlow(value: unknown): MergeWorldState['openingGlow'] {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<NonNullable<MergeWorldState['openingGlow']>>;
+  if (typeof candidate.receiptId !== 'string') return null;
+  return { receiptId: candidate.receiptId, amount: Math.max(0, Math.floor(finite(candidate.amount, 0))), grantedAt: finite(candidate.grantedAt, 0) };
 }
 
 function normalizeArrivals(value: unknown): MergeWorldArrival[] {

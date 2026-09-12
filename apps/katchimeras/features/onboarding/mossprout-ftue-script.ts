@@ -144,7 +144,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 49,
+  version: 50,
   entryStepId: 'world.mist_open',
   terminalStepId: 'complete',
   steps: [
@@ -251,10 +251,12 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.seed_planted', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Your Memory', title: COPY.planted, body: COPY.mergePurpose },
-      cue: { kind: 'tap', target: { kind: 'haven_garden_button', characterId: 'mossprout' } },
-      spotlight: { targets: [{ kind: 'haven_guide' }, { kind: 'haven_garden_cluster', characterId: 'mossprout' }, { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID }], grouping: 'individual', targetGroups: [[0, 2], [1]], padding: 7 },
-      actions: [{ id: 'world.acknowledge_seed_dormant', title: 'Open Merge', description: COPY.mergePurpose, icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'merge.serve_sprout', backendEvent: true }],
+      // The first restore is paid with the light that drove the wisps off (earned at the lift, never
+      // a Merge visit); this beat moves on to the offer by itself, with Continue as the fallback.
+      // The Garden board is introduced later, when Steppling's trail needs light the Mist did not give.
+      guide: { eyebrow: 'Your Memory', title: COPY.planted, body: 'Look at it. The Mist gave a little ground just for that.' },
+      spotlight: { targets: [{ kind: 'haven_guide' }, { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID }], grouping: 'individual', padding: 7 },
+      actions: [{ id: 'world.acknowledge_seed_dormant', title: 'Continue', description: '', icon: 'sparkles', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_offer', backendEvent: true }],
       camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
       blockingBeat: 'mossprout_intro',
     },
@@ -356,7 +358,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.first_bloom_offer', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'First light', title: 'See that? Light.', body: 'That came from your day. It’s the only kind of light that works here. Tap the glowing bubble.' },
+      guide: { eyebrow: 'First light', title: 'See that? Light.', body: 'Twenty Glow. The light that drove them off stayed with you, and it is the only thing the Mist gives ground to. Tap the glowing bubble.' },
       actions: [{ id: 'world.open_first_bloom_upgrade', title: 'See what the light does', description: '', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_restore' }],
       cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
       spotlight: { targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }], padding: 7, radius: 18, dimOpacity: 0.58 },

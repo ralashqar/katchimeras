@@ -358,7 +358,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       setNarrativeHandoffActive(true);
       try {
         if (!run.mergeInstalled) {
-          await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run), { preserveHaven: true });
+          await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run), { preserveHaven: true, basketParcel: true });
           updateFtueRun({ mergeInstalled: true });
         }
         const meetingResult = await advanceFtueActionDurably({ expectedStepId: 'companion.first_meeting', actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
@@ -614,7 +614,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     const run = loadFtueRun();
     try {
       if (!run?.mergeInstalled) {
-        await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run), { preserveHaven: true });
+        await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run), { preserveHaven: true, basketParcel: true });
         updateFtueRun({ mergeInstalled: true });
       }
       const result = await advanceFtueActionDurably({

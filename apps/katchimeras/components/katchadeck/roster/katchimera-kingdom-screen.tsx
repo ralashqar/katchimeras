@@ -2,7 +2,7 @@ import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden
 import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
 import { advanceGlowUpgrade, recoverPaidGlowUpgrade } from '@/features/onboarding/glow-upgrade-runtime';
 import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_MERGE_REQUIRED, OPENING_CAMERA_ENTRY_ZOOM, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
-import { KingdomOpeningMergeDock, MissionGlowLayer, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
+import { KingdomOpeningMergeDock, MissionGlowLayer, OPENING_GLOW_FLIGHT_MS, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
 import { StepplingMissionDock } from '@/components/katchadeck/world/steppling-mission-dock';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import { createStepplingMissionState, STEPPLING_MISSION_HINT_THEME, STEPPLING_MISSION_ID, STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep } from '@/features/onboarding/steppling-mission';
@@ -69,6 +69,7 @@ import { ThemedText } from '@/components/themed-text';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants/mossprout-memory-plants';
 import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
+import { GLOW } from '@/constants/glow';
 import { AppFontFamilies } from '@/constants/theme';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { useStableCallback } from '@/hooks/use-stable-callback';
@@ -79,7 +80,7 @@ import type { MergeCharacterId, MergeWorldState, MossproutGardenPlantSlotId, Mos
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { ConversationSession } from '@/types/companion-conversation';
 import { HAVEN_ENVIRONMENTS, type HavenStage } from '@/constants/haven-catalog';
-import { acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, ensureStoredFirstFtueMemoryPlacement, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead } from '@/utils/merge-world/repository';
+import { acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, ensureStoredFirstFtueMemoryPlacement, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow } from '@/utils/merge-world/repository';
 import type { FtueCameraDirective, FtueCueDefinition } from '@/features/onboarding/ftue-types';
 import { IslandRestorationDock } from '@/components/katchadeck/world/island-restoration-dock';
 import { consumeIslandRestorationOpen, requestIslandRestorationOpen } from '@/features/island-restoration/restoration-intent';
@@ -196,6 +197,8 @@ const OPENING_CLEAR_CAMERA = mossproutFtueStep(OPENING_MIST_CLEAR_STEP_ID)?.came
 const WISP_FALL_MS = 640;
 /** How long the opening's lift caption is on screen before the run moves on to the Egg. */
 const LIFT_CAPTION_MIN_MS = 2400;
+/** After the lift caption appears: when the first light is seen flying into the counter. */
+const OPENING_GLOW_ARRIVAL_DELAY_MS = 600;
 /**
  * After the finale has settled and the run reaches the lift: how long the camera and the Egg
  * wait, so the board (a 260ms fade) is gone before anything in the world moves.
@@ -330,6 +333,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // A friend's paid stage: the Glow leaves the top bar for the tile as the counter counts it down, the way a purchase shows.
   // Primed before the write (the counter holds the old balance), counting once the write has landed.
   const [glowSpend, setGlowSpend] = useState<{ amount: number; counting: boolean } | null>(null);
+  // The first restore's light could not be kept (a storage error): the offer shows a way to retry.
+  const [firstLightFailed, setFirstLightFailed] = useState(false);
   const [requiredUpgradeStory, setRequiredUpgradeStory] = useState<{ offer: WorldUpgradeOffer; presentation: HavenTileUpgradePresentation } | null>(null);
   const prepareEggEntry = useCallback(() => { setFtueCameraSettled(false); setGlowPanelOpen(false); }, []);
   const eggHandoff = useGlowEggHandoff({ run: glowRun, world: mergeWorld, focused: screenFocused,
@@ -533,6 +538,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   useEffect(() => {
     const delays: Partial<Record<string, number>> = {
       'world.egg_intro': 4_100,
+      // "There. It'll grow if we keep looking at it. Light, then." A beat, then the offer.
+      'world.seed_planted': 2_600,
     };
     const delay = ftueStep?.autoAdvanceMs ?? (ftueStepId ? delays[ftueStepId] : undefined);
     const key = ftueStepId ? `${activeFtueRunId ?? 'current'}:${ftueStepId}` : null;
@@ -726,7 +733,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const gardenWorldGuidanceActive = Boolean(ftueStepId && (
     mossproutFtueShowsWorldGarden(ftueStepId) || ftueStepId === 'world.first_seed_grew'
   ));
-  const gardenWorldBottomCtaActive = (ftueStepId === 'world.seed_planted' && firstSeedPlacementFailed)
+  const gardenWorldBottomCtaActive = (ftueStepId === 'world.seed_planted' && (firstSeedPlacementFailed || firstSeedPlanted))
+    || (ftueStepId === 'world.first_bloom_offer' && firstLightFailed)
     || ftueStepId === 'world.first_seed_grew';
   const seedPlantingFtueActive = ftueStepId === 'world.garden_arrival' || ftueStepId === 'world.seed_planted';
   const measureGlowCurrencyOrigin = useCallback(() => new Promise<{ x: number; y: number }>((resolve) => {
@@ -961,6 +969,64 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (pending) { liftCommitRef.current = null; liftCommitTimerRef.current = setTimeout(pending, LIFT_CAPTION_MIN_MS); }
     return () => { if (liftCommitTimerRef.current) { clearTimeout(liftCommitTimerRef.current); liftCommitTimerRef.current = null; } };
   }, [ftueStepId]);
+  // The first light. The Glow that drove the wisps off stays with you: granted by the flow right
+  // after the lift (`haven.opening_glow`), and here as well under the same receipt in case that effect
+  // was interrupted. Seen arriving once: tokens fly from the tile into the counter, which counts them in.
+  const openingGlowShownRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (ftueStepId !== OPENING_MIST_LIFT_STEP_ID) return;
+    const key = `${activeFtueRunId ?? 'current'}:opening-glow`;
+    if (openingGlowShownRef.current === key) return;
+    openingGlowShownRef.current = key;
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    // After the caption's first beat, so the light does not fight the crossblend.
+    timers.push(setTimeout(() => {
+      void ensureStoredOpeningGlow(`${activeFtueRunId ?? 'current'}:opening-glow`).then((result) => {
+        if (cancelled || !result.state.openingGlow) return;
+        const { amount } = result.state.openingGlow;
+        const total = result.state.coins;
+        // Hold the counter below the grant while the tokens are in the air, then count them in.
+        setGlowSpend({ amount, counting: false });
+        setDisplayedGlow(Math.max(0, total - amount));
+        const fly = (from: { x: number; y: number }) => {
+          openingGlow.launch(from, glowCurrencyArtRef.current);
+          timers.push(setTimeout(() => {
+            if (cancelled) return;
+            setGlowSpend({ amount, counting: true });
+            setDisplayedGlow(total);
+            timers.push(setTimeout(() => { if (!cancelled) setGlowSpend(null); }, 900));
+          }, OPENING_GLOW_FLIGHT_MS));
+        };
+        const node = homeTileNode;
+        if (!node) { fly({ x: window.width / 2, y: window.height * 0.5 }); return; }
+        node.measureInWindow((x, y, width, height) => fly({ x: x + width / 2, y: y + height * 0.5 }));
+      }).catch(() => undefined);
+    }, OPENING_GLOW_ARRIVAL_DELAY_MS));
+    return () => {
+      cancelled = true;
+      for (const timer of timers) clearTimeout(timer);
+      // Whatever was mid-flight: the counter follows the wallet again.
+      setGlowSpend(null);
+    };
+  }, [activeFtueRunId, ftueStepId, homeTileNode, openingGlow, window.height, window.width]);
+  // The repair: a profile that reaches the first restore short of its light (the lift happened before
+  // the light was kept, or the effect was interrupted) is granted it here under the same receipt.
+  const firstLightRepairRef = useRef<string | null>(null);
+  const repairFirstLight = useCallback(() => {
+    setFirstLightFailed(false);
+    return ensureStoredOpeningGlow(`${activeFtueRunId ?? 'current'}:opening-glow`)
+      .then((result) => { if (result.state.coins < GLOW.firstRestorationCost) setFirstLightFailed(true); })
+      .catch(() => setFirstLightFailed(true));
+  }, [activeFtueRunId]);
+  useEffect(() => {
+    if (ftueStepId !== 'world.first_bloom_offer' && ftueStepId !== 'world.first_bloom_restore') return;
+    if (mergeWorld.coins >= GLOW.firstRestorationCost) return;
+    const key = `${activeFtueRunId ?? 'current'}:${ftueStepId}:first-light`;
+    if (firstLightRepairRef.current === key) return;
+    firstLightRepairRef.current = key;
+    void repairFirstLight();
+  }, [activeFtueRunId, ftueStepId, mergeWorld.coins, repairFirstLight]);
   // The opening's veil lift: one local crossblend per run at `world.mist_lift`,
   // rebuilt on a cold resume and committed exactly once when the canvas finishes.
   const veilLiftKeyRef = useRef<string | null>(null);
@@ -1789,7 +1855,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onCameraSnapshotChange={onCameraSnapshotChange}
         onCameraMotionChange={handleCameraMotionChange}
         onInteractionExitFocusComplete={closeResidentInteraction}
-        onOpenGarden={openGarden}
+        onOpenGarden={ftueStepId ? undefined : openGarden}
         onGardenPlotTargetChange={setGardenPlotNode}
         onHomeTileTargetChange={setHomeTileNode}
         homeVeil={homeVeil}
@@ -1897,7 +1963,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           />
         </Animated.View>
       ) : null}
-      {!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && !kingdomGoalGuideActive && !sharedUpgrade && havenMergeBoardActive && mossproutFtueShowsWorldGarden(ftueStepId) && !gardenWorldBottomCtaActive ? (
+      {/* The Merge button waits for the Garden lesson in Steppling's discovery: never during the first session. */}
+      {!stepplingSurfaceOpen && !upgradePresentation && !activeInteractionResidentId && !kingdomGoalGuideActive && !sharedUpgrade && havenMergeBoardActive && !ftueStepId ? (
         <Animated.View
           collapsable={false}
           ref={setGardenClusterNode}
@@ -2076,8 +2143,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           <View collapsable={false} pointerEvents="none" ref={setHavenGuideNode} style={styles.discoveryCallout}>
             <FtueGuideCopy guide={ftueStep.guide} hero />
           </View>
-          {!['world.mist_lift', 'world.egg_intro', 'world.garden_arrival', 'world.garden_handoff', 'world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId ?? '')
-            && (ftueStepId !== 'world.seed_planted' || firstSeedPlacementFailed)
+          {(!['world.mist_lift', 'world.egg_intro', 'world.garden_arrival', 'world.garden_handoff', 'world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId ?? '')
+              || (ftueStepId === 'world.first_bloom_offer' && firstLightFailed))
+            && (ftueStepId !== 'world.seed_planted' || firstSeedPlacementFailed || firstSeedPlanted)
             && (ftueStepId !== 'world.first_seed_grew' || firstSeedGrown) ? <View style={styles.discoveryCalloutButton}>
             <KatchaButton
               fullWidth
@@ -2085,10 +2153,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
               icon={ftueStep.actions[0]?.icon ?? 'sparkles'}
               label={ftueStepId === 'world.seed_planted' && firstSeedPlacementFailed
                 ? 'Retry Planting'
-                : ftueStep.actions[0]?.title ?? 'Continue'}
+                : ftueStepId === 'world.first_bloom_offer'
+                  ? 'Try again'
+                  : ftueStep.actions[0]?.title ?? 'Continue'}
               loading={firstSeedPlacementBusy && (ftueStepId === 'world.garden_arrival' || ftueStepId === 'world.seed_planted')}
               onPress={ftueStepId === 'world.garden_arrival'
                 ? beginFirstSeedPlanting
+                : ftueStepId === 'world.first_bloom_offer'
+                  ? repairFirstLight
                 : ftueStepId === 'world.seed_planted'
                   ? acknowledgeFirstSeedPlanting
                 : ftueStepId === 'world.first_seed_grew'

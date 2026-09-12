@@ -6,6 +6,8 @@ import type { MergeOrder, MergeWorldCommand, MergeWorldCommandResult, MergeWorld
 
 export const GLOW_GATEWAY_ID = 'mossprout:overgrown-trail' as const;
 export const GLOW_ORDER_IDS = ['mossprout:glow:plant-1', 'mossprout:glow:plant-2'] as const;
+/** The parcel the Garden Basket arrives in: the first thing the player opens on the Garden board. */
+export const MOSSPROUT_BASKET_ARRIVAL_ID = 'arrival:ftue:garden-basket';
 export const GLOW_ECHO_IDS = ['glow:seed', 'glow:sprout'] as const;
 export const GLOW_REPEAT_ECHO_IDS = ['glow:repeat:seed', 'glow:repeat:sprout', 'glow:repeat:plant', 'glow:repeat:flower', 'glow:repeat:rare-flower'] as const;
 export const GLOW_SINGLE_ECHO_IDS = GLOW_REPEAT_ECHO_IDS.slice(1, 4);
@@ -60,8 +62,8 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
     const lesson = state.glowDiscoveryLesson;
     const orderIndex = 1;
     if (lesson && (lesson.servedOrderIds.includes(GLOW_ORDER_IDS[1]) || lesson.layoutVersion === 2)) return no();
+    // The Basket may still be in its parcel: the lesson's first beat opens it, and the claim installs the generator.
     const generator = state.generators['wild-garden'];
-    if (!generator) return no('Open the Garden first.');
     const board = state.board.map((cell) => ({ ...cell }));
     // Retire obsolete seed/extra-tier targets without touching owned items.
     const retiredIds: readonly string[] = [...GLOW_ECHO_IDS, GLOW_REPEAT_ECHO_IDS[0], GLOW_REPEAT_ECHO_IDS[4], MOSSPROUT_DREAM_ECHOES[0].id];
@@ -83,7 +85,7 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
     }
     return changed(state, {
       ...state, board, glowDiscoveryLesson: { preparedAt: lesson?.preparedAt ?? command.now, servedOrderIds: lesson?.servedOrderIds ?? [], guidedOrderIndex: orderIndex, layoutVersion: 2 },
-      generators: { ...state.generators, 'wild-garden': { ...generator, forcedDropDefinitionId: 'nature:garden:1' } },
+      generators: generator ? { ...state.generators, 'wild-garden': { ...generator, forcedDropDefinitionId: 'nature:garden:1' } } : state.generators,
       activeOrders: [...state.activeOrders.filter((order) => order.id !== 'mossprout:ftue:help-garden-wake' && !(GLOW_ORDER_IDS as readonly string[]).includes(order.id)), glowDiscoveryOrder(orderIndex, command.now)],
     }, command.now);
   }

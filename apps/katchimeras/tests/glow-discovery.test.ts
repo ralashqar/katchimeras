@@ -5,7 +5,7 @@ import { SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { mergeLessonEvidenceReady } from '@/features/content-flow/merge-lesson-recipe';
 import { createMossproutChapterZeroState } from '@/utils/merge-world/onboarding';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
-import { GLOW_ECHO_IDS, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, glowGatewayState, glowDiscoveryOrder } from '@/utils/merge-world/glow-discovery-policy';
+import { GLOW_ECHO_IDS, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, glowGatewayState, glowDiscoveryOrder, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/utils/merge-world/glow-discovery-policy';
 import type { MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
 import { GLOW_DISCOVERY_FLOW, glowDiscoveryAllowsGarden, glowDiscoveryBoardStep, glowDiscoveryLessonReady, glowDiscoveryRevealLocked, glowDiscoveryLocksCamera, GLOW_LESSON } from '@/features/onboarding/glow-discovery-flow';
 import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
@@ -135,7 +135,7 @@ test('one Glow request starts with two Seeds, survives reloads, and pays for mis
     assert.equal(cells(state, 1).length, count + 1);
     assert.equal(glowDiscoveryLessonReady('lesson.single.spawn', state), count === 1);
   }
-  for (const beat of GLOW_LESSON.slice(1)) {
+  for (const beat of GLOW_LESSON.filter((candidate) => candidate.kind !== 'parcel' && candidate.kind !== 'spawn')) {
     const step = glowDiscoveryBoardStep(beat.id, state)!;
     assert.ok(step.cue);
     assert.ok(step.spotlight);
@@ -340,9 +340,12 @@ test('a prior unlock carries into the shared reveal for free, even with a differ
 });
 
 test('lesson evidence requires a real spawn and validates authored references', () => {
-  assert.equal(mergeLessonEvidenceReady(GLOW_LESSON[0], { spawned: false, remainingEchoIds: [...GLOW_ECHO_IDS], servedOrderIds: [] }), false);
-  assert.equal(mergeLessonEvidenceReady(GLOW_LESSON[0], { spawned: true, remainingEchoIds: [...GLOW_ECHO_IDS], servedOrderIds: [] }), true);
-  const invalid = { ...GLOW_DISCOVERY_FLOW, nodes: GLOW_DISCOVERY_FLOW.nodes.map((node) => node.id === 'lesson.single.spawn' ? { ...node, payload: { beat: { ...GLOW_LESSON[0], generatorId: 'missing-generator' } } } : node) };
+  assert.equal(GLOW_LESSON[0].kind, 'parcel', 'the board is introduced by opening the Basket’s parcel');
+  assert.equal(mergeLessonEvidenceReady(GLOW_LESSON[0], { spawned: true, remainingEchoIds: [...GLOW_ECHO_IDS], servedOrderIds: [] }), false);
+  assert.equal(mergeLessonEvidenceReady(GLOW_LESSON[0], { spawned: false, remainingEchoIds: [...GLOW_ECHO_IDS], servedOrderIds: [], claimedArrivalIds: [MOSSPROUT_BASKET_ARRIVAL_ID] }), true);
+  assert.equal(mergeLessonEvidenceReady(GLOW_LESSON[1], { spawned: false, remainingEchoIds: [...GLOW_ECHO_IDS], servedOrderIds: [] }), false);
+  assert.equal(mergeLessonEvidenceReady(GLOW_LESSON[1], { spawned: true, remainingEchoIds: [...GLOW_ECHO_IDS], servedOrderIds: [] }), true);
+  const invalid = { ...GLOW_DISCOVERY_FLOW, nodes: GLOW_DISCOVERY_FLOW.nodes.map((node) => node.id === 'lesson.single.spawn' ? { ...node, payload: { beat: { ...GLOW_LESSON[1], generatorId: 'missing-generator' } } } : node) };
   assert.ok(validateContentFlowDefinition(invalid).some((issue) => issue.message.includes('known generator')));
   for (const old of ['egg.transfer', 'world.choose', 'steppling.hatch', 'steppling.claim'] as const) assert.equal(GLOW_DISCOVERY_FLOW.migrations?.[old], 'gateway.egg');
 });

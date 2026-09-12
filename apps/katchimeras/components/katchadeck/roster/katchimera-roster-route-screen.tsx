@@ -470,7 +470,8 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
     } else if (stepId === 'world.egg_intro') {
       commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-intro-seen' });
     } else if (stepId === 'world.seed_planted') {
-      void openFtueGarden();
+      // The planted memory is the first light: no Merge visit, straight on to the offer.
+      void advanceFtueActionDurably({ expectedStepId: 'world.seed_planted', actionId: 'world.acknowledge_seed_dormant', evidenceRef: 'mossprout-world:seed-planted' }).catch(() => {});
     } else if (stepId === 'companion.meditating') {
       void advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden' }).catch(() => {});
     }

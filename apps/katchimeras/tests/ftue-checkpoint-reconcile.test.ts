@@ -62,13 +62,15 @@ async function parkFlowAt(runId: string, nodeId: string) {
 }
 
 test('a checkpoint that outran the journal replays every task it proves, counted requirements included, then waits at the next scene work', async () => {
-  assert.ok(taskCount('merge.serve_sprout') === 1, 'the request is a single serve');
-  const ftue = ftueAt('ftue-ahead', 'world.first_bloom_offer', ['merge.serve_sprout']);
-  await parkFlowAt(ftue.runId, 'merge.serve_sprout');
+  // The Chapter 0 request is gone (the first restore is paid with granted light): the mist clear is the flow's task.
+  assert.equal(MOSSPROUT_FTUE_FLOW.nodes.some((node) => node.id === 'merge.serve_sprout'), false, 'no Merge visit before the first restore: the profile starts with its Glow');
+  assert.equal(taskCount('world.mist_clear'), 7, 'the opening counts seven merges');
+  const ftue = ftueAt('ftue-ahead', 'world.mist_lift', ['world.mist_clear']);
+  await parkFlowAt(ftue.runId, 'world.mist_clear');
   const run = await runtime.reconcileFtueCheckpoint(ftue);
   assert.equal(run.status, 'active');
-  assert.equal(run.nodeId, 'garden.first-bloom-offer.focus', 'the request replayed; the camera beat is the Kingdom screen’s to acknowledge');
-  assert.equal([...events].filter((id) => id.includes(':reconcile:')).length, 1);
+  assert.equal(run.nodeId, 'world.mist_lift', 'the clear replayed in full; the lift is the Kingdom screen’s to acknowledge');
+  assert.equal([...events].filter((id) => id.includes(':reconcile:')).length, 7);
   const again = await runtime.reconcileFtueCheckpoint(ftue);
   assert.equal(again.nodeId, run.nodeId, 'reconcile is idempotent');
 });
@@ -86,17 +88,17 @@ test('every counted task on the shipping path is replayed in full when the check
 });
 
 test('replay stops exactly at the checkpoint and never fabricates evidence the checkpoint does not prove', async () => {
-  const inStep = ftueAt('ftue-in-step', 'merge.serve_sprout', []);
-  await parkFlowAt(inStep.runId, 'merge.serve_sprout');
+  const inStep = ftueAt('ftue-in-step', 'world.mist_clear', []);
+  await parkFlowAt(inStep.runId, 'world.mist_clear');
   const unchanged = await runtime.reconcileFtueCheckpoint(inStep);
-  assert.equal(unchanged.nodeId, 'merge.serve_sprout');
+  assert.equal(unchanged.nodeId, 'world.mist_clear');
   assert.equal(unchanged.phase, 'awaiting_event');
 
   // A rewound checkpoint (board write lost) sits before the flow; the flow
-  // waits where it is and the live serve catches it up.
-  const behind = ftueAt('ftue-behind', 'world.seed_planted', []);
-  await parkFlowAt(behind.runId, 'merge.serve_sprout');
+  // waits where it is and the live merges catch it up.
+  const behind = ftueAt('ftue-behind', 'world.mist_open', []);
+  await parkFlowAt(behind.runId, 'world.mist_clear');
   const parked = await runtime.reconcileFtueCheckpoint(behind);
-  assert.equal(parked.nodeId, 'merge.serve_sprout');
+  assert.equal(parked.nodeId, 'world.mist_clear');
   assert.equal([...events].filter((id) => id.startsWith('ftue:ftue-behind')).length, 0);
 });

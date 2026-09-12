@@ -60,7 +60,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
   // Independent from the legacy FTUE schema version. Bumping this lets v39
   // journal runs migrate onto the direct manifest without mutating a release.
-  version: 51,
+  version: 53,
   entryNodeId: 'world.mist_open',
   metadata: {
     kind: 'ftue' as const,
@@ -71,7 +71,9 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   nodes: [
     scene('world.mist_open', 'haven', [{ id: 'world.look_closer', next: 'world.mist_clear' }]),
     task('world.mist_clear', 'haven', { id: 'world.clear_mist', event: ftueEvent('merge_completed'), count: 7, next: 'world.mist_lift' }),
-    scene('world.mist_lift', 'haven', [{ id: 'world.mist_lifted', next: 'world.egg_intro' }]),
+    scene('world.mist_lift', 'haven', [{ id: 'world.mist_lifted', next: 'effect.haven.opening_glow' }]),
+    // The first light: the Glow that drove the wisps off stays with you, and pays the first restore.
+    story.effect({ id: 'effect.haven.opening_glow', capability: 'haven.opening_glow', next: 'world.egg_intro' }),
     scene('world.egg_intro', 'haven', [{ id: 'world.inspect_mossprout_egg', next: 'egg.opening' }]),
     scene('egg.opening', 'haven', [{ id: 'egg.day_texture', next: 'egg.context' }]),
     scene('egg.context', 'haven', [{ id: 'egg.desired_help', next: 'egg.ready' }]),
@@ -100,12 +102,9 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
       capability: 'haven.place_first_memory',
       next: 'world.seed_planted',
     }),
-    scene('world.seed_planted', 'haven', [{ id: 'world.acknowledge_seed_dormant', next: 'merge.serve_sprout' }]),
-    task('merge.serve_sprout', 'merge', {
-      id: 'merge.serve_sprout',
-      event: ftueEvent('order_served', { orderId: 'mossprout:chapter-0:first-sprout' }),
-      next: 'garden.first-bloom-offer.focus',
-    }),
+    // No Merge visit stands between the planted memory and the garden waking: the profile starts
+    // with the first restore's Glow. A save parked on the old Chapter 0 request migrates to the offer.
+    scene('world.seed_planted', 'haven', [{ id: 'world.acknowledge_seed_dormant', next: 'garden.first-bloom-offer.focus' }]),
     storyOperations.focusCamera({
       id: 'garden.first-bloom-offer.focus',
       target: MOSSPROUT_GARDEN_FOCUS_TARGET,
@@ -155,10 +154,11 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     story.complete(),
   ],
   migrations: {
-    // v51: merging is taught by the opening, so the guided drags are gone.
-    'merge.seed_drag': 'merge.serve_sprout',
-    'merge.second_seed_drag': 'merge.serve_sprout',
-    'merge.first_bloom': 'merge.serve_sprout',
+    // v51: merging is taught by the opening, so the guided drags are gone; v52: the first restore is paid with granted light, so the request is too.
+    'merge.seed_drag': 'garden.first-bloom-offer.focus',
+    'merge.second_seed_drag': 'garden.first-bloom-offer.focus',
+    'merge.first_bloom': 'garden.first-bloom-offer.focus',
+    'merge.serve_sprout': 'garden.first-bloom-offer.focus',
     'effect.haven.prepare_merge_handoff': 'effect.haven.start_glow_discovery',
     'merge.handoff.spawn': 'effect.haven.start_glow_discovery',
     'merge.handoff.merge': 'effect.haven.start_glow_discovery',

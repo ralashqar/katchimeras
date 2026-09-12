@@ -360,7 +360,7 @@ test('Mossprout FTUE turns one Bond answer into a Garden upgrade and an intimate
   assert.equal(mossproutFtueStep('companion.garden_intro')?.actions[0]?.nextStepId, 'world.garden_arrival');
   assert.equal(mossproutFtueStep('companion.order_preview')?.actions[0]?.nextStepId, 'world.garden_arrival');
   assert.equal(mossproutFtueStep('world.garden_arrival')?.actions[0]?.nextStepId, 'world.seed_planted');
-  assert.equal(mossproutFtueStep('world.seed_planted')?.actions[0]?.nextStepId, 'merge.serve_sprout');
+  assert.equal(mossproutFtueStep('world.seed_planted')?.actions[0]?.nextStepId, 'world.first_bloom_offer');
   assert.equal(mossproutFtueStep('world.seed_planted')?.autoAdvanceMs, undefined);
   const gardenArrivalProjection = mossproutFtueStep('world.garden_arrival')?.camera;
   const gardenArrival = mossproutFtueStep('world.garden_arrival');
@@ -474,7 +474,7 @@ test('live Chapter 0 board installation preserves the planted Haven memory', () 
   const repository = readFileSync('utils/merge-world/repository.ts', 'utf8');
   const havenScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
 
-  assert.match(companionRoute, /installMossproutOnboardingMergeWorld\(Date\.now\(\), ftueWispForRun\(run\), \{ preserveHaven: true \}\)/);
+  assert.match(companionRoute, /installMossproutOnboardingMergeWorld\(Date\.now\(\), ftueWispForRun\(run\), \{ preserveHaven: true, basketParcel: true \}\)/, 'the Garden board starts bare, with the Basket in a parcel');
   assert.match(repository, /options: \{ preserveHaven\?: boolean \}/);
   assert.match(repository, /options\.preserveHaven[\s\S]*?haven: current\.haven/);
   assert.match(havenScreen, /beginFirstSeedPlanting[\s\S]*?evidenceRef: `garden-plot:\$\{MOSSPROUT_FIRST_MEMORY_SLOT_ID\}`/);

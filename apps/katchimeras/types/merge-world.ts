@@ -521,6 +521,8 @@ export type MergeWorldState = {
   stepplingEgg?: import('@/features/onboarding/steppling-egg-policy').StepplingEggProgress;
   worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
   glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 };
+  /** The first light, earned when the last wisp fell on the opening board: what the first garden restore is paid with. */
+  openingGlow?: { receiptId: string; amount: number; grantedAt: number } | null;
   stepplingGardenLesson?: { preparedAt: number; servedAt?: number };
   /** Mossprout's wish — bring every friend home — once it has been told, and once its map hint was seen. */
   kingdomGoal?: { introducedAt: number; coachmarkSeenAt: number | null };
@@ -600,6 +602,8 @@ export type MergeWorldCommand =
   | { type: 'transferDiscoveryEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
   | { type: 'hatchWorldEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
   | { type: 'prepareGlowDiscoveryLesson'; now: number }
+  /** The first light: the Glow that drove the opening's wisps off stays with you, once per run. */
+  | { type: 'grantOpeningGlow'; receiptId: string; amount: number; now: number }
   | { type: 'prepareStepplingGardenLesson'; now: number }
   | { type: 'refreshTime'; boardId?: MergeBoardId; now: number }
   | { type: 'tapGenerator'; boardId?: MergeBoardId; generatorId: string; now: number; seed: string; spendEnergy?: boolean; activityOpportunityId?: string }

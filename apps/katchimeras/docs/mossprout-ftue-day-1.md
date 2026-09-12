@@ -52,3 +52,17 @@ The first-rest scene explains: â€œJourney Days follow our story, at your pace.â€
 Run five cozy-game newcomers through the entire session. Record time to first merge, first Bloom and Egg discovery, manual/automatic hints, exits, and first return. Existing durable flow receipts establish completed milestones; observe hint use and confusion in the device session. Do not treat local tests as retention analytics.
 
 Target four of five who can complete discovery and explain how merging helps the Garden, how their day connects to the companion, and what remains available during meditation. These are acceptance targets, not measured results.
+
+## First light and the Garden board's introduction (Sept 12, 2026)
+
+Built. The first restore no longer sends the player to Merge: the profile starts with twenty Glow
+(`createMossproutBasketParcelState` sets `coins`), the planted-memory beat moves on to the offer by itself
+after a short pause, and the glowing bubble wakes the garden. The Merge button is not shown at all during
+the first session. Script v50; a save parked on the old Chapter 0 request continues at the offer.
+
+The Garden board is introduced during Steppling's Glow discovery instead. It is installed bare at the first
+meeting (`createMossproutBasketParcelState`: locked cells, the sleeping echoes, no request, the Garden Basket
+waiting in a parcel on the tray). The lesson (`GLOW_LESSON`, flow v10) opens the parcel first (the Basket's
+"New spawner" page greets it), then two Seeds, one merge, three sleeping pieces woken up the ladder, and
+Mossprout's request served for the forty Glow the trail needs. The copy introduces requests as the thing that
+turns a grown thing into light.

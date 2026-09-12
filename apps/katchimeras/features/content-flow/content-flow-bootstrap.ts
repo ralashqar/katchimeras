@@ -13,7 +13,7 @@ import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
-import { applyStoredGlowDiscovery, grantStoredGeneratorParcel, reconcileStoredHavenStory, activateStoredResidentCardDiscovery, ensureStoredFirstFtueMemoryPlacement, grantStoredPlantableMemory, growStoredPlantableMemory, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget } from '@/utils/merge-world/repository';
+import { applyStoredGlowDiscovery, grantStoredGeneratorParcel, reconcileStoredHavenStory, activateStoredResidentCardDiscovery, ensureStoredFirstFtueMemoryPlacement, grantStoredPlantableMemory, growStoredPlantableMemory, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget, ensureStoredOpeningGlow } from '@/utils/merge-world/repository';
 import { firstFtueMemoryForSource } from '@/utils/merge-world/first-ftue-memory';
 import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
 import { beginKatchimeraMeditation, completeMossproutJourneyResolution, katchimeraMeditationRecord } from '@/game/katchimeras/relationship-progression';
@@ -188,6 +188,12 @@ export function bootstrapContentFlowCatalog() {
       }
     }
     return { effectKey, definitionId: seed.id, instanceId };
+  });
+  registerContentFlowEffect('haven.opening_glow', async ({ run, effectKey }) => {
+    const sourceId = typeof run.variables.ftueRunId === 'string' ? run.variables.ftueRunId : run.runId;
+    const result = await ensureStoredOpeningGlow(`${sourceId}:opening-glow`);
+    if (!result.state.openingGlow) throw new Error('The first light could not be kept');
+    return { effectKey, amount: result.state.openingGlow.amount, receiptId: result.state.openingGlow.receiptId };
   });
   registerContentFlowEffect('haven.place_first_memory', async ({ run, effectKey }) => {
     const sourceId = typeof run.variables.ftueRunId === 'string' ? run.variables.ftueRunId : run.runId;

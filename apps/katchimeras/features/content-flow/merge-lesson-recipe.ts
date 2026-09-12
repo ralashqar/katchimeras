@@ -4,6 +4,8 @@ import type { MergeWorldState } from '@/types/merge-world';
 import { story } from './story-manifest';
 
 export type MergeLessonBeat = { id: string; guide: FtueGuide } & (
+  /** A parcel on the tray to open: the Basket arrives this way, and its reward page greets it. */
+  | { kind: 'parcel'; arrivalId: string }
   | { kind: 'spawn'; generatorId: string }
   | { kind: 'match'; definitionId: string; echoId: string }
   | { kind: 'pair'; definitionId: string }
@@ -25,6 +27,10 @@ export function mergeLessonBoardStep(beat: MergeLessonBeat | undefined, idPrefix
 }): FtueStepDefinition | null {
   if (!beat) return null;
   const base = { id: `${idPrefix}.${beat.id}`, surface: 'merge' as const, actions: [], guide: beat.guide };
+  if (beat.kind === 'parcel') {
+    const target: FtueTarget = { kind: 'tray_parcel', arrivalId: beat.arrivalId };
+    return { ...base, cue: { kind: 'tap', target }, spotlight: { targets: [target], padding: 7, radius: 14 }, interaction: { mode: 'exclusive', allowed: { kind: 'parcel_tap', target } } };
+  }
   const missingSource = recovery && recovery.board.filter((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === recovery.requiredDefinitionId).length < (beat.kind === 'pair' ? 2 : 1);
   if (recovery && (beat.kind === 'spawn' || missingSource) && beat.kind !== 'practice') {
     if (!recovery.board.some((cell) => !cell.locked && !cell.occupant && !cell.mist)) return {
@@ -53,8 +59,11 @@ export function mergeLessonBoardStep(beat: MergeLessonBeat | undefined, idPrefix
 export function mergeLessonEvidenceReady(beat: MergeLessonBeat | undefined, evidence: {
   spawned: boolean; remainingEchoIds: readonly string[]; servedOrderIds: readonly string[];
   pairMerged?: boolean;
+  /** Parcels opened (or whose contents are already on the board). */
+  claimedArrivalIds?: readonly string[];
 }) {
   if (!beat) return false;
+  if (beat.kind === 'parcel') return Boolean(evidence.claimedArrivalIds?.includes(beat.arrivalId));
   if (beat.kind === 'spawn') return evidence.spawned;
   if (beat.kind === 'pair') return Boolean(evidence.pairMerged);
   if (beat.kind === 'match') return !evidence.remainingEchoIds.includes(beat.echoId);

@@ -5,7 +5,7 @@ import type { ContentFlowRun, ContentFlowSurface } from '@/types/content-flow';
 import type { MergeWorldState } from '@/types/merge-world';
 import type { FtueCameraDirective, FtueStepDefinition } from './ftue-types';
 import { mergeLessonRecipe, mergeLessonBoardStep, mergeLessonEvidenceReady, type MergeLessonBeat } from '@/features/content-flow/merge-lesson-recipe';
-import { GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS, glowGeneratorRule } from '@/utils/merge-world/glow-discovery-policy';
+import { GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS, glowGeneratorRule, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/utils/merge-world/glow-discovery-policy';
 import { MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM } from './opening-mist';
 import { STEPPLING_MISSION_CAMERA } from './steppling-mission';
 
@@ -44,22 +44,28 @@ export function glowDiscoveryResumeWorld(run: Pick<ContentFlowRun, 'status'> | n
 }
 
 export const GLOW_DISCOVERY_RUN_ID = 'story:glow-steppling-v1';
+/**
+ * The Garden board's proper introduction. The board starts bare: the first beat opens the parcel
+ * the Basket arrives in (its own reward page greets it), then two Seeds, one merge, three sleeping
+ * pieces woken up the ladder, and the request served for the light the trail needs.
+ */
 export const GLOW_LESSON: readonly MergeLessonBeat[] = [
-  { id: 'lesson.single.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'Someone’s in there', title: 'Make enough light to see who it’s holding.', body: 'Tap the Basket twice.' } },
+  { id: 'lesson.single.parcel', kind: 'parcel', arrivalId: MOSSPROUT_BASKET_ARRIVAL_ID, guide: { eyebrow: 'A parcel from Mossprout', title: 'The Garden Basket. Open it.', body: 'Everything that grows here starts in there.' } },
+  { id: 'lesson.single.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'A request', title: 'Mossprout is asking for a Rare Flower.', body: 'That’s a request. Start small: tap the Basket twice for two Seeds.' } },
   { id: 'lesson.single.seeds', kind: 'pair', definitionId: 'nature:garden:1', guide: { eyebrow: 'Making light', title: 'Two of the same, together.', body: 'Drag one onto the other.' } },
   ...['Sprout', 'Plant', 'Flower'].map((name, index): MergeLessonBeat => ({
     id: `lesson.single.match-${index + 2}`, kind: 'match', definitionId: `nature:garden:${index + 2}`, echoId: GLOW_SINGLE_ECHO_IDS[index],
     guide: { coaching: index === 0 ? undefined : 'practice', eyebrow: 'In the grey', title: `The Mist has a ${name}. Its twin will pull it free.`, body: `Drag your ${name} onto it.` },
   })),
-  { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: 'Enough light', title: 'Give it here. I’ll turn it into light.', body: 'Serve the request.' } },
+  { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: 'A request, served', title: 'That’s what was asked for. Give it here.', body: 'Serving a request is what turns a grown thing into light. Tap Serve.' } },
 ];
 export const GLOW_ALL_LESSON_BEATS = GLOW_LESSON;
 export const GLOW_DISCOVERY_FLOW = defineStory({
-  id: 'glow-steppling-discovery', version: 9, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
+  id: 'glow-steppling-discovery', version: 10, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
   nodes: [
     storyOperations.focusCamera({ id: 'gateway.focus', target: STEPPLING_STORY_TARGET, ...MIST_CLOSE_UP, next: 'garden.open' }),
-    worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.single.prepare', view: { kind: 'garden', guide: { eyebrow: 'Someone’s in there', title: 'Back to the board.', body: 'The trail past the garden is held too. One more request’s light should reach it.' }, actionLabel: 'Open Garden' } }),
-    story.effect({ id: 'lesson.single.prepare', capability: 'glow.lesson.prepare', next: 'lesson.single.spawn' }),
+    worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.single.prepare', view: { kind: 'garden', guide: { eyebrow: 'Someone’s in there', title: 'Light is made on the Garden board.', body: 'Mossprout has a request waiting there. Serve it and the light reaches the trail.' }, actionLabel: 'Open Garden' } }),
+    story.effect({ id: 'lesson.single.prepare', capability: 'glow.lesson.prepare', next: GLOW_LESSON[0]!.id }),
     ...mergeLessonRecipe(GLOW_LESSON, 'gateway.ready', 'glow'),
     worldActionScene({ id: 'gateway.ready', actionId: 'return', next: 'gateway.offer', view: { kind: 'return', guide: { eyebrow: 'Enough light', title: 'That should reach.', body: 'Come and see who the trail was hiding.' }, actionLabel: 'Back to world' } }),
     // Returning to the world exposes the upgrade immediately. Camera framing
@@ -135,7 +141,7 @@ export function glowDiscoveryBoardStep(nodeId: string, state?: MergeWorldState |
   if (state && beat?.kind === 'match' && beat.definitionId === 'nature:garden:2'
     && !state.board.some((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:2')) {
     const seeds = state.board.filter((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:1').length;
-    beat = lesson[seeds >= 2 ? 1 : 0];
+    beat = lesson.find((candidate) => candidate.kind === (seeds >= 2 ? 'pair' : 'spawn'));
   }
   return mergeLessonBoardStep(beat, 'glow', state ? {
     board: state.board, generatorId: rule!.generatorId,
@@ -151,10 +157,16 @@ export function glowDiscoveryLessonReady(nodeId: string, world: MergeWorldState)
   if (lesson.servedOrderIds.includes(GLOW_ORDER_IDS[1])) return true;
   if (lesson.layoutVersion !== 2) return false;
   const remainingEchoIds = world.board.flatMap((cell) => cell.mist?.kind === 'echo' ? [cell.mist.id] : []);
+  // The Basket's parcel is opened once it has been claimed, or once the Basket is on the board at all (a save from before the parcel).
+  const basketInstalled = Boolean(world.generators['wild-garden']) || world.board.some((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'wild-garden');
+  const claimedArrivalIds = [
+    ...world.arrivals.flatMap((arrival) => arrival.claimedAt != null ? [arrival.id] : []),
+    ...(basketInstalled ? [MOSSPROUT_BASKET_ARRIVAL_ID] : []),
+  ];
   const pairMerged = !remainingEchoIds.includes(GLOW_SINGLE_ECHO_IDS[0]) || world.board.some((cell) => !cell.locked && cell.occupant?.kind === 'item' && /^nature:garden:[2-9]$/.test(cell.occupant.definitionId));
   return mergeLessonEvidenceReady(beat, {
     spawned: pairMerged || Boolean(lesson.spawnedAt && world.board.filter((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:1').length >= 2),
     pairMerged,
-    remainingEchoIds, servedOrderIds: lesson.servedOrderIds,
+    remainingEchoIds, servedOrderIds: lesson.servedOrderIds, claimedArrivalIds,
   });
 }

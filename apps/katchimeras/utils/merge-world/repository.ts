@@ -1,3 +1,4 @@
+import { GLOW } from '@/constants/glow';
 import * as SQLite from 'expo-sqlite';
 import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { WORLD_UPGRADE_STORIES } from '@/features/world-upgrades/world-upgrade-stories';
@@ -11,7 +12,7 @@ import { islandCampaignForIsland } from '@/constants/island-campaigns/registry';
 import { mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
 import type { HavenStage } from '@/constants/haven-catalog';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld, resetMergeActivityForDay } from '@/utils/merge-world/engine';
-import { createMossproutChapterZeroState, createMossproutOpeningState } from '@/utils/merge-world/onboarding';
+import { createMossproutChapterZeroState, createMossproutOpeningState, createMossproutBasketParcelState } from '@/utils/merge-world/onboarding';
 import { completeMossproutChapterZeroSlice } from '@/utils/merge-world/chapter-zero-policy';
 import { MOSSPROUT_FTUE_JOURNAL_ENERGY } from '@/utils/merge-world/economy-policy';
 import { firstFtueMemoryForSource, reduceFirstFtueMemoryPlacement } from '@/utils/merge-world/first-ftue-memory';
@@ -570,6 +571,16 @@ export async function applyStoredStepplingEgg(action: import('@/features/onboard
   return result;
 }
 
+/**
+ * The first light: the Glow that drove the opening's wisps off stays with you. Granted once per
+ * run (the receipt is the run's) by the flow after the lift, and repaired by the world screen at the
+ * first restore. Reports whether this call was the one that granted it.
+ */
+export async function ensureStoredOpeningGlow(receiptId: string, amount = GLOW.firstRestorationCost, now = Date.now()) {
+  const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantOpeningGlow', receiptId, amount, now }), now);
+  return { state: result.state, granted: result.changed, amount };
+}
+
 export function grantStoredGeneratorParcel(generatorId: string, rewardId: string, dayId: string) {
   const now = Date.now();
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantGeneratorParcel', generatorId, rewardId, dayId, now }), now);
@@ -696,7 +707,7 @@ export async function installMergeWorldStateForDebug(input: unknown, now = Date.
 }
 
 /** `opening`: the mist-veiled opening's board (eight Seeds, two Sprouts) instead of the classic lesson board. */
-export type MossproutInstallOptions = { opening?: boolean };
+export type MossproutInstallOptions = { opening?: boolean; /** The live first session: the Basket arrives by parcel and the board starts bare. */ basketParcel?: boolean };
 
 /**
  * Installs Chapter 0's board. Live FTUE entry preserves the player's Haven;
@@ -710,7 +721,9 @@ export async function installMossproutOnboardingMergeWorld(
   await serializeWrite(async () => undefined);
   resetGeneration += 1;
   resetInProgress = true;
-  let installedState = options.opening ? createMossproutOpeningState(now, rewardWispId) : createMossproutChapterZeroState(now, rewardWispId);
+  let installedState = options.opening ? createMossproutOpeningState(now, rewardWispId)
+    : options.basketParcel ? createMossproutBasketParcelState(now, rewardWispId)
+    : createMossproutChapterZeroState(now, rewardWispId);
   try {
     await serializeWrite(async () => {
       const db = await database();

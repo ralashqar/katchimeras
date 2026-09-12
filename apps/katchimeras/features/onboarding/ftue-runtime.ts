@@ -119,6 +119,11 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     && !run.receipts.some((receipt) => receipt.actionId === 'world.inspect_mossprout_egg')) {
     return { ...run, schemaVersion: 6, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: 'world.mist_open', objectiveProgress: run.objectiveProgress ?? {}, updatedAt: new Date().toISOString() };
   }
+  // v50 pays the first restore with granted light: a run parked on the old
+  // Chapter 0 request skips it and continues at the offer, where the light arrives.
+  if (run.status === 'active' && run.scriptVersion < 50 && run.stepId === 'merge.serve_sprout') {
+    return { ...run, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: 'world.first_bloom_offer', updatedAt: new Date().toISOString() };
+  }
   // v49 removed the three guided drags; a run parked on one continues at the
   // request. Their receipts must go too, or the replayed edges never fire.
   const trimmedMergeSteps = new Set(['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom']);

@@ -4,6 +4,8 @@ import type { WispId } from '@/types/wisp';
 import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mossproutChapterZeroOrder } from '@/utils/merge-world/chapter-zero-policy';
 import { authoredDormantMistForCell } from '@/utils/merge-world/board-mist-progression';
+import { MOSSPROUT_BASKET_ARRIVAL_ID } from '@/utils/merge-world/glow-discovery-policy';
+import { localDayId } from '@/utils/world-identity-rules';
 
 export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: WispId = 'sprout'): MergeWorldState {
   let state = reduceMergeWorld(createInitialMergeWorldState(now), { type: 'reconcileCharacters', characterIds: ['mossprout'], now }).state;
@@ -79,6 +81,23 @@ export function createMossproutChapterZeroState(now = Date.now(), rewardWispId: 
  * Basket is not part of the opening either: it waits just below the window
  * for the persistent board's first request.
  */
+/**
+ * The board the Garden first opens on, now that the first restore is paid with granted light and
+ * the Merge lesson moved to Steppling's discovery: nothing on it but the locked cells and the
+ * sleeping echoes, no request, and the Garden Basket waiting in a parcel on the tray. The lesson
+ * opens the parcel (the Basket's own reward page greets it), then spawns, merges and serves.
+ */
+export function createMossproutBasketParcelState(now = Date.now(), rewardWispId: WispId = 'sprout'): MergeWorldState {
+  const state = createMossproutChapterZeroState(now, rewardWispId);
+  const board = state.board.map((cell) => (cell.occupant ? { ...cell, occupant: null } : cell));
+  // No Glow yet: the first restore's twenty is earned when the last wisp falls on the opening board.
+  const parcel = reduceMergeWorld(
+    { ...state, board, generators: {}, activeOrders: [], recentOrderKeys: [] },
+    { type: 'grantGeneratorParcel', generatorId: 'wild-garden', rewardId: MOSSPROUT_BASKET_ARRIVAL_ID, dayId: localDayId(new Date(now)), now },
+  );
+  return parcel.state;
+}
+
 export const MOSSPROUT_OPENING_BASKET_CELL = 44;
 export const MOSSPROUT_OPENING_SEED_CELLS: readonly number[] = [16, 17, 18, 19];
 export const MOSSPROUT_OPENING_SPROUT_CELLS: readonly number[] = [23, 25];
