@@ -90,6 +90,8 @@ export type HatchableDiscoveryFlowDefinition = {
 
 export type HatchableDayOneDefinition = {
   flow: { id: string; version: number; runId: string; title: string; migrations?: Readonly<Record<string, string>> };
+  /** The conversation the hatch opens, whose completed session is replayed into the day-one flow. */
+  conversationId: string;
   opening: string;
   choices: readonly { id: string; label: string }[];
   handoffs: Readonly<Record<string, string>>;
@@ -117,6 +119,7 @@ export type HatchableLessonDefinition = {
 
 export type HatchableCompanionDefinition = {
   companion: MergeCharacterId;
+  displayName: string;
   tile: HatchableTileDefinition;
   availability: HatchableAvailability;
   /** What the hatch records in companion discovery. */

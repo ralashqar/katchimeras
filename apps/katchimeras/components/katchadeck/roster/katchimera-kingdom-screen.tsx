@@ -1,13 +1,13 @@
-import { HATCHABLE_COMPANIONS, hatchableByTile, STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
-import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
+import { HATCHABLE_COMPANIONS, hatchableByCompanion, hatchableByTile, STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
-import { advanceGlowUpgrade, recoverPaidGlowUpgrade } from '@/features/onboarding/glow-upgrade-runtime';
+import { activeHatchableFor, advanceHatchableUpgrade, completeHatchableMission, gardenLessonFor, recoverPaidHatchableUpgrade, startHatchableDiscovery, submitHatchableAction, useHatchableRuns } from '@/features/onboarding/hatchable-runtime';
+import { HATCHABLE_LESSON_FINALE_NODE_IDS, hatchableDiscoveryScene } from '@/features/onboarding/hatchable-flows';
 import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_MERGE_REQUIRED, OPENING_CAMERA_ENTRY_ZOOM, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
 import { KingdomOpeningMergeDock, MissionGlowLayer, OPENING_GLOW_FLIGHT_MS, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
-import { StepplingMissionDock } from '@/components/katchadeck/world/steppling-mission-dock';
+import { HatchableMissionDock } from '@/components/katchadeck/world/steppling-mission-dock';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
-import { createStepplingMissionState, STEPPLING_MISSION_HINT_THEME, STEPPLING_MISSION_ID, STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep } from '@/features/onboarding/steppling-mission';
-import { ISLAND_WISP_LINES, OPENING_WISP_LINES, OPENING_WISPS, STEPPLING_WISP_LINES, STEPPLING_WISPS, wispsForClearing } from '@/features/onboarding/corruption-wisps';
+import { createMissionState, missionBoardStep, STEPPLING_MISSION_HINT_THEME } from '@/features/onboarding/steppling-mission';
+import { ISLAND_WISP_LINES, OPENING_WISP_LINES, OPENING_WISPS, wispsForClearing } from '@/features/onboarding/corruption-wisps';
 import { MissionWisps, type CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
 import { KingdomOpeningCaption } from '@/components/katchadeck/world/kingdom-opening-caption';
 import { clearMission, clearOpeningMission, useMissionBoard, useOpeningMissionBoard } from '@/features/onboarding/use-opening-mission-board';
@@ -34,8 +34,7 @@ import { StepplingEncounterPanel } from '@/components/katchadeck/world/steppling
 import { SHARED_EGG_REST_ZOOM, usesSharedResidentStage } from '@/components/katchadeck/world/shared-resident-presentation';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
 import { useStepplingEncounter } from '@/features/onboarding/use-steppling-encounter';
-import { completeStepplingMission, startGlowDiscovery, submitGlowAction, useGlowDiscoveryState } from '@/features/onboarding/glow-discovery-runtime';
-import { GLOW_GATEWAY_NODE_IDS, GLOW_MISSION_CLEAR_NODE_ID, glowDiscoveryAllowsGarden, glowDiscoveryLocksCamera, glowDiscoveryMissionNode, glowDiscoveryResumeCamera, glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
+import { GLOW_GATEWAY_NODE_IDS, GLOW_MISSION_CLEAR_NODE_ID, glowDiscoveryAllowsGarden, glowDiscoveryLocksCamera, glowDiscoveryMissionNode, glowDiscoveryResumeCamera } from '@/features/onboarding/glow-discovery-flow';
 import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
 import { glowGatewayState, hatchableGatewayState } from '@/utils/merge-world/glow-discovery-policy';
 import { sharedWorldIncludesCompanion } from '@/constants/shared-world';
@@ -134,7 +133,7 @@ import { KingdomGoalScene } from '@/components/katchadeck/onboarding/kingdom-goa
 import { KingdomProgressPill } from '@/components/katchadeck/world/kingdom-progress-pill';
 import { IslandWakeHandoffSheet, KingdomProgressSheet } from '@/components/katchadeck/world/kingdom-progress-sheet';
 import { kingdomProgress, type KingdomNext } from '@/features/kingdom-progress/kingdom-progress';
-import { STEPPLING_FINALE_NODE_IDS, stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
+import { stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
 import { acknowledgeStoredKingdomGoalCoachmark } from '@/utils/merge-world/repository';
 
 type Props = {
@@ -231,8 +230,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   worldSubjectPresentation,
 }: Props) {
   const router = useRouter();
-  const { run: glowRun, ready: glowReady } = useGlowDiscoveryState();
-  // Steppling's mist mission is live while the Glow story waits on its bar.
+  // Every hatchable companion's runs; the live one is whose discovery (and whose garden lesson) the Kingdom shows.
+  const hatchableRuns = useHatchableRuns();
+  const { discovery: activeHatchable, lesson: activeLessonHatchable } = useMemo(() => activeHatchableFor(mergeWorld, hatchableRuns), [hatchableRuns, mergeWorld]);
+  const glowRun = hatchableRuns.discovery[activeHatchable.companion] ?? null;
+  const glowReady = hatchableRuns.ready;
+  // The live companion's mist mission is up while their discovery waits on its bar.
   const stepplingMissionActive = glowRun?.status === 'active' && glowRun.nodeId === GLOW_MISSION_CLEAR_NODE_ID;
   // The final merge's item flies into the mist before the lift beat: the run
   // is already at `world.mist_lift`, but the Kingdom keeps presenting the
@@ -282,7 +285,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const homeVeil = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld && !openingGlow.finaleLanded ? 'veiled' : homeVeilForStep(routeFtueStepId);
   const { flush: flushMergeWorld } = useMergeWorldActions();
   const { transitionTo } = useGameScreenTransition();
-  const stepplingLesson = useStepplingGardenLesson();
+  const stepplingLesson = useMemo(() => gardenLessonFor(hatchableRuns, activeLessonHatchable), [activeLessonHatchable, hatchableRuns]);
   const stepplingLessonOpening = useRef(false);
   const stepplingEncounter = useStepplingEncounter(mergeWorld);
   const stepplingSurfaceOpen = stepplingEncounter.open;
@@ -300,7 +303,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   useEffect(() => { setGlowPanelOpen(glowRun?.status !== 'completed'); }, [glowRun?.status, glowRun?.nodeId]);
   const glowGatewayActive = Boolean(glowRun);
   const mistUpgradeActive = Boolean(glowRun && glowRun.status !== 'completed' && GLOW_GATEWAY_NODE_IDS.includes(glowRun.nodeId));
-  const glowScene = glowRun ? glowDiscoveryScene(glowRun.nodeId) : null;
+  const glowScene = glowRun ? hatchableDiscoveryScene(activeHatchable, glowRun.nodeId) : null;
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const reduceMotion = useReducedMotion();
@@ -383,8 +386,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [ftueStepId]);
   useEffect(() => {
     if (!screenFocused || !mistUpgradeActive) return;
-    void recoverPaidGlowUpgrade(mergeWorld).catch((error) => { setUpgradeError(error instanceof Error ? error.message : 'Please try again.'); });
-  }, [screenFocused, mistUpgradeActive, mergeWorld]);
+    void recoverPaidHatchableUpgrade(activeHatchable, mergeWorld).catch((error) => { setUpgradeError(error instanceof Error ? error.message : 'Please try again.'); });
+  }, [activeHatchable, screenFocused, mistUpgradeActive, mergeWorld]);
   useEffect(() => {
     if (upgradePresentation) { setSelectedUpgrade(null); setUpgradePurchasing(false); }
   }, [upgradePresentation]);
@@ -620,10 +623,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // Steppling's mist mission: its own board and store under the misted
   // clearing. The bar filling is what moves the Glow story on to the paid
   // reveal, recorded the moment the final item strikes the tile.
-  const stepplingMission = useMissionBoard(STEPPLING_MISSION_STORAGE_KEY, stepplingMissionActive ? STEPPLING_MISSION_ID : null, createStepplingMissionState);
-  const stepplingMissionStep = useMemo(() => stepplingMissionActive ? stepplingMissionBoardStep(stepplingMission.state, stepplingMission.merges) : null, [stepplingMission.merges, stepplingMission.state, stepplingMissionActive]);
+  const createActiveMission = useCallback((now: number) => createMissionState(activeHatchable.mission.seed, activeHatchable.companion, now), [activeHatchable]);
+  const stepplingMission = useMissionBoard(activeHatchable.mission.storageKey, stepplingMissionActive ? activeHatchable.mission.id : null, createActiveMission);
+  const stepplingMissionStep = useMemo(() => stepplingMissionActive ? missionBoardStep(activeHatchable.mission, stepplingMission.state, stepplingMission.merges) : null, [activeHatchable.mission, stepplingMission.merges, stepplingMission.state, stepplingMissionActive]);
   const stepplingMissionGuidanceVisible = Boolean(stepplingMissionStep && (stepplingMissionStep.cue || stepplingMissionStep.spotlight));
-  const stepplingMissionCleared = stepplingMission.merges >= STEPPLING_MISSION_MERGE_REQUIRED;
+  const stepplingMissionCleared = stepplingMission.merges >= activeHatchable.mission.required;
   const { launchFinale: launchGlowFinale } = openingGlow;
   const launchStepplingFinale = useCallback((from: RewardFlightPoint, definitionId: string) => {
     stepplingFinaleIdRef.current = launchGlowFinale(from, definitionId);
@@ -633,11 +637,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const finishStepplingMission = useCallback(() => {
     if (stepplingMissionDoneRef.current) return;
     stepplingMissionDoneRef.current = true;
-    void completeStepplingMission().catch((error) => {
+    void completeHatchableMission(activeHatchable).catch((error) => {
       stepplingMissionDoneRef.current = false;
       console.warn('The mist could not clear', error);
     });
-  }, []);
+  }, [activeHatchable]);
   // Live: the mist clears when the mission's own final item has struck the last wisp and the wisp has fallen.
   useEffect(() => {
     if (!(stepplingMissionActive && stepplingMissionCleared && stepplingMissionLanded)) return;
@@ -650,12 +654,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (!stepplingMissionActive || !stepplingMission.state) { stepplingMissionCheckedRef.current = false; return; }
     if (stepplingMissionCheckedRef.current) return;
     stepplingMissionCheckedRef.current = true;
-    if (stepplingMission.merges >= STEPPLING_MISSION_MERGE_REQUIRED) finishStepplingMission();
-  }, [finishStepplingMission, stepplingMission.merges, stepplingMission.state, stepplingMissionActive]);
+    if (stepplingMission.merges >= activeHatchable.mission.required) finishStepplingMission();
+  }, [activeHatchable.mission.required, finishStepplingMission, stepplingMission.merges, stepplingMission.state, stepplingMissionActive]);
   useEffect(() => {
     // The mission is over once the reveal has played: its store goes with it.
-    if (glowRun?.status === 'completed' || glowRun?.nodeId === 'gateway.egg') clearMission(STEPPLING_MISSION_STORAGE_KEY);
-  }, [glowRun?.nodeId, glowRun?.status]);
+    if (glowRun?.status === 'completed' || glowRun?.nodeId === 'gateway.egg') clearMission(activeHatchable.mission.storageKey);
+  }, [activeHatchable.mission.storageKey, glowRun?.nodeId, glowRun?.status]);
   const setGardenButtonNode = useCallback((node: View | null) => {
     registerFtueTarget('garden-button:mossprout', node);
   }, [registerFtueTarget]);
@@ -664,8 +668,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [registerFtueTarget]);
   const setGatewayNode = useCallback((node: View | null) => {
     setGatewayTileNodeState(node);
-    registerFtueTarget('shared-world:steppling-home', node);
-  }, [registerFtueTarget]);
+    registerFtueTarget(`shared-world:${activeHatchable.tile.id}`, node);
+  }, [activeHatchable.tile.id, registerFtueTarget]);
   const setGardenPlotNode = useCallback((slotId: MossproutGardenPlantSlotId, node: View | null) => {
     registerFtueTarget(`garden-plot:mossprout:${slotId}`, node);
   }, [registerFtueTarget]);
@@ -1434,12 +1438,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // The mist, given faces: wisps over the veiled tile take the merges' Glow; the last falls on the final item, and the mist lifts with it.
   // A friend's board has them too, over the island, for as long as the board is up; their hits come from the board's saved merges.
   const wispTarget = useMemo((): CorruptionWispTarget | null => stepplingMissionActive
-    ? { key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission.merges, specs: STEPPLING_WISPS, lines: STEPPLING_WISP_LINES, settled: ftueCameraSettled, revealNonce: stepplingRevealNonce }
+    ? { key: activeHatchable.mission.id, node: gatewayTileNode, required: activeHatchable.mission.required, merges: stepplingMission.merges, specs: activeHatchable.mission.wisps, lines: activeHatchable.mission.lines, settled: ftueCameraSettled, revealNonce: stepplingRevealNonce }
     : openingBoardActive
       ? { key: 'opening-mist', node: homeTileNode, required: OPENING_MERGE_REQUIRED, merges: openingProgress, specs: OPENING_WISPS, lines: OPENING_WISP_LINES, settled: ftueCameraSettled }
       : restorationBoardVisible && restorationDefinition && restorationBoardRunId
         ? { key: restorationBoardRunId, node: restorationTileNode, required: restorationDefinition.merges, merges: restorationStore.merges, specs: wispsForClearing(restorationDefinition.merges), lines: restorationWispLines, settled: ftueCameraSettled }
-        : null, [ftueCameraSettled, gatewayTileNode, homeTileNode, openingBoardActive, openingProgress, restorationBoardRunId, restorationBoardVisible, restorationDefinition, restorationStore.merges, restorationTileNode, restorationWispLines, stepplingMission.merges, stepplingMissionActive, stepplingRevealNonce]);
+        : null, [activeHatchable, ftueCameraSettled, gatewayTileNode, homeTileNode, openingBoardActive, openingProgress, restorationBoardRunId, restorationBoardVisible, restorationDefinition, restorationStore.merges, restorationTileNode, restorationWispLines, stepplingMission.merges, stepplingMissionActive, stepplingRevealNonce]);
   useEffect(() => {
     // Back puts the board away; it never leaves the Kingdom from here.
     if (!restorationBoardVisible) return;
@@ -1466,9 +1470,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const timer = setTimeout(() => setRestorationHandoff(null), RESTORATION_HANDOFF_MAX_MS);
     return () => clearTimeout(timer);
   }, [pendingIslandCampaign?.phase, restorationHandoff, upgradeError]);
-  const soloLayerId = stepplingBoardBusy ? 'structure:steppling-home' : restorationBoardBusy && restorationIslandId ? `nature:mossprout:${restorationIslandId}` : null;
+  const soloLayerId = stepplingBoardBusy ? `structure:${activeHatchable.tile.id}` : restorationBoardBusy && restorationIslandId ? `nature:mossprout:${restorationIslandId}` : null;
   // No marker percentage while the board is up: the request lives on the dock's tray instead.
-  const soloOfferId = stepplingBoardBusy ? 'mist:steppling-home' : null;
+  const soloOfferId = stepplingBoardBusy ? `mist:${activeHatchable.tile.id}` : null;
   // No tutorial on a friend's board: the step only locks the board once its bar is full.
   const restorationStep = useMemo(() => islandRestoration && restorationStore.state
     ? restorationBoardStep(islandRestoration.campaign, islandRestoration.level, restorationStore.state, restorationStore.merges)
@@ -1709,14 +1713,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   useEffect(() => {
     if (!screenFocused) { stepplingLessonOpening.current = false; return; }
     if (!stepplingLesson.active || !stepplingLesson.run || !havenMergeBoardActive) return;
-    if (STEPPLING_FINALE_NODE_IDS.includes(stepplingLesson.run.nodeId)) {
-      const resident = companionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === 'steppling');
+    if (HATCHABLE_LESSON_FINALE_NODE_IDS.includes(stepplingLesson.run.nodeId)) {
+      const resident = companionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === activeLessonHatchable.companion);
       if (resident?.kind === 'owned' && interactionCreatureId !== resident.creature.creatureId) selectResident(resident.creature.creatureId);
     } else if (!activeInteractionResidentId && !stepplingLessonOpening.current) {
       stepplingLessonOpening.current = true;
-      openGarden(undefined, 'steppling');
+      openGarden(undefined, activeLessonHatchable.companion);
     }
-  }, [screenFocused, stepplingLesson.active, stepplingLesson.run, havenMergeBoardActive, companionSlots, interactionCreatureId, activeInteractionResidentId, selectResident, openGarden]);
+  }, [screenFocused, stepplingLesson.active, stepplingLesson.run, havenMergeBoardActive, companionSlots, interactionCreatureId, activeInteractionResidentId, activeLessonHatchable.companion, selectResident, openGarden]);
 
   const openUpgradeOffer = useCallback(async (offer: WorldUpgradeOffer) => {
     if (upgradePressBusy.current || upgradePurchasing || upgradePresentation) return;
@@ -1731,9 +1735,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     setUpgradeError(null); setUpgradeCommitted(false);
     try {
       if (ftueStepId === 'world.first_bloom_offer') await advanceFtueActionDurably({ expectedStepId: ftueStepId, actionId: 'world.open_first_bloom_upgrade' });
-      if (offer.id === 'mist:steppling-home' && glowRun && glowRun.status !== 'completed') {
+      if (offer.id === `mist:${activeHatchable.tile.id}` && glowRun && glowRun.status !== 'completed') {
         // The bubble opens the mission board under the tile, never a purchase sheet.
-        await advanceGlowUpgrade('open');
+        await advanceHatchableUpgrade(activeHatchable, 'open');
         setSelectedUpgrade(null);
         return;
       }
@@ -1746,7 +1750,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       setSelectedUpgrade(offer);
     } catch (error) { setSelectedUpgrade(offer); setUpgradeError(error instanceof Error ? error.message : 'Could not open the upgrade. Please try again.'); }
     finally { upgradePressBusy.current = false; }
-  }, [ftueStepId, glowRun, restorationCampaignId, upgradePresentation, upgradePurchasing]);
+  }, [activeHatchable, ftueStepId, glowRun, restorationCampaignId, upgradePresentation, upgradePurchasing]);
   openUpgradeOfferRef.current = openUpgradeOffer;
   const handleUpgradeOfferPress = useCallback((offer: WorldUpgradeOffer) => {
     void openUpgradeOffer(offer);
@@ -1767,8 +1771,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     pendingUpgradeReward.current = reward && !Object.values(mergeWorldRef.current.upgradeSkinGrants ?? {}).some((grant) => grant.skinId === reward)
       && !mergeWorldRef.current.ownedKatchimeraCards.some((card) => card.cardId === reward) ? reward : null;
     try {
-      if (sharedUpgrade.id === 'mist:steppling-home' && glowRun && glowRun.status !== 'completed') {
-        const run = await advanceGlowUpgrade('confirm');
+      if (sharedUpgrade.id === `mist:${activeHatchable.tile.id}` && glowRun && glowRun.status !== 'completed') {
+        const run = await advanceHatchableUpgrade(activeHatchable, 'confirm');
         if (run.status === 'completed' || ['gateway.egg', 'egg.enter'].includes(run.nodeId)) { setSelectedUpgrade(null); setUpgradeCommitted(false); }
       } else if (ftueStepId === 'world.first_bloom_restore') {
         await advanceFtueActionDurably({ expectedStepId: ftueStepId, actionId: 'world.restore_with_first_bloom', nextStepId: ftueStepId, evidenceRef: 'shared-upgrade:confirm' });
@@ -1779,7 +1783,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       }
     } catch (error) { setDisplayedGlow(mergeWorldRef.current.coins); setUpgradeError(error instanceof Error ? error.message : 'Could not upgrade. Please try again.'); setUpgradeCommitted(false); }
     finally { upgradePressBusy.current = false; setUpgradePurchasing(false); }
-  }, [flushMergeWorld, ftueStepId, glowRun, sharedUpgrade, upgradeCommitted, upgradeError]);
+  }, [activeHatchable, flushMergeWorld, ftueStepId, glowRun, sharedUpgrade, upgradeCommitted, upgradeError]);
   // Sleeping islands arrive from the offers layer already locked, in wake order.
   const presentedUpgradeOffers = upgradeOffers;
   // Alone until the hatch: no markers at all until the islands are drawn. And none while any mini board is
@@ -1807,17 +1811,18 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   });
   const selectGateway = useStableCallback(() => {
     if (kingdomGoalGuideActive) return;
-    if (gatewayState === 'egg' && !glowDiscoveryLocksCamera(glowRun)) {
+    // The Egg on the tile: Steppling's encounter until every companion's Egg runs on the shared policy.
+    if (activeHatchable.companion === 'steppling' && gatewayState === 'egg' && !glowDiscoveryLocksCamera(glowRun)) {
       setFtueCameraSettled(false);
       setGlowPanelOpen(false);
       void stepplingEncounter.enter();
       return;
     }
     if (glowRun && glowDiscoveryMissionNode(glowRun.nodeId)) return;
-    const offer = upgradeOffers.find((candidate) => candidate.id === 'mist:steppling-home');
+    const offer = upgradeOffers.find((candidate) => candidate.id === `mist:${activeHatchable.tile.id}`);
     if (offer && (!glowRun || GLOW_GATEWAY_NODE_IDS.includes(glowRun.nodeId))) { void openUpgradeOffer(offer); return; }
     setGlowPanelOpen(true);
-    void startGlowDiscovery().catch((error) => console.warn('The path could not open', error));
+    void startHatchableDiscovery(activeHatchable).catch((error) => console.warn('The path could not open', error));
   });
   const selectResidentFromCanvas = useStableCallback((creatureId: string) => {
     if (glowDiscoveryLocksCamera(glowRun) || kingdomGoalGuideActive) return;
@@ -1992,7 +1997,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
               disabled={navigationLocked && !glowDiscoveryAllowsGarden(glowRun) && !['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '')}
               onPress={['world.garden_handoff', 'world.seed_planted'].includes(ftueStepId ?? '') ? onFtueOpenGarden : () => {
                 if (glowScene?.view.kind === 'garden') {
-                  void submitGlowAction(glowScene.actionId).then((run) => { if (run?.status === 'active') openGarden(); }).catch((error) => console.warn('The Garden could not open', error));
+                  void submitHatchableAction(activeHatchable, glowScene.actionId).then((run) => { if (run?.status === 'active') openGarden(); }).catch((error) => console.warn('The Garden could not open', error));
                 } else openGarden();
               }}
               ref={setGardenButtonNode}
@@ -2088,8 +2093,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       /> : null}
       {screenFocused && mistUpgradeActive && !sharedUpgrade && !upgradePresentation && !activeInteractionResidentId && !stepplingEggOpen ? (
         <HavenFtueOverlay
-          cue={{ kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'steppling' } }}
-          spotlight={{ targets: [{ kind: 'haven_upgrade_button', characterId: 'steppling' }], grouping: 'bounding_rect' }}
+          cue={{ kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: activeHatchable.companion } }}
+          spotlight={{ targets: [{ kind: 'haven_upgrade_button', characterId: activeHatchable.companion }], grouping: 'bounding_rect' }}
           fingerPlacement="below" screenRef={screenRef} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision}
         />
       ) : null}
@@ -2193,7 +2198,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={openingBoardStep?.cue ?? null} guide={openingBoardStep?.guide ?? null}
           layoutNonce={openingProgress} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={openingBoardStep?.spotlight ?? null} state={mission.state ?? mergeWorld} targetRevision={openingProgress} />
       </View> : null}
-      {stepplingMissionActive && stepplingMission.state ? <StepplingMissionDock
+      {stepplingMissionActive && stepplingMission.state ? <HatchableMissionDock mission={activeHatchable.mission}
         state={stepplingMission.state} send={stepplingMission.send} merges={stepplingMission.merges} mergesRef={stepplingMission.mergesRef} width={window.width} bottomInset={insets.bottom}
         landings={openingGlow.store} onGlow={openingGlow.launch} onFinale={launchStepplingFinale} onReveal={bumpStepplingReveal} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} /> : null}
@@ -2249,8 +2254,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
               const archive = worldUpgradeArchiveOffer(mergeWorld, 'haven:mossprout');
               if (archive) { setDetailCreatureId(null); setSelectedUpgrade({ ...archive, currentLevel: currentStage }); }
             }} /> : null}
-            {characterId === 'steppling' && mergeWorld.worldUnlocks?.['mossprout:overgrown-trail'] && !ftueStepId ? <KatchaButton fullWidth label="Clearing story & history" variant="secondary" onPress={() => {
-              const archive = worldUpgradeArchiveOffer(mergeWorld, 'mist:steppling-home');
+            {hatchableByCompanion(characterId) && mergeWorld.worldUnlocks?.[hatchableByCompanion(characterId)!.tile.unlockId] && !ftueStepId ? <KatchaButton fullWidth label="Clearing story & history" variant="secondary" onPress={() => {
+              const archive = worldUpgradeArchiveOffer(mergeWorld, `mist:${hatchableByCompanion(characterId)!.tile.id}`);
               if (archive) { setDetailCreatureId(null); setSelectedUpgrade(archive); }
             }} /> : null}
           </View>}

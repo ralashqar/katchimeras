@@ -1,6 +1,7 @@
-import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
+import { gardenLessonFor, useHatchableRuns } from '@/features/onboarding/hatchable-runtime';
+import { HATCHABLE_LESSON_FINALE_NODE_IDS } from '@/features/onboarding/hatchable-flows';
+import { hatchableByCompanion, STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 import { StepplingGardenFinale } from '@/components/katchadeck/onboarding/steppling-garden-finale';
-import { STEPPLING_FINALE_NODE_IDS } from '@/features/onboarding/steppling-garden-lesson';
 import { useFtueMistHandoff } from '@/features/onboarding/use-ftue-mist-handoff';
 import { isMossproutFirstGrowStep } from '@/features/onboarding/mossprout-first-grow';
 import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
@@ -11,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-companion-screen';
-import { useStepplingDayOne } from '@/features/companion/use-steppling-day-one';
+import { useHatchableDayOne } from '@/features/companion/use-steppling-day-one';
 import { STEPPLING_DAY_ONE_CONVERSATION_ID } from '@/constants/steppling-day-one-conversation';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { WispDiscoveryReveal } from '@/components/katchadeck/wisps/wisp-discovery-reveal';
@@ -119,9 +120,12 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const router = useRouter();
   const { transitionTo } = useGameScreenTransition();
   const familyId = familyIdFromCompanionId(creatureId);
-  const stepplingDayOne = useStepplingDayOne(familyId === 'steppling' && surfaceActive);
+  // A hatchable friend's page: their day one and their garden lesson, from their definition.
+  const hatchable = familyId ? hatchableByCompanion(familyId) : null;
+  const stepplingDayOne = useHatchableDayOne(hatchable, Boolean(hatchable) && surfaceActive);
   const completeStepplingDayOne = stepplingDayOne.complete;
-  const stepplingLesson = useStepplingGardenLesson();
+  const hatchableRuns = useHatchableRuns();
+  const stepplingLesson = gardenLessonFor(hatchableRuns, hatchable ?? STEPPLING_HATCHABLE);
   const stepplingGardenOpening = useRef(false);
   // Narrative completion can update its durable session before the FTUE graph
   // or navigation curtain has taken ownership. Keep the companion presentation
@@ -166,9 +170,9 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     if (!stepplingDayOne.gardenHandoffPending) { stepplingGardenOpening.current = false; return; }
     if (!surfaceActive || !stepplingDayOne.ready || stepplingDayOne.error || stepplingGardenOpening.current) return;
     stepplingGardenOpening.current = true;
-    if (onHostedOpenMerge) onHostedOpenMerge(undefined, 'steppling');
+    if (onHostedOpenMerge) onHostedOpenMerge(undefined, hatchable?.companion);
     else {
-      const accepted = transitionTo({ announcement: "Opening Steppling's Garden", target: 'merge', navigate: () => router.push({
+      const accepted = transitionTo({ announcement: `Opening ${hatchable?.displayName ?? 'the'}'s Garden`, target: 'merge', navigate: () => router.push({
         pathname: '/katchimera/[creatureId]/activity', params: { creatureId: 'companion:mossprout' },
       }) });
       if (!accepted) {
@@ -176,7 +180,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
         setNarrativeHandoffActive(false);
       }
     }
-  }, [creatureId, onHostedOpenMerge, router, stepplingDayOne.error, stepplingDayOne.gardenHandoffPending, stepplingDayOne.ready, surfaceActive, transitionTo]);
+  }, [creatureId, hatchable, onHostedOpenMerge, router, stepplingDayOne.error, stepplingDayOne.gardenHandoffPending, stepplingDayOne.ready, surfaceActive, transitionTo]);
   const ftueHandoffRef = useRef(false);
   const [mistHandoffActive, setMistHandoffActive] = useState(false);
   const [mistHandoffError, setMistHandoffError] = useState(false);
@@ -734,7 +738,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     </View> : null}
   </View>;
 
-  if (familyId === 'steppling' && (!stepplingDayOne.ready || stepplingDayOne.error)) {
+  if (hatchable && (!stepplingDayOne.ready || stepplingDayOne.error)) {
     return <View pointerEvents="box-none" style={styles.inactiveScreen}>
       {stepplingDayOne.error ? <View style={{ position: 'absolute', bottom: 40, left: 24, right: 24 }}>
         <KatchaButton label="Try again" onPress={stepplingDayOne.retry} />
@@ -746,8 +750,8 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     return <View style={styles.inactiveScreen} />;
   }
 
-  if (familyId === 'steppling' && stepplingLesson.active && STEPPLING_FINALE_NODE_IDS.includes(stepplingLesson.run?.nodeId ?? '')) {
-    return <StepplingGardenFinale hosted={hostedInHaven} summary={stepplingLesson.run?.nodeId === 'summary'} />;
+  if (hatchable && stepplingLesson.active && HATCHABLE_LESSON_FINALE_NODE_IDS.includes(stepplingLesson.run?.nodeId ?? '')) {
+    return <StepplingGardenFinale definition={hatchable} hosted={hostedInHaven} summary={stepplingLesson.run?.nodeId === 'summary'} />;
   }
   return (
     <View style={styles.screen}>
@@ -759,7 +763,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
         ? 'mossprout:game:form-finder'
         : hostedInitialConversationId}
       onInitialConversationComplete={hostedInitialConversationId ? async (session) => {
-        if (familyId === 'steppling' && hostedInitialConversationId === stepplingDayOne.definitionId) await completeStepplingNarrative();
+        if (hatchable && hostedInitialConversationId === stepplingDayOne.definitionId) await completeStepplingNarrative();
         await onHostedInitialConversationComplete?.(hostedInitialConversationId, session);
       } : undefined}
       discoveryRecords={discovery.records}
@@ -825,13 +829,13 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
         navigate: () => router.dismissTo('/(tabs)/katchimeras'),
       }) : router.back();
       }}
-      onOpenMerge={onHostedOpenMerge ?? (familyId === 'mossprout' || familyId === 'steppling' ? (orderId) => {
+      onOpenMerge={onHostedOpenMerge ?? (familyId === 'mossprout' || hatchable ? (orderId) => {
         transitionTo({
-          announcement: familyId === 'steppling' ? "Opening Steppling's Garden" : "Opening Mossprout's Garden",
+          announcement: hatchable ? `Opening ${hatchable.displayName}'s Garden` : "Opening Mossprout's Garden",
           target: 'merge',
           navigate: () => router.push({
             pathname: '/katchimera/[creatureId]/activity',
-            params: { creatureId: familyId === 'steppling' ? 'companion:mossprout' : creatureId, requestCharacterId: familyId, ...(orderId ? { focusOrderId: orderId } : {}) },
+            params: { creatureId: hatchable ? 'companion:mossprout' : creatureId, requestCharacterId: familyId, ...(orderId ? { focusOrderId: orderId } : {}) },
           }),
         });
       } : undefined)}

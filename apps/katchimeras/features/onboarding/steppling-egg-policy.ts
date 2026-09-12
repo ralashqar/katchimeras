@@ -109,3 +109,8 @@ export function reduceStepplingEgg(state: MergeWorldState, action: StepplingEggA
   }
   return { state: { ...state, stepplingEgg: egg, revision: state.revision + 1, updatedAt: now }, changed: true };
 }
+
+/** A companion's Egg as the world holds it. Steppling's is his own field; later friends' arrive with the shared Egg policy. */
+export function hatchableEggProgress(world: Pick<MergeWorldState, 'stepplingEgg'>, definition: { companion: string }): StepplingEggProgress | undefined {
+  return definition.companion === 'steppling' ? world.stepplingEgg : undefined;
+}

@@ -17,6 +17,7 @@ import { acknowledgeChapterReturn, completeChapter, completeRestoration, greetIs
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import type { MergeWorldCommand, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import { readFileSync } from './helpers/content-fs';
+import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 import { sharedResidentAnchor } from '@/components/katchadeck/world/shared-resident-presentation';
 import type { KingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { loadNativeModule, nativeViews } from './helpers/native-motion-harness';
@@ -350,7 +351,13 @@ function mistUpgradeRuntime(initialNode = 'gateway.offer', initialStatus = 'acti
   let run = { nodeId: initialNode, status: initialStatus, error: null as string | null };
   let block = false;
   const commands: string[] = [];
-  const runtime = loadNativeModule('features/onboarding/glow-upgrade-runtime.ts', {
+  const runtime = loadNativeModule('features/onboarding/hatchable-runtime.ts', {
+    'react': {},
+    '@/features/content-flow/content-flow-catalog': { registerContentFlowDefinition() {} },
+    '@/utils/merge-world/repository': {},
+    '@/constants/hatchable-companions/registry': { HATCHABLE_COMPANIONS: [STEPPLING_HATCHABLE], hatchableByCompanion: () => null },
+    './steppling-egg-policy': {}, './glow-discovery-flow': {}, './steppling-garden-lesson': {},
+    './hatchable-flows': { hatchableFlows: () => ({}), HATCHABLE_LESSON_FINALE_NODE_IDS: ['closing', 'summary'], HATCHABLE_MISSION_CLEAR_NODE_ID: 'mission.clear', HATCHABLE_MISSION_CLEARED_EVENT: 'glow.mission.cleared', HATCHABLE_EGG_ENTERED_EVENT: 'glow.egg.entered' },
     '@/features/content-flow/content-flow-repository': { loadContentFlowRun: async () => run },
     '@/features/content-flow/content-flow-director': { dispatchContentFlowCommand: async (_id: string, command: { type: string; actionId?: string }) => {
       commands.push(command.actionId ?? command.type);
@@ -360,14 +367,12 @@ function mistUpgradeRuntime(initialNode = 'gateway.offer', initialStatus = 'acti
       if (command.actionId === 'open_upgrade') run = { ...run, nodeId: 'mission.focus' };
       return run;
     } },
-    './glow-discovery-flow': {
-      GLOW_DISCOVERY_RUN_ID: 'story:glow-steppling-v1',
-      GLOW_GATEWAY_NODE_IDS: ['gateway.ready', 'gateway.return', 'gateway.offer'],
-      glowDiscoveryMissionNode: (nodeId: string) => nodeId === 'mission.focus' || nodeId === 'mission.clear',
-    },
-    '@/utils/merge-world/glow-discovery-policy': { GLOW_GATEWAY_ID: 'mossprout:overgrown-trail' },
+    '@/utils/merge-world/glow-discovery-policy': {},
   });
-  return { runtime, commands, setBlocked: (value: boolean) => { block = value; } };
+  // Steppling's mist upgrade, through the shared runtime and his definition.
+  const advanceGlowUpgrade = (action: 'open' | 'confirm') => runtime.advanceHatchableUpgrade(STEPPLING_HATCHABLE, action);
+  const recoverPaidGlowUpgrade = (world: unknown) => runtime.recoverPaidHatchableUpgrade(STEPPLING_HATCHABLE, world);
+  return { runtime: { advanceGlowUpgrade, recoverPaidGlowUpgrade }, commands, setBlocked: (value: boolean) => { block = value; } };
 }
 
 test('the bubble opens the mission board without buying, and repeated taps never send another command', async () => {
@@ -559,17 +564,21 @@ test('unfinished Glow discovery owns the Mossprout map even after the original F
 test('startup waits for the saved Glow journal before choosing the selector or Mossprout world', async () => {
   let finishLoad: (run: unknown) => void = () => {};
   const saved = new Promise((resolve) => { finishLoad = resolve; });
-  const module = loadNativeModule('features/onboarding/glow-discovery-runtime.ts', {
+  const module = loadNativeModule('features/onboarding/hatchable-runtime.ts', {
+    'react': React,
+    '@/features/content-flow/content-flow-catalog': { registerContentFlowDefinition() {} },
     '@/features/content-flow/content-flow-director': {},
     '@/features/content-flow/content-flow-repository': {
       loadContentFlowRun: () => saved, subscribeContentFlowJournal: () => () => {},
     },
     '@/utils/merge-world/glow-discovery-policy': {},
     '@/utils/merge-world/repository': {},
-    './glow-discovery-flow': { GLOW_DISCOVERY_RUN_ID: 'story:glow-steppling-v1' },
+    '@/constants/hatchable-companions/registry': { HATCHABLE_COMPANIONS: [STEPPLING_HATCHABLE], hatchableByCompanion: () => null },
+    './steppling-egg-policy': {}, './glow-discovery-flow': {}, './steppling-garden-lesson': {},
+    './hatchable-flows': { hatchableFlows: () => ({ gardenLesson: { nodes: [{ id: 'gateway.offer' }], version: 2, migrations: {} } }), HATCHABLE_LESSON_FINALE_NODE_IDS: ['closing', 'summary'], HATCHABLE_MISSION_CLEAR_NODE_ID: 'mission.clear', HATCHABLE_MISSION_CLEARED_EVENT: 'glow.mission.cleared', HATCHABLE_EGG_ENTERED_EVENT: 'glow.egg.entered' },
   });
   let snapshot: { run: null | { status: 'active' }; ready: boolean };
-  function Host() { snapshot = module.useGlowDiscoveryState(); return null; }
+  function Host() { const runs = module.useHatchableRuns(); snapshot = { run: runs.discovery.steppling ?? null, ready: runs.ready }; return null; }
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<Host />); });
   assert.equal(snapshot!.ready, false, 'do not briefly mount the top-level selector while loading');
