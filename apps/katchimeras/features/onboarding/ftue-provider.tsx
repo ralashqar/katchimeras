@@ -1,6 +1,8 @@
 import { useEffect, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
+import { flushDeferredStoredWrites } from '@/utils/app-storage';
+
 import { flushFtueReceipts, scheduleFtueReceiptSync } from './ftue-sync';
 import { flushFtuePersistence, useFtueRun } from './ftue-runtime';
 import { FtueNavigationReconciler } from './ftue-navigation-reconciler';
@@ -14,6 +16,8 @@ export function FtueProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') return;
+      // Everything written behind the frame (mission boards, counted merges) lands before the app can be killed.
+      flushDeferredStoredWrites();
       void flushFtuePersistence();
       void flushFtueReceipts();
     });

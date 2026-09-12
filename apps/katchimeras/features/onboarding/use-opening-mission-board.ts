@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
-import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-storage';
+import { flushDeferredStoredWrites, getStoredJson, removeStoredValue, setStoredJsonDeferred } from '@/utils/app-storage';
 import { normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { createOpeningMissionState, OPENING_MISSION_STORAGE_KEY, type StoredOpeningMission } from './opening-mission-state';
 
@@ -24,9 +24,15 @@ export function loadMission(storageKey: string, runId: string, now = Date.now())
   }
 }
 
+/**
+ * Written behind the frame: the board is saved a beat after each command rather than on it, so the
+ * synchronous SQLite write never lands on the frame a merge animation starts. Reads see the pending
+ * board at once; it is flushed on a timer, when the board unmounts, and when the app leaves the foreground.
+ */
 export function saveMission(storageKey: string, runId: string, state: MergeWorldState, merges: number, placedDeliveries = 0) {
-  setStoredJson<StoredMission>(storageKey, { runId, state, merges, placedDeliveries });
+  setStoredJsonDeferred<StoredMission>(storageKey, { runId, state, merges, placedDeliveries }, MISSION_SAVE_DELAY_MS);
 }
+const MISSION_SAVE_DELAY_MS = 150;
 
 export function clearMission(storageKey: string) {
   removeStoredValue(storageKey);
@@ -72,6 +78,8 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     setState(loaded.state);
     setMerges(loaded.merges);
     setPlacedDeliveries(loaded.placedDeliveries);
+    // A board put away or a run that ends lands its last save at once.
+    return () => flushDeferredStoredWrites(storageKey);
   }, [runId, storageKey]);
   const send = useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
     const current = stateRef.current;

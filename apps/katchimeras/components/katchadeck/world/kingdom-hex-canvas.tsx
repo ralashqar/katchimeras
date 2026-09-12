@@ -198,6 +198,8 @@ type Props = {
   homeSolo?: boolean;
   /** The opening's weather: rain over the veiled world and sparkles on the veiled tile, thinning away with the lift. */
   openingWeather?: boolean;
+  /** False while a board is docked over the world: the rain and the tile's embers fade out and stop. */
+  openingWeatherActive?: boolean;
   /** Opening: resting friends are shown but cannot be opened yet. */
   sleepingMarkersInert?: boolean;
   /** Screen-space FTUE target for the home tile (wisp destination, spotlight). */
@@ -442,6 +444,9 @@ const GardenPlotTarget = memo(function GardenPlotTarget({
   );
 });
 
+/** How long the opening's rain and tile embers take to fade when a board docks, before they unmount. */
+const OPENING_WEATHER_FADE_MS = 420;
+
 export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   background,
   companionSlots,
@@ -512,6 +517,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   homeVeil = 'none',
   homeSolo = false,
   openingWeather = false,
+  openingWeatherActive = true,
   sleepingMarkersInert = false,
   onHomeTileTargetChange,
   soloLayerId = null,
@@ -545,8 +551,21 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     homeVeilProgress.value = 0;
     veilLiftNonceRef.current = upgradePresentation?.nonce ?? null;
   }, [homeVeilProgress, revealingVeiledHome, upgradePresentation?.nonce]);
-  // The opening's rain and sparkles thin away on the same clock as the mist.
-  const openingWeatherStyle = useAnimatedStyle(() => ({ opacity: 1 - homeVeilProgress.value }));
+  // The opening's rain and sparkles thin away on the same clock as the mist, and step aside while a
+  // board is docked: a fade, the rain's per-frame path paused, then unmounted. A full-screen Skia
+  // path rebuilt every frame and a tile of looping embers are a constant load under the board's own
+  // motion, and the wisps over the tile carry the mood on their own.
+  const openingWeatherPresence = useSharedValue(openingWeatherActive ? 1 : 0);
+  const [openingWeatherMounted, setOpeningWeatherMounted] = useState(openingWeatherActive);
+  useEffect(() => {
+    openingWeatherPresence.value = withTiming(openingWeatherActive ? 1 : 0, { duration: OPENING_WEATHER_FADE_MS, easing: Easing.out(Easing.quad) });
+    if (openingWeatherActive) { setOpeningWeatherMounted(true); return; }
+    const timer = setTimeout(() => setOpeningWeatherMounted(false), OPENING_WEATHER_FADE_MS + 40);
+    return () => clearTimeout(timer);
+  }, [openingWeatherActive, openingWeatherPresence]);
+  const openingWeatherStyle = useAnimatedStyle(() => ({ opacity: (1 - homeVeilProgress.value) * openingWeatherPresence.value }));
+  const openingWeatherShown = openingWeather && openingWeatherMounted;
+  const openingRainSettings = useMemo(() => ({ ...OPENING_RAIN, paused: !openingWeatherActive }), [openingWeatherActive]);
   const [paintedTransitionKeys, setPaintedTransitionKeys] = useState<Record<string, string | null>>({});
   const [settledDiscoveryFamily, setSettledDiscoveryFamily] = useState<string | null>(null);
   const [settlingUpgrade, setSettlingUpgrade] = useState<{
@@ -1733,7 +1752,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                     priority={layer.id === scene.centerTile.id || layer.id === 'structure:mossprout-hex-garden' ? 'high' : 'normal'}
                   />
                   </Animated.View>
-                  {layer.id === scene.centerTile.id && openingWeather ? (
+                  {layer.id === scene.centerTile.id && openingWeatherShown ? (
                     <Animated.View pointerEvents="none" style={[styles.tileWeather, layer.frame, openingWeatherStyle]}>
                       <HavenAmbientEmbers area={{ left: 0, top: 0, width: layer.frame.width, height: layer.frame.height }}
                         intensity={OPENING_TILE_EMBERS.intensity} palette={OPENING_TILE_EMBERS.palette} reducedMotion={reduceMotion} />
@@ -1880,8 +1899,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           }) : null}
         </View>
       </GestureDetector>
-      {openingWeather ? <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.openingRain, openingWeatherStyle]}>
-        <AtmosphereLayer plane="foreground" settings={OPENING_RAIN} />
+      {openingWeatherShown ? <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.openingRain, openingWeatherStyle]}>
+        <AtmosphereLayer plane="foreground" settings={openingRainSettings} />
       </Animated.View> : null}
       {revealedEggProjection && homeVeil !== 'veiled' ? (
         <RevealedCompanionEgg

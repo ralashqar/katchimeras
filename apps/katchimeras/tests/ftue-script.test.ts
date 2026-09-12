@@ -606,11 +606,19 @@ test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   assert.match(overlay, /<SpotlightDimMask/);
   assert.match(overlay, /<NativeMultiSpotlightDimMask/);
   assert.match(overlay, /roundedMultiCutoutSegments\(frames, radius, screen\)/);
-  assert.match(overlay, /Math\.hypot\(screen\.width, screen\.height\)/);
+  // The single-target mask is four bands and a hollow frame, never a screen-sized box-shadow spread:
+  // on the new architecture a box-shadow is rasterised into a bitmap of its bounds, and the slot moves every frame of a transition.
+  const spotlightSource = overlay.slice(overlay.indexOf('function FtueSpotlight('), overlay.indexOf('function mergeFtueOverlayPropsEqual('));
+  assert.doesNotMatch(spotlightSource, /boxShadow/, 'no box-shadow anywhere on the spotlight: the mask and rings animate their frames');
+  assert.doesNotMatch(overlay, /Math\.hypot\(screen\.width, screen\.height\)/);
+  assert.match(overlay, /const topStyle = useAnimatedStyle\(\(\) => \(\{ height: Math\.max\(0, slot\.y\.value\) \}\)\);/);
+  assert.match(overlay, /borderRadius: corner \* 2,\s*borderWidth: corner,/, 'the frame’s inner edge is the opening’s rounded corner');
+  assert.match(overlay, /<Animated\.View pointerEvents="none" style=\{\[StyleSheet\.absoluteFill, opacityStyle\]\}>\s*<Animated\.View style=\{\[styles\.dimBand, styles\.dimBandTop, fill, topStyle\]\} \/>/, 'one group opacity over the bands, so their overlaps never double');
+  assert.match(overlay, /const RING_GLOW_WIDTH = 3;/);
+  assert.match(overlay, /borderColor: withAlpha\(theme\.focusRingShadowColor, RING_GLOW_ALPHA\)/, 'the ring’s glow is a translucent border');
   assert.match(overlay, /borderRadius: slot\.corner\.value/);
   assert.match(readFileSync(require.resolve('@incubator/presentation/spotlight-geometry'), 'utf8'), /const stepsPerCorner = 12/);
   assert.match(overlay, /nativeSpotlightRing: \{[\s\S]*?borderCurve: 'continuous'/);
-  assert.match(overlay, /boxShadow: `0 0 0 \$\{spreadRadius\}px \$\{color\}`/);
   assert.doesNotMatch(overlay, /SpotlightCornerFillers|spotlightCornerFiller/);
   assert.match(overlay, /<NativeSpotlightRing slot=\{slot0\}/);
   assert.doesNotMatch(overlay, /@shopify\/react-native-skia|<Canvas|usePathValue|BlurMask/);
@@ -715,6 +723,13 @@ test('route-changing FTUE actions persist before navigation and owned companion 
   const publishSnapshotIndex = runtime.indexOf('snapshot = next', writeThroughIndex);
   assert.ok(writeThroughIndex >= 0 && writeThroughIndex < publishSnapshotIndex);
   assert.doesNotMatch(runtime, /setStoredJsonAsync|pendingPersistence|persistenceWorker/);
+  // Only an objective's progress (a merge counted on a board) is written behind the frame; every step change stays write-through.
+  assert.match(runtime, /if \(options\.progressOnly\) setStoredJsonDeferred\(STORAGE_KEY, next, PROGRESS_WRITE_DELAY_MS\);\s*else setStoredJson\(STORAGE_KEY, next\);/);
+  assert.match(runtime, /const pending = publish\(\{ \.\.\.current, objectiveProgress, updatedAt: now \}, \{ progressOnly: true \}\);/);
+  assert.equal(runtime.match(/progressOnly: true/g)?.length, 1, 'no step change is deferred');
+  assert.match(runtime, /export async function flushFtuePersistence\(\) \{[\s\S]*?flushDeferredStoredWrites\(STORAGE_KEY\);/, 'the durable boundary lands it');
+  const provider = readFileSync('features/onboarding/ftue-provider.tsx', 'utf8');
+  assert.match(provider, /if \(nextState === 'active'\) return;[\s\S]*?flushDeferredStoredWrites\(\);\s*void flushFtuePersistence\(\);/, 'and so does leaving the foreground');
   assert.match(runtime, /advanceFtueActionDurably[\s\S]*?commitFtueAction\(\{ \.\.\.input, skipContentFlowDispatch: true \}\)[\s\S]*?await flushFtuePersistence\(\)[\s\S]*?await dispatchFtueActionToContentFlow/);
   assert.doesNotMatch(today, /Talk to Mossprout|talkToMossprout/);
   assert.match(haven, /ftueStep\?\.id === 'companion\.first_meeting'/);

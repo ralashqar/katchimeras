@@ -16,7 +16,7 @@ import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
 import { createMergeBoardSession } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import type { MergeOrder, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
-import { MistMissionDock } from './kingdom-opening-merge-dock';
+import { MistMissionDock, type GlowLandingSource } from './kingdom-opening-merge-dock';
 
 /**
  * One delivered item's flight. The parcel flight restarts its animation
@@ -64,7 +64,7 @@ const FriendSpeechBubble = memo(function FriendSpeechBubble({ text, reduceMotion
  * one arrives. The board is put away from Back, not from a button of its own.
  */
 export const IslandRestorationDock = memo(function IslandRestorationDock({
-  campaign, level, state, send, merges, mergesRef, boardStep, order, orderServed, pendingDeliveries, speech, width, bottomInset, impactKey = 0,
+  campaign, level, state, send, merges, mergesRef, boardStep, order, orderServed, pendingDeliveries, speech, width, bottomInset, landings,
   onMerge, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onOpenOrder, onPlaceDelivery, railTargetRefs,
 }: {
   campaign: IslandCampaignDefinition;
@@ -84,7 +84,7 @@ export const IslandRestorationDock = memo(function IslandRestorationDock({
   speech?: string | null;
   width: number;
   bottomInset: number;
-  impactKey?: number;
+  landings?: GlowLandingSource;
   /** Every merge sends the thing it made into the tile (a copy; the item stays on the board). */
   onMerge?: (from: RewardFlightPoint, definitionId: string) => void;
   /** The merge that fills the bar: its item leaves the board for the tile. */
@@ -237,7 +237,7 @@ export const IslandRestorationDock = memo(function IslandRestorationDock({
     state={state} boardStep={boardStep} progress={progress.current} required={Math.max(1, progress.total)}
     layout={restorationLayout(definition?.rows ?? 4)} barTitle={`Drive the Mist from ${islandName}`}
     interactionKey={`restoration:${campaign.campaignId}:${level}:${boardStep?.id ?? 'free'}`} sessionId={sessionId} hiddenItemIds={hiddenItemIds}
-    width={width} bottomInset={bottomInset} impactKey={impactKey}
+    width={width} bottomInset={bottomInset} landings={landings}
     onCommand={dispatch} onBoardMetrics={handleMetrics} onBlockedInteraction={onBlockedInteraction} onEntranceSettled={onEntranceSettled}
     rootRef={rootRef} header={tray} headerGap={TRAY_LIFT}
     overlay={flights.map((flight) => <DeliveryFlight key={flight.nonce} flight={flight} onFinish={finishFlight} onItemArrive={handleItemArrive} />)} />;

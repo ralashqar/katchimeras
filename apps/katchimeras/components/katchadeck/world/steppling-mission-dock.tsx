@@ -7,7 +7,7 @@ import { createMergeBoardSession } from '@/features/onboarding/merge-ftue-intera
 import { STEPPLING_MISSION_MERGE_REQUIRED, stepplingMissionBoardStep, stepplingMissionProgress } from '@/features/onboarding/steppling-mission';
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
-import { MistMissionDock } from './kingdom-opening-merge-dock';
+import { MistMissionDock, type GlowLandingSource } from './kingdom-opening-merge-dock';
 
 /**
  * Steppling's mission board under the misted clearing: the same dock the
@@ -15,7 +15,7 @@ import { MistMissionDock } from './kingdom-opening-merge-dock';
  * Locker. Progress is the mission store's own merge count, not an FTUE run:
  * the Glow discovery story only hears about the bar filling.
  */
-export const StepplingMissionDock = memo(function StepplingMissionDock({ state, send, merges, mergesRef, width, bottomInset, impactKey = 0, onGlow, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
+export const StepplingMissionDock = memo(function StepplingMissionDock({ state, send, merges, mergesRef, width, bottomInset, landings, onGlow, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
   state: MergeWorldState;
   send: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
   merges: number;
@@ -23,7 +23,7 @@ export const StepplingMissionDock = memo(function StepplingMissionDock({ state, 
   mergesRef: RefObject<number>;
   width: number;
   bottomInset: number;
-  impactKey?: number;
+  landings?: GlowLandingSource;
   onGlow?: (from: RewardFlightPoint) => void;
   /** The merge that fills the bar: its item leaves the board for the mist. */
   onFinale?: (from: RewardFlightPoint, definitionId: string) => void;
@@ -74,6 +74,6 @@ export const StepplingMissionDock = memo(function StepplingMissionDock({ state, 
   return <MistMissionDock
     state={state} boardStep={boardStep} progress={stepplingMissionProgress(merges)} required={STEPPLING_MISSION_MERGE_REQUIRED}
     interactionKey={`steppling-mission:${boardStep?.id ?? 'free'}`} sessionId={sessionId} hiddenItemIds={hiddenItemIds}
-    width={width} bottomInset={bottomInset} impactKey={impactKey}
+    width={width} bottomInset={bottomInset} landings={landings}
     onCommand={dispatch} onBoardMetrics={handleMetrics} onBlockedInteraction={onBlockedInteraction} onEntranceSettled={onEntranceSettled} />;
 });

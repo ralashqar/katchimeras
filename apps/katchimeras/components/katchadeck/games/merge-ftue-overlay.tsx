@@ -65,6 +65,18 @@ export const DEFAULT_MERGE_FTUE_VISUAL_THEME: MergeFtueVisualTheme = {
   tapDurationMs: 1_180,
 };
 
+/** The soft ring around the crisp spotlight ring: a translucent border, never a blurred shadow. */
+const RING_GLOW_WIDTH = 3;
+const RING_GLOW_ALPHA = 0.55;
+
+/** `#RRGGBB` with an alpha; any other colour string is returned as it is. */
+function withAlpha(color: string, alpha: number) {
+  const match = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  if (!match) return color;
+  const value = parseInt(match[1]!, 16);
+  return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${alpha})`;
+}
+
 type Point = { x: number; y: number };
 type Frame = Point & { height: number; width: number };
 type CuePoints = { from: Point; to: Point };
@@ -350,7 +362,6 @@ function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
         <SpotlightDimMask
           color={`rgb(${theme.dimColor})`}
           opacity={dimOpacity}
-          screen={screen}
           slot={boundingSlot}
         />
       )}
@@ -364,31 +375,52 @@ function FtueSpotlight({ frames, opacity, radius, screen, theme }: {
 
 type AnimatedSpotlightSlot = ReturnType<typeof useAnimatedSpotlightSlot>;
 
-function SpotlightDimMask({ color, opacity, screen, slot }: {
+function SpotlightDimMask({ color, opacity, slot }: {
   color: string;
   opacity: SharedValue<number>;
-  screen: { height: number; width: number };
   slot: AnimatedSpotlightSlot;
 }) {
-  const spreadRadius = Math.max(1, Math.hypot(screen.width, screen.height));
-  const style = useAnimatedStyle(() => ({
-    borderRadius: slot.corner.value,
+  // Four plain bands around the opening and one hollow frame for its rounded corners. The old
+  // mask was a single view with a box-shadow spread across the whole screen: on the new
+  // architecture a box-shadow is rasterised into a bitmap the size of its bounds, and the slot
+  // moves every frame of a transition, so each of those frames redrew a screen-sized image.
+  // Nothing here carries a shadow; the bands are cheap layout, and the parent's opacity fades
+  // the group as one, so their overlaps never double up.
+  const opacityStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const topStyle = useAnimatedStyle(() => ({ height: Math.max(0, slot.y.value) }));
+  const bottomStyle = useAnimatedStyle(() => ({ top: slot.y.value + Math.max(0, slot.height.value) }));
+  const leftStyle = useAnimatedStyle(() => ({
     height: Math.max(0, slot.height.value),
-    left: slot.x.value,
-    opacity: opacity.value,
     top: slot.y.value,
-    width: Math.max(0, slot.width.value),
+    width: Math.max(0, slot.x.value),
   }));
-
+  const rightStyle = useAnimatedStyle(() => ({
+    height: Math.max(0, slot.height.value),
+    left: slot.x.value + Math.max(0, slot.width.value),
+    top: slot.y.value,
+  }));
+  // A border as thick as the corner radius, with twice that radius outside: its inner edge is the
+  // opening's rounded corner, and its outer square corners hide under the bands.
+  const frameStyle = useAnimatedStyle(() => {
+    const corner = Math.max(0, slot.corner.value);
+    return {
+      borderRadius: corner * 2,
+      borderWidth: corner,
+      height: Math.max(0, slot.height.value) + corner * 2,
+      left: slot.x.value - corner,
+      top: slot.y.value - corner,
+      width: Math.max(0, slot.width.value) + corner * 2,
+    };
+  });
+  const fill = { backgroundColor: color };
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        styles.spotlightDimShadow,
-        { boxShadow: `0 0 0 ${spreadRadius}px ${color}` },
-        style,
-      ]}
-    />
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, opacityStyle]}>
+      <Animated.View style={[styles.dimBand, styles.dimBandTop, fill, topStyle]} />
+      <Animated.View style={[styles.dimBand, styles.dimBandBottom, fill, bottomStyle]} />
+      <Animated.View style={[styles.dimBand, styles.dimBandLeft, fill, leftStyle]} />
+      <Animated.View style={[styles.dimBand, styles.dimBandRight, fill, rightStyle]} />
+      <Animated.View style={[styles.dimFrame, { borderColor: color }, frameStyle]} />
+    </Animated.View>
   );
 }
 
@@ -440,22 +472,20 @@ function NativeSpotlightRing({ slot, theme }: {
   slot: AnimatedSpotlightSlot;
   theme: MergeFtueVisualTheme;
 }) {
+  // The glow is a wider translucent border around the crisp ring, not a blurred shadow: the ring's
+  // frame animates on every transition, and a shadow on a view whose frame changes is redrawn each frame.
   const style = useAnimatedStyle(() => ({
-    borderRadius: slot.corner.value,
-    height: Math.max(0, slot.height.value),
-    left: slot.x.value,
+    borderRadius: slot.corner.value + RING_GLOW_WIDTH,
+    height: Math.max(0, slot.height.value) + RING_GLOW_WIDTH * 2,
+    left: slot.x.value - RING_GLOW_WIDTH,
     opacity: slot.width.value > 0.5 && slot.height.value > 0.5 ? 1 : 0,
-    top: slot.y.value,
-    width: Math.max(0, slot.width.value),
+    top: slot.y.value - RING_GLOW_WIDTH,
+    width: Math.max(0, slot.width.value) + RING_GLOW_WIDTH * 2,
   }));
-  return <Animated.View style={[
-    styles.nativeSpotlightRing,
-    {
-      borderColor: theme.focusRingColor,
-      boxShadow: `0 0 9px ${theme.focusRingShadowColor}`,
-    },
-    style,
-  ]} />;
+  const ringStyle = useAnimatedStyle(() => ({ borderRadius: slot.corner.value }));
+  return <Animated.View style={[styles.nativeSpotlightGlow, { borderColor: withAlpha(theme.focusRingShadowColor, RING_GLOW_ALPHA) }, style]}>
+    <Animated.View style={[styles.nativeSpotlightRing, { borderColor: theme.focusRingColor }, ringStyle]} />
+  </Animated.View>;
 }
 
 function mergeFtueOverlayPropsEqual(previous: MergeFtueOverlayProps, next: MergeFtueOverlayProps) {
@@ -874,12 +904,26 @@ const styles = StyleSheet.create({
   },
   eggGuideEmphasis: { fontWeight: '900' },
   multiCutoutSegment: { position: 'absolute' },
+  nativeSpotlightGlow: {
+    borderCurve: 'continuous',
+    borderWidth: RING_GLOW_WIDTH,
+    position: 'absolute',
+  },
   nativeSpotlightRing: {
     borderCurve: 'continuous',
     borderWidth: 2,
+    bottom: 0,
+    left: 0,
     position: 'absolute',
+    right: 0,
+    top: 0,
   },
-  spotlightDimShadow: {
+  dimBand: { position: 'absolute' },
+  dimBandTop: { left: 0, right: 0, top: 0 },
+  dimBandBottom: { bottom: 0, left: 0, right: 0 },
+  dimBandLeft: { left: 0 },
+  dimBandRight: { right: 0 },
+  dimFrame: {
     backgroundColor: 'transparent',
     borderCurve: 'continuous',
     position: 'absolute',

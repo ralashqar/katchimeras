@@ -1593,7 +1593,7 @@ test('Merge FTUE commits before visual settlement and preserves all native anima
   assert.doesNotMatch(overlay, /requestAnimationFrame/);
   assert.match(overlay, /spotlightTransitionDurationMs: 420/);
   assert.match(overlay, /<SpotlightDimMask/);
-  assert.match(overlay, /boxShadow: `0 0 0 \$\{spreadRadius\}px \$\{color\}`/);
+  assert.doesNotMatch(overlay.slice(overlay.indexOf('function FtueSpotlight('), overlay.indexOf('function mergeFtueOverlayPropsEqual(')), /boxShadow/, 'the mask is bands and a hollow frame, not a screen-sized shadow spread');
   assert.match(overlay, /<NativeSpotlightRing slot=\{slot0\}/);
   assert.doesNotMatch(overlay, /@shopify\/react-native-skia|<Canvas|usePathValue|BlurMask/);
   assert.doesNotMatch(route, /useSharedValue|effectsPaused/);

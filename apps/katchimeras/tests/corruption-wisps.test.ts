@@ -59,14 +59,17 @@ test('the Glow aims at the wisps: every burst at the first standing, the finale 
   assert.match(dock, /const reach = 1 - Math\.pow\(1 - t\.value, 2\.2\);/, 'shards fly out with drag');
   assert.match(dock, /tintColor=\{STRIKE_PUFF\}/, 'the dark puff is the wisp’s own colour');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  const layerSource = readFileSync('components/katchadeck/world/corruption-wisp-layer.tsx', 'utf8');
   assert.match(screen, /\? \{ key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission\.merges, specs: STEPPLING_WISPS, lines: STEPPLING_WISP_LINES, settled: ftueCameraSettled \}/);
   assert.match(screen, /\? \{ key: 'opening-mist', node: homeTileNode, required: OPENING_MERGE_REQUIRED, merges: openingProgress, specs: OPENING_WISPS, lines: OPENING_WISP_LINES, settled: ftueCameraSettled \}/);
-  assert.match(screen, /const wisps = useCorruptionWisps\(wispTarget\);\s*openingGlow\.sinkRef\.current = wisps\.sink;/, 'the screen hands the wisps to the Glow every render');
+  // The wisps own their state in their own component: a strike or a measurement re-renders it, never the screen. It hands the Glow its sink on every render.
+  assert.match(layerSource, /export const MissionWisps = memo\(function MissionWisps\([\s\S]*?const wisps = useCorruptionWisps\(target\);\s*glow\.sinkRef\.current = wisps\.sink;\s*return wisps\.visible \? <CorruptionWispLayer wisps=\{wisps\} screenRef=\{screenRef\} \/> : null;/);
+  assert.match(screen, /<MissionWisps target=\{wispTarget\} glow=\{openingGlow\.store\} screenRef=\{screenRef\} \/>/);
+  assert.doesNotMatch(screen, /useCorruptionWisps\(/, 'the screen no longer subscribes to the wisps');
   assert.match(screen, /specs: STEPPLING_WISPS, lines: STEPPLING_WISP_LINES, settled: ftueCameraSettled \}/);
   assert.match(screen, /specs: OPENING_WISPS, lines: OPENING_WISP_LINES, settled: ftueCameraSettled \}/);
   assert.match(screen, /specs: wispsForClearing\(restorationDefinition\.merges\), lines: restorationWispLines, settled: ftueCameraSettled \}/);
   assert.match(screen, /const restorationWispLines = islandRestoration\?\.campaign\.copy\.wispLines \?\? ISLAND_WISP_LINES;/, 'a friend speaks over their own board when authored');
-  const layerSource = readFileSync('components/katchadeck/world/corruption-wisp-layer.tsx', 'utf8');
   // The wisps measure the tile only while the camera is still, and wait a beat for the opening glide to start: no early appearance, no jump when it lands.
   assert.match(layerSource, /const settled = target\?\.settled \?\? true;/);
   assert.match(layerSource, /if \(!key \|\| !node \|\| !settled\) return;/, 'no measurement while the camera moves');
@@ -77,9 +80,19 @@ test('the Glow aims at the wisps: every burst at the first standing, the finale 
   // A friend's board: wisps over the island for as long as the board is up, keyed to the stage's run, their hits from the board's saved merges.
   assert.match(screen, /: restorationBoardVisible && restorationDefinition && restorationBoardRunId\s*\? \{ key: restorationBoardRunId, node: restorationTileNode, required: restorationDefinition\.merges, merges: restorationStore\.merges, specs: wispsForClearing\(restorationDefinition\.merges\), lines: restorationWispLines, settled: ftueCameraSettled \}/);
   assert.match(dock, /const aimed = sinkRef\.current\?\.aim\('glow'\) \?\? null;\s*const push = \(to: RewardFlightPoint\) => setFlights\(\(current\) => \[\.\.\.current, \{ id, index: 0, count: 1, from, to, art, size: 44/, 'a restoration merge’s item strikes a wisp too');
-  assert.match(screen, /\{wisps\.visible \? <CorruptionWispLayer wisps=\{wisps\} screenRef=\{screenRef\} \/> : null\}\s*\{openingGlow\.flights\.length/, 'the wisps sit under the Glow flights');
+  assert.match(screen, /<MissionWisps target=\{wispTarget\} glow=\{openingGlow\.store\} screenRef=\{screenRef\} \/>\s*<MissionGlowLayer store=\{openingGlow\.store\} screenRef=\{screenRef\} \/>/, 'the wisps sit under the Glow flights');
   const layer = readFileSync('components/katchadeck/world/corruption-wisp-layer.tsx', 'utf8');
   assert.match(layer, /const WISP_ART = require\('@incubator\/art-cutouts\/corruption-wisp\.png'\);/);
+  // The ambient load steps aside for the board: three embers per wisp, loops cancelled on a fall, and the opening's rain and tile embers fade out and stop while a board is docked.
+  assert.equal(layer.slice(layer.indexOf('const EMBERS = ['), layer.indexOf('] as const;', layer.indexOf('const EMBERS = ['))).match(/\{ dx: /g)?.length, 3, 'three embers per wisp');
+  assert.match(layer, /if \(alive\) return;\s*\/\/[^\n]*\n\s*cancelAnimation\(hover\);\s*cancelAnimation\(pulse\);/, 'a felled wisp stops its loops');
+  assert.match(screen, /openingWeatherActive=\{homeVeil === 'veiled' && !missionBoardDocked\}/, 'no rain under a docked board');
+  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
+  assert.match(canvas, /const openingRainSettings = useMemo\(\(\) => \(\{ \.\.\.OPENING_RAIN, paused: !openingWeatherActive \}\), \[openingWeatherActive\]\);/, 'the rain’s per-frame path stops, not only its opacity');
+  assert.match(canvas, /const openingWeatherStyle = useAnimatedStyle\(\(\) => \(\{ opacity: \(1 - homeVeilProgress\.value\) \* openingWeatherPresence\.value \}\)\);/);
+  assert.match(canvas, /const timer = setTimeout\(\(\) => setOpeningWeatherMounted\(false\), OPENING_WEATHER_FADE_MS \+ 40\);/, 'and unmounts after its fade');
+  assert.match(canvas, /\{openingWeatherShown \? <Animated\.View pointerEvents="none" style=\{\[StyleSheet\.absoluteFill, styles\.openingRain, openingWeatherStyle\]\}>\s*<AtmosphereLayer plane="foreground" settings=\{openingRainSettings\} \/>/);
+  assert.match(canvas, /\{layer\.id === scene\.centerTile\.id && openingWeatherShown \? \(/, 'the tile’s embers go with the rain');
   assert.match(layer, /assignedRef\.current = target\.merges;\s*setLanded\(target\.merges\);/, 'a resumed board starts with the wisps its merges already felled');
   assert.match(layer, /withSequence\(\s*withTiming\(1, \{ duration: 40 \}\),\s*withTiming\(-1, \{ duration: 60 \}\)/, 'a struck wisp flinches');
   assert.match(layer, /death\.value = withTiming\(1, \{ duration: reduceMotion \? 160 : DEATH_MS, easing: Easing\.in\(Easing\.cubic\) \}\);/, 'a felled wisp shrinks away');

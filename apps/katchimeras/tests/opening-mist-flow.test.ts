@@ -28,6 +28,8 @@ function loadRuntime(stored?: unknown) {
     '@/utils/app-storage': {
       getStoredJson: (key: string, fallback: unknown) => storage.has(key) ? storage.get(key) : fallback,
       setStoredJson: (key: string, value: unknown) => { storage.set(key, JSON.parse(JSON.stringify(value))); },
+      setStoredJsonDeferred: (key: string, value: unknown) => { storage.set(key, JSON.parse(JSON.stringify(value))); },
+      flushDeferredStoredWrites: () => {},
     },
     '@/features/content-flow/ftue-content-flow-runtime': {
       dismissFtueContentFlow: async () => undefined,
@@ -145,10 +147,11 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(screen, /ftueStepId: routeFtueStepId,/, 'the route step is renamed so the presented step can be held');
   assert.match(screen, /const openingFinaleHeld = openingGlow\.finaleActive \|\| openingGlow\.finaleHoldRef\.current;\s*const ftueStepId = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld \? OPENING_MIST_CLEAR_STEP_ID : routeFtueStepId;/, 'the clear beat is held while the finale flies, from the instant it launches');
   assert.match(dock, /finaleIdRef\.current = id;\s*finaleHoldRef\.current = true;\s*setFinaleActive\(true\);/, 'the hold is a ref set before any state renders, so the run store’s own sync render never sees the lift step unheld');
-  assert.match(dock, /setTimeout\(\(\) => \{ finaleHoldRef\.current = false; setFinaleActive\(false\); \}, OPENING_FINALE_SETTLE_MS\)/);
+  assert.match(dock, /if \(finale\) \{\s*setFinaleLanded\(true\);\s*setFinaleLandedId\(id\);[\s\S]*?setTimeout\(\(\) => \{ finaleHoldRef\.current = false; setFinaleActive\(false\); \}, OPENING_FINALE_SETTLE_MS\);\s*\}/, 'the hold lifts on the impact’s clock: the mission is over when the last wisp has fallen');
+  assert.match(dock, /const OPENING_FINALE_SETTLE_MS = 520;/);
+  assert.doesNotMatch(dock, /if \(id === finaleIdRef\.current\) setTimeout/, 'not after the burst has finished and a further beat');
   assert.match(screen, /\(ftueRun\.stepId === routeFtueStepId \|\| \(ftueRun\.stepId === OPENING_MIST_LIFT_STEP_ID && routeFtueStepId === OPENING_MIST_CLEAR_STEP_ID\)\)\s*\? ftueRun : null/, 'the run is matched against the real step, and kept through the frame the route lags the store, so the mission board stays alive through the hold');
   assert.match(dock, /finaleIdRef\.current = id;\s*finaleHoldRef\.current = true;\s*setFinaleActive\(true\);/, 'the finale flag is raised synchronously at launch, before the flight is measured');
-  assert.match(dock, /if \(id === finaleIdRef\.current\) setTimeout\(\(\) => \{ finaleHoldRef\.current = false; setFinaleActive\(false\); \}, OPENING_FINALE_SETTLE_MS\);/, 'and lowered only after the burst has finished and settled');
   assert.match(dock, /if \(landed && \(finale \|\| landed\.index % 2 === 0\)\)/, 'the finale always bursts');
   assert.match(screen, /const openingGuidanceVisible = Boolean\(openingBoardStep && \(openingBoardStep\.cue \|\| openingBoardStep\.spotlight\)\)/);
   assert.match(screen, /const visibleUpgradeOffers = homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS : missionBoardDocked \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch, nor while a board hands off to its story');
@@ -158,11 +161,11 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(screen, /onEntranceSettled=\{markOpeningDockSettled\}/);
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   assert.match(overlay, /spotlightOpacity: spotlight \? spotlight\.dimOpacity \?\? 0\.64 : 0,/, 'a finger-only beat never dims the screen');
-  assert.match(canvas, /const openingWeatherStyle = useAnimatedStyle\(\(\) => \(\{ opacity: 1 - homeVeilProgress\.value \}\)\);/, 'weather thins on the lift clock');
-  assert.match(canvas, /<\/GestureDetector>\s*\{openingWeather \? <Animated\.View[\s\S]*?<AtmosphereLayer plane="foreground" settings=\{OPENING_RAIN\} \/>/, 'rain in front of the world');
+  assert.match(canvas, /const openingWeatherStyle = useAnimatedStyle\(\(\) => \(\{ opacity: \(1 - homeVeilProgress\.value\) \* openingWeatherPresence\.value \}\)\);/, 'weather thins on the lift clock, and steps aside for a docked board');
+  assert.match(canvas, /<\/GestureDetector>\s*\{openingWeatherShown \? <Animated\.View[\s\S]*?<AtmosphereLayer plane="foreground" settings=\{openingRainSettings\} \/>/, 'rain in front of the world, until a board docks');
   assert.doesNotMatch(canvas, /<AtmosphereLayer plane="background" settings=\{OPENING_RAIN\}/, 'one rain plane: the second halved the headroom for nothing visible');
   assert.match(screen, /const NO_UPGRADE_OFFERS: WorldUpgradeOffer\[\] = \[\];[\s\S]*?homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS :/, 'a stable empty offers prop while solo');
-  assert.match(canvas, /layer\.id === scene\.centerTile\.id && openingWeather \? \([\s\S]*?<HavenAmbientEmbers area=\{\{ left: 0, top: 0, width: layer\.frame\.width, height: layer\.frame\.height \}\}/, 'the reveal’s own embers loop over the veiled tile');
+  assert.match(canvas, /layer\.id === scene\.centerTile\.id && openingWeatherShown \? \([\s\S]*?<HavenAmbientEmbers area=\{\{ left: 0, top: 0, width: layer\.frame\.width, height: layer\.frame\.height \}\}/, 'the reveal’s own embers loop over the veiled tile');
   const effects = readFileSync('../../packages/environments/src/upgrade-effects.tsx', 'utf8');
   assert.match(effects, /const AMBIENT_EMBERS = RISING_PARTICLES\.filter/, 'the ambient embers are the reveal particles themselves');
   assert.match(effects, /withRepeat\(withTiming\(1, \{ duration: particle\.duration \* 2\.4/, 'looping, slower than the reveal');
@@ -178,7 +181,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   // Phase two: once the run is at the lift and the board is fading, the camera and the Egg's subject
   // presentation wait a further beat. The presentation's arrival changes the canvas's tutorial camera key
   // and would otherwise re-apply the clear step's camera against the revealed-Egg tile mid-fall.
-  assert.match(screen, /const OPENING_LIFT_CAMERA_DELAY_MS = 420;/);
+  assert.match(screen, /const OPENING_LIFT_CAMERA_DELAY_MS = 300;/);
   assert.match(screen, /const OPENING_CLEAR_CAMERA = mossproutFtueStep\(OPENING_MIST_CLEAR_STEP_ID\)\?\.camera \?\? null;/, 'one stable directive, so its key never changes while held');
   assert.match(screen, /const openingLiftCameraHeld = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID\s*&& \(openingFinaleHeld \|\| \(openingGlow\.finaleLanded && !openingLiftCameraReleased\)\);/);
   assert.match(screen, /if \(routeFtueStepId !== OPENING_MIST_LIFT_STEP_ID \|\| openingFinaleHeld \|\| !openingGlow\.finaleLanded\) \{ setOpeningLiftCameraReleased\(false\); return; \}\s*const timer = setTimeout\(\(\) => setOpeningLiftCameraReleased\(true\), OPENING_LIFT_CAMERA_DELAY_MS\);/, 'a cold resume at the lift (no finale landed) is not held');
@@ -187,7 +190,13 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   // The run store advances a frame before the route's step id: the board must not unmount (and replay its entrance) in between.
   assert.match(screen, /\(ftueRun\.stepId === routeFtueStepId \|\| \(ftueRun\.stepId === OPENING_MIST_LIFT_STEP_ID && routeFtueStepId === OPENING_MIST_CLEAR_STEP_ID\)\)/, 'the opening run survives the frame between the store and the route');
   assert.match(dock, /const finale = openingMistProgress\(runRef\.current\) \+ 1 >= OPENING_MERGE_REQUIRED;[\s\S]*?setHiddenItemIds[\s\S]*?onFinale\?\.\(from, event\.resultDefinitionId\);/, 'the last merge’s item leaves the board for the mist');
-  assert.match(screen, /<OpeningGlowLayer flights=\{openingGlow\.flights\} impacts=\{openingGlow\.impacts\}/, 'landed Glow bursts where it hits the mist');
+  // The flights live in the Glow's own store: the layer that draws them subscribes, the screen does not.
+  assert.match(screen, /<MissionGlowLayer store=\{openingGlow\.store\} screenRef=\{screenRef\} \/>/, 'landed Glow bursts where it hits the mist');
+  assert.match(dock, /export const MissionGlowLayer = memo\(function MissionGlowLayer[\s\S]*?useSyncExternalStore\(store\.subscribe, store\.getFlights, store\.getFlights\);[\s\S]*?<OpeningGlowLayer flights=\{flights\} impacts=\{impacts\} onArrive=\{store\.arrive\} onImpactDone=\{store\.impactDone\}/);
+  assert.match(dock, /const finale = useSyncExternalStore\(store\.subscribe, store\.getFinale, store\.getFinale\);/, 'the screen subscribes to the finale alone');
+  assert.match(dock, /if \(next\.flights !== state\.flights \|\| next\.impacts !== state\.impacts\) flightsSnapshot = /, 'snapshots keep their identity unless their own fields moved');
+  assert.match(dock, /const arrive = \(id: number\) => batch\(\(\) => \{/, 'a landing notifies once');
+  assert.doesNotMatch(screen, /openingGlow\.(flights|impacts|landed)\b/, 'nothing per landing reaches the screen');
   assert.match(dock, /<Image source=\{flight\.art \?\? GAME_CURRENCY_ART\.coins\}/, 'merges send Glow, not wisps; the finale sends the item itself');
   assert.match(dock, /const timer = setTimeout\(\(\) => \{\s*timers\.delete\(timer\);\s*setShownProgress\(\(shown\) => Math\.max\(shown, progress\)\);\s*\}, OPENING_GLOW_FLIGHT_MS\);\s*timers\.add\(timer\);/, 'every merge schedules its own bar step; rapid merges never cancel an earlier one');
   assert.doesNotMatch(dock, /return \(\) => clearTimeout\(timer\);\s*\}, \[progress, shownProgress\]\);/, 'no single cancel-and-restart timer for the bar');
@@ -196,7 +205,8 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(dock, /Array\.from\(\{ length: OPENING_GLOWS_PER_MERGE \}, \(_, index\) => \(\{ id: \+\+nextId\.current, index, from, to, group, key: aimed\?\.key \}\)\)/, 'the burst peels off one Glow per index, all at the wisp the sink named');
   assert.match(dock, /count=\{flight\.count \?\? OPENING_GLOWS_PER_MERGE\} index=\{flight\.index\}/, 'the flight staggers by index');
   assert.match(dock, /setLanded\(\(count\) => count \+ 1\);\s*if \(process\.env\.EXPO_OS === 'ios'\) void Haptics\.impactAsync/, 'every impact flashes the bar and taps the phone');
-  assert.match(screen, /impactKey=\{openingGlow\.landed\}/);
+  assert.match(screen, /landings=\{openingGlow\.store\}/);
+  assert.match(dock, /const impactKey = useSyncExternalStore\(landings\?\.subscribe \?\? subscribeToNothing, landings\?\.getLanded \?\? noLandings, landings\?\.getLanded \?\? noLandings\);/, 'the bar flashes on its own subscription');
   assert.match(dock, /const grew = progress > previous\.current;[\s\S]*?scale\.value = withSequence\(/, 'the bar swells once per landed Glow');
   assert.match(screen, /<MergeFtueOverlay blockedPulseNonce=\{openingBlockedNonce\}[\s\S]*?guide=\{openingBoardStep\?\.guide \?\? null\}[\s\S]*?spotlight=\{openingBoardStep\?\.spotlight \?\? null\}/);
   // The lift caption keeps the screen for a beat, however quickly the crossblend finished.
@@ -206,7 +216,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(screen, /if \(homeVeil !== 'lifting'\) return;[\s\S]*?veilLiftKeyRef\.current = key;[\s\S]*?veilLift: true/, 'the crossblend starts when the veil enters lifting, not when the step changes');
   // The mist clears on the frame the final item strikes the tile; the camera, caption and dock still wait for the burst to settle.
   assert.match(screen, /const homeVeil = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld && !openingGlow\.finaleLanded \? 'veiled' : homeVeilForStep\(routeFtueStepId\);/);
-  assert.match(dock, /if \(finale\) \{ setFinaleLanded\(true\); setFinaleLandedId\(id\); \}/, 'the landing flag is raised at impact, by id too');
+  assert.match(dock, /if \(finale\) \{\s*setFinaleLanded\(true\);\s*setFinaleLandedId\(id\);/, 'the landing flag is raised at impact, by id too');
   assert.match(screen, /Boolean\(upgradePresentation && !upgradePresentation\.veilLift\)/, 'the HUD stays hidden while the veil lifts');
   assert.match(screen, /homeVeil=\{homeVeil\}\s*homeSolo=\{homeSoloForStep\(ftueStepId\)\}/);
   assert.match(canvas, /return buildMossproutHexNeighborhoodScene\(fromSlots, fromNatureLevels, fromGarden, fromReveals, \{ homeVeiled: homeVeil === 'veiled' \|\| homeVeil === 'lifting', homeSolo \}\);/, 'the lift’s from-scene stays veiled and solo, so the world never flashes in during the crossblend');

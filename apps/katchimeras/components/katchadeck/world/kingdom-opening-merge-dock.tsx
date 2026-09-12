@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View, type View as ViewType } from 'react-native';
 import Animated, { Easing, FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
@@ -26,12 +26,12 @@ export const OPENING_GLOWS_PER_MERGE = 4;
 export const OPENING_GLOW_FLIGHT_MS = 700 + (OPENING_GLOWS_PER_MERGE - 1) * 65;
 /** How long the impact burst lives at the veiled tile. */
 export const OPENING_IMPACT_BURST_MS = 640;
-/** After the final item's burst, before the Kingdom moves on to the lift. */
 /**
- * After the finale's burst: long enough for the wisp it struck to shrink, burst and go
- * (its fall and death burst together run past a second) before the lift beat moves the camera.
+ * From the finale's impact: the wisp it struck shrinks and bursts over 440ms and is gone. The hold
+ * on the board lifts right after, while the strike's last sparks are still fading; it used to wait
+ * for the whole burst and then a further beat, leaving the empty board up for over a second.
  */
-const OPENING_FINALE_SETTLE_MS = 760;
+const OPENING_FINALE_SETTLE_MS = 520;
 const GLOW_SIZE = 34;
 // Fewer, shadow-free motes: four impacts land per merge, and blurred shadows on
 // animating views re-rasterise every frame.
@@ -74,13 +74,13 @@ const STRIKE_PARTICLES = 10;
  * overlay the Kingdom mounts over it. Merges go through the same FTUE
  * dispatch as the dedicated page; each merged item sends Glow up into the mist.
  */
-export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ run, step, state, send, width, bottomInset, impactKey = 0, onGlow, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
+export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ run, step, state, send, width, bottomInset, landings, onGlow, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
   run: FtueRunState | null;
   /** The mission board's state and reducer, owned by the Kingdom's mission store. */
   state: MergeWorldState;
   send: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
-  /** Bumps once per landed Glow; the bar flashes on each. */
-  impactKey?: number;
+  /** The Glow's landings: the bar flashes on each, subscribed on its own so no caller re-renders for them. */
+  landings?: GlowLandingSource;
   /** The authored opening step (`world.mist_clear`); the dock derives its own refill beat from the board. */
   step: FtueStepDefinition | null;
   width: number;
@@ -158,7 +158,7 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   return <MistMissionDock
     state={state} boardStep={boardStep} progress={progress} required={OPENING_MERGE_REQUIRED}
     interactionKey={`${run?.runId ?? 'free'}:${boardStep?.id ?? 'open'}`} sessionId={sessionId} hiddenItemIds={hiddenItemIds}
-    width={width} bottomInset={bottomInset} impactKey={impactKey}
+    width={width} bottomInset={bottomInset} landings={landings}
     onCommand={dispatch} onBoardMetrics={handleMetrics} onBlockedInteraction={onBlockedInteraction} onEntranceSettled={onEntranceSettled} />;
 });
 
@@ -172,7 +172,7 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
 /** How far the header's bottom edge sits under the top of the bar. */
 const HEADER_TUCK = 24;
 
-export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, impactKey = 0, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, headerGap, overlay, rootRef }: {
+export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, landings, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, headerGap, overlay, rootRef }: {
   state: MergeWorldState;
   /** The window over the canonical board; the opening's 5×4 by default. */
   layout?: typeof OPENING_BOARD_LAYOUT | (Omit<typeof OPENING_BOARD_LAYOUT, 'rows' | 'cellIndices' | 'accessibilityLabel'> & { rows: number; cellIndices: readonly number[]; accessibilityLabel: string });
@@ -187,8 +187,8 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
   hiddenItemIds: ReadonlySet<string>;
   width: number;
   bottomInset: number;
-  /** Bumps once per landed Glow; the bar flashes on each. */
-  impactKey?: number;
+  /** The Glow's landings: the bar flashes on each, subscribed on its own so no caller re-renders for them. */
+  landings?: GlowLandingSource;
   onCommand: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
   onBoardMetrics?: (metrics: MergeBoardScreenMetrics | null) => void;
   onBlockedInteraction?: () => void;
@@ -296,7 +296,7 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
       <View pointerEvents="box-none" style={{ width: boardWidth }}>{header}</View>
     </Animated.View> : null}
     <View pointerEvents="box-none" onLayout={(event) => setBarTop(Math.round(event.nativeEvent.layout.y))}>
-      <ClearTheMistBar progress={shownProgress} total={required} width={boardWidth} impactKey={impactKey} title={barTitle} />
+      <ClearTheMistBar progress={shownProgress} total={required} width={boardWidth} landings={landings} title={barTitle} />
     </View>
     <MergePlaySurface
       animateEntrance={false}
@@ -337,7 +337,9 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
 });
 
 /** The bar interpolates its fill, flashes its halo on every landed Glow, and swells once per counted merge. */
-export function ClearTheMistBar({ progress, total, width, impactKey = 0, title = 'Drive off the Mist' }: { progress: number; total: number; width?: number; impactKey?: number; title?: string }) {
+export function ClearTheMistBar({ progress, total, width, landings, title = 'Drive off the Mist' }: { progress: number; total: number; width?: number; landings?: GlowLandingSource; title?: string }) {
+  // Landings arrive here straight from the Glow's store: the bar is the only thing that re-renders for one.
+  const impactKey = useSyncExternalStore(landings?.subscribe ?? subscribeToNothing, landings?.getLanded ?? noLandings, landings?.getLanded ?? noLandings);
   const reduceMotion = useReducedMotion();
   const scale = useSharedValue(1);
   const halo = useSharedValue(0);
@@ -504,33 +506,98 @@ function ImpactMote({ index, t }: { index: number; t: SharedValue<number> }) {
   return <Animated.View style={[styles.mote, index % 3 === 0 && styles.moteLarge, style]} />;
 }
 
-/** Measures the veiled tile, launches a burst of Glow per merged item, and bursts where each one lands. */
-export function useOpeningGlow(targetNode: ViewType | null) {
-  const [flights, setFlights] = useState<OpeningGlowFlight[]>([]);
-  const [impacts, setImpacts] = useState<OpeningImpact[]>([]);
-  const [landed, setLanded] = useState(0);
-  // True from the final merge until its item has landed, burst, and settled:
-  // the Kingdom holds the clear beat on screen for exactly that long.
-  const [finaleActive, setFinaleActive] = useState(false);
-  // The same hold as a ref: set the instant the finale launches, before any state has rendered.
-  // The FTUE run store re-renders its subscribers at sync priority, ahead of ordinary state updates
-  // queued in the same frame; a screen deriving its step from `finaleActive` alone renders the lift
-  // step once without the hold and moves the camera. Reading this ref during render closes that gap.
-  const finaleHoldRef = useRef(false);
-  // True from the moment the final item strikes the tile: the mist clears on that frame.
-  const [finaleLanded, setFinaleLanded] = useState(false);
-  const finaleIdRef = useRef<number | null>(null);
-  const nextId = useRef(0);
-  const groupSeq = useRef(0);
-  const targetRef = useRef(targetNode);
-  targetRef.current = targetNode;
-  // Set by the screen each render: whoever is taking the Glow right now (the wisps over a misted tile), or nothing for the tile itself.
-  const sinkRef = useRef<GlowSink | null>(null);
-  const flightsRef = useRef<OpeningGlowFlight[]>([]);
-  flightsRef.current = flights;
-  const landedGroups = useRef(new Set<number>());
+type OpeningGlowState = {
+  flights: OpeningGlowFlight[];
+  impacts: OpeningImpact[];
+  landed: number;
+  finaleActive: boolean;
+  finaleLanded: boolean;
+  finaleLandedId: number | null;
+};
+type GlowFlightsSnapshot = Pick<OpeningGlowState, 'flights' | 'impacts'>;
+type GlowFinaleSnapshot = Pick<OpeningGlowState, 'finaleActive' | 'finaleLanded' | 'finaleLandedId'>;
+/** What a bar needs to flash on each landed Glow: a subscription and the count. */
+export type GlowLandingSource = {
+  subscribe: (listener: () => void) => () => void;
+  getLanded: () => number;
+};
+/**
+ * The Glow's own store. Flights, bursts and landings change many times per merge; only the
+ * layer that draws them and the bar that flashes subscribe to those. The screen subscribes to the
+ * finale alone (three changes per mission), so a landing never re-renders the Kingdom.
+ */
+export type OpeningGlowStore = GlowLandingSource & {
+  getFlights: () => GlowFlightsSnapshot;
+  getFinale: () => GlowFinaleSnapshot;
+  /** True from the moment the finale launches until its burst has settled; readable during any render. */
+  finaleHoldRef: { current: boolean };
+  /** Whoever is taking the Glow right now (the wisps over a misted tile), or nothing for the tile itself. */
+  sinkRef: { current: GlowSink | null };
+  /** The tile the Glow is aimed at when nothing over it takes it; the screen sets it each render. */
+  targetRef: { current: ViewType | null };
   /** A burst of Glow into the wisp the sink names, else the tile the hook is aimed at, else the node given (a spend that lands before the screen has re-aimed). */
-  const launch = useCallback((from: RewardFlightPoint, targetNode?: ViewType | null) => {
+  launch: (from: RewardFlightPoint, targetNode?: ViewType | null) => void;
+  /** One merge's item, alone, into the tile: a restoration board sends what it just made, not Glow. */
+  launchItem: (from: RewardFlightPoint, definitionId: string) => void;
+  /** The final merge's item, large and alone, straight up into the mist. */
+  launchFinale: (from: RewardFlightPoint, definitionId: string) => number;
+  arrive: (id: number) => void;
+  impactDone: (id: number) => void;
+};
+type Updater<T> = T | ((current: T) => T);
+const subscribeToNothing = () => () => {};
+const noLandings = () => 0;
+
+function createOpeningGlowStore(): OpeningGlowStore {
+  let state: OpeningGlowState = { flights: [], impacts: [], landed: 0, finaleActive: false, finaleLanded: false, finaleLandedId: null };
+  let flightsSnapshot: GlowFlightsSnapshot = { flights: state.flights, impacts: state.impacts };
+  let finaleSnapshot: GlowFinaleSnapshot = { finaleActive: false, finaleLanded: false, finaleLandedId: null };
+  const listeners = new Set<() => void>();
+  let batching = 0;
+  let dirty = false;
+  const notify = () => {
+    if (batching > 0) { dirty = true; return; }
+    for (const listener of [...listeners]) listener();
+  };
+  /** Several changes, one notification: a landing touches flights, impacts and the count together. */
+  const batch = (work: () => void) => {
+    batching += 1;
+    try { work(); } finally {
+      batching -= 1;
+      if (batching === 0 && dirty) { dirty = false; notify(); }
+    }
+  };
+  const update = (change: Partial<OpeningGlowState>) => {
+    const next = { ...state, ...change };
+    // Snapshots keep their identity unless their own fields moved: a landing does not wake the finale's subscriber.
+    if (next.flights !== state.flights || next.impacts !== state.impacts) flightsSnapshot = { flights: next.flights, impacts: next.impacts };
+    if (next.finaleActive !== state.finaleActive || next.finaleLanded !== state.finaleLanded || next.finaleLandedId !== state.finaleLandedId) {
+      finaleSnapshot = { finaleActive: next.finaleActive, finaleLanded: next.finaleLanded, finaleLandedId: next.finaleLandedId };
+    }
+    state = next;
+    notify();
+  };
+  const resolve = <T,>(value: Updater<T>, current: T): T => typeof value === 'function' ? (value as (current: T) => T)(current) : value;
+  const setFlights = (value: Updater<OpeningGlowFlight[]>) => update({ flights: resolve(value, state.flights) });
+  const setImpacts = (value: Updater<OpeningImpact[]>) => update({ impacts: resolve(value, state.impacts) });
+  const setLanded = (value: Updater<number>) => update({ landed: resolve(value, state.landed) });
+  const setFinaleActive = (value: boolean) => update({ finaleActive: value });
+  const setFinaleLanded = (value: boolean) => update({ finaleLanded: value });
+  const setFinaleLandedId = (value: number | null) => update({ finaleLandedId: value });
+
+  const nextId = { current: 0 };
+  const groupSeq = { current: 0 };
+  const finaleIdRef = { current: null as number | null };
+  // The same hold as a ref: set the instant the finale launches, before any subscriber has rendered.
+  // The FTUE run store re-renders its subscribers at sync priority, ahead of other updates queued in
+  // the same frame; a screen deriving its step from `finaleActive` alone renders the lift step once
+  // without the hold and moves the camera. Reading this ref during render closes that gap.
+  const finaleHoldRef = { current: false };
+  const targetRef = { current: null as ViewType | null };
+  const sinkRef = { current: null as GlowSink | null };
+  const landedGroups = { current: new Set<number>() };
+
+  const launch = (from: RewardFlightPoint, targetNode?: ViewType | null) => {
     const group = ++groupSeq.current;
     const aimed = targetNode ? null : sinkRef.current?.aim('glow') ?? null;
     const push = (to: RewardFlightPoint) => setFlights((current) => [
@@ -541,12 +608,11 @@ export function useOpeningGlow(targetNode: ViewType | null) {
     const target = targetNode ?? targetRef.current;
     if (!target) { push({ x: from.x, y: from.y - 220 }); return; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.55 }));
-  }, []);
-  const [finaleLandedId, setFinaleLandedId] = useState<number | null>(null);
-  const arrive = useCallback((id: number) => {
+  };
+  const arrive = (id: number) => batch(() => {
     const finale = id === finaleIdRef.current;
     // A token that struck a wisp: the wisp flinches on every token and takes one hit per burst.
-    const struck = flightsRef.current.find((flight) => flight.id === id);
+    const struck = state.flights.find((flight) => flight.id === id);
     if (struck?.key != null) {
       sinkRef.current?.struck(struck.key);
       if (struck.group != null && !landedGroups.current.has(struck.group)) {
@@ -554,24 +620,26 @@ export function useOpeningGlow(targetNode: ViewType | null) {
         sinkRef.current?.landed(struck.key, finale ? 'finale' : 'glow');
       }
     }
-    if (finale) { setFinaleLanded(true); setFinaleLandedId(id); }
+    if (finale) {
+      setFinaleLanded(true);
+      setFinaleLandedId(id);
+      // The mission is over the moment the last wisp has fallen: the hold lifts on that clock, not the burst's.
+      setTimeout(() => { finaleHoldRef.current = false; setFinaleActive(false); }, OPENING_FINALE_SETTLE_MS);
+    }
     setFlights((current) => {
       const landed = current.find((flight) => flight.id === id);
       // Every other landing bursts (the first and third of four): half the particle
       // views for the same read, since the impacts land 65 ms apart. The finale always bursts.
-      if (landed && (finale || landed.index % 2 === 0)) setImpacts((bursts) => [...bursts, { id, wisp: landed.key != null, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 14, y: landed.to.y + (landed.index % 2) * 10 - 5 } }]);
+      if (landed && (finale || landed.index % 2 === 0)) setImpacts((bursts) => [...bursts, { id, wisp: landed.key != null, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 10, y: landed.to.y } }]);
       return current.filter((flight) => flight.id !== id);
     });
     setLanded((count) => count + 1);
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(finale ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
-  }, []);
-  const impactDone = useCallback((id: number) => {
+  });
+  const impactDone = (id: number) => {
     setImpacts((current) => current.filter((impact) => impact.id !== id));
-    // The burst is over; let it settle before the lift beat takes the screen.
-    if (id === finaleIdRef.current) setTimeout(() => { finaleHoldRef.current = false; setFinaleActive(false); }, OPENING_FINALE_SETTLE_MS);
-  }, []);
-  /** One merge's item, alone, into the tile: a restoration board sends what it just made, not Glow. */
-  const launchItem = useCallback((from: RewardFlightPoint, definitionId: string) => {
+  };
+  const launchItem = (from: RewardFlightPoint, definitionId: string) => {
     const id = ++nextId.current;
     const art = mergeWorldItemArt(definitionId) as number | undefined;
     const aimed = sinkRef.current?.aim('glow') ?? null;
@@ -580,9 +648,8 @@ export function useOpeningGlow(targetNode: ViewType | null) {
     const target = targetRef.current;
     if (!target) { push({ x: from.x, y: from.y - 220 }); return; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.55 }));
-  }, []);
-  /** The final merge's item, large and alone, straight up into the mist. */
-  const launchFinale = useCallback((from: RewardFlightPoint, definitionId: string): number => {
+  };
+  const launchFinale = (from: RewardFlightPoint, definitionId: string): number => {
     const id = ++nextId.current;
     finaleIdRef.current = id;
     finaleHoldRef.current = true;
@@ -597,9 +664,40 @@ export function useOpeningGlow(targetNode: ViewType | null) {
     if (!target) { push({ x: from.x, y: from.y - 260 }); return id; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.5 }));
     return id;
-  }, []);
-  return { flights, impacts, landed, finaleActive, finaleHoldRef, finaleLanded, finaleLandedId, launch, launchItem, launchFinale, arrive, impactDone, sinkRef };
+  };
+  return {
+    subscribe: (listener) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    getLanded: () => state.landed,
+    getFlights: () => flightsSnapshot,
+    getFinale: () => finaleSnapshot,
+    finaleHoldRef, sinkRef, targetRef,
+    launch, launchItem, launchFinale, arrive, impactDone,
+  };
 }
+
+/**
+ * The Glow of one screen: launches a burst per merged item into the veiled tile (or the wisps
+ * over it) and bursts where each lands. The screen gets stable launchers and the finale's three
+ * flags; the flights themselves live in the store, drawn by `MissionGlowLayer`.
+ */
+export function useOpeningGlow(targetNode: ViewType | null) {
+  const [store] = useState(createOpeningGlowStore);
+  store.targetRef.current = targetNode;
+  const finale = useSyncExternalStore(store.subscribe, store.getFinale, store.getFinale);
+  return useMemo(() => ({
+    store,
+    launch: store.launch, launchItem: store.launchItem, launchFinale: store.launchFinale,
+    finaleHoldRef: store.finaleHoldRef, sinkRef: store.sinkRef,
+    finaleActive: finale.finaleActive, finaleLanded: finale.finaleLanded, finaleLandedId: finale.finaleLandedId,
+  }), [finale, store]);
+}
+
+/** The Glow flights and bursts, subscribed on their own: a landing re-renders this layer, not the screen. */
+export const MissionGlowLayer = memo(function MissionGlowLayer({ store, screenRef }: { store: OpeningGlowStore; screenRef: RefObject<ViewType | null> }) {
+  const { flights, impacts } = useSyncExternalStore(store.subscribe, store.getFlights, store.getFlights);
+  if (!flights.length && !impacts.length) return null;
+  return <OpeningGlowLayer flights={flights} impacts={impacts} onArrive={store.arrive} onImpactDone={store.impactDone} screenRef={screenRef} />;
+});
 
 const styles = StyleSheet.create({
   dock: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60, alignItems: 'center', gap: 10 },

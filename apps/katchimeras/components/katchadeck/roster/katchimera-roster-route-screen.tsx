@@ -7,6 +7,8 @@ import { useRouter } from 'expo-router';
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
 import { sharedWorldIncludesCompanion } from '@/constants/shared-world';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+
+import { useStableCallback } from '@/hooks/use-stable-callback';
 import { BackHandler, Pressable, StyleSheet, View, type View as ViewType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -460,6 +462,20 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       },
     });
   }, [ftueRun, router, transitionTo]);
+  // Stable for the memoised Kingdom: the bodies read the live run through the callback's ref.
+  const handleFtueInspect = useStableCallback(() => {
+    const stepId = ftueRun?.status === 'active' ? ftueRun.stepId : null;
+    if (stepId === 'world.mist_open') {
+      commitFtueAction({ actionId: 'world.look_closer', evidenceRef: 'mossprout-world:look-closer' });
+    } else if (stepId === 'world.egg_intro') {
+      commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-intro-seen' });
+    } else if (stepId === 'world.seed_planted') {
+      void openFtueGarden();
+    } else if (stepId === 'companion.meditating') {
+      void advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden' }).catch(() => {});
+    }
+  });
+  const handleFtueOpenGarden = useStableCallback(() => { void openFtueGarden(); });
   return discovery.ready && glowReady && stepplingLesson.ready && presentationMergeWorld ? (
     <View style={styles.screen}>
       {activeWorldFamilyId === 'mossprout' ? <Suspense fallback={<View style={styles.worldMountFallback} />}><LazyKatchimeraKingdomScreen
@@ -475,19 +491,8 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
           companionSlots={mossproutWorldCompanionSlots}
           mergeWorld={presentationMergeWorld}
           ftueStepId={ftueRun?.status === 'active' ? ftueRun.stepId : undefined}
-          onFtueInspect={() => {
-            const stepId = ftueRun?.status === 'active' ? ftueRun.stepId : null;
-            if (stepId === 'world.mist_open') {
-              commitFtueAction({ actionId: 'world.look_closer', evidenceRef: 'mossprout-world:look-closer' });
-            } else if (stepId === 'world.egg_intro') {
-              commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-intro-seen' });
-            } else if (stepId === 'world.seed_planted') {
-              void openFtueGarden();
-            } else if (stepId === 'companion.meditating') {
-              void advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden' }).catch(() => {});
-            }
-          }}
-          onFtueOpenGarden={() => void openFtueGarden()}
+          onFtueInspect={handleFtueInspect}
+          onFtueOpenGarden={handleFtueOpenGarden}
           worldEggTargetRef={worldEggTargetRef}
           worldSubjectPresentation={worldSubjectPresentation}
       /></Suspense> : <HavenSelectorPresentation

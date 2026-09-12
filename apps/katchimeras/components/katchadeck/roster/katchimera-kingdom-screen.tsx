@@ -2,12 +2,12 @@ import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden
 import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
 import { advanceGlowUpgrade, recoverPaidGlowUpgrade } from '@/features/onboarding/glow-upgrade-runtime';
 import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_MERGE_REQUIRED, OPENING_CAMERA_ENTRY_ZOOM, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
-import { KingdomOpeningMergeDock, OpeningGlowLayer, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
+import { KingdomOpeningMergeDock, MissionGlowLayer, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
 import { StepplingMissionDock } from '@/components/katchadeck/world/steppling-mission-dock';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import { createStepplingMissionState, STEPPLING_MISSION_ID, STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep } from '@/features/onboarding/steppling-mission';
 import { ISLAND_WISP_LINES, OPENING_WISP_LINES, OPENING_WISPS, STEPPLING_WISP_LINES, STEPPLING_WISPS, wispsForClearing } from '@/features/onboarding/corruption-wisps';
-import { CorruptionWispLayer, useCorruptionWisps, type CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
+import { MissionWisps, type CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
 import { KingdomOpeningCaption } from '@/components/katchadeck/world/kingdom-opening-caption';
 import { clearMission, clearOpeningMission, useMissionBoard, useOpeningMissionBoard } from '@/features/onboarding/use-opening-mission-board';
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
@@ -23,7 +23,7 @@ import { KatchimeraFriendDiscoveryReveal } from '@/components/katchadeck/world/k
 import { worldUpgradeStory, upgradeUsesTutorialNarrative } from '@/features/world-upgrades/world-upgrade-stories';
 import { useGlowEggHandoff } from '@/features/onboarding/use-glow-egg-handoff';
 import { CompanionJournalButton } from '@/components/katchadeck/world/companion-life-actions';
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View, useWindowDimensions, type View as ViewType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -71,6 +71,7 @@ import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants
 import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
 import { AppFontFamilies } from '@/constants/theme';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
+import { useStableCallback } from '@/hooks/use-stable-callback';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import { loadWorldIdentity } from '@/utils/world-identity';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
@@ -197,13 +198,16 @@ const WISP_FALL_MS = 640;
 const LIFT_CAPTION_MIN_MS = 2400;
 /**
  * After the finale has settled and the run reaches the lift: how long the camera and the Egg
- * wait, so the board (a 260ms fade) and the last wisp are gone before anything in the world moves.
+ * wait, so the board (a 260ms fade) is gone before anything in the world moves.
  */
-const OPENING_LIFT_CAMERA_DELAY_MS = 420;
+const OPENING_LIFT_CAMERA_DELAY_MS = 300;
 /** The longest the screen is held still between a board's finale and its resolution story. */
 const RESTORATION_HANDOFF_MAX_MS = 12_000;
 
-export function KatchimeraKingdomScreen({
+const noop = () => {};
+
+/** Memoised: the route re-renders on every FTUE run and world-session change, and hands it stable props. */
+export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   background,
   companionSlots,
   onContentReady,
@@ -1359,8 +1363,6 @@ export function KatchimeraKingdomScreen({
       : restorationBoardVisible && restorationDefinition && restorationBoardRunId
         ? { key: restorationBoardRunId, node: restorationTileNode, required: restorationDefinition.merges, merges: restorationStore.merges, specs: wispsForClearing(restorationDefinition.merges), lines: restorationWispLines, settled: ftueCameraSettled }
         : null, [ftueCameraSettled, gatewayTileNode, homeTileNode, openingBoardActive, openingProgress, restorationBoardRunId, restorationBoardVisible, restorationDefinition, restorationStore.merges, restorationTileNode, restorationWispLines, stepplingMission.merges, stepplingMissionActive]);
-  const wisps = useCorruptionWisps(wispTarget);
-  openingGlow.sinkRef.current = wisps.sink;
   useEffect(() => {
     // Back puts the board away; it never leaves the Kingdom from here.
     if (!restorationBoardVisible) return;
@@ -1707,6 +1709,47 @@ export function KatchimeraKingdomScreen({
   const missionBoardDocked = openingBoardActive || stepplingMissionActive || restorationBoardVisible;
   const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : missionBoardDocked ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
 
+  // The canvas is memoised, and it holds only if none of its props change identity on an ordinary
+  // screen render: these handlers read live state through a ref instead of being re-created.
+  const selectLockedFamily = useStableCallback((_familyId: string) => {
+    if (kingdomGoalGuideActive) return;
+    if (!ftueStep || ftueStep.surface !== 'haven') setLockedHintVisible(true);
+  });
+  const selectNatureIsland = useStableCallback((islandId: MossproutNatureIslandId) => {
+    if (ftueStep?.surface === 'haven') return;
+    if (kingdomGoalGuideActive && islandId !== goalIslandId) return;
+    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const offer = presentedUpgradeOffers.find((candidate) => candidate.id === `nature:${islandId}`);
+    if (offer?.lockedReason) {
+      void openUpgradeOffer(offer);
+      return;
+    }
+    if (offer) void openUpgradeOffer(offer);
+    else { const archive = worldUpgradeArchiveOffer(mergeWorld, `nature:${islandId}`); if (archive) setSelectedUpgrade(archive); }
+  });
+  const selectGateway = useStableCallback(() => {
+    if (kingdomGoalGuideActive) return;
+    if (gatewayState === 'egg' && !glowDiscoveryLocksCamera(glowRun)) {
+      setFtueCameraSettled(false);
+      setGlowPanelOpen(false);
+      void stepplingEncounter.enter();
+      return;
+    }
+    if (glowRun && glowDiscoveryMissionNode(glowRun.nodeId)) return;
+    const offer = upgradeOffers.find((candidate) => candidate.id === 'mist:steppling-home');
+    if (offer && (!glowRun || GLOW_GATEWAY_NODE_IDS.includes(glowRun.nodeId))) { void openUpgradeOffer(offer); return; }
+    setGlowPanelOpen(true);
+    void startGlowDiscovery().catch((error) => console.warn('The path could not open', error));
+  });
+  const selectResidentFromCanvas = useStableCallback((creatureId: string) => {
+    if (glowDiscoveryLocksCamera(glowRun) || kingdomGoalGuideActive) return;
+    selectResident(creatureId);
+  });
+  const canvasNatureIslandReveals = useMemo(
+    () => Object.fromEntries(Object.keys(mergeWorld.haven.mossproutNatureIslandReveals).map((id) => [id, true])),
+    [mergeWorld.haven.mossproutNatureIslandReveals],
+  );
+
   // Mount the camera with its saved framing, rather than initializing the overview first.
   if (!glowReady || !stepplingLesson.ready) return null;
 
@@ -1741,7 +1784,7 @@ export function KatchimeraKingdomScreen({
         initialTutorialCameraScale={initialFtueCameraScale}
         initialCameraSnapshot={initialCameraSnapshot}
         mossproutNatureIslandLevels={mergeWorld.haven.mossproutNatureIslands}
-        mossproutNatureIslandReveals={Object.fromEntries(Object.keys(mergeWorld.haven.mossproutNatureIslandReveals).map((id) => [id, true]))}
+        mossproutNatureIslandReveals={canvasNatureIslandReveals}
         mossproutGarden={mossproutGardenScene}
         onCameraSnapshotChange={onCameraSnapshotChange}
         onCameraMotionChange={handleCameraMotionChange}
@@ -1752,11 +1795,12 @@ export function KatchimeraKingdomScreen({
         homeVeil={homeVeil}
         homeSolo={homeSoloForStep(ftueStepId)}
         openingWeather={homeVeil !== 'none'}
+        openingWeatherActive={homeVeil === 'veiled' && !missionBoardDocked}
         sleepingMarkersInert={Boolean(ftueStepId)}
         onTileUpgradeOfferPress={beginFirstSeedPlanting}
         upgradeOffers={screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingEggOpen && !ordinaryUpgradeRun && !upgradeHandoffPending
           ? kingdomGoalGuideActive ? visibleUpgradeOffers.filter((offer) => offer.id === `nature:${goalIslandId}`) : visibleUpgradeOffers
-          : []}
+          : NO_UPGRADE_OFFERS}
         selectedUpgradeOffer={selectedUpgrade}
         onDismissUpgrade={() => upgradeDismiss.current?.()}
         upgradePanel={screenFocused && sharedUpgrade && !upgradePresentation && !upgradeHandoffPending && !activeInteractionResidentId ? <WorldUpgradePanel
@@ -1774,23 +1818,9 @@ export function KatchimeraKingdomScreen({
         onUpgradeOfferPress={handleUpgradeOfferPress}
         onUpgradeOfferTargetChange={setUpgradeMarkerNode}
         onTileUpgradeOfferTargetChange={setGardenWorldOfferNode}
-        onSelectHome={() => {}}
-        onSelectLocked={(familyId) => {
-          if (kingdomGoalGuideActive) return;
-          if (!ftueStep || ftueStep.surface !== 'haven') setLockedHintVisible(true);
-        }}
-        onSelectNatureIsland={(islandId) => {
-          if (ftueStep?.surface === 'haven') return;
-          if (kingdomGoalGuideActive && islandId !== goalIslandId) return;
-          if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          const offer = presentedUpgradeOffers.find((candidate) => candidate.id === `nature:${islandId}`);
-          if (offer?.lockedReason) {
-            void openUpgradeOffer(offer);
-            return;
-          }
-          if (offer) void openUpgradeOffer(offer);
-          else { const archive = worldUpgradeArchiveOffer(mergeWorld, `nature:${islandId}`); if (archive) setSelectedUpgrade(archive); }
-        }}
+        onSelectHome={noop}
+        onSelectLocked={selectLockedFamily}
+        onSelectNatureIsland={selectNatureIsland}
         focusNatureIslandId={focusIslandId}
         onFocusNatureIslandComplete={completeIslandFocus}
         onSelectMemoryPlant={kingdomGoalGuideActive ? undefined : setSelectedMemoryPlantId}
@@ -1799,24 +1829,8 @@ export function KatchimeraKingdomScreen({
         soloLayerId={soloLayerId}
         soloOfferId={soloOfferId}
         storyOperationsEnabled={screenFocused && !activeInteractionResidentId && !interactionExiting}
-        onSelectGateway={() => {
-          if (kingdomGoalGuideActive) return;
-          if (gatewayState === 'egg' && !glowDiscoveryLocksCamera(glowRun)) {
-            setFtueCameraSettled(false);
-            setGlowPanelOpen(false);
-            void stepplingEncounter.enter();
-            return;
-          }
-          if (glowRun && glowDiscoveryMissionNode(glowRun.nodeId)) return;
-          const offer = upgradeOffers.find((candidate) => candidate.id === 'mist:steppling-home');
-          if (offer && (!glowRun || GLOW_GATEWAY_NODE_IDS.includes(glowRun.nodeId))) { void openUpgradeOffer(offer); return; }
-          setGlowPanelOpen(true);
-          void startGlowDiscovery().catch((error) => console.warn('The path could not open', error));
-        }}
-        onSelectResident={(creatureId) => {
-          if (glowDiscoveryLocksCamera(glowRun) || kingdomGoalGuideActive) return;
-          selectResident(creatureId);
-        }}
+        onSelectGateway={selectGateway}
+        onSelectResident={selectResidentFromCanvas}
         onResidentFocusComplete={completeResidentFocus}
         onUpgradePresentationComplete={completeUpgradePresentation}
         recenterBottom={Math.max(insets.bottom, 12) + 150}
@@ -2088,7 +2102,7 @@ export function KatchimeraKingdomScreen({
         step={ftueStep} bottomInset={insets.bottom} onLookCloser={advanceOpening} /> : null}
       {openingBoardActive && ftueStep && mission.state ? <KingdomOpeningMergeDock
         run={openingRun} step={ftueStep} state={mission.state} send={mission.send} width={window.width} bottomInset={insets.bottom}
-        impactKey={openingGlow.landed} onGlow={openingGlow.launch} onFinale={openingGlow.launchFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
+        landings={openingGlow.store} onGlow={openingGlow.launch} onFinale={openingGlow.launchFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} /> : null}
       {openingGuidanceVisible && ftueCameraSettled && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
         <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={openingBoardStep?.cue ?? null} guide={openingBoardStep?.guide ?? null}
@@ -2096,7 +2110,7 @@ export function KatchimeraKingdomScreen({
       </View> : null}
       {stepplingMissionActive && stepplingMission.state ? <StepplingMissionDock
         state={stepplingMission.state} send={stepplingMission.send} merges={stepplingMission.merges} mergesRef={stepplingMission.mergesRef} width={window.width} bottomInset={insets.bottom}
-        impactKey={openingGlow.landed} onGlow={openingGlow.launch} onFinale={launchStepplingFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
+        landings={openingGlow.store} onGlow={openingGlow.launch} onFinale={launchStepplingFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} /> : null}
       {stepplingMissionActive && stepplingMission.state && stepplingMissionGuidanceVisible && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
         <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={stepplingMissionStep?.cue ?? null} guide={stepplingMissionStep?.guide ?? null}
@@ -2107,7 +2121,7 @@ export function KatchimeraKingdomScreen({
         merges={restorationStore.merges} mergesRef={restorationStore.mergesRef} width={window.width} bottomInset={insets.bottom}
         order={restorationOrder} orderServed={restorationOrderServed} pendingDeliveries={restorationPendingDeliveries} speech={restorationSpeech} onOpenOrder={openRestorationOrder} onPlaceDelivery={placeRestorationDelivery}
         railTargetRefs={openingRailRefs}
-        impactKey={openingGlow.landed} onMerge={openingGlow.launchItem} onFinale={launchRestorationFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
+        landings={openingGlow.store} onMerge={openingGlow.launchItem} onFinale={launchRestorationFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} /> : null}
       {restorationCheckpointHint && restorationHintCue && restorationStore.state && restorationHintReady ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
         <MergeFtueOverlay blockedPulseNonce={0} boardMetrics={openingBoardMetrics}
@@ -2117,9 +2131,9 @@ export function KatchimeraKingdomScreen({
           spotlight={null}
           state={restorationStore.state} targetRevision={0} />
       </View> : null}
-      {wisps.visible ? <CorruptionWispLayer wisps={wisps} screenRef={screenRef} /> : null}
-      {openingGlow.flights.length || openingGlow.impacts.length ? <OpeningGlowLayer flights={openingGlow.flights} impacts={openingGlow.impacts}
-        onArrive={openingGlow.arrive} onImpactDone={openingGlow.impactDone} screenRef={screenRef} /> : null}
+      {/* The wisps under the Glow flights. Both own their state: a landing or a strike re-renders them, never this screen. */}
+      <MissionWisps target={wispTarget} glow={openingGlow.store} screenRef={screenRef} />
+      <MissionGlowLayer store={openingGlow.store} screenRef={screenRef} />
       {detailCreatureId ? (() => {
         const slot = visibleCompanionSlots.find((candidate) => candidate.kind === 'owned' && candidate.creature.creatureId === detailCreatureId);
         if (!slot || slot.kind !== 'owned') return null;
@@ -2207,7 +2221,7 @@ export function KatchimeraKingdomScreen({
       /> : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#55A9E2', flex: 1 },

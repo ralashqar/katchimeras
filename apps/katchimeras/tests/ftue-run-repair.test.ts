@@ -18,6 +18,8 @@ function loadRuntime() {
     '@/utils/app-storage': {
       getStoredJson: (key: string, fallback: unknown) => storage.has(key) ? storage.get(key) : fallback,
       setStoredJson: (key: string, value: unknown) => { storage.set(key, JSON.parse(JSON.stringify(value))); },
+      setStoredJsonDeferred: (key: string, value: unknown) => { storage.set(key, JSON.parse(JSON.stringify(value))); },
+      flushDeferredStoredWrites: () => {},
     },
     '@/features/content-flow/ftue-content-flow-runtime': {
       dismissFtueContentFlow: async () => undefined,

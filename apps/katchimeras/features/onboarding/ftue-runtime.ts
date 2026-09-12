@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { createClientId } from '@/utils/client-id';
-import { getStoredJson, setStoredJson } from '@/utils/app-storage';
+import { flushDeferredStoredWrites, getStoredJson, setStoredJson, setStoredJsonDeferred } from '@/utils/app-storage';
 import { dismissFtueContentFlow, dispatchFtueActionToContentFlow, dispatchFtueEventToContentFlow } from '@/features/content-flow/ftue-content-flow-runtime';
 import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
@@ -65,18 +65,27 @@ function migrateLegacy(): FtueRunState | null {
 }
 
 export async function flushFtuePersistence() {
-  // FTUE checkpoints use expo-sqlite's synchronous localStorage adapter, so
-  // there is no second writer to flush. Keep this boundary async for callers
-  // that atomically pair it with domain repositories and Content Flow.
+  // FTUE checkpoints use expo-sqlite's synchronous localStorage adapter. The
+  // only write held back is an objective's progress (a merge counted on a
+  // board), which lands here; callers that atomically pair this boundary with
+  // domain repositories and Content Flow keep their guarantee.
+  flushDeferredStoredWrites(STORAGE_KEY);
   await Promise.resolve();
 }
 
-function publish(next: FtueRunState | null) {
+/** How long a counted merge waits before its progress is written: past the frame its animation starts on. */
+const PROGRESS_WRITE_DELAY_MS = 150;
+
+function publish(next: FtueRunState | null, options: { progressOnly?: boolean } = {}) {
   // `expo-sqlite/localStorage` is synchronous. Write through before publishing
   // the new snapshot so a process kill immediately after a CTA can never
   // restore the destination route with the previous FTUE node. The async
   // Content Flow is journaled separately by the durable route-boundary API.
-  setStoredJson(STORAGE_KEY, next);
+  // Progress inside a step (one more merge counted) is the exception: the step
+  // itself is unchanged, the board it came from is the truth on a resume, and
+  // the write would otherwise land on the merge's own frame.
+  if (options.progressOnly) setStoredJsonDeferred(STORAGE_KEY, next, PROGRESS_WRITE_DELAY_MS);
+  else setStoredJson(STORAGE_KEY, next);
   snapshot = next;
   listeners.forEach((listener) => listener());
   return next;
@@ -506,7 +515,7 @@ export function dispatchFtueEvent(event: FtueEvent, evidenceRef?: string) {
     [progressKey]: Math.min(nextCount, requiredCount),
   };
   if (nextCount < requiredCount) {
-    const pending = publish({ ...current, objectiveProgress, updatedAt: now });
+    const pending = publish({ ...current, objectiveProgress, updatedAt: now }, { progressOnly: true });
     void dispatchFtueEventToContentFlow(current, event, pending?.stepId ?? current.stepId);
     return pending;
   }

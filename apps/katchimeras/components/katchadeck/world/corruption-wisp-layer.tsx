@@ -25,12 +25,12 @@ const ENTRANCE_STAGGER_MS = 150;
  */
 const EXIT_MS = 260;
 const EXIT_STAGGER_MS = 40;
+// Three per wisp: each ember is a native view animating for as long as the wisp stands, and three
+// wisps hang over the tile under a board that has its own motion to run.
 const EMBERS = [
   { dx: -0.22, rise: 0.95, duration: 2_300, delay: 0, size: 5, light: true },
-  { dx: 0.14, rise: 1.05, duration: 2_700, delay: 500, size: 4, light: false },
-  { dx: -0.06, rise: 0.85, duration: 2_050, delay: 950, size: 6, light: true },
-  { dx: 0.26, rise: 0.9, duration: 2_500, delay: 1_400, size: 4, light: false },
-  { dx: 0.02, rise: 1.15, duration: 2_900, delay: 1_900, size: 5, light: true },
+  { dx: 0.14, rise: 1.05, duration: 2_700, delay: 700, size: 4, light: false },
+  { dx: 0.02, rise: 1.15, duration: 2_900, delay: 1_500, size: 5, light: true },
 ] as const;
 const DEATH_MOTES = 8;
 
@@ -213,6 +213,21 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
   </View>;
 });
 
+/**
+ * The wisps over a mission's tile, owned here rather than by the screen: their measuring, their
+ * strikes and their captions re-render this component alone. The Glow's sink is theirs, handed
+ * over on every render so a burst launched from the board is aimed at the first wisp standing.
+ */
+export const MissionWisps = memo(function MissionWisps({ target, glow, screenRef }: {
+  target: CorruptionWispTarget | null;
+  glow: { sinkRef: { current: GlowSink | null } };
+  screenRef: RefObject<ViewType | null>;
+}) {
+  const wisps = useCorruptionWisps(target);
+  glow.sinkRef.current = wisps.sink;
+  return wisps.visible ? <CorruptionWispLayer wisps={wisps} screenRef={screenRef} /> : null;
+});
+
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */
 function CorruptionWisp({ index, x, y, size, alive, leaving, strikeNonce }: { index: number; x: number; y: number; size: number; alive: boolean; leaving: boolean; strikeNonce: number }) {
   const reduceMotion = useReducedMotion();
@@ -272,10 +287,13 @@ function CorruptionWisp({ index, x, y, size, alive, leaving, strikeNonce }: { in
   }, [alive, entrance, index, leaving, reduceMotion]);
   useEffect(() => {
     if (alive) return;
+    // A felled wisp stops hovering and pulsing at once; only its death plays until it is gone.
+    cancelAnimation(hover);
+    cancelAnimation(pulse);
     death.value = withTiming(1, { duration: reduceMotion ? 160 : DEATH_MS, easing: Easing.in(Easing.cubic) });
     const timer = setTimeout(() => setGone(true), (reduceMotion ? 160 : DEATH_MS) + 320);
     return () => clearTimeout(timer);
-  }, [alive, death, reduceMotion]);
+  }, [alive, death, hover, pulse, reduceMotion]);
   const bodyStyle = useAnimatedStyle(() => {
     const bob = (hover.value - 0.5) * size * 0.12;
     const flinch = shake.value * 7;
