@@ -3,6 +3,7 @@ import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import type { FtueStepDefinition, FtueTarget } from './ftue-types';
 import { closestPairOnBoard } from '@/features/content-flow/merge-lesson-recipe';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/steppling';
+import { HATCHABLE_COMPANIONS, hatchableByCompanion } from '@/constants/hatchable-companions/registry';
 import { HATCHABLE_LESSON_FINALE_NODE_IDS, hatchableFlows } from './hatchable-flows';
 
 /**
@@ -25,10 +26,20 @@ export const STEPPLING_FINALE_NODE_IDS: readonly string[] = HATCHABLE_LESSON_FIN
 
 export const STEPPLING_GARDEN_FLOW = hatchableFlows(STEPPLING_HATCHABLE).gardenLesson;
 
+/** A companion's lesson record: the new map first, Steppling's older field behind it. */
+export function gardenLessonRecord(state: MergeWorldState, companion: HatchableCompanionDefinition['companion']) {
+  return state.gardenLessons?.[companion] ?? (companion === 'steppling' ? state.stepplingGardenLesson : undefined);
+}
+/** Writes a companion's lesson record, mirroring Steppling's into the field older builds read. */
+export function withGardenLessonRecord(state: MergeWorldState, companion: HatchableCompanionDefinition['companion'], record: { preparedAt: number; servedAt?: number } | undefined): MergeWorldState {
+  const gardenLessons = { ...state.gardenLessons };
+  if (record) gardenLessons[companion] = record; else delete gardenLessons[companion];
+  return { ...state, gardenLessons, ...(companion === 'steppling' ? { stepplingGardenLesson: record } : {}) };
+}
 /** The lesson's request has been served, by any of the records that can say so. */
 export function lessonOrderServed(state: MergeWorldState, definition: HatchableCompanionDefinition): boolean {
-  const served = definition.companion === 'steppling' ? state.stepplingGardenLesson?.servedAt != null : false;
-  return served || state.externalRewardReceipts.some((receipt) => receipt.id === `merge-story-served:${definition.lesson.order.id}`)
+  return gardenLessonRecord(state, definition.companion)?.servedAt != null
+    || state.externalRewardReceipts.some((receipt) => receipt.id === `merge-story-served:${definition.lesson.order.id}`)
     || Boolean(state.companionDiscovery.records.find((record) => record.characterId === definition.companion)?.firstOrderCompletedAt);
 }
 export function stepplingShoeServed(state: MergeWorldState): boolean {
@@ -37,11 +48,25 @@ export function stepplingShoeServed(state: MergeWorldState): boolean {
 export function lessonOrder(definition: HatchableCompanionDefinition, now: number): MergeOrder {
   return { ...definition.lesson.order, createdAt: now };
 }
+/** Prepares a companion's lesson once: its record, and its request on the rail unless already served. */
+export function prepareGardenLesson(state: MergeWorldState, definition: HatchableCompanionDefinition, now: number): MergeWorldState {
+  if (gardenLessonRecord(state, definition.companion)) return state;
+  const served = lessonOrderServed(state, definition);
+  const order = lessonOrder(definition, now);
+  const prepared = withGardenLessonRecord(state, definition.companion, { preparedAt: now });
+  return { ...prepared, activeOrders: served || state.activeOrders.some((entry) => entry.id === order.id) ? state.activeOrders : [...state.activeOrders, order] };
+}
 export function prepareStepplingGarden(state: MergeWorldState, now: number): MergeWorldState {
-  if (state.stepplingGardenLesson) return state;
-  const served = stepplingShoeServed(state);
-  const order = lessonOrder(STEPPLING_HATCHABLE, now);
-  return { ...state, stepplingGardenLesson: { preparedAt: now }, activeOrders: served || state.activeOrders.some((entry) => entry.id === order.id) ? state.activeOrders : [...state.activeOrders, order] };
+  return prepareGardenLesson(state, STEPPLING_HATCHABLE, now);
+}
+/** The companion whose lesson is under way on this spawner: prepared, unserved, and this is their spawner. */
+export function lessonOnGenerator(state: MergeWorldState, generatorId: string): HatchableCompanionDefinition | null {
+  return HATCHABLE_COMPANIONS.find((definition) => definition.lesson.generatorId === generatorId && gardenLessonRecord(state, definition.companion) && !lessonOrderServed(state, definition)) ?? null;
+}
+/** The companion whose lesson request this is, if any. */
+export function lessonForOrder(orderId: string, characterId: string): HatchableCompanionDefinition | null {
+  const definition = hatchableByCompanion(characterId);
+  return definition && definition.lesson.order.id === orderId ? definition : null;
 }
 /** Where the lesson stands, read from the board: parcel unopened, growing, or ready to serve. */
 export function lessonCheckpoint(state: MergeWorldState, definition: HatchableCompanionDefinition): string {
@@ -54,11 +79,13 @@ export function lessonCheckpoint(state: MergeWorldState, definition: HatchableCo
 export function stepplingGardenCheckpoint(state: MergeWorldState): string {
   return lessonCheckpoint(state, STEPPLING_HATCHABLE);
 }
-/** Socks, and only Socks, until the Shoe is on the board: it is merged, never dropped. */
+/** The lesson's first tier, and only that, until the grown piece is on the board: it is merged, never dropped. */
+export function lessonDrop(state: MergeWorldState, generatorId: string): string | null {
+  const definition = lessonOnGenerator(state, generatorId);
+  return definition && lessonCheckpoint(state, definition) === 'grow' ? definition.lesson.dropDefinitionId : null;
+}
 export function stepplingGardenDrop(state: MergeWorldState, generatorId: string): string | null {
-  const { lesson } = STEPPLING_HATCHABLE;
-  return state.stepplingGardenLesson && !stepplingShoeServed(state) && generatorId === lesson.generatorId
-    && stepplingGardenCheckpoint(state) === 'grow' ? lesson.dropDefinitionId : null;
+  return generatorId === STEPPLING_HATCHABLE.lesson.generatorId ? lessonDrop(state, generatorId) : null;
 }
 /** The board's guidance for a lesson node, from the definition's copy. */
 export function lessonBoardStep(nodeId: string, state: MergeWorldState, definition: HatchableCompanionDefinition): FtueStepDefinition | null {

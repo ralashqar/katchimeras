@@ -12,7 +12,10 @@ import { STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, STEPPLING_PARCEL_ID, ST
 import { createMissionState, missionBoardStep } from '@/features/onboarding/steppling-mission';
 import { OPENING_MERGE_WINDOW_CELLS } from '@/features/onboarding/opening-mist';
 import { validateContentFlowDefinition } from '@/features/content-flow/content-flow-compiler';
-import { reduceMergeWorld } from '@/utils/merge-world/engine';
+import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
+import { hatchableAvailable, hatchableTileState } from '@/utils/merge-world/glow-discovery-policy';
+import { gardenLessonRecord, lessonOrderServed } from '@/features/onboarding/steppling-garden-lesson';
+import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { MergeWorldState } from '@/types/merge-world';
 
@@ -114,4 +117,58 @@ test('every mission board can be played out: no move strands it, and after the f
     };
     walk(start, 0);
   }
+});
+
+test('a tile’s state is read from its definition: asleep until its turn, saving, ready, an Egg, open', () => {
+  const world = createInitialMergeWorldState(NOW, ['mossprout']);
+  const later: HatchableCompanionDefinition = { ...STEPPLING_HATCHABLE, companion: 'baristabbit', availability: { kind: 'kingdom_goal_introduced' },
+    tile: { ...STEPPLING_HATCHABLE.tile, id: 'later-home', unlockId: 'later:unlock', price: 60 }, discovery: { gateId: 'gate-3-first-choice', pathId: 'warm-light' } };
+  const afterFriend: HatchableCompanionDefinition = { ...later, availability: { kind: 'after_companion', companion: 'steppling' } };
+  // Steppling wakes with the first session; a later friend waits for Mossprout's wish, or for a friend before them.
+  assert.equal(hatchableAvailable(world, STEPPLING_HATCHABLE), true);
+  assert.equal(hatchableAvailable(world, later), false);
+  assert.equal(hatchableAvailable({ ...world, kingdomGoal: { introducedAt: NOW, coachmarkSeenAt: null } }, later), true);
+  assert.equal(hatchableAvailable(world, afterFriend), false);
+  assert.equal(hatchableAvailable({ ...world, companionDiscovery: { ...world.companionDiscovery, records: [{ characterId: 'steppling', source: 'ftue_hatch', gateId: 'gate-2-steppling', pathId: 'overgrown-trail', discoveredAt: NOW, revealSeenAt: NOW, firstOrderCompletedAt: null, permanentFeatureId: null }] } }, afterFriend), true);
+  // The state machine, on the definition's price.
+  assert.equal(hatchableTileState(world, later), 'sleeping');
+  const woken = { ...world, kingdomGoal: { introducedAt: NOW, coachmarkSeenAt: null } };
+  assert.equal(hatchableTileState({ ...woken, coins: 59 }, later), 'saving');
+  assert.equal(hatchableTileState({ ...woken, coins: 60 }, later), 'ready');
+  assert.equal(hatchableTileState({ ...woken, coins: 0, worldUnlocks: { 'later:unlock': { unlockedAt: NOW, paid: 60, destination: 'baristabbit', transferredAt: null, hatchedAt: null } } }, later), 'egg');
+  assert.equal(hatchableTileState({ ...woken, companionDiscovery: { ...woken.companionDiscovery, records: [{ characterId: 'baristabbit', source: 'ftue_hatch', gateId: 'gate-3-first-choice', pathId: 'warm-light', discoveredAt: NOW, revealSeenAt: NOW, firstOrderCompletedAt: null, permanentFeatureId: null }] } }, later), 'open');
+  // Steppling, never asleep: saving at 39, ready at 40.
+  assert.equal(hatchableTileState({ ...world, coins: 39 }, STEPPLING_HATCHABLE), 'saving');
+  assert.equal(hatchableTileState({ ...world, coins: 40 }, STEPPLING_HATCHABLE), 'ready');
+  // The engine refuses a purchase while the tile sleeps, in the tile's own words, and records the definition's gate at the hatch.
+  const policy = readFileSync('utils/merge-world/glow-discovery-policy.ts', 'utf8');
+  assert.match(policy, /if \(hatchable && !existing && !owned && !hatchableAvailable\(state, hatchable\)\) return no\(hatchable\.tile\.markerLines\.sleeping\);/);
+  assert.match(policy, /const discovery = hatchableByUnlock\(command\.targetId\)\?\.discovery \?\? STEPPLING_HATCHABLE\.discovery;/);
+  assert.doesNotMatch(policy, /gateId: 'gate-2-steppling'/);
+});
+
+test('garden lessons live in one map keyed by companion, with Steppling’s older field read and mirrored', () => {
+  // Steppling unlocked but not yet grandfathered as discovered: the lesson's request must still be owed.
+  const base = createInitialMergeWorldState(NOW, ['mossprout']);
+  const world: MergeWorldState = { ...base, unlockedCharacters: [...base.unlockedCharacters, 'steppling'] };
+  const viaSteppling = reduceMergeWorld(world, { type: 'prepareStepplingGardenLesson', now: NOW });
+  const viaCompanion = reduceMergeWorld(world, { type: 'prepareGardenLesson', companion: 'steppling', now: NOW });
+  assert.equal(viaSteppling.changed, true);
+  assert.deepEqual(viaCompanion.state.gardenLessons, viaSteppling.state.gardenLessons, 'the same command under either name');
+  assert.deepEqual(viaSteppling.state.gardenLessons, { steppling: { preparedAt: NOW } });
+  assert.deepEqual(viaSteppling.state.stepplingGardenLesson, { preparedAt: NOW }, 'mirrored for older builds');
+  assert.equal(viaSteppling.state.activeOrders.some((order) => order.id === STEPPLING_SHOE_ORDER_ID), true, 'the lesson’s request is on the rail');
+  assert.equal(reduceMergeWorld(viaSteppling.state, { type: 'prepareGardenLesson', companion: 'steppling', now: NOW + 1 }).changed, false, 'prepared once');
+  assert.equal(reduceMergeWorld(world, { type: 'prepareGardenLesson', companion: 'mossprout', now: NOW }).changed, false, 'no lesson for a friend without a definition');
+  assert.equal(gardenLessonRecord(viaSteppling.state, 'steppling')?.preparedAt, NOW);
+  // A save from before the map: only the old field. It is read into the map and stays mirrored.
+  const legacy = JSON.parse(JSON.stringify({ ...world, stepplingGardenLesson: { preparedAt: NOW, servedAt: NOW + 5 } }));
+  delete legacy.gardenLessons;
+  const migrated = normalizeMergeWorldState(legacy, NOW + 10);
+  assert.deepEqual(migrated.gardenLessons, { steppling: { preparedAt: NOW, servedAt: NOW + 5 } });
+  assert.deepEqual(migrated.stepplingGardenLesson, { preparedAt: NOW, servedAt: NOW + 5 });
+  assert.equal(lessonOrderServed(migrated, STEPPLING_HATCHABLE), true);
+  // And the map survives a round trip on its own.
+  const round = normalizeMergeWorldState(JSON.parse(JSON.stringify(viaSteppling.state)), NOW + 10);
+  assert.deepEqual(round.gardenLessons, { steppling: { preparedAt: NOW } });
 });
