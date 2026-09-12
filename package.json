@@ -21,6 +21,7 @@
     "test:packages": "tsx --test tests/packages/*.test.ts",
     "verify:consumer": "node tooling/workspace/verify-consumer.cjs",
     "build:ios:preview": "npm run build:ios:preview --workspace=katchimeras",
+    "verify:game-build": "npm run check:boundaries && npm run typecheck --workspace=katchimeras && tsc --noEmit -p tsconfig.packages.json && npm run lint:shared && npm run test:packages && node tooling/art-pipeline/scripts/generate-shared-egg-catalog.cjs --check",
     "lint:shared": "eslint packages tests/packages",
     "test:game": "node tooling/workspace/test-game.cjs",
     "release:pack": "node tooling/workspace/pack-shared.cjs",

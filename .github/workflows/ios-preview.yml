@@ -53,9 +53,11 @@ jobs:
         working-directory: .
         run: npm ci
 
+      # Only Katchimeras and the shared packages it ships: a failure in another
+      # incubator game must not block this build, and the archive carries none of it.
       - name: Verify shared packages and game compilation
         working-directory: .
-        run: npm run verify:workspace
+        run: npm run verify:game-build
 
       - name: Run preview preflight
         run: npm run build:ios:preview:check

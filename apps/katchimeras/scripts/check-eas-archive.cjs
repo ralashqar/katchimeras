@@ -55,7 +55,7 @@ async function main() {
         throw new Error(`Archive is missing or changed required native module/target source: ${file}`);
       }
     }
-    for (const relative of ['package.json', 'package-lock.json', 'apps/katchimeras/package.json']) {
+    for (const relative of ['package.json', 'package-lock.json', 'apps/katchimeras/package.json', 'apps/egg-snap/package.json', 'packages/tile-match/package.json']) {
       if (!fs.existsSync(path.join(stage, relative))) throw new Error(`Archive excludes workspace metadata: ${relative}`);
     }
     const required = JSON.parse(fs.readFileSync(requiredPath, 'utf8'));
@@ -80,8 +80,15 @@ async function main() {
         throw new Error(`Development-only files leaked into archive: ${forbidden}`);
       }
     }
+    // This is Katchimeras's archive: the other incubator game and its own package send only the
+    // manifests `npm ci` needs to resolve the workspace.
+    for (const other of ['apps/egg-snap', 'packages/tile-match']) {
+      const leaked = files.filter((file) => file.path.split(path.sep).join('/').startsWith(`${other}/`) && file.path.split(path.sep).join('/') !== `${other}/package.json`);
+      if (leaked.length) throw new Error(`Another game's files leaked into archive: ${leaked[0].path} (${leaked.length} under ${other})`);
+    }
+    // Relative paths only: GNU tar reads a drive letter in an absolute Windows path as a remote host.
     const archive = path.join(work, 'project.tar.gz');
-    const result = spawnSync('tar', ['-czf', archive, '-C', stage, '.'], { stdio: 'inherit' });
+    const result = spawnSync('tar', ['-czf', 'project.tar.gz', '-C', 'project', '.'], { cwd: work, stdio: 'inherit' });
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error('Could not package archive for size verification.');
     const size = fs.statSync(archive).size;
