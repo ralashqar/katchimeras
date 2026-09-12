@@ -39,8 +39,8 @@ export function mossproutItemAtlasDescriptor(definitionId: string) {
   return descriptor(`item:${definitionId}`);
 }
 
-export function mossproutGeneratorAtlasDescriptor(generatorId: string, level: number, mossproutOnboarding: boolean) {
-  if (generatorId === 'wild-garden') return descriptor(`generator:wild-garden:${mossproutOnboarding ? 'ftue' : Math.max(1, Math.min(3, level))}`);
+export function mossproutGeneratorAtlasDescriptor(generatorId: string, level: number) {
+  if (generatorId === 'wild-garden') return descriptor(`generator:wild-garden:${Math.max(1, Math.min(3, level))}`);
   if (generatorId === 'memory-nursery') return descriptor(`generator:memory-nursery:${Math.max(1, Math.min(3, level))}`);
   return null;
 }
@@ -56,7 +56,7 @@ export function mossproutAtlasPagesForArt(itemDefinitionIds: readonly string[], 
     if (entry) pages.set(mossproutAtlasPageCacheKey(entry.page), entry.source);
   });
   generatorIds.forEach((id) => {
-    const entry = mossproutGeneratorAtlasDescriptor(id, 1, false);
+    const entry = mossproutGeneratorAtlasDescriptor(id, 1);
     if (entry) pages.set(mossproutAtlasPageCacheKey(entry.page), entry.source);
   });
   return pages;

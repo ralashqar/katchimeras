@@ -134,16 +134,18 @@ export const MERGE_WORLD_GENERATOR_ART = {
   'study-desk': require('@incubator/art-merge-world/generators/study-desk.webp'),
   'creative-playroom': require('@incubator/art-merge-world/generators/creative-playroom.webp'),
 } as const;
-export const MOSSPROUT_SPROUTING_POT_ART = require('@incubator/art-merge-world/generators/mossprout-sprouting-pot.webp');
-
 export type MergeWorldAuthoredGeneratorId = keyof typeof MERGE_WORLD_GENERATOR_ART;
 
 export function mergeWorldItemArt(definitionId: string) {
   return MERGE_WORLD_ITEM_ART[definitionId as MergeWorldAuthoredItemId] ?? null;
 }
 
-export function mergeWorldGeneratorArt(generatorId: string, options?: { mossproutOnboarding?: boolean; level?: number }) {
-  if (generatorId === 'wild-garden' && options?.mossproutOnboarding) return MOSSPROUT_SPROUTING_POT_ART;
+/**
+ * A spawner's art is its level's and nothing else: the Garden Basket looks the same in its parcel, in
+ * the reward page, in flight and on the board (a Seed-only Basket once wore a tutorial pot on the
+ * board alone, and changed face the moment it landed).
+ */
+export function mergeWorldGeneratorArt(generatorId: string, options?: { level?: number }) {
   if (generatorId === 'wild-garden' && (options?.level ?? 1) >= 3) return MOSSPROUT_PROGRESSION_ART.wildGardenUpgrades[1];
   if (generatorId === 'wild-garden' && (options?.level ?? 1) >= 2) return MOSSPROUT_PROGRESSION_ART.wildGardenUpgrades[0];
   if (generatorId === 'memory-nursery') return MOSSPROUT_PROGRESSION_ART.memoryNursery[Math.max(0, Math.min(2, (options?.level ?? 1) - 1))];

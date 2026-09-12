@@ -22,19 +22,18 @@ export function mergeItemArtCacheKey(definitionId: string) {
   return `${MERGE_ART_CACHE_REVISION}:item:${definitionId}`;
 }
 
-export function mergeGeneratorArtCacheKey(generatorId: string, mossproutOnboarding: boolean) {
-  return `${MERGE_ART_CACHE_REVISION}:generator:${generatorId}:${mossproutOnboarding ? 'mossprout' : 'default'}`;
+export function mergeGeneratorArtCacheKey(generatorId: string) {
+  return `${MERGE_ART_CACHE_REVISION}:generator:${generatorId}`;
 }
 
 export function useMergeArtCache(
   state: MergeWorldState,
-  mossproutOnboarding: boolean,
   onInitialArtReady?: () => void,
   visibleItemDefinitionIds: readonly string[] = [],
 ): MergeArtCache {
   const plan = useMemo(() => mergeArtWarmupPlan({ board: state.board, generators: state.generators }), [state.board, state.generators]);
   const pinnedItems = useMemo(() => [...new Set([...plan.itemDefinitionIds, ...visibleItemDefinitionIds])].sort(), [plan.itemDefinitionIds, visibleItemDefinitionIds]);
-  const signature = useMemo(() => `${MERGE_ART_CACHE_REVISION}|${mossproutOnboarding ? '1' : '0'}|${plan.generatorIds.join(',')}|${pinnedItems.join(',')}`, [mossproutOnboarding, pinnedItems, plan.generatorIds]);
+  const signature = useMemo(() => `${MERGE_ART_CACHE_REVISION}|${plan.generatorIds.join(',')}|${pinnedItems.join(',')}`, [pinnedItems, plan.generatorIds]);
   const retainedRef = useRef(new Map<string, ImageRef>());
   const generationRef = useRef(0);
   const [workQueue] = useState(createSerialWorkQueue);
@@ -55,8 +54,8 @@ export function useMergeArtCache(
       if (source) desired.set(mergeItemArtCacheKey(definitionId), source);
     });
     plan.generatorIds.forEach((generatorId) => {
-      const source = mergeWorldGeneratorArt(generatorId, { mossproutOnboarding });
-      if (source) desired.set(mergeGeneratorArtCacheKey(generatorId, mossproutOnboarding), source);
+      const source = mergeWorldGeneratorArt(generatorId);
+      if (source) desired.set(mergeGeneratorArtCacheKey(generatorId), source);
     });
 
     const publishCache = () => {

@@ -28,7 +28,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { MergeBoardEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
 import { canReuseSpawnSprites, createMergeBoardEffects } from '@/utils/merge-world/board-effects';
-import { generatorChainOpen } from '@/utils/merge-world/generator-branches';
 import { mergeWorldGeneratorArt, mergeWorldItemArt, mossproutRootRewardArt, RESIDENT_CARD_ART } from '@/constants/merge-world-art';
 import { MERGE_CHARACTER_NAMES, MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS, MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
 import { COMPANION_DISCOVERIES_BY_ID } from '@/constants/companion-discovery-catalog';
@@ -318,15 +317,10 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const gateFromCell = interactionGate.kind === 'drag' ? interactionGate.fromCell : -1;
   const gateToCell = interactionGate.kind === 'drag' ? interactionGate.toCell : -1;
   const gateGeneratorCell = interactionGate.kind === 'generator' ? interactionGate.cell : -1;
-  // Not "the chapter-0 order is still active": that order clears the moment
-  // it's served, but the Garden Basket stays Seed-only well after — its
-  // Pebble/Shell branch is Shellio's to open. Keep the tutorial pot art for
-  // as long as the basket actually is Seed-only, not just during the order.
-  const mossproutOnboarding = !generatorChainOpen(state, 'nature:waterside');
   const [baseArtDisplayed, setBaseArtDisplayed] = useState(!showBaseArt);
   const [cellArtReady, setCellArtReady] = useState(false);
   const visibleItemDefinitionIds = useMemo(() => sprites.flatMap((sprite) => sprite.occupant.kind === 'item' ? [sprite.occupant.definitionId] : []), [sprites]);
-  const artCache = useMergeArtCache(presentation, mossproutOnboarding, () => setCellArtReady(true), visibleItemDefinitionIds);
+  const artCache = useMergeArtCache(presentation, () => setCellArtReady(true), visibleItemDefinitionIds);
   useEffect(() => {
     if (baseArtDisplayed && cellArtReady) onVisualReady?.();
   }, [baseArtDisplayed, cellArtReady, onVisualReady]);
@@ -1232,9 +1226,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           matchHint={matchHint}
           cachedSource={sprite.occupant.kind === 'item'
             ? artCache.get(mergeItemArtCacheKey(sprite.occupant.definitionId))
-            : artCache.get(mergeGeneratorArtCacheKey(sprite.occupant.generatorId, mossproutOnboarding))}
+            : artCache.get(mergeGeneratorArtCacheKey(sprite.occupant.generatorId))}
           generatorLevel={sprite.occupant.kind === 'generator' ? presentation.generators[sprite.occupant.generatorId]?.level ?? 1 : 1}
-          mossproutOnboarding={mossproutOnboarding}
           occupant={sprite.occupant}
           onComplete={completeMotion}
           projection={geometry.projection}
@@ -1519,7 +1512,7 @@ function MergeMatchHint({ active, children, offsetX, offsetY }: { active: boolea
   return <Animated.View style={[styles.matchHint, style]}>{children}</Animated.View>;
 }
 
-const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, generatorLevel, grabX, grabY, matchHint, motion, cachedSource, mossproutOnboarding, projection, projectionGridHeight, projectionInset, reduceMotion, onComplete, occupant }: {
+const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, generatorLevel, grabX, grabY, matchHint, motion, cachedSource, projection, projectionGridHeight, projectionInset, reduceMotion, onComplete, occupant }: {
   instanceId: string;
   baseX: number;
   baseY: number;
@@ -1536,7 +1529,6 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   matchHint: { x: number; y: number } | null;
   motion?: SpriteMotion;
   cachedSource?: ImageRef;
-  mossproutOnboarding: boolean;
   projection?: MergeBoardProjection;
   projectionGridHeight: number;
   projectionInset: number;
@@ -1786,14 +1778,14 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
     <Animated.View pointerEvents="none" style={[styles.spriteArtSurface, { height: nativeArtSize, width: nativeArtSize, left: (cellSize - nativeArtSize) / 2, top: (cellSize - nativeArtSize) / 2 }, artLayoutStyle]}>
       {occupant.kind === 'generator'
-        ? <PersistentGeneratorArt cachedSource={cachedSource} fill generatorId={occupant.generatorId} level={generatorLevel} mossproutOnboarding={mossproutOnboarding} size={nativeArtSize} />
+        ? <PersistentGeneratorArt cachedSource={cachedSource} fill generatorId={occupant.generatorId} level={generatorLevel} size={nativeArtSize} />
         : <PersistentMergeItemArt cachedSource={cachedSource} definitionId={occupant.definitionId} fill size={nativeArtSize} />}
     </Animated.View>
   </Animated.View>;
 });
 
-function PersistentGeneratorArt({ cachedSource, fill = false, generatorId, level, mossproutOnboarding, size }: { cachedSource?: ImageRef; fill?: boolean; generatorId: string; level: number; mossproutOnboarding: boolean; size: number }) {
-  const art = mergeWorldGeneratorArt(generatorId, { mossproutOnboarding, level });
+function PersistentGeneratorArt({ cachedSource, fill = false, generatorId, level, size }: { cachedSource?: ImageRef; fill?: boolean; generatorId: string; level: number; size: number }) {
+  const art = mergeWorldGeneratorArt(generatorId, { level });
   const usesProgressionArt = (generatorId === 'wild-garden' && level > 1) || generatorId === 'memory-nursery';
   const source = usesProgressionArt ? art : cachedSource ?? art;
   return <View style={[styles.generatorSprite, fill ? StyleSheet.absoluteFillObject : { height: size, width: size }]}>
