@@ -1125,7 +1125,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   // Measure a stable, untransformed frame. The visual board enters with a
   // translateY animation; measuring that Animated.View cached a temporary
   // screen Y and caused parcel flights to land below their eventual cells.
-  return <View onLayout={reportScreenMetrics} ref={boardRef} style={[styles.boardFrame, { height: boardHeight, width: boardWidth }]}>
+  return <View onLayout={reportScreenMetrics} ref={boardRef} style={[styles.boardFrame, layout.transparentSurface && styles.boardFrameFlat, { height: boardHeight, width: boardWidth }]}>
     <MergeBoardFrameProbe active={busy} dragPhase={dragPhase} effectsActivity={effectsActivity} />
     <GestureDetector gesture={boardGesture}><Animated.View accessibilityLabel={layout.accessibilityLabel} style={[styles.board, layout.transparentSurface && styles.boardTransparentSurface, busy && styles.boardAnimating, { height: boardHeight, padding, width: boardWidth }, boardEntranceStyle]}>
     {!layout.transparentSurface ? <LinearGradient colors={['#788143', '#55602F', '#384321']} locations={[0, 0.52, 1]} pointerEvents="none" style={styles.boardGradient} /> : null}
@@ -1978,8 +1978,11 @@ function DreamEchoItemArt({ definitionId, size }: { definitionId: string; size: 
 }
 
 const styles = StyleSheet.create({
-  boardFrame: { alignSelf: 'center', overflow: 'visible', position: 'relative' },
-  board: { alignSelf: 'center', backgroundColor: '#4D582B', borderCurve: 'continuous', borderRadius: 9, borderWidth: 0, boxShadow: '0 13px 24px rgba(39,31,16,0.38), 0 3px 5px rgba(39,31,16,0.22), inset 0 3px 2px rgba(255,242,193,0.24), inset 0 -4px 5px rgba(29,38,16,0.34)', overflow: 'visible', position: 'relative' },
+  // The drop shadows sit on the frame, which never animates; the board's face carries only its inset lighting,
+  // so its entrance and busy states never re-rasterise a blurred shadow.
+  boardFrame: { alignSelf: 'center', borderCurve: 'continuous', borderRadius: 9, boxShadow: '0 13px 24px rgba(39,31,16,0.38), 0 3px 5px rgba(39,31,16,0.22)', overflow: 'visible', position: 'relative' },
+  boardFrameFlat: { boxShadow: '0 0 0 rgba(0,0,0,0)' },
+  board: { alignSelf: 'center', backgroundColor: '#4D582B', borderCurve: 'continuous', borderRadius: 9, borderWidth: 0, boxShadow: 'inset 0 3px 2px rgba(255,242,193,0.24), inset 0 -4px 5px rgba(29,38,16,0.34)', overflow: 'visible', position: 'relative' },
   boardTransparentSurface: { backgroundColor: 'transparent', boxShadow: '0 0 0 rgba(0,0,0,0)' },
   boardGradient: { ...StyleSheet.absoluteFillObject, borderRadius: 9 },
   boardAnimating: { zIndex: 30 },
@@ -2011,7 +2014,7 @@ const styles = StyleSheet.create({
   matchHint: { alignItems: 'center', justifyContent: 'center' },
   selectedCorners: { position: 'absolute', zIndex: 1300 },
   familyArt: { alignItems: 'center', justifyContent: 'center' },
-  familyDisc: { alignItems: 'center', borderColor: 'rgba(255,244,213,0.65)', borderRadius: 16, borderWidth: 2, boxShadow: '0 3px 8px rgba(38,19,11,0.32)', height: '76%', justifyContent: 'center', width: '76%' },
+  familyDisc: { alignItems: 'center', borderColor: 'rgba(255,244,213,0.65)', borderRadius: 16, borderWidth: 2, height: '76%', justifyContent: 'center', width: '76%' },
   dreamEchoArt: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
   generatorArt: { height: '92%', width: '92%' },
   generatorSprite: { alignItems: 'center', justifyContent: 'center', overflow: 'visible' },

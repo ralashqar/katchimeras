@@ -195,6 +195,13 @@ test('the docked board dispatches through the FTUE contract: Basket taps spend n
   assert.match(dock, /const caughtUpRef = useRef\(false\);\s*useEffect\(\(\) => \{\s*if \(!run \|\| run\.status !== 'active' \|\| caughtUpRef\.current\) return;\s*caughtUpRef\.current = true;/, 'the replay runs once, for the mounted board only: a live merge rerenders before its deferred event lands and must not be counted twice');
   assert.doesNotMatch(dock, /caughtUpRevisionRef/, 'no per-revision replay');
   assert.doesNotMatch(dock, /boxShadow: `0 0 \d+px \$\{GLOW_COLOR\}`/, 'no blurred shadows on the animating impact views');
+  // The bar pulses on every landing: its shadow sits on a wrapper that never moves.
+  assert.match(dock, /<View style=\{\[styles\.barShadow, width != null \? \{ width \} : null\]\}>\s*<Animated\.View accessibilityRole="progressbar"[\s\S]*?style=\{\[styles\.bar, pulseStyle\]\}>/);
+  assert.doesNotMatch(dock.slice(dock.indexOf('  bar: {'), dock.indexOf('  barHalo:')), /boxShadow/, 'no shadow on the pulsing face');
+  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
+  assert.match(board, /boardFrame: \{[^\n]*boxShadow: '0 13px 24px rgba\(39,31,16,0\.38\), 0 3px 5px rgba\(39,31,16,0\.22\)'/, 'the board’s drop shadows sit on its static frame');
+  assert.match(board, /  board: \{[^\n]*boxShadow: 'inset 0 3px 2px/, 'only the inset lighting stays on the face');
+  assert.doesNotMatch(board, /familyDisc: \{[^\n]*boxShadow/, 'no shadow on a sprite that moves');
   assert.doesNotMatch(dock, /entering=\{FadeIn/, 'no layout animation on the Glow tokens');
   assert.match(dock, /layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist'/, 'the opening window and title are the defaults');
   assert.match(dock, /boardLayout=\{layout\}[\s\S]*?railHidden[\s\S]*?counterHidden[\s\S]*?inspectorHidden[\s\S]*?trayEntries=\{\[\]\}/);

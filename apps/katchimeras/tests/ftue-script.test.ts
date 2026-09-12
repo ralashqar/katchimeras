@@ -623,9 +623,14 @@ test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   assert.match(overlay, /<NativeSpotlightRing slot=\{slot0\}/);
   assert.doesNotMatch(overlay, /@shopify\/react-native-skia|<Canvas|usePathValue|BlurMask/);
   assert.match(sharedSpotlight, /cornerRadius = Math\.min\(radius, focus\.width \/ 2, focus\.height \/ 2\)/);
-  assert.match(sharedSpotlight, /Math\.hypot\(screen\.width, screen\.height\)/);
-  assert.match(sharedSpotlight, /boxShadow: `0 0 0 \$\{spreadRadius\}px rgba\(11,9,24,\$\{opacity\}\)`/);
+  // The shared spotlight (the haven overlay, the coachmark) is bands and a hollow frame as well: no screen-sized shadow spread.
+  assert.doesNotMatch(sharedSpotlight, /Math\.hypot|spreadRadius/);
+  assert.doesNotMatch(sharedSpotlight.slice(sharedSpotlight.indexOf('export function Spotlight('), sharedSpotlight.indexOf('const styles = ')), /boxShadow/);
+  assert.match(sharedSpotlight, /borderRadius: cornerRadius \* 2,\s*borderWidth: cornerRadius,/, 'the frame’s inner edge is the opening’s rounded corner');
   assert.match(sharedSpotlight, /dimMask: \{[\s\S]*?borderCurve: 'continuous'/);
+  // The Merge overlay's spotlight is not mounted at all when it has nothing to show, once its fade is over.
+  assert.match(overlay, /const spotlightMounted = useLingering\(spotlightReady, SPOTLIGHT_UNMOUNT_MS\);/);
+  assert.match(overlay, /\{!spotlightDismissed && spotlightMounted \? \(\s*<FtueSpotlight/);
   assert.match(havenOverlay, /const cueFrame = cue\?\.kind === 'tap'[\s\S]*?<Finger focus=\{layout\.cueFocus \?\? layout\.focus\}/);
   assert.match(havenOverlay, /target\.kind === 'haven_guide'\) return 'haven-guide'/);
   assert.match(kingdomScreen, /collapsable=\{false\}[\s\S]*?ref=\{setHavenGuideNode\}[\s\S]*?<FtueGuideCopy/);
@@ -646,7 +651,7 @@ test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   assert.match(overlay, /guideDismissible = Boolean\(spotlight\?\.dismissOnGuideClose\)[\s\S]*?guideDismissed = Boolean\(guideDismissible && guideKey && dismissedGuideKey === guideKey\)[\s\S]*?spotlightDismissed = guideDismissed/);
   assert.match(overlay, /if \(!guideDismissible \|\| !showGuide \|\| !guideKey\) return;[\s\S]*?setTimeout\(\(\) => setDismissedGuideKey\(guideKey\), GUIDE_AUTO_DISMISS_MS\)/);
   assert.match(overlay, /guideDismissible \? <Pressable[\s\S]*?accessibilityLabel="Dismiss Merge guidance"[\s\S]*?onPress=\{dismissGuide\}[\s\S]*?: null/);
-  assert.match(overlay, /!spotlightDismissed \? \([\s\S]*?<FtueSpotlight[\s\S]*?\) : null/);
+  assert.match(overlay, /!spotlightDismissed && spotlightMounted \? \([\s\S]*?<FtueSpotlight[\s\S]*?\) : null/);
   assert.match(overlay, /entering=\{FadeIn\.duration\(150\)\}[\s\S]*?exiting=\{FadeOut\.duration\(150\)\}/);
   assert.match(overlay, /function MergeFtueEggGuide[\s\S]*?pointerEvents="none"[\s\S]*?styles\.eggGuideAvatar[\s\S]*?<EggAvatar[^>]*size=\{76\}/);
   assert.match(overlay, /hand: \{ position: 'absolute', zIndex: 4 \}/);

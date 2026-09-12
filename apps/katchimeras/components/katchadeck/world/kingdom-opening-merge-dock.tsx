@@ -362,15 +362,19 @@ export function ClearTheMistBar({ progress, total, width, landings, title = 'Dri
   }, [progress, reduceMotion, scale]);
   const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const haloStyle = useAnimatedStyle(() => ({ opacity: halo.value }));
-  return <Animated.View accessibilityRole="progressbar" accessibilityLabel={title} accessibilityValue={{ min: 0, max: total, now: progress, text: `${progress} of ${total}` }}
-    style={[styles.bar, width != null ? { width } : null, pulseStyle]}>
+  // The shadow lives on a wrapper that never moves: a shadow on the view that pulses would be
+  // re-rasterised on every frame of every landing, four times a merge.
+  return <View style={[styles.barShadow, width != null ? { width } : null]}>
+    <Animated.View accessibilityRole="progressbar" accessibilityLabel={title} accessibilityValue={{ min: 0, max: total, now: progress, text: `${progress} of ${total}` }}
+      style={[styles.bar, pulseStyle]}>
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.barHalo, haloStyle]} />
     <View style={styles.barHeader}>
       <Text style={styles.barTitle}>{title}</Text>
       <Text style={styles.barCount}>{progress}/{total}</Text>
     </View>
     <ProgressBar current={progress} total={total} minimumPercent={0} variant="egg" color={BAR_FILL_COLOR} trackColor={BAR_TRACK_COLOR} />
-  </Animated.View>;
+    </Animated.View>
+  </View>;
 }
 
 /** Window-space Glow flights from merged items up into the mist, each ending in a burst. Mounted by the Kingdom screen above everything. */
@@ -706,10 +710,10 @@ const styles = StyleSheet.create({
   closeRow: { alignItems: 'flex-end', marginBottom: -4 },
   close: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF', boxShadow: '0 3px 10px rgba(20,40,60,0.14)' },
   closeText: { color: '#2E4A66', fontSize: 13, lineHeight: 16, fontWeight: '800' },
+  barShadow: { borderRadius: 16, boxShadow: '0 4px 14px rgba(20,40,60,0.16)' },
   bar: {
     gap: 5, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 16, overflow: 'visible',
     backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF',
-    boxShadow: '0 4px 14px rgba(20,40,60,0.16)',
   },
   barHalo: { borderRadius: 16, backgroundColor: 'rgba(143,211,255,0.28)' },
   barHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },

@@ -16,18 +16,28 @@ export const MultipleSpotlights = memo(function MultipleSpotlights({ frames, opa
 
 export function Spotlight({ focus, opacity, radius, screen }: { focus: Frame; opacity: number; radius: number; screen: Frame }) {
   const cornerRadius = Math.min(radius, focus.width / 2, focus.height / 2);
-  const spreadRadius = Math.max(1, Math.hypot(screen.width, screen.height));
+  // Four bands around the opening and a hollow frame whose border is its rounded corner. The old
+  // mask was one view with a box-shadow spread across the whole screen, which the new architecture
+  // rasterises into a screen-sized bitmap on every change of frame or opacity.
+  const dim = `rgba(11,9,24,${opacity})`;
+  const right = focus.x + focus.width;
+  const bottom = focus.y + focus.height;
   return (
     <View style={StyleSheet.absoluteFill}>
+      <View style={[styles.band, { backgroundColor: dim, left: 0, top: 0, width: screen.width, height: Math.max(0, focus.y) }]} />
+      <View style={[styles.band, { backgroundColor: dim, left: 0, top: bottom, width: screen.width, height: Math.max(0, screen.height - bottom) }]} />
+      <View style={[styles.band, { backgroundColor: dim, left: 0, top: focus.y, width: Math.max(0, focus.x), height: focus.height }]} />
+      <View style={[styles.band, { backgroundColor: dim, left: right, top: focus.y, width: Math.max(0, screen.width - right), height: focus.height }]} />
       <View style={[
         styles.dimMask,
         {
-          borderRadius: cornerRadius,
-          boxShadow: `0 0 0 ${spreadRadius}px rgba(11,9,24,${opacity})`,
-          height: focus.height,
-          left: focus.x,
-          top: focus.y,
-          width: focus.width,
+          borderColor: dim,
+          borderRadius: cornerRadius * 2,
+          borderWidth: cornerRadius,
+          height: focus.height + cornerRadius * 2,
+          left: focus.x - cornerRadius,
+          top: focus.y - cornerRadius,
+          width: focus.width + cornerRadius * 2,
         },
       ]} />
       <View style={[styles.ring, { borderRadius: cornerRadius, height: focus.height, left: focus.x, top: focus.y, width: focus.width }]} />
@@ -37,6 +47,7 @@ export function Spotlight({ focus, opacity, radius, screen }: { focus: Frame; op
 
 
 const styles = StyleSheet.create({
+  band: { position: 'absolute' },
   dimMask: { backgroundColor: 'transparent', borderCurve: 'continuous', position: 'absolute' },
   ring: { borderColor: 'rgba(214,255,190,0.96)', borderCurve: 'continuous', borderWidth: 2, boxShadow: '0 0 18px rgba(154,239,112,0.9)', position: 'absolute' },
 });

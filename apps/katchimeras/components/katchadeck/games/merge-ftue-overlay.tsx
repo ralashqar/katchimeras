@@ -65,6 +65,20 @@ export const DEFAULT_MERGE_FTUE_VISUAL_THEME: MergeFtueVisualTheme = {
   tapDurationMs: 1_180,
 };
 
+/** After the spotlight's 140ms fade-out, when its views are unmounted. */
+const SPOTLIGHT_UNMOUNT_MS = 200;
+
+/** True while `value` is, and for `ms` after it turns false: a fade-out gets its frames before an unmount. */
+function useLingering(value: boolean, ms: number) {
+  const [lingering, setLingering] = useState(value);
+  useEffect(() => {
+    if (value) { setLingering(true); return; }
+    const timer = setTimeout(() => setLingering(false), ms);
+    return () => clearTimeout(timer);
+  }, [ms, value]);
+  return value || lingering;
+}
+
 /** The soft ring around the crisp spotlight ring: a translucent border, never a blurred shadow. */
 const RING_GLOW_WIDTH = 3;
 const RING_GLOW_ALPHA = 0.55;
@@ -231,6 +245,9 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
   // Keep the prior cutout visible while measuring the next target. Readiness
   // still gates input above; only an explicit null spotlight dismisses the mask.
   const spotlightReady = Boolean(spotlight && currentLayout?.spotlightFrames.length);
+  // With nothing to show (a finger-only cue, or after a step) the mask and its four rings are not
+  // mounted at all, rather than sitting over the screen at opacity 0; they stay for their fade-out.
+  const spotlightMounted = useLingering(spotlightReady, SPOTLIGHT_UNMOUNT_MS);
   const guideKey = guide && presentationReady ? `${configKey}:${normalizeSpeechText(guide.title)}:${normalizeSpeechText(guide.body)}` : null;
   const [hintKey, setHintKey] = useState<string | null>(null);
   const practice = guide?.coaching === 'practice';
@@ -276,7 +293,7 @@ export const MergeFtueOverlay = memo(function MergeFtueOverlay({
     <View
       pointerEvents="box-none"
       style={styles.overlay}>
-      {!spotlightDismissed ? (
+      {!spotlightDismissed && spotlightMounted ? (
         <FtueSpotlight
           frames={showSpotlight ? currentLayout?.spotlightFrames ?? [] : []}
           opacity={showSpotlight ? currentLayout?.spotlightOpacity ?? 0 : 0}
