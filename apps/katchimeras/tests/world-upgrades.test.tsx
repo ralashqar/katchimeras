@@ -97,6 +97,7 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
   const mocks: Record<string, unknown> = {
     './shared-resident-presentation': { sharedResidentAnchor },
     '@/constants/mossprout-memory-plants': { mossproutMemoryPlantById: new Map() },
+    '@/constants/hatchable-companions/tile-art': { hatchableTileArt: (tileId: string) => ({ full: `${tileId}:full`, medium: `${tileId}:512`, thumb: `${tileId}:256` }) },
     '@/components/katchadeck/world/kingdom-hex-scene': {
       tileVisibleBounds: (x: number, y: number) => ({ left: x - 200, top: y - 200, right: x + 200, bottom: y + 200 }),
     },

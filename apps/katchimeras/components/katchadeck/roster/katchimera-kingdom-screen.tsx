@@ -1,3 +1,4 @@
+import { HATCHABLE_COMPANIONS, hatchableByTile, STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 import { useStepplingGardenLesson } from '@/features/onboarding/steppling-garden-runtime';
 import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
 import { advanceGlowUpgrade, recoverPaidGlowUpgrade } from '@/features/onboarding/glow-upgrade-runtime';
@@ -36,7 +37,7 @@ import { useStepplingEncounter } from '@/features/onboarding/use-steppling-encou
 import { completeStepplingMission, startGlowDiscovery, submitGlowAction, useGlowDiscoveryState } from '@/features/onboarding/glow-discovery-runtime';
 import { GLOW_GATEWAY_NODE_IDS, GLOW_MISSION_CLEAR_NODE_ID, glowDiscoveryAllowsGarden, glowDiscoveryLocksCamera, glowDiscoveryMissionNode, glowDiscoveryResumeCamera, glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
 import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
-import { glowGatewayState } from '@/utils/merge-world/glow-discovery-policy';
+import { glowGatewayState, hatchableGatewayState } from '@/utils/merge-world/glow-discovery-policy';
 import { sharedWorldIncludesCompanion } from '@/constants/shared-world';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -454,8 +455,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     };
   }, [ftueStepId]);
   const gatewayState = glowGatewayState(mergeWorld);
+  // Every hatchable tile's state; the one whose Egg is open on screen shows the Egg even before the world says so.
+  const hatchableTiles = useMemo(() => Object.fromEntries(HATCHABLE_COMPANIONS.map((definition) => [definition.tile.id,
+    definition.companion === 'steppling' && stepplingEncounter.open ? 'egg' as const : hatchableGatewayState(mergeWorld, definition)])),
+  [mergeWorld, stepplingEncounter.open]);
   const mossproutGardenScene = useMemo(() => ({
     gateway: stepplingEncounter.open ? 'egg' as const : gatewayState,
+    hatchableTiles,
     level: mergeWorld.haven.structures.mossproutGarden.level,
     plantableMemories: mergeWorld.haven.plantableMemories,
     previewMemoryId: ftueStepId === 'world.garden_arrival'
@@ -465,6 +471,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     featureLevels: mergeWorld.haven.structures.mossproutGarden.featureLevels,
   }), [
     gatewayState,
+    hatchableTiles,
     ftueStepId,
     activeFtueRunId,
     stepplingEncounter.open,
@@ -810,13 +817,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         visualTarget: payload.target,
       };
     } else if (receipt.target.kind === 'haven_structure') {
+      const hatchable = hatchableByTile(receipt.target.structureId) ?? STEPPLING_HATCHABLE;
       presentation = {
-        cameraAlreadyFocused: true, characterId: 'steppling', coinCost: receipt.coinCost, coinOrigin,
-        creatureId: 'steppling', creatureName: 'A new friend', fromStage: receipt.fromLevel as HavenStage,
+        cameraAlreadyFocused: true, characterId: hatchable.companion, coinCost: receipt.coinCost, coinOrigin,
+        creatureId: hatchable.companion, creatureName: 'A new friend', fromStage: receipt.fromLevel as HavenStage,
         toStage: 1, nonce: ++upgradeNonceRef.current,
         palette: { accent: '#FFE28A', glow: '#FFD98C', mist: 'rgba(226,255,213,0.88)', primary: '#4F9F57' },
         reactionLine: '', showCoins: receipt.coinCost > 0 && receipt.economyMode === 'normal',
-        status: 'playing', storyPresentationKey: work.key, upgradeName: 'Misty clearing', visualTarget: payload.target,
+        status: 'playing', storyPresentationKey: work.key, upgradeName: hatchable.tile.name, visualTarget: payload.target,
       };
     } else {
       const island = mossproutNatureIslandById.get(receipt.target.islandId);
@@ -949,8 +957,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       return;
     }
     const id = presentation.natureIslandId ? `nature:${presentation.natureIslandId}`
-      : presentation.visualTarget?.kind === 'haven_structure' && presentation.visualTarget.structureId === 'steppling-home'
-        ? 'mist:steppling-home' : `haven:${presentation.characterId}`;
+      : presentation.visualTarget?.kind === 'haven_structure' && hatchableByTile(presentation.visualTarget.structureId)
+        ? `mist:${presentation.visualTarget.structureId}` : `haven:${presentation.characterId}`;
     const definition = WORLD_UPGRADE_DEFINITIONS.find((item) => item.id === id && item.nextLevel === presentation.toStage);
     if (definition && worldUpgradeStory(id, presentation.toStage)) {
       setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
@@ -1745,7 +1753,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [openUpgradeOffer]);
   const setUpgradeMarkerNode = useCallback((id: string, node: View | null) => {
     if (id === 'haven:mossprout') registerFtueTarget('upgrade:mossprout', node);
-    if (id === 'mist:steppling-home') registerFtueTarget('upgrade:steppling', node);
+    const hatchable = id.startsWith('mist:') ? hatchableByTile(id.slice('mist:'.length)) : null;
+    if (hatchable) registerFtueTarget(`upgrade:${hatchable.companion}`, node);
     if (goalIslandIdRef.current && id === `nature:${goalIslandIdRef.current}`) {
       goalMarkerRef.current = node;
       setGoalMarkerRevision((revision) => revision + 1);

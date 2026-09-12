@@ -3,6 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { HATCHABLE_COMPANIONS, hatchableByCompanion, hatchableByMission, hatchableByTile, hatchableByUnlock } from '@/constants/hatchable-companions/registry';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/steppling';
+import { HATCHABLE_TILE_ART_IDS } from '@/constants/hatchable-companions/tile-art';
 import { SHARED_WORLD_PURCHASES, SHARED_WORLD_TILES, STEPPLING_TILE } from '@/constants/shared-world';
 import { GLOW_GATEWAY_ID } from '@/constants/glow-discovery-ids';
 import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
@@ -71,8 +72,9 @@ test('every definition is sound: unique ids, tiles apart, flows that compile, an
       assert.deepEqual(validateContentFlowDefinition(flow), [], `${flow.id} compiles`);
     }
     assert.ok(definition.tile.price > 0);
-    assert.equal(typeof definition.tile.art, 'function', 'tile art is resolved on demand: a definition never loads images');
-    assert.ok(readFileSync('constants/hatchable-companions/' + definition.companion + '.ts', 'utf8').includes(definition.tile.alphaBoundsKey.replace('.webp', '')), 'the art the definition names is the art its bounds are generated for');
+    assert.ok(HATCHABLE_TILE_ART_IDS.includes(definition.tile.id), `${definition.tile.id} has cleared tile art registered`);
+    assert.ok(readFileSync('constants/hatchable-companions/tile-art.ts', 'utf8').includes(definition.tile.alphaBoundsKey.replace('.webp', '')), 'the art registered for the tile is the art its bounds are generated for');
+    assert.ok(readFileSync('constants/kingdom-hex-tile-bounds.gen.ts', 'utf8').includes(`'${definition.tile.alphaBoundsKey}'`), 'and its alpha bounds are generated');
     assert.equal(definition.lesson.order.characterId, definition.companion);
     assert.equal(definition.dayOne.parcel.generatorId, definition.lesson.generatorId);
     assert.equal(definition.dayOne.parcel.rewardId, definition.lesson.parcelArrivalId);
