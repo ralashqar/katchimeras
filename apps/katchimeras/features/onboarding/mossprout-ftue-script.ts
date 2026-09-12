@@ -252,8 +252,9 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'world.seed_planted', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       // The first restore is paid with the light that drove the wisps off (earned at the lift, never
-      // a Merge visit); this beat moves on to the offer by itself, with Continue as the fallback.
-      // The Garden board is introduced later, when Steppling's trail needs light the Mist did not give.
+      // a Merge visit); this beat moves on to the offer the moment the Seed is in the ground. Nothing
+      // is shown for it unless the planting failed, when its guide and a retry come up. The Garden
+      // board is introduced later, when Steppling's trail needs light the Mist did not give.
       guide: { eyebrow: 'Your Memory', title: COPY.planted, body: 'Look at it. The Mist gave a little ground just for that.' },
       spotlight: { targets: [{ kind: 'haven_guide' }, { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID }], grouping: 'individual', padding: 7 },
       actions: [{ id: 'world.acknowledge_seed_dormant', title: 'Continue', description: '', icon: 'sparkles', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_offer', backendEvent: true }],

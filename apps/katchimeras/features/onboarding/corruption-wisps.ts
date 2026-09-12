@@ -42,7 +42,7 @@ export function wispsForClearing(merges: number): readonly CorruptionWispSpec[] 
  * struck, one as each falls, and one for the last. Short, sly, never scary;
  * the Mist is named once per mission at most, in the guide, not here.
  */
-export type CorruptionWispLines = { firstStrike: string; fell: readonly string[]; last: string };
+export type CorruptionWispLines = { firstStrike: string; fell: readonly string[]; last: string; /** Said once, when full mist first bursts open beside a woken sleeper. */ reveal?: string };
 
 export const OPENING_WISP_LINES: CorruptionWispLines = {
   firstStrike: 'It felt that.',
@@ -54,6 +54,7 @@ export const STEPPLING_WISP_LINES: CorruptionWispLines = {
   firstStrike: 'It felt that.',
   fell: ['One gone. The trail’s already brighter.', 'Two gone. It’s thinning.', 'One left.'],
   last: 'The last one falls. Look what it was sitting on.',
+  reveal: 'It was holding more.',
 };
 
 /** A friend's board: the same beats, in nobody's voice but the Mist's. */

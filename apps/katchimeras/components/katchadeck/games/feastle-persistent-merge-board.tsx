@@ -678,6 +678,10 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         timers.schedule(() => setMistDissipations((current) => current.filter((entry) => entry.id !== dissipation.id)), reduceMotion ? 220 : 560);
       }
       emitBoardEffect(to, 'merge');
+      // The Mist beside the woken sleeper lets go a beat later: cause, then effect, one cell at a time.
+      (predicted.revealedMistCells ?? []).forEach((cell, index) => {
+        timers.schedule(() => emitBoardEffect(cell, 'mist-burst'), reduceMotion ? 0 : 140 + index * 90);
+      });
     } else if (residentCardReveal) {
       nextSprites = currentSprites.filter((entry) => spriteId(entry) !== instanceId);
       nextMotions[instanceId] = { kind: 'merge-source', startX: sourceOrigin.x + dx, startY: sourceOrigin.y + dy };
@@ -1177,6 +1181,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
                     : cell.mist?.kind === 'discovery_dormant' ? dormantNames.length
                       ? `A path to ${dormantNames.join(' or ')}. Meet them to open this space.`
                       : 'A future Katchimera story will open this space.'
+                : cell.mist?.kind === 'veiled' ? 'Thick mist. Wake the sleeping cell beside it and it lets go.'
                 : cell.mist ? 'Something is hidden in the Dream Mist.' : 'Empty board space';
         return <BoardCell
           accessibilityActionLabel={gateKind === 'drag' && index === gateFromCell
@@ -1966,15 +1971,22 @@ export function PersistentMergeItemArt({ artCache, cachedSource, desaturateOpaci
 
 function DreamEchoItemArt({ definitionId, size }: { definitionId: string; size: number }) {
   const definition = MERGE_ITEMS_BY_ID.get(definitionId);
+  // A sleeper that has just been shown (the mist beside it burst) settles into place rather than snapping in.
+  const arrival = useSharedValue(0);
+  useEffect(() => {
+    arrival.value = withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) });
+    return () => cancelAnimation(arrival);
+  }, [arrival]);
+  const arrivalStyle = useAnimatedStyle(() => ({ opacity: arrival.value, transform: [{ scale: 0.82 + arrival.value * 0.18 }] }));
   if (!definition) return null;
   // Keep Dream Echoes on the same Expo Image decode/cache path as ordinary
   // merge sprites. A newly unlocked generator can put the same cold WebP into
   // its spawned sprite, merge result, and dissolving Echo in one frame. Having
   // Skia decode that source while Expo Image mounted the other two could crash
   // the native renderer after the reducer had already persisted the merge.
-  return <View style={[styles.dreamEchoArt, { height: size, width: size }]}>
+  return <Animated.View style={[styles.dreamEchoArt, { height: size, width: size }, arrivalStyle]}>
     <PersistentMergeItemArt desaturateOpacity={0.26} definitionId={definitionId} size={size} />
-  </View>;
+  </Animated.View>;
 }
 
 const styles = StyleSheet.create({

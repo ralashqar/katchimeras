@@ -1,6 +1,6 @@
 # Mist Missions: the opening board as a repeatable mini-game
 
-Status: partly built (Sept 2026). Built: the opening plays on its own mission board (`features/onboarding/opening-mission-state.ts`, `use-opening-mission-board.ts`), and Steppling's misted clearing is cleared the same way (`features/onboarding/steppling-mission.ts`, `components/katchadeck/world/steppling-mission-dock.tsx`): tapping the bubble at `gateway.offer` frames the tile with the opening's camera and docks a 5×4 board with Steppling's walking gear and the Journey Locker (Sock-only, never rests); 12 merges fill the bar, the final item flies into the mist, and its impact records `glow.mission.cleared`, after which the paid reveal, the Egg and the hatch run unchanged. The shared dock is `MistMissionDock` in `kingdom-opening-merge-dock.tsx`; each mission keeps its own store with its own merge count. Not built: parcel rewards, a data-authored mission catalogue, missions for the six island campaigns.
+Status: partly built (Sept 2026). Built: the opening plays on its own mission board (`features/onboarding/opening-mission-state.ts`, `use-opening-mission-board.ts`), and Steppling's misted clearing is cleared the same way (`features/onboarding/steppling-mission.ts`, `components/katchadeck/world/steppling-mission-dock.tsx`): tapping the bubble at `gateway.offer` frames the tile with the opening's camera and docks a 5×4 board with three Socks, a sleeper and five veiled cells (see the revised section below); eight strikes fill the bar, the final item flies into the mist, and its impact records `glow.mission.cleared`, after which the paid reveal, the Egg and the hatch run unchanged. The shared dock is `MistMissionDock` in `kingdom-opening-merge-dock.tsx`; each mission keeps its own store with its own merge count. Not built: parcel rewards, a data-authored mission catalogue, missions for the six island campaigns.
 
 This spec turns the opening beat into its own small board, a *mission*, whose reward arrives on the persistent board as a parcel, and makes the mission the template for clearing every misted island.
 
@@ -76,15 +76,26 @@ A mission is data; islands get missions by authoring, not by code.
 - **Content cost**: one authored mission per island (board, bar length, reward). Keep the format a template so an island is a data entry.
 - **Where mission boards live in the world**: docked under the island's tile as the opening does, camera pulled to the island, not a separate route.
 
-## Steppling's board, revised (Sept 12, 2026)
+## Steppling's board, revised again (Sept 12, 2026): no spawner, mist that bursts
 
-Built. The board starts with the Journey Locker alone (it makes Socks) and three cells asleep under the
-Mist straight above it, holding a Shoe, a Boot and Hiking Gear. A sleeper wakes when its match is dropped
-on it and wakes as the next piece up, which is what the next sleeper wants: tap for two Socks, merge them
-into a Shoe, wake the Shoe into a Boot, the Boot into Gear, the Gear into an Adventure Pack. Four strikes,
-one per wisp (`STEPPLING_MISSION_MERGE_REQUIRED = 4`), so the board teaches the item hierarchy and the
-sleeping-cell unlock rather than asking for a grind. Guidance: the first two Locker taps are spotlit and
-exclusive; after that nothing is spotlit and the finger appears only after two seconds of pause
-(`STEPPLING_MISSION_HINT_THEME`), pointing at a match to wake, a pair to merge, or the Locker when the
-board has run dry. Source: `features/onboarding/steppling-mission.ts`; a waking (`dream_echo_cleared`)
-sends Glow like a merge in `steppling-mission-dock.tsx`.
+Built. Spawning is taught on the Garden board by parcel, so this board has no Locker. It holds three
+Socks along the bottom, one cell asleep under a lower band of mist (a Shoe), and five cells the Mist
+holds completely (`mist.kind === 'veiled'`), each hiding the next sleeper. A sleeper wakes when its match
+is dropped on it and wakes as the next piece up, and the moment it wakes every veiled cell sharing an
+edge with it bursts open into the sleeper it was hiding (`revealedMistCells` from the engine's echo
+branch; a `mist-burst` board effect a beat later, and the revealed sleeper scales in). The chain snakes
+up and across the window and holds exactly what it consumes: merge two Socks into a Shoe; wake the
+sleeping Shoe (38) into a Boot and 31 bursts; wake 31 into Hiking Gear and two cells burst, 24 wanting a
+Pack you cannot make yet and 30 wanting the Sock you still have; wake 30 into a Shoe and 23 bursts; wake
+23 into a Boot and 22 bursts; wake 22 into Hiking Gear; merge the two Hiking Gears into the Pack; wake
+24 with it into an Expedition Kit, the finale. Eight strikes, two per wisp
+(`STEPPLING_MISSION_MERGE_REQUIRED = 8`). At every moment there is one thing to do (the exhaustive test
+proves both that no move strands the chain and that no strike after the first offers a choice), so the
+board is free without a lock. Guidance: the first merge is spotlit and exclusive; after that nothing is
+spotlit and the finger appears only after two seconds of pause (`STEPPLING_MISSION_HINT_THEME`),
+pointing at the match that wakes the lowest sleeper, or at the pair when nothing can wake. The first
+burst speaks `STEPPLING_WISP_LINES.reveal` once. Source: `features/onboarding/steppling-mission.ts`;
+storage key v3, so a Locker board saved mid-mission is left behind. Veiled cells survive reload through
+`normalizeDreamMist` (unknown owner or item decays to plain mist), cannot be dropped on, and only a
+waking sleeper opens them: an ordinary merge beside one does nothing.
+mist), cannot be dropped on, and only a waking sleeper opens them: an ordinary merge beside one does nothing.

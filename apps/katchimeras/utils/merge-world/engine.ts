@@ -26,6 +26,8 @@ import {
   MERGE_WORLD_SIZE,
   MOSSPROUT_ROOTBOUND_GATES_BY_ID,
   mergeLevelForXp,
+  MERGE_WORLD_COLUMNS,
+  MERGE_WORLD_ROWS,
 } from '@/constants/merge-world-catalog';
 import { advanceGlowRequests, glowTutorialDrop, normalizeGlowDiscoveryFields, reduceGlowDiscovery } from './glow-discovery-policy';
 import { normalizeStepplingEgg, reduceStepplingEgg } from '@/features/onboarding/steppling-egg-policy';
@@ -2411,6 +2413,14 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
       mist: null,
       occupant: { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId: resultId },
     };
+    // The Mist beside a woken sleeper lets go too: any veiled cell touching it (same row or column)
+    // bursts open into the sleeper it was hiding. Shown by the board, never counted as a strike.
+    const revealedMistCells = orthogonalNeighbours(to).filter((cell) => board[cell]?.mist?.kind === 'veiled');
+    for (const cell of revealedMistCells) {
+      const veiled = board[cell]!.mist;
+      if (veiled?.kind !== 'veiled') continue;
+      board[cell] = { ...board[cell]!, locked: true, blocker: null, occupant: null, mist: { kind: 'echo', ...veiled.echo } };
+    }
     const receipt = { id: `dream-echo:${echo.id}`, source: 'dream_echo' as const, clearedCells: [to], createdAt: now };
     let next = touch({
       ...state,
@@ -2428,6 +2438,7 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
       mergedCell: to,
       dreamEchoClearedId: echo.id,
       clearedMistCells: [to],
+      ...(revealedMistCells.length ? { revealedMistCells } : {}),
       discoveryId: discovery.newDiscovery ? resultId : undefined,
       message: `${MERGE_ITEMS_BY_ID.get(resultId)?.name ?? 'New item'} woke from the Dream Mist.`,
     };
@@ -3839,6 +3850,9 @@ function ensureGenerator(state: MergeWorldState, generatorId: string, now: numbe
   if (state.generators[generatorId]) return state;
   const definition = MERGE_GENERATORS_BY_ID.get(generatorId);
   if (!definition) return state;
+  // A spawner waiting in an unopened parcel is the parcel's to bring in: opening it is the lesson
+  // (the Garden Basket, Steppling's Locker). Nothing that reconciles the board may put it there first.
+  if (state.arrivals.some((arrival) => arrival.generatorId === generatorId && arrival.claimedAt == null)) return state;
   const board = [...state.board];
   const preferred = definition.initialCell;
   const cell = !board[preferred].locked && !board[preferred].mist && !board[preferred].occupant ? preferred : firstEmptyCell(board, preferred);
@@ -4217,6 +4231,18 @@ function normalizeCell(value: unknown, fallback: MergeBoardCell, index: number):
   };
 }
 
+/** The cells sharing an edge with `cell` on the canonical board: same row or same column, never diagonal. */
+function orthogonalNeighbours(cell: number): number[] {
+  const column = cell % MERGE_WORLD_COLUMNS;
+  const row = Math.floor(cell / MERGE_WORLD_COLUMNS);
+  const neighbours: number[] = [];
+  if (row > 0) neighbours.push(cell - MERGE_WORLD_COLUMNS);
+  if (row < MERGE_WORLD_ROWS - 1) neighbours.push(cell + MERGE_WORLD_COLUMNS);
+  if (column > 0) neighbours.push(cell - 1);
+  if (column < MERGE_WORLD_COLUMNS - 1) neighbours.push(cell + 1);
+  return neighbours;
+}
+
 function normalizeDreamMist(value: unknown, legacyLocked: boolean, index: number): MergeBoardCell['mist'] {
   if (!value || typeof value !== 'object') return legacyLocked ? authoredDormantMistForCell(index) : null;
   const mist = value as { kind?: unknown; id?: unknown; definitionId?: unknown; generatorId?: unknown; ownerCharacterId?: unknown; discoveryId?: unknown; gateId?: unknown; residentId?: unknown; pathId?: unknown; sequenceIndex?: unknown; boundDefinitionId?: unknown; active?: unknown; candidateIds?: unknown; characterIds?: unknown; clearingId?: unknown; revealDay?: unknown; recommendedCharacterId?: unknown; chapter?: unknown; ready?: unknown };
@@ -4246,6 +4272,14 @@ function normalizeDreamMist(value: unknown, legacyLocked: boolean, index: number
       kind: 'resident_card', discoveryId: typeof mist.discoveryId === 'string' ? mist.discoveryId : `resident-node:${node.residentId}`,
       gateId: node.gateId, residentId, ready: Boolean(mist.ready),
     };
+  }
+  if (mist.kind === 'veiled') {
+    const hidden = (mist as { echo?: { id?: unknown; definitionId?: unknown; ownerCharacterId?: unknown } }).echo;
+    if (hidden && typeof hidden.id === 'string' && typeof hidden.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(hidden.definitionId)
+      && typeof hidden.ownerCharacterId === 'string' && KNOWN_CHARACTERS.has(hidden.ownerCharacterId as MergeCharacterId)) {
+      return { kind: 'veiled', echo: { id: hidden.id, definitionId: hidden.definitionId, ownerCharacterId: hidden.ownerCharacterId as MergeCharacterId } };
+    }
+    return legacyLocked ? authoredDormantMistForCell(index) : null;
   }
   if (mist.kind === 'echo' && typeof mist.id === 'string' && typeof mist.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(mist.definitionId)) {
     const ownerCharacterId = typeof mist.ownerCharacterId === 'string' && KNOWN_CHARACTERS.has(mist.ownerCharacterId as MergeCharacterId)

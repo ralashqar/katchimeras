@@ -73,11 +73,14 @@ test('Merge speech guidance is one green line and appears only for first-use mec
     assert.equal(guide.body, '');
     assert.ok(guide.title.length <= 42);
   }
-  assert.equal(mergeFtueDisplayGuide({
-    id: 'glow.lesson.single.match-2',
-    cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:2', occurrence: 0 }, to: { kind: 'board_dream_echo', echoId: 'sprout' } },
-    guide: { eyebrow: 'old', title: 'A much longer title', body: 'A much longer explanation.' },
-  })?.title, 'Bring the Sprout its twin.');
+  // The Garden lesson's beats each say their one line; a free beat's line follows whatever the finger points at.
+  const long = { eyebrow: 'old', title: 'A much longer title', body: 'A much longer explanation.' };
+  assert.equal(mergeFtueDisplayGuide({ id: 'glow.lesson.single.parcel', cue: { kind: 'tap', target: { kind: 'tray_parcel', arrivalId: 'x' } }, guide: long })?.title, 'Open the parcel.');
+  assert.equal(mergeFtueDisplayGuide({ id: 'glow.lesson.single.spawn', cue: { kind: 'tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } }, guide: long })?.title, 'Tap the Basket for a Seed.');
+  assert.equal(mergeFtueDisplayGuide({ id: 'glow.lesson.single.grow', cue: { kind: 'drag', from: { kind: 'board_cell', cell: 1 }, to: { kind: 'board_cell', cell: 2 } }, guide: long })?.title, 'Grow a Plant. Two of the same make the next.');
+  assert.equal(mergeFtueDisplayGuide({ id: 'glow.lesson.single.grow', cue: { kind: 'tap', target: { kind: 'board_generator', generatorId: 'wild-garden' } }, guide: long })?.title, 'Grow a Plant. Two of the same make the next.');
+  assert.equal(mergeFtueDisplayGuide({ id: 'glow.lesson.single.serve', cue: { kind: 'tap', target: { kind: 'order_serve', orderId: 'o' } }, guide: long })?.title, 'Give it here.');
+  assert.equal(mergeFtueDisplayGuide({ id: 'glow.lesson.single.match-2', cue: { kind: 'drag', from: { kind: 'board_cell', cell: 1 }, to: { kind: 'board_cell', cell: 2 } }, guide: long }), null, 'the sleeper matches are gone from the lesson');
 });
 
 test('hero copy fits three lines without captions and Haven spotlight retries native layout', () => {
@@ -1152,7 +1155,7 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(mossproutOpening, /companionStageActive \|\| \(worldHosted && stepId === 'world\.egg_intro'\)[\s\S]*?\? null/);
   assert.match(kingdomScreen, /ftueEggFeedingCloseupActive = ftueStepId === 'world\.egg_intro'[\s\S]*?Boolean\(ftueStepId\?\.startsWith\('egg\.'\)\)/);
   assert.match(kingdomScreen, /gardenWorldGuidanceActive[\s\S]*?top: insets\.top \+ 18/);
-  assert.match(kingdomScreen, /gardenWorldBottomCtaActive = \(ftueStepId === 'world\.seed_planted' && \(firstSeedPlacementFailed \|\| firstSeedPlanted\)\)[\s\S]*?ftueStepId === 'world\.first_seed_grew'/);
+  assert.match(kingdomScreen, /gardenWorldBottomCtaActive = \(ftueStepId === 'world\.seed_planted' && firstSeedPlacementFailed\)[\s\S]*?ftueStepId === 'world\.first_seed_grew'/);
   assert.doesNotMatch(kingdomScreen, /gardenWorldBottomCtaActive = ftueStepId === 'world\.garden_arrival'/);
   assert.match(kingdomScreen, /ftueStepId === 'world\.seed_planted' && !firstSeedPlanted[\s\S]*?onFtueInspectRef\.current\?\.\(\)/);
   assert.equal(mossproutFtueStep('world.seed_planted')?.autoAdvanceMs, undefined);

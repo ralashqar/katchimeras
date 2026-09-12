@@ -59,6 +59,8 @@ export type MergeDreamMist =
   | { kind: 'garden_growth'; clearingId: string; revealDay: number }
   | { kind: 'discovery_dormant'; characterIds: MergeCharacterId[] }
   | { kind: 'echo'; id: string; definitionId: string; ownerCharacterId: MergeCharacterId | null; generatorId?: string }
+  /** Full mist hiding the next sleeper: it bursts open, as that echo, the moment an echo beside it wakes. */
+  | { kind: 'veiled'; echo: { id: string; definitionId: string; ownerCharacterId: MergeCharacterId | null } }
   | { kind: 'rootbound_echo'; id: string; gateId: string; definitionId: string; chapter: MossproutBoardChapter; ready: boolean }
   | { kind: 'resident_card'; discoveryId: string; gateId: string; residentId: KatchimeraSkinId | null; ready: boolean }
   | { kind: 'discovery_fork'; gateId: string; candidateIds: MergeCharacterId[]; recommendedCharacterId: MergeCharacterId | null }
@@ -520,7 +522,8 @@ export type MergeWorldState = {
   islandCampaigns?: Record<string, IslandCampaignProgress>;
   stepplingEgg?: import('@/features/onboarding/steppling-egg-policy').StepplingEggProgress;
   worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
-  glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 };
+  /** `layoutVersion` 3: the Basket is earned by parcel on a board with no loose items; anything older is re-prepared. */
+  glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 | 3 };
   /** The first light, earned when the last wisp fell on the opening board: what the first garden restore is paid with. */
   openingGlow?: { receiptId: string; amount: number; grantedAt: number } | null;
   stepplingGardenLesson?: { preparedAt: number; servedAt?: number };
@@ -687,6 +690,8 @@ export type MergeWorldCommandResult = {
   /** An island friend's final chapter just granted their card. */
   friendCardEarned?: { campaignId: string; residentSkinId: KatchimeraSkinId };
   clearedMistCells?: number[];
+  /** Veiled cells that burst open into sleepers because a neighbour woke: shown, never counted. */
+  revealedMistCells?: number[];
   spawnedCell?: number;
   spawnedItems?: { instanceId: string; definitionId: string; progressionGateId?: string; cell: number }[];
   servedOrderId?: string;

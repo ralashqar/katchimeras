@@ -45,11 +45,15 @@ export type CorruptionWispTarget = {
   lines?: CorruptionWispLines;
   /** False while the camera is still gliding onto the tile: the wisps wait, and measure where it stops. */
   settled?: boolean;
+  /** Bumps when full mist bursts open on the board (a sleeper beside it woke); the first one gets a line. */
+  revealNonce?: number;
 };
 /** A board opening asks the camera to frame its tile; this is how long to give it to start moving before a measurement is trusted. */
 const SETTLE_GRACE_MS = 200;
 /** How long a wisp line stays under the tile. */
 const CAPTION_MS = 1_700;
+/** After the strike that burst the mist open: when its line is said. */
+const REVEAL_LINE_DELAY_MS = 1_100;
 
 type WispFrame = { x: number; y: number; width: number; height: number };
 
@@ -161,6 +165,16 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
     const timer = setTimeout(() => setCaption((current) => current?.id === caption.id ? null : current), CAPTION_MS);
     return () => clearTimeout(timer);
   }, [caption]);
+  // The first burst gets its line, a beat after the strike that caused it so the two are heard in order.
+  const revealNonce = target?.revealNonce ?? 0;
+  const spokenRevealRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!key || !revealNonce || spokenRevealRef.current === key || !lines?.reveal) return;
+    spokenRevealRef.current = key;
+    const text = lines.reveal;
+    const timer = setTimeout(() => setCaption({ id: ++captionSeq.current, text }), REVEAL_LINE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [key, lines, revealNonce]);
   const sink = useMemo<GlowSink | null>(() => {
     if (!target || !shownFrame || !plan.length) return null;
     const point = (index: number): RewardFlightPoint => {

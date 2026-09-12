@@ -12,7 +12,7 @@ import { createContentFlowRun, stabilizeContentFlow } from '@/features/content-f
 import { GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID } from '@/features/onboarding/glow-discovery-flow';
 import { STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, STEPPLING_PARCEL_ID, STEPPLING_SHOE_ORDER_ID } from '@/features/onboarding/steppling-garden-lesson';
 import { STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID, STEPPLING_PARCEL_REWARD_ID } from '@/features/content-flow/steppling-day-one-flow';
-import { advanceGlowRequests, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS } from '@/utils/merge-world/glow-discovery-policy';
+import { advanceGlowRequests, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/utils/merge-world/glow-discovery-policy';
 import { islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers';
 import { PETALIMP_BLOOM_CAMPAIGN, PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_ID } from '@/constants/island-campaigns/petalimp-bloom';
 
@@ -188,6 +188,9 @@ function gardenRestored(now: number) {
 function glowLessonServed(now: number) {
   const at = now - 5 * DAY;
   let state = reduceMergeWorld(gardenRestored(now), { type: 'prepareGlowDiscoveryLesson', now: at }).state;
+  // The lesson opens the Basket's parcel first, and its reward page has been seen.
+  state = reduceMergeWorld(state, { type: 'claimArrival', arrivalId: MOSSPROUT_BASKET_ARRIVAL_ID, now: at + 1 }).state;
+  state = reduceMergeWorld(state, { type: 'ackGeneratorUnlock', receiptId: 'generator-unlock:wild-garden', now: at + 1 }).state;
   state = advanceGlowRequests(advanceGlowRequests(state, GLOW_ORDER_IDS[0], at + 1), GLOW_ORDER_IDS[1], at + 2);
   const echoIds: readonly string[] = GLOW_SINGLE_ECHO_IDS;
   return {

@@ -15,7 +15,7 @@ import { MistMissionDock, type GlowLandingSource } from './kingdom-opening-merge
  * Locker. Progress is the mission store's own merge count, not an FTUE run:
  * the Glow discovery story only hears about the bar filling.
  */
-export const StepplingMissionDock = memo(function StepplingMissionDock({ state, send, merges, mergesRef, width, bottomInset, landings, onGlow, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
+export const StepplingMissionDock = memo(function StepplingMissionDock({ state, send, merges, mergesRef, width, bottomInset, landings, onGlow, onFinale, onReveal, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: {
   state: MergeWorldState;
   send: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
   merges: number;
@@ -27,6 +27,8 @@ export const StepplingMissionDock = memo(function StepplingMissionDock({ state, 
   onGlow?: (from: RewardFlightPoint) => void;
   /** The merge that fills the bar: its item leaves the board for the mist. */
   onFinale?: (from: RewardFlightPoint, definitionId: string) => void;
+  /** Veiled cells that burst open because a sleeper beside them woke. */
+  onReveal?: (count: number) => void;
   onBoardMetrics?: (metrics: MergeBoardScreenMetrics | null) => void;
   onBlockedInteraction?: () => void;
   onEntranceSettled?: () => void;
@@ -51,10 +53,11 @@ export const StepplingMissionDock = memo(function StepplingMissionDock({ state, 
       onBlockedInteraction?.();
       return null;
     }
-    // A mission has no Energy economy; a Locker tap is never refused for it.
+    // A mission has no Energy economy; a spawner tap (a friend's board may have one) is never refused for it.
     const effective = command.type === 'tapGenerator' ? { ...command, spendEnergy: false as const } : command;
     const result = send(effective);
     if (result) stateRef.current = result.state;
+    if (result?.revealedMistCells?.length) onReveal?.(result.revealedMistCells.length);
     const event = mergeFtueEventForCommand(current, command, result);
     // A sleeping cell woken by its match is a strike as much as a merge is: the store counts both.
     if (!result || (event?.type !== 'merge_completed' && event?.type !== 'dream_echo_cleared')) return result;
@@ -70,7 +73,7 @@ export const StepplingMissionDock = memo(function StepplingMissionDock({ state, 
       onGlow?.(from);
     }
     return result;
-  }, [mergesRef, onBlockedInteraction, onFinale, onGlow, send]);
+  }, [mergesRef, onBlockedInteraction, onFinale, onGlow, onReveal, send]);
 
   return <MistMissionDock
     state={state} boardStep={boardStep} progress={stepplingMissionProgress(merges)} required={STEPPLING_MISSION_MERGE_REQUIRED}

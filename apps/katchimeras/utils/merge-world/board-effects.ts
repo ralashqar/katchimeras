@@ -1,7 +1,8 @@
 import { createSelectorStore } from './selector-store';
 
 export const MERGE_EFFECT_SLOT_IDS = [0, 1, 2, 3, 4, 5] as const;
-export type MergeBoardEffectKind = 'spawn-origin' | 'spawn-settle' | 'merge';
+/** `mist-burst`: full mist letting go of a cell, when the sleeper beside it woke. */
+export type MergeBoardEffectKind = 'spawn-origin' | 'spawn-settle' | 'merge' | 'mist-burst';
 export type MergeBoardEffect = { id: number; cell: number; kind: MergeBoardEffectKind };
 
 /** Transient effects have their own subscribers, never the board's React state. */
@@ -39,7 +40,7 @@ export function createMergeBoardEffects() {
 export type MergeBoardEffects = ReturnType<typeof createMergeBoardEffects>;
 
 export function mergeEffectRetentionMs(kind: MergeBoardEffectKind, reduceMotion: boolean) {
-  return reduceMotion ? 220 : kind === 'merge' ? 700 : kind === 'spawn-settle' ? 620 : 520;
+  return reduceMotion ? 220 : kind === 'merge' ? 700 : kind === 'spawn-settle' || kind === 'mist-burst' ? 620 : 520;
 }
 
 /** Spawns introduce no retiring ghosts. Reuse sprites only if the board

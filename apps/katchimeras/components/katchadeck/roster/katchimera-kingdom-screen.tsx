@@ -253,6 +253,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // A board's finale is its last item striking the last wisp. Nothing moves on until that landing,
   // and then only once the wisp has fallen: the mission is over when the player has seen it end.
   const stepplingFinaleIdRef = useRef<number | null>(null);
+  // Full mist bursting open on Steppling's board: the wisps get a line for the first one.
+  const [stepplingRevealNonce, setStepplingRevealNonce] = useState(0);
+  const bumpStepplingReveal = useCallback(() => setStepplingRevealNonce((nonce) => nonce + 1), []);
   const restorationFinaleIdRef = useRef<number | null>(null);
   const stepplingMissionLanded = stepplingFinaleIdRef.current != null && openingGlow.finaleLandedId === stepplingFinaleIdRef.current;
   const restorationLanded = restorationFinaleIdRef.current != null && openingGlow.finaleLandedId === restorationFinaleIdRef.current;
@@ -538,8 +541,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   useEffect(() => {
     const delays: Partial<Record<string, number>> = {
       'world.egg_intro': 4_100,
-      // "There. It'll grow if we keep looking at it. Light, then." A beat, then the offer.
-      'world.seed_planted': 2_600,
+      // The Seed is in the ground: straight on to the offer, nothing to read and nothing to tap.
+      'world.seed_planted': 0,
     };
     const delay = ftueStep?.autoAdvanceMs ?? (ftueStepId ? delays[ftueStepId] : undefined);
     const key = ftueStepId ? `${activeFtueRunId ?? 'current'}:${ftueStepId}` : null;
@@ -733,7 +736,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const gardenWorldGuidanceActive = Boolean(ftueStepId && (
     mossproutFtueShowsWorldGarden(ftueStepId) || ftueStepId === 'world.first_seed_grew'
   ));
-  const gardenWorldBottomCtaActive = (ftueStepId === 'world.seed_planted' && (firstSeedPlacementFailed || firstSeedPlanted))
+  const gardenWorldBottomCtaActive = (ftueStepId === 'world.seed_planted' && firstSeedPlacementFailed)
     || (ftueStepId === 'world.first_bloom_offer' && firstLightFailed)
     || ftueStepId === 'world.first_seed_grew';
   const seedPlantingFtueActive = ftueStepId === 'world.garden_arrival' || ftueStepId === 'world.seed_planted';
@@ -1423,12 +1426,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // The mist, given faces: wisps over the veiled tile take the merges' Glow; the last falls on the final item, and the mist lifts with it.
   // A friend's board has them too, over the island, for as long as the board is up; their hits come from the board's saved merges.
   const wispTarget = useMemo((): CorruptionWispTarget | null => stepplingMissionActive
-    ? { key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission.merges, specs: STEPPLING_WISPS, lines: STEPPLING_WISP_LINES, settled: ftueCameraSettled }
+    ? { key: STEPPLING_MISSION_ID, node: gatewayTileNode, required: STEPPLING_MISSION_MERGE_REQUIRED, merges: stepplingMission.merges, specs: STEPPLING_WISPS, lines: STEPPLING_WISP_LINES, settled: ftueCameraSettled, revealNonce: stepplingRevealNonce }
     : openingBoardActive
       ? { key: 'opening-mist', node: homeTileNode, required: OPENING_MERGE_REQUIRED, merges: openingProgress, specs: OPENING_WISPS, lines: OPENING_WISP_LINES, settled: ftueCameraSettled }
       : restorationBoardVisible && restorationDefinition && restorationBoardRunId
         ? { key: restorationBoardRunId, node: restorationTileNode, required: restorationDefinition.merges, merges: restorationStore.merges, specs: wispsForClearing(restorationDefinition.merges), lines: restorationWispLines, settled: ftueCameraSettled }
-        : null, [ftueCameraSettled, gatewayTileNode, homeTileNode, openingBoardActive, openingProgress, restorationBoardRunId, restorationBoardVisible, restorationDefinition, restorationStore.merges, restorationTileNode, restorationWispLines, stepplingMission.merges, stepplingMissionActive]);
+        : null, [ftueCameraSettled, gatewayTileNode, homeTileNode, openingBoardActive, openingProgress, restorationBoardRunId, restorationBoardVisible, restorationDefinition, restorationStore.merges, restorationTileNode, restorationWispLines, stepplingMission.merges, stepplingMissionActive, stepplingRevealNonce]);
   useEffect(() => {
     // Back puts the board away; it never leaves the Kingdom from here.
     if (!restorationBoardVisible) return;
@@ -2125,7 +2128,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         </KatchaSheet>
       ) : null}
       {havenOpeningActive && ftueStep && !activeInteractionResidentId && ftueStepId !== 'world.first_bloom_restore'
-        && ftueStepId !== OPENING_MIST_OPEN_STEP_ID && ftueStepId !== OPENING_MIST_CLEAR_STEP_ID ? (
+        && ftueStepId !== OPENING_MIST_OPEN_STEP_ID && ftueStepId !== OPENING_MIST_CLEAR_STEP_ID
+        && (ftueStepId !== 'world.seed_planted' || firstSeedPlacementFailed) ? (
         <View
           pointerEvents="box-none"
           style={[
@@ -2145,7 +2149,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           </View>
           {(!['world.mist_lift', 'world.egg_intro', 'world.garden_arrival', 'world.garden_handoff', 'world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId ?? '')
               || (ftueStepId === 'world.first_bloom_offer' && firstLightFailed))
-            && (ftueStepId !== 'world.seed_planted' || firstSeedPlacementFailed || firstSeedPlanted)
+            && (ftueStepId !== 'world.seed_planted' || firstSeedPlacementFailed)
             && (ftueStepId !== 'world.first_seed_grew' || firstSeedGrown) ? <View style={styles.discoveryCalloutButton}>
             <KatchaButton
               fullWidth
@@ -2182,7 +2186,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       </View> : null}
       {stepplingMissionActive && stepplingMission.state ? <StepplingMissionDock
         state={stepplingMission.state} send={stepplingMission.send} merges={stepplingMission.merges} mergesRef={stepplingMission.mergesRef} width={window.width} bottomInset={insets.bottom}
-        landings={openingGlow.store} onGlow={openingGlow.launch} onFinale={launchStepplingFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
+        landings={openingGlow.store} onGlow={openingGlow.launch} onFinale={launchStepplingFinale} onReveal={bumpStepplingReveal} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} /> : null}
       {stepplingMissionActive && stepplingMission.state && stepplingMissionGuidanceVisible && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
         <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={stepplingMissionStep?.cue ?? null} guide={stepplingMissionStep?.guide ?? null}
@@ -2270,7 +2274,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           </View>
         </KatchaSheet>;
       })() : null}
-      {ftueCameraSettled && !sharedUpgrade && !upgradePresentation && !interactionCreatureId && (ftueStepId === 'haven.mossprout.focus' || ftueStepId === 'haven.mossprout.restore' || ftueStepId === 'world.garden_arrival' || (ftueStepId === 'world.seed_planted' && firstSeedPlanted && !firstSeedPlacementBusy && !firstSeedPlacementFailed) || ftueStepId === 'world.garden_handoff' || ftueStepId === 'world.first_bloom_offer' || ftueStepId === 'world.first_bloom_restore') ? (
+      {ftueCameraSettled && !sharedUpgrade && !upgradePresentation && !interactionCreatureId && (ftueStepId === 'haven.mossprout.focus' || ftueStepId === 'haven.mossprout.restore' || ftueStepId === 'world.garden_arrival' || (ftueStepId === 'world.seed_planted' && firstSeedPlacementFailed && !firstSeedPlacementBusy) || ftueStepId === 'world.garden_handoff' || ftueStepId === 'world.first_bloom_offer' || ftueStepId === 'world.first_bloom_restore') ? (
         <HavenFtueOverlay
           cue={ftueStep?.cue ?? null}
           fingerPlacement={ftueGardenUpgradeActive ? 'below' : 'center'}

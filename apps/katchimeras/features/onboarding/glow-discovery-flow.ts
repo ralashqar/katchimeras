@@ -5,7 +5,7 @@ import type { ContentFlowRun, ContentFlowSurface } from '@/types/content-flow';
 import type { MergeWorldState } from '@/types/merge-world';
 import type { FtueCameraDirective, FtueStepDefinition } from './ftue-types';
 import { mergeLessonRecipe, mergeLessonBoardStep, mergeLessonEvidenceReady, type MergeLessonBeat } from '@/features/content-flow/merge-lesson-recipe';
-import { GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS, glowGeneratorRule, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/utils/merge-world/glow-discovery-policy';
+import { GLOW_LESSON_LAYOUT_VERSION, GLOW_ORDER_IDS, glowGeneratorRule, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/utils/merge-world/glow-discovery-policy';
 import { MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM } from './opening-mist';
 import { STEPPLING_MISSION_CAMERA } from './steppling-mission';
 
@@ -45,23 +45,21 @@ export function glowDiscoveryResumeWorld(run: Pick<ContentFlowRun, 'status'> | n
 
 export const GLOW_DISCOVERY_RUN_ID = 'story:glow-steppling-v1';
 /**
- * The Garden board's proper introduction. The board starts bare: the first beat opens the parcel
- * the Basket arrives in (its own reward page greets it), then two Seeds, one merge, three sleeping
- * pieces woken up the ladder, and the request served for the light the trail needs.
+ * The Garden board's proper introduction: one lesson, nothing taught twice. Merging was taught by the
+ * opening, waking sleepers by Steppling's board; what is new here is a parcel on the tray, a spawner,
+ * and a request served. The board starts bare: open the parcel (the Basket's own reward page greets it),
+ * two Seeds, then grow the Plant the request asks for the player's own way (the finger only points after
+ * a pause), and serve it for the light the trail needs.
  */
 export const GLOW_LESSON: readonly MergeLessonBeat[] = [
   { id: 'lesson.single.parcel', kind: 'parcel', arrivalId: MOSSPROUT_BASKET_ARRIVAL_ID, guide: { eyebrow: 'A parcel from Mossprout', title: 'The Garden Basket. Open it.', body: 'Everything that grows here starts in there.' } },
-  { id: 'lesson.single.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'A request', title: 'Mossprout is asking for a Rare Flower.', body: 'That’s a request. Start small: tap the Basket twice for two Seeds.' } },
-  { id: 'lesson.single.seeds', kind: 'pair', definitionId: 'nature:garden:1', guide: { eyebrow: 'Making light', title: 'Two of the same, together.', body: 'Drag one onto the other.' } },
-  ...['Sprout', 'Plant', 'Flower'].map((name, index): MergeLessonBeat => ({
-    id: `lesson.single.match-${index + 2}`, kind: 'match', definitionId: `nature:garden:${index + 2}`, echoId: GLOW_SINGLE_ECHO_IDS[index],
-    guide: { coaching: index === 0 ? undefined : 'practice', eyebrow: 'In the grey', title: `The Mist has a ${name}. Its twin will pull it free.`, body: `Drag your ${name} onto it.` },
-  })),
-  { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: 'A request, served', title: 'That’s what was asked for. Give it here.', body: 'Serving a request is what turns a grown thing into light. Tap Serve.' } },
+  { id: 'lesson.single.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'A request', title: 'Mossprout is asking for a Plant.', body: 'That’s a request, on the right. Start with two Seeds.' } },
+  { id: 'lesson.single.grow', kind: 'grow', definitionId: 'nature:garden:3', generatorId: 'wild-garden', guide: { eyebrow: 'Making light', title: 'Two Seeds make a Sprout. Two Sprouts make a Plant.', body: 'Tap the Basket whenever you run short.' } },
+  { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: 'A request, served', title: 'Give it here.', body: 'Serving a request is what turns a grown thing into light.' } },
 ];
 export const GLOW_ALL_LESSON_BEATS = GLOW_LESSON;
 export const GLOW_DISCOVERY_FLOW = defineStory({
-  id: 'glow-steppling-discovery', version: 10, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
+  id: 'glow-steppling-discovery', version: 11, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
   nodes: [
     storyOperations.focusCamera({ id: 'gateway.focus', target: STEPPLING_STORY_TARGET, ...MIST_CLOSE_UP, next: 'garden.open' }),
     worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.single.prepare', view: { kind: 'garden', guide: { eyebrow: 'Someone’s in there', title: 'Light is made on the Garden board.', body: 'Mossprout has a request waiting there. Serve it and the light reaches the trail.' }, actionLabel: 'Open Garden' } }),
@@ -129,7 +127,7 @@ export function glowDiscoveryBoardStep(nodeId: string, state?: MergeWorldState |
   if (state && beat) {
     const start = lesson.indexOf(beat);
     beat = lesson.slice(start).find((candidate) => !glowDiscoveryLessonReady(candidate.id, state));
-  } else if (state && nodeId.endsWith('.prepare') && state.glowDiscoveryLesson?.layoutVersion === 2) {
+  } else if (state && nodeId.endsWith('.prepare') && state.glowDiscoveryLesson?.layoutVersion === GLOW_LESSON_LAYOUT_VERSION) {
     beat = lesson.find((candidate) => !glowDiscoveryLessonReady(candidate.id, state));
   }
   if (nodeId.startsWith('lesson.') && !beat) return {
@@ -137,16 +135,16 @@ export function glowDiscoveryBoardStep(nodeId: string, state?: MergeWorldState |
     interaction: { mode: 'blocked' as const },
   };
   const rule = state ? glowGeneratorRule() : null;
-  // If a Sprout was lost, rebuild it from Seeds using the same two guided beats.
-  if (state && beat?.kind === 'match' && beat.definitionId === 'nature:garden:2'
-    && !state.board.some((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:2')) {
-    const seeds = state.board.filter((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:1').length;
-    beat = lesson.find((candidate) => candidate.kind === (seeds >= 2 ? 'pair' : 'spawn'));
-  }
-  return mergeLessonBoardStep(beat, 'glow', state ? {
+  const step = mergeLessonBoardStep(beat, 'glow', state ? {
     board: state.board, generatorId: rule!.generatorId,
-    requiredDefinitionId: beat?.kind === 'match' || beat?.kind === 'pair' ? beat.definitionId : beat?.kind === 'serve' ? rule!.orderDefinitionId : rule!.defaultDefinitionId,
+    requiredDefinitionId: beat?.kind === 'match' || beat?.kind === 'pair' || beat?.kind === 'grow' ? beat.definitionId : beat?.kind === 'serve' ? rule!.orderDefinitionId : rule!.defaultDefinitionId,
   } : undefined);
+  // The Basket is spotlit for its first tap only; the second is the finger alone.
+  if (step && beat?.kind === 'spawn' && state && (state.glowDiscoveryLesson?.spawnedAt || state.board.some((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:1'))) {
+    const { spotlight: _spotlight, ...rest } = step;
+    return rest;
+  }
+  return step;
 }
 
 /** Board evidence survives reloads and delayed journal events without replaying input. */
@@ -155,18 +153,17 @@ export function glowDiscoveryLessonReady(nodeId: string, world: MergeWorldState)
   const beat = GLOW_ALL_LESSON_BEATS.find((candidate) => candidate.id === nodeId);
   if (!lesson || !beat) return false;
   if (lesson.servedOrderIds.includes(GLOW_ORDER_IDS[1])) return true;
-  if (lesson.layoutVersion !== 2) return false;
+  if (lesson.layoutVersion !== GLOW_LESSON_LAYOUT_VERSION) return false;
   const remainingEchoIds = world.board.flatMap((cell) => cell.mist?.kind === 'echo' ? [cell.mist.id] : []);
-  // The Basket's parcel is opened once it has been claimed, or once the Basket is on the board at all (a save from before the parcel).
-  const basketInstalled = Boolean(world.generators['wild-garden']) || world.board.some((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'wild-garden');
-  const claimedArrivalIds = [
-    ...world.arrivals.flatMap((arrival) => arrival.claimedAt != null ? [arrival.id] : []),
-    ...(basketInstalled ? [MOSSPROUT_BASKET_ARRIVAL_ID] : []),
-  ];
-  const pairMerged = !remainingEchoIds.includes(GLOW_SINGLE_ECHO_IDS[0]) || world.board.some((cell) => !cell.locked && cell.occupant?.kind === 'item' && /^nature:garden:[2-9]$/.test(cell.occupant.definitionId));
+  const boardDefinitionIds = world.board.flatMap((cell) => !cell.locked && cell.occupant?.kind === 'item' ? [cell.occupant.definitionId] : []);
+  // The Basket's parcel counts as opened only when it was claimed: the board this layout starts on has no
+  // Basket on it, so there is no other way for one to be there.
+  const claimedArrivalIds = world.arrivals.flatMap((arrival) => arrival.claimedAt != null ? [arrival.id] : []);
+  // Two Seeds out of the Basket, or anything already grown past a Seed: the spawns are done.
+  const pairMerged = boardDefinitionIds.some((id) => /^nature:garden:[2-9]$/.test(id));
   return mergeLessonEvidenceReady(beat, {
-    spawned: pairMerged || Boolean(lesson.spawnedAt && world.board.filter((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'nature:garden:1').length >= 2),
+    spawned: pairMerged || Boolean(lesson.spawnedAt && boardDefinitionIds.filter((id) => id === 'nature:garden:1').length >= 2),
     pairMerged,
-    remainingEchoIds, servedOrderIds: lesson.servedOrderIds, claimedArrivalIds,
+    remainingEchoIds, servedOrderIds: lesson.servedOrderIds, claimedArrivalIds, boardDefinitionIds,
   });
 }

@@ -1,6 +1,7 @@
 import type { MergeWorldState, MergeOrder } from '@/types/merge-world';
 import type { FtueStepDefinition, FtueTarget } from './ftue-types';
 import { defineStory, story } from '@/features/content-flow/story-manifest';
+import { closestPairOnBoard } from '@/features/content-flow/merge-lesson-recipe';
 
 export const STEPPLING_GARDEN_RUN_ID = 'ftue:steppling-garden:1';
 export const STEPPLING_PARCEL_ID = 'journey:steppling:day-1:journey-locker';
@@ -14,13 +15,15 @@ export const STEPPLING_GARDEN_CLOSING = 'A Shoe, some light, and the first stret
 export const STEPPLING_FINALE_NODE_IDS: readonly string[] = ['closing', 'summary'];
 
 export const STEPPLING_GARDEN_FLOW = defineStory({
-  id: 'steppling-garden-lesson', version: 1, entryNodeId: 'parcel', metadata: { kind: 'story' },
+  id: 'steppling-garden-lesson', version: 2, entryNodeId: 'parcel', metadata: { kind: 'story' },
   // An interim build authored the Kingdom goal as a node of this run. A save
   // that stopped there must land back on the summary it was reached from,
   // otherwise the lesson stays active forever with no surface that can end it.
-  migrations: { 'kingdom.goal': 'summary' },
+  // v2: the two guided taps and the guided merge became one free beat (the
+  // Garden lesson just taught that shape); a save parked on any of them grows.
+  migrations: { 'kingdom.goal': 'summary', 'spawn.first': 'grow', 'spawn.second': 'grow', 'merge': 'grow' },
   nodes: [
-    ...['parcel', 'spawn.first', 'spawn.second', 'merge', 'serve'].map((id, index, ids) => story.task({
+    ...['parcel', 'grow', 'serve'].map((id, index, ids) => story.task({
       id, capability: 'steppling.garden.task', surface: 'merge', taskId: id,
       requirements: [{ id: 'done', event: { type: `steppling.garden.${id}` } }], next: ids[index + 1] ?? 'closing',
     })),
@@ -50,33 +53,32 @@ export function stepplingGardenCheckpoint(state: MergeWorldState): string {
   if (!state.board.some((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'journey-locker')) return 'parcel';
   const items = state.board.filter((cell) => !cell.locked && cell.occupant?.kind === 'item').map((cell) => cell.occupant);
   if (items.some((item) => item?.kind === 'item' && item.definitionId === 'adventure:trail:2')) return 'serve';
-  const socks = items.filter((item) => item?.kind === 'item' && item.definitionId === 'adventure:trail:1').length;
-  return socks >= 2 ? 'merge' : socks === 1 ? 'spawn.second' : 'spawn.first';
+  return 'grow';
 }
+/** Socks, and only Socks, until the Shoe is on the board: it is merged, never dropped. */
 export function stepplingGardenDrop(state: MergeWorldState, generatorId: string): string | null {
   return state.stepplingGardenLesson && !stepplingShoeServed(state) && generatorId === 'journey-locker'
-    && ['spawn.first', 'spawn.second'].includes(stepplingGardenCheckpoint(state)) ? 'adventure:trail:1' : null;
+    && stepplingGardenCheckpoint(state) === 'grow' ? 'adventure:trail:1' : null;
 }
 export function stepplingGardenBoardStep(nodeId: string, state: MergeWorldState): FtueStepDefinition | null {
   if (nodeId === 'complete') return null;
   const base = { id: `steppling.garden.${nodeId}`, surface: 'merge' as const, actions: [] };
   if (STEPPLING_FINALE_NODE_IDS.includes(nodeId)) return { ...base, guide: { eyebrow: '', title: 'Back to Steppling.', body: '' }, interaction: { mode: 'blocked' } };
-  if (['parcel', 'spawn.first', 'spawn.second'].includes(nodeId) && !state.board.some((cell) => !cell.locked && !cell.mist && !cell.occupant)) {
+  if (nodeId === 'parcel' && !state.board.some((cell) => !cell.locked && !cell.mist && !cell.occupant)) {
     return { ...base, guide: { eyebrow: '', title: 'A little room', body: 'Merge or store an item, then we’ll continue.' } };
   }
-  if (nodeId === 'merge') {
-    const from: FtueTarget = { kind: 'board_items', definitionId: 'adventure:trail:1', occurrence: 0 };
-    const to: FtueTarget = { ...from, occurrence: 1 };
-    return { ...base, guide: { eyebrow: '', title: 'Make a Shoe.', body: 'Merge the two Socks.' }, cue: { kind: 'drag', from, to },
-      spotlight: { targets: [from, to], grouping: 'bounding_rect' }, interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from, to } } };
+  if (nodeId === 'grow') {
+    // Free: the Garden lesson just taught this shape. The finger only points after a pause, at the two Socks or the Locker.
+    const pair = closestPairOnBoard(state.board);
+    const cue: FtueStepDefinition['cue'] = pair
+      ? { kind: 'drag', from: { kind: 'board_cell', cell: pair.from }, to: { kind: 'board_cell', cell: pair.to } }
+      : { kind: 'tap', target: { kind: 'board_generator', generatorId: 'journey-locker' } };
+    return { ...base, guide: { eyebrow: '', title: 'Yours now. Make him a Shoe.', body: 'Two Socks from the Locker, together.' }, cue, interaction: { mode: 'none' } };
   }
   if (nodeId === 'serve') return { ...base, guide: { eyebrow: '', title: 'Steppling needs a Shoe.', body: 'Serve it, and the light is yours to spend.' },
     cue: { kind: 'tap', target: { kind: 'order_serve', orderId: STEPPLING_SHOE_ORDER_ID } }, spotlight: { targets: [{ kind: 'order_card', orderId: STEPPLING_SHOE_ORDER_ID }] },
     interaction: { mode: 'exclusive', allowed: { kind: 'order_serve', target: { kind: 'order_serve', orderId: STEPPLING_SHOE_ORDER_ID } } } };
-  const parcel = nodeId === 'parcel';
-  const target: FtueTarget = parcel ? { kind: 'tray_parcel', arrivalId: STEPPLING_PARCEL_ID } : { kind: 'board_generator', generatorId: 'journey-locker' };
-  return { ...base, guide: parcel ? { eyebrow: '', title: 'A parcel from Steppling!', body: 'He kept it through the whole Mist. Tap to open it.' }
-    : nodeId === 'spawn.first' ? { eyebrow: '', title: 'Steppling’s Journey Locker.', body: 'Yours now. Tap it to make walking gear.' }
-    : { eyebrow: '', title: 'One more Sock!', body: 'Tap the Locker again.' }, cue: { kind: 'tap', target }, spotlight: { targets: [target] },
-    interaction: parcel ? { mode: 'exclusive', allowed: { kind: 'parcel_tap', target } } : { mode: 'exclusive', allowed: { kind: 'generator_tap', target } } };
+  const target: FtueTarget = { kind: 'tray_parcel', arrivalId: STEPPLING_PARCEL_ID };
+  return { ...base, guide: { eyebrow: '', title: 'A parcel from Steppling!', body: 'He kept it through the whole Mist. Tap to open it.' },
+    cue: { kind: 'tap', target }, spotlight: { targets: [target] }, interaction: { mode: 'exclusive', allowed: { kind: 'parcel_tap', target } } };
 }

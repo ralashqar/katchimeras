@@ -40,11 +40,14 @@ test('the first light is earned once per run when the last wisp falls, and pays 
 
 test('the planted memory goes straight to the offer, and nothing on the way can strand the player', () => {
   assert.equal(mossproutFtueAction('world.seed_planted', 'world.acknowledge_seed_dormant')?.nextStepId, 'world.first_bloom_offer');
-  assert.equal(mossproutFtueStep('world.seed_planted')?.cue, undefined, 'nothing to tap but Continue');
+  assert.equal(mossproutFtueStep('world.seed_planted')?.cue, undefined, 'nothing to tap');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  assert.match(screen, /'world\.seed_planted': 2_600,/, 'a beat on the planted line, then the offer');
+  assert.match(screen, /'world\.seed_planted': 0,/, 'the moment the Seed is in the ground, the offer: no beat, no Continue');
   assert.match(screen, /if \(ftueStepId === 'world\.seed_planted' && !firstSeedPlanted\) return;/, 'never before the Seed is in the ground');
-  assert.match(screen, /\(ftueStepId !== 'world\.seed_planted' \|\| firstSeedPlacementFailed \|\| firstSeedPlanted\)/, 'and Continue is on screen as the fallback');
+  assert.match(screen, /&& \(ftueStepId !== 'world\.seed_planted' \|\| firstSeedPlacementFailed\) \? \(/, 'nothing is shown for the beat unless the planting failed');
+  assert.match(screen, /\(ftueStepId !== 'world\.seed_planted' \|\| firstSeedPlacementFailed\)\s*&& \(ftueStepId !== 'world\.first_seed_grew'/, 'the only button the beat can show is the retry');
+  assert.match(screen, /ftueStepId === 'world\.seed_planted' && firstSeedPlacementFailed\s*\? 'Retry Planting'/);
+  assert.doesNotMatch(screen, /gardenWorldBottomCtaActive = \(ftueStepId === 'world\.seed_planted' && \(firstSeedPlacementFailed \|\| firstSeedPlanted\)\)/);
   // The lift: the light is seen arriving; the offer: repaired under the same receipt if the wallet is short.
   assert.match(screen, /if \(ftueStepId !== OPENING_MIST_LIFT_STEP_ID\) return;[\s\S]*?ensureStoredOpeningGlow\(`\$\{activeFtueRunId \?\? 'current'\}:opening-glow`\)[\s\S]*?openingGlow\.launch\(from, glowCurrencyArtRef\.current\);/);
   assert.match(screen, /if \(mergeWorld\.coins >= GLOW\.firstRestorationCost\) return;[\s\S]*?void repairFirstLight\(\);/, 'a short wallet at the offer is repaired');

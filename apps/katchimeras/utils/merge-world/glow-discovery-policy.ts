@@ -1,13 +1,16 @@
+import { localDayId } from '@/utils/world-identity-rules';
 import { GLOW } from '@/constants/glow';
-import { MERGE_WORLD_COLUMNS, MOSSPROUT_DREAM_ECHOES } from '@/constants/merge-world-catalog';
+import { MOSSPROUT_DREAM_ECHOES, MERGE_GENERATORS_BY_ID, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { SHARED_WORLD_PURCHASES } from '@/constants/shared-world';
-import { tutorialGeneratorDrop, type TutorialGeneratorRule } from './tutorial-generator-policy';
+import type { TutorialGeneratorRule } from './tutorial-generator-policy';
 import type { MergeOrder, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 
 export const GLOW_GATEWAY_ID = 'mossprout:overgrown-trail' as const;
 export const GLOW_ORDER_IDS = ['mossprout:glow:plant-1', 'mossprout:glow:plant-2'] as const;
 /** The parcel the Garden Basket arrives in: the first thing the player opens on the Garden board. */
 export const MOSSPROUT_BASKET_ARRIVAL_ID = 'arrival:ftue:garden-basket';
+/** The lesson's board layout: 3 is the Basket by parcel on a board with no loose items. An older layout is re-prepared. */
+export const GLOW_LESSON_LAYOUT_VERSION = 3 as const;
 export const GLOW_ECHO_IDS = ['glow:seed', 'glow:sprout'] as const;
 export const GLOW_REPEAT_ECHO_IDS = ['glow:repeat:seed', 'glow:repeat:sprout', 'glow:repeat:plant', 'glow:repeat:flower', 'glow:repeat:rare-flower'] as const;
 export const GLOW_SINGLE_ECHO_IDS = GLOW_REPEAT_ECHO_IDS.slice(1, 4);
@@ -16,10 +19,11 @@ export const GLOW_GENERATOR_RULE: TutorialGeneratorRule = {
   matches: GLOW_ECHO_IDS.map((echoId, index) => ({ echoId, definitionId: `nature:garden:${index + 1}` })),
   orderId: GLOW_ORDER_IDS[0], orderDefinitionId: 'nature:garden:3',
 };
+/** The Garden lesson: Seeds only from the Basket, grown the player's way into the Plant the request asks for. */
 export const GLOW_REPEAT_GENERATOR_RULE: TutorialGeneratorRule = {
   generatorId: 'wild-garden', defaultDefinitionId: 'nature:garden:1',
-  matches: GLOW_SINGLE_ECHO_IDS.map((echoId, index) => ({ echoId, definitionId: `nature:garden:${index + 2}` })),
-  orderId: GLOW_ORDER_IDS[1], orderDefinitionId: 'nature:garden:5',
+  matches: [],
+  orderId: GLOW_ORDER_IDS[1], orderDefinitionId: 'nature:garden:3',
 };
 
 export function glowGeneratorRule() {
@@ -29,9 +33,8 @@ export function glowGeneratorRule() {
 export function glowTutorialDrop(state: MergeWorldState, generatorId: string) {
   const lesson = state.glowDiscoveryLesson;
   if (!lesson || generatorId !== GLOW_GENERATOR_RULE.generatorId || lesson.servedOrderIds.includes(GLOW_ORDER_IDS[1])) return null;
-  // The first Sprout must come from two spawned Seeds, never a direct tier-two drop.
-  if (state.board.some((cell) => cell.mist?.kind === 'echo' && cell.mist.id === GLOW_SINGLE_ECHO_IDS[0])) return 'nature:garden:1';
-  return tutorialGeneratorDrop(state, glowGeneratorRule(), lesson.servedOrderIds);
+  // Seeds, and only Seeds, until the request is served: the Plant is grown, never dropped.
+  return glowGeneratorRule().defaultDefinitionId;
 }
 export const WORLD_UNLOCK_CATALOG = Object.fromEntries(SHARED_WORLD_PURCHASES.map((tile) => [tile.unlockId, { ...tile, destination: tile.companion }]));
 
@@ -44,9 +47,9 @@ export function glowGatewayState(state: MergeWorldState): 'egg' | 'open' | 'lock
 
 export function glowDiscoveryOrder(index: 0 | 1, now: number): MergeOrder {
   return {
-    id: GLOW_ORDER_IDS[index], characterId: 'mossprout', title: index === 0 ? 'A little light' : 'Keep the Garden growing',
-    description: index === 0 ? 'Grow a Plant to earn 20 Glow.' : 'Grow a Rare Flower to earn enough Glow to clear the mist.', difficulty: index === 0 ? 'small' : 'medium',
-    requirements: [{ definitionId: index === 0 ? 'nature:garden:3' : 'nature:garden:5', quantity: 1 }],
+    id: GLOW_ORDER_IDS[index], characterId: 'mossprout', title: index === 0 ? 'A little light' : 'Light for the trail',
+    description: index === 0 ? 'Grow a Plant to earn 20 Glow.' : 'Grow a Plant. The trail needs forty Glow.', difficulty: 'small',
+    requirements: [{ definitionId: 'nature:garden:3', quantity: 1 }],
     reward: { coins: index === 0 ? GLOW.tutorialRequestReward : GLOW.mistUnlockCost, energy: 0, mergeXp: 15, friendshipXp: 0 },
     createdAt: now, signature: false, purpose: 'normal', storyArcId: 'mossprout:glow-discovery',
   };
@@ -61,31 +64,49 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
   if (command.type === 'prepareGlowDiscoveryLesson') {
     const lesson = state.glowDiscoveryLesson;
     const orderIndex = 1;
-    if (lesson && (lesson.servedOrderIds.includes(GLOW_ORDER_IDS[1]) || lesson.layoutVersion === 2)) return no();
+    if (lesson && (lesson.servedOrderIds.includes(GLOW_ORDER_IDS[1]) || lesson.layoutVersion === GLOW_LESSON_LAYOUT_VERSION)) return no();
     // The Basket may still be in its parcel: the lesson's first beat opens it, and the claim installs the generator.
-    const generator = state.generators['wild-garden'];
+    let generators = state.generators;
+    let arrivals = state.arrivals;
     const board = state.board.map((cell) => ({ ...cell }));
-    // Retire obsolete seed/extra-tier targets without touching owned items.
-    const retiredIds: readonly string[] = [...GLOW_ECHO_IDS, GLOW_REPEAT_ECHO_IDS[0], GLOW_REPEAT_ECHO_IDS[4], MOSSPROUT_DREAM_ECHOES[0].id];
+    // The board the lesson starts on is empty: only the parcel brings the spawner in. A profile from
+    // before that (the Basket already on the board, or an older lesson under way with its Seeds and
+    // sleepers), or one whose Basket was put on the board while its parcel still waited on the tray,
+    // is brought to the same start, as long as it has earned nothing else yet: the Basket goes back
+    // into its parcel, the loose items on the open cells go, and the Basket's reward page is owed
+    // again, so the parcel is opened and greeted the way it is meant to be. Once the parcel has been
+    // opened the Basket is the player's, and nothing here touches it.
+    const basketCell = board.findIndex((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'wild-garden');
+    const basketArrival = arrivals.find((arrival) => arrival.id === MOSSPROUT_BASKET_ARRIVAL_ID);
+    const preEconomy = Object.keys(state.generators).every((id) => id === 'wild-garden') && (!basketArrival || basketArrival.claimedAt == null);
+    let generatorUnlockReceipts = state.generatorUnlockReceipts;
+    if (preEconomy) {
+      const definition = MERGE_GENERATORS_BY_ID.get('wild-garden')!;
+      const item = MERGE_ITEMS_BY_ID.get(definition.tierOneDropDefinitionIds[0])!;
+      if (basketCell >= 0) board[basketCell] = { ...board[basketCell], occupant: null };
+      for (const cell of board) {
+        if (!cell.locked && !cell.mist && cell.occupant?.kind === 'item') cell.occupant = null;
+      }
+      generators = Object.fromEntries(Object.entries(state.generators).filter(([id]) => id !== 'wild-garden'));
+      generatorUnlockReceipts = state.generatorUnlockReceipts.filter((receipt) => receipt.generatorId !== 'wild-garden');
+      if (!basketArrival) {
+        arrivals = [...arrivals, {
+          id: MOSSPROUT_BASKET_ARRIVAL_ID, kind: 'contextual_parcel', generatorId: 'wild-garden', createdAt: command.now, dayId: localDayId(new Date(command.now)),
+          label: definition.name, theme: 'memory', familyId: item.familyId, chainId: definition.chainIds[0], source: 'companion_story', itemDefinitionIds: [], claimedAt: null, seenAt: null,
+        }];
+      }
+    }
+    const generator = generators['wild-garden'];
+    // Retire the old lessons' sleeping targets without touching owned items; nothing new is planted, the
+    // sleepers were taught on Steppling's board and the Plant is grown from Seeds alone.
+    const retiredIds: readonly string[] = [...GLOW_ECHO_IDS, ...GLOW_REPEAT_ECHO_IDS, MOSSPROUT_DREAM_ECHOES[0].id];
     for (const cell of board) {
       if (!cell.occupant && cell.mist?.kind === 'echo' && retiredIds.includes(cell.mist.id)) cell.mist = { kind: 'dormant' };
     }
-    const echoIds = GLOW_SINGLE_ECHO_IDS;
-    for (const [index, id] of echoIds.entries()) {
-      if (board.some((cell) => cell.mist?.kind === 'echo' && cell.mist.id === id)) continue;
-      const existing = board.findIndex((cell) => !cell.occupant && cell.mist?.kind === 'echo' && cell.mist.id === MOSSPROUT_DREAM_ECHOES[index + 1].id);
-      // Expand nearby mist first: do not re-lock the spaces just freed by request one.
-      const anchor = MOSSPROUT_DREAM_ECHOES[index + 1].cell;
-      const distance = (slot: number) => Math.abs(slot % MERGE_WORLD_COLUMNS - anchor % MERGE_WORLD_COLUMNS) + Math.abs(Math.floor(slot / MERGE_WORLD_COLUMNS) - Math.floor(anchor / MERGE_WORLD_COLUMNS));
-      const candidates = board.flatMap((cell, slot) => !cell.occupant && (!cell.mist || cell.mist.kind === 'dormant') ? [slot] : []);
-      candidates.sort((a, b) => Number(board[b].mist?.kind === 'dormant') - Number(board[a].mist?.kind === 'dormant') || distance(a) - distance(b));
-      const slot = existing >= 0 ? existing : candidates[0] ?? -1;
-      if (slot < 0) return no('Make room in the Garden, then try again.');
-      board[slot] = { ...board[slot], locked: true, blocker: 'vines', mist: { kind: 'echo', id, definitionId: `nature:garden:${index + 2}`, ownerCharacterId: 'mossprout' } };
-    }
     return changed(state, {
-      ...state, board, glowDiscoveryLesson: { preparedAt: lesson?.preparedAt ?? command.now, servedOrderIds: lesson?.servedOrderIds ?? [], guidedOrderIndex: orderIndex, layoutVersion: 2 },
-      generators: generator ? { ...state.generators, 'wild-garden': { ...generator, forcedDropDefinitionId: 'nature:garden:1' } } : state.generators,
+      ...state, board, arrivals, generatorUnlockReceipts,
+      glowDiscoveryLesson: { preparedAt: lesson?.preparedAt ?? command.now, servedOrderIds: lesson?.servedOrderIds ?? [], guidedOrderIndex: orderIndex, layoutVersion: GLOW_LESSON_LAYOUT_VERSION },
+      generators: generator ? { ...generators, 'wild-garden': { ...generator, forcedDropDefinitionId: 'nature:garden:1' } } : generators,
       activeOrders: [...state.activeOrders.filter((order) => order.id !== 'mossprout:ftue:help-garden-wake' && !(GLOW_ORDER_IDS as readonly string[]).includes(order.id)), glowDiscoveryOrder(orderIndex, command.now)],
     }, command.now);
   }
@@ -161,7 +182,7 @@ export function normalizeGlowDiscoveryFields(source: Partial<MergeWorldState>): 
   return { worldUnlocks, glowDiscoveryLesson: lesson && time(lesson.preparedAt) ? {
     preparedAt: lesson.preparedAt, spawnedAt: time(lesson.spawnedAt) ? lesson.spawnedAt : undefined,
     guidedOrderIndex: lesson.guidedOrderIndex === 1 ? 1 : 0,
-    layoutVersion: lesson.layoutVersion === 2 ? 2 : undefined,
+    layoutVersion: lesson.layoutVersion === 3 ? 3 : lesson.layoutVersion === 2 ? 2 : undefined,
     servedOrderIds: Array.isArray(lesson.servedOrderIds) ? [...new Set(lesson.servedOrderIds.filter((id) => (GLOW_ORDER_IDS as readonly string[]).includes(id)))] : [],
   } : undefined };
 }

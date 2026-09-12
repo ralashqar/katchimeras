@@ -36,6 +36,8 @@ import { useMergeWorldActions, useMergeWorldLastResult, useMergeWorldSelector, u
 import { advanceFtueActionDurably, commitFtueAction, completeFtueRun, dispatchFtueEvent, flushFtuePersistence, loadFtueRun, registerFtueObjectiveBaseline, repairFtueStep, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MOSSPROUT_FTUE_COPY } from '@/features/onboarding/mossprout-ftue-copy';
 import { useGlowDiscovery, reconcileGlowLesson, submitGlowAction } from '@/features/onboarding/glow-discovery-runtime';
+import { IDLE_FINGER_THEME } from '@/features/content-flow/merge-lesson-recipe';
+import { GLOW_ORDER_IDS, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/utils/merge-world/glow-discovery-policy';
 import { glowDiscoveryBoardStep, glowDiscoveryScene } from '@/features/onboarding/glow-discovery-flow';
 import { MOSSPROUT_FTUE_RETURN_NOTE_ID, mossproutFtueStep } from '@/features/onboarding/mossprout-ftue-script';
 import { mergeFtueAllowsChatNote, mergeFtueAllowsCommand, mergeFtueBoardGate, mergeFtueEventForCommand, mergeFtueRailGate, mergeFtueRepairTarget, mergeFtueStepEntryBaseline, mergeFtueStepForBoard, chapterZeroStepsFrom, mossproutChapterZeroRepairTarget, recoverMergeFtueEvent } from '@/features/onboarding/merge-ftue';
@@ -120,6 +122,8 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   const stepplingReturning = useRef(false);
   const [stepplingLessonError, setStepplingLessonError] = useState(false);
   const glowScene = glowRun ? glowDiscoveryScene(glowRun.nodeId) : null;
+  // The Garden lesson: the tray holds only the Basket's parcel, then only Mossprout's request.
+  const glowLessonActive = Boolean(glowRun && glowRun.status !== 'completed' && glowRun.nodeId.startsWith('lesson.'));
   const navigation = useNavigation();
   const stepplingBoardLocked = active && stepplingLesson.active && !STEPPLING_FINALE_NODE_IDS.includes(stepplingLesson.run?.nodeId ?? '');
   usePreventRemove(stepplingBoardLocked, () => {});
@@ -700,7 +704,9 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     && (arrival.kind === 'discovery_parcel' || arrival.kind === 'root_match_parcel' || arrival.kind === 'resident_card_parcel' || arrival.kind === 'contextual_parcel' || arrival.kind === 'goal_chest')
     && (arrival.itemDefinitionIds.length > 0 || Boolean(arrival.generatorId))
   )).sort((left, right) => left.createdAt - right.createdAt) ?? [], [state?.arrivals]);
-  const pendingParcel = (stepplingLesson.active ? pendingParcels.find((arrival) => arrival.id === STEPPLING_PARCEL_ID) : pendingParcels[0]) ?? null;
+  const pendingParcel = (stepplingLesson.active ? pendingParcels.find((arrival) => arrival.id === STEPPLING_PARCEL_ID)
+    : glowLessonActive ? pendingParcels.find((arrival) => arrival.id === MOSSPROUT_BASKET_ARRIVAL_ID) ?? pendingParcels[0]
+    : pendingParcels[0]) ?? null;
   const pendingMemoryCard = state?.ownedMemoryCards.find((card) => card.revealedAt == null) ?? null;
   const revealedMemoryCard = revealedMemoryCardId ? MEMORY_CARDS_BY_ID.get(revealedMemoryCardId) ?? null : null;
   const memoryCardPresentation = pendingMemoryCard ? MEMORY_CARDS_BY_ID.get(pendingMemoryCard.cardId) ?? null : revealedMemoryCard;
@@ -711,6 +717,12 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       if (pendingParcel) return [{ id: 'parcel-stack', kind: 'parcel', arrival: pendingParcel, count: 1,
         disabled: !active || Boolean(parcelFlight) || Boolean(serveFlight), shakeNonce: parcelShakeNonce }];
       const order = state.activeOrders.find((entry) => entry.id === STEPPLING_SHOE_ORDER_ID);
+      return order ? [{ id: order.id, kind: 'order', order, itemReadiness: mergeOrderItemReadiness(state, order), ready: readyOrderIds.has(order.id) }] : [];
+    }
+    if (glowLessonActive) {
+      if (pendingParcel?.id === MOSSPROUT_BASKET_ARRIVAL_ID) return [{ id: 'parcel-stack', kind: 'parcel', arrival: pendingParcel, count: 1,
+        disabled: !active || Boolean(parcelFlight) || Boolean(serveFlight), shakeNonce: parcelShakeNonce }];
+      const order = state.activeOrders.find((entry) => entry.id === GLOW_ORDER_IDS[1]);
       return order ? [{ id: order.id, kind: 'order', order, itemReadiness: mergeOrderItemReadiness(state, order), ready: readyOrderIds.has(order.id) }] : [];
     }
     const chapterZeroOrders = state.activeOrders.filter((order) => order.id.startsWith('mossprout:chapter-0:'));
@@ -790,7 +802,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     // Midpoint notes sit before the remaining requests so the story beat is
     // immediately visible without replacing or hiding any unserved order.
     return [...parcelEntries, ...returnEntries, ...orderEntries];
-  }, [stepplingLesson.active, active, activeResidentDiscovery?.id, activityFamilyId, requestCharacterId, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+  }, [stepplingLesson.active, glowLessonActive, active, activeResidentDiscovery?.id, activityFamilyId, requestCharacterId, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
     const state = stateRef.current;
@@ -1088,6 +1100,8 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
         state={state}
         spotlight={mergeGuidanceVisible ? mergeGuidanceSpotlight : null}
         targetRevision={ftueTargetRevision}
+        // A free beat with nothing spotlit (grow it your way): the finger is a nudge after a pause, not a lead.
+        visualTheme={ftueStep?.interaction?.mode === 'none' && !ftueStep.spotlight ? IDLE_FINGER_THEME : undefined}
       />
       {active && glowScene?.view.kind === 'return' && !serveFlight ? <MergeGlowReadyGuide
         screenRef={screenRef} currencyRef={coinHudRef} currencyPillRef={coinHudPillRef} layoutNonce={screenLayoutNonce}

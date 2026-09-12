@@ -55,14 +55,23 @@ Target four of five who can complete discovery and explain how merging helps the
 
 ## First light and the Garden board's introduction (Sept 12, 2026)
 
-Built. The first restore no longer sends the player to Merge: the profile starts with twenty Glow
-(`createMossproutBasketParcelState` sets `coins`), the planted-memory beat moves on to the offer by itself
-after a short pause, and the glowing bubble wakes the garden. The Merge button is not shown at all during
-the first session. Script v50; a save parked on the old Chapter 0 request continues at the offer.
+Built. The first restore no longer sends the player to Merge. The Glow that drove the opening's wisps
+off stays with you: right after the lift, a flow effect (`haven.opening_glow`, world command
+`grantOpeningGlow`, once per run) grants twenty Glow, the Kingdom shows it flying from the tile into the
+counter, and a profile that reaches the offer short of it is repaired under the same receipt (with a
+retry if that fails). The planted-memory beat moves on to the offer the moment the Seed is in the
+ground: nothing to read, nothing to tap, only a retry if the planting itself failed. The Merge button is
+not shown at all during the first session.
+Script v50; a save parked on the old Chapter 0 request continues at the offer.
 
-The Garden board is introduced during Steppling's Glow discovery instead. It is installed bare at the first
-meeting (`createMossproutBasketParcelState`: locked cells, the sleeping echoes, no request, the Garden Basket
-waiting in a parcel on the tray). The lesson (`GLOW_LESSON`, flow v10) opens the parcel first (the Basket's
-"New spawner" page greets it), then two Seeds, one merge, three sleeping pieces woken up the ladder, and
-Mossprout's request served for the forty Glow the trail needs. The copy introduces requests as the thing that
-turns a grown thing into light.
+The Garden board is introduced during Steppling's Glow discovery instead, as one lesson that teaches
+nothing twice (merging was taught by the opening board, waking sleepers by Steppling's board). The board
+is installed bare at the first meeting (`createMossproutBasketParcelState`: locked cells, the sleeping
+echoes, no request, the Garden Basket waiting in a parcel on the tray); a profile from before the parcel
+has its Basket lifted back into one when the lesson is prepared. The lesson (`GLOW_LESSON`, flow v11) is
+four beats: open the parcel (spotlit; the Basket's "New spawner" page greets it), tap the Basket for two
+Seeds (spotlit once, then the finger alone), grow a Plant your own way (a free `grow` beat: the finger
+points at the closest pair or the Basket only after a two-second pause, and the Basket gives Seeds only),
+and serve Mossprout's request for the forty Glow the trail needs. The tray holds only the parcel, then
+only the request. Steppling's own garden lesson keeps the same shape shorter: open his parcel, make him
+a Shoe freely, serve it (`steppling-garden-lesson.ts` v2).

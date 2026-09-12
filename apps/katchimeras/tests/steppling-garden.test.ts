@@ -31,7 +31,7 @@ test('Steppling lesson registers and every authored task and finale action is va
   assert.deepEqual(validateContentFlowDefinition(STEPPLING_GARDEN_FLOW), []);
   assert.doesNotThrow(() => registerContentFlowDefinition(STEPPLING_GARDEN_FLOW));
   let run = createContentFlowRun(STEPPLING_GARDEN_FLOW, { runId: 'lesson-test', now: NOW });
-  for (const id of ['parcel', 'spawn.first', 'spawn.second', 'merge', 'serve']) {
+  for (const id of ['parcel', 'grow', 'serve']) {
     assert.equal(run.nodeId, id);
     run = reduceContentFlow(STEPPLING_GARDEN_FLOW, JSON.parse(JSON.stringify(run)), { type: 'record_event', event: {
       eventId: id, runId: run.runId, nodeId: id, type: `steppling.garden.${id}`, occurredAt: NOW, payload: {},
@@ -45,29 +45,32 @@ test('Steppling lesson registers and every authored task and finale action is va
   run = reduceContentFlow(STEPPLING_GARDEN_FLOW, JSON.parse(JSON.stringify(run)), { type: 'submit_scene', actionId: 'finish' }).run;
   assert.equal(run.status, 'completed', 'the summary tap ends the lesson');
 });
-test('parcel, two guaranteed Socks, merge and one Shoe order survive reloads without duplicate rewards', () => {
+test('the parcel, then a Shoe grown freely from the Locker’s Socks, then one Shoe order, all surviving reloads without duplicate rewards', () => {
   let state = prepared();
   assert.equal(stepplingGardenCheckpoint(state), 'parcel');
   assert.equal(reduceMergeWorld(state, { type: 'prepareStepplingGardenLesson', now: NOW }).changed, false);
   state = apply(state, { type: 'claimArrival', arrivalId: STEPPLING_PARCEL_ID, now: NOW });
-  assert.equal(stepplingGardenCheckpoint(state), 'spawn.first');
+  assert.equal(stepplingGardenCheckpoint(state), 'grow', 'the Garden lesson just taught the shape: the middle is free');
   state.generators['journey-locker'] = { ...state.generators['journey-locker'], charges: 0, restStartedAt: NOW };
   state.energy.value = 0;
-  for (const [index, next] of ['spawn.second', 'merge'].entries()) {
+  const first = stepplingGardenBoardStep('grow', state)!;
+  assert.deepEqual(first.interaction, { mode: 'none' });
+  assert.equal(first.spotlight, undefined);
+  assert.equal(first.cue?.kind, 'tap', 'no Socks yet: the finger points at the Locker, after a pause');
+  for (let index = 0; index < 2; index++) {
     const command = { type: 'tapGenerator' as const, generatorId: 'journey-locker', seed: `${index}`, now: NOW };
     const step = stepplingGardenBoardStep(stepplingGardenCheckpoint(state), state);
     assert.equal(mergeFtueAllowsCommand(step, state, command), true);
-    assert.equal(mergeFtueAllowsCommand(step, state, { ...command, generatorId: 'wild-garden' }), false);
     state = apply(state, command);
-    assert.equal(stepplingGardenCheckpoint(state), next);
+    assert.equal(stepplingGardenCheckpoint(state), 'grow');
     assert.equal(state.energy.value, 0);
   }
-  assert.equal(stepplingGardenDrop(state, 'journey-locker'), null, 'no third tutorial drop');
-  assert.equal(reduceMergeWorld(state, { type: 'tapGenerator', generatorId: 'journey-locker', seed: 'rapid-third', now: NOW }).changed, false);
+  assert.equal(stepplingGardenDrop(state, 'journey-locker'), 'adventure:trail:1', 'the Locker keeps giving Socks until the Shoe is made');
   const socks = state.board.filter((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'adventure:trail:1');
   assert.equal(socks.length, 2);
+  assert.equal(stepplingGardenBoardStep('grow', state)!.cue?.kind, 'drag', 'two Socks: the finger points at the pair');
   const command = { type: 'move' as const, from: state.board.indexOf(socks[0]), to: state.board.indexOf(socks[1]), now: NOW };
-  assert.equal(mergeFtueAllowsCommand(stepplingGardenBoardStep('merge', state), state, command), true);
+  assert.equal(mergeFtueAllowsCommand(stepplingGardenBoardStep('grow', state), state, command), true);
   state = apply(state, command);
   assert.equal(stepplingGardenCheckpoint(state), 'serve');
   const before = state.coins;
@@ -99,7 +102,7 @@ test('journal recovery follows saved board evidence and preserves the summary an
   });
   let state = prepared();
   state = apply(state, { type: 'claimArrival', arrivalId: STEPPLING_PARCEL_ID, now: NOW });
-  await runtime.reconcileStepplingGarden(state); assert.equal(run.nodeId, 'spawn.first');
+  await runtime.reconcileStepplingGarden(state); assert.equal(run.nodeId, 'grow');
   for (const nodeId of ['summary', 'complete']) {
     run = { ...run, nodeId, status: nodeId === 'complete' ? 'completed' : 'active' };
     await runtime.reconcileStepplingGarden(state); assert.equal(run.nodeId, nodeId);
@@ -112,6 +115,7 @@ test('journal recovery follows saved board evidence and preserves the summary an
   assert.equal(run.nodeId, 'summary');
   assert.equal(run.definitionVersion, STEPPLING_GARDEN_FLOW.version);
   assert.equal(STEPPLING_GARDEN_FLOW.migrations?.['kingdom.goal'], 'summary');
+  for (const old of ['spawn.first', 'spawn.second', 'merge']) assert.equal((STEPPLING_GARDEN_FLOW.migrations as Record<string, string>)[old], 'grow', 'a save parked on a retired guided beat grows');
   const completed = { ...run, nodeId: 'kingdom.goal', status: 'completed' as const };
   run = completed;
   await runtime.reconcileStepplingGarden(state);

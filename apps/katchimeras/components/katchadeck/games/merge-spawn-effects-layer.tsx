@@ -89,7 +89,7 @@ const MergeBoardEffectSlot = memo(function MergeBoardEffectSlot({ effect, geomet
     cancelAnimation(progress);
     progress.value = 0;
     if (effect) {
-      const duration = reduceMotion ? 180 : effect.kind === 'spawn-origin' ? 450 : effect.kind === 'merge' ? 620 : 560;
+      const duration = reduceMotion ? 180 : effect.kind === 'spawn-origin' ? 450 : effect.kind === 'merge' ? 620 : effect.kind === 'mist-burst' ? 600 : 560;
       progress.value = withTiming(1, { duration, easing: Easing.out(Easing.cubic) });
     }
     return () => cancelAnimation(progress);
@@ -136,12 +136,13 @@ const MergeEffectGlow = memo(function MergeEffectGlow({ centerX, centerY, kind, 
   reduceMotion: boolean;
   size: number;
 }) {
-  const diameter = size * (kind === 'merge' ? 1.72 : kind === 'spawn-settle' ? 1.42 : 1.05);
+  // A mist burst is the cell's own cloud swelling and thinning: bigger, paler and slower than a merge's flash.
+  const diameter = size * (kind === 'merge' ? 1.72 : kind === 'mist-burst' ? 1.6 : kind === 'spawn-settle' ? 1.42 : 1.05);
   const style = useAnimatedStyle(() => {
     const p = effectProgress(progress.value, kind);
     return {
-      opacity: interpolate(p, [0, 0.12, 0.58, 1], [0, kind === 'merge' ? 0.9 : 0.7, 0.34, 0]),
-      transform: [{ scale: reduceMotion ? 1 : interpolate(p, [0, 0.22, 1], [0.46, 1.04, kind === 'merge' ? 1.62 : 1.42]) }],
+      opacity: interpolate(p, [0, 0.12, 0.58, 1], [0, kind === 'merge' ? 0.9 : kind === 'mist-burst' ? 0.96 : 0.7, kind === 'mist-burst' ? 0.5 : 0.34, 0]),
+      transform: [{ scale: reduceMotion ? 1 : interpolate(p, [0, 0.22, 1], [kind === 'mist-burst' ? 0.7 : 0.46, 1.04, kind === 'merge' ? 1.62 : kind === 'mist-burst' ? 1.9 : 1.42]) }],
     };
   }, [kind, reduceMotion]);
   return (
@@ -155,7 +156,7 @@ const MergeEffectGlow = memo(function MergeEffectGlow({ centerX, centerY, kind, 
         top: centerY - diameter / 2,
         width: diameter,
       }, style]}
-      tintColor={kind === 'merge' ? '#FFD46F' : '#FFE7A5'}
+      tintColor={kind === 'merge' ? '#FFD46F' : kind === 'mist-burst' ? '#E4EEF6' : '#FFE7A5'}
       transition={0}
     />
   );
@@ -169,16 +170,16 @@ const MergeEffectRing = memo(function MergeEffectRing({ centerX, centerY, kind, 
   reduceMotion: boolean;
   size: number;
 }) {
-  const diameter = size * (kind === 'merge' ? 0.86 : 0.72);
+  const diameter = size * (kind === 'merge' ? 0.86 : kind === 'mist-burst' ? 0.8 : 0.72);
   const style = useAnimatedStyle(() => {
     const p = effectProgress(progress.value, kind);
     return {
       opacity: interpolate(p, [0, 0.12, 0.72, 1], [0, reduceMotion ? 0.52 : 0.94, 0.32, 0]),
-      transform: [{ scale: reduceMotion ? 1 : interpolate(p, [0, 0.28, 1], [0.48, 1.02, kind === 'merge' ? 1.72 : 1.38]) }],
+      transform: [{ scale: reduceMotion ? 1 : interpolate(p, [0, 0.28, 1], [0.48, 1.02, kind === 'merge' ? 1.72 : kind === 'mist-burst' ? 1.9 : 1.38]) }],
     };
   }, [kind, reduceMotion]);
   return <Animated.View style={[styles.ring, {
-    borderColor: kind === 'merge' ? 'rgba(255,238,174,0.96)' : 'rgba(255,239,190,0.8)',
+    borderColor: kind === 'merge' ? 'rgba(255,238,174,0.96)' : kind === 'mist-burst' ? 'rgba(236,244,250,0.9)' : 'rgba(255,239,190,0.8)',
     height: diameter,
     left: centerX - diameter / 2,
     top: centerY - diameter / 2,
@@ -198,7 +199,7 @@ const MergeEffectParticle = memo(function MergeEffectParticle({ centerX, centerY
 }) {
   const directionX = Math.cos(particle.angle);
   const directionY = Math.sin(particle.angle);
-  const distanceScale = kind === 'merge' ? 1.18 : kind === 'spawn-settle' ? 0.82 : 1;
+  const distanceScale = kind === 'merge' ? 1.18 : kind === 'mist-burst' ? 1.3 : kind === 'spawn-settle' ? 0.82 : 1;
   const travelEnd = size * particle.distance * distanceScale;
   const style = useAnimatedStyle(() => {
     if (reduceMotion) return { opacity: 0, transform: [{ translateX: 0 }, { translateY: 0 }, { scale: 0 }] };
@@ -215,7 +216,7 @@ const MergeEffectParticle = memo(function MergeEffectParticle({ centerX, centerY
     };
   }, [directionX, directionY, index, kind, reduceMotion, size, travelEnd]);
   return <Animated.View style={[styles.particle, {
-    backgroundColor: kind === 'merge' ? '#FFF0B0' : '#FFE4A0',
+    backgroundColor: kind === 'merge' ? '#FFF0B0' : kind === 'mist-burst' ? '#F3F8FC' : '#FFE4A0',
     height: particle.size,
     left: centerX - particle.size / 2,
     top: centerY - particle.size / 2,
