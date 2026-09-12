@@ -1,0 +1,393 @@
+{
+  "id": "glow-steppling-discovery",
+  "version": 11,
+  "entryNodeId": "gateway.focus",
+  "metadata": {
+    "kind": "story"
+  },
+  "nodes": [
+    {
+      "id": "gateway.focus",
+      "kind": "presentation",
+      "capability": "world.camera",
+      "surface": "haven",
+      "presentationId": "gateway.focus",
+      "presentationType": "world.camera",
+      "payload": {
+        "operation": "focus",
+        "target": {
+          "kind": "haven_structure",
+          "structureId": "steppling-home"
+        },
+        "zoom": 1.2,
+        "anchorY": 0.46,
+        "durationMs": 900,
+        "lockInput": true
+      },
+      "replayPolicy": "replay",
+      "next": "garden.open"
+    },
+    {
+      "id": "garden.open",
+      "kind": "scene",
+      "capability": "world.action",
+      "surface": "haven",
+      "sceneId": "garden.open",
+      "actions": [
+        {
+          "id": "open",
+          "next": "lesson.single.prepare"
+        }
+      ],
+      "payload": {
+        "worldAction": {
+          "lockCamera": true,
+          "kind": "garden",
+          "guide": {
+            "eyebrow": "Someone’s in there",
+            "title": "Light is made on the Garden board.",
+            "body": "Mossprout has a request waiting there. Serve it and the light reaches the trail."
+          },
+          "actionLabel": "Open Garden"
+        }
+      }
+    },
+    {
+      "id": "lesson.single.prepare",
+      "kind": "effect",
+      "capability": "glow.lesson.prepare",
+      "effectId": "lesson.single.prepare",
+      "effectType": "glow.lesson.prepare",
+      "next": "lesson.single.parcel"
+    },
+    {
+      "id": "lesson.single.parcel",
+      "capability": "merge.lesson",
+      "surface": "merge",
+      "taskId": "lesson.single.parcel",
+      "mode": "all",
+      "payload": {
+        "beat": {
+          "id": "lesson.single.parcel",
+          "kind": "parcel",
+          "arrivalId": "arrival:ftue:garden-basket",
+          "guide": {
+            "eyebrow": "A parcel from Mossprout",
+            "title": "The Garden Basket. Open it.",
+            "body": "Everything that grows here starts in there."
+          }
+        }
+      },
+      "next": "lesson.single.spawn",
+      "requirements": [
+        {
+          "id": "lesson.single.parcel",
+          "event": {
+            "type": "glow.lesson.single.parcel"
+          }
+        }
+      ],
+      "kind": "task"
+    },
+    {
+      "id": "lesson.single.spawn",
+      "capability": "merge.lesson",
+      "surface": "merge",
+      "taskId": "lesson.single.spawn",
+      "mode": "all",
+      "payload": {
+        "beat": {
+          "id": "lesson.single.spawn",
+          "kind": "spawn",
+          "generatorId": "wild-garden",
+          "guide": {
+            "eyebrow": "A request",
+            "title": "Mossprout is asking for a Plant.",
+            "body": "That’s a request, on the right. Start with two Seeds."
+          }
+        }
+      },
+      "next": "lesson.single.grow",
+      "requirements": [
+        {
+          "id": "lesson.single.spawn",
+          "event": {
+            "type": "glow.lesson.single.spawn"
+          }
+        }
+      ],
+      "kind": "task"
+    },
+    {
+      "id": "lesson.single.grow",
+      "capability": "merge.lesson",
+      "surface": "merge",
+      "taskId": "lesson.single.grow",
+      "mode": "all",
+      "payload": {
+        "beat": {
+          "id": "lesson.single.grow",
+          "kind": "grow",
+          "definitionId": "nature:garden:3",
+          "generatorId": "wild-garden",
+          "guide": {
+            "eyebrow": "Making light",
+            "title": "Two Seeds make a Sprout. Two Sprouts make a Plant.",
+            "body": "Tap the Basket whenever you run short."
+          }
+        }
+      },
+      "next": "lesson.single.serve",
+      "requirements": [
+        {
+          "id": "lesson.single.grow",
+          "event": {
+            "type": "glow.lesson.single.grow"
+          }
+        }
+      ],
+      "kind": "task"
+    },
+    {
+      "id": "lesson.single.serve",
+      "capability": "merge.lesson",
+      "surface": "merge",
+      "taskId": "lesson.single.serve",
+      "mode": "all",
+      "payload": {
+        "beat": {
+          "id": "lesson.single.serve",
+          "kind": "serve",
+          "orderId": "mossprout:glow:plant-2",
+          "guide": {
+            "eyebrow": "A request, served",
+            "title": "Give it here.",
+            "body": "Serving a request is what turns a grown thing into light."
+          }
+        }
+      },
+      "next": "gateway.ready",
+      "requirements": [
+        {
+          "id": "lesson.single.serve",
+          "event": {
+            "type": "glow.lesson.single.serve"
+          }
+        }
+      ],
+      "kind": "task"
+    },
+    {
+      "id": "gateway.ready",
+      "kind": "scene",
+      "capability": "world.action",
+      "surface": "haven",
+      "sceneId": "gateway.ready",
+      "actions": [
+        {
+          "id": "return",
+          "next": "gateway.offer"
+        }
+      ],
+      "payload": {
+        "worldAction": {
+          "lockCamera": true,
+          "kind": "return",
+          "guide": {
+            "eyebrow": "Enough light",
+            "title": "That should reach.",
+            "body": "Come and see who the trail was hiding."
+          },
+          "actionLabel": "Back to world"
+        }
+      }
+    },
+    {
+      "id": "gateway.offer",
+      "kind": "scene",
+      "capability": "world.action",
+      "surface": "haven",
+      "sceneId": "gateway.offer",
+      "actions": [
+        {
+          "id": "open_upgrade",
+          "next": "mission.focus"
+        }
+      ],
+      "payload": {
+        "worldAction": {
+          "lockCamera": true,
+          "kind": "purchase",
+          "guide": {
+            "eyebrow": "Held",
+            "title": "Tap the glowing bubble.",
+            "body": "Four Mistwisps have the trail. Spend the light and they’ll show themselves."
+          },
+          "actionLabel": "See the light"
+        }
+      }
+    },
+    {
+      "id": "mission.focus",
+      "kind": "presentation",
+      "capability": "world.camera",
+      "surface": "haven",
+      "presentationId": "mission.focus",
+      "presentationType": "world.camera",
+      "payload": {
+        "operation": "focus",
+        "target": {
+          "kind": "haven_structure",
+          "structureId": "steppling-home"
+        },
+        "zoom": 0.96,
+        "anchorY": 0.36,
+        "durationMs": 900,
+        "lockInput": true
+      },
+      "replayPolicy": "replay",
+      "next": "mission.clear"
+    },
+    {
+      "id": "mission.clear",
+      "capability": "glow.discovery.task",
+      "surface": "haven",
+      "taskId": "mission.clear",
+      "requirements": [
+        {
+          "id": "cleared",
+          "event": {
+            "type": "glow.mission.cleared"
+          }
+        }
+      ],
+      "next": "gateway.purchase.focus",
+      "kind": "task"
+    },
+    {
+      "id": "gateway.purchase.focus",
+      "kind": "presentation",
+      "capability": "world.camera",
+      "surface": "haven",
+      "presentationId": "gateway.purchase.focus",
+      "presentationType": "world.camera",
+      "payload": {
+        "operation": "preserve",
+        "holdWorldState": true,
+        "lockInput": true
+      },
+      "replayPolicy": "replay",
+      "next": "gateway.purchase.commit"
+    },
+    {
+      "id": "gateway.purchase.commit",
+      "kind": "effect",
+      "capability": "world.upgrade",
+      "effectId": "gateway.purchase.commit",
+      "effectType": "world.upgrade",
+      "payload": {
+        "target": {
+          "kind": "haven_structure",
+          "structureId": "steppling-home"
+        },
+        "toLevel": 1,
+        "economy": {
+          "mode": "normal"
+        }
+      },
+      "next": "gateway.purchase.reveal"
+    },
+    {
+      "id": "gateway.purchase.reveal",
+      "kind": "presentation",
+      "capability": "world.upgrade_reveal",
+      "surface": "haven",
+      "presentationId": "gateway.purchase.reveal",
+      "presentationType": "world.upgrade_reveal",
+      "payload": {
+        "sourceEffectNodeId": "gateway.purchase.commit",
+        "sourceEffectId": "gateway.purchase.commit",
+        "target": {
+          "kind": "haven_structure",
+          "structureId": "steppling-home"
+        },
+        "preset": "mist-clear",
+        "reactionLine": "",
+        "showCoins": true
+      },
+      "replayPolicy": "replay",
+      "next": "gateway.egg"
+    },
+    {
+      "id": "gateway.egg",
+      "kind": "scene",
+      "capability": "world.action",
+      "surface": "haven",
+      "sceneId": "gateway.egg",
+      "actions": [
+        {
+          "id": "done",
+          "next": "egg.enter"
+        }
+      ],
+      "payload": {
+        "worldAction": {
+          "lockCamera": true,
+          "kind": "discovery",
+          "guide": {
+            "eyebrow": "An Egg",
+            "title": "So the trail was keeping someone.",
+            "body": "You noticed something out in your world today. This is what that did. Go on. That’s you."
+          },
+          "actionLabel": "Meet the Egg"
+        }
+      }
+    },
+    {
+      "id": "egg.enter",
+      "capability": "glow.discovery.task",
+      "surface": "haven",
+      "taskId": "egg.enter",
+      "requirements": [
+        {
+          "id": "entered",
+          "event": {
+            "type": "glow.egg.entered"
+          }
+        }
+      ],
+      "next": "complete",
+      "kind": "task"
+    },
+    {
+      "id": "complete",
+      "kind": "complete"
+    }
+  ],
+  "migrations": {
+    "gateway.return": "gateway.offer",
+    "gateway.goal": "garden.open",
+    "garden.focus": "gateway.focus",
+    "lesson.prepare": "lesson.single.prepare",
+    "lesson.spawn": "lesson.single.prepare",
+    "lesson.seed": "lesson.single.prepare",
+    "lesson.sprout": "lesson.single.prepare",
+    "lesson.serve": "lesson.single.prepare",
+    "lesson.repeat": "lesson.single.prepare",
+    "lesson.repeat.prepare": "lesson.single.prepare",
+    "lesson.repeat.spawn": "lesson.single.prepare",
+    "lesson.repeat.match-1": "lesson.single.prepare",
+    "lesson.repeat.match-2": "lesson.single.prepare",
+    "lesson.repeat.match-3": "lesson.single.prepare",
+    "lesson.repeat.match-4": "lesson.single.prepare",
+    "lesson.repeat.match-5": "lesson.single.prepare",
+    "lesson.repeat.serve": "lesson.single.prepare",
+    "gateway.purchase": "gateway.purchase.focus",
+    "gateway.buy": "mission.focus",
+    "egg.transfer": "gateway.egg",
+    "world.choose": "gateway.egg",
+    "steppling.hatch": "gateway.egg",
+    "steppling.claim": "gateway.egg",
+    "steppling.welcome": "complete"
+  }
+}

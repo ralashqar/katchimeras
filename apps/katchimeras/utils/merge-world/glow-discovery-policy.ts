@@ -5,10 +5,9 @@ import { SHARED_WORLD_PURCHASES } from '@/constants/shared-world';
 import type { TutorialGeneratorRule } from './tutorial-generator-policy';
 import type { MergeOrder, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 
-export const GLOW_GATEWAY_ID = 'mossprout:overgrown-trail' as const;
-export const GLOW_ORDER_IDS = ['mossprout:glow:plant-1', 'mossprout:glow:plant-2'] as const;
-/** The parcel the Garden Basket arrives in: the first thing the player opens on the Garden board. */
-export const MOSSPROUT_BASKET_ARRIVAL_ID = 'arrival:ftue:garden-basket';
+import { GLOW_GATEWAY_ID, GLOW_ORDER_IDS, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/constants/glow-discovery-ids';
+
+export { GLOW_GATEWAY_ID, GLOW_ORDER_IDS, MOSSPROUT_BASKET_ARRIVAL_ID };
 /** The lesson's board layout: 3 is the Basket by parcel on a board with no loose items. An older layout is re-prepared. */
 export const GLOW_LESSON_LAYOUT_VERSION = 3 as const;
 export const GLOW_ECHO_IDS = ['glow:seed', 'glow:sprout'] as const;

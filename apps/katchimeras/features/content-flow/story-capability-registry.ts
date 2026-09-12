@@ -1,4 +1,5 @@
 import type { ContentFlowNode } from '@/types/content-flow';
+import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
 import { MERGE_GENERATORS_BY_ID, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { sharedWorldPurchase } from '@/constants/shared-world';
 import { validateStoryTarget } from './story-targets';
@@ -75,7 +76,8 @@ const BUILT_INS: readonly StoryCapabilityDefinition[] = [
     const view = payload.worldAction as { kind?: string; actionLabel?: string; guide?: { title?: string; body?: string } } | undefined;
     return view && ['goal', 'garden', 'return', 'purchase', 'discovery'].includes(view.kind ?? '') && view.actionLabel && view.guide?.title && view.guide.body ? null : 'World action needs a view, guide and action label';
   } },
-  { id: 'steppling.garden.task', kind: 'task' },
+  // Every hatchable companion's garden lesson runs on its own task capability, named in its definition.
+  ...[...new Set(HATCHABLE_COMPANIONS.map((definition) => definition.lesson.taskCapability))].map((id) => ({ id, kind: 'task' as const })),
   { id: 'merge.lesson', kind: 'task', validatePayload: (payload) => {
     const beat = payload.beat as Record<string, unknown> | undefined;
     if (!beat || typeof beat.id !== 'string' || !beat.guide) return 'Lesson needs an id and guide';

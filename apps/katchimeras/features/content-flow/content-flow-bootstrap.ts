@@ -1,4 +1,5 @@
-import { STEPPLING_GARDEN_FLOW } from '@/features/onboarding/steppling-garden-lesson';
+import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
+import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
 import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from './steppling-day-one-flow-v2';
 import { completeMossproutHavenUpgrade } from '@/utils/companion-story-storage';
 import { LEGACY_WORLD_UPGRADE_FLOWS, WORLD_UPGRADE_FLOWS } from '@/features/world-upgrades/world-upgrade-flows';
@@ -6,8 +7,6 @@ import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campai
 import { registerCompanionJourneyFlows } from '@/features/companion/companion-journey-service';
 import { nextUnearnedMossproutResident } from '@/constants/resident-card-discovery';
 import { MOSSPROUT_FTUE_VARIANTS } from '@/features/onboarding/mossprout-ftue-flow';
-import { GLOW_DISCOVERY_FLOW } from '@/features/onboarding/glow-discovery-flow';
-import { STEPPLING_DAY_ONE_FLOW } from './steppling-day-one-flow';
 import { LEGACY_STEPPLING_DAY_ONE_FLOW } from './steppling-day-one-flow-v1';
 import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
@@ -47,11 +46,15 @@ export function bootstrapContentFlowCatalog() {
   [...LEGACY_WORLD_UPGRADE_FLOWS, ...WORLD_UPGRADE_FLOWS].forEach(registerContentFlowDefinition);
   registerStoryVariantSet(MOSSPROUT_FTUE_VARIANTS);
   MOSSPROUT_FTUE_VARIANTS.variants.forEach((variant) => registerContentFlowDefinition(variant.definition));
-  registerContentFlowDefinition(GLOW_DISCOVERY_FLOW);
+  // Every hatchable companion's discovery, day one and garden lesson, generated from its definition.
+  for (const definition of HATCHABLE_COMPANIONS) {
+    const flows = hatchableFlows(definition);
+    registerContentFlowDefinition(flows.discovery);
+    registerContentFlowDefinition(flows.dayOne);
+    registerContentFlowDefinition(flows.gardenLesson);
+  }
   registerContentFlowDefinition(LEGACY_STEPPLING_DAY_ONE_FLOW);
   registerContentFlowDefinition(LEGACY_STEPPLING_DAY_ONE_FLOW_V2);
-  registerContentFlowDefinition(STEPPLING_DAY_ONE_FLOW);
-  registerContentFlowDefinition(STEPPLING_GARDEN_FLOW);
   registerContentFlowEffect('journey.grant_generator_parcel', async ({ run, payload }) => {
     const generatorId = String(payload.generatorId);
     const rewardId = String(payload.rewardId);

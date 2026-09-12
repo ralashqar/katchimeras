@@ -1,0 +1,100 @@
+{
+  "id": "steppling-garden-lesson",
+  "version": 2,
+  "entryNodeId": "parcel",
+  "metadata": {
+    "kind": "story"
+  },
+  "migrations": {
+    "kingdom.goal": "summary",
+    "spawn.first": "grow",
+    "spawn.second": "grow",
+    "merge": "grow"
+  },
+  "nodes": [
+    {
+      "id": "parcel",
+      "capability": "steppling.garden.task",
+      "surface": "merge",
+      "taskId": "parcel",
+      "requirements": [
+        {
+          "id": "done",
+          "event": {
+            "type": "steppling.garden.parcel"
+          }
+        }
+      ],
+      "next": "grow",
+      "kind": "task"
+    },
+    {
+      "id": "grow",
+      "capability": "steppling.garden.task",
+      "surface": "merge",
+      "taskId": "grow",
+      "requirements": [
+        {
+          "id": "done",
+          "event": {
+            "type": "steppling.garden.grow"
+          }
+        }
+      ],
+      "next": "serve",
+      "kind": "task"
+    },
+    {
+      "id": "serve",
+      "capability": "steppling.garden.task",
+      "surface": "merge",
+      "taskId": "serve",
+      "requirements": [
+        {
+          "id": "done",
+          "event": {
+            "type": "steppling.garden.serve"
+          }
+        }
+      ],
+      "next": "closing",
+      "kind": "task"
+    },
+    {
+      "id": "closing",
+      "kind": "scene",
+      "capability": "journey.reflection",
+      "surface": "companion",
+      "sceneId": "closing",
+      "payload": {
+        "text": "A Shoe, some light, and the first stretch of trail the Mist doesn’t own. We can keep going, at your pace."
+      },
+      "actions": [
+        {
+          "id": "summary",
+          "next": "summary"
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "kind": "scene",
+      "capability": "journey.reflection",
+      "surface": "companion",
+      "sceneId": "summary",
+      "payload": {
+        "text": "Your world grows where you look"
+      },
+      "actions": [
+        {
+          "id": "finish",
+          "next": "complete"
+        }
+      ]
+    },
+    {
+      "id": "complete",
+      "kind": "complete"
+    }
+  ]
+}
