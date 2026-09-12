@@ -130,6 +130,7 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
     handoffs: STEPPLING_DAY_ONE_HANDOFFS,
     choiceVariable: 'movementChoice',
     handoffLabel: 'Tend garden',
+    endMessage: 'A little parcel is waiting in our Garden. I carried it the whole way through.',
     parcel: { generatorId: 'journey-locker', rewardId: 'journey:steppling:day-1:journey-locker' },
   },
   lesson: {
@@ -161,6 +162,7 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
       grow: { eyebrow: '', title: 'Yours now. Make him a Shoe.', body: 'Two Socks from the Locker, together.' },
       serve: { eyebrow: '', title: 'Steppling needs a Shoe.', body: 'Serve it, and the light is yours to spend.' },
       finale: { eyebrow: '', title: 'Back to Steppling.', body: '' },
+      finaleAction: 'Our adventure',
     },
   },
   egg: STEPPLING_EGG_POLICY,

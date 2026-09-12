@@ -1,15 +1,16 @@
 import type { MergeCharacterId } from '@/types/merge-world';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { STEPPLING_HATCHABLE } from './steppling';
+import { BARISTABBIT_HATCHABLE } from './baristabbit';
 
-export { STEPPLING_HATCHABLE };
+export { STEPPLING_HATCHABLE, BARISTABBIT_HATCHABLE };
 
 /**
  * Every friend the Mist keeps on a shared-world tile, in the order they were
  * authored. Screens, flows and the engine read this; nothing names a friend by
  * hand. To add one, add a definition file here and its content and art.
  */
-export const HATCHABLE_COMPANIONS: readonly HatchableCompanionDefinition[] = [STEPPLING_HATCHABLE];
+export const HATCHABLE_COMPANIONS: readonly HatchableCompanionDefinition[] = [STEPPLING_HATCHABLE, BARISTABBIT_HATCHABLE];
 
 const byCompanion = new Map(HATCHABLE_COMPANIONS.map((definition) => [definition.companion, definition]));
 const byTile = new Map(HATCHABLE_COMPANIONS.map((definition) => [definition.tile.id, definition]));

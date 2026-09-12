@@ -670,6 +670,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const setGatewayNode = useCallback((node: View | null) => {
     setGatewayTileNodeState(node);
     registerFtueTarget(`shared-world:${activeHatchable.tile.id}`, node);
+    registerFtueTarget('shared-world:gateway', node);
   }, [activeHatchable.tile.id, registerFtueTarget]);
   const setGardenPlotNode = useCallback((slotId: MossproutGardenPlantSlotId, node: View | null) => {
     registerFtueTarget(`garden-plot:mossprout:${slotId}`, node);

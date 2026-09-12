@@ -1851,7 +1851,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               );
             }) : null}
             {focusedMossproutWorld && (mossproutGarden?.hatchableTiles?.[gatewayTileId] ?? mossproutGarden?.gateway) ? scene.tileArtLayers.filter((layer) => layer.id === `structure:${gatewayTileId}`).map((layer) => (
-              <Pressable ref={onGatewayTargetChange} collapsable={false} key="steppling-home" accessibilityRole="button" accessibilityLabel={mossproutGarden.gateway === 'locked' ? 'Misty clearing, clear mist for 40 Glow' : 'A new friend is resting here'} onPress={interactionEnabled && !upgradePresentation ? onSelectGateway : undefined} style={[styles.natureIslandHitTarget, layer.frame]}>
+              <Pressable ref={onGatewayTargetChange} collapsable={false} key={gatewayTileId} accessibilityRole="button" accessibilityLabel={(mossproutGarden.hatchableTiles?.[gatewayTileId] ?? mossproutGarden.gateway) === 'locked' ? `${hatchableByTile(gatewayTileId)?.tile.name ?? 'Misty clearing'}, clear mist for ${hatchableByTile(gatewayTileId)?.tile.price ?? 40} Glow` : 'A new friend is resting here'} onPress={interactionEnabled && !upgradePresentation ? onSelectGateway : undefined} style={[styles.natureIslandHitTarget, layer.frame]}>
               </Pressable>
             )) : null}
             {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onSelectMemoryPlant

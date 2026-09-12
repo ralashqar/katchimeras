@@ -17,6 +17,8 @@ import { journeyCohortStoryConversationDefinitions } from '@/constants/journey-c
 import { mossproutFtueConversationDefinitions } from '@/constants/mossprout-ftue-conversations';
 import { mossproutStoryConversationDefinitions } from '@/constants/mossprout-story-conversations';
 import { stepplingDayOneConversation } from '@/constants/steppling-day-one-conversation';
+import { hatchableDayOneConversation } from '@/constants/hatchable-day-one-conversation';
+import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
 import { mossproutCampaignConversationDefinitions } from '@/constants/mossprout-campaign-conversations';
 import { ALL_ISLAND_CAMPAIGN_CONVERSATION_DEFINITIONS } from '@/constants/island-campaigns/helpers';
 import {
@@ -934,6 +936,7 @@ function familyPack(
 
 export const companionConversationDefinitionsV2: readonly ConversationDefinition[] = [
   stepplingDayOneConversation,
+  ...HATCHABLE_COMPANIONS.filter((definition) => definition.companion !== 'steppling').map(hatchableDayOneConversation),
   ...STEPPLING_TRAIL_CONVERSATIONS,
   ...mossproutFtueConversationDefinitions,
   ...mossproutCampaignConversationDefinitions,

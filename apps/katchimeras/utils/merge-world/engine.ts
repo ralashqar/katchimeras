@@ -2067,7 +2067,7 @@ function advanceCompanionDiscovery(state: MergeWorldState, from: number, to: num
   const primaryChain = KATCHIMERA_MERGE_PROFILES[definition.characterId].coreChains[0];
   const primaryTierOne = `${primaryChain}:1`;
   const primaryTierTwo = `${primaryChain}:2`;
-  const firstOrderId = definition.characterId === 'steppling' ? 'steppling:discovery:first-trail' : `${definition.characterId}:discovery:first-order`;
+  const firstOrderId = hatchableByCompanion(definition.characterId)?.lesson.order.id ?? `${definition.characterId}:discovery:first-order`;
   const firstOrderCopy = DISCOVERY_FIRST_ORDER_COPY[definition.characterId];
   const firstOrder: MergeOrder = {
     id: firstOrderId,
