@@ -5,7 +5,7 @@ import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, MISSION_CAMER
 import { KingdomOpeningMergeDock, MissionGlowLayer, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
 import { StepplingMissionDock } from '@/components/katchadeck/world/steppling-mission-dock';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
-import { createStepplingMissionState, STEPPLING_MISSION_ID, STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep } from '@/features/onboarding/steppling-mission';
+import { createStepplingMissionState, STEPPLING_MISSION_HINT_THEME, STEPPLING_MISSION_ID, STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep } from '@/features/onboarding/steppling-mission';
 import { ISLAND_WISP_LINES, OPENING_WISP_LINES, OPENING_WISPS, STEPPLING_WISP_LINES, STEPPLING_WISPS, wispsForClearing } from '@/features/onboarding/corruption-wisps';
 import { MissionWisps, type CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
 import { KingdomOpeningCaption } from '@/components/katchadeck/world/kingdom-opening-caption';
@@ -2114,7 +2114,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onEntranceSettled={markOpeningDockSettled} /> : null}
       {stepplingMissionActive && stepplingMission.state && stepplingMissionGuidanceVisible && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
         <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={stepplingMissionStep?.cue ?? null} guide={stepplingMissionStep?.guide ?? null}
-          layoutNonce={stepplingMission.state.revision} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={stepplingMissionStep?.spotlight ?? null} state={stepplingMission.state} targetRevision={stepplingMission.state.revision} />
+          layoutNonce={stepplingMission.state.revision} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={stepplingMissionStep?.spotlight ?? null} state={stepplingMission.state} targetRevision={stepplingMission.state.revision}
+          visualTheme={stepplingMissionStep?.spotlight ? undefined : STEPPLING_MISSION_HINT_THEME} />
       </View> : null}
       {restorationBoardVisible && islandRestoration && restorationStore.state ? <IslandRestorationDock
         campaign={islandRestoration.campaign} level={islandRestoration.level} state={restorationStore.state} send={restorationStore.send} boardStep={restorationStep}

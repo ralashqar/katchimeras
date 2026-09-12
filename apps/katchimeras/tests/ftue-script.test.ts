@@ -627,6 +627,10 @@ test('Merge FTUE spotlight uses a lifecycle-safe native rounded cutout', () => {
   assert.doesNotMatch(sharedSpotlight, /Math\.hypot|spreadRadius/);
   assert.doesNotMatch(sharedSpotlight.slice(sharedSpotlight.indexOf('export function Spotlight('), sharedSpotlight.indexOf('const styles = ')), /boxShadow/);
   assert.match(sharedSpotlight, /borderRadius: cornerRadius \* 2,\s*borderWidth: cornerRadius,/, 'the frame’s inner edge is the opening’s rounded corner');
+  // Opaque pieces under one group opacity: a translucent frame over translucent bands showed their overlap as a darker ring around the opening.
+  assert.match(sharedSpotlight, /<View style=\{\[StyleSheet\.absoluteFill, \{ opacity \}\]\}>\s*<View style=\{\[styles\.band, \{ left: 0, top: 0,/, 'one opacity over the bands and the frame');
+  assert.match(sharedSpotlight, /const DIM = 'rgb\(11,9,24\)';/);
+  assert.doesNotMatch(sharedSpotlight.slice(sharedSpotlight.indexOf('export function Spotlight('), sharedSpotlight.indexOf('const styles = ')), /rgba\(/, 'no alpha on the pieces themselves');
   assert.match(sharedSpotlight, /dimMask: \{[\s\S]*?borderCurve: 'continuous'/);
   // The Merge overlay's spotlight is not mounted at all when it has nothing to show, once its fade is over.
   assert.match(overlay, /const spotlightMounted = useLingering\(spotlightReady, SPOTLIGHT_UNMOUNT_MS\);/);

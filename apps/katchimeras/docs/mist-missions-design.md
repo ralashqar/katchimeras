@@ -75,3 +75,16 @@ A mission is data; islands get missions by authoring, not by code.
 - **Energy**: missions are free of it; the persistent board keeps it. Otherwise missions read as a second board to manage.
 - **Content cost**: one authored mission per island (board, bar length, reward). Keep the format a template so an island is a data entry.
 - **Where mission boards live in the world**: docked under the island's tile as the opening does, camera pulled to the island, not a separate route.
+
+## Steppling's board, revised (Sept 12, 2026)
+
+Built. The board starts with the Journey Locker alone (it makes Socks) and three cells asleep under the
+Mist straight above it, holding a Shoe, a Boot and Hiking Gear. A sleeper wakes when its match is dropped
+on it and wakes as the next piece up, which is what the next sleeper wants: tap for two Socks, merge them
+into a Shoe, wake the Shoe into a Boot, the Boot into Gear, the Gear into an Adventure Pack. Four strikes,
+one per wisp (`STEPPLING_MISSION_MERGE_REQUIRED = 4`), so the board teaches the item hierarchy and the
+sleeping-cell unlock rather than asking for a grind. Guidance: the first two Locker taps are spotlit and
+exclusive; after that nothing is spotlit and the finger appears only after two seconds of pause
+(`STEPPLING_MISSION_HINT_THEME`), pointing at a match to wake, a pair to merge, or the Locker when the
+board has run dry. Source: `features/onboarding/steppling-mission.ts`; a waking (`dream_echo_cleared`)
+sends Glow like a merge in `steppling-mission-dock.tsx`.

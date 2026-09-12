@@ -56,7 +56,8 @@ export const StepplingMissionDock = memo(function StepplingMissionDock({ state, 
     const result = send(effective);
     if (result) stateRef.current = result.state;
     const event = mergeFtueEventForCommand(current, command, result);
-    if (!result || event?.type !== 'merge_completed') return result;
+    // A sleeping cell woken by its match is a strike as much as a merge is: the store counts both.
+    if (!result || (event?.type !== 'merge_completed' && event?.type !== 'dream_echo_cleared')) return result;
     const metrics = boardMetricsRef.current;
     if (!metrics) return result;
     const center = mergeCellCenter(metrics.geometry, event.resultCell);

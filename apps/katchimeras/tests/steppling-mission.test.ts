@@ -4,8 +4,8 @@ import { readFileSync } from './helpers/content-fs';
 import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
 import { MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_CAMERA_ZOOM, OPENING_MERGE_WINDOW_CELLS } from '@/features/onboarding/opening-mist';
 import {
-  createStepplingMissionState, STEPPLING_MISSION_CAMERA, STEPPLING_MISSION_GENERATOR_ID, STEPPLING_MISSION_ITEMS, STEPPLING_MISSION_LOCKER_CELL,
-  STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_SOCK_ID, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep, stepplingMissionItemsOnBoard, stepplingMissionProgress,
+  createStepplingMissionState, STEPPLING_MISSION_CAMERA, STEPPLING_MISSION_ECHOES, STEPPLING_MISSION_GENERATOR_ID, STEPPLING_MISSION_HINT_DELAY_MS, STEPPLING_MISSION_HINT_THEME, STEPPLING_MISSION_LOCKER_CELL,
+  STEPPLING_MISSION_MERGE_REQUIRED, STEPPLING_MISSION_SOCK_ID, STEPPLING_MISSION_STORAGE_KEY, stepplingMissionBoardStep, stepplingMissionItemsOnBoard, stepplingMissionProgress, stepplingMissionWake,
 } from '@/features/onboarding/steppling-mission';
 import { GLOW_DISCOVERY_FLOW, GLOW_GATEWAY_NODE_IDS, GLOW_MISSION_CLEAR_NODE_ID, GLOW_MISSION_CLEARED_EVENT, GLOW_MISSION_FOCUS_NODE_ID, glowDiscoveryLocksCamera, glowDiscoveryMissionNode, glowDiscoveryResumeCamera, glowDiscoveryRevealLocked } from '@/features/onboarding/glow-discovery-flow';
 import { STEPPLING_STORY_TARGET } from '@/constants/shared-world';
@@ -28,17 +28,24 @@ function closestPair(state: MergeWorldState): [number, number] | null {
   return null;
 }
 
-test('the Steppling mission board is its own window: walking gear, the Journey Locker as a piece, nothing else', () => {
+test('the Steppling mission board starts with the Locker alone and a sleeping trail above it', () => {
   const state = createStepplingMissionState(NOW);
-  for (const [index, cell] of state.board.entries()) {
+  state.board.forEach((cell, index) => {
     if (!WINDOW.has(index)) assert.equal(cell.occupant, null, `cell ${index} outside the window is empty`);
-  }
+  });
   assert.deepEqual(state.board[STEPPLING_MISSION_LOCKER_CELL].occupant, { kind: 'generator', generatorId: STEPPLING_MISSION_GENERATOR_ID });
-  for (const { cell, definitionId } of STEPPLING_MISSION_ITEMS) {
-    assert.ok(WINDOW.has(cell), `item cell ${cell} is in the window`);
-    assert.equal((state.board[cell].occupant as { definitionId: string }).definitionId, definitionId);
+  assert.equal(stepplingMissionItemsOnBoard(state), 0, 'no items to start with: everything comes out of the Locker');
+  assert.equal(STEPPLING_MISSION_ECHOES.length, 3);
+  for (const echo of STEPPLING_MISSION_ECHOES) {
+    assert.ok(WINDOW.has(echo.cell), `sleeping cell ${echo.cell} is in the window`);
+    const cell = state.board[echo.cell];
+    assert.equal(cell.occupant, null);
+    assert.equal(cell.locked, true, 'asleep under the Mist');
+    assert.deepEqual(cell.mist, { kind: 'echo', id: echo.id, definitionId: echo.definitionId, ownerCharacterId: 'steppling' });
   }
-  assert.equal(stepplingMissionItemsOnBoard(state), STEPPLING_MISSION_ITEMS.length);
+  // Each sleeper wants exactly what the one below it wakes into: the trail climbs one tier at a time.
+  assert.deepEqual(STEPPLING_MISSION_ECHOES.map((echo) => echo.definitionId), ['adventure:trail:2', 'adventure:trail:3', 'adventure:trail:4']);
+  assert.deepEqual(STEPPLING_MISSION_ECHOES.map((echo) => echo.cell), [31, 24, 17], 'straight up from the Locker');
   const locker = state.generators[STEPPLING_MISSION_GENERATOR_ID];
   assert.ok(locker, 'the Locker is a real generator on this board');
   assert.equal(locker.forcedDropDefinitionId, STEPPLING_MISSION_SOCK_ID, 'it only ever makes Socks');
@@ -47,57 +54,90 @@ test('the Steppling mission board is its own window: walking gear, the Journey L
   assert.equal(state.activeOrders.length, 0);
   assert.equal(state.arrivals.length, 0);
   assert.equal(state.rewardInbox.length, 0);
-  assert.equal(STEPPLING_MISSION_STORAGE_KEY, 'katchimeras.mist-mission.steppling.v1');
+  assert.equal(STEPPLING_MISSION_STORAGE_KEY, 'katchimeras.mist-mission.steppling.v2', 'a new key: the old walking-gear board is never resumed onto this one');
 });
 
-test('Locker taps drop Socks inside the window without Energy, and the bar’s merges are reachable', () => {
+test('two Socks, one merge and three wakings fill the bar, each guided in turn', () => {
   let state = createStepplingMissionState(NOW);
-  const spawned = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW + 1, seed: 'tap-1', spendEnergy: false });
-  assert.equal(spawned.changed, true, spawned.message);
-  assert.ok(spawned.spawnedCell != null && WINDOW.has(spawned.spawnedCell), 'the Sock lands in the window');
-  assert.equal((spawned.state.board[spawned.spawnedCell!].occupant as { definitionId: string }).definitionId, STEPPLING_MISSION_SOCK_ID);
-  state = spawned.state;
+  assert.equal(stepplingMissionBoardStep(state, 0)!.id, 'mission.steppling.spawn');
+  const first = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW + 1, seed: 'tap-1', spendEnergy: false });
+  assert.equal(first.changed, true, first.message);
+  assert.ok(first.spawnedCell != null && WINDOW.has(first.spawnedCell), 'the Sock lands in the window');
+  assert.equal((first.state.board[first.spawnedCell!].occupant as { definitionId: string }).definitionId, STEPPLING_MISSION_SOCK_ID);
+  state = first.state;
+  assert.equal(stepplingMissionBoardStep(state, 0)!.id, 'mission.steppling.spawn_again', 'one Sock is not enough');
+  state = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW + 2, seed: 'tap-2', spendEnergy: false }).state;
   let merges = 0;
-  for (let step = 0; step < 200 && merges < STEPPLING_MISSION_MERGE_REQUIRED; step++) {
-    const pair = closestPair(state);
-    if (pair) {
-      const result = reduceMergeWorld(state, { type: 'move', from: pair[0], to: pair[1], now: NOW + 10 + step });
-      assert.equal(result.changed, true, result.message);
-      assert.ok(result.mergedCell != null, 'a same-item drop is a merge');
-      state = result.state;
-      merges += 1;
-      continue;
-    }
-    const tap = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW + 10 + step, seed: `tap-${step}`, spendEnergy: false });
-    assert.equal(tap.changed, true, tap.message);
-    assert.ok(WINDOW.has(tap.spawnedCell!), 'every Sock lands in the window');
-    state = tap.state;
+  const merge = stepplingMissionBoardStep(state, merges)!;
+  assert.equal(merge.id, 'mission.steppling.merge');
+  assert.equal(merge.spotlight, undefined, 'nothing spotlit once the Locker has been introduced');
+  assert.equal(merge.cue?.kind, 'drag');
+  const pair = closestPair(state)!;
+  const merged = reduceMergeWorld(state, { type: 'move', from: pair[0], to: pair[1], now: NOW + 3 });
+  assert.equal(merged.changed, true, merged.message);
+  assert.ok(merged.mergedCell != null);
+  assert.equal((merged.state.board[merged.mergedCell!].occupant as { definitionId: string }).definitionId, 'adventure:trail:2', 'two Socks make a Shoe');
+  state = merged.state;
+  merges += 1;
+  const expected = ['adventure:trail:3', 'adventure:trail:4', 'adventure:trail:5'];
+  for (const [index, echo] of STEPPLING_MISSION_ECHOES.entries()) {
+    const step = stepplingMissionBoardStep(state, merges)!;
+    assert.equal(step.id, 'mission.steppling.wake', `the ${index + 1}. sleeper's match is on the board, so the finger points at it`);
+    const wake = stepplingMissionWake(state)!;
+    assert.equal(wake.to, echo.cell, 'the lowest sleeper first');
+    assert.deepEqual(step.cue, { kind: 'drag', from: { kind: 'board_cell', cell: wake.from }, to: { kind: 'board_cell', cell: echo.cell } });
+    assert.equal(mergeFtueAllowsCommand(step, state, { type: 'move', from: wake.from, to: echo.cell, now: NOW }), true, 'free: any drag is allowed');
+    const wrong = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW + 10 + index, seed: `extra-${index}`, spendEnergy: false });
+    const sock = wrong.spawnedCell!;
+    const refused = reduceMergeWorld(wrong.state, { type: 'move', from: sock, to: echo.cell, now: NOW + 11 + index });
+    assert.equal(refused.changed, false, 'a Sock does not wake a sleeper that wants something higher');
+    const woken = reduceMergeWorld(state, { type: 'move', from: wake.from, to: echo.cell, now: NOW + 12 + index });
+    assert.equal(woken.changed, true, woken.message);
+    assert.equal(woken.mergedCell, echo.cell, 'a waking counts like a merge');
+    assert.ok(woken.dreamEchoClearedId, 'and is reported as the sleeper clearing');
+    assert.equal(woken.state.board[echo.cell].locked, false);
+    assert.equal(woken.state.board[echo.cell].mist, null);
+    assert.equal((woken.state.board[echo.cell].occupant as { definitionId: string }).definitionId, expected[index], 'it wakes as the next piece up the trail');
+    state = woken.state;
+    merges += 1;
   }
-  assert.equal(merges, STEPPLING_MISSION_MERGE_REQUIRED, 'the Locker keeps the board supplied to the end of the bar');
-  assert.ok(STEPPLING_MISSION_MERGE_REQUIRED > 7, 'more than the opening asked for');
+  assert.equal(merges, STEPPLING_MISSION_MERGE_REQUIRED, 'four strikes: one per wisp');
+  assert.equal(stepplingMissionWake(state), null);
   assert.equal(stepplingMissionProgress(STEPPLING_MISSION_MERGE_REQUIRED + 3), STEPPLING_MISSION_MERGE_REQUIRED);
   assert.equal(stepplingMissionProgress(-1), 0);
 });
 
-test('the mission’s guidance: a spotlit Locker tap first and nothing else, then the finger on the first pair, then free', () => {
+test('the mission’s guidance: two spotlit Locker taps and nothing else, then a finger that waits for a pause', () => {
   const state = createStepplingMissionState(NOW);
   const first = stepplingMissionBoardStep(state, 0)!;
   assert.equal(first.id, 'mission.steppling.spawn');
   assert.ok(first.spotlight && first.cue?.kind === 'tap', 'the new thing is spotlit and pointed at');
   assert.equal(mergeFtueAllowsCommand(first, state, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW, seed: 'x' }), true);
-  assert.equal(mergeFtueAllowsCommand(first, state, { type: 'move', from: 16, to: 18, now: NOW }), false, 'merging the placed Socks waits for the tap');
-  const spawned = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW + 1, seed: 'tap', spendEnergy: false }).state;
-  const second = stepplingMissionBoardStep(spawned, 0)!;
-  assert.equal(second.id, 'mission.steppling.merge');
-  assert.equal(second.cue?.kind, 'drag');
-  assert.equal(second.spotlight, undefined, 'no spotlight for a merge the player already knows');
-  assert.equal(mergeFtueAllowsCommand(second, spawned, { type: 'move', from: 22, to: 26, now: NOW }), true, 'any drag is allowed');
-  assert.equal(mergeFtueAllowsCommand(second, spawned, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW, seed: 'y' }), true, 'and so is another tap');
-  const free = stepplingMissionBoardStep(spawned, 1)!;
+  assert.equal(mergeFtueAllowsCommand(first, state, { type: 'move', from: 16, to: 18, now: NOW }), false, 'nothing but the tap');
+  const once = reduceMergeWorld(state, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW + 1, seed: 'tap', spendEnergy: false }).state;
+  const second = stepplingMissionBoardStep(once, 0)!;
+  assert.equal(second.id, 'mission.steppling.spawn_again');
+  assert.ok(second.spotlight && second.cue?.kind === 'tap', 'the second tap is spotlit too');
+  assert.equal(mergeFtueAllowsCommand(second, once, { type: 'move', from: 16, to: 18, now: NOW }), false);
+  const twice = reduceMergeWorld(once, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW + 2, seed: 'tap-2', spendEnergy: false }).state;
+  const merge = stepplingMissionBoardStep(twice, 0)!;
+  assert.equal(merge.id, 'mission.steppling.merge');
+  assert.equal(merge.spotlight, undefined, 'no spotlight for a merge the player already knows');
+  assert.equal(mergeFtueAllowsCommand(merge, twice, { type: 'tapGenerator', generatorId: STEPPLING_MISSION_GENERATOR_ID, now: NOW, seed: 'y' }), true, 'another tap is allowed');
+  // Two Socks merged into a Shoe with the first sleeper wanting one: the finger points at the sleeper.
+  const pair = closestPair(twice)!;
+  const shoe = reduceMergeWorld(twice, { type: 'move', from: pair[0], to: pair[1], now: NOW + 3 }).state;
+  assert.equal(stepplingMissionBoardStep(shoe, 1)!.id, 'mission.steppling.wake');
+  // A lone Sock and nothing to wake: the finger points back at the Locker, with no spotlight.
+  const lone = reduceMergeWorld(shoe, { type: 'move', from: 31, to: 30, now: NOW + 4 });
+  assert.equal(lone.changed, false, 'the sleeper cannot be moved');
+  const free = stepplingMissionBoardStep(once, 1)!;
   assert.equal(free.id, 'mission.steppling.free');
-  assert.equal(free.cue, undefined);
+  assert.equal(free.cue?.kind, 'tap');
   assert.equal(free.spotlight, undefined);
   assert.equal(stepplingMissionBoardStep(null, 0), null);
+  assert.equal(STEPPLING_MISSION_HINT_DELAY_MS, 2_000);
+  assert.deepEqual(STEPPLING_MISSION_HINT_THEME, { fingerDelayMs: 2_000 });
 });
 
 test('the Glow story opens the mission from the bubble and pays the reveal only after the bar fills', () => {
@@ -157,6 +197,8 @@ test('the Kingdom docks the mission under Steppling’s tile and clears the mist
   assert.match(screen, /await advanceGlowUpgrade\('open'\);\s*setSelectedUpgrade\(null\);\s*return;/, 'the bubble never opens a purchase sheet');
   assert.doesNotMatch(screen, /'gateway\.buy'/);
   assert.match(dock, /spendEnergy: false as const/, 'Locker taps cost nothing');
+  assert.match(dock, /if \(!result \|\| \(event\?\.type !== 'merge_completed' && event\?\.type !== 'dream_echo_cleared'\)\) return result;/, 'a waking sends Glow like a merge');
+  assert.match(screen, /visualTheme=\{stepplingMissionStep\?\.spotlight \? undefined : STEPPLING_MISSION_HINT_THEME\}/, 'with nothing spotlit, the finger waits two seconds of the player’s pause');
   assert.match(dock, /if \(\(mergesRef\.current \?\? 0\) >= STEPPLING_MISSION_MERGE_REQUIRED\) \{[\s\S]*?setHiddenItemIds[\s\S]*?onFinale\?\.\(from, event\.resultDefinitionId\);/, 'the merge that fills the bar sends its item into the mist');
   assert.match(dock, /<MistMissionDock[\s\S]*?required=\{STEPPLING_MISSION_MERGE_REQUIRED\}/);
   assert.match(store, /const merged = command\.type === 'move' && result\.mergedCell != null;[\s\S]*?saveMission\(storageKey, activeRunId, result\.state, nextMerges, placedRef\.current\);/, 'every merge is counted and saved with the board');
