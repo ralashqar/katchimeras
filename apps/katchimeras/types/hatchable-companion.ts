@@ -98,6 +98,8 @@ export type HatchableDayOneDefinition = {
   /** The run variable the reflection's answer is kept under. */
   choiceVariable: string;
   handoffLabel: string;
+  /** The conversation's closing line, once the parcel is on its way. */
+  endMessage: string;
   parcel: { generatorId: string; rewardId: string };
 };
 
@@ -114,7 +116,7 @@ export type HatchableLessonDefinition = {
   growDefinitionId: string;
   dropDefinitionId: string;
   order: Omit<MergeOrder, 'createdAt'>;
-  copy: { parcel: FtueGuide; room: FtueGuide; grow: FtueGuide; serve: FtueGuide; finale: FtueGuide };
+  copy: { parcel: FtueGuide; room: FtueGuide; grow: FtueGuide; serve: FtueGuide; finale: FtueGuide; /** The button that leaves the closing scene. */ finaleAction: string };
 };
 
 /** One answer the Egg can be given, drawn as a question card. */

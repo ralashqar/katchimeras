@@ -21,7 +21,8 @@ test('splash counts from its own appearance, requires two early taps, and accept
     './game-loop-summary': { GameLoopSummary: 'Art' },
     '@/features/onboarding/steppling-garden-lesson': { STEPPLING_GARDEN_CLOSING: 'Closing' },
     '@/features/onboarding/hatchable-runtime': { advanceGardenFinale: async (_definition: unknown, id: string) => { saves.push(id); return { status: 'completed' }; } },
-    '@/constants/hatchable-companions/registry': { STEPPLING_HATCHABLE: { companion: 'steppling' } },
+    '@/constants/hatchable-companions/registry': { STEPPLING_HATCHABLE: { companion: 'steppling', displayName: 'Steppling', lesson: { closing: 'Closing', copy: { finaleAction: 'Our adventure' } } } },
+    '@/constants/hatchable-companions/tile-art': { hatchableCutoutArt: () => 1 },
     '@incubator/art-cutouts/steppling.png': 1,
   }, { Date: { now: () => now } });
   const Finale = module.StepplingGardenFinale as React.ComponentType<{ summary: boolean; hosted: boolean }>;
