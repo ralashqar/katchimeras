@@ -431,7 +431,7 @@ test('shared-world tile layout and presentation keep one map and one Egg reveal'
   assert.match(scene, /'residentVisible' in entry && !entry.residentVisible/);
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   assert.match(canvas, /tutorialCameraReady && storyOperationsEnabled/);
-  assert.match(canvas, /gateway === 'egg' \|\| discoveredEggInteraction\) && !upgradePresentation && !storySceneGuard/);
+  assert.match(canvas, /\(mossproutGarden\?\.hatchableTiles\?\.\[gatewayTileId\] \?\? mossproutGarden\?\.gateway\) === 'egg' \|\| discoveredEggInteraction\) && !upgradePresentation && !storySceneGuard/, 'the Egg shows on whichever hatchable tile is the gateway');
   assert.match(canvas, /<RevealedCompanionEgg\s+idleDiscovery/);
   const route = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
   assert.doesNotMatch(route, /StepplingWorldScreen|world\.choose|Following the glow/);
