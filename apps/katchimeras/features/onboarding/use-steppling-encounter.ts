@@ -2,22 +2,30 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import type { MergeWorldState } from '@/types/merge-world';
-import { applyStoredStepplingEgg } from '@/utils/merge-world/repository';
+import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
+import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
+import { applyStoredHatchableEgg } from '@/utils/merge-world/repository';
 import { localDayId } from '@/utils/world-identity';
 import { IDLE_TODAY_HATCH_PRESENTATION, type TodayHatchPhase } from '@/utils/today-hatch-presentation';
 import { HATCH_PHASE_DELAYS_MS, REDUCED_HATCH_PHASE_DELAYS_MS } from '@/utils/hatch-reveal-timing';
 import type { WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
-import { stepplingEggHasBeenFed, stepplingEggReady, stepplingStepFeedOffer, STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, type StepplingEggAction, type StepplingEggProgress } from './steppling-egg-policy';
+import { eggFeedOffer, hatchableEggHasBeenFed, hatchableEggProgress, hatchableEggReady, type HatchableEggAction, type HatchableEggProgress } from './hatchable-egg-policy';
 import { useEggFeedController } from '@/features/today/use-egg-feed-controller';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { eggBondFeedPayload } from '@/features/today/egg-bond-feed';
 import { createEggHatchHaptics } from '@/features/today/egg-haptics';
 
-export function useStepplingEncounter(world: MergeWorldState) {
+/**
+ * A hatchable companion's Egg encounter: opening it, answering its question,
+ * feeding it the light its policy names, and the hatch choreography. The same
+ * hook for every friend, keyed by their definition.
+ */
+export function useHatchableEncounter(world: MergeWorldState, definition: HatchableCompanionDefinition) {
+  const policy = definition.egg;
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [feeding, setFeeding] = useState(false);
-  const [feedingEgg, setFeedingEgg] = useState<StepplingEggProgress>();
+  const [feedingEgg, setFeedingEgg] = useState<HatchableEggProgress>();
   const [feedCompletionKey, setFeedCompletionKey] = useState<string | null>(null);
   const feedCompletionRef = useRef<string | null>(null);
   const feedSequenceRef = useRef(0);
@@ -32,24 +40,26 @@ export function useStepplingEncounter(world: MergeWorldState) {
   const pending = useRef(false);
   const reduceMotion = useReducedMotion();
   const hatchHaptics = useMemo(() => createEggHatchHaptics(reduceMotion), [reduceMotion]);
-  const egg = world.stepplingEgg;
+  const egg = hatchableEggProgress(world, definition);
   const hatching = Boolean(open && egg?.hatchStartedAt && !egg.hatchedAt);
-  const send = useCallback(async (action: StepplingEggAction, animateFeedback = true) => {
+  const send = useCallback(async (action: HatchableEggAction, animateFeedback = true) => {
     if (pending.current) return false;
     pending.current = true; setBusy(true); setError(null);
     try {
-      const result = await applyStoredStepplingEgg(action);
+      const result = await applyStoredHatchableEgg(definition, action);
       if (!result.changed && result.message) throw new Error(result.message);
       if (animateFeedback && result.changed && (action.kind === 'intent' || action.kind === 'feed' || action.kind === 'alternative')) setFeedback((value) => value + 1);
       return true;
     } catch { setError('That didn’t save. Please try again.'); return false; }
     finally { pending.current = false; setBusy(false); }
-  }, []);
+  }, [definition]);
   const enter = useCallback(async () => {
     setOpen(true);
-    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    return send({ kind: 'begin', sourceDayId: localDayId(yesterday) });
-  }, [send]);
+    // Steps are yesterday's, counted whole; a photo or an answer is today's.
+    const source = new Date();
+    if (policy.feed.kind === 'steps') source.setDate(source.getDate() - 1);
+    return send({ kind: 'begin', sourceDayId: localDayId(source) });
+  }, [policy.feed.kind, send]);
   const close = useCallback(() => { if (!pending.current && !feedingRef.current && !hatching) { setOpen(false); setPhase('idle'); } }, [hatching]);
   const releaseFeedPanel = useCallback(() => {
     feedCompletionRef.current = null;
@@ -62,12 +72,12 @@ export function useStepplingEncounter(world: MergeWorldState) {
     if (feedCompletionRef.current !== completionKey) return;
     releaseFeedPanel();
   }, [releaseFeedPanel]);
-  const feed = useCallback(async (action: StepplingEggAction, from: FeedSourceRect) => {
+  const feed = useCallback(async (action: HatchableEggAction, from: FeedSourceRect) => {
     if (pending.current || feedingRef.current) return;
     // Calculate against the pre-feed snapshot, exactly like the displayed card.
     const bondAmount = action.kind === 'feed'
-      ? stepplingStepFeedOffer(egg, action.observedSteps).bond
-      : action.kind === 'intent' ? STEPPLING_INTENT_BOND : STEPPLING_MOVEMENT_BOND;
+      ? eggFeedOffer(policy, egg, action.observedSteps).bond
+      : action.kind === 'intent' ? policy.intent.bond : policy.alternative.bond;
     feedingRef.current = true; setFeeding(true); setFeedingEgg(egg);
     const ok = await send(action, false);
     const arrive = () => {
@@ -75,14 +85,14 @@ export function useStepplingEncounter(world: MergeWorldState) {
       setFeedback((value) => value + 1);
       // Bond arrival starts the same panel outro as the first Egg. Keep the
       // pre-answer card and interaction lock until its onFinished handoff.
-      const completionKey = `steppling:feed:${++feedSequenceRef.current}`;
+      const completionKey = `${definition.companion}:feed:${++feedSequenceRef.current}`;
       feedCompletionRef.current = completionKey;
       setFeedCompletionKey(completionKey);
     };
     if (!ok || reduceMotion || bondAmount <= 0) { arrive(); return; }
     // Same batched Bond flight and launch/arrival Egg effects as question cards.
     startEggFeed(from, eggBondFeedPayload(bondAmount, from), arrive);
-  }, [egg, reduceMotion, releaseFeedPanel, send, startEggFeed]);
+  }, [definition.companion, egg, policy, reduceMotion, releaseFeedPanel, send, startEggFeed]);
   const finish = useCallback(async () => {
     const ok = await send({ kind: 'finish' });
     // Keep the revealed subject mounted until the world ownership projection
@@ -126,12 +136,17 @@ export function useStepplingEncounter(world: MergeWorldState) {
     return () => { timers.forEach(clearTimeout); hatchHaptics.stop(); };
   }, [active, assetsReady, hatchHaptics, hatching, reduceMotion]);
   const presentation = useMemo<WorldFtueSubjectPresentation>(() => ({
-    hatchFamilyId: 'steppling', companionVisible: Boolean(open && egg?.hatchedAt),
+    hatchFamilyId: definition.companion, companionVisible: Boolean(open && egg?.hatchedAt),
     preloadHatch: open,
-    feedbackKey: feedback, feedExpressionKey: eggFeedLaunchKey, growthProgress: 1, growthStage: stepplingEggHasBeenFed(feedingEgg ?? egg) ? 6 : 0,
-    readyToHatch: stepplingEggReady(feedingEgg ?? egg) && !hatching && !egg?.hatchedAt, rewardPulseKey: 0,
+    feedbackKey: feedback, feedExpressionKey: eggFeedLaunchKey, growthProgress: 1, growthStage: hatchableEggHasBeenFed(feedingEgg ?? egg) ? 6 : 0,
+    readyToHatch: hatchableEggReady(policy, feedingEgg ?? egg) && !hatching && !egg?.hatchedAt, rewardPulseKey: 0,
     hatchPresentation: open && (hatching || egg?.hatchedAt) ? { ...IDLE_TODAY_HATCH_PRESENTATION, animationKey: egg?.hatchStartedAt ?? 0, phase, policy: 'ftue_discovery' } : null,
     onHatchAssetsReady: onAssetsReady, onHatchAssetsError: onAssetsReady,
-  }), [egg, eggFeedLaunchKey, feedback, feedingEgg, hatching, onAssetsReady, open, phase]);
-  return { open, enter, close, finish, egg: feedingEgg ?? egg, busy: busy || feeding, error, send, feed, feedCompletionKey, finishFeedPanel, feedController, hatching, phase, presentation };
+  }), [definition.companion, egg, eggFeedLaunchKey, feedback, feedingEgg, hatching, onAssetsReady, open, phase, policy]);
+  return { definition, open, enter, close, finish, egg: feedingEgg ?? egg, busy: busy || feeding, error, send, feed, feedCompletionKey, finishFeedPanel, feedController, hatching, phase, presentation };
+}
+
+/** Steppling's encounter, by its old name. */
+export function useStepplingEncounter(world: MergeWorldState) {
+  return useHatchableEncounter(world, STEPPLING_HATCHABLE);
 }

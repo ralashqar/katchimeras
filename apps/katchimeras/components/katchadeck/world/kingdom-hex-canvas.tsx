@@ -58,7 +58,7 @@ import { CompanionStepsValue } from '@/components/katchadeck/world/companion-ste
 import { worldEggReadyEffectsVisible, type WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
-import { hatchableByTile } from '@/constants/hatchable-companions/registry';
+import { hatchableByCompanion, hatchableByTile } from '@/constants/hatchable-companions/registry';
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
@@ -2350,7 +2350,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
         style={[StyleSheet.absoluteFill, eggMotionStyle]}>
         <Animated.View style={[StyleSheet.absoluteFill, eggFadeStyle]}>
         <View collapsable={false} ref={targetRef} style={StyleSheet.absoluteFill}>
-        <Pressable accessibilityLabel={idleDiscovery || presentation?.hatchFamilyId === 'steppling' ? 'Discovered Egg' : 'Mossprout Egg'} accessibilityRole="button" disabled={!onPress} onPress={onPress} style={StyleSheet.absoluteFill}>
+        <Pressable accessibilityLabel={idleDiscovery || (presentation?.hatchFamilyId && presentation.hatchFamilyId !== 'mossprout') ? 'Discovered Egg' : 'Mossprout Egg'} accessibilityRole="button" disabled={!onPress} onPress={onPress} style={StyleSheet.absoluteFill}>
           <Animated.View
             collapsable={false}
             renderToHardwareTextureAndroid={false}
@@ -2452,7 +2452,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
                 priority="high"
                 source={WORLD_FTUE_SOFT_GLOW}
                 style={[styles.worldFtueHatchGlow, hatchGlowStyle]}
-                tintColor={presentation?.hatchFamilyId === 'steppling' ? '#FFD76A' : FTUE_MOSSPROUT_CREATURE.accentColor}
+                tintColor={(presentation?.hatchFamilyId && hatchableByCompanion(presentation.hatchFamilyId)?.egg.accentColor) ?? FTUE_MOSSPROUT_CREATURE.accentColor}
                 transition={0}
               />
             </> : null}
@@ -2466,9 +2466,10 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
             }, rewardGlowStyle]} />
             <CreatureGroundShadow frameSize={creatureNativeWidth} stage="grown" visualKey={presentation?.hatchFamilyId ?? 'mossprout'} widthMultiplier={1.6} />
             <CreatureAnimatedArt
-              accessibilityLabel={`${presentation?.hatchFamilyId === 'steppling' ? 'Steppling' : 'Mossprout'} animated`}
+              accessibilityLabel={`${(presentation?.hatchFamilyId && hatchableByCompanion(presentation.hatchFamilyId)?.displayName) ?? 'Mossprout'} animated`}
               allowDownscaling={false}
-              fallbackSource={presentation?.hatchFamilyId === 'steppling' ? require('@incubator/art-world/square/steppling-standing-resident-512.webp') : WORLD_FTUE_MOSSPROUT_SOURCE}
+              fallbackSource={presentation?.hatchFamilyId === 'steppling' ? require('@incubator/art-world/square/steppling-standing-resident-512.webp')
+                : presentation?.hatchFamilyId && presentation.hatchFamilyId !== 'mossprout' ? resolveCreatureArtSource(presentation.hatchFamilyId) : WORLD_FTUE_MOSSPROUT_SOURCE}
               onLoad={presentation.onHatchAssetsReady}
               style={StyleSheet.absoluteFill}
               visualKey={presentation?.hatchFamilyId ?? 'mossprout'}

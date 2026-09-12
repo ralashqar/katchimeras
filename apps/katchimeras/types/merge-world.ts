@@ -520,7 +520,10 @@ export type MergeWorldState = {
   upgradeSkinGrants?: Record<string, { skinId: string; grantedAt: number }>;
   /** Durable mini-campaign state for narrative-led nature islands. */
   islandCampaigns?: Record<string, IslandCampaignProgress>;
-  stepplingEgg?: import('@/features/onboarding/steppling-egg-policy').StepplingEggProgress;
+  /** Kept for saves written before `hatchableEggs`; mirrors `hatchableEggs.steppling`. */
+  stepplingEgg?: import('@/features/onboarding/hatchable-egg-policy').HatchableEggProgress;
+  /** Each hatchable companion's Egg, from the clearing to the hatch. */
+  hatchableEggs?: Partial<Record<MergeCharacterId, import('@/features/onboarding/hatchable-egg-policy').HatchableEggProgress>>;
   worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
   /** `layoutVersion` 3: the Basket is earned by parcel on a board with no loose items; anything older is re-prepared. */
   glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 | 3 };
@@ -599,7 +602,9 @@ export type MergeWorldState = {
 };
 
 export type MergeWorldCommand =
-  | { type: 'stepplingEgg'; action: import('@/features/onboarding/steppling-egg-policy').StepplingEggAction; now: number }
+  /** `stepplingEgg` is the same command for Steppling, kept for callers and saves. */
+  | { type: 'stepplingEgg'; action: import('@/features/onboarding/hatchable-egg-policy').HatchableEggAction; now: number }
+  | { type: 'hatchableEgg'; companion: MergeCharacterId; action: import('@/features/onboarding/hatchable-egg-policy').HatchableEggAction; now: number }
   | { type: 'grantGeneratorParcel'; generatorId: string; rewardId: string; dayId: string; now: number }
   | { type: 'reconcileJourneyMeditation'; cycle: import('./companion-journey-cycle').CompanionJourneyCycle; availableAt: number; now: number }
   | { type: 'ensureCompanionDailyGarden'; familyId: MergeCharacterId; now: number }

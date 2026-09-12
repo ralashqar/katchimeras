@@ -3,7 +3,9 @@ import { readFileSync } from './helpers/content-fs';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
-import { stepplingStepFeedOffer, STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND, type StepplingEggProgress } from '@/features/onboarding/steppling-egg-policy';
+import { type StepplingEggProgress } from '@/features/onboarding/steppling-egg-policy';
+import { eggFeedOffer } from '@/features/onboarding/hatchable-egg-policy';
+import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 
 const controller = readFileSync('features/onboarding/use-steppling-encounter.ts', 'utf8');
 const source = ts.createSourceFile('controller.ts', controller, ts.ScriptTarget.Latest, true);
@@ -29,7 +31,7 @@ function harness(reduced = false, saveOk = true) {
   const context: Record<string, unknown> = {
     egg, pending: { current: false }, feedingRef,
     feedCompletionRef: completionRef, feedSequenceRef: { current: 0 },
-    reduceMotion: reduced, stepplingStepFeedOffer, STEPPLING_INTENT_BOND, STEPPLING_MOVEMENT_BOND,
+    reduceMotion: reduced, eggFeedOffer, policy: STEPPLING_HATCHABLE.egg, definition: STEPPLING_HATCHABLE,
     setFeeding: (value: boolean) => { view.feeding = value; },
     setFeedingEgg: (value: StepplingEggProgress | undefined) => { view.egg = value; },
     setFeedCompletionKey: (value: string | null) => { view.completion = value; },
@@ -93,7 +95,7 @@ test('original Egg, Steppling questions and steps all use the same panel lifecyc
   const steps = readFileSync('components/katchadeck/onboarding/scripted-action-list.tsx', 'utf8');
   assert.match(panel, /<EggHeroGuide guide=\{guide\} topInset=\{insets.top\}/);
   assert.match(nurture, /<EggHeroGuide guide=\{onboardingGuide\} topInset=\{topInset\}/);
-  for (const stage of ['intent', 'movement', 'steps', 'reading', 'ready']) assert.ok(panel.includes(`STEPPLING_EGG_GUIDES.${stage}`));
+  for (const stage of ['intent', 'alternative', 'feed', 'reading', 'ready']) assert.ok(panel.includes(`policy.guides.${stage}`), `the panel speaks the policy's ${stage} guide`);
   const lifecycle = readFileSync('features/today/use-shared-action-panel-lifecycle.ts', 'utf8');
   for (const content of [nurture, steps]) assert.match(content, /import \{ useSharedActionPanelLifecycle \} from '@\/features\/today\/use-shared-action-panel-lifecycle'/);
   assert.match(panel, /completionEvent=\{encounter.feedCompletionKey \? \{ action: question, id: encounter.feedCompletionKey \} : null\}/);

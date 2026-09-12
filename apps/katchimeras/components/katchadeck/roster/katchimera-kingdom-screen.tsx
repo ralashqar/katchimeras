@@ -30,10 +30,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useIsFocused } from '@react-navigation/native';
 import { GlowGatewayGuide } from '@/components/katchadeck/world/glow-gateway-guide';
-import { StepplingEncounterPanel } from '@/components/katchadeck/world/steppling-encounter-panel';
+import { HatchableEncounterPanel } from '@/components/katchadeck/world/steppling-encounter-panel';
 import { SHARED_EGG_REST_ZOOM, usesSharedResidentStage } from '@/components/katchadeck/world/shared-resident-presentation';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
-import { useStepplingEncounter } from '@/features/onboarding/use-steppling-encounter';
+import { useHatchableEncounter } from '@/features/onboarding/use-steppling-encounter';
+import { hatchableEggProgress } from '@/features/onboarding/hatchable-egg-policy';
 import { GLOW_GATEWAY_NODE_IDS, GLOW_MISSION_CLEAR_NODE_ID, glowDiscoveryAllowsGarden, glowDiscoveryLocksCamera, glowDiscoveryMissionNode, glowDiscoveryResumeCamera } from '@/features/onboarding/glow-discovery-flow';
 import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
 import { glowGatewayState, hatchableGatewayState } from '@/utils/merge-world/glow-discovery-policy';
@@ -287,7 +288,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const { transitionTo } = useGameScreenTransition();
   const stepplingLesson = useMemo(() => gardenLessonFor(hatchableRuns, activeLessonHatchable), [activeLessonHatchable, hatchableRuns]);
   const stepplingLessonOpening = useRef(false);
-  const stepplingEncounter = useStepplingEncounter(mergeWorld);
+  const stepplingEncounter = useHatchableEncounter(mergeWorld, activeHatchable);
   const stepplingSurfaceOpen = stepplingEncounter.open;
   const { open: stepplingEggOpen, close: closeStepplingEgg } = stepplingEncounter;
   useEffect(() => {
@@ -346,7 +347,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const prepareEggEntry = useCallback(() => { setFtueCameraSettled(false); setGlowPanelOpen(false); }, []);
   const eggHandoff = useGlowEggHandoff({ run: glowRun, world: mergeWorld, focused: screenFocused,
     available: !interactionCreatureId && !upgradePresentation && !requiredUpgradeStory, open: stepplingEggOpen,
-    enter: stepplingEncounter.enter, onOpening: prepareEggEntry });
+    enter: stepplingEncounter.enter, onOpening: prepareEggEntry, definition: activeHatchable });
   const upgradeOffers = useMemo(() => worldUpgradeOffers(mergeWorld), [mergeWorld]);
   const [selectedUpgrade, setSelectedUpgrade] = useState<WorldUpgradeOffer | null>(null);
   const [upgradePurchasing, setUpgradePurchasing] = useState(false);
@@ -460,8 +461,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const gatewayState = glowGatewayState(mergeWorld);
   // Every hatchable tile's state; the one whose Egg is open on screen shows the Egg even before the world says so.
   const hatchableTiles = useMemo(() => Object.fromEntries(HATCHABLE_COMPANIONS.map((definition) => [definition.tile.id,
-    definition.companion === 'steppling' && stepplingEncounter.open ? 'egg' as const : hatchableGatewayState(mergeWorld, definition)])),
-  [mergeWorld, stepplingEncounter.open]);
+    definition.companion === activeHatchable.companion && stepplingEncounter.open ? 'egg' as const : hatchableGatewayState(mergeWorld, definition)])),
+  [activeHatchable.companion, mergeWorld, stepplingEncounter.open]);
   const mossproutGardenScene = useMemo(() => ({
     gateway: stepplingEncounter.open ? 'egg' as const : gatewayState,
     hatchableTiles,
@@ -1173,14 +1174,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [ftueStepId, havenPresentations]);
 
   useEffect(() => {
-    if (!stepplingEggOpen || !mergeWorld.stepplingEgg?.hatchedAt) return;
-    const resident = companionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === 'steppling');
+    if (!stepplingEggOpen || !hatchableEggProgress(mergeWorld, activeHatchable)?.hatchedAt) return;
+    const resident = companionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === activeHatchable.companion);
     if (resident?.kind !== 'owned') return;
     // Swap the hatch actor and hosted resident together, after durable ownership
     // has arrived. The canvas carries the Egg camera origin into normal Back.
     selectResident(resident.creature.creatureId);
     closeStepplingEgg();
-  }, [closeStepplingEgg, companionSlots, mergeWorld.stepplingEgg?.hatchedAt, selectResident, stepplingEggOpen]);
+  }, [activeHatchable, closeStepplingEgg, companionSlots, mergeWorld, selectResident, stepplingEggOpen]);
 
   useEffect(() => {
     if (!interactionRequest || handledInteractionRequestRef.current === interactionRequest.key) return;
@@ -1811,8 +1812,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   });
   const selectGateway = useStableCallback(() => {
     if (kingdomGoalGuideActive) return;
-    // The Egg on the tile: Steppling's encounter until every companion's Egg runs on the shared policy.
-    if (activeHatchable.companion === 'steppling' && gatewayState === 'egg' && !glowDiscoveryLocksCamera(glowRun)) {
+    // The Egg on the live companion's tile opens their encounter.
+    if (hatchableGatewayState(mergeWorld, activeHatchable) === 'egg' && !glowDiscoveryLocksCamera(glowRun)) {
       setFtueCameraSettled(false);
       setGlowPanelOpen(false);
       void stepplingEncounter.enter();
@@ -1937,7 +1938,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       {screenFocused && eggHandoff.error ? <View style={{ position: 'absolute', bottom: insets.bottom + 20, left: 24, right: 24, zIndex: 120 }}>
         <KatchaButton label="Try again" onPress={eggHandoff.retry} />
       </View> : null}
-      {screenFocused && stepplingEncounter.open ? <StepplingEncounterPanel
+      {screenFocused && stepplingEncounter.open ? <HatchableEncounterPanel definition={activeHatchable}
         encounter={stepplingEncounter}
         egg={stepplingEncounter.egg}
         cameraReady={ftueCameraSettled}
