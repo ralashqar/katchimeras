@@ -100,7 +100,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
     guide: { eyebrow: 'Question 3 of 3', title: 'Each answer helps it wake.', body: '' },
     camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.mind'), anchorY: 0.51, durationMs: 520 },
     actions: [{
-      id: 'egg.support_style', title: 'The Egg can keep one thing full for you. Which?', description: '', icon: 'sparkles',
+      id: 'egg.support_style', title: 'The Egg keeps one thing full for you. Which?', description: '', icon: 'sparkles',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'day_focus', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
       nextStepId: 'egg.ready', backendEvent: true,
       options: [
@@ -114,7 +114,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
     id: 'egg.nature_theme', surface: 'today',
     guide: { eyebrow: 'Question 4 of 5', title: 'Your answer is taking root.', body: '' },
     actions: [{
-      id: 'egg.life_priority', title: 'You wake up with a whole free day. What gets it first?', description: '', icon: 'leaf.fill',
+      id: 'egg.life_priority', title: 'A whole free day. What gets it first?', description: '', icon: 'leaf.fill',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'activity', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
       nextStepId: 'egg.companion_identity', backendEvent: true,
       options: [
@@ -129,7 +129,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
     id: 'egg.companion_identity', surface: 'today',
     guide: { eyebrow: 'Question 5 of 5', title: 'One spark before we meet.', body: '' },
     actions: [{
-      id: 'egg.companion_place', title: 'Four paths lead off into the Mist. Which one do you take?', description: '', icon: 'map.fill',
+      id: 'egg.companion_place', title: 'Four paths lead into the Mist. Which do you take?', description: '', icon: 'map.fill',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'activity', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
       nextStepId: 'egg.ready', backendEvent: true,
       options: [
@@ -187,7 +187,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'egg.ready', surface: 'haven',
       guide: { eyebrow: 'Mossprout’s Egg', title: 'Something in there heard you.', body: '' },
-      actions: [{ id: 'egg.hatch', title: 'Open the Egg', description: 'See who heard you.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'discovery_hatch', nextStepId: 'companion.first_meeting', backendEvent: true }],
+      actions: [{ id: 'egg.hatch', title: 'Hatch', description: 'See who heard you.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'discovery_hatch', nextStepId: 'companion.first_meeting', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.ready'), anchorY: 0.5, durationMs: 520 },
     },
@@ -229,7 +229,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.garden_arrival', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Your Memory', title: 'Here. The soil’s still soft where the Mist lifted.', body: '' },
+      guide: { eyebrow: 'Your Memory', title: 'Here. The soil’s still soft.', body: '' },
       actions: [{ id: 'world.plant_first_seed', title: 'Plant it', description: 'Give your Memory a place in the garden.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'world.seed_planted', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_garden_plant_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_garden_plant_button', characterId: 'mossprout' } },
@@ -568,12 +568,12 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       guide: { eyebrow: 'Mossprout understands', title: 'What are we growing?', body: 'Choose the shape that feels closest. It does not need to be a precise goal.' },
       actions: [
         {
-          id: 'companion.choose_growth_intent', title: 'You get one magical garden plot. What does it grow for you?', description: '', icon: 'heart.fill',
+          id: 'companion.choose_growth_intent', title: 'One magical garden plot. What does it grow for you?', description: '', icon: 'heart.fill',
           presentation: 'inline_choice', handlerId: 'player_profile', nextStepId: 'companion.day_one_action',
           options: MOSSPROUT_BOND_SHARE_PROMPTS[0].options.map((option) => ({ id: `${MOSSPROUT_BOND_SHARE_PROMPTS[0].id}:${option.id}`, label: option.label, icon: option.icon })),
         },
         {
-          id: 'companion.choose_support_style', title: 'You’re stuck halfway up a hill. What do you want from the friend beside you?', description: '', icon: 'heart.fill',
+          id: 'companion.choose_support_style', title: 'Halfway up a hill and stuck. What do you want from me?', description: '', icon: 'heart.fill',
           presentation: 'inline_choice', handlerId: 'player_profile', nextStepId: 'companion.day_one_action',
           options: [
             { id: 'tiny_step', label: 'Point at the next step', icon: 'leaf.fill' },

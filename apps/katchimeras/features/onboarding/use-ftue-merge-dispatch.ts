@@ -32,6 +32,12 @@ export type FtueMergeDispatchInput = {
   deferEvent?: boolean;
   onBlocked?: () => void;
   onEvent?: (event: FtueEvent, result: MergeWorldCommandResult) => void;
+  /**
+   * Like onEvent, but before the run advances. Anything that must be on screen
+   * on the same frame the step changes (the opening's finale flag, which holds
+   * the camera) goes here, so no subscriber ever renders the next step without it.
+   */
+  onBeforeAdvance?: (event: FtueEvent, result: MergeWorldCommandResult) => void;
 };
 
 /**
@@ -40,7 +46,7 @@ export type FtueMergeDispatchInput = {
  * Extracted from the dedicated merge page so the opening's docked board
  * cannot drift from it.
  */
-export function useFtueMergeDispatch({ send, coordinator, sessionId, stateRef, runRef, stepRef, guided, deferEvent = false, onBlocked, onEvent }: FtueMergeDispatchInput) {
+export function useFtueMergeDispatch({ send, coordinator, sessionId, stateRef, runRef, stepRef, guided, deferEvent = false, onBlocked, onEvent, onBeforeAdvance }: FtueMergeDispatchInput) {
   return useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
     const currentState = stateRef.current;
     const currentRun = runRef.current;
@@ -62,6 +68,7 @@ export function useFtueMergeDispatch({ send, coordinator, sessionId, stateRef, r
       const event = mergeFtueEventForCommand(currentState, command, result);
       if (event && currentRun?.status === 'active') {
         const advance = () => {
+          if (result) onBeforeAdvance?.(event, result);
           const nextRun = dispatchFtueEvent(event, `merge-command:${sessionId}:${event.revision}`);
           runRef.current = nextRun;
           stepRef.current = nextRun?.status === 'active' ? mossproutFtueStep(nextRun.stepId) : null;
@@ -76,5 +83,5 @@ export function useFtueMergeDispatch({ send, coordinator, sessionId, stateRef, r
       if (token) coordinator.abort(token);
       throw error;
     }
-  }, [coordinator, deferEvent, guided, onBlocked, onEvent, runRef, send, sessionId, stateRef, stepRef]);
+  }, [coordinator, deferEvent, guided, onBeforeAdvance, onBlocked, onEvent, runRef, send, sessionId, stateRef, stepRef]);
 }

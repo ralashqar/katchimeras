@@ -83,8 +83,13 @@ test('Merge speech guidance is one green line and appears only for first-use mec
 test('hero copy fits three lines without captions and Haven spotlight retries native layout', () => {
   const copy = readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8');
   // One title node: two independently fitted copies could wrap differently and overlap.
-  assert.equal(copy.match(/numberOfLines=\{hero \? 3 : 2\}/g)?.length, 1);
-  assert.doesNotMatch(copy, /adjustsFontSizeToFit/, 'the title wraps at full size instead of shrinking');
+  assert.equal(copy.match(/<FittedTitle/g)?.length, 1);
+  assert.equal(copy.match(/maxLines=\{hero \? 3 : 2\}/g)?.length, 1);
+  // Full size first, wrapping up to the line cap; only past it does the title shrink, by the ratio that brings it back inside, and it truncates only at the floor.
+  assert.doesNotMatch(copy, /adjustsFontSizeToFit/, 'the native fit shrank before wrapping and reserved the unshrunk height');
+  assert.match(copy, /if \(lines <= maxLines \|\| scale <= TITLE_MIN_SCALE\) return;\s*setScale\(Math\.max\(TITLE_MIN_SCALE, Math\.floor\(scale \* \(maxLines \/ lines\) \* 100\) \/ 100\)\);/);
+  assert.match(copy, /numberOfLines=\{scale <= TITLE_MIN_SCALE \? maxLines : undefined\}/, 'no ellipsis until the floor');
+  assert.match(copy, /const TITLE_MIN_SCALE = 0\.76;/);
   assert.match(copy, /titleShadow: \{ textShadowColor: 'rgba\(117,69,10,0\.82\)', textShadowOffset: \{ height: 3, width: 0 \}, textShadowRadius: 0 \}/);
   assert.doesNotMatch(copy, /accessibilityElementsHidden\s*numberOfLines/, 'no duplicate shadow text layer');
   assert.match(copy, /!hero && guide.body/);
@@ -257,7 +262,7 @@ test('the first Bond action turns a soft intention into a Seed direction', () =>
   assert.equal(MOSSPROUT_BOND_SHARE_PROMPTS.every((prompt) => prompt.options.length === 3), true);
   assert.equal(MOSSPROUT_SUPPORT_STYLE_OPTIONS.length, 4);
   const selection = mossproutBondShareSelection('desired-help:progress');
-  assert.equal(selection?.prompt.prompt, 'You get one magical garden plot. What does it grow for you?');
+  assert.equal(selection?.prompt.prompt, 'One magical garden plot. What does it grow for you?');
   assert.equal(selection?.answer.label, 'Something that gets me moving');
   assert.equal(mossproutBondShareSelection('desired-help:energy')?.answer.label, 'Getting some energy back');
   assert.equal(mossproutBondShareSelection('desired-help:good_day')?.answer.label, 'Just having a good day');
@@ -560,7 +565,7 @@ test('Mossprout remembers the day, reflects it back, then offers one narrative G
   assert.doesNotMatch(mossproutStage, /eyebrow="MEMORY SEED"|accessibilityLabel="Your memory seed"/);
   assert.doesNotMatch(mossproutStage, /seedName:|seedDescription:|seedEyebrow:/);
   assert.match(mossproutStage, /onContinue=\{\(id\) => onContinue\?\.\(id\)\}/);
-  assert.match(bondShare, /You get one magical garden plot\. What does it grow for you\?/);
+  assert.match(bondShare, /One magical garden plot\. What does it grow for you\?/);
   assert.match(bondShare, /Something that gets me moving[\s\S]*?Somewhere quiet to sit[\s\S]*?Something that feels like me again/);
   assert.match(bondShare, /Point at the next step[\s\S]*?Talk it through with me[\s\S]*?A push[\s\S]*?Just walk with me/);
   assert.match(mossproutStage, /ref=\{actionStackTargetRef\}[\s\S]*?style=\{styles\.bondChoiceStack\}/);

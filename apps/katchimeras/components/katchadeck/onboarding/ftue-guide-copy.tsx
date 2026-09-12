@@ -2,7 +2,8 @@ import { FTUE_SCENE_LAYERS } from '@/constants/ftue-scene-layers';
 import { normalizeSpeechText } from '@/utils/speech-text';
 import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 import { Meadow } from '@/constants/meadow-theme';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View, type StyleProp, type TextLayoutEventData, type TextStyle, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type React from 'react';
 
@@ -57,15 +58,12 @@ export function FtueGuideCopy({ guide, hero = false }: {
         <View style={styles.titleStack}>
           {/* One text node: a second, absolutely placed copy for the drop shadow
               fitted its font independently and could land on a different line
-              count, so the two overlapped. The shadow is a text shadow now, and
-              the title keeps its full size and wraps rather than shrinking. */}
-          <ThemedText
-            numberOfLines={hero ? 3 : 2}
+              count, so the two overlapped. The shadow is a text shadow now. */}
+          <FittedTitle
+            text={normalizeSpeechText(guide.title)}
+            maxLines={hero ? 3 : 2}
             style={[titleStyle, styles.titleShadow]}
-            lightColor={KatchaDeckUI.ftue.gold}
-            darkColor={KatchaDeckUI.ftue.gold}>
-            {normalizeSpeechText(guide.title)}
-          </ThemedText>
+          />
         </View>
         {!hero && guide.body ? (
           <ThemedText
@@ -77,6 +75,39 @@ export function FtueGuideCopy({ guide, hero = false }: {
         ) : null}
       </Panel>
     </View>
+  );
+}
+
+/** The smallest the title may go before it is allowed to cut off. */
+const TITLE_MIN_SCALE = 0.76;
+
+/**
+ * Full size first: the title wraps at its authored size for up to `maxLines`.
+ * Only when it would need more lines than that does it shrink, by exactly the
+ * ratio that brings it back inside, down to TITLE_MIN_SCALE; past that it
+ * truncates. The platform's own fitting shrank before wrapping and reserved
+ * the unshrunk height, which left a small line floating in a tall panel.
+ */
+function FittedTitle({ text, maxLines, style }: { text: string; maxLines: number; style: StyleProp<TextStyle> }) {
+  const [scale, setScale] = useState(1);
+  useEffect(() => { setScale(1); }, [text]);
+  const flat = StyleSheet.flatten(style) as TextStyle;
+  const fontSize = (flat.fontSize ?? 32) * scale;
+  const lineHeight = flat.lineHeight ? flat.lineHeight * scale : undefined;
+  const onTextLayout = (event: { nativeEvent: TextLayoutEventData }) => {
+    const lines = event.nativeEvent.lines.length;
+    if (lines <= maxLines || scale <= TITLE_MIN_SCALE) return;
+    setScale(Math.max(TITLE_MIN_SCALE, Math.floor(scale * (maxLines / lines) * 100) / 100));
+  };
+  return (
+    <ThemedText
+      numberOfLines={scale <= TITLE_MIN_SCALE ? maxLines : undefined}
+      onTextLayout={onTextLayout}
+      style={[style, { fontSize, ...(lineHeight ? { lineHeight } : {}) }]}
+      lightColor={KatchaDeckUI.ftue.gold}
+      darkColor={KatchaDeckUI.ftue.gold}>
+      {text}
+    </ThemedText>
   );
 }
 

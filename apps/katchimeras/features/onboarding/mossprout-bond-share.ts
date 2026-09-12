@@ -28,7 +28,7 @@ export const MOSSPROUT_BOND_SHARE_PROMPTS = [
     id: 'desired-help',
     cardLabel: 'What would help',
     icon: 'leaf.fill',
-    prompt: 'You get one magical garden plot. What does it grow for you?',
+    prompt: 'One magical garden plot. What does it grow for you?',
     reply: 'Good. We do not have to grow a whole forest today.',
     options: [
       { id: 'progress', icon: 'leaf.fill', label: 'Something that gets me moving', reply: 'Then we will begin with one small, living thing.' },

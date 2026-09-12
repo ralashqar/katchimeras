@@ -45,13 +45,13 @@ export function glowDiscoveryResumeWorld(run: Pick<ContentFlowRun, 'status'> | n
 
 export const GLOW_DISCOVERY_RUN_ID = 'story:glow-steppling-v1';
 export const GLOW_LESSON: readonly MergeLessonBeat[] = [
-  { id: 'lesson.single.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'Someone’s in there', title: 'Let’s make enough light to see who it’s holding.', body: 'Tap the Basket twice.' } },
+  { id: 'lesson.single.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'Someone’s in there', title: 'Make enough light to see who it’s holding.', body: 'Tap the Basket twice.' } },
   { id: 'lesson.single.seeds', kind: 'pair', definitionId: 'nature:garden:1', guide: { eyebrow: 'Making light', title: 'Two of the same, together.', body: 'Drag one onto the other.' } },
   ...['Sprout', 'Plant', 'Flower'].map((name, index): MergeLessonBeat => ({
     id: `lesson.single.match-${index + 2}`, kind: 'match', definitionId: `nature:garden:${index + 2}`, echoId: GLOW_SINGLE_ECHO_IDS[index],
     guide: { coaching: index === 0 ? undefined : 'practice', eyebrow: 'In the grey', title: `The Mist has a ${name}. Its twin will pull it free.`, body: `Drag your ${name} onto it.` },
   })),
-  { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: 'Enough light', title: 'That’s the one. Give it here, and I’ll turn it into light.', body: 'Serve the request.' } },
+  { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: 'Enough light', title: 'Give it here. I’ll turn it into light.', body: 'Serve the request.' } },
 ];
 export const GLOW_ALL_LESSON_BEATS = GLOW_LESSON;
 export const GLOW_DISCOVERY_FLOW = defineStory({

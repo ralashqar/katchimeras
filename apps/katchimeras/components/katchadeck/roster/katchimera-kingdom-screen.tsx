@@ -189,8 +189,17 @@ function FtueOpeningFade() {
 const RESTORATION_HINT_DELAY_MS = 900;
 const RESTORATION_HINT_FINGER_DROP = 40;
 
+/** The clear step's camera, held past the run's own step change while the board fades. */
+const OPENING_CLEAR_CAMERA = mossproutFtueStep(OPENING_MIST_CLEAR_STEP_ID)?.camera ?? null;
 /** After a finale lands: the struck wisp's fall (shrink, burst) before the mission is declared over. */
 const WISP_FALL_MS = 640;
+/** How long the opening's lift caption is on screen before the run moves on to the Egg. */
+const LIFT_CAPTION_MIN_MS = 2400;
+/**
+ * After the finale has settled and the run reaches the lift: how long the camera and the Egg
+ * wait, so the board (a 260ms fade) and the last wisp are gone before anything in the world moves.
+ */
+const OPENING_LIFT_CAMERA_DELAY_MS = 420;
 /** The longest the screen is held still between a board's finale and its resolution story. */
 const RESTORATION_HANDOFF_MAX_MS = 12_000;
 
@@ -240,10 +249,26 @@ export function KatchimeraKingdomScreen({
   const restorationFinaleIdRef = useRef<number | null>(null);
   const stepplingMissionLanded = stepplingFinaleIdRef.current != null && openingGlow.finaleLandedId === stepplingFinaleIdRef.current;
   const restorationLanded = restorationFinaleIdRef.current != null && openingGlow.finaleLandedId === restorationFinaleIdRef.current;
-  const ftueStepId = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow.finaleActive ? OPENING_MIST_CLEAR_STEP_ID : routeFtueStepId;
+  // Held from the instant the finale launches (the ref) until its burst has settled (the state): the run
+  // store's own render pass arrives before the state does, and must not see the lift step unheld.
+  const openingFinaleHeld = openingGlow.finaleActive || openingGlow.finaleHoldRef.current;
+  const ftueStepId = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld ? OPENING_MIST_CLEAR_STEP_ID : routeFtueStepId;
+  // Phase two of the hold, for the camera and the Egg only. The moment the run reaches the lift, the
+  // Egg surface mounts and publishes a subject presentation; that changes the canvas's tutorial camera
+  // key, which re-applies the clear step's directive against the tile that is now a revealed Egg (a
+  // different anchor) and nudges the camera while the last wisp is still falling. So until the board
+  // has faded, the canvas keeps the clear step's camera and sees no presentation at all.
+  const [openingLiftCameraReleased, setOpeningLiftCameraReleased] = useState(false);
+  useEffect(() => {
+    if (routeFtueStepId !== OPENING_MIST_LIFT_STEP_ID || openingFinaleHeld || !openingGlow.finaleLanded) { setOpeningLiftCameraReleased(false); return; }
+    const timer = setTimeout(() => setOpeningLiftCameraReleased(true), OPENING_LIFT_CAMERA_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [openingFinaleHeld, openingGlow.finaleLanded, routeFtueStepId]);
+  const openingLiftCameraHeld = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID
+    && (openingFinaleHeld || (openingGlow.finaleLanded && !openingLiftCameraReleased));
   // The mist itself starts clearing the frame the item strikes the tile; only
   // the camera, the caption and the dock wait for the burst to settle.
-  const homeVeil = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingGlow.finaleActive && !openingGlow.finaleLanded ? 'veiled' : homeVeilForStep(routeFtueStepId);
+  const homeVeil = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld && !openingGlow.finaleLanded ? 'veiled' : homeVeilForStep(routeFtueStepId);
   const { flush: flushMergeWorld } = useMergeWorldActions();
   const { transitionTo } = useGameScreenTransition();
   const stepplingLesson = useStepplingGardenLesson();
@@ -479,7 +504,7 @@ export function KatchimeraKingdomScreen({
     kind: 'focus_target' as const, target: { kind: 'haven_nature_island' as const, islandId: restorationIslandId },
     zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700,
   } : null, [restorationIslandId, restorationOpen, screenFocused]);
-  const tutorialCamera = mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? ftueStep?.camera ?? null;
+  const tutorialCamera = mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null);
   const ftueReturnCamera = ftueReturnFocusCreatureId
     ? mossproutFtueStep('companion.chapter_zero_return')?.camera ?? null
     : null;
@@ -544,7 +569,12 @@ export function KatchimeraKingdomScreen({
   // The opening's docked board: the run's own progress drives the bar, each
   // merge sends a Glow into the mist, and the finger shows only the first pairs.
   const ftueRun = useFtueRun();
-  const openingRun = ftueRun?.status === 'active' && ftueRun.stepId === routeFtueStepId ? ftueRun : null;
+  // The run store advances a frame before the route's step id follows it. On the final merge the run is
+  // already at the lift while the route still says clear; the run is still the opening's, or the docked
+  // board would unmount for that frame and remount with its entrance slide (and its final item back).
+  const openingRun = ftueRun?.status === 'active'
+    && (ftueRun.stepId === routeFtueStepId || (ftueRun.stepId === OPENING_MIST_LIFT_STEP_ID && routeFtueStepId === OPENING_MIST_CLEAR_STEP_ID))
+    ? ftueRun : null;
   const [openingBoardMetrics, setOpeningBoardMetrics] = useState<MergeBoardScreenMetrics | null>(null);
   const [openingBlockedNonce, setOpeningBlockedNonce] = useState(0);
   const openingRailRefs = useRef(new Map<string, View>());
@@ -869,14 +899,24 @@ export function KatchimeraKingdomScreen({
     }
   }, [ftueStepId, onFtueRestore]);
 
+  const liftCaptionShownAtRef = useRef<number | null>(null);
+  const liftCommitRef = useRef<(() => void) | null>(null);
+  const liftCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completeUpgradePresentation = useCallback((presentation: HavenTileUpgradePresentation) => {
     // The canvas may report completion more than once; a single story owns the ack.
     if (revealedUpgradeRef.current === presentation.nonce) return;
     revealedUpgradeRef.current = presentation.nonce;
     if (presentation.veilLift) {
-      // The opening's lift wrote nothing to the world; it only moves the run on.
+      // The opening's lift wrote nothing to the world; it only moves the run on. Not before the lift
+      // caption has had its beat: the crossblend runs while the last wisp is still falling, so it can
+      // finish before the caption is even on screen.
       setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
-      commitFtueAction({ actionId: OPENING_LIFTED_ACTION_ID, evidenceRef: 'mossprout-world:veil-lifted' });
+      const commitLift = () => commitFtueAction({ actionId: OPENING_LIFTED_ACTION_ID, evidenceRef: 'mossprout-world:veil-lifted' });
+      const shownAt = liftCaptionShownAtRef.current;
+      if (shownAt == null) { liftCommitRef.current = commitLift; return; }
+      const remaining = Math.max(0, shownAt + LIFT_CAPTION_MIN_MS - Date.now());
+      if (remaining === 0) commitLift();
+      else liftCommitTimerRef.current = setTimeout(commitLift, remaining);
       return;
     }
     if (tutorialUpgradeNonceRef.current === presentation.nonce) {
@@ -908,6 +948,15 @@ export function KatchimeraKingdomScreen({
     finishUpgradePresentation(presentation);
   }, [finishUpgradePresentation]);
 
+  // The lift caption ("The last one falls. The Mist lets go.") stays up for at least LIFT_CAPTION_MIN_MS
+  // before the run moves on to the Egg, however quickly the crossblend finished.
+  useEffect(() => {
+    if (ftueStepId !== OPENING_MIST_LIFT_STEP_ID) { liftCaptionShownAtRef.current = null; return; }
+    liftCaptionShownAtRef.current = Date.now();
+    const pending = liftCommitRef.current;
+    if (pending) { liftCommitRef.current = null; liftCommitTimerRef.current = setTimeout(pending, LIFT_CAPTION_MIN_MS); }
+    return () => { if (liftCommitTimerRef.current) { clearTimeout(liftCommitTimerRef.current); liftCommitTimerRef.current = null; } };
+  }, [ftueStepId]);
   // The opening's veil lift: one local crossblend per run at `world.mist_lift`,
   // rebuilt on a cold resume and committed exactly once when the canvas finishes.
   const veilLiftKeyRef = useRef<string | null>(null);
@@ -1779,7 +1828,7 @@ export function KatchimeraKingdomScreen({
         upgradePresentation={upgradePresentation}
         focusedMossproutWorld
         worldEggTargetRef={worldEggTargetRef}
-        worldSubjectPresentation={worldSubjectPresentation}
+        worldSubjectPresentation={openingLiftCameraHeld ? null : worldSubjectPresentation}
       />
       {!activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && (!ftueStepId || ftueStepId === 'companion.meditating') ? <View style={{ position: 'absolute', left: 16, bottom: Math.max(insets.bottom, 12) + 10, zIndex: 30 }}>
         <CompanionJournalButton familyId="mossprout" />

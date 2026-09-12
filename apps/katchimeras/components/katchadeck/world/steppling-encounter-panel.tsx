@@ -111,7 +111,7 @@ export function StepplingEncounterPanel({ encounter, egg, cameraReady, onReady }
   const askForSteps = Boolean(egg?.intent) && !ready && access === 'should_request' && displayedSteps == null;
   const question = egg && (!egg.intent || movementFallback && !ready) ? eggQuestionAction(
     !egg.intent ? 'egg.steppling.intent' : 'egg.steppling.movement',
-    !egg.intent ? 'What would you like more of?' : 'What movement suits you today?',
+    !egg.intent ? 'The door’s open and there’s an hour. Which way do you go?' : 'What actually moved you today?',
     !egg.intent ? STEPPLING_INTENT_BOND : STEPPLING_MOVEMENT_BOND,
     egg.sourceDayId,
   ) : null;

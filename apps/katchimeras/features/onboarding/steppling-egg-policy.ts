@@ -2,11 +2,11 @@ import type { MergeWorldState, MergeWorldCommandResult } from '@/types/merge-wor
 import { GLOW_GATEWAY_ID, reduceGlowDiscovery } from '@/utils/merge-world/glow-discovery-policy';
 
 export const STEPPLING_EGG_GUIDES = {
-  intent: { eyebrow: 'Under the Mist', title: 'This one moves when you do. So: the door’s open and there’s an hour. Which way do you go?', body: '' },
+  intent: { eyebrow: 'Under the Mist', title: 'This one moves when you do.', body: '' },
   reading: { eyebrow: 'Yesterday’s steps', title: 'Counting yesterday’s steps…', body: '' },
-  steps: { eyebrow: 'Yesterday’s steps', title: 'Every step you took was light the Mist never got. Feed them in.', body: '' },
+  steps: { eyebrow: 'Yesterday’s steps', title: 'Steps are light the Mist never got. Feed them in.', body: '' },
   permission: { eyebrow: 'Yesterday’s steps', title: 'Your steps are light too. May it count them?', body: '' },
-  movement: { eyebrow: 'Your own rhythm', title: 'Steps are one way to make light. Not the only one. What actually moved you today?', body: '' },
+  movement: { eyebrow: 'Your own rhythm', title: 'Steps are one way to make light. Not the only one.', body: '' },
   ready: { eyebrow: 'Awake', title: 'The Mist is off it. Someone’s waking.', body: '' },
 } as const;
 

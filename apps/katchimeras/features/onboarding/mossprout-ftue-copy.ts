@@ -2,13 +2,13 @@ import type { FtueChoiceOption } from './ftue-types';
 
 /** Shared by the authored graph and its native presentations. IDs are save data. */
 export const MOSSPROUT_FTUE_COPY = {
-  opening: 'Nobody has looked at this place in a very long time. The Mist came in behind them and stayed. Then you looked.',
-  openingNoticed: 'Nobody has looked at this place in a very long time.',
-  openingArrived: 'The Mist came in behind them and stayed. Then you looked.',
+  opening: 'Nobody has looked at this place in years. The Mist came in and stayed. Then you looked.',
+  openingNoticed: 'Nobody has looked at this place in years.',
+  openingArrived: 'The Mist came in and stayed. Then you looked.',
   lookCloser: 'Look closer',
   mistClearTitle: 'Three Mistwisps have this garden. Make light and they’ll flinch.',
   mistClearBody: 'Two of the same, together: that’s light. Drag one Seed onto the other.',
-  mistThins: 'The last one goes, and the Mist has nothing left to hold with.',
+  mistThins: 'The last one falls. The Mist lets go.',
   eggHeardYou: 'And something under it heard you looking.',
   dayQuestion: 'If today were weather over this garden, what was it?',
   helpQuestion: 'And the first thing we grow. What should it be for?',

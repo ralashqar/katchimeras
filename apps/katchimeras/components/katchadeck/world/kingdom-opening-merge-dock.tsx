@@ -27,7 +27,11 @@ export const OPENING_GLOW_FLIGHT_MS = 700 + (OPENING_GLOWS_PER_MERGE - 1) * 65;
 /** How long the impact burst lives at the veiled tile. */
 export const OPENING_IMPACT_BURST_MS = 640;
 /** After the final item's burst, before the Kingdom moves on to the lift. */
-const OPENING_FINALE_SETTLE_MS = 320;
+/**
+ * After the finale's burst: long enough for the wisp it struck to shrink, burst and go
+ * (its fall and death burst together run past a second) before the lift beat moves the camera.
+ */
+const OPENING_FINALE_SETTLE_MS = 760;
 const GLOW_SIZE = 34;
 // Fewer, shadow-free motes: four impacts land per merge, and blurred shadows on
 // animating views re-rasterise every frame.
@@ -134,7 +138,8 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
     if (event.type !== 'merge_completed' || !metrics) return;
     const center = mergeCellCenter(metrics.geometry, event.resultCell);
     const from = { x: metrics.x + center.x, y: metrics.y + center.y };
-    const finale = openingMistProgress(runRef.current) >= OPENING_MERGE_REQUIRED;
+    // Called before the run advances on this merge, so the run still shows the count without it.
+    const finale = openingMistProgress(runRef.current) + 1 >= OPENING_MERGE_REQUIRED;
     if (finale) {
       const occupant = result.state.board[event.resultCell]?.occupant;
       if (occupant?.kind === 'item') setHiddenItemIds((current) => new Set([...current, occupant.instanceId]));
@@ -145,7 +150,9 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
   }, [onFinale, onGlow]);
   const dispatch = useFtueMergeDispatch({
     send, coordinator, sessionId, stateRef, runRef, stepRef, guided: true, deferEvent: true,
-    onBlocked: onBlockedInteraction, onEvent: handleEvent,
+    // Before the advance: the finale flag must be up on the very frame the run reaches the lift step,
+    // or that frame renders the lift step's camera and the tile re-centres before the last wisp has fallen.
+    onBlocked: onBlockedInteraction, onBeforeAdvance: handleEvent,
   });
 
   return <MistMissionDock
@@ -505,6 +512,11 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   // True from the final merge until its item has landed, burst, and settled:
   // the Kingdom holds the clear beat on screen for exactly that long.
   const [finaleActive, setFinaleActive] = useState(false);
+  // The same hold as a ref: set the instant the finale launches, before any state has rendered.
+  // The FTUE run store re-renders its subscribers at sync priority, ahead of ordinary state updates
+  // queued in the same frame; a screen deriving its step from `finaleActive` alone renders the lift
+  // step once without the hold and moves the camera. Reading this ref during render closes that gap.
+  const finaleHoldRef = useRef(false);
   // True from the moment the final item strikes the tile: the mist clears on that frame.
   const [finaleLanded, setFinaleLanded] = useState(false);
   const finaleIdRef = useRef<number | null>(null);
@@ -556,7 +568,7 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   const impactDone = useCallback((id: number) => {
     setImpacts((current) => current.filter((impact) => impact.id !== id));
     // The burst is over; let it settle before the lift beat takes the screen.
-    if (id === finaleIdRef.current) setTimeout(() => setFinaleActive(false), OPENING_FINALE_SETTLE_MS);
+    if (id === finaleIdRef.current) setTimeout(() => { finaleHoldRef.current = false; setFinaleActive(false); }, OPENING_FINALE_SETTLE_MS);
   }, []);
   /** One merge's item, alone, into the tile: a restoration board sends what it just made, not Glow. */
   const launchItem = useCallback((from: RewardFlightPoint, definitionId: string) => {
@@ -573,6 +585,7 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   const launchFinale = useCallback((from: RewardFlightPoint, definitionId: string): number => {
     const id = ++nextId.current;
     finaleIdRef.current = id;
+    finaleHoldRef.current = true;
     setFinaleActive(true);
     setFinaleLanded(false);
     const art = mergeWorldItemArt(definitionId) as number | undefined;
@@ -585,7 +598,7 @@ export function useOpeningGlow(targetNode: ViewType | null) {
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.5 }));
     return id;
   }, []);
-  return { flights, impacts, landed, finaleActive, finaleLanded, finaleLandedId, launch, launchItem, launchFinale, arrive, impactDone, sinkRef };
+  return { flights, impacts, landed, finaleActive, finaleHoldRef, finaleLanded, finaleLandedId, launch, launchItem, launchFinale, arrive, impactDone, sinkRef };
 }
 
 const styles = StyleSheet.create({
