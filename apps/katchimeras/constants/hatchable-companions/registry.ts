@@ -2,6 +2,8 @@ import type { MergeCharacterId } from '@/types/merge-world';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { STEPPLING_HATCHABLE } from './steppling';
 
+export { STEPPLING_HATCHABLE };
+
 /**
  * Every friend the Mist keeps on a shared-world tile, in the order they were
  * authored. Screens, flows and the engine read this; nothing names a friend by

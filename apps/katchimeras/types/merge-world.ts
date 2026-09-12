@@ -526,7 +526,10 @@ export type MergeWorldState = {
   glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 | 3 };
   /** The first light, earned when the last wisp fell on the opening board: what the first garden restore is paid with. */
   openingGlow?: { receiptId: string; amount: number; grantedAt: number } | null;
+  /** Kept for saves written before `gardenLessons`; mirrors `gardenLessons.steppling`. */
   stepplingGardenLesson?: { preparedAt: number; servedAt?: number };
+  /** Each hatchable companion's garden lesson (parcel, grow, serve): prepared once, served once. */
+  gardenLessons?: Partial<Record<MergeCharacterId, { preparedAt: number; servedAt?: number }>>;
   /** Mossprout's wish — bring every friend home — once it has been told, and once its map hint was seen. */
   kingdomGoal?: { introducedAt: number; coachmarkSeenAt: number | null };
   version: 24;
@@ -555,7 +558,7 @@ export type MergeWorldState = {
   favouriteCharacterId: MergeCharacterId | null;
   activeOrders: MergeOrder[];
   companionDailyGardenVersion?: 1;
-  companionDailyGarden?: Partial<Record<'mossprout' | 'steppling', import('@/utils/merge-world/companion-daily-garden').CompanionDailyGardenBatch>>;
+  companionDailyGarden?: Partial<Record<MergeCharacterId, import('@/utils/merge-world/companion-daily-garden').CompanionDailyGardenBatch>>;
   mossproutDailyGardenOrders: MossproutDailyGardenOrders | null;
   characterActivityOpportunities: MergeCharacterActivityOpportunity[];
   ownedKatchimeraCards: OwnedKatchimeraCard[];
@@ -599,15 +602,17 @@ export type MergeWorldCommand =
   | { type: 'stepplingEgg'; action: import('@/features/onboarding/steppling-egg-policy').StepplingEggAction; now: number }
   | { type: 'grantGeneratorParcel'; generatorId: string; rewardId: string; dayId: string; now: number }
   | { type: 'reconcileJourneyMeditation'; cycle: import('./companion-journey-cycle').CompanionJourneyCycle; availableAt: number; now: number }
-  | { type: 'ensureCompanionDailyGarden'; familyId: 'mossprout' | 'steppling'; now: number }
+  | { type: 'ensureCompanionDailyGarden'; familyId: MergeCharacterId; now: number }
   | { type: 'grantJourneyReturn'; cycle: import('./companion-journey-cycle').CompanionJourneyCycle; dayId: string; now: number }
   | { type: 'unlockWorldTarget'; targetId: string; now: number; receiptId?: string }
-  | { type: 'transferDiscoveryEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
-  | { type: 'hatchWorldEgg'; targetId: 'mossprout:overgrown-trail'; now: number }
+  | { type: 'transferDiscoveryEgg'; targetId: string; now: number }
+  | { type: 'hatchWorldEgg'; targetId: string; now: number }
   | { type: 'prepareGlowDiscoveryLesson'; now: number }
   /** The first light: the Glow that drove the opening's wisps off stays with you, once per run. */
   | { type: 'grantOpeningGlow'; receiptId: string; amount: number; now: number }
+  /** `prepareStepplingGardenLesson` is the same command for Steppling, kept for callers and saves. */
   | { type: 'prepareStepplingGardenLesson'; now: number }
+  | { type: 'prepareGardenLesson'; companion: MergeCharacterId; now: number }
   | { type: 'refreshTime'; boardId?: MergeBoardId; now: number }
   | { type: 'tapGenerator'; boardId?: MergeBoardId; generatorId: string; now: number; seed: string; spendEnergy?: boolean; activityOpportunityId?: string }
   | { type: 'setGeneratorForcedDrop'; boardId?: MergeBoardId; generatorId: string; definitionId: string | null; now: number }

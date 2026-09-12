@@ -2,7 +2,8 @@ import { createOrderQueries } from '@incubator/merge/orders';
 import { reconcileUpgradeProgress } from '@/features/world-upgrades/world-upgrade-progress';
 const { mergeOrderReady, mergeOrderRequirementReadiness, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds, boardItemCounts } = createOrderQueries();
 export { mergeOrderReady, mergeOrderRequirementReadiness, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds };
-import { prepareStepplingGarden, stepplingGardenDrop, stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
+import { lessonDrop, lessonForOrder, lessonOnGenerator, lessonOrderServed, prepareGardenLesson, withGardenLessonRecord, gardenLessonRecord } from '@/features/onboarding/steppling-garden-lesson';
+import { HATCHABLE_COMPANIONS, hatchableByCompanion } from '@/constants/hatchable-companions/registry';
 import { ensureOrdersRequireMerge, repairOrderChains } from './order-requirements';
 import { generatorChainOpen, openChainFor, openDefinitionFor, openTierOneDropIds } from './generator-branches';
 import { ensureCompanionDailyGarden, completeDailyGardenOrder, DAILY_GARDEN_ARC, DAILY_GARDEN_BONUS } from './companion-daily-garden';
@@ -342,8 +343,11 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
         source: 'companion_story', itemDefinitionIds: [], claimedAt: null, seenAt: null,
       }] }, command.now));
     }
-    case 'prepareStepplingGardenLesson': {
-      const next = prepareStepplingGarden(current, command.now);
+    case 'prepareStepplingGardenLesson':
+    case 'prepareGardenLesson': {
+      const definition = hatchableByCompanion(command.type === 'prepareGardenLesson' ? command.companion : 'steppling');
+      if (!definition) return unchanged(current, 'This friend has no garden lesson.');
+      const next = prepareGardenLesson(current, definition, command.now);
       return next === current ? unchanged(current) : changed(touch(next, command.now));
     }
     case 'ensureCompanionDailyGarden': {
@@ -862,8 +866,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     arrivals: normalizeArrivals(source.arrivals),
     landmarks: normalizeLandmarks(source.landmarks),
     generatorUnlockReceipts: uniqueGeneratorUnlockReceipts(source.generatorUnlockReceipts),
-    stepplingGardenLesson: source.stepplingGardenLesson && Number.isFinite(source.stepplingGardenLesson.preparedAt)
-      ? { preparedAt: source.stepplingGardenLesson.preparedAt, servedAt: source.stepplingGardenLesson.servedAt } : undefined,
+    ...normalizeGardenLessons(source),
     kingdomGoal: source.kingdomGoal && Number.isFinite(source.kingdomGoal.introducedAt)
       ? { introducedAt: source.kingdomGoal.introducedAt, coachmarkSeenAt: Number.isFinite(source.kingdomGoal.coachmarkSeenAt ?? NaN) ? source.kingdomGoal.coachmarkSeenAt : null }
       : undefined,
@@ -1774,9 +1777,10 @@ function normalizeMovementEgg(value: unknown): MergeWorldState['haven']['movemen
 function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string, activityOpportunityId?: string): MergeWorldCommandResult {
   const generator = state.generators[generatorId];
   if (!generator) return unchanged(state, 'That item maker is not available yet.');
-  const tutorialDrop = stepplingGardenDrop(state, generatorId) ?? glowTutorialDrop(state, generatorId);
-  if (generatorId === 'journey-locker' && state.stepplingGardenLesson && !stepplingShoeServed(state) && !tutorialDrop) {
-    return unchanged(state, 'Merge your Socks and serve Steppling’s Shoe first.');
+  const tutorialDrop = lessonDrop(state, generatorId) ?? glowTutorialDrop(state, generatorId);
+  const lesson = lessonOnGenerator(state, generatorId);
+  if (lesson && !tutorialDrop) {
+    return unchanged(state, `Make ${MERGE_ITEMS_BY_ID.get(lesson.lesson.growDefinitionId)?.name ?? 'the piece'} and serve ${lesson.lesson.order.title} first.`);
   }
   const opportunity = activityOpportunityId && !tutorialDrop
     ? state.characterActivityOpportunities.find((candidate) => candidate.id === activityOpportunityId)
@@ -2690,13 +2694,14 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
       companionDiscovery: discoveryProgress,
     };
   }
-  if (order.id === 'steppling:discovery:first-trail' && next.generators['journey-locker']) {
+  const servedLesson = lessonForOrder(order.id, order.characterId);
+  if (servedLesson && next.generators[servedLesson.lesson.generatorId]) {
+    const record = gardenLessonRecord(next, servedLesson.companion);
     next = {
-      ...next,
-      stepplingGardenLesson: next.stepplingGardenLesson ? { ...next.stepplingGardenLesson, servedAt: now } : undefined,
+      ...withGardenLessonRecord(next, servedLesson.companion, record ? { ...record, servedAt: now } : undefined),
       generators: {
         ...next.generators,
-        'journey-locker': { ...next.generators['journey-locker'], forcedDropDefinitionId: null },
+        [servedLesson.lesson.generatorId]: { ...next.generators[servedLesson.lesson.generatorId], forcedDropDefinitionId: null },
       },
     };
   }
@@ -3499,7 +3504,8 @@ function reconcileStory(
 ): MergeWorldState {
   // This discovery path delivers the generator through Day 1's parcel, not
   // through the retired companion story's automatic starter installation.
-  if (story.familyId === 'steppling' && state.stepplingEgg && !state.generators['journey-locker']) return state;
+  const hatchable = hatchableByCompanion(story.familyId);
+  if (hatchable && state.worldUnlocks?.[hatchable.tile.unlockId] && !state.generators[hatchable.economy.generatorId]) return state;
   // A midpoint return is an interlude inside the five-order bundle, not the
   // end of it. Keep the unserved requests on the rail while the companion's
   // note is waiting or open; only the served IDs should rotate out.
@@ -3889,13 +3895,15 @@ function ensureProceduralOrders(state: MergeWorldState, now: number): MergeWorld
   // Chapter 0 is still teaching the authored loop. The repeatable economy
   // begins after the first non-Mossprout companion completes their introduction.
   const unlocked = state.companionDiscovery.records.some((record) => record.characterId !== 'mossprout' && record.firstOrderCompletedAt != null)
-    || stepplingShoeServed(state)
+    || HATCHABLE_COMPANIONS.some((definition) => lessonOrderServed(state, definition))
     || Object.values(state.companionDailyGarden ?? {}).some((batch) => Boolean(batch?.bonusReceiptId))
-    || Boolean(state.stepplingEgg?.hatchedAt && state.arrivals.some((arrival) => arrival.generatorId === 'journey-locker' && arrival.claimedAt != null));
+    // A hatched friend whose parcel is open on the board: the economy has begun even before the lesson's request is served.
+    || HATCHABLE_COMPANIONS.some((definition) => state.worldUnlocks?.[definition.tile.unlockId]?.hatchedAt != null
+      && state.arrivals.some((arrival) => arrival.generatorId === definition.economy.generatorId && arrival.claimedAt != null));
   if (!unlocked) return state;
   // Rehydrate the same batches displayed by Tend garden, including older saves
   // whose daily requests were removed by story reconciliation.
-  for (const familyId of ['mossprout', 'steppling'] as const) state = ensureCompanionDailyGarden(state, familyId, now);
+  for (const familyId of ['mossprout' as const, ...HATCHABLE_COMPANIONS.map((definition) => definition.companion)]) state = ensureCompanionDailyGarden(state, familyId, now);
   const procedural = state.activeOrders.filter((order) => !order.storyArcId);
   const existingKeys = new Set(procedural.map(templateKeyForOrder));
   const recent = new Set(state.recentOrderKeys);
@@ -4241,6 +4249,27 @@ function orthogonalNeighbours(cell: number): number[] {
   if (column > 0) neighbours.push(cell - 1);
   if (column < MERGE_WORLD_COLUMNS - 1) neighbours.push(cell + 1);
   return neighbours;
+}
+
+/**
+ * Each hatchable companion's lesson record. Saves from before the map carry
+ * Steppling's in its own field; both are read, and Steppling's stays mirrored
+ * so an older build can still read the save.
+ */
+function normalizeGardenLessons(source: Partial<MergeWorldState>): Pick<MergeWorldState, 'gardenLessons' | 'stepplingGardenLesson'> {
+  const record = (value: unknown) => {
+    const raw = value as { preparedAt?: unknown; servedAt?: unknown } | undefined;
+    if (!raw || typeof raw !== 'object' || !Number.isFinite(raw.preparedAt)) return undefined;
+    return { preparedAt: raw.preparedAt as number, ...(Number.isFinite(raw.servedAt) ? { servedAt: raw.servedAt as number } : {}) };
+  };
+  const gardenLessons: NonNullable<MergeWorldState['gardenLessons']> = {};
+  for (const [companion, value] of Object.entries(source.gardenLessons ?? {})) {
+    const normalized = record(value);
+    if (normalized && KNOWN_CHARACTERS.has(companion as MergeCharacterId)) gardenLessons[companion as MergeCharacterId] = normalized;
+  }
+  const steppling = gardenLessons.steppling ?? record(source.stepplingGardenLesson);
+  if (steppling) gardenLessons.steppling = steppling;
+  return { gardenLessons, stepplingGardenLesson: steppling };
 }
 
 function normalizeDreamMist(value: unknown, legacyLocked: boolean, index: number): MergeBoardCell['mist'] {

@@ -870,6 +870,6 @@ export function subscribeMergeWorldSnapshots(listener: (state: MergeWorldState, 
   return () => snapshotListeners.delete(listener);
 }
 
-export function ensureStoredCompanionDailyGarden(familyId: 'mossprout' | 'steppling', now = Date.now()) {
+export function ensureStoredCompanionDailyGarden(familyId: import('@/types/merge-world').MergeCharacterId, now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'ensureCompanionDailyGarden', familyId, now }), now);
 }

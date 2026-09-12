@@ -1,10 +1,10 @@
 import { COMPANION_JOURNEY_PROFILES } from '@/constants/companion-journey-profiles';
 import { GENERATOR_BY_CHAIN, KATCHIMERA_MERGE_PROFILES, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
-import type { MergeOrder, MergeWorldState } from '@/types/merge-world';
+import type { MergeCharacterId, MergeOrder, MergeWorldState } from '@/types/merge-world';
 import { localDayId } from '@/utils/world-identity-rules';
 import { generatorChainOpen } from './generator-branches';
 
-export type DailyGardenFamily = 'mossprout' | 'steppling';
+export type DailyGardenFamily = MergeCharacterId;
 export type CompanionDailyGardenBatch = {
   dayId: string;
   orders: MergeOrder[];
@@ -18,7 +18,7 @@ export const DAILY_GARDEN_ARC = 'companion:daily-garden';
 /** Orders are frozen against the generators actually owned when the batch opens. */
 export function ensureCompanionDailyGarden(state: MergeWorldState, familyId: DailyGardenFamily, now: number): MergeWorldState {
   const dayId = localDayId(new Date(now));
-  if (!state.unlockedCharacters.includes(familyId)) return state;
+  if (!state.unlockedCharacters.includes(familyId) || !COMPANION_JOURNEY_PROFILES[familyId]) return state;
   const previous = state.companionDailyGarden?.[familyId];
   if (previous?.dayId === dayId) {
     const missing = previous.orders.filter((order) => previous.served[order.id] == null && !state.activeOrders.some((item) => item.id === order.id));
@@ -35,7 +35,7 @@ export function ensureCompanionDailyGarden(state: MergeWorldState, familyId: Dai
     return drops.some((id) => id.startsWith(`${chain}:`));
   });
   if (!chains.length) return state;
-  const progress = familyId === 'mossprout' ? state.mossproutBoardProgression.activeDayIds.length : state.characterProgress.steppling?.friendshipLevel ?? 1;
+  const progress = familyId === 'mossprout' ? state.mossproutBoardProgression.activeDayIds.length : state.characterProgress[familyId]?.friendshipLevel ?? 1;
   const band = progress >= 12 ? 2 : progress >= 4 ? 1 : 0;
   const shift = [...dayId].reduce((sum, char) => sum + char.charCodeAt(0), 0) % chains.length;
   const primary = chains[shift]!;
