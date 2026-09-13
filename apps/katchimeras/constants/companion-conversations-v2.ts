@@ -1,5 +1,6 @@
 import { STEPPLING_TRAIL_CONVERSATIONS } from '@/constants/steppling-activities';
 import { STEPPLING_SCENARIO_POLLS } from '@/constants/steppling-scenario-polls';
+import { BARISTABBIT_SCENARIO_POLLS } from '@/constants/baristabbit-scenario-polls';
 import { mossproutTheoryConversationDefinitions } from '@/constants/mossprout-theory-conversations';
 import { spokenAnswerText } from '@/utils/companion-conversation';
 import type {
@@ -858,9 +859,7 @@ function questHandoff(familyId: ConversationV2FamilyId): ConversationDefinition 
   };
 }
 
-const BARISTA_POLLS: readonly PollSeed[] = ([
-  ['first', 'The first drink of the day should be…', ['Reliable', 'Strong', 'Slow']], ['cup', 'Pick the cup.', ['Favourite mug', 'Tiny cafe cup', 'Tall cold glass']], ['milk', 'Choose the finish.', ['No milk', 'A little', 'Cloud-like']], ['sweet', 'Choose the sweetness.', ['None', 'A hint', 'Dessert-level']], ['seat', 'Choose the cafe seat.', ['Window', 'Corner', 'Counter']], ['sound', 'Choose the background.', ['Quiet', 'Soft music', 'Busy chatter']], ['order', 'How do you order?', ['The usual', 'Seasonal special', 'Ask for a surprise']], ['tea', 'Tea should be…', ['Dark and strong', 'Fresh and green', 'Herbal and soft']], ['coffee', 'Coffee should be…', ['Short and bold', 'Milky and gentle', 'Cold and bright']], ['bubbles', 'Bubble tea mood?', ['Fruit tea', 'Milk tea', 'No bubbles today']], ['time', 'Best drink hour?', ['Early morning', 'Afternoon pause', 'Late evening']], ['weather', 'Rainy-day cup?', ['Coffee', 'Tea', 'Hot chocolate']], ['summer', 'Hot-day rescue?', ['Iced coffee', 'Iced tea', 'Something fruity']], ['share', 'A shared drink needs…', ['Good conversation', 'A treat beside it', 'Plenty of time']], ['home', 'Home ritual essential?', ['A good kettle', 'A favourite method', 'The right mug']], ['cafe-food', 'Cafe companion?', ['Pastry', 'Toast', 'Nothing']], ['new', 'Try one unusual note.', ['Floral', 'Spiced', 'Smoky']], ['pace', 'How long should the pause last?', ['Five minutes', 'Half an hour', 'Lose track of time']], ['walk', 'Drink destination?', ['Neighbourhood cafe', 'Park kiosk', 'Kitchen']], ['temperature', 'Absolute loyalty?', ['Always hot', 'Always cold', 'Season decides']], ['foam', 'Foam opinion?', ['Essential', 'Nice extra', 'No thank you']], ['ritual', 'The ritual is mostly about…', ['Beginning', 'Stopping', 'Connecting']], ['refill', 'Second cup?', ['Obviously', 'Sometimes', 'One is enough']], ['last', 'The last sip should be…', ['Still hot', 'Long forgotten', 'Saved for later']],
-] as const).map(([id, prompt, labels]) => ({ id, prompt, labels }));
+// Baristabbit's daily questions are scenarios, authored in constants/baristabbit-scenario-polls.ts.
 
 // Steppling's daily questions are scenarios, authored in constants/steppling-scenario-polls.ts.
 
@@ -943,7 +942,7 @@ export const companionConversationDefinitionsV2: readonly ConversationDefinition
   ...ALL_ISLAND_CAMPAIGN_CONVERSATION_DEFINITIONS,
   ...mossproutStoryConversationDefinitions,
   ...mossproutTheoryConversationDefinitions,
-  ...familyPack('baristabbit', BARISTA_POLLS, BARISTA_PROFILE),
+  ...familyPack('baristabbit', BARISTABBIT_SCENARIO_POLLS, BARISTA_PROFILE),
   ...baristabbitStoryConversationDefinitions,
   ...journeyCohortStoryConversationDefinitions,
   ...familyPack('steppling', STEPPLING_SCENARIO_POLLS, STEPPLING_PROFILE),

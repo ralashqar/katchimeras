@@ -1748,6 +1748,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     setUpgradeError(null); setUpgradeCommitted(false);
     try {
       if (ftueStepId === 'world.first_bloom_offer') await advanceFtueActionDurably({ expectedStepId: ftueStepId, actionId: 'world.open_first_bloom_upgrade' });
+      // A woken hatchable tile whose story has not begun: the bubble begins it (the camera to the tile, then the
+      // offer, then the mission), never a purchase sheet. Steppling's begins at the end of the opening instead.
+      const tappedHatchable = offer.id.startsWith('mist:') ? hatchableByTile(offer.id.slice('mist:'.length)) : null;
+      if (tappedHatchable && offer.hatchable && offer.hatchable.state !== 'sleeping' && hatchableRuns.ready && !hatchableRuns.discovery[tappedHatchable.companion]) {
+        await startHatchableDiscovery(tappedHatchable);
+        setSelectedUpgrade(null);
+        return;
+      }
       if (offer.id === `mist:${activeHatchable.tile.id}` && glowRun && glowRun.status !== 'completed') {
         // The bubble opens the mission board under the tile, never a purchase sheet.
         await advanceHatchableUpgrade(activeHatchable, 'open');
@@ -1763,7 +1771,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       setSelectedUpgrade(offer);
     } catch (error) { setSelectedUpgrade(offer); setUpgradeError(error instanceof Error ? error.message : 'Could not open the upgrade. Please try again.'); }
     finally { upgradePressBusy.current = false; }
-  }, [activeHatchable, ftueStepId, glowRun, restorationCampaignId, upgradePresentation, upgradePurchasing]);
+  }, [activeHatchable, ftueStepId, glowRun, hatchableRuns, restorationCampaignId, upgradePresentation, upgradePurchasing]);
   openUpgradeOfferRef.current = openUpgradeOffer;
   const handleUpgradeOfferPress = useCallback((offer: WorldUpgradeOffer) => {
     void openUpgradeOffer(offer);

@@ -1,4 +1,5 @@
 import { EggHeroGuide } from '@/components/katchadeck/onboarding/ftue-guide-copy';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, View } from 'react-native';
 import { Gesture } from 'react-native-gesture-handler';
@@ -15,14 +16,19 @@ import type { useHatchableEncounter } from '@/features/onboarding/use-steppling-
 import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
+import { beginCompanionPhotoCapture, cancelCompanionPhotoCapture, loadCompanionPhotoCapture, subscribeCompanionPhotoCapture } from '@/utils/companion-photo-capture-storage';
 
 /** Motion access as the Egg sees it. 'should_request' waits for the spoken ask before any system prompt. */
 type StepAccess = 'unknown' | 'should_request' | 'available' | 'denied' | 'unsupported';
 
 /**
  * A hatchable companion's Egg panel: the question, the feed the policy names
- * (yesterday's steps read from the pedometer, or an answer alone), and the
- * hatch. Everything on screen comes from the companion's Egg policy.
+ * (yesterday's steps read from the pedometer, a photo of today taken on the
+ * camera screen, or an answer alone), and the hatch. Everything on screen
+ * comes from the companion's Egg policy. A photo feed counts like a step
+ * feed of one: `steps` is null until the camera has answered, one when the
+ * photo showed what the Egg asked for, zero when it did not (or the player
+ * chose to tell it instead), which falls through to the alternative question.
  */
 export function HatchableEncounterPanel({ definition, encounter, egg, cameraReady, onReady }: {
   definition: HatchableCompanionDefinition;
@@ -33,6 +39,7 @@ export function HatchableEncounterPanel({ definition, encounter, egg, cameraRead
 }) {
   const policy = definition.egg;
   const stepsFeed = policy.feed.kind === 'steps';
+  const photoPolicy = policy.feed.kind === 'photo' ? policy.feed : null;
   const intentChoices = useMemo<FtueChoiceOption[]>(() => policy.intent.options.map((option) => ({ ...option, icon: option.icon ?? 'sparkles' })), [policy.intent.options]);
   const alternativeChoices = useMemo<FtueChoiceOption[]>(() => policy.alternative.options.map((option) => ({ ...option, icon: option.icon ?? 'sparkles' })), [policy.alternative.options]);
   const accessActions = useMemo<readonly FtueActionDefinition[]>(() => policy.access ? [
@@ -44,7 +51,7 @@ export function HatchableEncounterPanel({ definition, encounter, egg, cameraRead
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const gesture = useMemo(() => Gesture.Pan().enabled(false), []);
-  const [steps, setSteps] = useState<number | null>(stepsFeed ? null : 0);
+  const [steps, setSteps] = useState<number | null>(stepsFeed || photoPolicy ? null : 0);
   const [reading, setReading] = useState(stepsFeed);
   const [access, setAccess] = useState<StepAccess>(stepsFeed ? 'unknown' : 'unsupported');
   const [requesting, setRequesting] = useState(false);
@@ -107,6 +114,48 @@ export function HatchableEncounterPanel({ definition, encounter, egg, cameraRead
     setAccess('denied');
     setSteps(0);
   }, []);
+  // A photo feed: the camera screen answers through the Egg's capture session, read here on the way
+  // back (and on the next launch, if the app was killed in the camera). A session for another day or
+  // another friend is not this Egg's.
+  const router = useRouter();
+  const [captureId, setCaptureId] = useState<string | null>(null);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photoPolicy || !sourceDayId) return;
+    const apply = () => {
+      const capture = loadCompanionPhotoCapture();
+      if (!capture || capture.purpose !== 'egg' || capture.companion !== definition.companion || capture.dayId !== sourceDayId) { setCaptureId(null); setReading(false); return; }
+      setCaptureId(capture.id);
+      if (capture.phase !== 'ready') { setReading(true); return; }
+      setReading(false);
+      if (capture.error) { setCaptureError(capture.error); cancelCompanionPhotoCapture(capture.id); return; }
+      setCaptureError(null);
+      setSteps(capture.matched ? 1 : 0);
+    };
+    apply();
+    return subscribeCompanionPhotoCapture(apply);
+  }, [definition.companion, photoPolicy, sourceDayId]);
+  const photographForEgg = useCallback(() => {
+    if (!photoPolicy || !sourceDayId) return;
+    setCaptureError(null);
+    try {
+      const capture = beginCompanionPhotoCapture(definition.companion, sourceDayId, photoPolicy.category, 'egg');
+      setCaptureId(capture.id);
+      setReading(true);
+      router.push({ pathname: '/moment-capture', params: { photoCaptureId: capture.id, photoCategory: photoPolicy.category, photoFor: 'egg', companionReturnTo: '/katchimeras' } });
+    } catch {
+      setReading(false);
+      setCaptureError('The camera could not open. Tell it instead, or try again.');
+    }
+  }, [definition.companion, photoPolicy, router, sourceDayId]);
+  const tellInstead = useCallback(() => { setCaptureError(null); setSteps(0); }, []);
+  // Fed: the session has done its work.
+  const eggReady = hatchableEggReady(policy, egg);
+  useEffect(() => {
+    if (!eggReady || !captureId) return;
+    cancelCompanionPhotoCapture(captureId);
+    setCaptureId(null);
+  }, [captureId, eggReady]);
 
   if (!hasEntered && !cameraReady) return null;
   // Freeze *all* inputs selecting the current card, not just the saved Egg.
@@ -128,7 +177,9 @@ export function HatchableEncounterPanel({ definition, encounter, egg, cameraRead
     : ready ? policy.guides.ready
       : askForSteps ? policy.guides.permission
       : question ? policy.guides.alternative
-        : stepOffer.steps > 0 ? policy.guides.feed : policy.guides.reading;
+        : stepOffer.steps > 0 ? policy.guides.feed
+        // A photo feed's ask: show it the cup, or tell it. While the camera is up, the reading line.
+        : photoPolicy && displayedSteps == null && !reading ? policy.guides.permission : policy.guides.reading;
   return <>
     <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1 }} onLayout={() => setLaidOut(true)} />
     <EggHeroGuide guide={guide} topInset={insets.top} />
@@ -158,7 +209,18 @@ export function HatchableEncounterPanel({ definition, encounter, egg, cameraRead
             setAnswerSteps(steps);
             void encounter.feed({ kind: 'feed', sourceDayId: egg.sourceDayId, observedSteps: steps ?? 0 }, from);
           }} />
-            : <ScriptedActionList actions={[{ id: 'egg.read_steps', title: policy.feed.kind === 'steps' ? policy.feed.readingTitle : policy.guides.reading.title, description: '', icon: 'figure.walk', presentation: 'route_action', handlerId: 'pedometer_steps' }]} locked onAction={() => {}} />}
+          : photoPolicy && stepOffer.steps > 0 ? <ScriptedActionList completionKey={encounter.feedCompletionKey} onFinished={encounter.finishFeedPanel} actions={[{ id: 'egg.feed_photo', title: photoPolicy.feedTitle, description: '', icon: 'heart.fill', presentation: 'route_action', handlerId: 'journal_photo' }]} locked={encounter.busy || reading || !cameraReady} onAction={(_action, from) => {
+            setAnswerSteps(steps);
+            void encounter.feed({ kind: 'feed', sourceDayId: egg.sourceDayId, observedSteps: steps ?? 0 }, from);
+          }} />
+          : photoPolicy && !reading ? <>
+            {captureError ? <GameSurface><ThemedText accessibilityRole="alert">{captureError}</ThemedText></GameSurface> : null}
+            <ScriptedActionList actions={[
+              { id: 'egg.photo', title: photoPolicy.actionTitle, description: '', icon: 'camera.fill', presentation: 'route_action', handlerId: 'journal_photo' },
+              { id: 'egg.tell', title: photoPolicy.skipTitle, description: '', icon: 'heart.fill', presentation: 'cta_action', handlerId: 'acknowledgement' },
+            ]} locked={encounter.busy || !cameraReady} onAction={(action) => { if (action.id === 'egg.photo') photographForEgg(); else tellInstead(); }} />
+          </>
+            : <ScriptedActionList actions={[{ id: 'egg.read_steps', title: policy.feed.kind === 'steps' ? policy.feed.readingTitle : policy.guides.reading.title, description: '', icon: photoPolicy ? 'cup.and.saucer.fill' : 'figure.walk', presentation: 'route_action', handlerId: photoPolicy ? 'journal_photo' : 'pedometer_steps' }]} locked onAction={() => {}} />}
     </EggActionDock>
   </>;
 }

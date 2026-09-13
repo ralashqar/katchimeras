@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { STEPPLING_SCENARIO_POLLS } from '@/constants/steppling-scenario-polls';
+import { BARISTABBIT_SCENARIO_POLLS } from '@/constants/baristabbit-scenario-polls';
 import { companionConversationDefinitionById, companionConversationDefinitionsForFamily } from '@/constants/companion-conversations-v2';
 import { scenarioJournalEntry, journalSummary } from '@/utils/companion-life';
 import {
@@ -138,7 +139,7 @@ test('answers carry an emoji for the eye and a plain spoken form for the voice a
   assert.ok(poll.kind === 'poll');
   assert.equal(poll.options[0]!.label, '👀 I’m already halfway down it');
   assert.equal(poll.options[0]!.spokenText, 'I’m already halfway down it');
-  for (const family of ['steppling', 'mossprout'] as const) {
+  for (const family of ['steppling', 'mossprout', 'baristabbit'] as const) {
     for (const definition of companionConversationDefinitionsForFamily(family)) {
       if (!(definition.format === 'poll' || definition.tags?.includes('nature-question') || ['steppling:insight:setting-out', 'steppling:insight:free-day', 'steppling:insight:when-it-goes-wrong', 'mossprout:insight:nature-connection'].includes(definition.id))) continue;
       if (definition.contextualOnly) continue;
@@ -150,4 +151,22 @@ test('answers carry an emoji for the eye and a plain spoken form for the voice a
       }
     }
   }
+});
+
+test('Baristabbit’s daily questions are scenarios in the same shape: authored replies, two to five emoji answers, a trait behind most', () => {
+  assert.equal(BARISTABBIT_SCENARIO_POLLS.length, 31);
+  assert.equal(new Set(BARISTABBIT_SCENARIO_POLLS.map((seed) => seed.id)).size, 31);
+  for (const seed of BARISTABBIT_SCENARIO_POLLS) {
+    assert.ok(seed.title && seed.title.split(/\s+/).length <= 6, `${seed.id}: card title stays short`);
+    assert.ok(seed.prompt.split(/\s+/).length <= 24, `${seed.id}: prompt under 24 words`);
+    assert.ok(seed.labels.length >= 2 && seed.labels.length <= 5, `${seed.id}: two to five answers`);
+    assert.equal(seed.replies?.length, seed.labels.length, `${seed.id}: a reply per answer`);
+    assert.ok(seed.replies!.every((reply) => reply.length > 0 && !GENERIC_REPLY.test(reply) && !/!/.test(reply)), `${seed.id}: replies are authored, in the lore voice`);
+    assert.ok(seed.traits!.filter(Boolean).length >= seed.labels.length - 1, `${seed.id}: nearly every answer tags a trait`);
+    assert.ok(seed.ending, `${seed.id}: has a closing line`);
+    assert.doesNotMatch(seed.prompt, /how organised|rate yourself|on a scale/i, `${seed.id}: no personality-test phrasing`);
+  }
+  const polls = companionConversationDefinitionsForFamily('baristabbit').filter((definition) => definition.format === 'poll');
+  assert.equal(polls.length, 31);
+  assert.equal(companionConversationDefinitionById.get('baristabbit:poll:dangerous-sentence')!.minimumBondLevel, 2, 'the deeper question waits for a little bond');
 });

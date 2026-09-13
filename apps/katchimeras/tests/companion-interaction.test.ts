@@ -1577,7 +1577,6 @@ test('Katchimera Bond currency uses its bespoke artwork in chips, meters, summar
     'katchimera-page-header.tsx',
     'companion-visit-scene.tsx',
     'feastle-story-stage.tsx',
-    'baristabbit-story-stage.tsx',
     'journey-cohort-story-stage.tsx',
   ].map((file) => fs.readFileSync(path.join(root, 'components', 'katchadeck', 'world', file), 'utf8'));
 

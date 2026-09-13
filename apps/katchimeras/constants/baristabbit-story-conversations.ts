@@ -1,51 +1,9 @@
 import type { ConversationDefinition } from '@/types/companion-conversation';
 
+/** The legacy opener's id. No definition carries it any more: Baristabbit's first meeting is his hatchable day one. */
 export const BARISTABBIT_FIRST_MEETING_DEFINITION_ID = 'baristabbit:story:first-meeting';
 
 export const baristabbitStoryConversationDefinitions: readonly ConversationDefinition[] = [
-  {
-    id: BARISTABBIT_FIRST_MEETING_DEFINITION_ID,
-    version: 1,
-    familyId: 'baristabbit',
-    title: 'The counter is open',
-    trigger: 'evergreen',
-    minimumBondLevel: 1,
-    cooldownDays: 3650,
-    contextualOnly: true,
-    isOpener: true,
-    format: 'opener',
-    tags: ['story', 'first-meeting', 'ritual'],
-    entryNodeId: 'counter',
-    nodes: [
-      {
-        id: 'counter', kind: 'choice', phase: 'explore',
-        prompt: 'Welcome. The menu is imaginary, but the pause can be real. What would you most like a drink moment to give you lately?',
-        options: [
-          { id: 'energy', label: 'A clear beginning', reply: 'A threshold, then—not a demand to be productive.', nextNodeId: 'style' },
-          { id: 'comfort', label: 'Comfort', reply: 'Something familiar can give the day a softer edge.', nextNodeId: 'style' },
-          { id: 'refresh', label: 'A reset', reply: 'Warm, cold, caffeinated, or not—the useful part can simply be the pause.', nextNodeId: 'style' },
-          { id: 'company', label: 'Easy company', reply: 'A cup gives conversation somewhere to put its hands.', nextNodeId: 'style' },
-          { id: 'pause', label: 'Ten quiet minutes', reply: 'No improvement project. Just ten minutes that belong to you.', nextNodeId: 'style' },
-        ],
-      },
-      {
-        id: 'style', kind: 'choice', phase: 'deepen',
-        prompt: 'One house rule before the order bell opens: how should I talk about your rituals?',
-        options: [
-          { id: 'gentle', label: 'Keep it gentle', reply: 'No streak anxiety and no judging what is in the cup.', nextNodeId: 'bell' },
-          { id: 'curious', label: 'Help me notice patterns', reply: 'We can notice what helps without turning it into a rule.', nextNodeId: 'bell' },
-          { id: 'practical', label: 'Give me one small experiment', reply: 'One contained experiment, with permission to abandon it.', nextNodeId: 'bell' },
-          { id: 'space', label: 'Wait until I ask', reply: 'Of course. I can polish the imaginary cups quietly.', nextNodeId: 'bell' },
-        ],
-      },
-      {
-        id: 'bell', kind: 'choice', phase: 'resolve',
-        prompt: 'Good. Five village requests have appeared. Shall we open the Ritual Bar?',
-        options: [{ id: 'open', label: 'Open the counter', reply: 'I will keep three requests visible at a time. We serve them at our pace.', nextNodeId: 'end' }],
-      },
-      { id: 'end', kind: 'end', message: 'Counter open. Kettle listening. Absolutely nobody is timing the pause.' },
-    ],
-  },
   {
     id: 'baristabbit:story:6', version: 1, familyId: 'baristabbit', title: 'Two cups in',
     trigger: 'bond', triggerSourceIds: ['friendship-level:6'], minimumBondLevel: 1, minimumFriendshipLevel: 1,

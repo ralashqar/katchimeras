@@ -26,6 +26,7 @@ import { confirmationsRejectDomain } from '@/utils/intelligence/classification-p
 import type { SceneRead } from '@/utils/scene-classify';
 import type { DayInputTarget, DayVisionSummary, ManualJournalSubmission, PhotoVisionResult, UserConfirmation } from '@/types/home';
 import { cancelMossproutNatureCapture, finishMossproutNatureCapture } from '@/utils/mossprout-life-activity-storage';
+import { cancelCompanionPhotoCapture, finishCompanionPhotoCapture } from '@/utils/companion-photo-capture-storage';
 import { beginQuestCapture, cancelQuestCapture, completeQuestCapture } from '@/utils/quest-capture-session';
 import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
@@ -42,7 +43,7 @@ type CaptureState = 'live' | 'capturing' | 'captured' | 'evaluating';
 
 export default function MomentCaptureScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ target?: string; questId?: string; questCreatureId?: string; questRunId?: string; companionActivityId?: string; companionReturnTo?: string }>();
+  const params = useLocalSearchParams<{ target?: string; questId?: string; questCreatureId?: string; questRunId?: string; companionActivityId?: string; companionReturnTo?: string; photoCaptureId?: string; photoCategory?: string; photoFor?: string; photoName?: string }>();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const { selectedDay, applyCapturedMoment, isTodayHatched, tomorrowDay } = useHomeScreenState({
@@ -66,12 +67,19 @@ export default function MomentCaptureScreen() {
   const [captureError, setCaptureError] = useState<string | null>(null);
   const companionActivityId = typeof params.companionActivityId === 'string' ? params.companionActivityId : null;
   const companionReturnTo = typeof params.companionReturnTo === 'string' ? params.companionReturnTo : '/katchimeras';
+  // A companion's photo (a hatchable Egg being fed, or a friend's daily card): one photo, judged for the
+  // category asked for, handed back through the capture session.
+  const photoCaptureId = typeof params.photoCaptureId === 'string' ? params.photoCaptureId : null;
+  const photoCategory = typeof params.photoCategory === 'string' ? params.photoCategory : null;
+  const photoDrink = photoCategory === 'drink';
+  const photoName = typeof params.photoName === 'string' && params.photoName ? params.photoName : null;
+  const photoWho = params.photoFor === 'daily' && photoName ? photoName : 'the Egg';
   const returnFromCamera = useCallback(() => {
-    if (companionActivityId) {
+    if (companionActivityId || photoCaptureId) {
       const origin = companionReturnTo === '/katchimeras' || companionReturnTo.startsWith('/katchimera/') ? companionReturnTo : '/katchimeras';
       safeGoBack(router, origin as Href);
     } else safeDismissModal(router);
-  }, [companionActivityId, companionReturnTo, router]);
+  }, [companionActivityId, companionReturnTo, photoCaptureId, router]);
   const questId = typeof params.questId === 'string' ? params.questId : null;
   const questCreatureId = typeof params.questCreatureId === 'string' ? params.questCreatureId : null;
   const questRunId = typeof params.questRunId === 'string' ? params.questRunId : null;
@@ -88,9 +96,12 @@ export default function MomentCaptureScreen() {
     if (companionActivityId) {
       try { cancelMossproutNatureCapture(companionActivityId); }
       catch { /* The companion destination retries clearing the session on focus. */ }
+    } else if (photoCaptureId) {
+      try { cancelCompanionPhotoCapture(photoCaptureId); }
+      catch { /* The Egg panel clears a stale session on its next read. */ }
     } else cancelQuestCapture(questId);
     returnFromCamera();
-  }, [companionActivityId, questId, returnFromCamera]);
+  }, [companionActivityId, photoCaptureId, questId, returnFromCamera]);
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -263,6 +274,29 @@ export default function MomentCaptureScreen() {
     })();
   }, [analyzeCaptured, companionActivityId, photoUri, returnFromCamera, state]);
 
+  // A companion's photo: read it for the category asked for, record the answer, and go back to whoever
+  // asked. Nothing is journaled or rewarded here; the Egg or the daily card does that with the fact.
+  // When Vision cannot read the photo at all, the moment still counts: the player showed the cup.
+  useEffect(() => {
+    if (!photoCaptureId || state !== 'captured' || !photoUri || directQuestCaptureRef.current) return;
+    directQuestCaptureRef.current = true;
+    setState('evaluating');
+    void (async () => {
+      let analysis: PhotoAnalysisInput = { rawVision: null, summary: null };
+      try { analysis = await analyzeCaptured(); } catch { /* Judged as unreadable below. */ }
+      if (closingRef.current) return;
+      const category = analysis.summary ? resolvePhotoCategory(analysis.summary) : null;
+      try {
+        finishCompanionPhotoCapture(photoCaptureId, { matched: analysis.summary ? category?.id === photoCategory : true, categoryId: category?.id ?? null });
+      } catch {
+        setCaptureError('Your photo could not be saved yet. Please try again.');
+        return;
+      }
+      closingRef.current = true;
+      returnFromCamera();
+    })();
+  }, [analyzeCaptured, photoCaptureId, photoCategory, photoUri, returnFromCamera, state]);
+
   // Quest camera captures only need the on-device photo intelligence. Persist
   // that evidence directly, evaluate it, and return to the quest without
   // routing through the generic photo journal / Essence Review flow.
@@ -338,10 +372,10 @@ export default function MomentCaptureScreen() {
           <GameSurface tone="cream" contentStyle={styles.cameraPanel}>
             <DayActionIcon icon="camera.fill" />
             <ThemedText style={styles.panelTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-              {companionActivityId ? 'Something growing, just for Mossprout' : 'Capture a little moment'}
+              {companionActivityId ? 'Something growing, just for Mossprout' : photoCaptureId ? (photoDrink ? `Today’s drink, for ${photoWho}` : `Something for ${photoWho}`) : 'Capture a little moment'}
             </ThemedText>
             <ThemedText style={styles.panelBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-              {companionActivityId ? 'Show Mossprout a plant, tree, or flower near you. A windowsill plant counts.' : 'Use your camera to keep a moment from your day.'}
+              {companionActivityId ? 'Show Mossprout a plant, tree, or flower near you. A windowsill plant counts.' : photoCaptureId ? (photoDrink ? `Show ${photoWho} what is in your cup. Any drink counts, even water.` : `Show ${photoWho} what was asked for.`) : 'Use your camera to keep a moment from your day.'}
             </ThemedText>
             {!permission ? <ActivityIndicator color={Meadow.leafDeep} /> : permission.canAskAgain ?
               <KatchaButton label="Enable camera" onPress={() => void requestPermission()} /> :
@@ -354,19 +388,19 @@ export default function MomentCaptureScreen() {
     );
   }
 
-  if ((state === 'captured' || state === 'evaluating') && photoUri && ((questId && questCreatureId) || companionActivityId)) {
+  if ((state === 'captured' || state === 'evaluating') && photoUri && ((questId && questCreatureId) || companionActivityId || photoCaptureId)) {
     return (
       <View style={styles.screen}>
         <Image contentFit="cover" source={{ uri: photoUri }} style={StyleSheet.absoluteFill} transition={80} />
         <View style={styles.questCheckScrim} />
         <ScrollView contentContainerStyle={[styles.centeredContent, { paddingTop: insets.top + 68, paddingBottom: insets.bottom + 24, paddingLeft: Math.max(24, insets.left), paddingRight: Math.max(24, insets.right) }]}>
           <GameSurface tone="cream" contentStyle={styles.cameraPanel}>
-            <DayActionIcon icon={companionActivityId ? 'leaf.fill' : 'camera.fill'} />
+            <DayActionIcon icon={companionActivityId ? 'leaf.fill' : photoCaptureId ? 'cup.and.saucer.fill' : 'camera.fill'} />
             <ThemedText style={styles.panelTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
               {captureError ? 'Let’s try again' : 'A closer look'}
             </ThemedText>
             <ThemedText style={styles.panelBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-              {captureError ?? (companionActivityId ? 'Looking for something growing…' : 'Looking for the detail this quest needs…')}
+              {captureError ?? (companionActivityId ? 'Looking for something growing…' : photoCaptureId ? 'Looking at the cup…' : 'Looking for the detail this quest needs…')}
             </ThemedText>
             {captureError ? <KatchaButton label="Try again" onPress={() => { setCaptureError(null); directQuestCaptureRef.current = false; setState('captured'); }} /> : <ActivityIndicator color={Meadow.leafDeep} />}
           </GameSurface>
@@ -405,10 +439,10 @@ export default function MomentCaptureScreen() {
         <KatchimeraBackButton accessibilityLabel="Go back" onPress={closeCapture} style={styles.headerBack} />
         {state === 'live' ? (
           <Animated.View entering={FadeInDown.duration(240)} pointerEvents="none" style={styles.prompt}>
-            <DayActionCardSurface artwork={<DayActionIcon icon={companionActivityId ? 'leaf.fill' : 'camera.fill'} />}
-              title={companionActivityId ? 'Show Mossprout something growing' : 'What stands out?'}
+            <DayActionCardSurface artwork={<DayActionIcon icon={companionActivityId ? 'leaf.fill' : photoCaptureId ? 'cup.and.saucer.fill' : 'camera.fill'} />}
+              title={companionActivityId ? 'Show Mossprout something growing' : photoCaptureId ? (photoDrink ? `Show ${photoWho} today’s drink` : `Show ${photoWho}`) : 'What stands out?'}
               titleNumberOfLines={3}
-              subtitle={companionActivityId ? 'A plant, tree, or flower. A windowsill plant counts.' : 'Capture a little moment from your day.'}
+              subtitle={companionActivityId ? 'A plant, tree, or flower. A windowsill plant counts.' : photoCaptureId ? (photoDrink ? 'Whatever is in the cup. Water counts.' : 'What was asked for, as it is.') : 'Capture a little moment from your day.'}
               trailing={<View />} />
           </Animated.View>
         ) : null}

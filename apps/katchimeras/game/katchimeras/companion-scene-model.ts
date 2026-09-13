@@ -1,6 +1,6 @@
 export type CompanionScenePhase = 'active' | 'meditating' | 'ready' | 'finished';
 export type CompanionSceneModel = {
-  familyId: 'mossprout' | 'steppling';
+  familyId: string;
   phase: CompanionScenePhase;
   journey: { id: string; eyebrow: string; title: string; subtitle: string; command: 'continue' | 'wait' | 'return' | 'history' };
   slots: readonly ['tracker', 'garden', 'conversation'];

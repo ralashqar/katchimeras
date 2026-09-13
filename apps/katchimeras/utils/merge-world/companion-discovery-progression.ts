@@ -2,6 +2,7 @@ import type { HomeDayRecord } from '@/types/home';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import type { CompanionDiscoveryAffinity } from '@/constants/companion-discovery-catalog';
 import { EARLY_COMPANION_DISCOVERY_POOLS } from '@/constants/companion-discovery-catalog';
+import { isHatchableCompanion } from '@/constants/hatchable-companions/registry';
 
 export type CompanionDiscoveryGateDefinition = {
   gateId: string;
@@ -111,8 +112,9 @@ export function nextEligibleCompanionGate(
       || state.expansions.length < gate.minimumExpansions
       || meaningfulDayCount < gate.minimumMeaningfulDays) return null;
     const sourcePool = EARLY_COMPANION_DISCOVERY_POOLS[gate.gateId] ?? EARLY_COMPANION_DISCOVERY_POOLS['gate-3-first-choice'];
+    // A hatchable friend is found under their misted tile in the shared world, never on this board.
     const candidateIds = sourcePool
-      .filter((id) => !state.unlockedCharacters.includes(id))
+      .filter((id) => !state.unlockedCharacters.includes(id) && !isHatchableCompanion(id))
       .slice(0, gate.maximumCandidates);
     if (!candidateIds.length) continue;
     return { gateId: gate.gateId, candidateIds };

@@ -16,7 +16,7 @@ export const CONVERSATION_V2_ENABLED_FAMILIES: readonly ConversationV2FamilyId[]
 
 /** Skin matching remains gated until every result in that family has approved art. */
 export const CONVERSATION_V2_IDEAL_SKIN_FAMILIES: readonly ConversationV2FamilyId[] = [
-  'baristabbit', 'steppling', 'flexel',
+  'steppling', 'flexel',
 ];
 export type ConversationMode = 'talk' | 'play' | 'discover' | 'plan';
 

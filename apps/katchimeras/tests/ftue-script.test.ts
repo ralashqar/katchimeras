@@ -552,7 +552,6 @@ test('Mossprout remembers the day, reflects it back, then offers one narrative G
   const bondShare = readFileSync('features/onboarding/mossprout-bond-share.ts', 'utf8');
   const companionRoute = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
   const feastleStage = readFileSync('components/katchadeck/world/feastle-story-stage.tsx', 'utf8');
-  const baristabbitStage = readFileSync('components/katchadeck/world/baristabbit-story-stage.tsx', 'utf8');
   assert.match(interaction, /MossproutFtueStoryStage/);
   assert.match(mossproutStage, /CompanionMergeRequestTray/);
   assert.match(mossproutStage, /MOSSPROUT_CHAPTER_ZERO_REQUESTS/);
@@ -589,7 +588,6 @@ test('Mossprout remembers the day, reflects it back, then offers one narrative G
   assert.doesNotMatch(mossproutStage, /What should I call you/);
   assert.match(mossproutStage, /slice\(0, 1\)/);
   assert.match(feastleStage, /CompanionMergeRequestTray/);
-  assert.match(baristabbitStage, /CompanionMergeRequestTray/);
 });
 
 test('Merge FTUE never inserts guide panels into the fixed board layout', () => {

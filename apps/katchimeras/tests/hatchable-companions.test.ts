@@ -174,3 +174,35 @@ test('garden lessons live in one map keyed by companion, with Steppling’s olde
   const round = normalizeMergeWorldState(JSON.parse(JSON.stringify(viaSteppling.state)), NOW + 10);
   assert.deepEqual(round.gardenLessons, { steppling: { preparedAt: NOW } });
 });
+
+test('a friend’s daily cards and photo feed are content, and the Kingdom begins a woken tile’s story from its bubble', () => {
+  for (const definition of HATCHABLE_COMPANIONS) {
+    if (definition.egg.feed.kind === 'photo') {
+      assert.ok(definition.egg.feed.category, `${definition.companion}: a category to look for`);
+      assert.ok(definition.egg.feed.actionTitle && definition.egg.feed.feedTitle && definition.egg.feed.skipTitle, `${definition.companion}: open the camera, feed the light, tell it instead`);
+    }
+    if (!definition.daily) continue;
+    assert.ok(definition.daily.polls.length >= 20, `${definition.companion}: a rotation of daily questions`);
+    assert.ok(definition.daily.chapterTitle && definition.daily.restingLine && definition.daily.idleLine, `${definition.companion}: the page has its lines`);
+    if (definition.daily.photo) assert.ok(definition.daily.photo.category && definition.daily.photo.thanks.length > 0 && definition.daily.photo.noMatch, `${definition.companion}: the photo card has its words`);
+  }
+  assert.equal(HATCHABLE_COMPANIONS.find((definition) => definition.companion === 'baristabbit')?.egg.feed.kind, 'answer', 'Baristabbit’s Egg hatches on answers alone');
+  const panel = readFileSync('components/katchadeck/world/steppling-encounter-panel.tsx', 'utf8');
+  assert.match(panel, /beginCompanionPhotoCapture\(definition\.companion, sourceDayId, photoPolicy\.category, 'egg'\)/);
+  assert.match(panel, /setSteps\(capture\.matched \? 1 : 0\)/, 'a matching photo is a feed of one; anything else falls through to the question');
+  const actions = readFileSync('components/katchadeck/world/hatchable-actions.tsx', 'utf8');
+  assert.match(actions, /beginCompanionPhotoCapture\(companion, dayId, photo\.category, 'daily'\)/);
+  assert.match(actions, /completeCompanionPhotoActivity\(companion, capture\.dayId, capture\.categoryId \?\? null\)/, 'a matching daily photo is the life-activity Bond, once a day');
+  assert.match(actions, /`\$\{companion\}:poll:\$\{chat\.id\}`/, 'the day’s question is one of the friend’s scenario polls');
+  const camera = readFileSync('app/moment-capture.tsx', 'utf8');
+  assert.match(camera, /finishCompanionPhotoCapture\(photoCaptureId, \{ matched: analysis\.summary \? category\?\.id === photoCategory : true/);
+  const stage = readFileSync('components/katchadeck/world/companion-journey-cycle-stage.tsx', 'utf8');
+  assert.match(stage, /: hatchable \? <HatchableActions definition=\{hatchable\}/, 'a hatchable friend’s page shows their own cards on the journey stage');
+  const sheet = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
+  assert.doesNotMatch(sheet, /BaristabbitStoryStage|BARISTABBIT_FIRST_MEETING/, 'no legacy Baristabbit stage or opener');
+  assert.match(sheet, /isHatchableCompanion\(props\.familyId\) \|\| \(props\.familyId === 'mossprout'/);
+  const kingdom = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  assert.match(kingdom, /if \(tappedHatchable && offer\.hatchable && offer\.hatchable\.state !== 'sleeping' && hatchableRuns\.ready && !hatchableRuns\.discovery\[tappedHatchable\.companion\]\) \{\s*await startHatchableDiscovery\(tappedHatchable\);/);
+  const progression = readFileSync('utils/merge-world/companion-discovery-progression.ts', 'utf8');
+  assert.match(progression, /!isHatchableCompanion\(id\)/, 'the legacy board discovery never offers a hatchable friend');
+});

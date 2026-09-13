@@ -57,6 +57,12 @@ one legal move at every strike after the first.
 
 - Daily actions and daily question pools are still per-family code (Mossprout's photo/notice,
   Steppling's steps, the generic poll builder). Baristabbit uses the existing Barista poll pack.
-- A photo feed for the Egg is typed (`feed.kind: 'photo'`) but the capture route does not yet hand a
-  photo to the Egg; Baristabbit's Egg is answer-only for now.
+- (Done Sept 13, 2026) Daily cards as content: a definition's `daily` block names a photo card (a
+  category, worth the life-activity Bond once a day, through `utils/companion-photo-capture-storage.ts`
+  and `companion-photo-activity-storage.ts`), the friend's scenario polls (served one a day, like
+  Steppling's), and the page's lines. `components/katchadeck/world/hatchable-actions.tsx` draws them on
+  the journey stage for any hatchable friend. A photo feed for the Egg (`feed.kind: 'photo'`) exists on
+  the same session, but Baristabbit's Egg hatches on answers alone.
+- Journey chapters (journey days with merge orders and rest cycles) are still authored per family
+  (Steppling, Mossprout); a hatchable friend without one shows their daily cards and idle line.
 - Fixtures: no "Before Baristabbit" profile snapshot yet.

@@ -3,6 +3,7 @@ import type { HexCoord } from '@incubator/environments/hex';
 import type { MergeCharacterId, MergeOrder } from './merge-world';
 import type { CorruptionWispLines, CorruptionWispSpec } from '@/features/onboarding/corruption-wisps';
 import type { FtueCameraDirective, FtueGuide } from '@/features/onboarding/ftue-types';
+import type { ConversationPollSeed } from '@/types/companion-conversation';
 import type { MergeLessonBeat } from '@/features/content-flow/merge-lesson-recipe';
 
 /**
@@ -128,7 +129,7 @@ export type HatchableEggOption = { id: string; label: string; icon?: string; dom
  */
 export type HatchableEggFeed =
   | { kind: 'steps'; target: number; perBond: number; actionTitle: string; readingTitle: string }
-  | { kind: 'photo'; category: string; bond: number; actionTitle: string }
+  | { kind: 'photo'; category: string; bond: number; /** Opens the camera. */ actionTitle: string; /** Feeds a photo that showed the category. */ feedTitle: string; /** Falls through to the alternative question. */ skipTitle: string }
   | { kind: 'answer' };
 export type HatchableEggPolicy = {
   /** The Egg's glow while it hatches. */
@@ -140,6 +141,24 @@ export type HatchableEggPolicy = {
   access?: { allow: { id: string; title: string; description: string; icon?: string }; decline: { id: string; title: string; description: string; icon?: string } };
   feed: HatchableEggFeed;
   hatch: { actionId: string; title: string; description: string };
+};
+
+/**
+ * A friend's daily cards once they are home, all content: a photo card (show
+ * them something of a category, once a day, for Bond), the day's question
+ * (one of their scenario polls), and the lines their page says when there is
+ * no journey day to tell.
+ */
+export type HatchableDailyDefinition = {
+  /** The chapter name over the journey card until a journey chapter is authored. */
+  chapterTitle: string;
+  /** Said while the friend rests between journey days. */
+  restingLine: string;
+  /** Said when there is nothing to continue: the page's idle line. */
+  idleLine: string;
+  photo?: { category: string; title: string; subtitle: string; /** Said when the photo did not show the category. */ noMatch: string; /** Said when it did, rotating by day. */ thanks: readonly string[] };
+  polls: readonly ConversationPollSeed[];
+  questionSubtitle: string;
 };
 
 export type HatchableCompanionDefinition = {
@@ -155,4 +174,5 @@ export type HatchableCompanionDefinition = {
   lesson: HatchableLessonDefinition;
   egg: HatchableEggPolicy;
   economy: { generatorId: string };
+  daily?: HatchableDailyDefinition;
 };

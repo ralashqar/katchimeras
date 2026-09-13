@@ -864,12 +864,11 @@ test('Feastle first meeting is a first-person story in the conversation engine',
 
 test('Baristabbit owns a complete drink-ritual chapter with journal, insight, memory, and goal beats', () => {
   const definitions = companionConversationDefinitionsForFamily('baristabbit');
-  const firstMeeting = definitions.find((item) => item.id === BARISTABBIT_FIRST_MEETING_DEFINITION_ID)!;
+  // The first meeting is the hatchable day-one conversation now; the legacy opener is gone.
+  assert.equal(definitions.some((item) => item.id === BARISTABBIT_FIRST_MEETING_DEFINITION_ID), false);
   const midpoint = definitions.find((item) => item.id === 'baristabbit:story:6')!;
   const insight = definitions.find((item) => item.id === 'baristabbit:story:7')!;
   const finale = definitions.find((item) => item.id === 'baristabbit:story:8')!;
-  assert.equal(firstMeeting.format, 'opener');
-  assert.match(JSON.stringify(firstMeeting.nodes), /The menu is imaginary, but the pause can be real/);
   const journal = midpoint.nodes.find((node) => node.kind === 'journal_handoff');
   assert.ok(journal);
   assert.equal('rewardMergeEnergy' in journal, false);
