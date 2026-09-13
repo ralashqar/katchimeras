@@ -127,3 +127,58 @@ test('an inert marker is visible but cannot be opened and does not pulse', async
   assert.ok(repeats > 0, 'pulses once it is the player’s business');
   await act(async () => { tree!.unmount(); });
 });
+
+test('a hatchable tile’s marker is a silhouette Egg with still rays: dim asleep, lit while saving, warm when the light is enough, and nothing in the face animates', async () => {
+  const host = (name: string) => name as unknown as React.ComponentType<Record<string, unknown>>;
+  const motion = nativeMotionHarness();
+  let repeats = 0;
+  const module = loadNativeModule('components/katchadeck/world/world-upgrade-marker.tsx', {
+    'react-native': { ...nativeViews, Pressable: 'Pressable', Text: 'Text', AccessibilityInfo: {}, findNodeHandle: () => null },
+    'react-native-reanimated': { ...motion.animated, withSpring: () => 1, withRepeat: () => { repeats++; return 1; } },
+    'expo-image': { Image: 'Image' },
+    '@/components/katchadeck/progress-bar': { ProgressBar: 'ProgressBar' },
+    '@/features/world-upgrades/world-upgrade-stories': { upgradePercent: () => 50 },
+    '@/constants/katchimera-skins': { katchimeraSkinById: new Map() },
+    '@/game/days/visuals': { getCreatureVisual: () => null },
+    '@incubator/art-world/ui/upgrade-toy-v1.png': 1,
+    '@incubator/art-world/ui/clear-mist-toy-v1.png': 2,
+    '@incubator/art-cutouts/egg-base.webp': 3,
+    '@incubator/art-world/hex/kingdom_dream_mist_lock_v1_512.webp': 4,
+    '@incubator/art-ui/radial-sunburst.png': 5,
+  });
+  const Marker = module.WorldUpgradeMarker as React.ComponentType<Record<string, unknown>>;
+  const base = { id: 'mist:baristabbit-home', action: 'Clear mist', cost: 60, name: 'A lit window' };
+  const frame = { frame: { left: 100, top: 100, width: 600, height: 500 }, cameraScale: { value: 1 }, cameraX: { value: 0 }, cameraY: { value: 0 }, sceneWidth: 1000, sceneHeight: 1000, moving: false, onPress() {} };
+  const hatchable = (state: 'sleeping' | 'saving' | 'ready') => ({ companion: 'baristabbit', state, sleepingLine: 'The Mist still holds this one.' });
+  const images = (tree: ReactTestRenderer, source: number) => tree.root.findAllByType(host('Image')).filter((node) => node.props.source === source);
+  let tree: ReactTestRenderer;
+  // Asleep: no rays, no bar, the silhouette dim, the tile's own line as the hint, and no pulse.
+  await act(async () => { tree = create(<Marker {...frame} offer={{ ...base, missingGlow: 60, affordable: false, eligible: false, lockedReason: 'The Mist still holds this one.', lockedLabel: 'Held', hatchable: hatchable('sleeping') }} />); });
+  assert.equal(images(tree!, 5).length, 0, 'no rays while asleep');
+  assert.equal(tree!.root.findAllByType(host('ProgressBar')).length, 0, 'no bar while asleep');
+  const asleep = tree!.root.findByType(host('Pressable'));
+  assert.match(asleep.props.accessibilityLabel, /still under the Mist/);
+  assert.equal(asleep.props.accessibilityHint, 'The Mist still holds this one.');
+  assert.equal(repeats, 0, 'no pulse while asleep');
+  const eggs = images(tree!, 3);
+  assert.equal(eggs.length, 1, 'the silhouette is the egg art, tinted');
+  assert.ok((eggs[0]!.props.style as { tintColor?: string }[]).some((style) => style?.tintColor), 'a silhouette, not the egg');
+  // Saving: still rays behind the silhouette, the bar shows the light so far.
+  await act(async () => { tree!.update(<Marker {...frame} offer={{ ...base, missingGlow: 30, affordable: false, eligible: true, hatchable: hatchable('saving') }} />); });
+  assert.equal(images(tree!, 5).length, 1, 'rays once the tile has woken');
+  assert.equal(tree!.root.findAllByType(host('ProgressBar')).length, 1);
+  assert.equal(tree!.root.findByType(host('Pressable')).props.accessibilityValue.text, '30 of 60 Glow');
+  assert.equal(repeats, 0, 'no pulse until the light is enough');
+  // Ready: the rays brighten, the silhouette warms, and the marker pulses like any affordable upgrade.
+  await act(async () => { tree!.update(<Marker {...frame} offer={{ ...base, missingGlow: 0, affordable: true, eligible: true, hatchable: hatchable('ready') }} />); });
+  const rays = images(tree!, 5)[0]!;
+  assert.ok((rays.props.style as { opacity?: number }[]).some((style) => style?.opacity === 0.9), 'brighter rays when ready');
+  const warm = images(tree!, 3)[0]!;
+  assert.ok((warm.props.style as { tintColor?: string }[]).some((style) => style?.tintColor === '#F2B457'), 'warm from inside');
+  assert.ok(repeats > 0, 'pulses once affordable');
+  // The face is plain views and images: no Reanimated value, style or loop, and no shadows.
+  const source = readFileSync('components/katchadeck/world/world-upgrade-marker.tsx', 'utf8');
+  const face = source.slice(source.indexOf('function HatchableEggFace'), source.indexOf('const styles = '));
+  assert.doesNotMatch(face, /Animated|useSharedValue|useAnimatedStyle|withRepeat|withTiming|RotatingRadialSunburst/, 'nothing in the Egg face animates');
+  assert.doesNotMatch(face, /boxShadow|shadow/, 'no shadows on the Egg face');
+});
