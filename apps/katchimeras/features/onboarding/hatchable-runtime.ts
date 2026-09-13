@@ -255,7 +255,10 @@ const active = (run: ContentFlowRun | null | undefined) => Boolean(run && run.st
  */
 export function activeHatchableFor(world: MergeWorldState | null, runs: HatchableRuns): { discovery: HatchableCompanionDefinition; lesson: HatchableCompanionDefinition } {
   const first = HATCHABLE_COMPANIONS[0]!;
+  // A live run first; then a friend whose tile is cleared but who has not hatched (their run completes at the
+  // Egg's entry, before the questions and the hatch); then the first friend still under the Mist.
   const discovery = HATCHABLE_COMPANIONS.find((definition) => active(runs.discovery[definition.companion]))
+    ?? (world ? HATCHABLE_COMPANIONS.find((definition) => hatchableGatewayState(world, definition) === 'egg') : undefined)
     ?? (world ? HATCHABLE_COMPANIONS.find((definition) => hatchableGatewayState(world, definition) !== 'open') : undefined)
     ?? first;
   const lesson = HATCHABLE_COMPANIONS.find((definition) => active(runs.lessons[definition.companion])) ?? discovery;

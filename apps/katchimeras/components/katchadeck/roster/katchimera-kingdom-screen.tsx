@@ -288,7 +288,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const { transitionTo } = useGameScreenTransition();
   const stepplingLesson = useMemo(() => gardenLessonFor(hatchableRuns, activeLessonHatchable), [activeLessonHatchable, hatchableRuns]);
   const stepplingLessonOpening = useRef(false);
-  const stepplingEncounter = useHatchableEncounter(mergeWorld, activeHatchable);
+  // The Egg keeps its companion while the encounter is open: the live companion moves on the moment the
+  // hatch writes the discovery record, and the panel must finish with the friend it opened for.
+  const encounterOpenRef = useRef(false);
+  const encounterHatchableRef = useRef(activeHatchable);
+  if (!encounterOpenRef.current) encounterHatchableRef.current = activeHatchable;
+  const encounterHatchable = encounterHatchableRef.current;
+  const stepplingEncounter = useHatchableEncounter(mergeWorld, encounterHatchable);
+  encounterOpenRef.current = stepplingEncounter.open;
   const stepplingSurfaceOpen = stepplingEncounter.open;
   const { open: stepplingEggOpen, close: closeStepplingEgg } = stepplingEncounter;
   useEffect(() => {
@@ -345,9 +352,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [firstLightFailed, setFirstLightFailed] = useState(false);
   const [requiredUpgradeStory, setRequiredUpgradeStory] = useState<{ offer: WorldUpgradeOffer; presentation: HavenTileUpgradePresentation } | null>(null);
   const prepareEggEntry = useCallback(() => { setFtueCameraSettled(false); setGlowPanelOpen(false); }, []);
-  const eggHandoff = useGlowEggHandoff({ run: glowRun, world: mergeWorld, focused: screenFocused,
+  const eggHandoff = useGlowEggHandoff({ run: hatchableRuns.discovery[encounterHatchable.companion] ?? null, world: mergeWorld, focused: screenFocused,
     available: !interactionCreatureId && !upgradePresentation && !requiredUpgradeStory, open: stepplingEggOpen,
-    enter: stepplingEncounter.enter, onOpening: prepareEggEntry, definition: activeHatchable });
+    enter: stepplingEncounter.enter, onOpening: prepareEggEntry, definition: encounterHatchable });
   const upgradeOffers = useMemo(() => worldUpgradeOffers(mergeWorld), [mergeWorld]);
   const [selectedUpgrade, setSelectedUpgrade] = useState<WorldUpgradeOffer | null>(null);
   const [upgradePurchasing, setUpgradePurchasing] = useState(false);
@@ -460,9 +467,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [ftueStepId]);
   const gatewayState = glowGatewayState(mergeWorld);
   // Every hatchable tile's state; the one whose Egg is open on screen shows the Egg even before the world says so.
-  const hatchableTiles = useMemo(() => Object.fromEntries(HATCHABLE_COMPANIONS.map((definition) => [definition.tile.id,
-    definition.companion === activeHatchable.companion && stepplingEncounter.open ? 'egg' as const : hatchableGatewayState(mergeWorld, definition)])),
-  [activeHatchable.companion, mergeWorld, stepplingEncounter.open]);
+  const hatchableTileStates = HATCHABLE_COMPANIONS.map((definition) =>
+    definition.companion === encounterHatchable.companion && stepplingEncounter.open ? 'egg' as const : hatchableGatewayState(mergeWorld, definition)).join('|');
+  // Keyed by the states themselves, never by the world object: a Glow landing must not rebuild the whole scene mid-mission.
+  const hatchableTiles = useMemo(() => Object.fromEntries(HATCHABLE_COMPANIONS.map((definition, index) => [definition.tile.id, hatchableTileStates.split('|')[index] as 'locked' | 'egg' | 'open'])), [hatchableTileStates]);
   const mossproutGardenScene = useMemo(() => ({
     gateway: stepplingEncounter.open ? 'egg' as const : gatewayState,
     hatchableTiles,
@@ -659,8 +667,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [activeHatchable.mission.required, finishStepplingMission, stepplingMission.merges, stepplingMission.state, stepplingMissionActive]);
   useEffect(() => {
     // The mission is over once the reveal has played: its store goes with it.
-    if (glowRun?.status === 'completed' || glowRun?.nodeId === 'gateway.egg') clearMission(activeHatchable.mission.storageKey);
-  }, [activeHatchable.mission.storageKey, glowRun?.nodeId, glowRun?.status]);
+    for (const definition of HATCHABLE_COMPANIONS) {
+      const run = hatchableRuns.discovery[definition.companion];
+      if (run?.status === 'completed' || run?.nodeId === 'gateway.egg') clearMission(definition.mission.storageKey);
+    }
+  }, [hatchableRuns.discovery]);
   const setGardenButtonNode = useCallback((node: View | null) => {
     registerFtueTarget('garden-button:mossprout', node);
   }, [registerFtueTarget]);
@@ -1175,14 +1186,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [ftueStepId, havenPresentations]);
 
   useEffect(() => {
-    if (!stepplingEggOpen || !hatchableEggProgress(mergeWorld, activeHatchable)?.hatchedAt) return;
-    const resident = companionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === activeHatchable.companion);
+    if (!stepplingEggOpen || !hatchableEggProgress(mergeWorld, encounterHatchable)?.hatchedAt) return;
+    const resident = companionSlots.find((slot) => slot.kind === 'owned' && slot.familyId === encounterHatchable.companion);
     if (resident?.kind !== 'owned') return;
     // Swap the hatch actor and hosted resident together, after durable ownership
     // has arrived. The canvas carries the Egg camera origin into normal Back.
     selectResident(resident.creature.creatureId);
     closeStepplingEgg();
-  }, [activeHatchable, closeStepplingEgg, companionSlots, mergeWorld, selectResident, stepplingEggOpen]);
+  }, [encounterHatchable, closeStepplingEgg, companionSlots, mergeWorld, selectResident, stepplingEggOpen]);
 
   useEffect(() => {
     if (!interactionRequest || handledInteractionRequestRef.current === interactionRequest.key) return;
@@ -1659,7 +1670,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const stepplingLessonDone = stepplingLesson.ready
     && (stepplingLesson.run ? stepplingLesson.run.status === 'completed' : stepplingShoeServed(mergeWorld));
   const kingdomGoalWanted = screenFocused && stepplingLessonDone && !kingdomGoal?.introducedAt
-    && loadFtueRun()?.status === 'complete' && glowRun?.status === 'completed'
+    && loadFtueRun()?.status === 'complete' && hatchableRuns.discovery[HATCHABLE_COMPANIONS[0]!.companion]?.status === 'completed'
     && !sharedUpgrade && !upgradePresentation && !requiredUpgradeStory && !stepplingEggOpen && !pendingIslandDiscovery;
   // Steppling's page has to be gone before the wish, not behind it. Two
   // full-screen sheets that swap in the same frame can leave the second one
