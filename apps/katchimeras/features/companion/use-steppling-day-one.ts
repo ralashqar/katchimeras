@@ -31,7 +31,7 @@ const LEGACY_DAY_ONE_FLOWS: Partial<Record<string, readonly ContentFlowDefinitio
 
 export function acknowledgeHatchableDayOneGarden(definition: HatchableCompanionDefinition) {
   const state = loadCompanionContentState();
-  const pending = (session: Parameters<typeof gardenHandoffPendingFor>[0]) => gardenHandoffPendingFor(session, definition.dayOne.conversationId);
+  const pending = (session: Parameters<typeof gardenHandoffPendingFor>[0]) => gardenHandoffPendingFor(session, definition.dayOne.conversationId, definition.dayOne.flow.version);
   if (!state.conversationSessions.some(pending)) return;
   saveCompanionContentState({ ...state, conversationSessions: state.conversationSessions.map((session) =>
     pending(session) ? { ...session, gardenHandoffAt: Date.now() } : session) });
@@ -83,7 +83,8 @@ export async function settleHatchableDayOne(definition: HatchableCompanionDefini
   }
   if (run.status !== 'completed') throw new Error('Journey reward is still pending');
   recordLifeFlow(run);
-  if (gardenHandoffPendingFor(session, conversationId)) await ensureGardenLesson(definition);
+  // Pending from the definition's own day-one version: Steppling's handoff arrived at his v3, a new friend's at their first.
+  if (gardenHandoffPendingFor(session, conversationId, definition.dayOne.flow.version)) await ensureGardenLesson(definition);
   return true;
 }
 export function settleStepplingDayOne() {
@@ -99,7 +100,8 @@ export function useHatchableDayOne(definition: HatchableCompanionDefinition | nu
   const [revision, setRevision] = useState(0);
   const pending = useRef<Promise<boolean> | null>(null);
   const conversationId = definition?.dayOne.conversationId;
-  const handoffPending = useCallback(() => Boolean(conversationId) && loadCompanionContentState().conversationSessions.some((session) => gardenHandoffPendingFor(session, conversationId!)), [conversationId]);
+  const handoffVersion = definition?.dayOne.flow.version;
+  const handoffPending = useCallback(() => Boolean(conversationId) && loadCompanionContentState().conversationSessions.some((session) => gardenHandoffPendingFor(session, conversationId!, handoffVersion)), [conversationId, handoffVersion]);
   const complete = useCallback(() => {
     if (!on || !definition) return Promise.resolve(false);
     pending.current ??= settleHatchableDayOne(definition).then((settled) => {

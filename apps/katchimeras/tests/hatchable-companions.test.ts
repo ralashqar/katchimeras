@@ -202,7 +202,7 @@ test('a friend’s daily cards and photo feed are content, and the Kingdom begin
   assert.doesNotMatch(sheet, /BaristabbitStoryStage|BARISTABBIT_FIRST_MEETING/, 'no legacy Baristabbit stage or opener');
   assert.match(sheet, /isHatchableCompanion\(props\.familyId\) \|\| \(props\.familyId === 'mossprout'/);
   const kingdom = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  assert.match(kingdom, /if \(tappedHatchable && offer\.hatchable && offer\.hatchable\.state !== 'sleeping' && hatchableRuns\.ready && !hatchableRuns\.discovery\[tappedHatchable\.companion\]\) \{\s*await startHatchableDiscovery\(tappedHatchable\);/);
+  assert.match(kingdom, /if \(tappedHatchable && offer\.hatchable && offer\.hatchable\.state !== 'sleeping' && hatchableRuns\.ready && !hatchableRuns\.discovery\[tappedHatchable\.companion\]\) \{\s*missionOpenAfterStartRef\.current = tappedHatchable\.companion;\s*await startHatchableDiscovery\(tappedHatchable\);/, 'one tap: the story begins and the board opens once the camera settles');
   const progression = readFileSync('utils/merge-world/companion-discovery-progression.ts', 'utf8');
   assert.match(progression, /!isHatchableCompanion\(id\)/, 'the legacy board discovery never offers a hatchable friend');
 });

@@ -360,6 +360,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [upgradePurchasing, setUpgradePurchasing] = useState(false);
   const [upgradeCommitted, setUpgradeCommitted] = useState(false);
   const upgradePressBusy = useRef(false);
+  // A story begun from the bubble: whose board to open as soon as its camera focus has settled.
+  const missionOpenAfterStartRef = useRef<string | null>(null);
   const [upgradeCoachmark, setUpgradeCoachmark] = useState<UpgradeCoachmarkState>({ visible: false, revision: 0 });
   const upgradeActionRef = useRef<View>(null);
   const tutorialUpgradeNonceRef = useRef<number | null>(null);
@@ -396,6 +398,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (!screenFocused || !mistUpgradeActive) return;
     void recoverPaidHatchableUpgrade(activeHatchable, mergeWorld).catch((error) => { setUpgradeError(error instanceof Error ? error.message : 'Please try again.'); });
   }, [activeHatchable, screenFocused, mistUpgradeActive, mergeWorld]);
+  // The bubble's one tap: the story it began reaches its offer once the camera has settled, and the board opens then.
+  useEffect(() => {
+    if (missionOpenAfterStartRef.current !== activeHatchable.companion || glowRun?.nodeId !== 'gateway.offer') return;
+    missionOpenAfterStartRef.current = null;
+    void advanceHatchableUpgrade(activeHatchable, 'open').catch((error) => { setUpgradeError(error instanceof Error ? error.message : 'Please try again.'); });
+  }, [activeHatchable, glowRun?.nodeId]);
   useEffect(() => {
     if (upgradePresentation) { setSelectedUpgrade(null); setUpgradePurchasing(false); }
   }, [upgradePresentation]);
@@ -1752,6 +1760,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       // offer, then the mission), never a purchase sheet. Steppling's begins at the end of the opening instead.
       const tappedHatchable = offer.id.startsWith('mist:') ? hatchableByTile(offer.id.slice('mist:'.length)) : null;
       if (tappedHatchable && offer.hatchable && offer.hatchable.state !== 'sleeping' && hatchableRuns.ready && !hatchableRuns.discovery[tappedHatchable.companion]) {
+        missionOpenAfterStartRef.current = tappedHatchable.companion;
         await startHatchableDiscovery(tappedHatchable);
         setSelectedUpgrade(null);
         return;
