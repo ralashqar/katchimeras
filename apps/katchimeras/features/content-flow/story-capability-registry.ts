@@ -38,7 +38,7 @@ function validateUpgradeEffect(payload: Readonly<Record<string, unknown>>) {
   const targetError = validateStoryTarget(payload.target);
   if (targetError) return targetError;
   const target = payload.target as { kind?: unknown; structureId?: unknown };
-  if (target.kind === 'haven_structure' && (typeof target.structureId !== 'string' || !sharedWorldPurchase(target.structureId) || payload.toLevel !== 1 || (payload.economy as { mode?: string })?.mode !== 'normal')) return 'Unknown shared-world purchase';
+  if (target.kind === 'haven_structure' && (typeof target.structureId !== 'string' || !sharedWorldPurchase(target.structureId) || payload.toLevel !== 1 || !['normal', 'free'].includes((payload.economy as { mode?: string })?.mode ?? ''))) return 'Unknown shared-world purchase';
   if (target.kind !== 'haven_tile' && target.kind !== 'haven_nature_island' && target.kind !== 'haven_structure') return 'world.upgrade target must be a Haven tile, shared-world tile, or nature island';
   if (!Number.isInteger(payload.toLevel) || Number(payload.toLevel) < 1) return 'toLevel must be a positive integer';
   if (!payload.economy || typeof payload.economy !== 'object') return 'economy policy is required';

@@ -6,16 +6,16 @@ import type { ContentFlowCommand, ContentFlowRun } from '@/types/content-flow';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { HATCHABLE_COMPANIONS, hatchableByCompanion } from '@/constants/hatchable-companions/registry';
-import { hatchableGatewayState } from '@/utils/merge-world/glow-discovery-policy';
+import { hatchableGatewayState, hatchableTileState } from '@/utils/merge-world/glow-discovery-policy';
 import { loadMergeWorldState } from '@/utils/merge-world/repository';
 import { hatchableEggProgress } from './steppling-egg-policy';
 import { glowDiscoveryLessonReady } from './glow-discovery-flow';
-import { HATCHABLE_EGG_ENTERED_EVENT, HATCHABLE_LESSON_FINALE_NODE_IDS, HATCHABLE_MISSION_CLEAR_NODE_ID, HATCHABLE_MISSION_CLEARED_EVENT, hatchableFlows } from './hatchable-flows';
+import { HATCHABLE_EGG_ENTERED_EVENT, HATCHABLE_LESSON_FINALE_NODE_IDS, HATCHABLE_MISSION_CLEAR_NODE_ID, HATCHABLE_MISSION_CLEARED_EVENT, HATCHABLE_MISSION_PAID_EVENT, HATCHABLE_MISSION_PAY_NODE_ID, hatchableFlows } from './hatchable-flows';
 import { lessonCheckpoint } from './steppling-garden-lesson';
 
 /**
  * The runtime every hatchable companion shares: their discovery run (the
- * misted tile, the mission, the paid reveal, the Egg), their garden lesson run,
+ * misted tile, the paid ticket, the mission, the reveal, the Egg), their garden lesson run,
  * and the events the screens record into them. Everything is keyed by the
  * companion's definition; nothing here names a friend.
  */
@@ -104,45 +104,41 @@ export async function acknowledgeHatchableEggEntry(definition: HatchableCompanio
   if (next?.status !== 'completed') throw new Error('Could not save the egg handoff');
 }
 
-const upgradeQueues = new Map<MergeCharacterId, Promise<unknown>>();
+const resumeQueues = new Map<MergeCharacterId, Promise<unknown>>();
+export type HatchableDiscoveryResume = { run: ContentFlowRun | null; blockedBy: 'garden' | null };
 /**
- * The bubble must advance the saved story, never start an ordinary purchase.
- * Opening it lands on the mission board; there is no confirm step any more
- * (the mission is the price), so `confirm` only ever repairs an old save.
+ * Moves a saved discovery to where the world says it should be, without ever
+ * buying anything: a failed or unknown node is retried (the director migrates
+ * it), the lesson's return is submitted, and a paid ticket records the paid
+ * event so the board opens. Never throws for an unchanged node; the run it
+ * returns says where things stand, and `blockedBy` says when the Garden
+ * lesson still has to be finished first.
  */
-export function advanceHatchableUpgrade(definition: HatchableCompanionDefinition, action: 'open' | 'confirm'): Promise<ContentFlowRun> {
+export function resumeHatchableDiscovery(definition: HatchableCompanionDefinition, world: MergeWorldState): Promise<HatchableDiscoveryResume> {
   const runId = definition.discoveryFlow.runId;
-  const queue = upgradeQueues.get(definition.companion) ?? Promise.resolve();
-  const operation = queue.then(async () => {
+  const queue = resumeQueues.get(definition.companion) ?? Promise.resolve();
+  const operation = queue.then(async (): Promise<HatchableDiscoveryResume> => {
     let run = await loadContentFlowRun(runId);
-    if (!run) throw new Error('The mist story could not load. Please try again.');
+    if (!run || run.status === 'completed') return { run, blockedBy: null };
+    const known = new Set(hatchableFlows(definition).discovery.nodes.map((node) => node.id));
     const dispatch = async (command: ContentFlowCommand) => {
       const next = await dispatchContentFlowCommand(runId, command);
-      if (!next || next.status === 'failed_recoverable') throw new Error(next?.error ?? 'The mist upgrade paused. Please try again.');
-      if (command.type === 'submit_scene' && next.nodeId === run!.nodeId) throw new Error('The upgrade did not advance. Please try again.');
-      run = next;
+      if (next) run = next;
     };
-    if (run.status === 'failed_recoverable' || run.nodeId === 'gateway.return') await dispatch({ type: 'retry' });
-    if (run.nodeId === 'gateway.ready') await dispatch({ type: 'submit_scene', actionId: 'return' });
-    if (run.nodeId === 'gateway.offer') await dispatch({ type: 'submit_scene', actionId: 'open_upgrade' });
-    void action;
-    if (run.nodeId !== 'mission.focus' && run.nodeId !== HATCHABLE_MISSION_CLEAR_NODE_ID && !run.nodeId.startsWith('gateway.purchase.')
-      && !['gateway.egg', 'egg.enter', 'complete'].includes(run.nodeId)) {
-      throw new Error('Finish the Garden request before clearing this mist.');
+    if (run.status === 'failed_recoverable' || !known.has(run.nodeId)) await dispatch({ type: 'retry' });
+    if (run.status === 'active' && run.nodeId === 'gateway.ready') await dispatch({ type: 'submit_scene', actionId: 'return' });
+    const paid = Boolean(world.hatchableMissions?.[definition.companion] || world.worldUnlocks?.[definition.tile.unlockId]);
+    if (run.status === 'active' && run.nodeId === HATCHABLE_MISSION_PAY_NODE_ID && paid) {
+      await dispatch({ type: 'record_event', event: {
+        eventId: `${runId}:${HATCHABLE_MISSION_PAY_NODE_ID}:paid:${run.revision}`, type: HATCHABLE_MISSION_PAID_EVENT, runId, nodeId: HATCHABLE_MISSION_PAY_NODE_ID, payload: {}, occurredAt: Date.now(),
+      } });
     }
-    return run;
+    const current: ContentFlowRun = run;
+    const blockedBy = current.status !== 'completed' && (current.nodeId === 'garden.open' || current.nodeId.startsWith('lesson.')) ? 'garden' as const : null;
+    return { run, blockedBy };
   });
-  upgradeQueues.set(definition.companion, operation.catch(() => undefined));
+  resumeQueues.set(definition.companion, operation.catch(() => undefined));
   return operation;
-}
-
-/** Repair only an already purchased clearing; never buy automatically. The
- * existing unlock makes the original receipt-backed effect charge zero again. */
-export async function recoverPaidHatchableUpgrade(definition: HatchableCompanionDefinition, world: MergeWorldState) {
-  if (!world.worldUnlocks?.[definition.tile.unlockId]) return null;
-  const run = await loadContentFlowRun(definition.discoveryFlow.runId);
-  if (!run || run.status === 'completed' || !['gateway.ready', 'gateway.return', 'gateway.offer'].includes(run.nodeId)) return null;
-  return advanceHatchableUpgrade(definition, 'confirm');
 }
 
 // ---------------------------------------------------------------- the garden lesson
@@ -259,6 +255,7 @@ export function activeHatchableFor(world: MergeWorldState | null, runs: Hatchabl
   // Egg's entry, before the questions and the hatch); then the first friend still under the Mist.
   const discovery = HATCHABLE_COMPANIONS.find((definition) => active(runs.discovery[definition.companion]))
     ?? (world ? HATCHABLE_COMPANIONS.find((definition) => hatchableGatewayState(world, definition) === 'egg') : undefined)
+    ?? (world ? HATCHABLE_COMPANIONS.find((definition) => hatchableTileState(world, definition) === 'board') : undefined)
     ?? (world ? HATCHABLE_COMPANIONS.find((definition) => hatchableGatewayState(world, definition) !== 'open') : undefined)
     ?? first;
   const lesson = HATCHABLE_COMPANIONS.find((definition) => active(runs.lessons[definition.companion])) ?? discovery;
@@ -266,8 +263,8 @@ export function activeHatchableFor(world: MergeWorldState | null, runs: Hatchabl
 }
 
 /** A lesson's live state for one companion, from the shared runs. */
-export function gardenLessonFor(runs: HatchableRuns, definition: HatchableCompanionDefinition) {
-  const run = runs.lessons[definition.companion] ?? null;
+export function gardenLessonFor(runs: HatchableRuns, definition: HatchableCompanionDefinition | null) {
+  const run = definition ? runs.lessons[definition.companion] ?? null : null;
   return { run, ready: runs.ready, active: active(run) };
 }
 

@@ -418,6 +418,11 @@ export function acknowledgeStoredKingdomGoalCoachmark(now = Date.now()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'ackKingdomGoalCoachmark', now }), now);
 }
 
+/** A mist mission's ticket: the tile's price, paid once at its bubble; the reveal after the board then charges nothing. */
+export function payStoredHatchableMission(companion: import('@/types/merge-world').MergeCharacterId, receiptId: string, now = Date.now()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'payHatchableMission', companion, receiptId, now }), now);
+}
+
 /** Exactly-once story upgrade. Retrying an effect key returns its original receipt. */
 export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryWorldUpgradeEffectPayload, now = Date.now()) {
   const target = payload.target;
@@ -438,7 +443,8 @@ export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryW
   }
   if (target.kind === 'haven_structure') {
     const purchase = sharedWorldPurchase(target.structureId);
-    if (!purchase || payload.toLevel !== 1 || payload.economy.mode !== 'normal') throw new Error('Unknown shared-world purchase');
+    // The reducer decides the cost from the world (a paid ticket makes the reveal free); a save that never bought a ticket still pays here.
+    if (!purchase || payload.toLevel !== 1 || (payload.economy.mode !== 'normal' && payload.economy.mode !== 'free')) throw new Error('Unknown shared-world purchase');
     return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
       type: 'unlockWorldTarget', targetId: purchase.unlockId, receiptId: effectKey, now,
     }), now);

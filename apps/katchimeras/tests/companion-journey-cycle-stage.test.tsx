@@ -42,6 +42,7 @@ test('return UI blocks the next episode until receipt completion and prevents do
     './companion-scene-cards': { CompanionSceneCards: SceneCards },
     './companion-life-actions': { CompanionLifeActions: 'LifeActions' },
     './steppling-actions': { StepplingActions: 'StepplingActions' },
+    './hatchable-actions': { HatchableActions: 'HatchableActions' },
     './companion-meditation-stage': { CompanionMeditationStage: 'Timer' },
   }, { setInterval, clearInterval });
   const Stage = module.CompanionJourneyCycleStage as React.ComponentType<Record<string, unknown>>;
@@ -94,6 +95,7 @@ for (const familyId of ['mossprout', 'steppling'] as const) {
     './companion-scene-cards': { CompanionSceneCards: SceneCards },
     './companion-life-actions': { CompanionLifeActions: 'LifeActions' },
     './steppling-actions': { StepplingActions: 'StepplingActions' },
+    './hatchable-actions': { HatchableActions: 'HatchableActions' },
     './companion-meditation-stage': { CompanionMeditationStage: 'Timer' },
     }, { setInterval, clearInterval });
     const Stage = module.CompanionJourneyCycleStage as React.ComponentType<Record<string, unknown>>;

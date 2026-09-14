@@ -288,8 +288,8 @@ function storyRunAt(definition: ContentFlowDefinition, runId: string, nodeId: st
  * before Steppling's reveal, before Petalimp, before Fernip.
  */
 const FIXTURE_DEFINITIONS: readonly FixtureDefinition[] = [
-  { id: 'steppling-mist-ready', name: 'Kingdom · Before Steppling', description: 'The Garden lesson done and the Glow earned; the misted clearing’s bubble waits to be tapped and open its mission board.', tags: ['Kingdom', 'Steppling', 'Mist'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: glowLessonServed,
-    contentFlowRuns: (now) => [storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'gateway.offer', now - 5 * DAY + 3)] },
+  { id: 'steppling-mist-ready', name: 'Kingdom · Before Steppling', description: 'The Garden lesson done and the Glow earned; the misted clearing’s bubble waits to be tapped, paid, and its mission board opened.', tags: ['Kingdom', 'Steppling', 'Mist'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: glowLessonServed,
+    contentFlowRuns: (now) => [storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'gateway.pay', now - 5 * DAY + 3)] },
   { id: 'kingdom-before-petalimp', name: 'Kingdom · Before Petalimp', description: 'The first session over: Steppling home and his first Shoe served. Mossprout’s wish and Bloom Garden come next.', tags: ['Kingdom', 'Petalimp'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: stepplingHome,
     contentFlowRuns: (now) => [
       storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'complete', now - 4 * DAY + 5),

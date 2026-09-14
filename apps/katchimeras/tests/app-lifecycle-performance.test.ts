@@ -137,7 +137,7 @@ test('game mode releases background UI work and avoids full Kingdom hydration', 
   assert.match(mergeProviderSource, /if \(!activeRef\.current \|\| !isAppForeground\(\)\) return null;/);
   assert.match(companionRouteSource, /const surfaceActive = hostedInHaven \|\| isFocused/);
   assert.match(companionRouteSource, /if \(!surfaceActive \|\| \(!discovery\.ready && !hostedInHaven\) \|\| \(residentMergeFtueActive && !residentStoryResumeActive\)\) \{[\s\S]*?return <View style=\{styles\.inactiveScreen\} \/>;/);
-  assert.match(companionSheetSource, /if \(!props\.active \|\| !idealSkinOnboardingRequired/);
+  assert.doesNotMatch(companionSheetSource, /idealSkin/, 'no closest-form questionnaire retry loop');
   assert.match(todaySource, /const flowBusy =\s*!screenFocused \|\|/);
   assert.ok((captureSource.match(/enabled: captureGates\.captureEnabled/g) ?? []).length >= 3);
   assert.match(captureSource, /const captureActive = pathname === '\/today'/);

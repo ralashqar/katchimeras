@@ -65,7 +65,7 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
     lines: STEPPLING_WISP_LINES,
   },
   discoveryFlow: {
-    id: 'glow-steppling-discovery', version: 11, runId: 'story:glow-steppling-v1',
+    id: 'glow-steppling-discovery', version: 12, runId: 'story:glow-steppling-v1',
     gardenLesson: {
       open: { guide: { eyebrow: 'Someone’s in there', title: 'Light is made on the Garden board.', body: 'Mossprout has a request waiting there. Serve it and the light reaches the trail.' }, actionLabel: 'Open Garden' },
       prepareCapability: 'glow.lesson.prepare',
@@ -85,10 +85,10 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
       lessonPrefix: 'glow',
       ready: { guide: { eyebrow: 'Enough light', title: 'That should reach.', body: 'Come and see who the trail was hiding.' }, actionLabel: 'Back to world' },
     },
-    offer: { guide: { eyebrow: 'Held', title: 'Tap the glowing bubble.', body: 'Four Mistwisps have the trail. Spend the light and they’ll show themselves.' }, actionLabel: 'See the light' },
     egg: { guide: { eyebrow: 'An Egg', title: 'So the trail was keeping someone.', body: 'You noticed something out in your world today. This is what that did. Go on. That’s you.' }, actionLabel: 'Meet the Egg' },
     migrations: {
-      'gateway.return': 'gateway.offer',
+      // The bubble pays first now: a save waiting at the old offer or return goes to the pay step.
+      'gateway.return': 'gateway.pay', 'gateway.offer': 'gateway.pay',
       'gateway.goal': 'garden.open',
       'garden.focus': 'gateway.focus',
       ...Object.fromEntries(['lesson.prepare', 'lesson.spawn', 'lesson.seed', 'lesson.sprout', 'lesson.serve', 'lesson.repeat', 'lesson.repeat.prepare', 'lesson.repeat.spawn', 'lesson.repeat.match-1', 'lesson.repeat.match-2', 'lesson.repeat.match-3', 'lesson.repeat.match-4', 'lesson.repeat.match-5', 'lesson.repeat.serve'].map((id) => [id, 'lesson.single.prepare'])),

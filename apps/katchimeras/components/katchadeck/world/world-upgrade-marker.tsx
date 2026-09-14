@@ -94,7 +94,7 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   return <Animated.View pointerEvents={hidden ? 'none' : 'box-none'} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} style={[styles.position, projection]}>
       <Animated.View ref={target} collapsable={false} pointerEvents="none" accessible={false}
         onLayout={() => { onTargetChange?.(offer.id, null); if (!moving && !hidden) onTargetChange?.(offer.id, node.current); }} style={[styles.spotlightTarget, spotlightBounds]} />
-      <AnimatedPressable ref={button} collapsable={false} hitSlop={6} accessibilityRole="button" accessibilityLabel={hatchableAsleep ? `${offer.name}, still under the Mist` : hatchable ? `${offer.name}, an Egg under the Mist, ${offer.cost} Glow to clear` : sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
+      <AnimatedPressable ref={button} collapsable={false} hitSlop={6} accessibilityRole="button" accessibilityLabel={hatchableAsleep ? `${offer.name}, still under the Mist` : hatchable?.state === 'board' ? `${offer.name}, the mist board is open` : hatchable ? `${offer.name}, an Egg under the Mist, ${offer.cost} Glow to clear` : sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
         accessibilityValue={locked || sleepingPortrait || hatchableAsleep ? undefined : { min: 0, max: glowTotal, now: glowProgress, text: offer.restorationProgress ? `${glowProgress} of ${glowTotal} beds grown` : offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
         accessibilityHint={offer.lockedReason ?? (campaignPending ? 'Resumes this island story' : offer.affordable ? 'Opens upgrade details' : `${offer.missingGlow} more Glow needed. Opens upgrade details.`)}
         disabled={moving || hidden || inert} accessibilityState={{ disabled: moving || hidden || inert }} onPress={() => onPress(offer)} style={[styles.hitTarget, hitMotion]}>
@@ -137,7 +137,8 @@ function HatchableEggFace({ state, glowProgress, glowTotal, cost, missingGlow }:
   state: NonNullable<WorldUpgradeOffer['hatchable']>['state']; glowProgress: number; glowTotal: number; cost: number; missingGlow: number;
 }) {
   const asleep = state === 'sleeping';
-  const ready = state === 'ready';
+  // A paid ticket lights the face like enough light does: the board is what the tile wants now.
+  const ready = state === 'ready' || state === 'board';
   return <>
     <View style={[styles.portraitFrame, styles.eggFrame, asleep ? styles.eggFrameAsleep : ready ? styles.eggFrameReady : null]}>
       {asleep ? null : <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory" contentFit="contain" pointerEvents="none"

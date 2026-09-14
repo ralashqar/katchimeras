@@ -56,9 +56,6 @@ function actionOwnerForOrigin(origin: KatchimeraActionOrigin): ActionCompletionC
   if (origin.kind === 'garden_request') {
     return { kind: 'garden', orderId: origin.actionId.replace(/^mossprout:garden:/, '') || null };
   }
-  if (origin.kind === 'quest' || origin.kind === 'photo_request' || origin.kind === 'note_request') {
-    return { kind: 'quest', questId: origin.actionId.replace(/^mossprout:quest:/, '') };
-  }
   return { kind: 'daily_action' };
 }
 

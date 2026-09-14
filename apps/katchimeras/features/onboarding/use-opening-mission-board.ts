@@ -49,6 +49,8 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
   const [state, setState] = useState<MergeWorldState | null>(null);
   const [merges, setMerges] = useState(0);
   const [placedDeliveries, setPlacedDeliveries] = useState(0);
+  // Bumped by `reset`: the saved board is cleared and the store loads again (a fresh seed).
+  const [revision, setRevision] = useState(0);
   const stateRef = useRef<MergeWorldState | null>(null);
   const mergesRef = useRef(0);
   const placedRef = useRef(0);
@@ -80,7 +82,9 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     setPlacedDeliveries(loaded.placedDeliveries);
     // A board put away or a run that ends lands its last save at once.
     return () => flushDeferredStoredWrites(storageKey);
-  }, [runId, storageKey]);
+  }, [runId, storageKey, revision]);
+  /** Throws the saved board away and seeds a fresh one: the way out when a save cannot be read. */
+  const reset = useCallback(() => { clearMission(storageKey); setRevision((value) => value + 1); }, [storageKey]);
   const send = useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
     const current = stateRef.current;
     const activeRunId = runIdRef.current;
@@ -126,7 +130,7 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     setState(next);
     setPlacedDeliveries(placed);
   }, [storageKey]);
-  return { state, merges, mergesRef: mergesRef as RefObject<number>, placedDeliveries, send, place };
+  return { state, merges, mergesRef: mergesRef as RefObject<number>, placedDeliveries, send, place, reset };
 }
 
 export function loadOpeningMission(runId: string, now = Date.now()): MergeWorldState | null {

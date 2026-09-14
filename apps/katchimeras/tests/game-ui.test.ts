@@ -120,7 +120,7 @@ test('Mossprout collection buttons live in the bottom dock and swap embedded con
   const navArt = fs.readFileSync(path.resolve(process.cwd(), 'constants/katchimera-nav-art.ts'), 'utf8');
   assert.match(sheet, /onOpenCards=\{\(\) => selectDestination\('skins'\)\}/);
   assert.match(sheet, /onOpenTrophies=\{\(\) => selectDestination\('achievements'\)\}/);
-  assert.match(stage, /id: 'garden', label: 'Garden'[\s\S]*?id: 'discoveries', label: 'Discoveries'[\s\S]*?id: 'skins', label: 'Skins'[\s\S]*?id: 'trophies', label: 'Trophies'/);
+  assert.match(stage, /id: 'garden', label: 'Garden'[\s\S]*?id: 'skins', label: 'Skins'[\s\S]*?id: 'trophies', label: 'Trophies'/);
   assert.doesNotMatch(stage, /label: 'Journey'/);
   assert.match(dock, /featuredId/);
   assert.match(dock, /icon: \{ height: 40, width: 40 \}/);

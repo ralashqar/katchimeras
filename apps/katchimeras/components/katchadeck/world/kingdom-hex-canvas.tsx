@@ -1214,13 +1214,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const frames = targets.map(storyTargetFrame);
     if (!frames.length || frames.some((frame) => !frame)) throw new Error('The authored camera target is not ready');
     if (!storyCameraSnapshotsRef.current.has('entry')) storyCameraSnapshotsRef.current.set('entry', readLiveCameraSnapshot());
+    // A camera move superseded by another (a resume framing, a panel closing) never calls back: the story
+    // would wait for ever. The move's own duration plus a beat is the most any framing is allowed to take.
+    const settle = <T,>(move: Promise<T>) => Promise.race([move, new Promise<void>((resolve) => setTimeout(resolve, (reduceMotion ? 0 : payload.durationMs ?? 900) + 700))]);
     if (payload.operation === 'focus' && frames.length === 1 && payload.target?.kind !== 'haven_world') {
       const frame = frames[0]!;
-      await new Promise<void>((resolve) => camera.focusResident(
+      await settle(new Promise<void>((resolve) => camera.focusResident(
         frame.left + frame.width / 2,
         frame.top + frame.height / 2,
         { anchorY: payload.anchorY, durationMs: reduceMotion ? 0 : payload.durationMs, zoom: payload.zoom, onComplete: resolve },
-      ));
+      )));
       return;
     }
     const concrete = frames as { left: number; top: number; width: number; height: number }[];
@@ -1228,10 +1231,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const top = Math.min(...concrete.map((frame) => frame.top));
     const right = Math.max(...concrete.map((frame) => frame.left + frame.width));
     const bottom = Math.max(...concrete.map((frame) => frame.top + frame.height));
-    await new Promise<void>((resolve) => camera.focusFrame(
+    await settle(new Promise<void>((resolve) => camera.focusFrame(
       { left, top, width: right - left, height: bottom - top },
       { durationMs: reduceMotion ? 0 : payload.durationMs, horizontalPadding: payload.padding, verticalPadding: payload.padding, onComplete: resolve },
-    ));
+    )));
   }, tutorialCameraReady && storyOperationsEnabled);
   useEffect(() => {
     if (!upgradePresentation || !storySceneGuard) return;

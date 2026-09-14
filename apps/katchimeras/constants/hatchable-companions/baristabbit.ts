@@ -71,8 +71,9 @@ export const BARISTABBIT_HATCHABLE: HatchableCompanionDefinition = {
     },
   },
   discoveryFlow: {
-    id: 'glow-baristabbit-discovery', version: 1, runId: 'story:glow-baristabbit-v1',
-    offer: { guide: { eyebrow: 'Held', title: 'Tap the glowing bubble.', body: 'Four Mistwisps sit on the window. Spend the light and they show themselves.' }, actionLabel: 'See the light' },
+    id: 'glow-baristabbit-discovery', version: 2, runId: 'story:glow-baristabbit-v1',
+    // v1 opened the board from the bubble; the bubble pays first now.
+    migrations: { 'gateway.offer': 'gateway.pay', 'gateway.return': 'gateway.pay', 'gateway.focus': 'gateway.pay' },
     egg: { guide: { eyebrow: 'An Egg', title: 'So the window was keeping someone.', body: 'Something in there kept a kettle warm for nobody. Go on. That is you now.' }, actionLabel: 'Meet the Egg' },
   },
   dayOne: {

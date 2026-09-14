@@ -2,6 +2,7 @@ import {
   companionIdForFamily,
   katchimeraFamilyById,
 } from '@/constants/katchimera-skins';
+import { companionHasPage } from '@/features/companion/companion-page-policy';
 import type { CompanionDiscoveryRecord } from '@/types/merge-world';
 import type { KingdomCreature, KingdomState } from '@/types/kingdom';
 
@@ -34,6 +35,8 @@ export function withDiscoveredKatchimeras(
     kingdom.creatures.flatMap((creature) => creature.familyId ? [creature.familyId] : []),
   );
   const virtualCreatures = [...records]
+    // Only a friend with a page is discovered as a companion; the engine drops the rest durably, this is the read-side guard.
+    .filter((record) => companionHasPage(record.characterId))
     .sort((left, right) => right.discoveredAt - left.discoveredAt)
     .flatMap<KingdomCreature>((record) => {
       const family = katchimeraFamilyById.get(record.characterId);

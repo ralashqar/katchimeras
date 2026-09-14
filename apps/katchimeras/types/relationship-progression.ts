@@ -81,7 +81,6 @@ export type ActionOwner =
   | { kind: 'journey'; journeyId: string; journeyActionId: string }
   | { kind: 'daily_action' }
   | { kind: 'goal'; goalId: string }
-  | { kind: 'quest'; questId: string }
   | { kind: 'garden'; orderId: string | null };
 
 export type MossproutDailyActionDeck = {
@@ -99,7 +98,6 @@ export type KatchimeraDayActionDestination =
   | { kind: 'journey' }
   | { kind: 'focus_questionnaire' }
   | { kind: 'conversation'; definitionId: string }
-  | { kind: 'quest'; questId: string }
   | { kind: 'goal'; goalId: string }
   | { kind: 'garden'; orderId: string | null };
 

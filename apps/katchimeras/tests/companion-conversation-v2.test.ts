@@ -15,10 +15,8 @@ import type { ConversationDefinition } from '@/types/companion-conversation';
 import {
   CONVERSATION_V2_ENABLED_FAMILIES,
   CONVERSATION_V2_FAMILIES,
-  CONVERSATION_V2_IDEAL_SKIN_FAMILIES,
   isConversationV2AuthoredFamily,
   isConversationV2Family,
-  isConversationV2IdealSkinFamily,
 } from '@/types/companion-conversation';
 import type { StoredHomeDayRecord } from '@/types/home';
 import {
@@ -113,13 +111,8 @@ test('all 25 V2 packs are runtime-enabled while skin onboarding remains art-gate
   assert.deepEqual(validateConversationDefinitions(companionConversationDefinitionsV2), []);
   assert.equal(companionConversationDefinitionsV2.length, 1446);
   assert.deepEqual(CONVERSATION_V2_ENABLED_FAMILIES, CONVERSATION_V2_FAMILIES);
-  assert.deepEqual(CONVERSATION_V2_IDEAL_SKIN_FAMILIES, familyIds);
   assert.equal(isConversationV2Family('feastle'), true);
   assert.equal(isConversationV2AuthoredFamily('feastle'), true);
-  assert.equal(isConversationV2IdealSkinFamily('cheerlet'), false);
-  for (const familyId of CONVERSATION_V2_IDEAL_SKIN_FAMILIES) {
-    assert.ok(katchimeraFamilyById.get(familyId)!.skinIds.every((skinId) => katchimeraSkinById.get(skinId)?.visualKey));
-  }
   for (const familyId of CONVERSATION_V2_FAMILIES) {
     const pack = companionConversationDefinitionsForFamily(familyId);
     assert.equal(companionConversationTopics[familyId].length, 8);

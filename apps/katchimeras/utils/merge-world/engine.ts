@@ -4,6 +4,7 @@ const { mergeOrderReady, mergeOrderRequirementReadiness, mergeOrderItemReadiness
 export { mergeOrderReady, mergeOrderRequirementReadiness, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds };
 import { lessonDrop, lessonForOrder, lessonOnGenerator, lessonOrderServed, prepareGardenLesson, withGardenLessonRecord, gardenLessonRecord } from '@/features/onboarding/steppling-garden-lesson';
 import { HATCHABLE_COMPANIONS, hatchableByCompanion } from '@/constants/hatchable-companions/registry';
+import { companionHasPage } from '@/features/companion/companion-page-policy';
 import { ensureOrdersRequireMerge, repairOrderChains } from './order-requirements';
 import { generatorChainOpen, openChainFor, openDefinitionFor, openTierOneDropIds } from './generator-branches';
 import { ensureCompanionDailyGarden, completeDailyGardenOrder, DAILY_GARDEN_ARC, DAILY_GARDEN_BONUS } from './companion-daily-garden';
@@ -537,6 +538,7 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       return upgradeHavenStructure(current, command);
     case 'upgradeHavenFeature':
       return upgradeHavenFeature(current, command);
+    case 'payHatchableMission':
     case 'unlockWorldTarget':
     case 'transferDiscoveryEgg':
     case 'hatchWorldEgg':
@@ -4406,7 +4408,9 @@ function normalizeCompanionDiscovery(
   now: number,
 ): MergeWorldState['companionDiscovery'] {
   const candidate = value && typeof value === 'object' ? value as Partial<MergeWorldState['companionDiscovery']> : null;
-  const legacyCharacters = uniqueStrings(legacyUnlockedCharacters).filter((id): id is MergeCharacterId => KNOWN_CHARACTERS.has(id as MergeCharacterId));
+  // A discovery record belongs to a friend with a page (Mossprout, the hatchables); a legacy record for any other
+  // family (the retired board discovery) is dropped here, durably, so no save can reach a page that no longer exists.
+  const legacyCharacters = uniqueStrings(legacyUnlockedCharacters).filter((id): id is MergeCharacterId => KNOWN_CHARACTERS.has(id as MergeCharacterId) && companionHasPage(id));
   const activeDiscoveryOrderCharacters = new Set((Array.isArray(legacyActiveOrders) ? legacyActiveOrders : []).flatMap((order): MergeCharacterId[] => {
     if (!order || typeof order !== 'object') return [];
     const candidateOrder = order as Partial<MergeOrder>;
@@ -4417,7 +4421,7 @@ function normalizeCompanionDiscovery(
   }));
   const records = Array.isArray(candidate?.records)
     ? candidate.records.flatMap((record): MergeWorldState['companionDiscovery']['records'] => {
-        if (!record || typeof record !== 'object' || !KNOWN_CHARACTERS.has(record.characterId)) return [];
+        if (!record || typeof record !== 'object' || !KNOWN_CHARACTERS.has(record.characterId) || !companionHasPage(record.characterId)) return [];
         const source = record.source === 'ftue_hatch' || record.source === 'board_discovery' || record.source === 'legacy_grandfather'
           ? record.source
           : 'legacy_grandfather';

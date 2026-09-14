@@ -105,7 +105,7 @@ stays here."
 | echo beats | There's a X stuck in the grey. Bring it its twin. | The Mist has a X. Its twin will pull it free. |
 | `lesson.single.serve` | That's the one. Give it here. | That's the one. Give it here, and I'll turn it into light. |
 | `gateway.ready` | Enough light / That should do it. / Let's see who's in there. | Enough light / That should reach. / Come and see who the trail was hiding. |
-| `gateway.offer` | The mist / Tap the glowing bubble. / Something was left in there. | Held / Tap the glowing bubble. / Four of them have the trail. Spend the light and they'll show themselves. |
+| `gateway.pay` (was `gateway.offer`) | The mist / Tap the glowing bubble. / Something was left in there. | Retired Sept 2026: the bubble opens the shared purchase panel (the tile's name and price); no guide copy. |
 | `gateway.egg` | An Egg / So someone is being noticed again. / … | An Egg / So the trail was keeping someone. / You noticed something out in your world today. This is what that did. Go on. That's you. |
 
 ### 2.5 The rest of the first session (phase 2, Sept 11, 2026)

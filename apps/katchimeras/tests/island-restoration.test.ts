@@ -308,7 +308,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /const restorationBoardRunId = islandRestoration && restorationDefinition \? restorationRunId\(islandRestoration\.campaign\.campaignId, islandRestoration\.level, islandRestoration\.progress\.startedAt, restorationDefinition\) : null;/, 'a restarted or re-authored stage never inherits a saved board');
   assert.match(screen, /useMissionBoard\(islandRestoration \? restorationStorageKey\(islandRestoration\.campaign\.campaignId, islandRestoration\.level\) : 'katchimeras\.mist-mission\.none\.v1', restorationBoardRunId, createRestorationBoard, repairRestorationBoard\)/, 'its own store per chapter, repaired on load');
   assert.match(screen, /target: \{ kind: 'haven_nature_island' as const, islandId: restorationIslandId \},\s*zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y/, 'the board framing on the island');
-  assert.match(screen, /const soloOfferId = stepplingBoardBusy \? 'mist:steppling-home' : null;/, 'no marker percentage while the board is up');
+  assert.match(screen, /const soloOfferId = stepplingBoardBusy \? `mist:\$\{activeHatchable\.tile\.id\}` : null;/, 'no marker percentage while the board is up');
   // The request lives on the dock's tray: open on the Main Board it leads there; served, its items fly into the cells.
   assert.match(screen, /requestIslandRestorationOpen\(islandRestoration\.campaign\.campaignId\);\s*openGarden\(restorationOrder\.id, 'mossprout'\);/, 'the tray opens the Merge page and Back returns to the board');
   assert.match(screen, /if \(!islandRestoration \|\| !restorationDefinition \|\| !restorationStore\.state \|\| restorationBoardVisible\) return;/, 'quiet placement only while the board is put away');

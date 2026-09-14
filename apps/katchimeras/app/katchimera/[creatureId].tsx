@@ -1,6 +1,8 @@
 import { Redirect, useLocalSearchParams } from 'expo-router';
 
 import { KatchimeraCompanionRouteScreen } from '@/components/katchadeck/world/katchimera-companion-route-screen';
+import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
+import { companionHasPage } from '@/features/companion/companion-page-policy';
 import { MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID, mossproutFtueConversationDefinitionId } from '@/constants/mossprout-ftue-conversations';
 import { ftuePersonalizationKey, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
@@ -25,6 +27,8 @@ export default function KatchimeraCompanionRoute() {
         journey.familyId === 'mossprout' && journey.status === 'resolution_ready'
       ))?.returnConversationId ?? undefined
     : undefined;
+  // A roster-only family (no authored page): the Kingdom, never the interaction sheet.
+  if (!companionHasPage(familyIdFromCompanionId(creatureId))) return <Redirect href="/(tabs)/katchimeras" />;
   if (isMossprout) {
     return <Redirect href={{
       pathname: '/(tabs)/katchimeras',

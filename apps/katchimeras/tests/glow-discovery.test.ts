@@ -24,7 +24,7 @@ test('Glow Garden handoff stays actionable under the world navigation lock, incl
     assert.equal(glowDiscoveryAllowsGarden({ nodeId, status: 'failed_recoverable' }), true);
     assert.equal(glowDiscoveryAllowsGarden({ nodeId, status: 'completed' }), false);
   }
-  for (const nodeId of ['gateway.focus', 'gateway.offer', 'mission.focus', 'mission.clear', 'gateway.egg', 'egg.enter']) {
+  for (const nodeId of ['gateway.focus', 'gateway.pay', 'mission.focus', 'mission.clear', 'gateway.egg', 'egg.enter']) {
     assert.equal(glowDiscoveryAllowsGarden({ nodeId, status: 'active' }), false);
   }
   assert.equal(glowDiscoveryAllowsGarden(null), false);
@@ -59,7 +59,7 @@ test('enough Glow highlights the HUD with an actionable Egg bubble instead of a 
   assert.match(bubble, /onLayout=\{\(event\) => setMeasuredHeight/);
 });
 test('Egg reveal keeps the camera locked through final Continue and recovery, then releases it', () => {
-  const nodes = GLOW_DISCOVERY_FLOW.nodes.filter((node) => node.id.startsWith('gateway.purchase.') || ['gateway.return', 'mission.focus', 'mission.clear', 'gateway.egg', 'complete'].includes(node.id));
+  const nodes = GLOW_DISCOVERY_FLOW.nodes.filter((node) => node.id.startsWith('gateway.purchase.') || ['gateway.pay', 'mission.focus', 'mission.clear', 'gateway.egg', 'complete'].includes(node.id));
   assert.ok(nodes.some((node) => node.id === 'mission.clear'), 'the mission board keeps the world framed too');
   assert.ok(nodes.some((node) => node.id === 'gateway.egg'));
   for (const { id: nodeId } of nodes) {
@@ -383,10 +383,11 @@ test('discovery story has valid capabilities and resumes through each persisted 
   assert.ok(visited.indexOf('gateway.focus') < visited.indexOf('garden.open'));
   assert.ok(!visited.includes('garden.focus'));
   assert.ok(!visited.includes('gateway.goal'));
-  assert.ok(!visited.includes('gateway.return'), 'camera completion cannot gate the upgrade');
+  assert.ok(!visited.includes('gateway.return') && !visited.includes('gateway.offer'), 'camera completion cannot gate the upgrade, and nothing opens the board unpaid');
   // The bubble opens the mission board, not a purchase sheet; the paid reveal follows the bar filling.
   assert.ok(!visited.includes('gateway.buy'));
-  assert.ok(visited.indexOf('gateway.offer') < visited.indexOf('mission.focus'));
+  assert.ok(visited.indexOf('gateway.ready') < visited.indexOf('gateway.pay'));
+  assert.ok(visited.indexOf('gateway.pay') < visited.indexOf('mission.focus'), 'the ticket is paid before the board opens');
   assert.ok(visited.indexOf('mission.focus') < visited.indexOf('mission.clear'));
   assert.ok(visited.indexOf('mission.clear') < visited.indexOf('gateway.purchase.commit'));
   assert.equal((GLOW_DISCOVERY_FLOW.migrations as Record<string, string>)['gateway.buy'], 'mission.focus');

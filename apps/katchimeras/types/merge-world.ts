@@ -525,6 +525,8 @@ export type MergeWorldState = {
   /** Each hatchable companion's Egg, from the clearing to the hatch. */
   hatchableEggs?: Partial<Record<MergeCharacterId, import('@/features/onboarding/hatchable-egg-policy').HatchableEggProgress>>;
   worldUnlocks?: Record<string, { unlockedAt: number; paid: number; destination: MergeCharacterId; transferredAt: number | null; hatchedAt: number | null }>;
+  /** A mist mission's ticket: the tile's price, paid once at its bubble, before the board opens; the reveal after the board then costs nothing. */
+  hatchableMissions?: Partial<Record<MergeCharacterId, { paidAt: number; paidCoins: number; receiptId: string }>>;
   /** `layoutVersion` 3: the Basket is earned by parcel on a board with no loose items; anything older is re-prepared. */
   glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 | 3 };
   /** The first light, earned when the last wisp fell on the opening board: what the first garden restore is paid with. */
@@ -610,6 +612,7 @@ export type MergeWorldCommand =
   | { type: 'ensureCompanionDailyGarden'; familyId: MergeCharacterId; now: number }
   | { type: 'grantJourneyReturn'; cycle: import('./companion-journey-cycle').CompanionJourneyCycle; dayId: string; now: number }
   | { type: 'unlockWorldTarget'; targetId: string; now: number; receiptId?: string }
+  | { type: 'payHatchableMission'; companion: MergeCharacterId; receiptId: string; now: number }
   | { type: 'transferDiscoveryEgg'; targetId: string; now: number }
   | { type: 'hatchWorldEgg'; targetId: string; now: number }
   | { type: 'prepareGlowDiscoveryLesson'; now: number }

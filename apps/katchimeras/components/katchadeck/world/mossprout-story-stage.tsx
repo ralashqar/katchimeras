@@ -50,7 +50,7 @@ import {
 import { useOptionalMergeWorldState } from '@/features/merge-world/merge-world-provider';
 import { useActionPresentationController } from '@/hooks/use-action-presentation';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
-import type { CompanionQuestOfferViewModel } from '@/types/companion-interaction';
+import type { CompanionChatStarter } from '@/types/companion-interaction';
 import type { KatchimeraActionOrigin, KatchimeraDayAction, RelationshipProgressState } from '@/types/relationship-progression';
 import type { ConversationSession } from '@/types/companion-conversation';
 import type { MergeWorldState } from '@/types/merge-world';
@@ -63,7 +63,6 @@ import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { mossproutCampaignEpisodeByBeatId } from '@/constants/mossprout-campaign';
 import { RESIDENT_CARD_DEFINITION_ID } from '@/constants/resident-card-discovery';
 
-import type { CompanionChatStarter } from './companion-chat-lobby';
 import { KatchimeraBottomDock } from './katchimera-bottom-dock';
 import { KatchimeraJourneyStatusPlaque } from './katchimera-journey-status-plaque';
 import { MossproutJourneyRequestPanel } from './mossprout-journey-request-panel';
@@ -113,26 +112,22 @@ function useMossproutMergeWorldState() {
 }
 
 export function MossproutStoryStage({
-  activeQuestId,
   onActionNarration,
   onSubmenuChange,
   conversationSession,
   conversations,
   goals,
   hasActiveFocus,
-  offers,
   relationships,
   onCompleteGoal,
   onRememberGoal,
   onSkipGoal,
   onSnoozeGoal,
   onUndoGoal,
-  onDashboard,
   onOpenConversation,
   onOpenCards,
   onOpenFocusDirection,
   onOpenMerge,
-  onOpenQuestDirect,
   onOpenTrophies,
   onBondRewardRequest,
   dayOneActionChoiceActive = false,
@@ -149,25 +144,21 @@ export function MossproutStoryStage({
 }: {
   onSubmenuChange?: (open: boolean) => void;
   onActionNarration?: (text: string | null) => void;
-  activeQuestId?: string | null;
   conversationSession: ConversationSession | null;
   conversations: readonly CompanionChatStarter[];
   goals: readonly CompanionQuickGoalForDay[];
   hasActiveFocus: boolean;
-  offers: CompanionQuestOfferViewModel[];
   relationships: RelationshipProgressState;
   onCompleteGoal: (goalId: string) => CompanionQuickGoalCompletionReceipt;
   onRememberGoal: (completion: CompanionQuickGoalCompletion, goal: CompanionQuickGoalForDay['goal']) => void;
   onSkipGoal: (goalId: string) => boolean;
   onSnoozeGoal: (goalId: string) => boolean;
   onUndoGoal: (goalId: string) => boolean;
-  onDashboard: () => void;
   onAddTask?: () => void;
   onOpenConversation: (definitionId: string, actionOrigin?: KatchimeraActionOrigin) => void;
   onOpenCards: () => void;
   onOpenFocusDirection: (actionOrigin?: KatchimeraActionOrigin) => void;
   onOpenMerge: (orderId?: string | null) => void;
-  onOpenQuestDirect: (questId: string, originActionId: string) => void;
   onOpenTrophies: () => void;
   onVisitSeed?: () => void;
   onBondRewardRequest: (source: DayActionSourceRect, onArrive: () => void, receipt?: NonNullable<KatchimeraDayAction['rewardReceipt']>) => void;
@@ -292,7 +283,6 @@ export function MossproutStoryStage({
   }, [dayId, journey?.resolutionAvailableAt, journey?.status]);
 
   const actions = useMemo(() => resolveMossproutDayActions({
-    activeQuestId,
     conversations,
     consumedActionIds: mossproutDailyActionDeck(relationships, dayId).consumedActionIds,
     dayId,
@@ -305,11 +295,10 @@ export function MossproutStoryStage({
     journey,
     journeyDayNumber,
     journeyGardenRequest,
-    offers,
     skippedActionIds: relationships.skippedActionIds,
     slotSequences: mossproutDailyActionDeck(relationships, dayId).slotSequences,
     storyComplete,
-  }), [activeQuestId, conversations, dayId, dayOneActionChoiceActive, dayOneChoiceActionIds, dayOneLessonCompleted, gardenRequests, goals, hasActiveFocus, journey, journeyDayNumber, journeyGardenRequest, meditationMode, offers, relationships, storyComplete]);
+  }), [conversations, dayId, dayOneActionChoiceActive, dayOneChoiceActionIds, dayOneLessonCompleted, gardenRequests, goals, hasActiveFocus, journey, journeyDayNumber, journeyGardenRequest, meditationMode, relationships, storyComplete]);
   // The Day 1 Bond lesson temporarily scopes the normal resolver to its three
   // authored relationship choices. Coin-only requests remain in the Garden
   // and return to this rotation after FTUE completes.
@@ -330,22 +319,6 @@ export function MossproutStoryStage({
       });
     }, current));
   }, [dayId, goals]);
-
-  useEffect(() => {
-    relationshipProgressionRepository.update((current) => offers.reduce((state, offer) => {
-      if (!offer.completedToday || !['quest-mossprout-green-photo', 'quest-mossprout-nature-note'].includes(offer.id)) return state;
-      const photo = offer.family === 'photo';
-      const actionId = `mossprout:quest:${offer.id}`;
-      if (state.actionCompletions.some((event) => event.dayId === dayId && event.actionId === actionId)) return state;
-      const sequence = mossproutDailyActionDeck(state, dayId).slotSequences.field;
-      return recordKatchimeraActionCompletion(state, {
-        dayId, familyId: 'mossprout', actionId, instanceId: `${dayId}:field:${sequence}:${actionId}`, slotId: 'field', sequence, kind: photo ? 'photo_request' : 'note_request',
-        title: offer.title, subtitle: photo ? 'Nature moment captured' : 'Nature note remembered',
-        icon: photo ? 'camera.fill' : 'square.and.pencil', artKey: photo ? 'today:photo' : 'today:reflection', artworkDefinitionIds: [],
-        reward: { kind: 'bond', amount: offer.bondReward }, completedAt: Date.now(),
-      });
-    }, current));
-  }, [dayId, offers]);
 
   const resolvedVisibleActions = presentedActionCandidates
     .filter((action) => action.status === 'ready' || action.status === 'active')
@@ -510,7 +483,6 @@ export function MossproutStoryStage({
       }
       return onOpenMerge(action.destination.orderId);
     }
-    if (action.destination.kind === 'quest') return onOpenQuestDirect(action.destination.questId, action.id);
   };
   const openJourneyGarden = () => {
     if (!journey?.activity) return;
@@ -596,7 +568,7 @@ export function MossproutStoryStage({
 
 
   const calendarDay = useCompanionCalendarDay();
-  const narrativeCandidates = resolveMossproutDayActions({ conversations, goals: [], offers: [], dayId: calendarDay,
+  const narrativeCandidates = resolveMossproutDayActions({ conversations, goals: [], dayId: calendarDay,
     journey: null, storyComplete: false, includeJourneyAction: false, includeActionIds: undefined, hasActiveFocus: true, dayOneLessonCompleted: true })
     .filter((action) => ['fun_chat', 'insight_chat'].includes(action.kind) && !action.disabled && action.status !== 'completed');
   const narrativeTimes = Object.fromEntries(relationships.actionCompletions.filter((item) => item.familyId === 'mossprout')
@@ -796,7 +768,6 @@ export function MossproutStoryStage({
       featuredId="garden"
       items={[
         { id: 'garden', label: 'Garden', onPress: () => onOpenMerge(journey?.activity?.mergeOrderId) },
-        { id: 'discoveries', label: 'Discoveries', onPress: onDashboard },
         { id: 'skins', label: 'Skins', onPress: onOpenCards },
         { id: 'trophies', label: 'Trophies', onPress: onOpenTrophies },
       ]}
@@ -835,7 +806,7 @@ export function MossproutStoryStage({
   </CompanionGardenAction>;
   if (meditationMode) return <CompanionSceneOverlayHost>{flatCards}</CompanionSceneOverlayHost>;
   return <CompanionSceneCards hideJourney={gardenOpen || lifeOpen} model={model}
-    onJourney={storyComplete ? onDashboard : () => openJourney(actions.find((action) => action.destination.kind === 'journey'))}>
+    onJourney={storyComplete ? onOpenTrophies : () => openJourney(actions.find((action) => action.destination.kind === 'journey'))}>
     {flatCards}
   </CompanionSceneCards>;
 }

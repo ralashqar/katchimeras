@@ -5,6 +5,8 @@ import type { FtueCameraDirective, FtueStepDefinition } from './ftue-types';
 import { mergeLessonBoardStep, mergeLessonEvidenceReady, type MergeLessonBeat } from '@/features/content-flow/merge-lesson-recipe';
 import { GLOW_LESSON_LAYOUT_VERSION, GLOW_ORDER_IDS, glowGeneratorRule } from '@/utils/merge-world/glow-discovery-policy';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/steppling';
+import { HATCHABLE_GATEWAY_NODE_IDS } from '@/constants/glow-discovery-ids';
+import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import {
   HATCHABLE_EGG_ENTERED_EVENT, HATCHABLE_MISSION_CLEAR_NODE_ID, HATCHABLE_MISSION_CLEARED_EVENT, HATCHABLE_MISSION_FOCUS_NODE_ID, hatchableFlows, MIST_CLOSE_UP,
 } from './hatchable-flows';
@@ -25,15 +27,18 @@ export const GLOW_MISSION_FOCUS_NODE_ID = HATCHABLE_MISSION_FOCUS_NODE_ID;
 export const GLOW_MISSION_CLEAR_NODE_ID = HATCHABLE_MISSION_CLEAR_NODE_ID;
 export const GLOW_MISSION_CLEARED_EVENT = HATCHABLE_MISSION_CLEARED_EVENT;
 export const GLOW_EGG_ENTERED_EVENT = HATCHABLE_EGG_ENTERED_EVENT;
-export const GLOW_GATEWAY_NODE_IDS: readonly string[] = ['gateway.ready', 'gateway.return', 'gateway.offer'];
+export const GLOW_GATEWAY_NODE_IDS: readonly string[] = HATCHABLE_GATEWAY_NODE_IDS;
 export function glowDiscoveryMissionNode(nodeId: string): boolean {
   return nodeId === GLOW_MISSION_FOCUS_NODE_ID || nodeId === GLOW_MISSION_CLEAR_NODE_ID;
 }
 
 /** Rebuild framing from the saved checkpoint, without replaying a story action. */
-export function glowDiscoveryResumeCamera(run: Pick<ContentFlowRun, 'nodeId' | 'status'> | null): FtueCameraDirective | null {
+export function glowDiscoveryResumeCamera(run: Pick<ContentFlowRun, 'nodeId' | 'status'> | null, definition: HatchableCompanionDefinition = STEPPLING_HATCHABLE): FtueCameraDirective | null {
   if (!run || run.status === 'completed') return null;
-  if (glowDiscoveryMissionNode(run.nodeId)) return STEPPLING_HATCHABLE.mission.camera;
+  // The focus step's camera belongs to the story presentation itself: a second (resume) move at the same
+  // moment would supersede it and its completion would never be acknowledged. The board step resumes with it.
+  if (run.nodeId === GLOW_MISSION_FOCUS_NODE_ID) return null;
+  if (glowDiscoveryMissionNode(run.nodeId)) return definition.mission.camera;
   return glowDiscoveryAllowsGarden(run) || GLOW_GATEWAY_NODE_IDS.includes(run.nodeId) ? MIST_UPGRADE_CAMERA : null;
 }
 
@@ -67,6 +72,7 @@ export function glowDiscoveryRevealLocked(run: Pick<ContentFlowRun, 'nodeId' | '
   return Boolean(run && run.status !== 'completed' && (
     run.nodeId === 'gateway.return'
     || run.nodeId === 'gateway.offer'
+    || run.nodeId === 'gateway.pay'
     || glowDiscoveryMissionNode(run.nodeId)
     || run.nodeId.startsWith('gateway.purchase.')
     || run.nodeId === 'gateway.egg'

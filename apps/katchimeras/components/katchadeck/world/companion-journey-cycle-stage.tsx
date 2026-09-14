@@ -134,7 +134,9 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   useEffect(() => { onNarration?.(managed ? narration : null); }, [managed, narration, onNarration]);
   useEffect(() => () => onNarration?.(null), [onNarration]);
 
-  if (!managed) return <>{fallback}</>;
+  // A hatchable friend (Steppling included) keeps their daily cards even before their journey chapter can be
+  // managed (day one not yet finished); the journey card alone waits. Mossprout's unmanaged stage falls back to his own.
+  if (!managed && familyId === 'mossprout') return <>{fallback}</>;
   type Action = { id: string; title: string; subtitle?: string; icon: IconSymbolName; onPress: () => void };
   let actions: Action[] = [];
   const journal: Action = { id: 'journal', title: 'Check in', icon: 'book.closed.fill', onPress: onJournal };
@@ -210,7 +212,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   return <View style={styles.stage}>
     {!onNarration && !submenuOpen ? <JourneyText style={styles.prompt}>{narration}</JourneyText> : null}
     {initialized && !error ? <CompanionSceneCards
-      hideJourney={submenuOpen || routineSubmenuOpen || (hatchable != null && !cycle)} model={model} onJourney={onStory} disabled={busy}
+      hideJourney={submenuOpen || routineSubmenuOpen || (hatchable != null && !cycle) || !managed} model={model} onJourney={onStory} disabled={busy}
       timer={pending && !ready && rest ? <CompanionMeditationStage onPress={() => setReaction(journeyForeshadowLine(familyId))} title={model.journey.eyebrow} availableAt={rest.availableAt} startedAt={rest.startedAt} settledMs={rest.settledMs} now={now} companionName={familyId === 'steppling' ? 'Steppling' : 'Mossprout'} /> : undefined}>
       {familyId === 'steppling' ? <StepplingActions onReaction={setReaction} onOpenConversation={onOpenConversation}
         externalGesture={externalGesture} onBondRewardRequest={onBondRewardRequest} onSubmenuChange={setSubmenuOpen}

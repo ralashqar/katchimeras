@@ -85,7 +85,6 @@ export type HatchableDiscoveryFlowDefinition = {
     lessonPrefix: string;
     ready: HatchableFlowCopy;
   };
-  offer: HatchableFlowCopy;
   egg: HatchableFlowCopy;
 };
 

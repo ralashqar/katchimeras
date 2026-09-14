@@ -1,6 +1,6 @@
 {
   "id": "glow-steppling-discovery",
-  "version": 11,
+  "version": 12,
   "entryNodeId": "gateway.focus",
   "metadata": {
     "kind": "story"
@@ -186,7 +186,7 @@
       "actions": [
         {
           "id": "return",
-          "next": "gateway.offer"
+          "next": "gateway.pay"
         }
       ],
       "payload": {
@@ -203,29 +203,20 @@
       }
     },
     {
-      "id": "gateway.offer",
-      "kind": "scene",
-      "capability": "world.action",
+      "id": "gateway.pay",
+      "capability": "glow.discovery.task",
       "surface": "haven",
-      "sceneId": "gateway.offer",
-      "actions": [
+      "taskId": "gateway.pay",
+      "requirements": [
         {
-          "id": "open_upgrade",
-          "next": "mission.focus"
+          "id": "paid",
+          "event": {
+            "type": "glow.mission.paid"
+          }
         }
       ],
-      "payload": {
-        "worldAction": {
-          "lockCamera": true,
-          "kind": "purchase",
-          "guide": {
-            "eyebrow": "Held",
-            "title": "Tap the glowing bubble.",
-            "body": "Four Mistwisps have the trail. Spend the light and they’ll show themselves."
-          },
-          "actionLabel": "See the light"
-        }
-      }
+      "next": "mission.focus",
+      "kind": "task"
     },
     {
       "id": "mission.focus",
@@ -292,7 +283,8 @@
         },
         "toLevel": 1,
         "economy": {
-          "mode": "normal"
+          "mode": "free",
+          "reason": "The mist mission ticket was paid at the bubble."
         }
       },
       "next": "gateway.purchase.reveal"
@@ -313,7 +305,7 @@
         },
         "preset": "mist-clear",
         "reactionLine": "",
-        "showCoins": true
+        "showCoins": false
       },
       "replayPolicy": "replay",
       "next": "gateway.egg"
@@ -365,7 +357,8 @@
     }
   ],
   "migrations": {
-    "gateway.return": "gateway.offer",
+    "gateway.return": "gateway.pay",
+    "gateway.offer": "gateway.pay",
     "gateway.goal": "garden.open",
     "garden.focus": "gateway.focus",
     "lesson.prepare": "lesson.single.prepare",

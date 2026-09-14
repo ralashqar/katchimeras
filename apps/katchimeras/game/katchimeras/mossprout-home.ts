@@ -2,16 +2,6 @@ import type { ConversationDefinition, ConversationSession } from '@/types/compan
 import type { KatchimeraActionArtKey, KatchimeraActionCompletionRecord, KatchimeraActionOrigin, KatchimeraActionSlotId, KatchimeraDayAction, JourneyDayActionRecord, JourneyDayRecord } from '@/types/relationship-progression';
 import { mossproutCampaignEpisodeByBeatId } from '@/constants/mossprout-campaign';
 
-export type MossproutActionOffer = {
-  id: string;
-  title: string;
-  hint: string;
-  family?: string;
-  bondReward: number;
-  completedToday?: boolean;
-  availableToday?: boolean;
-};
-
 export type MossproutActionGoal = {
   id: string;
   templateId?: string;
@@ -283,7 +273,6 @@ export function mossproutConversationActionCompletion(
 }
 
 export function resolveMossproutDayActions(input: {
-  activeQuestId?: string | null;
   conversations?: readonly MossproutActionConversation[];
   consumedActionIds?: Partial<Record<KatchimeraActionSlotId, readonly string[]>>;
   dayId?: string;
@@ -296,7 +285,6 @@ export function resolveMossproutDayActions(input: {
   journeyDayNumber?: number;
   dayOneLessonCompleted?: boolean;
   journey: JourneyDayRecord | null;
-  offers: readonly MossproutActionOffer[];
   skippedActionIds?: readonly string[];
   slotSequences?: Partial<Record<KatchimeraActionSlotId, number>>;
   storyComplete: boolean;
@@ -417,27 +405,6 @@ export function resolveMossproutDayActions(input: {
     });
   }
 
-  for (const offer of input.offers) {
-    if (!['quest-mossprout-green-photo', 'quest-mossprout-nature-note'].includes(offer.id)) continue;
-    if (offer.completedToday || offer.availableToday === false) continue;
-    if (input.activeQuestId && input.activeQuestId !== offer.id) continue;
-    const isPhoto = offer.family === 'photo';
-    actions.push({
-      id: `mossprout:quest:${offer.id}`,
-      kind: isPhoto ? 'photo_request' : 'note_request',
-      title: offer.title,
-      subtitle: offer.hint,
-      icon: isPhoto ? 'camera.fill' : 'square.and.pencil',
-      artKey: isPhoto ? 'today:photo' : 'today:reflection',
-      required: false,
-      disabled: false,
-      status: input.activeQuestId === offer.id ? 'active' : 'ready',
-      reward: { kind: 'bond', amount: offer.bondReward },
-      destination: { kind: 'quest', questId: offer.id },
-      completedAt: null,
-      outroAcknowledgedAt: null,
-    });
-  }
 
   const dayId = input.dayId ?? journey?.dayId ?? '';
   const skipped = new Set(input.skippedActionIds ?? []);

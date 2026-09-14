@@ -2,6 +2,7 @@ import { HAVEN_ENVIRONMENTS } from '@/constants/haven-catalog';
 import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
 import { SHARED_WORLD_PURCHASES } from '@/constants/shared-world';
 import { hatchableByTile } from '@/constants/hatchable-companions/registry';
+import { HATCHABLE_GATEWAY_NODE_IDS } from '@/constants/glow-discovery-ids';
 import { hatchableTileState, type HatchableTileState } from '@/utils/merge-world/glow-discovery-policy';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import type { KatchimeraSkinId } from '@/types/katchimera';
@@ -23,7 +24,7 @@ export type WorldUpgradeDefinition = {
   description: string;
   nextLevel: number;
   cost: number;
-  action: 'Clear mist' | 'Restore' | 'Upgrade';
+  action: 'Clear mist' | 'Restore' | 'Upgrade' | 'Open the board';
   unlockId?: string;
   transition?: 'island_reveal';
   economyMode?: 'normal' | 'free';
@@ -138,7 +139,12 @@ export function worldUpgradeOffers(world: MergeWorldState): WorldUpgradeOffer[] 
     if (hatchable?.state === 'sleeping') {
       eligible = false;
     }
-    return [{ ...definition, cost, economyMode, currentLevel, maxLevel: worldUpgradeMaxLevel(definition), storyId: worldUpgradeStory(definition.id, definition.nextLevel)?.id, eligible, markerSkinId,
+    // Ticket paid: the tile's business is the board now, and nothing here costs Glow again.
+    if (hatchable?.state === 'board') {
+      cost = 0;
+      economyMode = 'free';
+    }
+    return [{ ...definition, ...(hatchable?.state === 'board' ? { action: 'Open the board' } : {}), cost, economyMode, currentLevel, maxLevel: worldUpgradeMaxLevel(definition), storyId: worldUpgradeStory(definition.id, definition.nextLevel)?.id, eligible, markerSkinId,
       affordable: world.coins >= cost, missingGlow: Math.max(0, cost - world.coins), ...(restorationProgress ? { restorationProgress } : {}),
       ...(hatchable ? { hatchable, ...(hatchable.state === 'sleeping' ? { lockedReason: hatchable.sleepingLine, lockedLabel: 'Held' } : {}) } : {}) }];
   });
@@ -168,7 +174,7 @@ export function visibleWorldUpgradeOffers(offers: WorldUpgradeOffer[], ftueStepI
   glowRun: { nodeId: string; status: string } | null, activeTileId = 'steppling-home') {
   return offers.filter((offer) => (offer.eligible || offer.markerSkinId != null || offer.sleepingSkinId != null || offer.hatchable?.state === 'sleeping') && (
     glowRun && glowRun.status !== 'completed'
-      ? ['gateway.ready', 'gateway.return', 'gateway.offer'].includes(glowRun.nodeId) && offer.id === `mist:${activeTileId}`
+      ? HATCHABLE_GATEWAY_NODE_IDS.includes(glowRun.nodeId) && offer.id === `mist:${activeTileId}`
       // The six resting friends are the opening's whole point: they stay on the
       // map from the first frame (inert), while every other marker waits.
       : ftueStepId ? (['world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId) && offer.id === 'haven:mossprout') || offer.sleepingSkinId != null

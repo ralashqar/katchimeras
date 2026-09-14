@@ -2,7 +2,7 @@ import { localDayId } from '@/utils/world-identity-rules';
 import { GLOW } from '@/constants/glow';
 import { MOSSPROUT_DREAM_ECHOES, MERGE_GENERATORS_BY_ID, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { SHARED_WORLD_PURCHASES } from '@/constants/shared-world';
-import { hatchableByUnlock, STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
+import { HATCHABLE_COMPANIONS, hatchableByCompanion, hatchableByUnlock, STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import type { TutorialGeneratorRule } from './tutorial-generator-policy';
 import type { MergeOrder, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
@@ -55,7 +55,7 @@ export function hatchableAvailable(state: MergeWorldState, definition: Hatchable
   if (availability.kind === 'kingdom_goal_introduced') return state.kingdomGoal?.introducedAt != null;
   return state.companionDiscovery.records.some((record) => record.characterId === availability.companion);
 }
-export type HatchableTileState = 'sleeping' | 'saving' | 'ready' | 'egg' | 'open';
+export type HatchableTileState = 'sleeping' | 'saving' | 'ready' | 'board' | 'egg' | 'open';
 /**
  * Where a hatchable tile stands for the marker and the engine: asleep under
  * the Mist until its turn, then saving light toward the price, ready when the
@@ -64,6 +64,8 @@ export type HatchableTileState = 'sleeping' | 'saving' | 'ready' | 'egg' | 'open
 export function hatchableTileState(state: MergeWorldState, definition: HatchableCompanionDefinition): HatchableTileState {
   const gateway = hatchableGatewayState(state, definition);
   if (gateway !== 'locked') return gateway;
+  // Paid but not cleared: the board is the tile's business until the bar fills.
+  if (state.hatchableMissions?.[definition.companion]) return 'board';
   if (!hatchableAvailable(state, definition)) return 'sleeping';
   return state.coins >= definition.tile.price ? 'ready' : 'saving';
 }
@@ -82,8 +84,22 @@ function changed(state: MergeWorldState, next: MergeWorldState, now: number): Me
   return { state: { ...next, revision: state.revision + 1, updatedAt: now }, changed: true };
 }
 
-export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<MergeWorldCommand, { type: 'unlockWorldTarget' | 'transferDiscoveryEgg' | 'hatchWorldEgg' | 'prepareGlowDiscoveryLesson' }>): MergeWorldCommandResult {
+export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<MergeWorldCommand, { type: 'unlockWorldTarget' | 'transferDiscoveryEgg' | 'hatchWorldEgg' | 'prepareGlowDiscoveryLesson' | 'payHatchableMission' }>): MergeWorldCommandResult {
   const no = (message?: string): MergeWorldCommandResult => ({ state, changed: false, message });
+  if (command.type === 'payHatchableMission') {
+    // The ticket: the tile's price, once, at the bubble. Refused while the tile sleeps, once it is already
+    // revealed or the friend is home, or without the light; a second payment for the same run is a no-op.
+    const hatchable = hatchableByCompanion(command.companion);
+    if (!hatchable) return no('This friend has no misted tile.');
+    if (state.hatchableMissions?.[command.companion]) return no();
+    if (state.worldUnlocks?.[hatchable.tile.unlockId] || state.companionDiscovery.records.some((record) => record.characterId === command.companion)) return no();
+    if (!hatchableAvailable(state, hatchable)) return no(hatchable.tile.markerLines.sleeping);
+    if (state.coins < hatchable.tile.price) return no('Complete requests to earn more Glow.');
+    return changed(state, {
+      ...state, coins: state.coins - hatchable.tile.price,
+      hatchableMissions: { ...state.hatchableMissions, [command.companion]: { paidAt: command.now, paidCoins: hatchable.tile.price, receiptId: command.receiptId } },
+    }, command.now);
+  }
   if (command.type === 'prepareGlowDiscoveryLesson') {
     const lesson = state.glowDiscoveryLesson;
     const orderIndex = 1;
@@ -143,18 +159,20 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
     const owned = state.companionDiscovery.records.some((record) => record.characterId === definition.destination);
     const hatchable = hatchableByUnlock(command.targetId);
     if (hatchable && !existing && !owned && !hatchableAvailable(state, hatchable)) return no(hatchable.tile.markerLines.sleeping);
-    const cost = existing || owned ? 0 : definition.price;
+    // A mission ticket paid at the bubble is the price: the reveal after the board charges nothing more.
+    const ticket = state.hatchableMissions?.[definition.destination];
+    const cost = existing || owned || ticket ? 0 : definition.price;
     if (state.coins < cost) return no('Complete requests to earn more Glow.');
     const receipt = command.receiptId ? {
       id: command.receiptId, kind: 'haven_upgrade' as const,
       target: { kind: 'haven_structure' as const, structureId: definition.tileId },
       fromLevel: existing || owned ? 1 : 0, toLevel: 1,
-      economyMode: 'normal' as const, coinCost: cost, createdAt: command.now,
+      economyMode: ticket ? 'free' as const : 'normal' as const, coinCost: cost, createdAt: command.now,
     } : undefined;
     return { ...changed(state, { ...state, coins: state.coins - cost,
       storyWorldMutationReceipts: receipt ? [...state.storyWorldMutationReceipts, receipt] : state.storyWorldMutationReceipts,
       worldUnlocks: {
-        ...state.worldUnlocks, [command.targetId]: existing ?? { unlockedAt: command.now, paid: cost, destination: definition.destination, transferredAt: owned ? command.now : null, hatchedAt: owned ? command.now : null },
+        ...state.worldUnlocks, [command.targetId]: existing ?? { unlockedAt: command.now, paid: ticket?.paidCoins ?? cost, destination: definition.destination, transferredAt: owned ? command.now : null, hatchedAt: owned ? command.now : null },
       },
     }, command.now), storyWorldMutationReceipt: receipt };
   }
@@ -184,7 +202,7 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
 }
 
 /** Validate additive save fields without changing balances or existing ownership. */
-export function normalizeGlowDiscoveryFields(source: Partial<MergeWorldState>): Pick<MergeWorldState, 'worldUnlocks' | 'glowDiscoveryLesson'> {
+export function normalizeGlowDiscoveryFields(source: Partial<MergeWorldState>): Pick<MergeWorldState, 'worldUnlocks' | 'glowDiscoveryLesson' | 'hatchableMissions'> {
   const time = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
   const worldUnlocks: MergeWorldState['worldUnlocks'] = {};
   for (const tile of SHARED_WORLD_PURCHASES) {
@@ -199,14 +217,20 @@ export function normalizeGlowDiscoveryFields(source: Partial<MergeWorldState>): 
     const receipts = Array.isArray(source.storyWorldMutationReceipts) ? source.storyWorldMutationReceipts : [];
     const receipt = receipts.find((entry) => entry?.kind === 'haven_upgrade'
       && entry.target?.kind === 'haven_structure' && entry.target.structureId === tile.tileId
-      && entry.toLevel === 1 && entry.economyMode === 'normal' && time(entry.createdAt));
+      && entry.toLevel === 1 && time(entry.createdAt));
     if (!worldUnlocks[tile.unlockId] && receipt) worldUnlocks[tile.unlockId] = {
       unlockedAt: receipt.createdAt, paid: time(receipt.coinCost) ? receipt.coinCost : 0,
       destination: tile.companion, transferredAt: null, hatchedAt: null,
     };
   }
+  // Tickets for registered friends only, each a paid amount and a receipt.
+  const hatchableMissions: NonNullable<MergeWorldState['hatchableMissions']> = {};
+  for (const definition of HATCHABLE_COMPANIONS) {
+    const raw = source.hatchableMissions?.[definition.companion];
+    if (raw && time(raw.paidAt) && time(raw.paidCoins) && typeof raw.receiptId === 'string') hatchableMissions[definition.companion] = { paidAt: raw.paidAt, paidCoins: raw.paidCoins, receiptId: raw.receiptId };
+  }
   const lesson = source.glowDiscoveryLesson;
-  return { worldUnlocks, glowDiscoveryLesson: lesson && time(lesson.preparedAt) ? {
+  return { worldUnlocks, hatchableMissions, glowDiscoveryLesson: lesson && time(lesson.preparedAt) ? {
     preparedAt: lesson.preparedAt, spawnedAt: time(lesson.spawnedAt) ? lesson.spawnedAt : undefined,
     guidedOrderIndex: lesson.guidedOrderIndex === 1 ? 1 : 0,
     layoutVersion: lesson.layoutVersion === 3 ? 3 : lesson.layoutVersion === 2 ? 2 : undefined,

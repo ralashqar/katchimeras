@@ -194,17 +194,21 @@ test('the Glow story opens the mission from the bubble and pays the reveal only 
   assert.equal(focus.next, GLOW_MISSION_CLEAR_NODE_ID);
   assert.equal(clear.requirements[0].event.type, GLOW_MISSION_CLEARED_EVENT);
   assert.equal(clear.next, 'gateway.purchase.focus', 'the paid reveal follows the bar');
-  const offer = GLOW_DISCOVERY_FLOW.nodes.find((node) => node.id === 'gateway.offer')!;
-  assert.equal(offer.kind === 'scene' ? offer.actions[0].next : null, GLOW_MISSION_FOCUS_NODE_ID, 'the bubble opens the mission');
-  assert.equal(GLOW_DISCOVERY_FLOW.nodes.some((node) => node.id === 'gateway.buy'), false, 'no purchase sheet beat');
-  assert.deepEqual(GLOW_GATEWAY_NODE_IDS, ['gateway.ready', 'gateway.return', 'gateway.offer']);
+  const pay = GLOW_DISCOVERY_FLOW.nodes.find((node) => node.id === 'gateway.pay')!;
+  assert.equal(pay.kind, 'task');
+  assert.equal(pay.kind === 'task' ? pay.requirements[0].event.type : null, 'glow.mission.paid', 'the ticket paid at the bubble is what opens the mission');
+  assert.equal(pay.kind === 'task' ? pay.next : null, GLOW_MISSION_FOCUS_NODE_ID);
+  assert.equal(GLOW_DISCOVERY_FLOW.nodes.some((node) => node.id === 'gateway.buy' || node.id === 'gateway.offer'), false, 'no purchase sheet beat, no free offer');
+  assert.deepEqual(GLOW_GATEWAY_NODE_IDS, ['gateway.ready', 'gateway.pay', 'gateway.return', 'gateway.offer']);
+  const reveal = GLOW_DISCOVERY_FLOW.nodes.find((node) => node.id === 'gateway.purchase.commit')!;
+  assert.equal(reveal.kind === 'effect' ? (reveal.payload as { economy: { mode: string } }).economy.mode : null, 'free', 'the reveal after the board charges nothing: the ticket was the price');
   for (const nodeId of [GLOW_MISSION_FOCUS_NODE_ID, GLOW_MISSION_CLEAR_NODE_ID]) {
     assert.equal(glowDiscoveryMissionNode(nodeId), true);
-    assert.deepEqual(glowDiscoveryResumeCamera({ nodeId, status: 'active' }), STEPPLING_MISSION_CAMERA, 'a resume reframes the tile the same way');
+    assert.deepEqual(glowDiscoveryResumeCamera({ nodeId, status: 'active' }), nodeId === GLOW_MISSION_CLEAR_NODE_ID ? STEPPLING_MISSION_CAMERA : null, 'the board step resumes with the same framing; the focus step leaves the camera to its own presentation');
     assert.equal(glowDiscoveryLocksCamera({ nodeId, status: 'active' }), true);
     assert.equal(glowDiscoveryRevealLocked({ nodeId, status: 'active' }), true);
   }
-  assert.equal(glowDiscoveryMissionNode('gateway.offer'), false);
+  assert.equal(glowDiscoveryMissionNode('gateway.pay'), false);
   assert.equal(STEPPLING_MISSION_CAMERA.kind === 'focus_target' ? STEPPLING_MISSION_CAMERA.zoom : null, MISSION_CAMERA_ZOOM);
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
@@ -234,8 +238,8 @@ test('the Kingdom docks the mission under Steppling’s tile and clears the mist
   assert.match(screen, /const stepplingBoardBusy = stepplingMissionActive && !stepplingMissionLanded;/, 'the map stays faded while the last item is in the air');
   assert.match(screen, /if \(stepplingMission\.merges >= activeHatchable\.mission\.required\) finishStepplingMission\(\);/, 'a board saved with a full bar clears on resume');
   assert.match(screen, /<HatchableMissionDock mission=\{activeHatchable\.mission\}[\s\S]*?onFinale=\{launchStepplingFinale\}/);
-  assert.match(screen, /if \(glowRun && glowDiscoveryMissionNode\(glowRun\.nodeId\)\) return;/, 'tile taps are inert while the board is up');
-  assert.match(screen, /await advanceHatchableUpgrade\(activeHatchable, 'open'\);\s*setSelectedUpgrade\(null\);\s*return;/, 'the bubble never opens a purchase sheet');
+  assert.match(screen, /if \(glowRun && glowDiscoveryMissionNode\(glowRun\.nodeId\)\) \{ if \(glowRun\.status === 'failed_recoverable'\) void resumeActiveHatchable\(\); return; \}/, 'tile taps are inert while the board is up');
+  assert.match(screen, /if \(!paid\) \{ setGlowSpend\(null\); throw new Error\(result\.message \?\? 'Earn a few more Glow through Merge orders\.'\); \}/, 'an unpaid ticket keeps the panel; the board never opens unpaid');
   assert.doesNotMatch(screen, /'gateway\.buy'/);
   assert.match(dock, /spendEnergy: false as const/, 'Locker taps cost nothing');
   assert.match(dock, /if \(!result \|\| \(event\?\.type !== 'merge_completed' && event\?\.type !== 'dream_echo_cleared'\)\) return result;/, 'a waking sends Glow like a merge');
@@ -245,5 +249,5 @@ test('the Kingdom docks the mission under Steppling’s tile and clears the mist
   assert.match(store, /const merged = command\.type === 'move' && result\.mergedCell != null;[\s\S]*?saveMission\(storageKey, activeRunId, result\.state, nextMerges, placedRef\.current\);/, 'every merge is counted and saved with the board');
   assert.match(runtime, /eventId: `\$\{run\.runId\}:\$\{HATCHABLE_MISSION_CLEAR_NODE_ID\}:cleared:\$\{run\.revision\}`, type: HATCHABLE_MISSION_CLEARED_EVENT/);
   assert.doesNotMatch(upgrade, /actionId: 'unlock'/, 'no confirm step: the mission is the price');
-  assert.match(offers, /\['gateway\.ready', 'gateway\.return', 'gateway\.offer'\]\.includes\(glowRun\.nodeId\) && offer\.id === `mist:\$\{activeTileId\}`/, 'no markers while the board is up');
+  assert.match(offers, /HATCHABLE_GATEWAY_NODE_IDS\.includes\(glowRun\.nodeId\) && offer\.id === `mist:\$\{activeTileId\}`/, 'no markers while the board is up');
 });

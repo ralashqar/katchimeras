@@ -1,6 +1,9 @@
 import { HATCHABLE_COMPANIONS, hatchableByCompanion, hatchableByTile, STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 import { useMergeWorldActions } from '@/features/merge-world/merge-world-provider';
-import { activeHatchableFor, advanceHatchableUpgrade, completeHatchableMission, gardenLessonFor, recoverPaidHatchableUpgrade, startHatchableDiscovery, submitHatchableAction, useHatchableRuns } from '@/features/onboarding/hatchable-runtime';
+import { activeHatchableFor, completeHatchableMission, gardenLessonFor, resumeHatchableDiscovery, startHatchableDiscovery, submitHatchableAction, useHatchableRuns } from '@/features/onboarding/hatchable-runtime';
+import { hatchableTicketReceiptId } from '@/constants/glow-discovery-ids';
+import { companionHasPage } from '@/features/companion/companion-page-policy';
+import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { HATCHABLE_LESSON_FINALE_NODE_IDS, hatchableDiscoveryScene } from '@/features/onboarding/hatchable-flows';
 import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_MERGE_REQUIRED, OPENING_CAMERA_ENTRY_ZOOM, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
 import { KingdomOpeningMergeDock, MissionGlowLayer, OPENING_GLOW_FLIGHT_MS, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
@@ -16,6 +19,7 @@ import { worldUpgradeRunId } from '@/features/world-upgrades/world-upgrade-flows
 import { WORLD_UPGRADE_DEFINITIONS, worldUpgradeMaxLevel, visibleWorldUpgradeOffers, worldUpgradeOffers, worldUpgradeArchiveOffer, type WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { purchaseWorldUpgrade, useWorldUpgradeRun } from '@/features/world-upgrades/world-upgrade-runtime';
 import { dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
+import { contentFlowPresentationKey } from '@/features/content-flow/content-flow-interpreter';
 import { WorldUpgradeNarrative } from '@/components/katchadeck/world/world-upgrade-narrative';
 import { CompanionFtueCoachmark } from '@/components/katchadeck/onboarding/companion-ftue-coachmark';
 import { WorldUpgradePanel, type UpgradeCoachmarkState, type WorldUpgradeCampaignState } from '@/components/katchadeck/world/world-upgrade-panel';
@@ -35,7 +39,7 @@ import { SHARED_EGG_REST_ZOOM, usesSharedResidentStage } from '@/components/katc
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
 import { useHatchableEncounter } from '@/features/onboarding/use-steppling-encounter';
 import { hatchableEggProgress } from '@/features/onboarding/hatchable-egg-policy';
-import { GLOW_GATEWAY_NODE_IDS, GLOW_MISSION_CLEAR_NODE_ID, glowDiscoveryAllowsGarden, glowDiscoveryLocksCamera, glowDiscoveryMissionNode, glowDiscoveryResumeCamera } from '@/features/onboarding/glow-discovery-flow';
+import { GLOW_GATEWAY_NODE_IDS, GLOW_MISSION_CLEAR_NODE_ID, GLOW_MISSION_FOCUS_NODE_ID, glowDiscoveryAllowsGarden, glowDiscoveryLocksCamera, glowDiscoveryMissionNode, glowDiscoveryResumeCamera } from '@/features/onboarding/glow-discovery-flow';
 import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
 import { glowGatewayState, hatchableGatewayState } from '@/utils/merge-world/glow-discovery-policy';
 import { sharedWorldIncludesCompanion } from '@/constants/shared-world';
@@ -135,7 +139,7 @@ import { KingdomProgressPill } from '@/components/katchadeck/world/kingdom-progr
 import { IslandWakeHandoffSheet, KingdomProgressSheet } from '@/components/katchadeck/world/kingdom-progress-sheet';
 import { kingdomProgress, type KingdomNext } from '@/features/kingdom-progress/kingdom-progress';
 import { stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
-import { acknowledgeStoredKingdomGoalCoachmark } from '@/utils/merge-world/repository';
+import { acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission } from '@/utils/merge-world/repository';
 
 type Props = {
   background: TodayAtmosphereBackground;
@@ -360,8 +364,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [upgradePurchasing, setUpgradePurchasing] = useState(false);
   const [upgradeCommitted, setUpgradeCommitted] = useState(false);
   const upgradePressBusy = useRef(false);
-  // A story begun from the bubble: whose board to open as soon as its camera focus has settled.
-  const missionOpenAfterStartRef = useRef<string | null>(null);
   const [upgradeCoachmark, setUpgradeCoachmark] = useState<UpgradeCoachmarkState>({ visible: false, revision: 0 });
   const upgradeActionRef = useRef<View>(null);
   const tutorialUpgradeNonceRef = useRef<number | null>(null);
@@ -394,23 +396,42 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       if (offer) { setSelectedUpgrade(offer); setUpgradeCommitted(false); }
     }
   }, [ftueStepId]);
+  // The discovery resumes wherever the world says it stands: a failed node retried, the lesson's return
+  // submitted, a paid ticket's event recorded so the board opens. Keyed on everything that can move it.
+  const hatchableTicketHeld = Boolean(mergeWorld.hatchableMissions?.[activeHatchable.companion]);
+  const hatchableTileUnlocked = Boolean(mergeWorld.worldUnlocks?.[activeHatchable.tile.unlockId]);
+  const resumeActiveHatchable = useCallback(() => resumeHatchableDiscovery(activeHatchable, mergeWorldRef.current)
+    .then((result) => { if (result.blockedBy === 'garden') openGardenRef.current?.(undefined, activeHatchable.companion); return result; })
+    .catch((error) => { setUpgradeError(error instanceof Error ? error.message : 'Please try again.'); return null; }), [activeHatchable]);
   useEffect(() => {
-    if (!screenFocused || !mistUpgradeActive) return;
-    void recoverPaidHatchableUpgrade(activeHatchable, mergeWorld).catch((error) => { setUpgradeError(error instanceof Error ? error.message : 'Please try again.'); });
-  }, [activeHatchable, screenFocused, mistUpgradeActive, mergeWorld]);
-  // The bubble's one tap: the story it began reaches its offer once the camera has settled, and the board opens then.
+    if (!screenFocused || !glowRun || glowRun.status === 'completed') return;
+    if (!mistUpgradeActive && glowRun.status !== 'failed_recoverable') return;
+    void resumeActiveHatchable();
+  }, [glowRun?.nodeId, glowRun?.status, glowRun, hatchableTicketHeld, hatchableTileUnlocked, mistUpgradeActive, resumeActiveHatchable, screenFocused]);
+  // The focus step frames the tile, then the board docks. If its camera acknowledgement is ever lost (a move
+  // superseded mid-flight, a surface not mounted for it), the step is acknowledged here after a beat: the
+  // board must open every time, never only after a relaunch.
   useEffect(() => {
-    if (missionOpenAfterStartRef.current !== activeHatchable.companion || glowRun?.nodeId !== 'gateway.offer') return;
-    missionOpenAfterStartRef.current = null;
-    void advanceHatchableUpgrade(activeHatchable, 'open').catch((error) => { setUpgradeError(error instanceof Error ? error.message : 'Please try again.'); });
-  }, [activeHatchable, glowRun?.nodeId]);
+    if (!screenFocused || glowRun?.status !== 'active' || glowRun.nodeId !== GLOW_MISSION_FOCUS_NODE_ID) return;
+    const run = glowRun;
+    const timer = setTimeout(() => {
+      void dispatchContentFlowCommand(run.runId, { type: 'presentation_acknowledged', presentationKey: contentFlowPresentationKey(run, GLOW_MISSION_FOCUS_NODE_ID) })
+        .catch((error) => console.warn('The mist board could not open', error));
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [glowRun, screenFocused]);
+  // A ticket paid with no story saved (the app went down between the two writes): the story begins now.
+  useEffect(() => {
+    if (!screenFocused || !glowReady || glowRun || !hatchableTicketHeld || hatchableTileUnlocked) return;
+    void startHatchableDiscovery(activeHatchable).then(() => resumeActiveHatchable()).catch((error) => console.warn('The path could not open', error));
+  }, [activeHatchable, glowReady, glowRun, hatchableTicketHeld, hatchableTileUnlocked, resumeActiveHatchable, screenFocused]);
   useEffect(() => {
     if (upgradePresentation) { setSelectedUpgrade(null); setUpgradePurchasing(false); }
   }, [upgradePresentation]);
   useEffect(() => {
     const failed = ordinaryUpgradeRun?.status === 'failed_recoverable' ? ordinaryUpgradeRun
       : ftueStepId === 'world.first_bloom_restore' && ftueUpgradeRun?.status === 'failed_recoverable' ? ftueUpgradeRun
-        : glowRun?.status === 'failed_recoverable' && glowRun.nodeId.startsWith('gateway.purchase') ? glowRun : null;
+        : glowRun?.status === 'failed_recoverable' && (glowRun.nodeId.startsWith('gateway.purchase') || glowRun.nodeId === 'gateway.pay') ? glowRun : null;
     if (!failed) return;
     setUpgradePurchasing(false); setUpgradeCommitted(false); setUpgradeError('The upgrade paused. Try again to continue without paying twice.');
     if (failed === ordinaryUpgradeRun) {
@@ -427,6 +448,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   /** A served request whose friend should greet the player on the island panel, not in an overlay. */
   const returnPanelRef = useRef<string | null>(null);
   const openUpgradeOfferRef = useRef<((offer: WorldUpgradeOffer) => Promise<void>) | null>(null);
+  const openGardenRef = useRef<((orderId?: string, companion?: MergeCharacterId) => void) | null>(null);
   const [selectedMemoryPlantId, setSelectedMemoryPlantId] = useState<string | null>(null);
   const [firstSeedPlacementBusy, setFirstSeedPlacementBusy] = useState(false);
   const [firstSeedPlacementFailed, setFirstSeedPlacementFailed] = useState(false);
@@ -645,6 +667,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const stepplingMissionStep = useMemo(() => stepplingMissionActive ? missionBoardStep(activeHatchable.mission, stepplingMission.state, stepplingMission.merges) : null, [activeHatchable.mission, stepplingMission.merges, stepplingMission.state, stepplingMissionActive]);
   const stepplingMissionGuidanceVisible = Boolean(stepplingMissionStep && (stepplingMissionStep.cue || stepplingMissionStep.spotlight));
   const stepplingMissionCleared = stepplingMission.merges >= activeHatchable.mission.required;
+  // A docked board with no state for three seconds is a save that could not be read: offer a fresh one.
+  const [stepplingMissionStalled, setStepplingMissionStalled] = useState(false);
+  useEffect(() => {
+    if (!stepplingMissionActive || stepplingMission.state) { setStepplingMissionStalled(false); return; }
+    const timer = setTimeout(() => setStepplingMissionStalled(true), 3000);
+    return () => clearTimeout(timer);
+  }, [stepplingMission.state, stepplingMissionActive]);
   const { launchFinale: launchGlowFinale } = openingGlow;
   const launchStepplingFinale = useCallback((from: RewardFlightPoint, definitionId: string) => {
     stepplingFinaleIdRef.current = launchGlowFinale(from, definitionId);
@@ -1186,12 +1215,17 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const presentation = havenPresentations.find((candidate) => candidate.creatureId === creatureId);
     if (ftueStepId === 'haven.mossprout.focus' && presentation?.characterId !== 'mossprout') return;
     if (ftueStepId === 'haven.mossprout.restore') return;
+    // A family with no authored page is a resident to look at, never to talk to. The family comes from the
+    // slot (the haven presentation only exists for a misted Mossprout tile), then from the creature id itself.
+    const tappedSlot = visibleCompanionSlots.find((slot) => slot.kind === 'owned' && slot.creature.creatureId === creatureId);
+    const tappedFamilyId = (tappedSlot?.kind === 'owned' ? tappedSlot.familyId : null) ?? familyIdFromCompanionId(creatureId) ?? presentation?.characterId;
+    if (!companionHasPage(tappedFamilyId)) { setDetailCreatureId(creatureId); return; }
     setDetailCreatureId(null);
     setHostedInteractionRequest(null);
     setInteractionCameraReady(false);
     setInteractionExiting(false);
     setInteractionCreatureId(creatureId);
-  }, [ftueStepId, havenPresentations]);
+  }, [ftueStepId, havenPresentations, visibleCompanionSlots]);
 
   useEffect(() => {
     if (!stepplingEggOpen || !hatchableEggProgress(mergeWorld, encounterHatchable)?.hatchedAt) return;
@@ -1756,18 +1790,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     setUpgradeError(null); setUpgradeCommitted(false);
     try {
       if (ftueStepId === 'world.first_bloom_offer') await advanceFtueActionDurably({ expectedStepId: ftueStepId, actionId: 'world.open_first_bloom_upgrade' });
-      // A woken hatchable tile whose story has not begun: the bubble begins it (the camera to the tile, then the
-      // offer, then the mission), never a purchase sheet. Steppling's begins at the end of the opening instead.
+      // A hatchable tile's bubble: with the ticket paid, the board is the tile's business (re-docked here);
+      // otherwise the panel with the price, and nothing moves (no story, no camera) until it is confirmed.
       const tappedHatchable = offer.id.startsWith('mist:') ? hatchableByTile(offer.id.slice('mist:'.length)) : null;
-      if (tappedHatchable && offer.hatchable && offer.hatchable.state !== 'sleeping' && hatchableRuns.ready && !hatchableRuns.discovery[tappedHatchable.companion]) {
-        missionOpenAfterStartRef.current = tappedHatchable.companion;
-        await startHatchableDiscovery(tappedHatchable);
-        setSelectedUpgrade(null);
-        return;
-      }
-      if (offer.id === `mist:${activeHatchable.tile.id}` && glowRun && glowRun.status !== 'completed') {
-        // The bubble opens the mission board under the tile, never a purchase sheet.
-        await advanceHatchableUpgrade(activeHatchable, 'open');
+      const tappedRun = tappedHatchable ? hatchableRuns.discovery[tappedHatchable.companion] ?? null : null;
+      if (tappedHatchable && (offer.hatchable?.state === 'board' || (tappedRun && tappedRun.status !== 'completed' && !GLOW_GATEWAY_NODE_IDS.includes(tappedRun.nodeId)))) {
+        if (!tappedRun) await startHatchableDiscovery(tappedHatchable);
+        await resumeHatchableDiscovery(tappedHatchable, mergeWorldRef.current);
         setSelectedUpgrade(null);
         return;
       }
@@ -1780,12 +1809,15 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       setSelectedUpgrade(offer);
     } catch (error) { setSelectedUpgrade(offer); setUpgradeError(error instanceof Error ? error.message : 'Could not open the upgrade. Please try again.'); }
     finally { upgradePressBusy.current = false; }
-  }, [activeHatchable, ftueStepId, glowRun, hatchableRuns, restorationCampaignId, upgradePresentation, upgradePurchasing]);
+  }, [ftueStepId, hatchableRuns, restorationCampaignId, upgradePresentation, upgradePurchasing]);
   openUpgradeOfferRef.current = openUpgradeOffer;
+  openGardenRef.current = openGarden;
   const handleUpgradeOfferPress = useCallback((offer: WorldUpgradeOffer) => {
     void openUpgradeOffer(offer);
   }, [openUpgradeOffer]);
+  const upgradeMarkerNodesRef = useRef<Record<string, View | null>>({});
   const setUpgradeMarkerNode = useCallback((id: string, node: View | null) => {
+    upgradeMarkerNodesRef.current[id] = node;
     if (id === 'haven:mossprout') registerFtueTarget('upgrade:mossprout', node);
     const hatchable = id.startsWith('mist:') ? hatchableByTile(id.slice('mist:'.length)) : null;
     if (hatchable) registerFtueTarget(`upgrade:${hatchable.companion}`, node);
@@ -1801,9 +1833,35 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     pendingUpgradeReward.current = reward && !Object.values(mergeWorldRef.current.upgradeSkinGrants ?? {}).some((grant) => grant.skinId === reward)
       && !mergeWorldRef.current.ownedKatchimeraCards.some((card) => card.cardId === reward) ? reward : null;
     try {
-      if (sharedUpgrade.id === `mist:${activeHatchable.tile.id}` && glowRun && glowRun.status !== 'completed') {
-        const run = await advanceHatchableUpgrade(activeHatchable, 'confirm');
-        if (run.status === 'completed' || ['gateway.egg', 'egg.enter'].includes(run.nodeId)) { setSelectedUpgrade(null); setUpgradeCommitted(false); }
+      const confirmedHatchable = sharedUpgrade.hatchable ? hatchableByTile(sharedUpgrade.id.slice('mist:'.length)) : null;
+      if (confirmedHatchable) {
+        // The ticket first: the tile's price leaves the counter and flies into the tile (as a friend's restoration
+        // stage does), and only a paid ticket lets the story begin and the board dock. A refusal keeps the panel.
+        const cost = sharedUpgrade.cost;
+        if (cost > 0) setGlowSpend({ amount: cost, counting: false });
+        let result: Awaited<ReturnType<typeof payStoredHatchableMission>>;
+        try { result = await payStoredHatchableMission(confirmedHatchable.companion, hatchableTicketReceiptId(confirmedHatchable.discoveryFlow.runId)); }
+        catch (error) { setGlowSpend(null); throw error; }
+        const paid = Boolean(result.state.hatchableMissions?.[confirmedHatchable.companion] || result.state.worldUnlocks?.[confirmedHatchable.tile.unlockId]);
+        if (!paid) { setGlowSpend(null); throw new Error(result.message ?? 'Earn a few more Glow through Merge orders.'); }
+        if (cost > 0 && result.changed) {
+          const spent = result.state.coins;
+          void measureGlowCurrencyOrigin().then((origin) => {
+            const aim = (attempt: number) => {
+              const node = upgradeMarkerNodesRef.current[sharedUpgrade.id] ?? gatewayTileNode;
+              if (!node && attempt < 30) { requestAnimationFrame(() => aim(attempt + 1)); return; }
+              openingGlow.launch(origin, node);
+              setGlowSpend({ amount: cost, counting: true });
+              setDisplayedGlow(spent);
+              setTimeout(() => setGlowSpend(null), 900);
+            };
+            aim(0);
+          });
+        } else if (cost === 0) setDisplayedGlow(result.state.coins);
+        // Paid: the panel leaves first, so nothing of its camera competes with the story's framing of the tile.
+        setSelectedUpgrade(null); setUpgradeCommitted(false);
+        await startHatchableDiscovery(confirmedHatchable);
+        await resumeHatchableDiscovery(confirmedHatchable, result.state);
       } else if (ftueStepId === 'world.first_bloom_restore') {
         await advanceFtueActionDurably({ expectedStepId: ftueStepId, actionId: 'world.restore_with_first_bloom', nextStepId: ftueStepId, evidenceRef: 'shared-upgrade:confirm' });
       } else {
@@ -1813,13 +1871,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       }
     } catch (error) { setDisplayedGlow(mergeWorldRef.current.coins); setUpgradeError(error instanceof Error ? error.message : 'Could not upgrade. Please try again.'); setUpgradeCommitted(false); }
     finally { upgradePressBusy.current = false; setUpgradePurchasing(false); }
-  }, [activeHatchable, flushMergeWorld, ftueStepId, glowRun, sharedUpgrade, upgradeCommitted, upgradeError]);
+  }, [flushMergeWorld, ftueStepId, gatewayTileNode, measureGlowCurrencyOrigin, openingGlow, sharedUpgrade, upgradeCommitted, upgradeError]);
   // Sleeping islands arrive from the offers layer already locked, in wake order.
   const presentedUpgradeOffers = upgradeOffers;
   // Alone until the hatch: no markers at all until the islands are drawn. And none while any mini board is
   // docked (the opening's, Steppling's, a friend's): the board is the only thing to do until it is put away.
   const missionBoardDocked = openingBoardActive || stepplingMissionActive || restorationBoardVisible;
-  const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : missionBoardDocked ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun);
+  const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : missionBoardDocked ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun, activeHatchable.tile.id);
 
   // The canvas is memoised, and it holds only if none of its props change identity on an ordinary
   // screen render: these handlers read live state through a ref instead of being re-created.
@@ -1848,11 +1906,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       void stepplingEncounter.enter();
       return;
     }
-    if (glowRun && glowDiscoveryMissionNode(glowRun.nodeId)) return;
+    if (glowRun && glowDiscoveryMissionNode(glowRun.nodeId)) { if (glowRun.status === 'failed_recoverable') void resumeActiveHatchable(); return; }
     const offer = upgradeOffers.find((candidate) => candidate.id === `mist:${activeHatchable.tile.id}`);
-    if (offer && (!glowRun || GLOW_GATEWAY_NODE_IDS.includes(glowRun.nodeId))) { void openUpgradeOffer(offer); return; }
+    if (offer && (!glowRun || glowRun.status === 'completed' || GLOW_GATEWAY_NODE_IDS.includes(glowRun.nodeId))) { void openUpgradeOffer(offer); return; }
     setGlowPanelOpen(true);
-    void startHatchableDiscovery(activeHatchable).catch((error) => console.warn('The path could not open', error));
+    void resumeActiveHatchable();
   });
   const selectResidentFromCanvas = useStableCallback((creatureId: string) => {
     if (glowDiscoveryLocksCamera(glowRun) || kingdomGoalGuideActive) return;
@@ -1926,7 +1984,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           onClose={() => { pendingUpgradeReward.current = null; setSelectedUpgrade(null); setUpgradeError(null); }} onConfirm={() => { void confirmWorldUpgrade(); }}
           onGarden={() => { openGarden(); }} /> : null}
         preserveUpgradeCamera={ftueGardenUpgradeActive || Boolean(pendingIslandCampaign)
-          || (selectedUpgrade?.id === 'mist:steppling-home' && Boolean(glowRun && glowRun.status !== 'completed'))}
+          || (selectedUpgrade?.id === `mist:${activeHatchable.tile.id}` && Boolean(glowRun && glowRun.status !== 'completed'))}
         upgradeSelectionCommitted={upgradeCommitted}
         upgradeFailed={Boolean(upgradeError)}
         onUpgradeOfferPress={handleUpgradeOfferPress}
@@ -2131,6 +2189,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       ) : null}
       {screenFocused && ordinaryUpgradeRun?.status === 'failed_recoverable' && !sharedUpgrade ? <View style={[styles.upgradeRecoveryCta, { bottom: Math.max(insets.bottom, 12) + 20 }]}>
         <KatchaButton label="Resume upgrade" onPress={() => { void dispatchContentFlowCommand(ordinaryUpgradeRun.runId, { type: 'retry' }); }} />
+      </View> : screenFocused && glowRun?.status === 'failed_recoverable' && !mistUpgradeActive && !sharedUpgrade && !stepplingEggOpen && !activeInteractionResidentId ? <View style={[styles.upgradeRecoveryCta, { bottom: Math.max(insets.bottom, 12) + 20 }]}>
+        <KatchaButton label="Resume" onPress={() => { void resumeActiveHatchable(); }} />
+      </View> : stepplingMissionStalled ? <View style={[styles.upgradeRecoveryCta, { bottom: Math.max(insets.bottom, 12) + 20 }]}>
+        <KatchaButton label="Set the board up again" onPress={stepplingMission.reset} />
       </View> : null}
       {lockedHintVisible ? (
         <KatchaSheet

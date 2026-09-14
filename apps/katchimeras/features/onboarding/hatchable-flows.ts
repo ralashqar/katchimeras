@@ -6,17 +6,21 @@ import { storyOperations, upgradeWorldTargetRecipe, worldActionScene } from '@/f
 import { mergeLessonRecipe } from '@/features/content-flow/merge-lesson-recipe';
 import { hatchableStoryTarget } from '@/constants/hatchable-companions/registry';
 import { MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM } from './opening-mist';
+import { HATCHABLE_MISSION_PAID_EVENT, HATCHABLE_MISSION_PAY_NODE_ID } from '@/constants/glow-discovery-ids';
+
+export { HATCHABLE_MISSION_PAID_EVENT, HATCHABLE_MISSION_PAY_NODE_ID };
 
 /**
  * The three flows every hatchable companion runs, generated from its
  * definition so a new friend authors copy and ids, never nodes:
  *
- * - the discovery: the misted tile's bubble, an optional Garden lesson, the
- *   mission board, the paid reveal, the Egg;
+ * - the discovery: an optional Garden lesson, the ticket paid at the tile's
+ *   bubble, the mission board, the reveal (free, the ticket was the price),
+ *   the Egg;
  * - day one: the first conversation's reflection and the parcel it hands over;
  * - the garden lesson: parcel, grow, serve, and the two closing scenes.
  *
- * Node ids are shared across companions (`gateway.offer`, `mission.clear`,
+ * Node ids are shared across companions (`gateway.pay`, `mission.clear`,
  * `parcel`, ...) because each companion has its own run; what differs is the
  * flow id, the run id, the copy and the migrations.
  */
@@ -34,24 +38,25 @@ export function createHatchableDiscoveryFlow(definition: HatchableCompanionDefin
   const { discoveryFlow: flow } = definition;
   const target = hatchableStoryTarget(definition);
   const lesson = flow.gardenLesson;
-  const afterFocus = lesson ? 'garden.open' : 'gateway.offer';
   return defineStory({
-    id: flow.id, version: flow.version, entryNodeId: 'gateway.focus', metadata: { kind: 'story' },
+    // Without a lesson the story begins at the pay step, on the marker the player is already looking at.
+    id: flow.id, version: flow.version, entryNodeId: lesson ? 'gateway.focus' : HATCHABLE_MISSION_PAY_NODE_ID, metadata: { kind: 'story' },
     nodes: [
-      storyOperations.focusCamera({ id: 'gateway.focus', target, ...MIST_CLOSE_UP, next: afterFocus }),
       ...(lesson ? [
+        storyOperations.focusCamera({ id: 'gateway.focus', target, ...MIST_CLOSE_UP, next: 'garden.open' }),
         worldActionScene({ id: 'garden.open', actionId: 'open', next: 'lesson.single.prepare', view: { kind: 'garden', ...lesson.open } }),
         story.effect({ id: 'lesson.single.prepare', capability: lesson.prepareCapability, next: lesson.beats[0]!.id }),
         ...mergeLessonRecipe(lesson.beats, 'gateway.ready', lesson.lessonPrefix),
-        worldActionScene({ id: 'gateway.ready', actionId: 'return', next: 'gateway.offer', view: { kind: 'return', ...lesson.ready } }),
+        worldActionScene({ id: 'gateway.ready', actionId: 'return', next: HATCHABLE_MISSION_PAY_NODE_ID, view: { kind: 'return', ...lesson.ready } }),
       ] : []),
-      // Returning to the world exposes the upgrade immediately. Camera framing
-      // stays at the existing close-up and must never gate this actionable checkpoint.
-      worldActionScene({ id: 'gateway.offer', actionId: 'open_upgrade', next: HATCHABLE_MISSION_FOCUS_NODE_ID, view: { kind: 'purchase', ...flow.offer } }),
-      // The bubble opens the mission, not a purchase sheet: the opening's framing on this tile, the board beneath.
+      // The ticket: the bubble opens the purchase panel, the panel charges the tile's price, and the paid
+      // event moves the story on. The board only ever opens on a paid ticket.
+      story.task({ id: HATCHABLE_MISSION_PAY_NODE_ID, capability: HATCHABLE_DISCOVERY_TASK_CAPABILITY, surface: 'haven', taskId: HATCHABLE_MISSION_PAY_NODE_ID, requirements: [{ id: 'paid', event: { type: HATCHABLE_MISSION_PAID_EVENT } }], next: HATCHABLE_MISSION_FOCUS_NODE_ID }),
+      // Paid: the opening's framing on this tile, the board beneath.
       storyOperations.focusCamera({ id: HATCHABLE_MISSION_FOCUS_NODE_ID, target, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 900, next: HATCHABLE_MISSION_CLEAR_NODE_ID }),
       story.task({ id: HATCHABLE_MISSION_CLEAR_NODE_ID, capability: HATCHABLE_DISCOVERY_TASK_CAPABILITY, surface: 'haven', taskId: HATCHABLE_MISSION_CLEAR_NODE_ID, requirements: [{ id: 'cleared', event: { type: HATCHABLE_MISSION_CLEARED_EVENT } }], next: 'gateway.purchase.focus' }),
-      ...upgradeWorldTargetRecipe({ id: 'gateway.purchase', target, toLevel: 1, economy: { mode: 'normal' }, cameraAlreadyFocused: true, presentation: { preset: definition.tile.revealPreset, reactionLine: '', showCoins: true }, next: 'gateway.egg' }),
+      // The reveal: the ticket was the price, so the world mutation charges nothing and shows no coins.
+      ...upgradeWorldTargetRecipe({ id: 'gateway.purchase', target, toLevel: 1, economy: { mode: 'free', reason: 'The mist mission ticket was paid at the bubble.' }, cameraAlreadyFocused: true, presentation: { preset: definition.tile.revealPreset, reactionLine: '', showCoins: false }, next: 'gateway.egg' }),
       worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'egg.enter', view: { kind: 'discovery', ...flow.egg } }),
       story.task({ id: 'egg.enter', capability: HATCHABLE_DISCOVERY_TASK_CAPABILITY, surface: 'haven', taskId: 'egg.enter', requirements: [{ id: 'entered', event: { type: HATCHABLE_EGG_ENTERED_EVENT } }], next: 'complete' }),
       story.complete(),

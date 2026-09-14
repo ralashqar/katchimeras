@@ -14,10 +14,6 @@ export type ConversationV2FamilyId = typeof CONVERSATION_V2_FAMILIES[number];
 /** Every authored family now uses the V2 chat lobby and conversation engine. */
 export const CONVERSATION_V2_ENABLED_FAMILIES: readonly ConversationV2FamilyId[] = CONVERSATION_V2_FAMILIES;
 
-/** Skin matching remains gated until every result in that family has approved art. */
-export const CONVERSATION_V2_IDEAL_SKIN_FAMILIES: readonly ConversationV2FamilyId[] = [
-  'steppling', 'flexel',
-];
 export type ConversationMode = 'talk' | 'play' | 'discover' | 'plan';
 
 export type ConversationTriggerKind =
@@ -417,6 +413,3 @@ export function isConversationV2AuthoredFamily(value: string | null | undefined)
   return CONVERSATION_V2_FAMILIES.includes(value as ConversationV2FamilyId);
 }
 
-export function isConversationV2IdealSkinFamily(value: string | null | undefined): value is ConversationV2FamilyId {
-  return CONVERSATION_V2_IDEAL_SKIN_FAMILIES.includes(value as ConversationV2FamilyId);
-}

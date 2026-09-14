@@ -137,6 +137,7 @@ test('a tile’s state is read from its definition: asleep until its turn, savin
   const woken = { ...world, kingdomGoal: { introducedAt: NOW, coachmarkSeenAt: null } };
   assert.equal(hatchableTileState({ ...woken, coins: 59 }, later), 'saving');
   assert.equal(hatchableTileState({ ...woken, coins: 60 }, later), 'ready');
+  assert.equal(hatchableTileState({ ...woken, coins: 0, hatchableMissions: { baristabbit: { paidAt: NOW, paidCoins: 60, receiptId: 'ticket' } } }, later), 'board', 'a paid ticket: the board is the tile’s business');
   assert.equal(hatchableTileState({ ...woken, coins: 0, worldUnlocks: { 'later:unlock': { unlockedAt: NOW, paid: 60, destination: 'baristabbit', transferredAt: null, hatchedAt: null } } }, later), 'egg');
   assert.equal(hatchableTileState({ ...woken, companionDiscovery: { ...woken.companionDiscovery, records: [{ characterId: 'baristabbit', source: 'ftue_hatch', gateId: 'gate-3-first-choice', pathId: 'warm-light', discoveredAt: NOW, revealSeenAt: NOW, firstOrderCompletedAt: null, permanentFeatureId: null }] } }, later), 'open');
   // Steppling, never asleep: saving at 39, ready at 40.
@@ -202,7 +203,8 @@ test('a friend’s daily cards and photo feed are content, and the Kingdom begin
   assert.doesNotMatch(sheet, /BaristabbitStoryStage|BARISTABBIT_FIRST_MEETING/, 'no legacy Baristabbit stage or opener');
   assert.match(sheet, /isHatchableCompanion\(props\.familyId\) \|\| \(props\.familyId === 'mossprout'/);
   const kingdom = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  assert.match(kingdom, /if \(tappedHatchable && offer\.hatchable && offer\.hatchable\.state !== 'sleeping' && hatchableRuns\.ready && !hatchableRuns\.discovery\[tappedHatchable\.companion\]\) \{\s*missionOpenAfterStartRef\.current = tappedHatchable\.companion;\s*await startHatchableDiscovery\(tappedHatchable\);/, 'one tap: the story begins and the board opens once the camera settles');
+  assert.match(kingdom, /if \(tappedHatchable && \(offer\.hatchable\?\.state === 'board' \|\| \(tappedRun && tappedRun\.status !== 'completed' && !GLOW_GATEWAY_NODE_IDS\.includes\(tappedRun\.nodeId\)\)\)\) \{\s*if \(!tappedRun\) await startHatchableDiscovery\(tappedHatchable\);\s*await resumeHatchableDiscovery\(tappedHatchable, mergeWorldRef\.current\);/, 'a paid ticket re-docks the board; otherwise the bubble opens the panel with the price');
+  assert.match(kingdom, /result = await payStoredHatchableMission\(confirmedHatchable\.companion, hatchableTicketReceiptId\(confirmedHatchable\.discoveryFlow\.runId\)\);[\s\S]*?await startHatchableDiscovery\(confirmedHatchable\);\s*await resumeHatchableDiscovery\(confirmedHatchable, result\.state\);/, 'confirm pays the ticket before the story begins');
   const progression = readFileSync('utils/merge-world/companion-discovery-progression.ts', 'utf8');
   assert.match(progression, /!isHatchableCompanion\(id\)/, 'the legacy board discovery never offers a hatchable friend');
 });

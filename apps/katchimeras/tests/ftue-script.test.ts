@@ -551,7 +551,6 @@ test('Mossprout remembers the day, reflects it back, then offers one narrative G
   const mossproutStage = readFileSync('components/katchadeck/world/mossprout-ftue-story-stage.tsx', 'utf8');
   const bondShare = readFileSync('features/onboarding/mossprout-bond-share.ts', 'utf8');
   const companionRoute = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
-  const feastleStage = readFileSync('components/katchadeck/world/feastle-story-stage.tsx', 'utf8');
   assert.match(interaction, /MossproutFtueStoryStage/);
   assert.match(mossproutStage, /CompanionMergeRequestTray/);
   assert.match(mossproutStage, /MOSSPROUT_CHAPTER_ZERO_REQUESTS/);
@@ -587,7 +586,6 @@ test('Mossprout remembers the day, reflects it back, then offers one narrative G
   assert.doesNotMatch(mossproutStage, /Bond level Familiar|Bond · Familiar|bondBadge/);
   assert.doesNotMatch(mossproutStage, /What should I call you/);
   assert.match(mossproutStage, /slice\(0, 1\)/);
-  assert.match(feastleStage, /CompanionMergeRequestTray/);
 });
 
 test('Merge FTUE never inserts guide panels into the fixed board layout', () => {
@@ -768,11 +766,11 @@ test('route-changing FTUE actions persist before navigation and owned companion 
   assert.match(haven, /companionActive && companionVisualReady[\s\S]*?<KatchimeraCompanionRouteScreen/);
   assert.doesNotMatch(reconciler, /hatch\.talk_to_mossprout|run\.stepId === 'hatch\.reveal'/);
   assert.match(companion, /ftueCompanionSurfaceOwned = Boolean\([\s\S]*?mossproutFtueStep\(navigationFtueRun\.stepId\)\?\.surface === 'companion'/);
-  assert.match(interaction, /!showMossproutDashboard[\s\S]*?!props\.ftueCompanionSurfaceOwned \|\| residentFtueDashboard/);
-  assert.match(interaction, /residentParcelHandoffActive=\{residentParcelGardenPanelActive\}/);
+  assert.match(interaction, /&& props\.familyId === 'mossprout'\s*&& \(!props\.ftueCompanionSurfaceOwned \|\| residentFtueDashboard\)/);
+  assert.match(interaction, /residentParcelHandoffActive: residentParcelGardenPanelActive,/);
   assert.match(interaction, /residentResultFtueDashboard = props\.familyId === 'mossprout'[\s\S]*?props\.ftueResidentMatchResultActive/);
   assert.match(interaction, /dashboardRouteActive = route\.kind === 'dashboard'[\s\S]*?residentResultFtueDashboard/);
-  assert.match(interaction, /!residentFtueDashboard && !residentResultFtueDashboard[\s\S]*?showFeastleStoryHome\(\)/);
+  assert.match(interaction, /!residentFtueDashboard && !residentResultFtueDashboard[\s\S]*?showStoryHome\(\)/);
   assert.match(companion, /run\?\.stepId === 'companion\.first_rest'[\s\S]*?beginKatchimeraMeditation\([\s\S]*?MOSSPROUT_FTUE_REST_MS,[\s\S]*?sourceId[\s\S]*?actionId: 'companion\.begin_rest'/);
   assert.match(companion, /continueToMist = useCallback[\s\S]*?actionId: 'companion\.tend_garden'[\s\S]*?await startGlowDiscovery\(\)[\s\S]*?if \(hostedInHaven\) onHostedClose\?\.\(\)/);
   assert.match(roster, /stepId === 'companion\.meditating'[\s\S]*?advanceFtueActionDurably/);
@@ -796,8 +794,8 @@ test('meditation stays inside companion interaction with compact action-card UI'
   assert.match(companion, /ftueRun\.stepId === 'companion\.meditating'[\s\S]*?\? 'meditating'/);
   assert.match(interaction, /companionInteractionAvailability\(relationships, props\.familyId, meditationNow\)/);
   assert.match(interaction, /meditationDashboardActive && meditation \? \([\s\S]*?styles\.meditationWorldTimer[\s\S]*?<CompanionMeditationStage/);
-  assert.match(interaction, /initialConversationHandoffPending \? null : route\.kind === 'chat_lobby'[\s\S]*?&& !meditation/);
-  assert.match(interaction, /\(route\.kind === 'destination' \|\| dashboardRouteActive[\s\S]*?&& !questGameVisible && !questionnaireExperience \? \([\s\S]*?<CompanionDestinationHeader/);
+  assert.match(interaction, /initialConversationHandoffPending \? null : route\.kind === 'conversation' && !residentFtueDashboard/);
+  assert.match(interaction, /\(route\.kind === 'destination' \|\| dashboardRouteActive[\s\S]*?&& !questionnaireExperience \? \([\s\S]*?<CompanionDestinationHeader/);
   assert.match(interaction, /meditationDashboardActive = Boolean\(\(!props\.ftueCompanionSurfaceOwned \|\| props\.ftueProfileStep === 'meditating'\) && !quickGoalPickerOpen && !unifiedJourneyActive && meditation && route\.kind !== 'conversation'/);
   assert.match(interaction, /companionSpeechTitle = dashboardRouteActive && actionNarration \? actionNarration : dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration \? journeyNarration : meditationDashboardActive \? MOSSPROUT_FTUE_COPY\.meditation/);
   assert.match(interaction, /meditating=\{Boolean\(meditation\)\}/);
@@ -823,10 +821,10 @@ test('meditation stays inside companion interaction with compact action-card UI'
   assert.equal(existsSync(require.resolve('@incubator/art-cutouts/mossprout-meditating.png')), true);
   assert.match(meditationStage, /formatMeditationCountdown/);
   assert.match(meditationStage, /meditationProgress/);
-  assert.match(interaction, /styles\.meditationActionsOverlay[\s\S]*?<MossproutStoryStage[\s\S]*?meditationMode/);
+  assert.match(interaction, /styles\.meditationActionsOverlay[\s\S]*?mossproutStage\(\{ meditationMode: true/);
   assert.match(interaction, /meditationActionsOverlay: \{ position: 'absolute', zIndex: 25 \}/);
   assert.match(interaction, /bottom: Math\.max\(8, insets\.bottom \+ 4\)/);
-  assert.match(interaction, /scrollEnabled=\{!\(dashboardRouteActive && unifiedJourneyActive\) && !activeAttemptId && !questionnaireExperience && !meditationDashboardActive/);
+  assert.match(interaction, /scrollEnabled=\{!\(dashboardRouteActive && unifiedJourneyActive\) && !questionnaireExperience && !meditationDashboardActive/);
   assert.doesNotMatch(interaction, /meditationActionStack/);
   assert.match(interaction, /meditationTimerScreenTop = Math\.max\(390, Math\.min\(510, viewportHeight \* 0\.58\)\)/);
   assert.match(interaction, /meditationTimerSurfaceTop = Math\.max\([\s\S]*?meditationTimerScreenTop - \(insets\.top \+ 58 \+ KatchaUI\.spacing\.xs\)/);
@@ -896,7 +894,7 @@ test('resident discovery pauses on one standard Mossprout action card and resume
   assert.match(companion, /residentStoryResumeActive[\s\S]*?initialConversationDefinitionId=\{!residentStoryResumeActive/);
   assert.doesNotMatch(interaction, /A VEILED PARCEL IS WAITING|Return to the exact resident step you left/);
   assert.match(interaction, /residentFtueDashboard = props\.familyId === 'mossprout'[\s\S]*?props\.ftueResidentHandoffActive[\s\S]*?dashboardRouteActive = route\.kind === 'dashboard'[\s\S]*?residentFtueDashboard[\s\S]*?props\.ftueCompanionSurfaceOwned/);
-  assert.match(interaction, /exitCompletedConversation[\s\S]*?pendingStoryConversationRef\.current = null[\s\S]*?openedStoryConversationRef\.current = null[\s\S]*?showFeastleStoryHome\(\)/);
+  assert.match(interaction, /exitCompletedConversation[\s\S]*?pendingStoryConversationRef\.current = null[\s\S]*?openedStoryConversationRef\.current = null[\s\S]*?showStoryHome\(\)/);
   assert.match(interaction, /onCompletedExit=\{exitCompletedConversation\}/);
   assert.match(conversationScene, /session\.status === 'completed'[\s\S]*?<ConversationCompletion[\s\S]*?Closest match found[\s\S]*?onContinue=\{onCompletedExit\}/);
   assert.match(interaction, /companionInitialConversationCompletionReady[\s\S]*?if \(props\.ftueResidentMatchResultActive\) return/);
@@ -910,10 +908,10 @@ test('resident discovery pauses on one standard Mossprout action card and resume
   assert.match(interaction, /exitCompletedConversation[\s\S]*?completedConversationExitRef\.current === completedConversationSessionId/);
   assert.doesNotMatch(conversationScene, /Returning to \$\{name\}/);
   assert.match(conversationFlow, /session\.status === 'completed'[\s\S]*?if \(directResidentParcelHandoff\) return;[\s\S]*?onComplete/);
-  assert.match(interaction, /\(route\.kind === 'visit' \|\| route\.kind === 'conversation'\) && !residentFtueDashboard/);
-  assert.match(interaction, /if \(!props\.active \|\| \(!residentFtueDashboard && !residentResultFtueDashboard\)\) return;[\s\S]*?showFeastleStoryHome\(\)/);
+  assert.match(interaction, /route\.kind === 'conversation' && !residentFtueDashboard/);
+  assert.match(interaction, /if \(!props\.active \|\| \(!residentFtueDashboard && !residentResultFtueDashboard\)\) return;[\s\S]*?showStoryHome\(\)/);
   assert.match(interaction, /dashboardRouteActive && props\.familyId === 'mossprout'[\s\S]*?<MossproutStoryStage/);
-  assert.match(interaction, /residentStoryResumeActive=\{props\.ftueResidentStoryResume\}/);
+  assert.match(interaction, /residentStoryResumeActive: props\.ftueResidentStoryResume,/);
   assert.match(stage, /if \(residentStoryResumeActive\) return \[residentResumeAction\]/);
   assert.match(stage, /title: residentStoryResumeTitle[\s\S]*?onResumeResidentStory/);
   assert.match(stage, /!residentStoryResumeActive \? <KatchimeraBottomDock/);
@@ -1015,7 +1013,7 @@ test('the first resident Garden handoff uses one shared parcel panel without a s
   const conversationFlow = readFileSync('features/companion/use-companion-conversation-flow.ts', 'utf8');
   assert.match(interaction, /residentParcelGardenPanelActive = props\.ftueResidentHandoffActive[\s\S]*?!props\.ftueResidentStoryResume/);
   assert.match(interaction, /showSpeechBubble=\{!props\.suppressWorldSpeech && ftueHasIntentionalSpeech && !narrativeOverlayVisible[\s\S]*?&& props\.ftueProfileStep !== 'bond_choice' && props\.ftueProfileStep !== 'notice_bond' && !initialConversationHandoffPending && \(Boolean\(companionSpeechTitle\) \|\| !residentParcelGardenPanelActive\)\}/);
-  assert.match(interaction, /residentParcelHandoffActive=\{residentParcelGardenPanelActive\}/);
+  assert.match(interaction, /residentParcelHandoffActive: residentParcelGardenPanelActive,/);
   assert.match(stage, /residentParcelHandoffActive \? <View[\s\S]*?<MossproutJourneyRequestPanel/);
   assert.match(stage, /actionLabel="Go to the Garden"[\s\S]*?eyebrow="GARDEN PARCEL"/);
   assert.match(stage, /countLabel="1 parcel"/);
@@ -1333,7 +1331,7 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(companion, /actionId: 'companion\.complete_chapter_zero_return'[\s\S]*?nextStepId: 'companion\.water_together'[\s\S]*?await flushFtuePersistence\(\)/);
   assert.doesNotMatch(companion, /Showing the First Bloom/);
   assert.doesNotMatch(companion, /revealStoredHaven/);
-  assert.match(interaction, /Promise\.resolve\(onInitialConversationComplete\?\.\(session\)\)[\s\S]*?\.then\(showFeastleStoryHome\)/);
+  assert.match(interaction, /Promise\.resolve\(onInitialConversationComplete\?\.\(session\)\)[\s\S]*?\.then\(showStoryHome\)/);
   assert.match(interaction, /CompanionFtueCoachmark[\s\S]*?ftueBondSpotlightActive[\s\S]*?ftueDayOneActionActive/);
   assert.doesNotMatch(companion, /companion\.complete_chapter_zero_return[\s\S]{0,800}?router\.dismissTo/);
   assert.match(repository, /seedStoredMossproutGardenAfterFtue[\s\S]*?completeMossproutChapterZeroSlice[\s\S]*?reconcileCharacterActivity[\s\S]*?status: 'complete'/);
@@ -1351,7 +1349,7 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(mossproutStage, /relationshipProgressionRepository\.update\(reconcileMossproutDayOneChoices\)/);
   assert.match(mossproutStage, /dayOneChoiceActionIds[\s\S]*?includeActionIds: dayOneActionChoiceActive \? dayOneChoiceActionIds : undefined/);
   assert.match(interaction, /status === 'profile_available'[\s\S]*?requestStoryConversation\(definitionId\)/);
-  assert.match(interaction, /residentStoryResumeActive=\{props\.ftueResidentStoryResume\}[\s\S]*?residentStoryResumeTitle/);
+  assert.match(interaction, /residentStoryResumeActive: props\.ftueResidentStoryResume,\s*residentStoryResumeTitle/);
   assert.doesNotMatch(interaction, /A VEILED PARCEL IS WAITING/);
   assert.match(mossproutStage, /Coin-only requests remain in the Garden[\s\S]*?const presentedActionCandidates = actions/);
   assert.match(bondCelebration, /resolvedJourneyDayNumber = journeyDayNumber \?\? journeyHandoff\?\.dayNumber \?\? 1[\s\S]*?<CelebrationHeroNumber[\s\S]*?label="JOURNEY DAY"/);

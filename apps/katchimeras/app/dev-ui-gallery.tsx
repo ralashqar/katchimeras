@@ -57,7 +57,7 @@ function SurfaceGallery({ surface }: { surface: KatchaSurface }) {
 
 function CompanionGallery() {
   const { tokens } = useKatchaSurface();
-  const [thread, setThread] = useState<CompanionThread>('quest');
+  const [thread, setThread] = useState<CompanionThread>('skins');
   return (
     <View style={[styles.surface, { backgroundColor: tokens.background, borderColor: tokens.borderStrong }]}>
       <ThemedText style={styles.eyebrow} lightColor={tokens.textTertiary} darkColor={tokens.textTertiary}>

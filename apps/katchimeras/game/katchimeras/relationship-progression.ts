@@ -138,7 +138,6 @@ function isActionOwner(value: unknown): value is ActionCompletionRecord['owner']
   if (owner.kind === 'daily_action') return true;
   if (owner.kind === 'journey') return typeof owner.journeyId === 'string' && typeof owner.journeyActionId === 'string';
   if (owner.kind === 'goal') return typeof owner.goalId === 'string';
-  if (owner.kind === 'quest') return typeof owner.questId === 'string';
   return owner.kind === 'garden' && (typeof owner.orderId === 'string' || owner.orderId === null);
 }
 

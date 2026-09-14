@@ -82,7 +82,6 @@ export function CompanionConversationScene({
   onInsightDecision: onInsightDecisionAction,
   onQuickGoalDecision: onQuickGoalDecisionAction,
   onJournalHandoff: onJournalHandoffAction,
-  onQuestHandoff: onQuestHandoffAction,
   hasActiveFocus,
   journeyTaskHandoff = false,
   journeyTaskRequests = [],
@@ -91,7 +90,6 @@ export function CompanionConversationScene({
   storyFinale = false,
   session,
   skins,
-  questOffer,
   requiresManualAdvance,
   journalMergeEnergyPreview,
   navigationLocked = false,
@@ -117,7 +115,6 @@ export function CompanionConversationScene({
   onOpenOutcomeDestination: (destination: ConversationOutcomeDestination) => void;
   onQuickGoalDecision: (accept: boolean, node: Extract<ConversationNode, { kind: 'quick_goal_proposal' }>) => void;
   onJournalHandoff: (open: boolean, node: Extract<ConversationNode, { kind: 'journal_handoff' }>) => void;
-  onQuestHandoff: (accept: boolean, node: Extract<ConversationNode, { kind: 'quest_handoff' }>) => void;
   hasActiveFocus: boolean;
   journeyTaskHandoff?: boolean;
   journeyTaskRequests?: readonly CompanionMergeRequest[];
@@ -129,7 +126,6 @@ export function CompanionConversationScene({
   storyFinale?: boolean;
   session: ConversationSession;
   skins: readonly KingdomSkinOption[];
-  questOffer: { id: string; title: string; hint: string } | null;
   requiresManualAdvance: boolean;
   journalMergeEnergyPreview: number;
   navigationLocked?: boolean;
@@ -168,7 +164,6 @@ export function CompanionConversationScene({
       const onGoalDecision: typeof onGoalDecisionAction = (...args) => perform(() => onGoalDecisionAction(...args));
       const onQuickGoalDecision: typeof onQuickGoalDecisionAction = (...args) => perform(() => onQuickGoalDecisionAction(...args));
       const onJournalHandoff: typeof onJournalHandoffAction = (...args) => perform(() => onJournalHandoffAction(...args), args[0] && !session.preview);
-      const onQuestHandoff: typeof onQuestHandoffAction = (...args) => perform(() => onQuestHandoffAction(...args));
       const onMemoryDecision: typeof onMemoryDecisionAction = (...args) => perform(() => onMemoryDecisionAction(...args));
       const onInsightDecision: typeof onInsightDecisionAction = (...args) => perform(() => onInsightDecisionAction(...args));
       return <View style={{ gap: 10 }}>
@@ -258,19 +253,6 @@ export function CompanionConversationScene({
             </View>
             <PrimaryAction label={node.saveLabel} onPress={() => onJournalHandoff(true, node)} />
             <SecondaryAction label="Skip" onPress={() => onJournalHandoff(false, node)} />
-          </View>
-        ) : node?.kind === 'quest_handoff' ? (
-          <View style={{ gap: 10 }}>
-            {questOffer ? <View style={{ backgroundColor: KatchaUI.companionScenePanel.cardBackground, borderColor: 'rgba(168,117,47,0.3)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, gap: 7, padding: 16 }}>
-              <ThemedText selectable style={{ fontSize: 10, fontWeight: '900', letterSpacing: 1.1 }} lightColor={KatchaUI.companionScenePanel.accent} darkColor={KatchaUI.companionScenePanel.accent}>A SMALL INVITATION</ThemedText>
-              <ThemedText selectable style={{ fontSize: 21, fontWeight: '900', lineHeight: 26 }} lightColor={KatchaUI.companionScenePanel.ink} darkColor={KatchaUI.companionScenePanel.ink}>{questOffer.title}</ThemedText>
-              <ThemedText selectable style={{ fontSize: 13, lineHeight: 19 }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>{questOffer.hint}</ThemedText>
-            </View> : <View style={{ alignItems: 'center', gap: 8, paddingVertical: 12 }}>
-              <IconSymbol color="#8B672E" name="sparkles" size={20} />
-              <ThemedText selectable style={{ fontSize: 14, lineHeight: 20, textAlign: 'center' }} lightColor={KatchaUI.companionScenePanel.inkSoft} darkColor={KatchaUI.companionScenePanel.inkSoft}>Looking for one that fits…</ThemedText>
-            </View>}
-            {questOffer ? <PrimaryAction label="Take this quest" onPress={() => onQuestHandoff(true, node)} /> : null}
-            {questOffer ? <SecondaryAction label="Skip" onPress={() => onQuestHandoff(false, node)} /> : null}
           </View>
         ) : null}
         {developerContent}

@@ -283,7 +283,6 @@ test('an active Journey Day exclusively owns Mossprout action cards', () => {
       id: 'routine-order', title: 'Routine order', description: 'Optional Garden work', difficulty: 'small' as const,
       requirements: [{ definitionId: 'nature:garden:2', quantity: 1 }], coins: 10,
     }],
-    offers: [{ id: 'quest-mossprout-green-photo', family: 'photo' as const, title: 'Take a photo', hint: 'Optional photo', bondReward: 4 }],
     storyComplete: false,
   };
   let actions = resolveMossproutDayActions({ ...optionalInput, journey });
@@ -337,7 +336,6 @@ test('the next unstarted Mossprout chapter is labelled as Journey Day 2', () => 
     goals: [],
     journey: null,
     journeyDayNumber: 2,
-    offers: [],
     storyComplete: false,
   });
   assert.equal(actions[0]?.title, 'Begin Journey Day 2');
@@ -380,7 +378,6 @@ test('legacy Mossprout Day 1 saves gain all three FTUE choices', () => {
     dayId: '2026-08-23',
     goals: [],
     journey,
-    offers: [],
     storyComplete: false,
   }).filter((action) => choices.some((choice) => choice.id === action.id));
   assert.equal(visible.length, 3);
@@ -564,8 +561,8 @@ test('optional Katchimera actions skip once for the selected day while required 
 test('Mossprout resolver hides a skipped optional action only on that day', () => {
   const conversations = [{ definitionId: 'field-note', mode: 'talk' as const, actionKind: 'journal_prompt' as const, title: 'Keep a field note' }];
   const skippedActionIds = [`2026-08-21:source:${MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID}`];
-  const hidden = resolveMossproutDayActions({ conversations, dayId: '2026-08-21', goals: [], journey: null, offers: [], skippedActionIds, storyComplete: false });
-  const tomorrow = resolveMossproutDayActions({ conversations, dayId: '2026-08-22', goals: [], journey: null, offers: [], skippedActionIds, storyComplete: false });
+  const hidden = resolveMossproutDayActions({ conversations, dayId: '2026-08-21', goals: [], journey: null, skippedActionIds, storyComplete: false });
+  const tomorrow = resolveMossproutDayActions({ conversations, dayId: '2026-08-22', goals: [], journey: null, skippedActionIds, storyComplete: false });
   assert.equal(hidden.some((action) => action.id === MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID), false);
   assert.equal(tomorrow.some((action) => action.id === MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID), true);
   assert.equal(hidden.some((action) => action.required), true);
@@ -581,7 +578,6 @@ test('meditation replaces the Journey launcher with ordinary Mossprout actions',
     goals: [],
     includeJourneyAction: false,
     journey: null,
-    offers: [],
     storyComplete: false,
   });
 
@@ -598,7 +594,7 @@ test('Mossprout offers only one field-note flow per day after it is skipped', ()
     actionKind: 'journal_prompt' as const,
     title: `Field note ${id}`,
   }));
-  const initial = resolveMossproutDayActions({ conversations, dayId, goals: [], journey: null, offers: [], storyComplete: false });
+  const initial = resolveMossproutDayActions({ conversations, dayId, goals: [], journey: null, storyComplete: false });
   const field = initial.find((action) => action.slotId === 'field');
   assert.ok(field);
   assert.equal(field.id, MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID);
@@ -612,12 +608,11 @@ test('Mossprout offers only one field-note flow per day after it is skipped', ()
     dayId,
     goals: [],
     journey: null,
-    offers: [],
     skippedActionIds: state.skippedActionIds,
     slotSequences: deck.slotSequences,
     storyComplete: false,
   });
-  const tomorrow = resolveMossproutDayActions({ conversations, dayId: '2026-08-22', goals: [], journey: null, offers: [], storyComplete: false });
+  const tomorrow = resolveMossproutDayActions({ conversations, dayId: '2026-08-22', goals: [], journey: null, storyComplete: false });
   assert.equal(sameDay.some((action) => action.kind === 'journal_prompt'), false);
   assert.equal(tomorrow.some((action) => action.id === MOSSPROUT_DAILY_FIELD_NOTE_ACTION_ID), true);
 });
@@ -630,7 +625,7 @@ test('a completed field note does not replace itself with another field note tha
     actionKind: 'journal_prompt' as const,
     title: `Field note ${id}`,
   }));
-  const first = resolveMossproutDayActions({ conversations, dayId, goals: [], journey: null, offers: [], storyComplete: false })
+  const first = resolveMossproutDayActions({ conversations, dayId, goals: [], journey: null, storyComplete: false })
     .find((action) => action.slotId === 'field')!;
   const state = recordKatchimeraActionCompletion(emptyRelationshipProgressState(), {
     dayId,
@@ -654,7 +649,6 @@ test('a completed field note does not replace itself with another field note tha
     dayId,
     goals: [],
     journey: null,
-    offers: [],
     slotSequences: deck.slotSequences,
     storyComplete: false,
   });
@@ -676,7 +670,6 @@ test('legacy definition-specific field-note receipts also consume today\'s share
     dayId,
     goals: [],
     journey: null,
-    offers: [],
     storyComplete: false,
   });
   const afterSkip = resolveMossproutDayActions({
@@ -684,26 +677,12 @@ test('legacy definition-specific field-note receipts also consume today\'s share
     dayId,
     goals: [],
     journey: null,
-    offers: [],
     skippedActionIds: [`${dayId}:source:${legacyActionId}`],
     storyComplete: false,
   });
 
   assert.equal(afterCompletion.some((action) => action.kind === 'journal_prompt'), false);
   assert.equal(afterSkip.some((action) => action.kind === 'journal_prompt'), false);
-});
-
-test('Mossprout hides unavailable and competing real-life requests instead of locking them', () => {
-  const offers = [
-    { id: 'quest-mossprout-green-photo', title: 'Green', hint: 'Photo', family: 'photo', bondReward: 5, availableToday: true },
-    { id: 'quest-mossprout-nature-note', title: 'Sensory detail', hint: 'Note', family: 'note', bondReward: 5, availableToday: false },
-  ];
-  const available = resolveMossproutDayActions({ goals: [], journey: null, offers, storyComplete: false });
-  assert.equal(available.some((action) => action.title === 'Sensory detail'), false);
-  assert.equal(available.some((action) => action.title === 'Green' && !action.disabled), true);
-
-  const competing = resolveMossproutDayActions({ activeQuestId: 'another-quest', goals: [], journey: null, offers, storyComplete: false });
-  assert.equal(competing.some((action) => action.kind === 'photo_request' || action.kind === 'note_request'), false);
 });
 
 test('Mossprout never selects a disabled Journey row into a visible slot', () => {
@@ -713,7 +692,7 @@ test('Mossprout never selects a disabled Journey row into a visible slot', () =>
   state = completeMossproutJourneyOpening(state, '2026-08-22', 4);
 
   const actions = resolveMossproutDayActions({
-    goals: [], journey: mossproutJourneyForDay(state, '2026-08-22'), offers: [], storyComplete: false,
+    goals: [], journey: mossproutJourneyForDay(state, '2026-08-22'), storyComplete: false,
   });
 
   assert.equal(actions.some((action) => action.disabled), false);
@@ -768,7 +747,6 @@ test('a Journey Garden card uses the live order title, reward, and every request
       ],
       coins: 47,
     },
-    offers: [],
     storyComplete: false,
   });
   const garden = actions.find((action) => action.kind === 'garden_request');
@@ -787,20 +765,15 @@ test('Mossprout Day 1 exposes its goal and fun threads after the main Garden jou
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
   state = finishDayOneResident(state, '2026-08-21', 3.1);
   let journey = mossproutJourneyForDay(state, '2026-08-21');
-  const offers = [
-    { id: 'quest-mossprout-green-photo', title: 'Photograph something green', hint: 'A nature photo', family: 'photo', bondReward: 4 },
-    { id: 'quest-mossprout-nature-note', title: 'Keep a tiny field note', hint: 'A nature note', family: 'journal', bondReward: 4 },
-  ];
-  let actions = resolveMossproutDayActions({ goals: [], journey, offers, storyComplete: false });
+  let actions = resolveMossproutDayActions({ goals: [], journey, storyComplete: false });
   assert.deepEqual(actions.map((action) => action.slotId), ['together', 'field', 'garden']);
-  assert.deepEqual(actions.map((action) => action.kind), ['fun_chat', 'journal_prompt', 'photo_request']);
+  assert.deepEqual(actions.map((action) => action.kind), ['fun_chat', 'journal_prompt', 'goal_plan']);
   assert.equal(actions.every((action) => action.status !== 'completed'), true);
 
   const mainAction = journey?.actions.find((action) => action.kind === 'journey');
   journey = mossproutJourneyForDay(state, '2026-08-21');
-  actions = resolveMossproutDayActions({ goals: [], journey, offers, storyComplete: false });
-  assert.deepEqual(actions.map((action) => action.kind), ['fun_chat', 'journal_prompt', 'photo_request']);
-  assert.equal(actions.filter((action) => action.kind === 'photo_request' || action.kind === 'note_request').length, 1);
+  actions = resolveMossproutDayActions({ goals: [], journey, storyComplete: false });
+  assert.deepEqual(actions.map((action) => action.kind), ['fun_chat', 'journal_prompt', 'goal_plan']);
   assert.equal(journey?.actions.find((action) => action.kind === 'goal_plan')?.status, 'ready');
 
   const goalPlan = journey!.actions.find((action) => action.kind === 'goal_plan')!;
@@ -813,13 +786,14 @@ test('Mossprout Day 1 exposes its goal and fun threads after the main Garden jou
   }, 4);
   assert.equal(state.actionCompletions.some((completion) => completion.actionId === goalPlan.id), true);
   assert.equal(state.actionPresentations.some((presentation) => presentation.card.kind === 'goal_plan' && presentation.status === 'pending'), true);
-  actions = resolveMossproutDayActions({ goals: [], journey: mossproutJourneyForDay(state, '2026-08-21'), offers, storyComplete: false });
+  // The other two lesson choices step aside once one is chosen; the daily question pool refills the rows.
+  actions = resolveMossproutDayActions({ conversations: [{ definitionId: 'question:one', mode: 'talk', title: 'Question one' }], goals: [], journey: mossproutJourneyForDay(state, '2026-08-21'), storyComplete: false });
   assert.equal(actions.some((action) => action.kind === 'goal_plan'), false);
   assert.equal(actions.every((action) => action.status !== 'completed'), true);
-  assert.equal(actions.some((action) => action.slotId === 'field'), true);
+  assert.ok(actions.length >= 1, 'the stage still offers rows once the goal plan is done');
 
   state = completeMossproutJourneyConversation(state, 'mossprout:quiet-patch:first-flower:playful', 5);
-  actions = resolveMossproutDayActions({ goals: [], journey: mossproutJourneyForDay(state, '2026-08-21'), offers, storyComplete: false });
+  actions = resolveMossproutDayActions({ goals: [], journey: mossproutJourneyForDay(state, '2026-08-21'), storyComplete: false });
   assert.equal(mossproutJourneyForDay(state, '2026-08-21')?.actions.find((action) => action.kind === 'playful_game')?.status, 'skipped');
   assert.equal(actions.some((action) => action.id === 'mossprout:quiet-patch:first-flower:playful'), false);
 });
@@ -850,7 +824,6 @@ test('the Day 1 Bond lesson shows its three authored choices without coin-only G
     hasActiveFocus: true,
     includeActionIds: choiceIds,
     journey,
-    offers: [],
     storyComplete: false,
   });
 
@@ -874,7 +847,6 @@ test('the inline Day 1 FTUE receipt refills all three action rows without comple
     goals: [],
     hasActiveFocus: true,
     journey: mossproutJourneyForDay(state, dayId),
-    offers: [],
     storyComplete: false,
   };
   const withoutFtueReceipt = resolveMossproutDayActions(input);
@@ -905,7 +877,6 @@ test('a completed Day 1 Journey action never participates in slot selection', ()
     }],
     goals: [],
     hasActiveFocus: false,
-    offers: [],
     storyComplete: false,
   };
   const resolved = resolveMossproutDayActions({
@@ -924,16 +895,15 @@ test('a Journey completion immediately reveals replacements', () => {
   state = completeMossproutJourneyConversation(state, 'mossprout:ftue:chapter-zero-return', 3);
   state = finishDayOneResident(state, dayId, 3.1);
   const mainAction = mossproutJourneyForDay(state, dayId)!.actions.find((action) => action.kind === 'journey')!;
-  const offers = [
-    { id: 'quest-mossprout-green-photo', title: 'Photograph something green', hint: 'A nature photo', family: 'photo', bondReward: 4 },
-    { id: 'quest-mossprout-nature-note', title: 'Keep a tiny field note', hint: 'A nature note', family: 'journal', bondReward: 4 },
-  ];
-  const before = resolveMossproutDayActions({ dayId, goals: [], journey: mossproutJourneyForDay(state, dayId), offers, storyComplete: false });
+  // A daily question waits in the pool: once the field note is done, it takes the row at once.
+  const conversations = [{ definitionId: 'question:one', mode: 'talk' as const, title: 'Question one' }];
+  const before = resolveMossproutDayActions({ conversations, dayId, goals: [], journey: mossproutJourneyForDay(state, dayId), storyComplete: false });
   assert.ok(before.find((action) => action.kind === 'journal_prompt'));
 
   state = completeMossproutJourneyConversation(state, 'mossprout:conversation:nature-journal:one-growing-thing', 4);
-  const after = resolveMossproutDayActions({ dayId, goals: [], journey: mossproutJourneyForDay(state, dayId), offers, storyComplete: false });
-  assert.equal(after.length, 2);
+  const after = resolveMossproutDayActions({ conversations, dayId, goals: [], journey: mossproutJourneyForDay(state, dayId), storyComplete: false });
+  assert.equal(after.length, 1);
+  assert.equal(after[0]?.kind, 'fun_chat');
   assert.equal(after.every((action) => action.status !== 'completed'), true);
 });
 
@@ -959,7 +929,6 @@ test('Mossprout keeps offering independent nature activities after Journey actio
     ],
     goals: [],
     journey: mossproutJourneyForDay(state, '2026-08-21'),
-    offers: [],
     storyComplete: false,
   });
 
@@ -978,18 +947,14 @@ test('Mossprout lends an empty slot to the deepest eligible action queue', () =>
     dayId: '2026-08-21',
     goals: [],
     journey: null,
-    offers: [
-      { id: 'quest-mossprout-green-photo', title: 'Photograph green', hint: 'Take a photo', family: 'photo', bondReward: 5 },
-      { id: 'quest-mossprout-nature-note', title: 'Follow one detail', hint: 'Keep a note', family: 'note', bondReward: 5 },
-    ],
     storyComplete: false,
   });
 
   assert.deepEqual(actions.map((action) => action.slotId), ['together', 'field', 'garden']);
   assert.equal(actions.length, 3);
   const borrowed = actions.find((action) => action.slotId === 'garden');
-  assert.equal(borrowed?.kind, 'photo_request');
-  assert.equal(borrowed?.sourceSlotId, 'field');
+  assert.equal(borrowed?.kind, 'fun_chat');
+  assert.equal(borrowed?.sourceSlotId, 'together');
 });
 
 test('skipping a borrowed action advances its source queue rather than the borrowed display slot', () => {
@@ -1003,7 +968,6 @@ test('skipping a borrowed action advances its source queue rather than the borro
     ],
     goals: [],
     journey: null,
-    offers: [],
     storyComplete: false,
   });
   const borrowed = initial.find((action) => action.slotId === 'field');
@@ -1315,7 +1279,6 @@ test('Mossprout conversation completions keep the visible action row identity', 
     dayId,
     goals: [],
     journey: null,
-    offers: [],
     slotSequences: { together: 3, field: 0, garden: 0 },
     storyComplete: false,
   });
