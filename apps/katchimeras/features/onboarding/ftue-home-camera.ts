@@ -62,44 +62,12 @@ export function ftueHomeCameraPanTarget(stepId: string | null | undefined): numb
   }
 }
 
-/** The relationship-first Grove opening retreats once per Egg answer. */
-export function mossproutGroveEggCameraPinchTarget(
-  stepId: string | null | undefined,
-  maxPinchScale: number,
-): number | null {
-  const maximum = Math.max(1, maxPinchScale);
-  switch (stepId) {
-    case 'egg.opening':
-      return maximum;
-    case 'egg.context':
-      return Math.pow(maximum, 2 / 3);
-    case 'egg.mind':
-      return Math.pow(maximum, 1 / 3);
-    case 'egg.ready':
-      return 1;
-    default:
-      return null;
-  }
+/** Hold a moderate frame while the two answers grow the Egg. */
+export function mossproutGroveEggCameraPinchTarget(stepId: string | null | undefined, _maxPinchScale: number): number | null {
+  return stepId?.startsWith('egg.') ? 1 : null;
 }
-
-export function mossproutGroveEggCameraPanTarget(stepId: string | null | undefined): number {
-  switch (stepId) {
-    case 'egg.opening':
-      return FTUE_OPENING_CAMERA_PAN_Y;
-    case 'egg.context':
-      return FTUE_OPENING_CAMERA_PAN_Y * (2 / 3);
-    case 'egg.mind':
-      return FTUE_OPENING_CAMERA_PAN_Y * (1 / 3);
-    default:
-      return 0;
-  }
-}
-
-export function mossproutGroveEggCameraDuration(stepId: string | null | undefined): number {
-  return stepId === 'egg.opening'
-    ? FTUE_OPENING_CAMERA_DURATION_MS
-    : FTUE_ANSWER_CAMERA_DURATION_MS;
-}
+export function mossproutGroveEggCameraPanTarget(_stepId: string | null | undefined): number { return 0; }
+export function mossproutGroveEggCameraDuration(_stepId: string | null | undefined): number { return 900; }
 
 /**
  * Keep the Grove Egg on Today's established visual curve while reserving a

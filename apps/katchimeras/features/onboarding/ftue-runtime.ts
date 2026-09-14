@@ -96,6 +96,9 @@ function scheduleReceiptSync() {
 }
 
 function migrateCurrentScript(run: FtueRunState): FtueRunState {
+  if (run.status === 'active' && (run.stepId === 'egg.wisps' || run.stepId === 'egg.listening')) {
+    return { ...run, stepId: 'egg.opening', updatedAt: new Date().toISOString() };
+  }
   if (run.scriptVersion >= 44 && run.scriptVersion < 46) {
     const completedHabitOffer = run.stepId === 'companion.water_together' && Boolean(run.answers['companion.choose_water_together']);
     return { ...run, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version,

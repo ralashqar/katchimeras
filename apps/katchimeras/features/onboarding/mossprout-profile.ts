@@ -1,3 +1,5 @@
+import { makeHatchAnswer } from './hatch-profile';
+import { recordHatchProfileAnswers } from './hatch-profile-storage';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import {
   loadOnboardingProfile,
@@ -45,6 +47,12 @@ export function mossproutResidentForPlace(placeId: string | null | undefined): K
 }
 
 export function recordMossproutOnboardingAnswer(actionId: string, optionId: string) {
+  const questionId = actionId === 'egg.day_texture' ? 'friction' : actionId === 'egg.desired_help' ? 'support' : null;
+  const hatchAnswer = questionId ? makeHatchAnswer('mossprout', questionId, optionId, Date.now()) : null;
+  if (hatchAnswer) {
+    recordHatchProfileAnswers('mossprout', [hatchAnswer]);
+    return loadOnboardingProfile();
+  }
   const field = ACTION_FIELDS[actionId];
   if (!field) return loadOnboardingProfile();
   if (field === 'growthIntentId') optionId = normalizeMossproutIntent(optionId);

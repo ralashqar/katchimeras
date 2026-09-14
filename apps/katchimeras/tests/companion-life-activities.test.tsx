@@ -153,6 +153,7 @@ test('native menu keeps the main card mounted, completes an option, and handles 
     '@/constants/katchimera-action-art': { katchimeraActionArt: () => 1 },
     '@/utils/companion-bond': { COMPANION_BOND_REWARDS },
     '@/hooks/use-companion-calendar-day': { useCompanionCalendarDay: () => dayId },
+    '@/features/onboarding/hatch-profile-storage': { hatchSupportInvitation: () => 'Just one tiny thing is enough.' },
     '@/constants/companion-daily/rotation': await import('../constants/companion-daily/rotation'),
     '@/utils/companion-life-activity-storage': h.module,
     './companion-scene-overlay': overlay, './companion-choice-list': { CompanionChoiceList: 'Choices' },
@@ -207,7 +208,7 @@ test('native menu keeps the main card mounted, completes an option, and handles 
   assert.equal(tree!.root.findAllByType('Completed' as React.ElementType).length, 0);
   assert.equal(narration, null);
   await press('Notice one small thing');
-  assert.equal(narration, mossproutNoticePrompt(dayId).prompt);
+  assert.equal(narration, `Just one tiny thing is enough.\n\n${mossproutNoticePrompt(dayId).prompt}`);
   assert.equal(tree!.root.findAllByType('Water' as React.ElementType).length, 1);
   await act(async () => tree!.unmount());
 });

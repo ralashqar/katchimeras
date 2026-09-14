@@ -1,3 +1,4 @@
+import { EGG_FEED_TARGET_Y_RATIO } from './egg-feed-target';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import type { View } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -26,7 +27,6 @@ type EggFeedRequest = {
   commit: () => void;
 };
 
-const EGG_FEED_TARGET_Y_RATIO = 0.64;
 const FEED_ARRIVAL_WATCHDOG_MS = 2_500;
 
 export function useEggFeedController(externalEggTargetRef?: RefObject<View | null>) {

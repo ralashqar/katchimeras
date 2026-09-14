@@ -190,8 +190,8 @@ test('a friend’s daily cards and photo feed are content, and the Kingdom begin
   }
   assert.equal(HATCHABLE_COMPANIONS.find((definition) => definition.companion === 'baristabbit')?.egg.feed.kind, 'answer', 'Baristabbit’s Egg hatches on answers alone');
   const panel = readFileSync('components/katchadeck/world/steppling-encounter-panel.tsx', 'utf8');
-  assert.match(panel, /beginCompanionPhotoCapture\(definition\.companion, sourceDayId, photoPolicy\.category, 'egg'\)/);
-  assert.match(panel, /setSteps\(capture\.matched \? 1 : 0\)/, 'a matching photo is a feed of one; anything else falls through to the question');
+  assert.match(panel, /HATCH_PROFILES/);
+  assert.doesNotMatch(panel, /beginCompanionPhotoCapture|requestPermissions/);
   const actions = readFileSync('components/katchadeck/world/companion-daily-actions.tsx', 'utf8');
   assert.match(actions, /<CompanionLifeActivityCard companion=\{companion\} config=\{daily\}/, 'the photo card is the shared life-activity card on the friend’s config');
   const card = readFileSync('components/katchadeck/world/companion-life-activity-card.tsx', 'utf8');

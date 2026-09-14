@@ -65,7 +65,7 @@ export function mossproutFirstSeedForIntent(intentId: string | null | undefined)
   if (intentId === 'desired-help:energy') return { id: 'renewal', name: 'Seed of Renewal', message: 'Fresh starts can arrive one small unfurling at a time.' } as const;
   if (intentId === 'desired-help:good_day') return { id: 'warmth', name: 'Seed of Warmth', message: 'A good day is worth noticing while it is here.' } as const;
   if (intentId === 'desired-help:unsure') return { id: 'curiosity', name: 'Seed of Curiosity', message: 'Today, you left room to discover what feels right.' } as const;
-  return { id: 'momentum', name: 'Seed of Momentum', message: 'Today, you wanted a small beginning.' } as const;
+  return { id: 'momentum', name: 'Seed of Momentum', message: 'A small beginning, grown from what you shared.' } as const;
 }
 
 export function mossproutBondSharePrompt(promptId: string | null | undefined) {

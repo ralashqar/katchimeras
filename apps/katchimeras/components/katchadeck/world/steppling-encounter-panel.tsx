@@ -1,35 +1,20 @@
-import { EggHeroGuide } from '@/components/katchadeck/onboarding/ftue-guide-copy';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
 import { Gesture } from 'react-native-gesture-handler';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { EggHeroGuide } from '@/components/katchadeck/onboarding/ftue-guide-copy';
 import { ThemedText } from '@/components/themed-text';
 import { GameSurface } from '@/components/katchadeck/ui/game-surface';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
-import { ScriptedActionList } from '@/components/katchadeck/onboarding/scripted-action-list';
 import { EggActionDock, EggQuestionPanel } from '@/components/katchadeck/home/today-nurture-experience';
 import { eggQuestionAction } from '@/features/onboarding/egg-question-action';
-import { eggFeedOffer, hatchableEggReady, type HatchableEggProgress } from '@/features/onboarding/hatchable-egg-policy';
+import { hatchableEggReady, hatchWispClearedCount, type HatchableEggProgress } from '@/features/onboarding/hatchable-egg-policy';
+import { HATCH_PROFILES, HATCH_ANSWER_BOND } from '@/features/onboarding/hatch-profile';
 import type { useHatchableEncounter } from '@/features/onboarding/use-steppling-encounter';
-import type { FtueActionDefinition, FtueChoiceOption } from '@/features/onboarding/ftue-types';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
-import { beginCompanionPhotoCapture, cancelCompanionPhotoCapture, loadCompanionPhotoCapture, subscribeCompanionPhotoCapture } from '@/utils/companion-photo-capture-storage';
 
-/** Motion access as the Egg sees it. 'should_request' waits for the spoken ask before any system prompt. */
-type StepAccess = 'unknown' | 'should_request' | 'available' | 'denied' | 'unsupported';
-
-/**
- * A hatchable companion's Egg panel: the question, the feed the policy names
- * (yesterday's steps read from the pedometer, a photo of today taken on the
- * camera screen, or an answer alone), and the hatch. Everything on screen
- * comes from the companion's Egg policy. A photo feed counts like a step
- * feed of one: `steps` is null until the camera has answered, one when the
- * photo showed what the Egg asked for, zero when it did not (or the player
- * chose to tell it instead), which falls through to the alternative question.
- */
+/** Main companion eggs ask two equal-value questions. Sensor activities stay in daily care. */
 export function HatchableEncounterPanel({ definition, encounter, egg, cameraReady, onReady }: {
   definition: HatchableCompanionDefinition;
   encounter: ReturnType<typeof useHatchableEncounter>;
@@ -37,195 +22,31 @@ export function HatchableEncounterPanel({ definition, encounter, egg, cameraRead
   cameraReady: boolean;
   onReady?: () => void;
 }) {
-  const policy = definition.egg;
-  const stepsFeed = policy.feed.kind === 'steps';
-  const photoPolicy = policy.feed.kind === 'photo' ? policy.feed : null;
-  const intentChoices = useMemo<FtueChoiceOption[]>(() => policy.intent.options.map((option) => ({ ...option, icon: option.icon ?? 'sparkles' })), [policy.intent.options]);
-  const alternativeChoices = useMemo<FtueChoiceOption[]>(() => policy.alternative.options.map((option) => ({ ...option, icon: option.icon ?? 'sparkles' })), [policy.alternative.options]);
-  const accessActions = useMemo<readonly FtueActionDefinition[]>(() => policy.access ? [
-    { ...policy.access.allow, icon: policy.access.allow.icon ?? 'figure.walk', presentation: 'cta_action', handlerId: 'pedometer_steps' },
-    { ...policy.access.decline, icon: policy.access.decline.icon ?? 'heart.fill', presentation: 'cta_action', handlerId: 'acknowledgement' },
-  ] : [], [policy.access]);
-  const [laidOut, setLaidOut] = useState(false);
-  useEffect(() => { if (laidOut && cameraReady && egg) onReady?.(); }, [laidOut, cameraReady, egg, onReady]);
+  const [entered, setEntered] = useState(cameraReady);
+  useEffect(() => { if (cameraReady) setEntered(true); }, [cameraReady]);
   const insets = useSafeAreaInsets();
-  const reduceMotion = useReducedMotion();
-  const gesture = useMemo(() => Gesture.Pan().enabled(false), []);
-  const [steps, setSteps] = useState<number | null>(stepsFeed || photoPolicy ? null : 0);
-  const [reading, setReading] = useState(stepsFeed);
-  const [access, setAccess] = useState<StepAccess>(stepsFeed ? 'unknown' : 'unsupported');
-  const [requesting, setRequesting] = useState(false);
-  // A declined ask (or a refused system prompt) falls through to the movement
-  // question for this visit; the OS decision is re-read on the next one.
-  const declinedRef = useRef(false);
-  // Camera readiness gates the entrance, not the lifetime of an answering card.
-  // A settled notification / app resume must not tear down its native animation.
-  const [hasEntered, setHasEntered] = useState(cameraReady);
-  useEffect(() => { if (cameraReady) setHasEntered(true); }, [cameraReady]);
-  const [answerSteps, setAnswerSteps] = useState<number | null | undefined>();
-  const readRevision = useRef(0);
-  const sourceDayId = egg?.sourceDayId;
-  const readSteps = useCallback(async () => {
-    if (!sourceDayId || !stepsFeed) return;
-    const revision = ++readRevision.current;
-    setReading(true);
-    try {
-      const { Pedometer } = await import('expo-sensors');
-      if (!(await Pedometer.isAvailableAsync())) throw new Error('unavailable');
-      const permission = await Pedometer.getPermissionsAsync();
-      if (revision !== readRevision.current) return;
-      if (!permission.granted) {
-        if (permission.canAskAgain === false || declinedRef.current) { setAccess('denied'); setSteps(0); }
-        // Keep the count unknown: the movement fallback waits for the spoken ask.
-        else setAccess('should_request');
-        return;
-      }
-      setAccess('available');
-      const [year, month, day] = sourceDayId.split('-').map(Number);
-      const result = await Pedometer.getStepCountAsync(new Date(year, month - 1, day), new Date(year, month - 1, day + 1));
-      if (revision !== readRevision.current) return;
-      setSteps(Number.isFinite(result.steps) ? Math.max(0, Math.floor(result.steps)) : 0);
-    } catch {
-      if (revision !== readRevision.current) return;
-      setAccess('unsupported');
-      setSteps(0);
-    } finally { if (revision === readRevision.current) setReading(false); }
-  }, [sourceDayId, stepsFeed]);
-  useEffect(() => {
-    if (!stepsFeed) return;
-    void readSteps();
-    const subscription = AppState.addEventListener('change', (state) => { if (state === 'active') void readSteps(); });
-    return () => { readRevision.current += 1; subscription.remove(); };
-  }, [readSteps, stepsFeed]);
-  const allowSteps = useCallback(async () => {
-    if (requesting) return;
-    setRequesting(true);
-    try {
-      const { Pedometer } = await import('expo-sensors');
-      const granted = (await Pedometer.requestPermissionsAsync()).granted;
-      if (!granted) declinedRef.current = true;
-    } catch {
-      declinedRef.current = true;
-    } finally { setRequesting(false); }
-    await readSteps();
-  }, [readSteps, requesting]);
-  const declineSteps = useCallback(() => {
-    declinedRef.current = true;
-    setAccess('denied');
-    setSteps(0);
-  }, []);
-  // A photo feed: the camera screen answers through the Egg's capture session, read here on the way
-  // back (and on the next launch, if the app was killed in the camera). A session for another day or
-  // another friend is not this Egg's.
-  const router = useRouter();
-  const [captureId, setCaptureId] = useState<string | null>(null);
-  const [captureError, setCaptureError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!photoPolicy || !sourceDayId) return;
-    const apply = () => {
-      const capture = loadCompanionPhotoCapture();
-      if (!capture || capture.purpose !== 'egg' || capture.companion !== definition.companion || capture.dayId !== sourceDayId) { setCaptureId(null); setReading(false); return; }
-      setCaptureId(capture.id);
-      if (capture.phase !== 'ready') { setReading(true); return; }
-      setReading(false);
-      if (capture.error) { setCaptureError(capture.error); cancelCompanionPhotoCapture(capture.id); return; }
-      setCaptureError(null);
-      setSteps(capture.matched ? 1 : 0);
-    };
-    apply();
-    return subscribeCompanionPhotoCapture(apply);
-  }, [definition.companion, photoPolicy, sourceDayId]);
-  const photographForEgg = useCallback(() => {
-    if (!photoPolicy || !sourceDayId) return;
-    setCaptureError(null);
-    try {
-      const capture = beginCompanionPhotoCapture(definition.companion, sourceDayId, photoPolicy.category, 'egg');
-      setCaptureId(capture.id);
-      setReading(true);
-      router.push({ pathname: '/moment-capture', params: { photoCaptureId: capture.id, photoCategory: photoPolicy.category, photoFor: 'egg', companionReturnTo: '/katchimeras' } });
-    } catch {
-      setReading(false);
-      setCaptureError('The camera could not open. Tell it instead, or try again.');
-    }
-  }, [definition.companion, photoPolicy, router, sourceDayId]);
-  const tellInstead = useCallback(() => { setCaptureError(null); setSteps(0); }, []);
-  // Fed: the session has done its work.
-  const eggReady = hatchableEggReady(policy, egg);
-  useEffect(() => {
-    if (!eggReady || !captureId) return;
-    cancelCompanionPhotoCapture(captureId);
-    setCaptureId(null);
-  }, [captureId, eggReady]);
-
-  if (!hasEntered && !cameraReady) return null;
-  // Freeze *all* inputs selecting the current card, not just the saved Egg.
-  // Health permission/step refreshes may resolve while Bond is flying.
-  const displayedSteps = encounter.busy && answerSteps !== undefined ? answerSteps : steps;
-  const ready = hatchableEggReady(policy, egg);
-  const stepOffer = eggFeedOffer(policy, egg, displayedSteps ?? 0);
-  const movementFallback = displayedSteps != null && stepOffer.steps === 0;
-  const askForSteps = Boolean(egg?.intent) && !ready && access === 'should_request' && displayedSteps == null && accessActions.length > 0;
-  const question = egg && (!egg.intent || movementFallback && !ready) ? eggQuestionAction(
-    !egg.intent ? policy.intent.actionId : policy.alternative.actionId,
-    !egg.intent ? policy.intent.title : policy.alternative.title,
-    !egg.intent ? policy.intent.bond : policy.alternative.bond,
-    egg.sourceDayId,
-  ) : null;
-  // No cards or extra claim CTA during the shared hatch choreography.
-  if ((encounter.hatching || egg?.hatchedAt) && !encounter.error) return null;
-  const guide = !egg?.intent ? policy.guides.intent
-    : ready ? policy.guides.ready
-      : askForSteps ? policy.guides.permission
-      : question ? policy.guides.alternative
-        : stepOffer.steps > 0 ? policy.guides.feed
-        // A photo feed's ask: show it the cup, or tell it. While the camera is up, the reading line.
-        : photoPolicy && displayedSteps == null && !reading ? policy.guides.permission : policy.guides.reading;
+  const reduced = useReducedMotion();
+  const gesture = useMemo(() => Gesture.Tap().enabled(false), []);
+  useEffect(() => { if (cameraReady && egg) onReady?.(); }, [cameraReady, egg, onReady]);
+  const cleared = hatchWispClearedCount(egg);
+  const question = HATCH_PROFILES[definition.companion]?.questions[cleared];
+  const ready = hatchableEggReady(definition.egg, egg);
+  const action = question && egg ? eggQuestionAction(`egg.${definition.companion}.wisp.${question.id}`, question.title, HATCH_ANSWER_BOND, egg.sourceDayId) : null;
+  if ((!cameraReady && !entered) || (encounter.hatching || egg?.hatchedAt) && !encounter.error) return null;
   return <>
-    <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1 }} onLayout={() => setLaidOut(true)} />
-    <EggHeroGuide guide={guide} topInset={insets.top} />
+    <EggHeroGuide topInset={insets.top} guide={{ eyebrow: `${definition.displayName}’s Egg`, title: ready ? 'The Mist has let go.' : cleared ? 'That reached it. One little wisp remains.' : 'The egg is listening.', body: ready ? '' : 'The Mist gathers around things that feel tangled. There’s no wrong answer.' }} />
     <EggActionDock bottomInset={insets.bottom}>
-    {encounter.error ? <GameSurface><ThemedText accessibilityRole="alert">{encounter.error}</ThemedText>
-      {encounter.hatching ? <KatchaButton label="Try again" disabled={encounter.busy} onPress={() => void encounter.finish()} /> : null}
-    </GameSurface> : null}
-    {!egg ? <KatchaButton label="Try again" onPress={() => void encounter.enter()} disabled={encounter.busy} />
-      : askForSteps ? <ScriptedActionList actions={accessActions} locked={encounter.busy || requesting || !cameraReady} onAction={(action) => {
-        if (action.id === policy.access?.allow.id) void allowSteps();
-        else declineSteps();
-      }} />
-      : question ? <EggQuestionPanel
-        key={question.id} action={question}
-        completionEvent={encounter.feedCompletionKey ? { action: question, id: encounter.feedCompletionKey } : null}
-        onFinished={encounter.finishFeedPanel} enterFromBottom
-        interactionLocked={encounter.busy || !cameraReady} onSkip={() => {}} selection={null}
-        options={!egg.intent ? intentChoices : alternativeChoices}
-        reduceMotion={reduceMotion} swipeExternalGesture={gesture}
-        onChoose={(option, _from, currencyFrom) => {
-          setAnswerSteps(steps);
-          void encounter.feed({ kind: !egg.intent ? 'intent' : 'alternative', answer: option.id }, currencyFrom);
-        }}
-      /> : encounter.hatching || egg.hatchedAt ? null
-        : ready ? <ScriptedActionList actions={[{ id: policy.hatch.actionId, title: policy.hatch.title, description: policy.hatch.description, icon: 'sparkles', presentation: 'cta_action', handlerId: 'discovery_hatch' }]} locked={encounter.busy} onAction={() => void encounter.send({ kind: 'hatch' })} />
-          : stepOffer.steps > 0 && policy.feed.kind === 'steps' ? <ScriptedActionList completionKey={encounter.feedCompletionKey} onFinished={encounter.finishFeedPanel} actions={[{ id: 'egg.feed_steps', title: policy.feed.actionTitle, description: '', icon: 'heart.fill', presentation: 'route_action', handlerId: 'pedometer_steps' }]} stepCount={stepOffer.steps} stepEnergy={stepOffer.bond} locked={encounter.busy || reading || !cameraReady} onAction={(_action, from) => {
-            setAnswerSteps(steps);
-            void encounter.feed({ kind: 'feed', sourceDayId: egg.sourceDayId, observedSteps: steps ?? 0 }, from);
-          }} />
-          : photoPolicy && stepOffer.steps > 0 ? <ScriptedActionList completionKey={encounter.feedCompletionKey} onFinished={encounter.finishFeedPanel} actions={[{ id: 'egg.feed_photo', title: photoPolicy.feedTitle, description: '', icon: 'heart.fill', presentation: 'route_action', handlerId: 'journal_photo' }]} locked={encounter.busy || reading || !cameraReady} onAction={(_action, from) => {
-            setAnswerSteps(steps);
-            void encounter.feed({ kind: 'feed', sourceDayId: egg.sourceDayId, observedSteps: steps ?? 0 }, from);
-          }} />
-          : photoPolicy && !reading ? <>
-            {captureError ? <GameSurface><ThemedText accessibilityRole="alert">{captureError}</ThemedText></GameSurface> : null}
-            <ScriptedActionList actions={[
-              { id: 'egg.photo', title: photoPolicy.actionTitle, description: '', icon: 'camera.fill', presentation: 'route_action', handlerId: 'journal_photo' },
-              { id: 'egg.tell', title: photoPolicy.skipTitle, description: '', icon: 'heart.fill', presentation: 'cta_action', handlerId: 'acknowledgement' },
-            ]} locked={encounter.busy || !cameraReady} onAction={(action) => { if (action.id === 'egg.photo') photographForEgg(); else tellInstead(); }} />
-          </>
-            : <ScriptedActionList actions={[{ id: 'egg.read_steps', title: policy.feed.kind === 'steps' ? policy.feed.readingTitle : policy.guides.reading.title, description: '', icon: photoPolicy ? 'cup.and.saucer.fill' : 'figure.walk', presentation: 'route_action', handlerId: photoPolicy ? 'journal_photo' : 'pedometer_steps' }]} locked onAction={() => {}} />}
+      {encounter.error ? <GameSurface><ThemedText accessibilityRole="alert">{encounter.error}</ThemedText>{encounter.hatching ? <KatchaButton label="Try again" onPress={() => void encounter.finish()} /> : null}</GameSurface> : null}
+      {!egg ? <KatchaButton label="Try again" onPress={() => void encounter.enter()} /> : ready ?
+        <KatchaButton label="Hatch" disabled={encounter.busy} onPress={() => void encounter.send({ kind: 'hatch' })} /> : action && question ?
+        <EggQuestionPanel key={question.id} action={action} options={question.options.map((option) => ({ ...option, icon: 'sparkles' }))}
+          completionEvent={encounter.feedCompletionKey ? { action, id: encounter.feedCompletionKey } : null}
+          onFinished={encounter.finishFeedPanel} enterFromBottom interactionLocked={encounter.busy} onSkip={() => {}} selection={null}
+          reduceMotion={reduced} swipeExternalGesture={gesture}
+          onChoose={(option, _from, currencyFrom) => void encounter.feed({ kind: 'answer', questionId: question.id, answer: option.id }, currencyFrom)} /> : null}
     </EggActionDock>
   </>;
 }
-
-/** Steppling's panel, by its old name. */
 export function StepplingEncounterPanel(props: Omit<Parameters<typeof HatchableEncounterPanel>[0], 'definition'>) {
   return <HatchableEncounterPanel definition={STEPPLING_HATCHABLE} {...props} />;
 }

@@ -3,7 +3,7 @@ import { KatchimeraRosterRouteScreen, type KatchimeraWorldSession } from '@/comp
 import { KatchimeraCompanionRouteScreen } from '@/components/katchadeck/world/katchimera-companion-route-screen';
 import { MossproutEggFtueSurface } from '@/components/katchadeck/world/mossprout-egg-ftue-surface';
 import type { MossproutWorldInteractionRequest } from '@/components/katchadeck/world/mossprout-world-interaction';
-import type { WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
+import { mossproutFtueUsesEggStage, type WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import { MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID, mossproutFtueConversationDefinitionId } from '@/constants/mossprout-ftue-conversations';
 import { ftuePersonalizationKey, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { mossproutFtueStep, mossproutFtueUsesHostedCompanionStage } from '@/features/onboarding/mossprout-ftue-script';
@@ -128,12 +128,7 @@ export default function KatchimerasScreen() {
     });
   }, [router]);
 
-  const eggPresentationActive = ftueStep?.id === 'world.mist_lift'
-    || ftueStep?.id === 'world.egg_intro'
-    || ftueStep?.id === 'egg.opening'
-    || ftueStep?.id === 'egg.context'
-    || ftueStep?.id === 'egg.mind'
-    || ftueStep?.id === 'egg.ready';
+  const eggPresentationActive = mossproutFtueUsesEggStage(ftueStep?.id);
 
   // The route remains Haven throughout. These are presentation modes of the
   // adjacent Mossprout hex, so neither the retired Today page nor a companion

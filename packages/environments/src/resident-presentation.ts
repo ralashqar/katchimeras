@@ -2,8 +2,8 @@
 export const SHARED_RESIDENT_WIDTH = 108;
 export const SHARED_RESIDENT_HEIGHT = 139;
 export const SHARED_RESIDENT_BASELINE_LIFT = 8;
-export const SHARED_EGG_REST_ZOOM = 2.05;
-export const SHARED_EGG_CLOSE_ZOOM = 3.2;
+export const SHARED_EGG_REST_ZOOM = 1.95;
+export const SHARED_EGG_CLOSE_ZOOM = 3.0;
 export const SHARED_EGG_ENTRY_ZOOM = 1.35;
 export const SHARED_EGG_SCREEN_ANCHOR_Y = 0.5;
 export const SHARED_RESIDENT_SCREEN_ANCHOR_Y = 0.46;
@@ -24,4 +24,10 @@ export function usesSharedResidentStage(familyId?: string) {
 /** Terrain identity stays stable across the mist reveal; resident slots have their own IDs. */
 export function residentArtLayerId(tileId: string, familyId?: string) {
   return familyId === 'steppling' ? 'structure:steppling-home' : tileId;
+}
+
+/** Two answer arrivals ease the close-up back to the resting composition. */
+export function sharedEggZoom(cleared: number) {
+  const progress = Math.min(2, Math.max(0, cleared)) / 2;
+  return SHARED_EGG_CLOSE_ZOOM * Math.pow(SHARED_EGG_REST_ZOOM / SHARED_EGG_CLOSE_ZOOM, progress);
 }

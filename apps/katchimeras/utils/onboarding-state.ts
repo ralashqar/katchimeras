@@ -1,3 +1,4 @@
+import type { HatchAnswer } from '@/features/onboarding/hatch-profile';
 import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-storage';
 import { resetEggAvatarSelection } from '@/utils/egg-avatar-storage';
 import { resetCompanionWaterCounts } from '@/utils/companion-water-storage';
@@ -25,6 +26,7 @@ export type MossproutOnboardingAnswers = {
 
 export type OnboardingProfile = {
   schemaVersion: 3;
+  hatchProfiles?: Record<string, HatchAnswer[]>;
   completed: boolean;
   aspirationId: string | null;
   painPointIds: string[];

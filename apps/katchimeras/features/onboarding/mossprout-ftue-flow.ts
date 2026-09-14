@@ -60,7 +60,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
   // Independent from the legacy FTUE schema version. Bumping this lets v39
   // journal runs migrate onto the direct manifest without mutating a release.
-  version: 53,
+  version: 55,
   entryNodeId: 'world.mist_open',
   metadata: {
     kind: 'ftue' as const,
@@ -154,6 +154,8 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     story.complete(),
   ],
   migrations: {
+    'egg.wisps': 'egg.opening',
+    'egg.listening': 'egg.opening',
     // v51: merging is taught by the opening, so the guided drags are gone; v52: the first restore is paid with granted light, so the request is too.
     'merge.seed_drag': 'garden.first-bloom-offer.focus',
     'merge.second_seed_drag': 'garden.first-bloom-offer.focus',

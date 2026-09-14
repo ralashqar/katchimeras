@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
+import { HatchWispLayer } from './hatch-wisp-layer';
+import { HATCH_CLEANSE_MS } from '@/features/onboarding/hatch-profile';
+import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { ThemedText } from '@/components/themed-text';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { eggQuestionAction } from '@/features/onboarding/egg-question-action';
 import { eggBondFeedPayload } from '@/features/today/egg-bond-feed';
 import { ActivityIndicator, StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
@@ -81,6 +85,11 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
   const step = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
   const stepId = step?.id ?? null;
   const [actionBusy, setActionBusy] = useState(false);
+  const actionLock = useRef(false);
+  const [saveError, setSaveError] = useState(false);
+  const [cleansed, setCleansed] = useState<number | null>(null);
+  const cleanseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (cleanseTimer.current) clearTimeout(cleanseTimer.current); }, []);
   // A direct relaunch into Companion has no live hatch subject to preserve.
   // Start settled in that case. A live Egg -> Companion transition moves the
   // retained hatch subject to the exact Grove frame, then exchanges renderer
@@ -182,13 +191,14 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
   });
 
   const answeredCount = ATTUNEMENT_ACTION_IDS.filter((actionId) => Boolean(ftueRun?.answers[actionId])).length;
+  const visualAnswerCount = cleansed ?? answeredCount;
   const growth = useMemo<TodayGrowthSummary | null>(() => {
     if (!day) return null;
     const base = todayGrowthSummary(day, 0);
     // Reuse Today's authored Egg size curve with a dedicated two-answer FTUE
     // mapping, so both answers produce a visible step before Hatch.
-    const energyRatio = mossproutGroveEggEnergyRatio(answeredCount);
-    const stage = Math.min(2, Math.max(0, answeredCount)) as TodayGrowthSummary['stage'];
+    const energyRatio = mossproutGroveEggEnergyRatio(visualAnswerCount);
+    const stage = Math.min(2, Math.max(0, visualAnswerCount)) as TodayGrowthSummary['stage'];
     return {
       ...base,
       activeEnergy: Math.round(base.energyTarget * energyRatio),
@@ -198,11 +208,12 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
       isActivated: true,
       isReady: step?.id === 'egg.ready',
     };
-  }, [answeredCount, day, step?.id]);
+  }, [visualAnswerCount, day, step?.id]);
 
   const worldSubjectPresentation = useMemo<WorldFtueSubjectPresentation | null>(() => (
     worldHosted && growth ? {
       companionVisible: companionStageActive,
+      wispsCleared: cleansed ?? answeredCount,
       feedbackKey: eggFeedKey,
       feedExpressionKey: eggFeedLaunchKey,
       growthProgress: growth.energyRatio,
@@ -216,6 +227,8 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
       rewardPulseKey,
     } : null
   ), [
+    answeredCount,
+    cleansed,
     companionStageActive,
     eggFeedKey,
     eggFeedLaunchKey,
@@ -238,6 +251,11 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
 
   const handleScriptedAction = useCallback((action: FtueActionDefinition) => {
     if (actionBusy) return;
+    if (action.handlerId === 'acknowledgement') {
+      beginFtueAction(action.id);
+      commitFtueAction({ actionId: action.id });
+      return;
+    }
     if (action.handlerId === 'discovery_hatch') {
       if (ftueRun?.stepId !== 'egg.ready') return;
       const receipt = beginFtueAction('egg.hatch');
@@ -253,23 +271,49 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
     from: { x: number; y: number; w: number; h: number },
     currencyFrom?: { x: number; y: number; w: number; h: number },
   ) => {
-    if (actionBusy || !action.promptKind || !action.growthSource) return;
+    if (actionLock.current || actionBusy || !action.promptKind || !action.growthSource) return;
     const receipt = beginFtueAction(action.id);
     if (!receipt || receipt.status !== 'pending') return;
+    actionLock.current = true;
     setActionBusy(true);
+    setSaveError(false);
+    try { recordMossproutOnboardingAnswer(action.id, option.id); } catch { setSaveError(true); setActionBusy(false); actionLock.current = false; return; }
     const reward = action.growthReward ?? TODAY_GROWTH_REWARDS.reflection;
     startEggFeed(from, eggBondFeedPayload(reward, currencyFrom ?? from, option.label), () => {
-      recordMossproutOnboardingAnswer(action.id, option.id);
-      commitFtueAction({
-        actionId: action.id,
-        optionId: option.id,
-        optionLabel: option.label,
-        evidenceRef: `attunement:${action.id}:${option.id}`,
-        nextStepId: option.nextStepId,
-      });
-      setActionBusy(false);
+      setCleansed(answeredCount + 1);
+      cleanseTimer.current = setTimeout(() => {
+        try {
+          commitFtueAction({
+            actionId: action.id,
+            optionId: option.id,
+            optionLabel: option.label,
+            evidenceRef: `attunement:${action.id}:${option.id}`,
+            nextStepId: option.nextStepId,
+          });
+        } catch { setSaveError(true); }
+        finally {
+          setActionBusy(false);
+          actionLock.current = false;
+          setCleansed(null);
+        }
+      }, reduceMotion ? 150 : HATCH_CLEANSE_MS);
     });
-  }, [actionBusy, startEggFeed]);
+  }, [actionBusy, answeredCount, reduceMotion, startEggFeed]);
+
+  useEffect(() => {
+    if (actionBusy) return;
+    const questionId = stepId === 'egg.opening' ? 'friction' : stepId === 'egg.context' ? 'support' : null;
+    const saved = loadOnboardingProfile().hatchProfiles?.mossprout?.find((a) => a.questionId === questionId);
+    const actionId = questionId === 'friction' ? 'egg.day_texture' : 'egg.desired_help';
+    // Only recover an interrupted flight from this run. A profile retained by
+    // a tutorial restart must never silently answer the new run's questions.
+    const pending = ftueRun?.receipts.find((receipt) => receipt.stepId === stepId
+      && receipt.actionId === actionId && receipt.status === 'pending');
+    if (saved && pending && saved.timestamp >= Date.parse(pending.startedAt) && !ftueRun?.answers[actionId]) {
+      beginFtueAction(actionId);
+      commitFtueAction({ actionId, optionId: saved.answerId, evidenceRef: `hatch-resume:${saved.questionId}` });
+    }
+  }, [actionBusy, ftueRun, stepId]);
 
   if (!day || !growth) {
     return (
@@ -385,6 +429,8 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
             />
           </Animated.View>
         ) : null}
+        <HatchWispLayer targetRef={eggTargetRef} cleared={cleansed ?? answeredCount} visible={!worldHosted && !companionStageActive && !isHatching} />
+        {saveError ? <View style={{ position: 'absolute', bottom: insets.bottom + 10, left: 24, zIndex: 130 }}><ThemedText accessibilityRole="alert">That didn’t save. Please choose again.</ThemedText></View> : null}
         {!companionStageActive ? <EggFeedOverlay
           feed={eggFeed}
           onArrive={handleEggFeedArrive}

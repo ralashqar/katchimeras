@@ -1,8 +1,10 @@
 import { HAVEN_UPGRADE_TIMING, HAVEN_UPGRADE_REDUCED_TIMING, type HavenUpgradePresentationPhase } from './upgrade-presentation';
 
 /** Mossprout's camera-first timeline. Both games supply their camera and durable receipt. */
-export function playUpgradeSequence({ reduced, focus, onPhase, onComplete }: {
+export function playUpgradeSequence({ reduced, quickReveal = false, focus, onPhase, onComplete }: {
   reduced: boolean;
+  /** A mission already paid and focused: no empty payment or reaction hold. */
+  quickReveal?: boolean;
   focus: (settled: () => void) => void;
   onPhase: (phase: HavenUpgradePresentationPhase) => void;
   onComplete: () => void;
@@ -20,9 +22,10 @@ export function playUpgradeSequence({ reduced, focus, onPhase, onComplete }: {
   focus(() => {
     if (cancelled || focused) return;
     focused = true;
-    const timing = reduced ? HAVEN_UPGRADE_REDUCED_TIMING : HAVEN_UPGRADE_TIMING;
-    onPhase(reduced ? 'focus' : 'payment');
-    if (!reduced) schedule('cover', HAVEN_UPGRADE_TIMING.coverAtMs);
+    const timing = reduced ? HAVEN_UPGRADE_REDUCED_TIMING : quickReveal
+      ? { revealAtMs: 200, reactAtMs: 730, completeAtMs: 1100 } : HAVEN_UPGRADE_TIMING;
+    onPhase(reduced ? 'focus' : quickReveal ? 'cover' : 'payment');
+    if (!reduced && !quickReveal) schedule('cover', HAVEN_UPGRADE_TIMING.coverAtMs);
     schedule('reveal', timing.revealAtMs);
     schedule('react', timing.reactAtMs);
     schedule('complete', timing.completeAtMs);

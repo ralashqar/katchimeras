@@ -1,3 +1,4 @@
+import { recordHatchProfileAnswers } from '@/features/onboarding/hatch-profile-storage';
 import { GLOW } from '@/constants/glow';
 import * as SQLite from 'expo-sqlite';
 import { DEV_TOOLS_ENABLED } from '@/constants/dev';
@@ -565,6 +566,14 @@ export async function applyStoredHatchableEgg(definition: import('@/types/hatcha
     import('@/utils/companion-bond-storage'), import('@/utils/companion-bond'), import('@/features/onboarding/hatchable-egg-policy'),
   ]);
   const egg = hatchableEggProgress(result.state, definition);
+  if (egg?.wispAnswers?.length) {
+    recordHatchProfileAnswers(companion, egg.wispAnswers);
+    let bond = loadCompanionBondState();
+    for (const answer of egg.wispAnswers) {
+      bond = recordCompanionBondEvent(bond, { id: `${companion}:egg:wisp:${answer.questionId}`, creatureId: `companion:${companion}`, kind: 'reflection_saved', points: 15, occurredAt: answer.timestamp, dayId: egg.sourceDayId }).state;
+    }
+    saveCompanionBondState(bond);
+  }
   if (egg?.intent) {
     let bond = loadCompanionBondState();
     for (const [id, points] of [['intent', definition.egg.intent.bond], ...(egg.alternative ? [['movement', definition.egg.alternative.bond] as const] : [])] as const) {

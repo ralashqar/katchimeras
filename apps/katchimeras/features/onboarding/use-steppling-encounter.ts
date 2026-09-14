@@ -1,3 +1,4 @@
+import { HATCH_ANSWER_BOND, HATCH_CLEANSE_MS } from './hatch-profile';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -9,19 +10,21 @@ import { localDayId } from '@/utils/world-identity';
 import { IDLE_TODAY_HATCH_PRESENTATION, type TodayHatchPhase } from '@/utils/today-hatch-presentation';
 import { HATCH_PHASE_DELAYS_MS, REDUCED_HATCH_PHASE_DELAYS_MS } from '@/utils/hatch-reveal-timing';
 import type { WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
-import { eggFeedOffer, hatchableEggHasBeenFed, hatchableEggProgress, hatchableEggReady, type HatchableEggAction, type HatchableEggProgress } from './hatchable-egg-policy';
+import { eggFeedOffer, hatchWispClearedCount, hatchableEggProgress, hatchableEggReady, type HatchableEggAction, type HatchableEggProgress } from './hatchable-egg-policy';
 import { useEggFeedController } from '@/features/today/use-egg-feed-controller';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { eggBondFeedPayload } from '@/features/today/egg-bond-feed';
 import { createEggHatchHaptics } from '@/features/today/egg-haptics';
 
 /**
- * A hatchable companion's Egg encounter: opening it, answering its question,
- * feeding it the light its policy names, and the hatch choreography. The same
- * hook for every friend, keyed by their definition.
+ * Shared two-wisp encounter: save, fly Bond to the Egg, cleanse, then release
+ * the question card. Durable answers and transient presentation stay separate.
  */
 export function useHatchableEncounter(world: MergeWorldState, definition: HatchableCompanionDefinition) {
   const policy = definition.egg;
+  const [cleansed, setCleansed] = useState<number | null>(null);
+  const cleanseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (cleanseTimer.current) clearTimeout(cleanseTimer.current); }, []);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [feeding, setFeeding] = useState(false);
@@ -49,17 +52,16 @@ export function useHatchableEncounter(world: MergeWorldState, definition: Hatcha
       const result = await applyStoredHatchableEgg(definition, action);
       if (!result.changed && result.message) throw new Error(result.message);
       if (animateFeedback && result.changed && (action.kind === 'intent' || action.kind === 'feed' || action.kind === 'alternative')) setFeedback((value) => value + 1);
-      return true;
+      return action.kind === 'answer' ? result.changed : true;
     } catch { setError('That didn’t save. Please try again.'); return false; }
     finally { pending.current = false; setBusy(false); }
   }, [definition]);
   const enter = useCallback(async () => {
     setOpen(true);
-    // Steps are yesterday's, counted whole; a photo or an answer is today's.
+    // Hatch answers belong to the day the encounter begins.
     const source = new Date();
-    if (policy.feed.kind === 'steps') source.setDate(source.getDate() - 1);
     return send({ kind: 'begin', sourceDayId: localDayId(source) });
-  }, [policy.feed.kind, send]);
+  }, [send]);
   const close = useCallback(() => { if (!pending.current && !feedingRef.current && !hatching) { setOpen(false); setPhase('idle'); } }, [hatching]);
   const releaseFeedPanel = useCallback(() => {
     feedCompletionRef.current = null;
@@ -67,6 +69,7 @@ export function useHatchableEncounter(world: MergeWorldState, definition: Hatcha
     feedingRef.current = false;
     setFeeding(false);
     setFeedingEgg(undefined);
+    setCleansed(null);
   }, []);
   const finishFeedPanel = useCallback((completionKey: string) => {
     if (feedCompletionRef.current !== completionKey) return;
@@ -77,7 +80,7 @@ export function useHatchableEncounter(world: MergeWorldState, definition: Hatcha
     // Calculate against the pre-feed snapshot, exactly like the displayed card.
     const bondAmount = action.kind === 'feed'
       ? eggFeedOffer(policy, egg, action.observedSteps).bond
-      : action.kind === 'intent' ? policy.intent.bond : policy.alternative.bond;
+      : action.kind === 'answer' ? HATCH_ANSWER_BOND : action.kind === 'intent' ? policy.intent.bond : policy.alternative.bond;
     feedingRef.current = true; setFeeding(true); setFeedingEgg(egg);
     const ok = await send(action, false);
     const arrive = () => {
@@ -86,8 +89,11 @@ export function useHatchableEncounter(world: MergeWorldState, definition: Hatcha
       // Bond arrival starts the same panel outro as the first Egg. Keep the
       // pre-answer card and interaction lock until its onFinished handoff.
       const completionKey = `${definition.companion}:feed:${++feedSequenceRef.current}`;
-      feedCompletionRef.current = completionKey;
-      setFeedCompletionKey(completionKey);
+      setCleansed(hatchWispClearedCount(egg) + 1);
+      cleanseTimer.current = setTimeout(() => {
+        feedCompletionRef.current = completionKey;
+        setFeedCompletionKey(completionKey);
+      }, reduceMotion ? 150 : HATCH_CLEANSE_MS);
     };
     if (!ok || reduceMotion || bondAmount <= 0) { arrive(); return; }
     // Same batched Bond flight and launch/arrival Egg effects as question cards.
@@ -138,12 +144,13 @@ export function useHatchableEncounter(world: MergeWorldState, definition: Hatcha
   const presentation = useMemo<WorldFtueSubjectPresentation>(() => ({
     hatchFamilyId: definition.companion, companionVisible: Boolean(open && egg?.hatchedAt),
     preloadHatch: open,
-    feedbackKey: feedback, feedExpressionKey: eggFeedLaunchKey, growthProgress: 1, growthStage: hatchableEggHasBeenFed(feedingEgg ?? egg) ? 6 : 0,
+    wispsCleared: cleansed ?? hatchWispClearedCount(feedingEgg ?? egg),
+    feedbackKey: feedback, feedExpressionKey: eggFeedLaunchKey, growthProgress: (cleansed ?? hatchWispClearedCount(feedingEgg ?? egg)) / 2, growthStage: (cleansed ?? hatchWispClearedCount(feedingEgg ?? egg)) as 0 | 1 | 2,
     readyToHatch: hatchableEggReady(policy, feedingEgg ?? egg) && !hatching && !egg?.hatchedAt, rewardPulseKey: 0,
     hatchPresentation: open && (hatching || egg?.hatchedAt) ? { ...IDLE_TODAY_HATCH_PRESENTATION, animationKey: egg?.hatchStartedAt ?? 0, phase, policy: 'ftue_discovery' } : null,
     onHatchAssetsReady: onAssetsReady, onHatchAssetsError: onAssetsReady,
-  }), [definition.companion, egg, eggFeedLaunchKey, feedback, feedingEgg, hatching, onAssetsReady, open, phase, policy]);
-  return { definition, open, enter, close, finish, egg: feedingEgg ?? egg, busy: busy || feeding, error, send, feed, feedCompletionKey, finishFeedPanel, feedController, hatching, phase, presentation };
+  }), [cleansed, definition.companion, egg, eggFeedLaunchKey, feedback, feedingEgg, hatching, onAssetsReady, open, phase, policy]);
+  return { cleansed: cleansed ?? hatchWispClearedCount(feedingEgg ?? egg), definition, open, enter, close, finish, egg: feedingEgg ?? egg, busy: busy || feeding, error, send, feed, feedCompletionKey, finishFeedPanel, feedController, hatching, phase, presentation };
 }
 
 /** Steppling's encounter, by its old name. */

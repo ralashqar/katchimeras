@@ -1,3 +1,5 @@
+import { loadHatchProfile } from '@/features/onboarding/hatch-profile-storage';
+import { hatchableByCompanion } from '@/constants/hatchable-companions/registry';
 import { conversationTranscript, rememberConversationLine } from '@/utils/conversation-transcript';
 import { legacyMossproutPondConversation } from '@/constants/mossprout-campaign-conversations';
 import { useFocusEffect } from '@react-navigation/native';
@@ -322,8 +324,12 @@ export function useKingdomQuests({ kingdom, residents, today }: Args) {
     const definition = companionConversationDefinitionById.get(selectedConversationSession.definitionId) ?? null;
     if (definition?.id === 'steppling:journey:day-one' && selectedConversationSession.definitionVersion < 2) return legacyStepplingDayOneConversation;
     if (definition?.id === 'steppling:journey:day-one' && selectedConversationSession.definitionVersion === 2) return legacyStepplingDayOneConversationV2;
+    if (definition && definition.id === hatchableByCompanion(definition.familyId)?.dayOne.conversationId) {
+      const insight = loadHatchProfile(definition.familyId).initialInsight;
+      if (insight) return { ...definition, nodes: definition.nodes.map((node) => node.id === definition.entryNodeId && node.kind === 'choice' ? { ...node, prompt: `${insight}\n\n${node.prompt}` } : node) };
+    }
     if (!definition || definition.familyId !== 'mossprout') return definition;
-    if (definition.id.startsWith('mossprout:ftue:first-meeting:')) return resolveMossproutFtueConversation(definition, loadLifeOnboardingProfile().mossproutAnswers.growthIntentId, selectedConversationSession.definitionVersion);
+    if (definition.id.startsWith('mossprout:ftue:first-meeting:')) return resolveMossproutFtueConversation(definition, loadLifeOnboardingProfile().mossproutAnswers.growthIntentId, selectedConversationSession.definitionVersion, loadHatchProfile('mossprout').initialInsight);
     return resolveMossproutCampaignConversation(
       selectedConversationSession.definitionVersion < 5 ? legacyMossproutPondConversation(definition.id) ?? definition : definition,
       relationshipProgressionRepository.load().stories.mossprout,

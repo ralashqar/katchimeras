@@ -4,6 +4,7 @@ import type { MergeCharacterId } from '@/types/merge-world';
 export type WorldFtueSubjectPresentation = {
   /** Load the resident behind the Egg without starting hatch expressions. */
   preloadHatch?: boolean;
+  wispsCleared?: number;
   hatchFamilyId?: MergeCharacterId;
   companionVisible: boolean;
   feedbackKey: number;
@@ -24,18 +25,20 @@ export function worldEggReadyEffectsVisible(
   return Boolean(presentation?.readyToHatch && !presentation.hatchPresentation && !presentation.companionVisible);
 }
 
+/** Shared by the interaction host and world actor, including every Egg narrative beat. */
+export function mossproutFtueUsesEggStage(stepId: string | null | undefined) {
+  return stepId === 'world.mist_lift'
+    || stepId === 'world.egg_intro'
+    || Boolean(stepId?.startsWith('egg.'));
+}
+
 /** The Egg is an opening actor, never a fallback for a post-hatch resident. */
 export function mossproutWorldUsesEggRenderer(
   stepId: string | null | undefined,
   presentation?: Pick<WorldFtueSubjectPresentation, 'companionVisible' | 'hatchPresentation'> | null,
 ) {
   // The veil lift reveals the Egg on the nest, so it is an Egg beat too.
-  const preHatch = stepId === 'world.mist_lift'
-    || stepId === 'world.egg_intro'
-    || stepId === 'egg.opening'
-    || stepId === 'egg.context'
-    || stepId === 'egg.mind'
-    || stepId === 'egg.ready';
+  const preHatch = mossproutFtueUsesEggStage(stepId);
   const liveHandoff = stepId === 'companion.first_meeting'
     && Boolean(presentation?.hatchPresentation || presentation?.companionVisible);
   return preHatch || liveHandoff;

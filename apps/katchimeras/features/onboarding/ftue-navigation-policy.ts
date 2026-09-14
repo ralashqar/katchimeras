@@ -14,6 +14,8 @@ const PRE_MOSSPROUT_CONVERSATION_STEPS = new Set([
   'world.egg_intro',
   'egg.nature_theme',
   'egg.companion_identity',
+  'egg.wisps',
+  'egg.listening',
   'egg.opening',
   'egg.context',
   'egg.mind',

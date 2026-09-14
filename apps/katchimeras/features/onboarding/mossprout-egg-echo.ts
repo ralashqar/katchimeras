@@ -1,3 +1,4 @@
+import { HATCH_PROFILES } from './hatch-profile';
 import type { FtueGuide, FtueRunState, FtueStepDefinition } from './ftue-types';
 
 /**
@@ -25,6 +26,9 @@ export function mossproutEggGuide(
   run: Pick<FtueRunState, 'answers'> | null,
 ): FtueGuide | null {
   if (!step) return null;
+  const wispAnswers = HATCH_PROFILES.mossprout.questions;
+  if (step.id === 'egg.context' && wispAnswers[0].options.some((o) => o.id === run?.answers['egg.day_texture']?.optionId)) return step.guide;
+  if (step.id === 'egg.ready' && wispAnswers[1].options.some((o) => o.id === run?.answers['egg.desired_help']?.optionId)) return step.guide;
   const echo = step.id === 'egg.context'
     ? DAY_ECHOES[run?.answers['egg.day_texture']?.optionId ?? '']
     : step.id === 'egg.ready'

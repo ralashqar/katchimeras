@@ -1,3 +1,4 @@
+import { HATCH_PROFILES } from './hatch-profile';
 import { MOSSPROUT_GARDEN_RETURN, MOSSPROUT_FIRST_NOTICE } from './mossprout-first-grow';
 import { TODAY_GROWTH_REWARDS } from '@/utils/today-growth';
 import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
@@ -5,34 +6,16 @@ import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout'
 import type { FtueScriptDefinition } from './ftue-types';
 import { STEPPLING_DISCOVERY_ID } from '@/constants/companion-discovery-catalog';
 import { MOSSPROUT_BOND_SHARE_PROMPTS } from './mossprout-bond-share';
-import { MOSSPROUT_FTUE_COPY as COPY, MOSSPROUT_DAY_OPTIONS, MOSSPROUT_HELP_OPTIONS } from './mossprout-ftue-copy';
+import { MOSSPROUT_FTUE_COPY as COPY } from './mossprout-ftue-copy';
 import { OPENING_CAMERA_ANCHOR_Y, OPENING_CAMERA_ENTRY_MS, OPENING_CAMERA_ZOOM, OPENING_MERGE_REQUIRED } from './opening-mist';
 
-// 2.05 is the established, correctly framed world-map composition. Feeding
-// begins closer and retreats toward it; it must never retreat to the generic
-// 1x world camera because that makes the growing Egg lose its framing.
-import { SHARED_EGG_REST_ZOOM, SHARED_EGG_CLOSE_ZOOM, SHARED_EGG_ENTRY_ZOOM } from '@/components/katchadeck/world/shared-resident-presentation';
+// Start just wider than the original close-up and pull back with each answer.
+import { sharedEggZoom, SHARED_EGG_CLOSE_ZOOM, SHARED_EGG_REST_ZOOM, SHARED_EGG_ENTRY_ZOOM } from '@/components/katchadeck/world/shared-resident-presentation';
 export const MOSSPROUT_WORLD_EGG_REST_ZOOM = SHARED_EGG_REST_ZOOM;
 export const MOSSPROUT_WORLD_EGG_CLOSE_ZOOM = SHARED_EGG_CLOSE_ZOOM;
 export const MOSSPROUT_WORLD_EGG_ENTRY_ZOOM = SHARED_EGG_ENTRY_ZOOM;
 export function mossproutWorldEggZoom(stepId: string): number {
-  const close = MOSSPROUT_WORLD_EGG_CLOSE_ZOOM;
-  const rest = MOSSPROUT_WORLD_EGG_REST_ZOOM;
-  const equalRetreat = (feedsRemaining: number) => (
-    rest * Math.pow(close / rest, feedsRemaining / 3)
-  );
-  switch (stepId) {
-    case 'world.egg_intro':
-    case 'egg.opening':
-      return close;
-    case 'egg.context':
-      return equalRetreat(2);
-    case 'egg.mind':
-      return equalRetreat(1);
-    case 'egg.ready':
-    default:
-      return rest;
-  }
+  return sharedEggZoom(stepId === 'egg.opening' ? 0 : stepId === 'egg.context' ? 1 : 2);
 }
 
 const mossproutCompanionResume = {
@@ -75,24 +58,24 @@ export const MOSSPROUT_FTUE_RETURN_NOTE_ID = 'mossprout:chapter-0:return-note';
 const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   {
     id: 'egg.opening', surface: 'haven',
-    guide: { eyebrow: 'Mossprout’s Egg', title: 'It’s listening.', body: '' },
+    guide: { eyebrow: 'Two wisps remain', title: 'The Mist gathers where growth feels tangled.', body: 'Every answer creates Glow. There’s no wrong answer.' },
     camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.opening'), anchorY: 0.5, durationMs: 520 },
     actions: [{
-      id: 'egg.day_texture', title: COPY.dayQuestion, description: '', icon: 'leaf.fill',
+      id: 'egg.day_texture', title: HATCH_PROFILES.mossprout.questions[0].title, description: '', icon: 'leaf.fill',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'day_focus', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
       nextStepId: 'egg.context', backendEvent: true,
-      options: MOSSPROUT_DAY_OPTIONS,
+      options: HATCH_PROFILES.mossprout.questions[0].options.map((option) => ({ ...option, icon: 'leaf.fill' })),
     }],
   },
   {
     id: 'egg.context', surface: 'haven',
-    guide: { eyebrow: 'Mossprout’s Egg', title: 'That reached it.', body: '' },
+    guide: { eyebrow: 'One wisp remains', title: 'Your answer cleared a little Mist.', body: 'Share what helps you grow. Clear the last wisp.' },
     camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.context'), anchorY: 0.49, durationMs: 520 },
     actions: [{
-      id: 'egg.desired_help', title: COPY.helpQuestion, description: '', icon: 'heart.fill',
+      id: 'egg.desired_help', title: HATCH_PROFILES.mossprout.questions[1].title, description: '', icon: 'heart.fill',
       presentation: 'inline_choice', handlerId: 'player_profile', promptKind: 'day_focus', growthSource: 'reflection', growthReward: FTUE_EGG_ANSWER_GROWTH_REWARD,
       nextStepId: 'egg.ready', backendEvent: true,
-      options: MOSSPROUT_HELP_OPTIONS,
+      options: HATCH_PROFILES.mossprout.questions[1].options.map((option) => ({ ...option, icon: 'heart.fill' })),
     }],
   },
   {
@@ -144,7 +127,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 50,
+  version: 51,
   entryStepId: 'world.mist_open',
   terminalStepId: 'complete',
   steps: [
@@ -181,12 +164,12 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'world.egg_intro', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: 'A new friend', title: COPY.eggHeardYou, body: '' },
       actions: [{ id: 'world.inspect_mossprout_egg', title: 'Come closer', description: 'See how the Egg responds to you.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'egg.opening' }],
-      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM, anchorY: 0.5, durationMs: 3_900 },
+      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM, anchorY: 0.5, durationMs: 900 },
     },
     ...openingQuestionSteps,
     {
       id: 'egg.ready', surface: 'haven',
-      guide: { eyebrow: 'Mossprout’s Egg', title: 'Something in there heard you.', body: '' },
+      guide: { eyebrow: 'The wisps are gone', title: 'Your Glow freed the egg.', body: 'It knows a little about you already.' },
       actions: [{ id: 'egg.hatch', title: 'Hatch', description: 'See who heard you.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'discovery_hatch', nextStepId: 'companion.first_meeting', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.ready'), anchorY: 0.5, durationMs: 520 },

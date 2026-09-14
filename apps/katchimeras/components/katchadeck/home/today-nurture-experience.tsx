@@ -2048,8 +2048,9 @@ export function EggQuestionPanel({ action, completionEvent, enterFromBottom = fa
   const sourceRef = useRef<ViewType | null>(null);
   const [localSelection, setLocalSelection] = useState<CheckInSelection | null>(null);
   useEffect(() => { if (!interactionLocked) setLocalSelection(null); }, [interactionLocked]);
-  // Only the first FTUE question uses the original five mood faces (3 + 2).
-  const moodQuestion = action.id === 'egg.day_texture';
+  // Legacy weather answers retain their faces; the new friction question
+  // shares the durable action ID but uses the ordinary illustrated rows.
+  const moodQuestion = action.id === 'egg.day_texture' && options.every((option) => Boolean(option.domainChoiceId));
   const visibleOptions = options.slice(0, moodQuestion ? 5 : 4);
   return (
     <View collapsable={false} ref={sourceRef}>

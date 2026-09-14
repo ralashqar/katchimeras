@@ -1,5 +1,5 @@
 export {
-  SHARED_RESIDENT_WIDTH, SHARED_RESIDENT_HEIGHT, SHARED_RESIDENT_BASELINE_LIFT, SHARED_EGG_REST_ZOOM, SHARED_EGG_CLOSE_ZOOM, SHARED_EGG_ENTRY_ZOOM,
+  sharedEggZoom, SHARED_RESIDENT_WIDTH, SHARED_RESIDENT_HEIGHT, SHARED_RESIDENT_BASELINE_LIFT, SHARED_EGG_REST_ZOOM, SHARED_EGG_CLOSE_ZOOM, SHARED_EGG_ENTRY_ZOOM,
   SHARED_EGG_SCREEN_ANCHOR_Y, SHARED_RESIDENT_SCREEN_ANCHOR_Y, SHARED_RESIDENT_FOCUS_DURATION_MS, sharedResidentAnchor, sharedResidentCenterY,
 } from '@incubator/environments/resident-presentation';
 import { hatchableByCompanion } from '@/constants/hatchable-companions/registry';
@@ -14,3 +14,6 @@ export function residentArtLayerId(tileId: string, familyId?: string) {
   const hatchable = familyId ? hatchableByCompanion(familyId) : null;
   return hatchable ? `structure:${hatchable.tile.id}` : tileId;
 }
+
+/** Original fixed framing for Steppling and subsequent discovered eggs. */
+export const DISCOVERED_EGG_ZOOM = 2.05;

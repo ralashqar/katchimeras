@@ -1,3 +1,5 @@
+import { EGG_FEED_TARGET_Y_RATIO } from '@/features/today/egg-feed-target';
+import { HatchWispLayer } from './hatch-wisp-layer';
 import { playUpgradeSequence } from '@incubator/environments/upgrade-sequence';
 import {createHexTileRenderer} from '@incubator/environments/hex-tile';
 import { WorldUpgradeMarker } from './world-upgrade-marker';
@@ -6,7 +8,7 @@ import { WorldUpgradeAnchor } from './world-upgrade-anchor';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { useFocusEffect } from '@react-navigation/native';
-import { SHARED_RESIDENT_WIDTH, SHARED_RESIDENT_HEIGHT, SHARED_RESIDENT_BASELINE_LIFT, SHARED_EGG_REST_ZOOM, SHARED_EGG_SCREEN_ANCHOR_Y, SHARED_RESIDENT_SCREEN_ANCHOR_Y, SHARED_RESIDENT_FOCUS_DURATION_MS, sharedResidentCenterY, residentArtLayerId, usesSharedResidentStage } from './shared-resident-presentation';
+import { SHARED_RESIDENT_WIDTH, SHARED_RESIDENT_HEIGHT, SHARED_RESIDENT_BASELINE_LIFT, DISCOVERED_EGG_ZOOM, SHARED_EGG_SCREEN_ANCHOR_Y, SHARED_RESIDENT_SCREEN_ANCHOR_Y, SHARED_RESIDENT_FOCUS_DURATION_MS, sharedResidentCenterY, residentArtLayerId, usesSharedResidentStage } from './shared-resident-presentation';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import {
@@ -1037,7 +1039,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     discoveredEggOriginRef.current = readLiveCameraSnapshot();
     focusTutorialResident(anchor.x, sharedResidentCenterY(anchor.y), {
       anchorY: SHARED_EGG_SCREEN_ANCHOR_Y,
-      zoom: SHARED_EGG_REST_ZOOM,
+      zoom: DISCOVERED_EGG_ZOOM,
       durationMs: reduceMotion ? 0 : SHARED_RESIDENT_FOCUS_DURATION_MS,
     });
   }, [animateToCameraSnapshot, discoveredEggInteraction, focusTutorialResident, gatewayTileId, interactionResidentId, readLiveCameraSnapshot, reduceMotion, scene.tileArtLayers, tutorialCameraReady]);
@@ -1419,6 +1421,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     };
     const cancelSequence = playUpgradeSequence({
       reduced: motionReduced,
+      quickReveal: !presentation.veilLift && presentation.coinCost === 0
+        && presentation.showCoins === false && !presentation.reactionLine
+        && hatchableByCompanion(presentation.characterId) != null,
       focus: settled => presentation.cameraAlreadyFocused ? settled() : upgradeFocusRef.current(layers.tile.cx, layers.tile.cy, motionReduced, settled),
       onPhase: phase => {
         setUpgradePhase(phase);
@@ -2067,9 +2072,12 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   fullSize?: boolean;
   revealProgress?: SharedValue<number>;
 }) {
+  const localTargetRef = useRef<ViewType | null>(null);
+  const wispTargetRef = targetRef ?? localTargetRef;
   const { equippedFaceId } = useEggAvatar();
   const reduceMotion = useReducedMotion();
   const opacity = useSharedValue(fullSize ? 1 : 0);
+  // Later discoveries start at full size; answer progress still drives wisps and camera.
   const growthProgress = fullSize ? 1 : presentation?.growthProgress ?? 0;
   const visualGrowth = useSharedValue(eggVisualGrowthForEnergyRatio(growthProgress));
   const feedbackPulse = useSharedValue(0);
@@ -2294,6 +2302,18 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
   const creatureRewardGlowSize = WORLD_FTUE_REWARD_GLOW_SIZE * WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE;
   const hatchPulseRingSize = WORLD_FTUE_EGG_WIDTH * 1.05 * WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE;
   const hatchPulseRingCenterY = WORLD_FTUE_EGG_HEIGHT * 0.08 + WORLD_FTUE_EGG_WIDTH * 1.05 / 2;
+  // Use the Egg's UI-thread camera values, not delayed native measurements.
+  const wispFrame = useDerivedValue(() => ({
+    x: sceneWidth / 2 + cameraTranslateX.value + (x - sceneWidth / 2) * cameraScale.value,
+    // The native Egg's centre is half its fixed frame above its projected anchor.
+    // All offsets from that centre are world distances, scaled by the camera.
+    y: sceneHeight / 2 + cameraTranslateY.value + (y - sceneHeight / 2) * cameraScale.value
+      - height / 2 - height * (0.5 + visualGrowth.value * 0.5) * 0.45 * cameraScale.value,
+    radius: width * (0.5 + visualGrowth.value * 0.5) / 2 + 12,
+    scale: cameraScale.value,
+    sourceY: height * (EGG_FEED_TARGET_Y_RATIO - 0.5) / cameraScale.value
+      + height * (0.5 + visualGrowth.value * 0.5) * 0.45,
+  }));
   const projectionStyle = useAnimatedStyle(() => ({
     opacity: revealProgress?.value ?? 1,
     transform: [
@@ -2311,7 +2331,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
       },
     ],
   }));
-  return (
+  return (<>
     <Animated.View
       pointerEvents="box-none"
       style={[styles.worldFtueProjectedSubject, { height, width }, projectionStyle]}>
@@ -2352,7 +2372,7 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
         shouldRasterizeIOS={false}
         style={[StyleSheet.absoluteFill, eggMotionStyle]}>
         <Animated.View style={[StyleSheet.absoluteFill, eggFadeStyle]}>
-        <View collapsable={false} ref={targetRef} style={StyleSheet.absoluteFill}>
+        <View collapsable={false} ref={wispTargetRef} style={StyleSheet.absoluteFill}>
         <Pressable accessibilityLabel={idleDiscovery || (presentation?.hatchFamilyId && presentation.hatchFamilyId !== 'mossprout') ? 'Discovered Egg' : 'Mossprout Egg'} accessibilityRole="button" disabled={!onPress} onPress={onPress} style={StyleSheet.absoluteFill}>
           <Animated.View
             collapsable={false}
@@ -2481,6 +2501,9 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
         </Animated.View>
       ) : null}
     </Animated.View>
+    <HatchWispLayer targetRef={wispTargetRef} projectedFrame={wispFrame} cleared={presentation?.wispsCleared ?? presentation?.growthStage ?? 0}
+      revealProgress={revealProgress} visible={!presentation?.hatchPresentation && !presentation?.companionVisible} />
+    </>
   );
 });
 

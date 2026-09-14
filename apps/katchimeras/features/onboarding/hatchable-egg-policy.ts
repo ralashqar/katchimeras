@@ -1,19 +1,17 @@
+import { HATCH_PROFILES, makeHatchAnswer, type HatchAnswer } from './hatch-profile';
 import type { MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import type { HatchableCompanionDefinition, HatchableEggPolicy } from '@/types/hatchable-companion';
 import { reduceGlowDiscovery } from '@/utils/merge-world/glow-discovery-policy';
 
 /**
- * A hatchable companion's Egg: found under the cleared tile, asked one
- * question, fed with the light its policy names (yesterday's steps, a photo
- * of today's drink, or an answer alone), and hatched. The policy is data on
- * the companion's definition; this module is the same for every friend.
- *
- * `fedSteps` is the progress toward the feed target whatever the feed is: for
- * a photo, one matching photo fills it; for an answer-only Egg it stays zero
- * and the alternative answer readies it.
+ * Two saved answers clear the Egg's wisps. Legacy feeding fields remain for
+ * old saves and command compatibility; new encounters use `answer` only.
  */
 export type HatchableEggProgress = {
   sourceDayId: string;
+  wispAnswers?: HatchAnswer[];
+  legacyWispCredit?: number;
+  wispVersion?: 1;
   intent: string | null;
   fedSteps: number;
   /** Full observed total explicitly fed for Bond; hatch progress stays capped at the target. */
@@ -24,6 +22,7 @@ export type HatchableEggProgress = {
 };
 export type HatchableEggAction =
   | { kind: 'begin'; sourceDayId: string }
+  | { kind: 'answer'; questionId: string; answer: string }
   | { kind: 'intent'; answer: string }
   | { kind: 'feed'; sourceDayId: string; observedSteps: number }
   | { kind: 'alternative'; answer: string }
@@ -52,16 +51,35 @@ export function eggFeedOffer(policy: HatchableEggPolicy, egg: HatchableEggProgre
 }
 
 // A discovered Egg sleeps until a saved answer/feed gives it its first Bond.
-export const hatchableEggHasBeenFed = (egg?: HatchableEggProgress) => Boolean(egg && (egg.intent || egg.fedSteps > 0 || egg.alternative));
+export const hatchableEggHasBeenFed = (egg?: HatchableEggProgress) => Boolean(egg && (egg.intent || egg.fedSteps > 0 || egg.alternative || egg.wispAnswers?.length));
 export const hatchableEggReady = (policy: HatchableEggPolicy, egg?: HatchableEggProgress) => {
   const target = eggFeedTarget(policy);
+  if (egg?.wispVersion) return hatchWispClearedCount(egg) >= 2;
   return Boolean(egg && ((target > 0 && egg.fedSteps >= target) || egg.alternative));
 };
+
+export function hatchWispClearedCount(egg?: HatchableEggProgress): 0 | 1 | 2 {
+  if (!egg) return 0;
+  return Math.min(2, (egg.legacyWispCredit ?? 0) + (egg.wispAnswers?.length ?? 0)) as 0 | 1 | 2;
+}
 
 export function normalizeHatchableEgg(policy: HatchableEggPolicy, raw: HatchableEggProgress | undefined): HatchableEggProgress | undefined {
   if (!raw || typeof raw !== 'object' || typeof raw.sourceDayId !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw.sourceDayId)) return undefined;
   const date = new Date(`${raw.sourceDayId}T12:00:00Z`);
   if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== raw.sourceDayId) return undefined;
+  if (raw.wispVersion === 1) {
+    const answers: HatchAnswer[] = [];
+    for (const item of Array.isArray(raw.wispAnswers) ? raw.wispAnswers : []) {
+      if (!item || typeof item !== 'object') continue;
+      const answer = makeHatchAnswer(item.katchimeraId, item.questionId, item.answerId, item.timestamp, item.definitionVersion ?? 1);
+      if (answer && !answers.some((prior) => prior.questionId === answer.questionId)) answers.push(answer);
+    }
+    const legacyWispCredit = Math.min(2, safeSteps(raw.legacyWispCredit ?? 0));
+    const ready = answers.length + legacyWispCredit >= 2;
+    return { ...raw, wispAnswers: answers, legacyWispCredit,
+      hatchStartedAt: ready && safeSteps(raw.hatchStartedAt ?? 0) > 0 ? raw.hatchStartedAt : null,
+      hatchedAt: ready && raw.hatchStartedAt && safeSteps(raw.hatchedAt ?? 0) > 0 ? raw.hatchedAt : null };
+  }
   const intent = policy.intent.options.some((option) => option.id === raw.intent) ? raw.intent : null;
   const alternative = policy.alternative.options.some((option) => option.id === raw.alternative) ? raw.alternative : null;
   const target = eggFeedTarget(policy);
@@ -94,26 +112,36 @@ export function reduceHatchableEgg(state: MergeWorldState, definition: Hatchable
   if (!state.worldUnlocks?.[definition.tile.unlockId]) return no('Clear the mist first.');
   if (state.companionDiscovery.records.some((record) => record.characterId === definition.companion)) return no();
   let egg = hatchableEggProgress(state, definition);
+  if (egg && !egg.wispVersion) {
+    const ready = hatchableEggReady(policy, egg);
+    egg = { ...egg, wispVersion: 1, wispAnswers: [], legacyWispCredit: ready ? 2 : egg.intent ? 1 : 0 };
+  }
   if (action.kind === 'begin') {
-    if (egg) return no();
-    egg = normalizeHatchableEgg(policy, { sourceDayId: action.sourceDayId, intent: null, fedSteps: 0, alternative: null, hatchStartedAt: null, hatchedAt: null });
+    if (hatchableEggProgress(state, definition)?.wispVersion === 1) return no();
+    if (egg) return { state: { ...withHatchableEgg(state, definition, egg), revision: state.revision + 1, updatedAt: now }, changed: true };
+    egg = normalizeHatchableEgg(policy, { wispVersion: 1, wispAnswers: [], legacyWispCredit: 0, sourceDayId: action.sourceDayId, intent: null, fedSteps: 0, alternative: null, hatchStartedAt: null, hatchedAt: null });
     if (!egg) return no('The source day is invalid.');
   } else {
     if (!egg) return no('Open the Egg first.');
-    if (action.kind === 'intent') {
+    if (action.kind === 'answer') {
+      const question = HATCH_PROFILES[definition.companion]?.questions[hatchWispClearedCount(egg)];
+      const answer = makeHatchAnswer(definition.companion, action.questionId, action.answer, now);
+      if (egg.hatchStartedAt || question?.id !== action.questionId || !answer) return no();
+      egg = { ...egg, wispAnswers: [...(egg.wispAnswers ?? []), answer] };
+    } else if (action.kind === 'intent') {
       if (egg.intent || !policy.intent.options.some((option) => option.id === action.answer)) return no();
-      egg = { ...egg, intent: action.answer };
+      egg = { ...egg, intent: action.answer, legacyWispCredit: 1 };
     } else if (action.kind === 'feed') {
       const target = eggFeedTarget(policy);
       if (!egg.intent || egg.hatchStartedAt || target === 0 || action.sourceDayId !== egg.sourceDayId || !Number.isFinite(action.observedSteps)) return no();
       const fedSteps = Math.max(egg.fedSteps, Math.min(target, safeSteps(action.observedSteps)));
       if (fedSteps === egg.fedSteps) return no();
-      egg = { ...egg, fedSteps, bondFedSteps: Math.max(egg.bondFedSteps ?? egg.fedSteps, safeSteps(action.observedSteps)) };
+      egg = { ...egg, fedSteps, legacyWispCredit: fedSteps >= target ? 2 : 1, bondFedSteps: Math.max(egg.bondFedSteps ?? egg.fedSteps, safeSteps(action.observedSteps)) };
     } else if (action.kind === 'alternative') {
       if (!egg.intent || egg.hatchStartedAt || egg.alternative || !policy.alternative.options.some((option) => option.id === action.answer)) return no();
-      egg = { ...egg, alternative: action.answer };
+      egg = { ...egg, alternative: action.answer, legacyWispCredit: 2 };
     } else if (action.kind === 'hatch') {
-      if (!egg.intent || !hatchableEggReady(policy, egg) || egg.hatchStartedAt) return no();
+      if (!hatchableEggReady(policy, egg) || egg.hatchStartedAt) return no();
       egg = { ...egg, hatchStartedAt: now };
     } else {
       if (!egg.hatchStartedAt || !hatchableEggReady(policy, egg)) return no('This Egg is not ready yet.');

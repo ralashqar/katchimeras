@@ -70,8 +70,8 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
   const lift = mossproutFtueStep('world.mist_lift')!;
   assert.equal(lift.actions[0]?.id, 'world.mist_lifted');
   assert.equal(lift.actions[0]?.nextStepId, 'world.egg_intro');
-  assert.equal(lift.guide.title, 'The last one falls. The Mist lets go.');
-  assert.equal(mossproutFtueStep('world.egg_intro')?.guide.title, 'And something under it heard you looking.');
+  assert.equal(lift.guide.title, 'The clearing opens. Look what was underneath.');
+  assert.equal(mossproutFtueStep('world.egg_intro')?.guide.title, 'An egg appears. Two wisps still cling to it.');
   assert.equal(mossproutFtueStep('world.egg_intro')?.actions[0]?.nextStepId, 'egg.opening');
   for (const stepId of MOSSPROUT_OPENING_STEP_IDS) {
     const step = mossproutFtueStep(stepId)!;
@@ -234,10 +234,48 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(surface, /const state = override \?\? subscribed;/, 'the surface renders an explicit board over the provider one');
   assert.match(route, /if \(stepId === 'world\.mist_open'\) \{\s*commitFtueAction\(\{ actionId: 'world\.look_closer'/);
   const tab = readFileSync('app/(tabs)/katchimeras.tsx', 'utf8');
-  assert.match(tab, /const eggPresentationActive = ftueStep\?\.id === 'world\.mist_lift'/);
+  assert.match(tab, /const eggPresentationActive = mossproutFtueUsesEggStage\(ftueStep\?\.id\)/);
   const egg = readFileSync('components/katchadeck/world/mossprout-egg-ftue-surface.tsx', 'utf8');
   assert.match(egg, /const scriptedActions = stepId === 'world\.egg_intro' \|\| stepId === 'world\.mist_lift'/);
   const caption = readFileSync('components/katchadeck/world/kingdom-opening-caption.tsx', 'utf8');
   assert.match(caption, /setTimeout\(\(\) => setPage\(1\), reduceMotion \? 1_200 : OPENING_CAPTION_PAGE_MS\)/);
   assert.match(caption, /disabled=\{page === 1\}[\s\S]*?onPress=\{\(\) => setPage\(1\)\}/, 'the first caption can be tapped through');
+});
+
+
+test('the stuck wisp checkpoint resumes through both questions and waits for the Hatch CTA', () => {
+  let { runtime } = loadRuntime();
+  runtime.beginFtueRun({ restart: true });
+  runtime.commitFtueAction({ actionId: 'world.look_closer' });
+  for (let i = 1; i <= OPENING_MERGE_REQUIRED; i++) runtime.dispatchFtueEvent(merge(i));
+  runtime.commitFtueAction({ actionId: 'world.mist_lifted' });
+  runtime.commitFtueAction({ actionId: 'world.inspect_mossprout_egg' });
+  const beats = [
+    ['egg.opening', 'egg.day_texture'],
+    ['egg.context', 'egg.desired_help'],
+    ['egg.ready', 'egg.hatch'],
+  ];
+  for (const [stepId, actionId] of beats) {
+    runtime = loadRuntime(runtime.loadFtueRun()).runtime;
+    assert.equal(runtime.loadFtueRun()?.stepId, stepId, 'relaunch preserves the unanswered beat');
+    assert.equal(mossproutWorldUsesEggRenderer(stepId, null), true, 'Egg remains visible before host layout');
+    assert.equal(runtime.commitFtueAction({ actionId: 'world.inspect_mossprout_egg' })?.stepId, stepId, 'late camera callback cannot skip this beat');
+    if (stepId !== 'egg.ready') {
+      assert.equal(runtime.commitFtueAction({ actionId: 'egg.hatch' })?.stepId, stepId, 'hatch is unavailable before questions');
+    }
+    runtime.commitFtueAction({ actionId });
+  }
+  assert.equal(runtime.loadFtueRun()?.stepId, 'companion.first_meeting');
+});
+
+
+test('retired wisp introductions resume at question one without losing progress', () => {
+  const { runtime } = loadRuntime();
+  const run = runtime.beginFtueRun({ restart: true });
+  for (const stepId of ['egg.wisps', 'egg.listening']) {
+    const resumed = loadRuntime({ ...run, stepId }).runtime.loadFtueRun()!;
+    assert.equal(resumed.stepId, 'egg.opening');
+    assert.equal(resumed.status, 'active');
+    assert.equal(JSON.stringify(resumed.receipts), JSON.stringify(run.receipts));
+  }
 });

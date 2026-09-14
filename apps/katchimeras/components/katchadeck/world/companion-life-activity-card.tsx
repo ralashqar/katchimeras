@@ -11,6 +11,7 @@ import { DayActionCardSurface, DayActionRewardChip } from '@/components/katchade
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { katchimeraActionArt } from '@/constants/katchimera-action-art';
 import { noticePromptForDay, photoThanksForDay } from '@/constants/companion-daily/rotation';
+import { hatchSupportInvitation } from '@/features/onboarding/hatch-profile-storage';
 import { COMPANION_BOND_REWARDS, type CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import { useCompanionCalendarDay } from '@/hooks/use-companion-calendar-day';
 import type { CompanionDailyConfig } from '@/types/companion-daily';
@@ -120,7 +121,8 @@ export function CompanionLifeActivityCard({ companion, config, onOpenChange, onN
     const selected: Answer = { kind: 'photo', answer: capture.photo.confirmedSubject ?? photoConfig.category, response: thanks, photo: capture.photo };
     setAnswer(selected); setNoticeReply(thanks); finishAnswer(selected);
   }, [dayId, finishAnswer, photoConfig, showError, state.capture]);
-  const narration = !open && !inline ? null : mode === 'notice' ? prompt?.prompt ?? null
+  const supportInvitation = hatchSupportInvitation(companion);
+  const narration = !open && !inline ? null : mode === 'notice' ? prompt ? [supportInvitation, prompt.prompt].filter(Boolean).join('\n\n') : null
     : mode === 'photo-confirm' ? photoConfig?.lines.unsure ?? 'What did you find?'
     : mode === 'photo-question' ? photoConfig?.lines.question ?? 'What caught your eye?'
     : mode === 'no-match' ? photoConfig?.lines.noMatch ?? null

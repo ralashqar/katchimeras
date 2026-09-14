@@ -155,7 +155,7 @@ test('Steppling uses the original full-sized Egg renderer and shared feed/hatch 
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   const controller = readFileSync('features/onboarding/use-steppling-encounter.ts', 'utf8');
   assert.match(canvas, /<RevealedCompanionEgg idleDiscovery=\{!discoveredEggInteraction\} fullSize eggSkinId="moss"/);
-  assert.match(canvas, /const growthProgress = fullSize \? 1 :/);
+  assert.match(canvas, /const growthProgress = fullSize \? 1 : presentation\?\.growthProgress \?\? 0/);
   assert.match(controller, /useEggFeedController\(\)/);
   assert.match(controller, /HATCH_PHASE_DELAYS_MS/);
   assert.match(controller, /hatchPresentation: open && \(hatching \|\| egg\?\.hatchedAt\)/);
@@ -174,7 +174,7 @@ test('both world residents share tile placement, full-size Egg framing and the h
   assert.match(scene, /if \(!locked\) layer\.residentAnchor = sharedResidentAnchor\(layer\.frame\);/, 'every cleared hatchable tile seats its resident the shared way');
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   assert.match(canvas, /if \(interactionResidentId\) interactionOriginSnapshotRef\.current = origin;\s*else animateToCameraSnapshot/);
-  assert.match(canvas, /focusTutorialResident\(anchor.x, sharedResidentCenterY\(anchor.y\), \{\s*anchorY: SHARED_EGG_SCREEN_ANCHOR_Y,\s*zoom: SHARED_EGG_REST_ZOOM/);
+  assert.match(canvas, /focusTutorialResident\(anchor.x, sharedResidentCenterY\(anchor.y\), \{\s*anchorY: SHARED_EGG_SCREEN_ANCHOR_Y,\s*zoom: DISCOVERED_EGG_ZOOM/);
   assert.doesNotMatch(canvas, /anchorY: 0\.31|zoom: 1\.7/);
 });
 
@@ -257,11 +257,11 @@ test('steps pay one Bond per 300, rounded cumulatively, independently of the hat
   assert.equal(act(state, { kind: 'feed', sourceDayId: '2026-09-03', observedSteps: 5444 }).changed, false);
 });
 
-test('second Egg beat has only the steps card or automatic shared fallback', () => {
+test('second Egg beat asks support without requesting steps', () => {
   const panel = readFileSync('components/katchadeck/world/steppling-encounter-panel.tsx', 'utf8');
   assert.doesNotMatch(panel, /Find my own pace|Check steps|steps fed\.|Feed yesterday’s steps|setAlternative|stepsMessage/);
-  assert.match(panel, /movementFallback = displayedSteps != null && stepOffer.steps === 0/);
-  assert.match(panel, /stepCount=\{stepOffer.steps\} stepEnergy=\{stepOffer.bond\}/);
+  assert.match(panel, /HATCH_PROFILES/);
+  assert.doesNotMatch(panel, /requestPermissions|displayedSteps|stepCount=/);
   const repository = readFileSync('utils/merge-world/repository.ts', 'utf8');
   assert.match(repository, /syncCompanionBondEvent\(bond, \{ id: `\$\{companion\}:egg:steps`[\s\S]*?points: eggFeedBond\(definition\.egg, egg\.bondFedSteps!\)/);
 });
@@ -355,4 +355,14 @@ test('Steppling sleeps on discovery and entry; successful feeding stays awake ac
   for (const fed of [{ ...sleeping, intent: 'own-pace' }, { ...sleeping, fedSteps: 100 }, { ...sleeping, alternative: 'rest' }]) {
     assert.equal(stepplingEggHasBeenFed(JSON.parse(JSON.stringify(fed))), true);
   }
+});
+
+
+test('later eggs retain the original fixed camera and start at maximum size', () => {
+  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
+  const policy = readFileSync('components/katchadeck/world/shared-resident-presentation.ts', 'utf8');
+  assert.match(policy, /DISCOVERED_EGG_ZOOM = 2\.05/);
+  assert.match(canvas, /if \(discoveredEggOriginRef\.current\) return;/);
+  assert.doesNotMatch(canvas, /discoveredEggCameraKey|discoveredEggZoom/);
+  assert.match(canvas, /const growthProgress = fullSize \? 1 :/);
 });

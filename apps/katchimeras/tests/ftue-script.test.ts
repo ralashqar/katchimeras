@@ -204,19 +204,20 @@ test('the Egg asks two meaningful real-life questions before Hatch', () => {
   const step = mossproutFtueStep('egg.opening');
   assert.equal(step?.actions.length, 1);
   assert.equal(step?.actions[0]?.handlerId, 'player_profile');
-  assert.equal(step?.actions[0]?.options?.length, 5);
+  assert.equal(step?.actions[0]?.options?.length, 4);
   assert.equal(mossproutFtueAction('egg.opening', 'egg.day_texture')?.nextStepId, 'egg.context');
-  assert.equal(step?.actions[0]?.title, 'If today were weather over this garden, what was it?');
+  assert.equal(step?.actions[0]?.title, 'When you want to make progress, what usually tangles your roots first?');
   assert.deepEqual(step?.actions[0]?.options?.map((option) => option.label), [
-    'Full sun', 'Mostly bright', 'Grey and still', 'Heavy rain', 'A proper storm',
+    'I don’t know where to start', 'I take on too much', 'I lose momentum', 'I run out of energy',
   ]);
   const desiredHelp = mossproutFtueStep('egg.context')?.actions[0];
   assert.equal(desiredHelp?.id, 'egg.desired_help');
-  assert.equal(desiredHelp?.options?.length, 3);
+  assert.equal(desiredHelp?.options?.length, 4);
   assert.deepEqual(desiredHelp?.options?.map((option) => option.label), [
-    'Getting something moving',
-    'A bit of quiet',
-    'Surprise me. I don’t know yet',
+    'One tiny step',
+    'A proper plan',
+    'Someone giving me a push',
+    'A little space first',
   ]);
   assert.equal(desiredHelp?.nextStepId, 'egg.ready');
   const eggSequenceStepIds = ['world.egg_intro', 'egg.opening', 'egg.context', 'egg.ready'];
@@ -1485,7 +1486,7 @@ test('each Discovery Egg answer grants the same visual Growth', () => {
   );
 });
 
-test('the Grove Egg inherits the authored camera retreat across its three feeds', () => {
+test('the Grove Egg holds a moderate camera through both wisp answers', () => {
   const grove = readFileSync('components/katchadeck/world/mossprout-egg-ftue-surface.tsx', 'utf8');
   const camera = readFileSync(require.resolve('@incubator/environments/hex-camera'), 'utf8');
   const openingScale = mossproutGroveEggCameraPinchTarget('egg.opening', 2)!;
@@ -1502,7 +1503,7 @@ test('the Grove Egg inherits the authored camera retreat across its three feeds'
     const directive = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === stepId)?.camera;
     return directive?.kind === 'focus_target' ? directive.zoom ?? 0 : 0;
   });
-  assert.ok(worldZooms.every((zoom, index) => index === 0 || zoom < worldZooms[index - 1]!));
+  assert.ok(worldZooms.every((zoom) => zoom === MOSSPROUT_WORLD_EGG_REST_ZOOM));
   assert.equal(worldZooms[0], MOSSPROUT_WORLD_EGG_CLOSE_ZOOM);
   assert.equal(worldZooms.at(-1), MOSSPROUT_WORLD_EGG_REST_ZOOM);
   const worldRatios = [worldZooms[0]! / worldZooms[1]!, worldZooms[1]! / worldZooms[2]!, worldZooms[2]! / worldZooms[3]!];
@@ -1510,9 +1511,9 @@ test('the Grove Egg inherits the authored camera retreat across its three feeds'
   assert.equal(mossproutWorldEggZoom('egg.ready'), MOSSPROUT_WORLD_EGG_REST_ZOOM);
   assert.match(camera, /options\?\.zoom == null[\s\S]*?Math\.min\(maxScale, Math\.max\(minScale, options\.zoom\)\)/);
   assert.doesNotMatch(camera, /Math\.max\(scale\.value, options\?\.zoom/);
-  assert.equal(mossproutGroveEggCameraPanTarget('egg.opening'), FTUE_OPENING_CAMERA_PAN_Y);
-  assert.equal(mossproutGroveEggCameraPanTarget('egg.context'), FTUE_OPENING_CAMERA_PAN_Y * (2 / 3));
-  assert.equal(mossproutGroveEggCameraPanTarget('egg.mind'), FTUE_OPENING_CAMERA_PAN_Y * (1 / 3));
+  assert.equal(mossproutGroveEggCameraPanTarget('egg.opening'), 0);
+  assert.equal(mossproutGroveEggCameraPanTarget('egg.context'), 0);
+  assert.equal(mossproutGroveEggCameraPanTarget('egg.mind'), 0);
   assert.equal(mossproutGroveEggCameraPanTarget('egg.ready'), 0);
   assert.match(grove, /useTodayEnvironmentMotion\(\{/);
   assert.match(grove, /scriptedPinchScale: groveCameraScale/);
@@ -1706,7 +1707,7 @@ test('FTUE copy uses the shared cozy-game type hierarchy and stays concise', () 
   assert.match(conversation, /prompt: `\$\{opening\}[\s\S]*?I’m Mossprout/);
   eggSteps.forEach((step) => {
     assert.ok(step.guide.title.split(/\s+/).length <= 5, `${step.id} title is too long`);
-    assert.ok(step.guide.body.split(/\s+/).length <= 7, `${step.id} body is too long`);
+    assert.ok(step.guide.body.split(/\s+/).length <= (['egg.opening', 'egg.listening'].includes(step.id) ? 14 : 7), `${step.id} body is too long`);
   });
 });
 

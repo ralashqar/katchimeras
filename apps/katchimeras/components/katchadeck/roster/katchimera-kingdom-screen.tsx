@@ -35,7 +35,7 @@ import { Image } from 'expo-image';
 import { useIsFocused } from '@react-navigation/native';
 import { GlowGatewayGuide } from '@/components/katchadeck/world/glow-gateway-guide';
 import { HatchableEncounterPanel } from '@/components/katchadeck/world/steppling-encounter-panel';
-import { SHARED_EGG_REST_ZOOM, usesSharedResidentStage } from '@/components/katchadeck/world/shared-resident-presentation';
+import { sharedEggZoom, DISCOVERED_EGG_ZOOM, usesSharedResidentStage } from '@/components/katchadeck/world/shared-resident-presentation';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
 import { useHatchableEncounter } from '@/features/onboarding/use-steppling-encounter';
 import { hatchableEggProgress } from '@/features/onboarding/hatchable-egg-policy';
@@ -565,7 +565,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     kind: 'focus_target' as const, target: { kind: 'haven_nature_island' as const, islandId: restorationIslandId },
     zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700,
   } : null, [restorationIslandId, restorationOpen, screenFocused]);
-  const tutorialCamera = mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null);
+  const baseTutorialCamera = mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null);
+  const tutorialCamera = useMemo(() => {
+    if (!ftueStepId?.startsWith('egg.') || baseTutorialCamera?.kind !== 'focus_target') return baseTutorialCamera;
+    return { ...baseTutorialCamera, zoom: sharedEggZoom(worldSubjectPresentation?.wispsCleared
+      ?? (ftueStepId === 'egg.ready' ? 2 : ftueStepId === 'egg.context' ? 1 : 0)), durationMs: 600 };
+  }, [baseTutorialCamera, ftueStepId, worldSubjectPresentation?.wispsCleared]);
   const ftueReturnCamera = ftueReturnFocusCreatureId
     ? mossproutFtueStep('companion.chapter_zero_return')?.camera ?? null
     : null;
@@ -589,7 +594,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       : undefined;
   useEffect(() => {
     const delays: Partial<Record<string, number>> = {
-      'world.egg_intro': 4_100,
+      'world.egg_intro': 1_200,
       // The Seed is in the ground: straight on to the offer, nothing to read and nothing to tap.
       'world.seed_planted': 0,
     };
@@ -1933,7 +1938,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         gatewayTileId={activeHatchable.tile.id}
         discoveredEggPresentation={stepplingEncounter.presentation}
         discoveredEggTargetRef={stepplingEncounter.feedController.eggTargetRef}
-        cameraMaximumScale={stepplingEncounter.open ? SHARED_EGG_REST_ZOOM : ftueEggFeedingCloseupActive
+        cameraMaximumScale={stepplingEncounter.open ? DISCOVERED_EGG_ZOOM : ftueEggFeedingCloseupActive
           ? MOSSPROUT_WORLD_EGG_CLOSE_ZOOM
           : ftueReturnResidentZoom != null
             ? ftueReturnResidentZoom
