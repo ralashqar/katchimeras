@@ -1086,6 +1086,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               right: Math.max(KatchaUI.layout.phoneGutter, insets.right),
             }]}>
                 <CompanionJourneyCycleStage
+                  cardsActive={props.active !== false && route.kind !== 'conversation'}
                   routineSubmenuOpen={actionSubmenuOpen}
                   onOpenConversation={requestStoryConversation}
                   onBondRewardRequest={requestStoryReward}

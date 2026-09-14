@@ -1,10 +1,12 @@
-import type { MossproutLifeCompletion } from './mossprout-life-activity-storage';
+import type { CompanionLifeCompletion } from './companion-life-activity-storage';
+import type { CompanionPhotoActivityConfig } from '@/types/companion-daily';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { hydrateHomeState } from '@/game/days';
 import { applyCapturedMomentForDay } from '@/game/days/actions';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
-export async function saveMossproutPhotoMemory(completion: MossproutLifeCompletion) {
+/** A kept photo becomes a memory of its own day in Today, labelled the way the friend's config says. */
+export async function saveCompanionPhotoMemory(completion: CompanionLifeCompletion, keepPhoto: NonNullable<CompanionPhotoActivityConfig['keepPhoto']>) {
   const photo = completion.photo;
   if (!photo) return;
   const profile = loadOnboardingProfile();
@@ -15,7 +17,7 @@ export async function saveMossproutPhotoMemory(completion: MossproutLifeCompleti
   const next = applyCapturedMomentForDay(state, {
     energy: {}, vision: photo.vision, captureMode: 'evidence_only', sourceId: photo.uri,
     classifiedMemory: photo.memory, evidence: photo.evidence,
-    meaning: { archetype: 'nature', label: `With Mossprout: ${completion.answer}`, thumbnailUri: photo.uri, sourceId: photo.uri },
+    meaning: { archetype: keepPhoto.memoryArchetype, label: keepPhoto.memoryLabel(completion.answer), thumbnailUri: photo.uri, sourceId: photo.uri },
   }, day.id, profile, now, new Date(photo.capturedAt).toISOString());
   // Completion must observe a failed write; the deferred Home writer is best-effort.
   homeRepository.save(next);

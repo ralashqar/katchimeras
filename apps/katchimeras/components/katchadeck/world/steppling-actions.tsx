@@ -1,13 +1,9 @@
 import { CompanionGardenAction } from './companion-garden-action';
-import { useDailyCompanionConversation } from '@/hooks/use-daily-companion-conversation';
+import { CompanionDailyQuestionSlot } from '@/components/katchadeck/world/companion-daily-question';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
 import { Meadow } from '@/constants/meadow-theme';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
-import { useActionPresentationController } from '@/hooks/use-action-presentation';
-import { claimActionPresentation, dismissActionPresentation } from '@/game/katchimeras/action-runtime';
-import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
-import { loadCompanionContentState } from '@/utils/companion-content-storage';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -15,7 +11,7 @@ import { useCompanionSteps } from '@/hooks/use-companion-steps';
 import type { GestureType } from 'react-native-gesture-handler';
 import { DayActionCardSurface, DayActionRewardChip } from '@/components/katchadeck/ui/day-action-card';
 import { DayActionGoalRow } from '@/components/katchadeck/ui/day-action-goal-row';
-import { DayActionActiveRow, DayActionCompletedRow, DayActionReplacementSlot, DAY_ACTION_MOTION, type DayActionSourceRect } from '@/components/katchadeck/ui/day-action-row';
+import { DayActionActiveRow, DAY_ACTION_MOTION, type DayActionSourceRect } from '@/components/katchadeck/ui/day-action-row';
 import { katchimeraActionArt } from '@/constants/katchimera-action-art';
 import { STEPPLING_SCENARIO_POLLS } from '@/constants/steppling-scenario-polls';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
@@ -24,17 +20,23 @@ import { claimStepplingMilestone, nextStepplingMilestone } from '@/utils/steppli
 import { localDayId } from '@/utils/world-identity';
 import { type CompanionMergeRequest } from './companion-merge-request-tray';
 
-/** Steppling's daily question is one of his scenario polls; each comes back once its fortnight is up. */
-const QUESTION_CANDIDATES = STEPPLING_SCENARIO_POLLS.map((poll) => ({ id: poll.id, title: poll.title ?? poll.prompt }));
-const QUESTION_REPEAT_MS = 14 * 24 * 60 * 60 * 1000;
-const chatId = (chat: { id: string }) => `steppling:poll:${chat.id}`;
-export function StepplingActions({ onReaction, onOpenConversation, requests, onOpenMerge, onSubmenuChange, onStory, storyLabel, onBondRewardRequest, externalGesture }: {
+/** Steppling's daily question is one of his scenario polls, served by the shared question slot. */
+const QUESTION_SUBTITLE = 'One quick scene. The village answers too.';
+
+/**
+ * Steppling's daily cards: his step goal (his alone, until a journey chapter
+ * carries it), the garden request, and the day's question from the shared
+ * daily tech. A note from him takes the question's place while it lasts.
+ */
+export function StepplingActions({ onReaction, onOpenConversation, requests, onOpenMerge, onSubmenuChange, onStory, storyLabel, onBondRewardRequest, externalGesture, active = true }: {
   onReaction?: (text: string) => void;
   onOpenConversation?: (definitionId: string, origin: KatchimeraActionOrigin) => void;
   requests: readonly CompanionMergeRequest[]; onOpenMerge: (id?: string) => void;
   onSubmenuChange?: (open: boolean) => void; onStory?: () => void; storyLabel?: string;
   onBondRewardRequest?: (source: DayActionSourceRect, onArrive: () => void, receipt?: CompanionBondAwardReceipt) => void;
   externalGesture?: GestureType;
+  /** Whether the cards are on screen (not behind a conversation): reward presentations wait otherwise. */
+  active?: boolean;
 }) {
   const { dayId, steps, refresh: syncSteps } = useCompanionSteps();
   const [bond, setBond] = useState(loadCompanionBondState);
@@ -45,42 +47,13 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
   useEffect(() => subscribeCompanionBondState(() => setBond(loadCompanionBondState())), []);
   const goal = completing ?? nextStepplingMilestone(bond, dayId);
   const ready = Boolean(goal && steps >= goal.steps);
-  const content = loadCompanionContentState();
-  // When each question was last answered; one answered within the fortnight stays out of the rotation.
-  const answeredAt: Record<string, number> = {};
-  for (const session of content.conversationSessions) {
-    if (session.preview || session.status !== 'completed' || !session.definitionId.startsWith('steppling:poll:')) continue;
-    const id = session.definitionId.slice('steppling:poll:'.length);
-    answeredAt[id] = Math.max(answeredAt[id] ?? 0, session.completedAt ?? session.updatedAt);
-  }
-  const completedChats = new Set(QUESTION_CANDIDATES.filter((item) => (answeredAt[item.id] ?? 0) > Date.now() - QUESTION_REPEAT_MS).map((item) => item.id));
-  const nextChat = useDailyCompanionConversation('steppling-questions', QUESTION_CANDIDATES, completedChats, answeredAt);
-  const chatComplete = Boolean(nextChat && completedChats.has(nextChat.id));
-  const presentations = relationships.actionPresentations.filter((item) => item.status !== 'dismissed'
+  // A presentation in flight for Steppling keeps the step goal from claiming over it.
+  const presenting = relationships.actionPresentations.some((item) => item.status !== 'dismissed'
     && relationships.actionCompletions.some((completion) => completion.id === item.completionId && completion.familyId === 'steppling'));
-  const pending = presentations.find((item) => item.status === 'pending') ?? null;
-  const claimed = presentations.find((item) => item.status === 'claimed') ?? pending;
-  const presentation = useActionPresentationController({
-    presentationId: pending?.id ?? null, presentationSlotId: claimed?.slotId ?? null,
-    claim: (id) => { relationshipProgressionRepository.update((state) => claimActionPresentation(state, id)); },
-    dismiss: (id) => { relationshipProgressionRepository.update((state) => dismissActionPresentation(state, id)); },
-  });
-  const displayed = presentations.find((item) => item.id === presentation.activeId);
-  const receipt = displayed ? relationships.actionCompletions.find((item) => item.id === displayed.completionId)?.rewardReceipt : null;
-  const concealChat = presentation.phase !== 'revealing' && Boolean(displayed ?? pending);
-  const openChat = () => {
-    if (!nextChat || chatComplete) return;
-    const id = chatId(nextChat);
-    onOpenConversation?.(id, {
-      dayId, familyId: 'steppling', actionId: id, instanceId: id, sourceSlotId: 'together', slotId: 'together', sequence: 0,
-      kind: 'fun_chat', title: nextChat.title, subtitle: 'One quick scene. The village answers too.', icon: 'bubble.left.and.bubble.right.fill',
-      artKey: 'today:reflection', artworkDefinitionIds: [], reward: { kind: 'bond', amount: 8 }, rotationEffect: 'preserve', presentation: 'action_card',
-    });
-  };
   const art = (kind: 'movement' | 'quest' | 'reflection') => <Image source={katchimeraActionArt(`today:${kind}`)} contentFit="contain" transition={0} style={{ width: 48, height: 48 }} />;
-  const action = (title: string, kind: 'quest' | 'reflection', onPress: () => void, index: number) => <DayActionActiveRow animateLayout entryDelayMs={DAY_ACTION_MOTION.entryBaseDelayMs + index * DAY_ACTION_MOTION.entryStaggerMs} disabled={Boolean(completing)} externalGesture={externalGesture} label={title}>
-    <Pressable accessibilityRole="button" accessibilityLabel={title} disabled={Boolean(completing)} onPress={onPress}><DayActionCardSurface artwork={art(kind)} title={title} /></Pressable>
-  </DayActionActiveRow>;
+  const note = onStory ? <DayActionActiveRow animateLayout entryDelayMs={DAY_ACTION_MOTION.entryBaseDelayMs + 2 * DAY_ACTION_MOTION.entryStaggerMs} disabled={Boolean(completing)} externalGesture={externalGesture} label={storyLabel ?? 'A note from Steppling'}>
+    <Pressable accessibilityRole="button" accessibilityLabel={storyLabel ?? 'A note from Steppling'} disabled={Boolean(completing)} onPress={onStory}><DayActionCardSurface artwork={art('reflection')} title={storyLabel ?? 'A note from Steppling'} /></Pressable>
+  </DayActionActiveRow> : undefined;
   return <CompanionGardenAction familyId="steppling" onOpenMerge={onOpenMerge} storyRequests={requests} onSubmenuChange={onSubmenuChange}>
     {(gardenCard) => <View style={{ gap: 7 }}>
     {goal ? <DayActionGoalRow key={`${completing?.dayId ?? dayId}:${goal.steps}:${attempt}`} animateLayout entryDelayMs={DAY_ACTION_MOTION.entryBaseDelayMs} externalGesture={externalGesture}
@@ -91,7 +64,7 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
       </View>}
       artwork={art('movement')} reward={<DayActionRewardChip reward={{ kind: 'bond', amount: goal.bond }} />}
       accessibilityHint={ready ? "Tap to claim your step reward." : "Hear how many steps remain and refresh your pedometer."}
-      hideCompletionControl highlighted={ready} completeOnPress={ready} disabled={Boolean(completing) || Boolean(pending || displayed)} onOpen={() => {
+      hideCompletionControl highlighted={ready} completeOnPress={ready} disabled={Boolean(completing) || presenting} onOpen={() => {
         const remaining = Math.max(0, goal.steps - steps);
         onReaction?.(`Not quite yet—${remaining.toLocaleString()} more ${remaining === 1 ? "step" : "steps"} to this little milestone. We can take them at your pace.`);
         void syncSteps();
@@ -118,21 +91,8 @@ export function StepplingActions({ onReaction, onOpenConversation, requests, onO
       }}
     /> : null}
     {gardenCard}
-    <View style={displayed ? { minHeight: 66 } : undefined}>
-      <DayActionReplacementSlot concealed={concealChat} ready={Boolean(onStory || (nextChat && !chatComplete && onOpenConversation))} revealing={presentation.phase === 'revealing'}>
-        {onStory ? action(storyLabel ?? 'A note from Steppling', 'reflection', onStory, 2) : nextChat && !chatComplete && onOpenConversation ? <DayActionActiveRow animateLayout enteringEnabled={false} entryDelayMs={0} disabled={Boolean(completing) || concealChat} externalGesture={externalGesture} label={nextChat.title}>
-          <Pressable accessibilityRole="button" accessibilityLabel={nextChat.title} disabled={Boolean(completing) || concealChat || chatComplete} onPress={openChat}>
-            <DayActionCardSurface artwork={art('reflection')} title={nextChat.title} reward={<DayActionRewardChip reward={{ kind: 'bond', amount: 8 }} />} />
-          </Pressable>
-        </DayActionActiveRow> : null}
-      </DayActionReplacementSlot>
-      {displayed ? <View style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
-        <DayActionCompletedRow animateLayout={false} enteringEnabled={false} artwork={art('reflection')} title={displayed.card.title}
-          reward={displayed.card.reward ? <DayActionRewardChip reward={displayed.card.reward} /> : undefined}
-          start={presentation.phase === 'animating'} onFinished={() => presentation.finish(displayed.id)}
-          onRewardRequest={receipt && onBondRewardRequest ? (source, onArrive) => onBondRewardRequest(source, onArrive, receipt) : undefined} />
-      </View> : null}
-    </View>
+    <CompanionDailyQuestionSlot companion="steppling" polls={STEPPLING_SCENARIO_POLLS} subtitle={QUESTION_SUBTITLE} disabled={Boolean(completing)} active={active}
+      onOpenConversation={onOpenConversation} onBondRewardRequest={onBondRewardRequest} externalGesture={externalGesture} override={note} />
   </View>}
   </CompanionGardenAction>;
 }

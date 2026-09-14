@@ -1,4 +1,7 @@
-export type LifeCompanionFamily = 'mossprout' | 'steppling';
+import type { MergeCharacterId } from '@/types/merge-world';
+
+/** Friends whose moments the companion journal keeps: Mossprout and any merge friend with a page. */
+export type LifeCompanionFamily = 'mossprout' | MergeCharacterId;
 export type LifeHabit = { id: string; familyId: LifeCompanionFamily; title: string; actionPhrase: string };
 
 export const LIFE_HABITS: readonly LifeHabit[] = [

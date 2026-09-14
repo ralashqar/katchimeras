@@ -6,13 +6,20 @@ import { readFileSync } from './helpers/content-fs';
 import { loadCompanionOverlay, loadNativeModule, nativeMotionHarness, nativeViews } from './helpers/native-motion-harness';
 import { emptyCompanionBondState, recordCompanionBondEvent, acknowledgeCompanionBondCelebration, COMPANION_BOND_REWARDS } from '../utils/companion-bond';
 import { buildPhotoIntelligence } from '../utils/intelligence/photo-intelligence';
-import { MOSSPROUT_NOTICE_PROMPTS, mossproutNoticePrompt, naturePhotoMatch, mossproutLifeActivityId } from '../utils/mossprout-life-activities';
-import type { MossproutNaturePhoto, MossproutLifeCompletion } from '../utils/mossprout-life-activity-storage';
+import { MOSSPROUT_DAILY, MOSSPROUT_NOTICE_PROMPTS } from '../constants/companion-daily/mossprout';
+import { noticePromptForDay } from '../constants/companion-daily/rotation';
+import { gradePhotoMatch } from '../utils/companion-photo-match';
+import { companionLifeActivityId } from '../utils/companion-life-activity-ids';
+import type { CompanionLifePhoto, CompanionLifeCompletion } from '../utils/companion-life-activity-storage';
+
+const PHOTO = MOSSPROUT_DAILY.photo!;
+const NOTICE = MOSSPROUT_DAILY.notice!;
+const mossproutNoticePrompt = (dayId: string) => noticePromptForDay(NOTICE, dayId);
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const now = new Date(2026, 8, 5, 23, 59).getTime();
 const dayId = '2026-09-05';
-function naturePhoto(match: MossproutNaturePhoto['match'] = 'ready'): MossproutNaturePhoto {
+function naturePhoto(match: CompanionLifePhoto['match'] = 'ready'): CompanionLifePhoto {
   const data = buildPhotoIntelligence({ sourceId: 'file:///nature.jpg', observedAt: new Date(now).toISOString(), thumbnailUri: 'file:///nature.jpg', rawVision: null, vision: null });
   return { uri: 'file:///nature.jpg', capturedAt: now, memory: data.memory, evidence: data.evidence, vision: null, match };
 }
@@ -27,8 +34,8 @@ function storageHarness(memoryGate?: Promise<void>) {
   let failAfterAward = false;
   const memories = new Map<string, unknown>();
   const journal = new Map<string, unknown>();
-  const module = loadNativeModule('utils/mossprout-life-activity-storage.ts', {
-    '@/utils/app-storage': { getStoredJson: (key: string, fallback: unknown) => structuredClone(disk.get(key) ?? fallback), setStoredJson: (key: string, value: unknown) => {
+  const module = loadNativeModule('utils/companion-life-activity-storage.ts', {
+    '@/utils/app-storage': { getStoredKeys: () => [...disk.keys()], getStoredJson: (key: string, fallback: unknown) => structuredClone(disk.get(key) ?? fallback), setStoredJson: (key: string, value: unknown) => {
       if (failActivityWrite) throw new Error('disk'); disk.set(key, structuredClone(value));
     } },
     '@/constants/katchimera-skins': { companionIdForFamily: () => 'mossprout' },
@@ -36,9 +43,9 @@ function storageHarness(memoryGate?: Promise<void>) {
     '@/utils/companion-bond-storage': { loadCompanionBondState: () => bond, saveCompanionBondState: (state: typeof bond) => { bond = state; if (failAfterAward) failActivityWrite = true; } },
     '@/utils/companion-life-storage': { rememberCompanionMoment: (entry: { id: string }) => journal.set(entry.id, entry) },
     '@/utils/world-identity-rules': { localDayId: (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` },
-    './mossprout-life-activities': { MOSSPROUT_LIFE_TITLES: { photo: 'Photo', notice: 'Notice' }, mossproutLifeActivityId },
-    './mossprout-photo-memory': { saveMossproutPhotoMemory: async (entry: MossproutLifeCompletion) => { if (memoryGate) await memoryGate; if (failMemory) throw new Error('memory'); memories.set(entry.id, entry.photo); } },
-    './mossprout-nature-capture': { discardMossproutNaturePhoto() {} },
+    '@/constants/companion-daily/registry': { companionDailyConfig: () => ({ photo: { title: 'Photo', keepPhoto: PHOTO.keepPhoto }, notice: { title: 'Notice' } }) },
+    './companion-photo-memory': { saveCompanionPhotoMemory: async (entry: CompanionLifeCompletion) => { if (memoryGate) await memoryGate; if (failMemory) throw new Error('memory'); memories.set(entry.id, entry.photo); } },
+    './companion-life-photo': { discardCompanionLifePhoto() {} },
   }, { Date: ActivityDate });
   return { module, memories, journal, bond: () => bond,
     failMemory: (value: boolean) => { failMemory = value; },
@@ -50,17 +57,31 @@ function storageHarness(memoryGate?: Promise<void>) {
 test('nature matching uses confidence and physical subjects, with manual fallback when Vision is missing', () => {
   const { memory } = naturePhoto();
   const quality = { qualityId: 'nature.plants', score: 0.9, centrality: 'primary' as const, status: 'inferred' as const, sources: [], reasons: [] };
-  assert.equal(naturePhotoMatch({ ...memory, qualities: [quality] }, true), 'ready');
-  assert.equal(naturePhotoMatch({ ...memory, qualities: [{ ...quality, score: 0.4 }] }, true), 'possible');
-  assert.equal(naturePhotoMatch({ ...memory, qualities: [{ ...quality, score: 0.1 }] }, true), 'no_match');
-  assert.equal(naturePhotoMatch(memory, false), 'unavailable');
-  assert.equal(naturePhotoMatch({ ...memory, qualities: [{ ...quality, qualityId: 'nature.water' }] }, true), 'no_match');
+  assert.equal(gradePhotoMatch({ ...memory, qualities: [quality] }, true, PHOTO.match), 'ready');
+  assert.equal(gradePhotoMatch({ ...memory, qualities: [{ ...quality, score: 0.4 }] }, true, PHOTO.match), 'possible');
+  assert.equal(gradePhotoMatch({ ...memory, qualities: [{ ...quality, score: 0.1 }] }, true, PHOTO.match), 'no_match');
+  assert.equal(gradePhotoMatch(memory, false, PHOTO.match), 'unavailable');
+  assert.equal(gradePhotoMatch({ ...memory, qualities: [{ ...quality, qualityId: 'nature.water' }] }, true, PHOTO.match), 'no_match');
   const screen = { ...memory, qualities: [quality], photoAnalysis: { representation: { kind: 'screenshot' } } } as unknown as typeof memory;
-  assert.equal(naturePhotoMatch(screen, true), 'no_match');
+  assert.equal(gradePhotoMatch(screen, true, PHOTO.match), 'no_match');
   const detected = buildPhotoIntelligence({ sourceId: 'plant', observedAt: new Date(now).toISOString(), rawVision: {
     labels: [{ name: 'houseplant', confidence: 0.99 }], text: [], faceCount: 0,
   }, vision: null });
   assert.ok(detected.memory.qualities.some((item) => item.qualityId === 'nature.plants'));
+});
+
+test('a category match is a plain hit on the capture category, unavailable without Vision', async () => {
+  const { BARISTABBIT_HATCHABLE } = await import('../constants/hatchable-companions/baristabbit');
+  const { memory } = naturePhoto();
+  const match = BARISTABBIT_HATCHABLE.daily!.photo!.match;
+  assert.deepEqual(match, { categoryIds: ['drink'] });
+  assert.equal(gradePhotoMatch(memory, true, match, 'drink'), 'ready');
+  assert.equal(gradePhotoMatch(memory, true, match, 'food'), 'no_match');
+  assert.equal(gradePhotoMatch(memory, true, match, null), 'no_match');
+  assert.equal(gradePhotoMatch(memory, false, match, 'drink'), 'unavailable');
+  assert.equal(BARISTABBIT_HATCHABLE.daily!.photo!.keepPhoto, undefined, 'the cup stays in the camera roll');
+  assert.equal(BARISTABBIT_HATCHABLE.daily!.presentation, 'rows');
+  assert.equal(MOSSPROUT_DAILY.presentation, 'menu');
 });
 
 test('noticing rotates consistently each calendar day and every choice has a response', () => {
@@ -73,43 +94,43 @@ test('noticing rotates consistently each calendar day and every choice has a res
 test('activities award independently, retry partial writes once, and keep photos on their capture date', async () => {
   const h = storageHarness(); const m = h.module;
   const photo = naturePhoto();
-  const pending = m.prepareMossproutLifeCompletion({ kind: 'photo', answer: 'Its colour', response: 'A little colour.', photo }, now + 120000);
+  const pending = m.prepareCompanionLifeCompletion('mossprout', { kind: 'photo', answer: 'Its colour', response: 'A little colour.', photo }, now + 120000);
   assert.equal(pending.dayId, dayId, 'midnight capture keeps its original day');
   h.failMemory(true);
-  await assert.rejects(m.commitMossproutLifeCompletion(pending.id));
+  await assert.rejects(m.commitCompanionLifeCompletion('mossprout', pending.id));
   assert.equal(h.bond().events.length, 0);
   h.failMemory(false); h.failAfterAward();
-  await assert.rejects(m.commitMossproutLifeCompletion(pending.id));
+  await assert.rejects(m.commitCompanionLifeCompletion('mossprout', pending.id));
   assert.equal(h.bond().events.length, 1);
   h.recover();
-  const done = await m.commitMossproutLifeCompletion(pending.id);
+  const done = await m.commitCompanionLifeCompletion('mossprout', pending.id);
   assert.equal(done.status, 'complete');
   assert.ok(done.receipt, 'crash after Bond write recovers the existing flight receipt');
   assert.equal(h.memories.size, 1);
   assert.equal(h.journal.size, 1);
-  await m.commitMossproutLifeCompletion(pending.id);
+  await m.commitCompanionLifeCompletion('mossprout', pending.id);
   assert.equal(h.bond().events.length, 1);
-  const notice = m.prepareMossproutLifeCompletion({ kind: 'notice', answer: 'Wind', response: 'Leaves rustle.' }, now);
-  await m.commitMossproutLifeCompletion(notice.id);
+  const notice = m.prepareCompanionLifeCompletion('mossprout', { kind: 'notice', answer: 'Wind', response: 'Leaves rustle.' }, now);
+  await m.commitCompanionLifeCompletion('mossprout', notice.id);
   assert.equal(h.bond().events.length, 2);
   assert.equal(h.bond().events.reduce((total, event) => total + event.points, 0), 10);
-  m.acknowledgeMossproutLifeCompletion(pending.id, now + 2000);
-  assert.ok(m.loadMossproutLifeActivities().completions[pending.id].presentedAt);
+  m.acknowledgeCompanionLifeCompletion('mossprout', pending.id, now + 2000);
+  assert.ok(m.loadCompanionLifeActivities('mossprout').completions[pending.id].presentedAt);
   assert.ok(!h.bond().pendingCelebrations?.some((receipt) => receipt.eventId === pending.id));
-  assert.equal(m.prepareMossproutLifeCompletion({ kind: 'photo', answer: 'Again', response: 'Again', photo }, now).id, pending.id);
-  assert.equal(m.loadMossproutLifeActivities().completions[mossproutLifeActivityId('2026-09-06', 'photo')], undefined);
+  assert.equal(m.prepareCompanionLifeCompletion('mossprout', { kind: 'photo', answer: 'Again', response: 'Again', photo }, now).id, pending.id);
+  assert.equal(m.loadCompanionLifeActivities('mossprout').completions[companionLifeActivityId('mossprout', '2026-09-06', 'photo')], undefined);
 });
 
 test('camera cancellation and stale camera returns never complete an activity', () => {
   const { module: m } = storageHarness();
-  const first = m.beginMossproutNatureCapture(now);
-  const second = m.beginMossproutNatureCapture(now + 1);
-  m.finishMossproutNatureCapture(first.id, naturePhoto());
-  assert.equal(m.loadMossproutLifeActivities().capture.id, second.id);
-  m.cancelMossproutNatureCapture(second.id);
-  m.finishMossproutNatureCapture(second.id, naturePhoto());
-  assert.equal(m.loadMossproutLifeActivities().capture, null);
-  assert.equal(Object.keys(m.loadMossproutLifeActivities().completions).length, 0);
+  const first = m.beginCompanionLifeCapture('mossprout', now);
+  const second = m.beginCompanionLifeCapture('mossprout', now + 1);
+  m.finishCompanionLifeCapture('mossprout', first.id, naturePhoto());
+  assert.equal(m.loadCompanionLifeActivities('mossprout').capture.id, second.id);
+  m.cancelCompanionLifeCapture('mossprout', second.id);
+  m.finishCompanionLifeCapture('mossprout', second.id, naturePhoto());
+  assert.equal(m.loadCompanionLifeActivities('mossprout').capture, null);
+  assert.equal(Object.keys(m.loadCompanionLifeActivities('mossprout').completions).length, 0);
 });
 
 test('native menu keeps the main card mounted, completes an option, and handles uncertain photos through dialogue', async () => {
@@ -121,19 +142,19 @@ test('native menu keeps the main card mounted, completes an option, and handles 
   const routes: unknown[] = [];
   const setNarration = (value: string | null) => { narration = value; };
   const setOpen = (value: boolean) => { opened = value; };
-  const module = loadNativeModule('components/katchadeck/world/mossprout-life-activity-card.tsx', {
+  const module = loadNativeModule('components/katchadeck/world/companion-life-activity-card.tsx', {
     'react-native': { ...nativeViews, Pressable: 'Pressable', ScrollView: 'ScrollView' },
     'react-native-reanimated': { __esModule: true, default: { View: 'AnimatedView' } },
     'expo-image': { Image: 'Image' }, 'expo-router': { usePathname: () => '/katchimeras', useRouter: () => ({ push: (route: unknown) => routes.push(route) }) },
     '@react-navigation/native': { useFocusEffect: (effect: () => void) => React.useEffect(effect, [effect]) },
-    '@/components/katchadeck/ui/day-action-row': { DayActionActiveRow: 'Active', DayActionCompletedRow: 'Completed' },
+    '@/components/katchadeck/ui/day-action-row': { DayActionActiveRow: 'Active', DayActionCompletedRow: 'Completed', DAY_ACTION_MOTION: { entryBaseDelayMs: 0, entryStaggerMs: 0 } },
     '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: 'Card', DayActionRewardChip: 'Reward' },
     '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
     '@/constants/katchimera-action-art': { katchimeraActionArt: () => 1 },
     '@/utils/companion-bond': { COMPANION_BOND_REWARDS },
     '@/hooks/use-companion-calendar-day': { useCompanionCalendarDay: () => dayId },
-    '@/utils/mossprout-life-activities': await import('../utils/mossprout-life-activities'),
-    '@/utils/mossprout-life-activity-storage': h.module,
+    '@/constants/companion-daily/rotation': await import('../constants/companion-daily/rotation'),
+    '@/utils/companion-life-activity-storage': h.module,
     './companion-scene-overlay': overlay, './companion-choice-list': { CompanionChoiceList: 'Choices' },
     './mossprout-water-action': { MossproutWaterAction: 'Water' },
     './mossprout-notice-choices': loadNativeModule('components/katchadeck/world/mossprout-notice-choices.tsx', {
@@ -142,9 +163,9 @@ test('native menu keeps the main card mounted, completes an option, and handles 
       './companion-choice-list': { CompanionChoiceList: 'Choices' },
     }),
   });
-  const Card = module.MossproutLifeActivityCard as React.ComponentType<Record<string, unknown>>;
+  const Card = module.CompanionLifeActivityCard as React.ComponentType<Record<string, unknown>>;
   let tree: ReactTestRenderer;
-  await act(async () => { tree = create(<Host><Card onOpenChange={setOpen} onNarration={setNarration} /></Host>); });
+  await act(async () => { tree = create(<Host><Card companion="mossprout" config={MOSSPROUT_DAILY} onOpenChange={setOpen} onNarration={setNarration} /></Host>); });
   const main = tree!.root.findByProps({ title: 'Grow with Mossprout' });
   const press = async (title: string) => act(async () => tree!.root.findByProps({ title }).parent!.props.onPress());
   const choose = async (id: string) => act(async () => tree!.root.findByType('Choices' as React.ElementType).props.onSelect(id));
@@ -172,15 +193,15 @@ test('native menu keeps the main card mounted, completes an option, and handles 
   assert.equal(tree!.root.findAllByProps({ title: 'Notice one small thing' }).length, 0);
   await press('Show Mossprout something growing');
   assert.equal(routes.length, 1);
-  const session = h.module.loadMossproutLifeActivities().capture;
-  await act(async () => h.module.finishMossproutNatureCapture(session.id, naturePhoto('possible')));
+  const session = h.module.loadCompanionLifeActivities('mossprout').capture;
+  await act(async () => h.module.finishCompanionLifeCapture('mossprout', session.id, naturePhoto('possible')));
   assert.match(narration!, /What did you find/);
   await choose('plant'); await choose('colour'); await choose('done');
   assert.equal(h.memories.size, 1);
   assert.equal(h.bond().events.length, 2);
   await act(async () => tree!.root.findByType('Completed' as React.ElementType).props.onFinished());
   assert.equal(tree!.root.findAllByProps({ title: 'Show Mossprout something growing' }).length, 0);
-  await act(async () => h.module.resetMossproutLifeActivities());
+  await act(async () => h.module.resetCompanionLifeActivities('mossprout'));
   assert.equal(tree!.root.findAllByProps({ title: 'Notice one small thing' }).length, 1, 'reset restores noticing in an already open menu');
   assert.equal(tree!.root.findAllByProps({ title: 'Show Mossprout something growing' }).length, 1);
   assert.equal(tree!.root.findAllByType('Completed' as React.ElementType).length, 0);
@@ -193,7 +214,7 @@ test('native menu keeps the main card mounted, completes an option, and handles 
 
 test('camera integration bypasses Essence Review and generic quest rewards for companion activity captures', () => {
   const source = readFileSync('app/moment-capture.tsx', 'utf8');
-  assert.match(source, /companionActivityId[\s\S]*?prepareMossproutNaturePhoto[\s\S]*?finishMossproutNatureCapture/);
+  assert.match(source, /companionActivityId[\s\S]*?prepareCompanionLifePhoto[\s\S]*?finishCompanionLifeCapture/);
   assert.match(source, /companionActivityId\s*\|\| state !== 'captured'/);
   assert.match(source, /capturedAtRef.current = Date.now\(\)/);
 });
@@ -237,20 +258,21 @@ test('nature captures copy out of camera cache once and discard only owned files
     copy(target: File) { assert.ok(this.exists); copies++; files.add(target.uri); }
     delete() { files.delete(this.uri); }
   }
-  const capture = loadNativeModule('utils/mossprout-nature-capture.ts', {
+  const capture = loadNativeModule('utils/companion-life-photo.ts', {
     'expo-file-system': { Directory, File, Paths: { document: 'file:///documents' } },
     '@/utils/intelligence/photo-intelligence': { buildPhotoIntelligence },
-    './mossprout-life-activities': { naturePhotoMatch },
+    '@/utils/photo-category': { resolvePhotoCategory: () => ({ id: 'nature' }) },
+    '@/utils/companion-photo-match': { gradePhotoMatch },
   });
-  const photo = capture.prepareMossproutNaturePhoto('capture:one', 'file:///cache/camera.jpg', now, { rawVision: null, summary: null });
+  const photo = capture.prepareCompanionLifePhoto(PHOTO, 'capture:one', 'file:///cache/camera.jpg', now, { rawVision: null, summary: null });
   assert.equal(photo.uri, 'file:///documents/mossprout-memories/capture-one.jpg');
   assert.equal(photo.memory.sourceId, photo.uri);
   assert.equal(photo.memory.createdAt, new Date(now).toISOString());
-  capture.prepareMossproutNaturePhoto('capture:one', 'file:///cache/camera.jpg', now, { rawVision: null, summary: null });
+  capture.prepareCompanionLifePhoto(PHOTO, 'capture:one', 'file:///cache/camera.jpg', now, { rawVision: null, summary: null });
   assert.equal(copies, 1);
-  capture.discardMossproutNaturePhoto('file:///documents/unrelated.jpg');
+  capture.discardCompanionLifePhoto('file:///documents/unrelated.jpg', 'mossprout-memories');
   assert.ok(files.has('file:///documents/unrelated.jpg'));
-  capture.discardMossproutNaturePhoto(photo.uri);
+  capture.discardCompanionLifePhoto(photo.uri, 'mossprout-memories');
   assert.equal(files.has(photo.uri), false);
 });
 
@@ -263,11 +285,11 @@ test('photo memory writes preserve capture date, propagate failures and remain i
   let archived = { id: `day-${dayId}`, isoDate: dayId, state: 'hatched', moments: [], locations: [],
     promptAnswers: [], classifiedMemories: [], capturedMeanings: [], evidence: [], capturedEnergy: { calm: 0.3 },
   } as unknown as import('../types/home').StoredHomeDayRecord;
-  const completion: MossproutLifeCompletion = { id: `test:${dayId}`, kind: 'photo', dayId,
+  const completion: CompanionLifeCompletion = { id: `test:${dayId}`, companion: 'mossprout', kind: 'photo', dayId,
     occurredAt: photo.capturedAt, answer: 'Its shape', response: 'A new leaf.', photo, status: 'pending' };
   let failSave = true;
   const home = () => ({ today: { id: 'today', isoDate: todayId }, tomorrow: null, archivedDays: [archived] });
-  const writer = loadNativeModule('utils/mossprout-photo-memory.ts', {
+  const writer = loadNativeModule('utils/companion-photo-memory.ts', {
     '@/storage/repositories/home-repository': { homeRepository: { load: home, save: (next: ReturnType<typeof home>) => { if (failSave) throw new Error('disk'); archived = next.archivedDays[0]; } } },
     '@/game/days': { hydrateHomeState: (state: ReturnType<typeof home>) => ({ state }) },
     '@/game/days/actions': { applyCapturedMomentForDay: (state: ReturnType<typeof home>, capture: Parameters<typeof withCapturedMoment>[1], target: string, _profile: unknown, _now: Date, observedAt: string) => {
@@ -278,10 +300,10 @@ test('photo memory writes preserve capture date, propagate failures and remain i
     } },
     '@/utils/onboarding-state': { loadOnboardingProfile: () => ({}) },
   });
-  await assert.rejects(writer.saveMossproutPhotoMemory(completion));
+  await assert.rejects(writer.saveCompanionPhotoMemory(completion, PHOTO.keepPhoto!));
   failSave = false;
-  await writer.saveMossproutPhotoMemory(completion);
-  await writer.saveMossproutPhotoMemory(completion);
+  await writer.saveCompanionPhotoMemory(completion, PHOTO.keepPhoto!);
+  await writer.saveCompanionPhotoMemory(completion, PHOTO.keepPhoto!);
   assert.equal(archived.classifiedMemories?.filter((item) => item.id === photo.memory.id).length, 1);
   assert.equal(archived.capturedMeanings?.filter((item) => item.sourceId === photo.uri).length, 1);
   assert.equal(archived.capturedMeanings?.find((item) => item.sourceId === photo.uri)?.createdAt, new Date(photo.capturedAt).toISOString());
@@ -291,27 +313,27 @@ test('photo memory writes preserve capture date, propagate failures and remain i
 
 test('profile reset clears noticing, pending captures and notifies mounted menus', async () => {
   const { module: m } = storageHarness();
-  const entry = m.prepareMossproutLifeCompletion({ kind: 'notice', answer: 'Wind', response: 'Leaves rustle.' }, now);
-  await m.commitMossproutLifeCompletion(entry.id);
-  m.acknowledgeMossproutLifeCompletion(entry.id, now + 1);
-  const capture = m.beginMossproutNatureCapture(now);
+  const entry = m.prepareCompanionLifeCompletion('mossprout', { kind: 'notice', answer: 'Wind', response: 'Leaves rustle.' }, now);
+  await m.commitCompanionLifeCompletion('mossprout', entry.id);
+  m.acknowledgeCompanionLifeCompletion('mossprout', entry.id, now + 1);
+  const capture = m.beginCompanionLifeCapture('mossprout', now);
   let resetNotifications = 0;
-  const unsubscribe = m.subscribeMossproutLifeActivities((reset?: boolean) => { if (reset) resetNotifications++; });
+  const unsubscribe = m.subscribeCompanionLifeActivities((reset?: boolean) => { if (reset) resetNotifications++; });
   const source = readFileSync('utils/reset-katchimera-progress-for-debug.ts', 'utf8');
   const mocks: Record<string, unknown> = {};
   for (const match of source.matchAll(/import \{ ([^}]+) \} from '([^']+)'/g)) {
     mocks[match[2]] = Object.fromEntries(match[1].split(',').map((name) => [name.trim(), () => {}]));
   }
   mocks['@/storage/repositories/relationship-progression-repository'] = { relationshipProgressionRepository: { resetForDebug() {} } };
-  mocks['@/utils/mossprout-life-activity-storage'] = m;
+  mocks['@/utils/companion-life-activity-storage'] = m;
   const reset = loadNativeModule('utils/reset-katchimera-progress-for-debug.ts', mocks);
   await reset.resetKatchimeraProgressForDebug();
   assert.equal(resetNotifications, 1);
-  assert.equal(Object.keys(m.loadMossproutLifeActivities().completions).length, 0);
-  assert.equal(m.loadMossproutLifeActivities().capture, null);
-  m.finishMossproutNatureCapture(capture.id, naturePhoto());
-  assert.equal(m.loadMossproutLifeActivities().capture, null, 'old camera result cannot restore reset data');
-  assert.equal(m.prepareMossproutLifeCompletion({ kind: 'notice', answer: 'Wind', response: 'Leaves rustle.' }, now).status, 'pending');
+  assert.equal(Object.keys(m.loadCompanionLifeActivities('mossprout').completions).length, 0);
+  assert.equal(m.loadCompanionLifeActivities('mossprout').capture, null);
+  m.finishCompanionLifeCapture('mossprout', capture.id, naturePhoto());
+  assert.equal(m.loadCompanionLifeActivities('mossprout').capture, null, 'old camera result cannot restore reset data');
+  assert.equal(m.prepareCompanionLifeCompletion('mossprout', { kind: 'notice', answer: 'Wind', response: 'Leaves rustle.' }, now).status, 'pending');
   unsubscribe();
 });
 
@@ -339,12 +361,12 @@ test('reset prevents an in-flight activity from restoring completion or rewards'
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
   const h = storageHarness(gate);
-  const pending = h.module.prepareMossproutLifeCompletion({ kind: 'photo', answer: 'Colour', response: 'Green.', photo: naturePhoto() }, now);
-  const oldCommit = h.module.commitMossproutLifeCompletion(pending.id);
-  h.module.resetMossproutLifeActivities();
+  const pending = h.module.prepareCompanionLifeCompletion('mossprout', { kind: 'photo', answer: 'Colour', response: 'Green.', photo: naturePhoto() }, now);
+  const oldCommit = h.module.commitCompanionLifeCompletion('mossprout', pending.id);
+  h.module.resetCompanionLifeActivities('mossprout');
   release();
   await assert.rejects(oldCommit, /Activity was reset/);
-  assert.equal(Object.keys(h.module.loadMossproutLifeActivities().completions).length, 0);
+  assert.equal(Object.keys(h.module.loadCompanionLifeActivities('mossprout').completions).length, 0);
   assert.equal(h.bond().events.length, 0);
   assert.equal(h.journal.size, 0);
 });
@@ -357,8 +379,7 @@ test('first Grow shares the daily noticing receipt, survives interruption, and r
   const runtime = loadNativeModule('features/onboarding/mossprout-first-grow-runtime.ts', {
     '@/utils/onboarding-state': { loadOnboardingProfile: () => ({ mossproutAnswers: { firstNoticeDayId: savedDay } }) },
     '@/utils/world-identity-rules': { localDayId: () => dayId },
-    '@/utils/mossprout-life-activity-storage': h.module,
-    '@/utils/mossprout-life-activities': { mossproutLifeActivityId },
+    '@/utils/companion-life-activity-storage': h.module,
     './mossprout-profile': { recordMossproutOnboardingAnswer: (_key: string, value: string) => { savedDay = value; } },
     './mossprout-first-grow': copy,
   });
@@ -374,9 +395,9 @@ test('first Grow shares the daily noticing receipt, survives interruption, and r
   assert.equal(runtime.loadFirstNoticeCompletion().id, done.id);
   assert.equal((await runtime.completeFirstNotice('sound')).id, done.id);
   assert.equal(h.bond().events.length, 1);
-  h.module.acknowledgeMossproutLifeCompletion(done.id);
+  h.module.acknowledgeCompanionLifeCompletion('mossprout', done.id);
   assert.ok(runtime.loadFirstNoticeCompletion().presentedAt);
-  h.module.resetMossproutLifeActivities(); savedDay = undefined;
+  h.module.resetCompanionLifeActivities('mossprout'); savedDay = undefined;
   assert.equal(runtime.loadFirstNoticeCompletion(), undefined);
 });
 
@@ -404,7 +425,7 @@ for (const outcome of ['later', 'light']) test(`FTUE chains noticing without a g
   const module = loadNativeModule('components/katchadeck/world/mossprout-first-grow-stage.tsx', {
     './ftue-grow-dialogue': growDialogue,
     'react-native': { ...nativeViews, Pressable: 'Pressable' }, 'expo-image': { Image: 'Image' },
-    '@/components/katchadeck/ui/day-action-row': { DayActionActiveRow: 'Active', DayActionCompletedRow: 'Completed' },
+    '@/components/katchadeck/ui/day-action-row': { DayActionActiveRow: 'Active', DayActionCompletedRow: 'Completed', DAY_ACTION_MOTION: { entryBaseDelayMs: 0, entryStaggerMs: 0 } },
     '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: 'Card', DayActionRewardChip: 'Reward' },
     '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
     '@/constants/katchimera-action-art': { katchimeraActionArt: () => 1 },
@@ -416,7 +437,7 @@ for (const outcome of ['later', 'light']) test(`FTUE chains noticing without a g
       if (!completion) { rewards++; completion = { id: 'notice', status: 'complete', answer: 'Some light', response: 'Well noticed.' }; }
       return completion;
     } },
-    '@/utils/mossprout-life-activity-storage': { acknowledgeMossproutLifeCompletion: () => { completion.presentedAt = 1; } },
+    '@/utils/companion-life-activity-storage': { acknowledgeCompanionLifeCompletion: () => { completion.presentedAt = 1; } },
     '@/features/onboarding/ftue-runtime': {
       loadFtueRun: () => run,
       useFtueRun: () => React.useSyncExternalStore((listener) => { listeners.add(listener); return () => listeners.delete(listener); }, () => run),

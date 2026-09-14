@@ -8,9 +8,9 @@ let cache: RelationshipProgressState | null = null;
 
 function hydrateRelationshipProgression(): RelationshipProgressState {
   const stored = getStoredJson<unknown>(STORAGE_KEY, emptyRelationshipProgressState());
-  const normalized = normalizeRelationshipProgressState(stored);
   // Hydration dismisses presentations that were already claimed before an
   // interrupted animation. Visual work is never replayed as progression.
+  const normalized = normalizeRelationshipProgressState(stored, { dismissClaimedPresentations: true });
   if (JSON.stringify(stored) !== JSON.stringify(normalized)) setStoredJson(STORAGE_KEY, normalized);
   return normalized;
 }

@@ -69,6 +69,7 @@ import {
   recordConversationOutcome,
   selectConversationForMode,
   selectConversationFromPool,
+  finishConversationAfterOutcome,
 } from '@/utils/companion-conversation';
 import { loadCompanionContentState, saveCompanionContentState, subscribeCompanionContentResets } from '@/utils/companion-content-storage';
 import { resolveMossproutFtueConversation } from '@/constants/mossprout-ftue-conversations';
@@ -1234,10 +1235,9 @@ export function useKingdomQuests({ kingdom, residents, today }: Args) {
       let acknowledged: ConversationSession = { ...history, outcomePresentation: undefined, updatedAt: occurredAt };
       if (session.outcomeCompletionPending) return { ...acknowledged, outcomeCompletionPending: undefined,
         status: 'completed' as const, completedAt: occurredAt, dialogueAcknowledgedAt: occurredAt };
-      if (selectedConversationDefinition && acknowledged.status === 'active') {
-        const node = conversationNode(selectedConversationDefinition, acknowledged.currentNodeId);
-        if (node?.kind === 'end') acknowledged = continueConversation(acknowledged, selectedConversationDefinition, occurredAt);
-      }
+      // Only the ending may follow an outcome (a poll's village result replaces its reply and
+      // closing line): finish here, so the action card completes and pays before the route exits.
+      if (selectedConversationDefinition && acknowledged.status === 'active') acknowledged = finishConversationAfterOutcome(acknowledged, selectedConversationDefinition, occurredAt);
       return acknowledged;
     };
     const dismissedSelectedSession = dismissOutcome(selectedConversationSession);
@@ -1245,7 +1245,11 @@ export function useKingdomQuests({ kingdom, residents, today }: Args) {
       const session = current.conversationSessions.find((candidate) => candidate.id === selectedConversationSession.id);
       if (!session?.outcomePresentation) return current;
       const acknowledged = dismissOutcome(session);
-      const next = upsertConversationSession(current, acknowledged);
+      let next = upsertConversationSession(current, acknowledged);
+      if (!acknowledged.preview && acknowledged.status === 'completed' && session.status !== 'completed') next = recordConversationTelemetry(next, {
+        id: `${acknowledged.id}:completed`, familyId: acknowledged.familyId, sessionId: acknowledged.id,
+        definitionId: acknowledged.definitionId, kind: 'conversation_completed', occurredAt,
+      });
       saveCompanionContentState(next);
       return next;
     });

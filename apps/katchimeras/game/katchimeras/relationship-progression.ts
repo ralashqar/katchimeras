@@ -64,7 +64,10 @@ export function emptyRelationshipProgressState(): RelationshipProgressState {
   };
 }
 
-export function normalizeRelationshipProgressState(value: unknown): RelationshipProgressState {
+export function normalizeRelationshipProgressState(value: unknown, options: {
+  /** Hydration only: a presentation claimed before an interrupted animation is never replayed as progression. */
+  dismissClaimedPresentations?: boolean;
+} = {}): RelationshipProgressState {
   if (!value || typeof value !== 'object') return emptyRelationshipProgressState();
   const candidate = value as Partial<RelationshipProgressState>;
   // This title is unreleased. Schema 7 deliberately starts from empty rather
@@ -83,7 +86,10 @@ export function normalizeRelationshipProgressState(value: unknown): Relationship
       .slice(-160)
     : [];
   const actionPresentations = Array.isArray(candidate.actionPresentations)
-    ? candidate.actionPresentations.filter(isActionPresentationRecord).map((item) => item.status === 'claimed'
+    // A claim is the card's live animation: every save passes through here, so it must survive
+    // a save (the card's row was vanishing the instant it claimed its reward). Only hydration
+    // retires claims, as an interrupted animation on the last run.
+    ? candidate.actionPresentations.filter(isActionPresentationRecord).map((item) => options.dismissClaimedPresentations && item.status === 'claimed'
       ? { ...item, status: 'dismissed' as const, dismissedAt: item.dismissedAt ?? Date.now() }
       : item).filter((item) => actionCompletions.some((completion) => completion.id === item.completionId)).slice(-80)
     : [];

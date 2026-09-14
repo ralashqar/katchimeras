@@ -1023,6 +1023,10 @@ test('canonical completion rotates once and presentation lifecycle cannot affect
   assert.equal(explicitlyDismissed.actionPresentations[0]?.status, 'dismissed');
   assert.deepEqual(dismissedOnRestart.mossproutDailyActionDecks, once.mossproutDailyActionDecks);
   assert.deepEqual(explicitlyDismissed.mossproutDailyActionDecks, once.mossproutDailyActionDecks);
+  // A claim is the card's live animation: an ordinary save (every repository write normalises)
+  // keeps it, and only hydration retires it as an interrupted animation from the last run.
+  assert.equal(normalizeRelationshipProgressState(claimed).actionPresentations[0]?.status, 'claimed', 'a save keeps the claim');
+  assert.equal(normalizeRelationshipProgressState(claimed, { dismissClaimedPresentations: true }).actionPresentations[0]?.status, 'dismissed', 'hydration retires it');
 });
 
 test('Day 1 milestone is explicit and idempotent', () => {

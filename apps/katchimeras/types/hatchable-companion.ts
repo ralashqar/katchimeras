@@ -1,4 +1,5 @@
 import type { ImageSourcePropType } from 'react-native';
+import type { CompanionDailyConfig } from '@/types/companion-daily';
 import type { HexCoord } from '@incubator/environments/hex';
 import type { MergeCharacterId, MergeOrder } from './merge-world';
 import type { CorruptionWispLines, CorruptionWispSpec } from '@/features/onboarding/corruption-wisps';
@@ -142,24 +143,6 @@ export type HatchableEggPolicy = {
   hatch: { actionId: string; title: string; description: string };
 };
 
-/**
- * A friend's daily cards once they are home, all content: a photo card (show
- * them something of a category, once a day, for Bond), the day's question
- * (one of their scenario polls), and the lines their page says when there is
- * no journey day to tell.
- */
-export type HatchableDailyDefinition = {
-  /** The chapter name over the journey card until a journey chapter is authored. */
-  chapterTitle: string;
-  /** Said while the friend rests between journey days. */
-  restingLine: string;
-  /** Said when there is nothing to continue: the page's idle line. */
-  idleLine: string;
-  photo?: { category: string; title: string; subtitle: string; /** Said when the photo did not show the category. */ noMatch: string; /** Said when it did, rotating by day. */ thanks: readonly string[] };
-  polls: readonly ConversationPollSeed[];
-  questionSubtitle: string;
-};
-
 export type HatchableCompanionDefinition = {
   companion: MergeCharacterId;
   displayName: string;
@@ -173,5 +156,6 @@ export type HatchableCompanionDefinition = {
   lesson: HatchableLessonDefinition;
   egg: HatchableEggPolicy;
   economy: { generatorId: string };
-  daily?: HatchableDailyDefinition;
+  /** The friend's daily activities and question, drawn by the shared daily tech. */
+  daily?: CompanionDailyConfig;
 };

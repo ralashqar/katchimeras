@@ -64,7 +64,7 @@ export function poll(
     format: 'poll',
     entryNodeId: 'poll',
     nodes: [
-      { id: 'poll', kind: 'poll', prompt: seed.prompt, helperText: seed.replies ? 'The village answers too. Just for fun.' : 'Pick quickly. The village result is just for fun.', options: pollOptions, nextNodeId: null },
+      { id: 'poll', kind: 'poll', prompt: seed.prompt, helperText: seed.replies ? 'The village answers too. Just for fun.' : 'Pick quickly. The village result is just for fun.', options: pollOptions, nextNodeId: 'end' },
       endNode(seed.ending ?? 'That one belongs in the village ledger now.'),
     ],
   };

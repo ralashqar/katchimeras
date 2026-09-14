@@ -47,7 +47,7 @@ test('Steppling keeps the claimed row through its flight, restores Garden naviga
   const opened: string[] = [];
   const panel = { backgroundColor: 'legacy-dark' };
   const subscribe = (listeners: Set<() => void>, fn: () => void) => { listeners.add(fn); return () => listeners.delete(fn); };
-  const module = loadNativeModule('components/katchadeck/world/steppling-actions.tsx', {
+  const mocks: Record<string, unknown> = {
     'react-native': { ...nativeViews, ScrollView: 'ScrollView', Pressable: 'Pressable', AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
     'expo-image': { Image: 'Image' },
     'expo-sensors': { Pedometer: { isAvailableAsync: async () => true, getPermissionsAsync: async () => ({ granted: true }), getStepCountAsync: async () => ({ steps }) } },
@@ -72,7 +72,12 @@ test('Steppling keeps the claimed row through its flight, restores Garden naviga
     './companion-garden-action': { CompanionGardenAction: ({ children, ...props }: { children: (card: React.ReactNode) => React.ReactNode }) => children(React.createElement('GardenCard', props)) },
     '@/hooks/use-daily-companion-conversation': { useDailyCompanionConversation: () => ({ id: STEPPLING_SCENARIO_POLLS[0].id, title: STEPPLING_SCENARIO_POLLS[0].title }) },
     './companion-merge-request-tray': { CompanionMergeRequestTray: 'Tray', COMPANION_MERGE_REQUEST_PALETTE: {}, COMPANION_STORY_PANEL_STYLE: panel },
-  }, { setInterval, clearInterval });
+  };
+  mocks['@/hooks/use-companion-calendar-day'] = { useCompanionCalendarDay: () => '2026-09-04' };
+  mocks['@/game/katchimeras/action-completion'] = { reconcilePendingActionRewards: () => 0 };
+  // The day's question is the shared slot, loaded through the same mocks so its rows are the test's rows.
+  mocks['@/components/katchadeck/world/companion-daily-question'] = loadNativeModule('components/katchadeck/world/companion-daily-question.tsx', mocks, { setInterval, clearInterval });
+  const module = loadNativeModule('components/katchadeck/world/steppling-actions.tsx', mocks, { setInterval, clearInterval });
   const Cards = module.StepplingActions as React.ComponentType<Record<string, unknown>>;
   let tree: ReactTestRenderer;
   let reaction = '';

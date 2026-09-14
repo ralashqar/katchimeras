@@ -55,14 +55,20 @@ one legal move at every strike after the first.
 
 ## Not yet data
 
-- Daily actions and daily question pools are still per-family code (Mossprout's photo/notice,
-  Steppling's steps, the generic poll builder). Baristabbit uses the existing Barista poll pack.
-- (Done Sept 13, 2026) Daily cards as content: a definition's `daily` block names a photo card (a
-  category, worth the life-activity Bond once a day, through `utils/companion-photo-capture-storage.ts`
-  and `companion-photo-activity-storage.ts`), the friend's scenario polls (served one a day, like
-  Steppling's), and the page's lines. `components/katchadeck/world/hatchable-actions.tsx` draws them on
-  the journey stage for any hatchable friend. A photo feed for the Egg (`feed.kind: 'photo'`) exists on
-  the same session, but Baristabbit's Egg hatches on answers alone.
+- (Done Sept 14, 2026) Daily activities are shared tech on a `CompanionDailyConfig`
+  (`types/companion-daily.ts`): a definition's `daily` block names its photo card (what to look for as
+  quality ids or capture categories, the camera's copy, follow-ups, whether the photo is kept as a
+  memory), an optional noticing prompt rotation, water, the scenario polls served one a day, the page's
+  lines, and whether the cards sit behind one gateway card (`menu`) or lie flat (`rows`). Mossprout's
+  nature photo, noticing and water are the first config (`constants/companion-daily/mossprout.ts`);
+  `companionDailyConfig(familyId)` finds any friend's. One card
+  (`components/katchadeck/world/companion-life-activity-card.tsx`), one store per friend
+  (`utils/companion-life-activity-storage.ts`, `companion:<family>-life-activities:v1`), one grading
+  (`utils/companion-photo-match.ts`) and one camera branch (`companionActivityId` +
+  `companionActivityFor` on `/moment-capture`) serve every friend; `companion-daily-actions.tsx` draws
+  a hatchable friend's column and `companion-daily-question.tsx` the day's question for anyone,
+  Steppling included. Only Steppling's step goal is still his own. A photo feed for the Egg
+  (`feed.kind: 'photo'`) uses the Egg's own capture session; Baristabbit's Egg hatches on answers alone.
 - Journey chapters (journey days with merge orders and rest cycles) are still authored per family
   (Steppling, Mossprout); a hatchable friend without one shows their daily cards and idle line.
 - Fixtures: no "Before Baristabbit" profile snapshot yet.

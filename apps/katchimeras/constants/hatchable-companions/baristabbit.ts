@@ -117,19 +117,33 @@ export const BARISTABBIT_HATCHABLE: HatchableCompanionDefinition = {
     chapterTitle: 'The Counter',
     restingLine: 'Baristabbit is resting. The kettle is on low. The Garden is open.',
     idleLine: 'The counter is open. Show me today’s cup, or answer me something.',
+    questionSubtitle: 'One small scene. The village answers too.',
+    presentation: 'rows',
     photo: {
       category: 'drink',
       title: 'Show Baristabbit today’s drink',
       subtitle: 'Whatever is in the cup. Water counts.',
-      noMatch: 'I could not find a cup in that one. Any drink counts, even water.',
-      thanks: [
-        'That is a good cup. I can tell from here.',
-        'A drink and a pause. The day has a shape now.',
-        'Noted, and kept warm. Thank you for showing me.',
-        'Whatever is in it, you stopped for it. That is the part I like.',
-      ],
+      artKey: 'today:photo',
+      camera: {
+        icon: 'cup.and.saucer.fill',
+        title: 'Show Baristabbit today’s drink',
+        subtitle: 'Whatever is in the cup. Water counts.',
+        permissionTitle: 'Today’s drink, for Baristabbit',
+        permissionBody: 'Show Baristabbit what is in your cup. Any drink counts, even water.',
+        analysingLine: 'Looking at the cup…',
+      },
+      /** A cup is a cup: the capture category, not a graded quality. The photo stays in the camera roll. */
+      match: { categoryIds: ['drink'] },
+      lines: {
+        noMatch: 'I could not find a cup in that one. Any drink counts, even water.',
+        thanks: [
+          'That is a good cup. I can tell from here.',
+          'A drink and a pause. The day has a shape now.',
+          'Noted, and kept warm. Thank you for showing me.',
+          'Whatever is in it, you stopped for it. That is the part I like.',
+        ],
+      },
     },
     polls: BARISTABBIT_SCENARIO_POLLS,
-    questionSubtitle: 'One small scene. The village answers too.',
   },
 };

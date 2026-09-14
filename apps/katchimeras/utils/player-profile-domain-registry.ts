@@ -38,8 +38,11 @@ const PROFILE_KEY_PREFIXES = [
   'katchadeck.quest-capture-session-',
 ] as const;
 
+/** Every friend's daily life activities, whoever has a store. */
+const PROFILE_KEY_PATTERNS = [/^companion:[a-z-]+-life-activities:v1$/] as const;
+
 export function isPlayerProfileStorageKey(key: string): boolean {
-  return EXACT_PROFILE_KEYS.has(key) || PROFILE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+  return EXACT_PROFILE_KEYS.has(key) || PROFILE_KEY_PREFIXES.some((prefix) => key.startsWith(prefix)) || PROFILE_KEY_PATTERNS.some((pattern) => pattern.test(key));
 }
 
 export function captureKeyValueProfileDomain(): Record<string, string> {

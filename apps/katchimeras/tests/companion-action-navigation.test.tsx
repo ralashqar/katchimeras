@@ -78,7 +78,7 @@ test('camera header stays bounded below the safe area and cancel/complete each p
       'react-native-reanimated': { ...motion.animated, FadeOut: motion.animated.FadeIn },
       'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }) },
       'expo-camera': { CameraView: Camera, useCameraPermissions: () => [{ granted: outcome !== 'denied', canAskAgain: false }, () => {}] },
-      'expo-router': { useRouter: () => router, useLocalSearchParams: () => ({ companionActivityId: 'capture', companionReturnTo: '/katchimeras' }) },
+      'expo-router': { useRouter: () => router, useLocalSearchParams: () => ({ companionActivityId: 'capture', companionActivityFor: 'mossprout', companionReturnTo: '/katchimeras' }) },
       'expo-image': { Image: 'Image' }, 'expo-haptics': { impactAsync: async () => {}, ImpactFeedbackStyle: { Medium: 'medium' } },
       'expo-location': { getForegroundPermissionsAsync: async () => ({ granted: false }) },
       '@/components/katchadeck/ui/screen-close-button': { ScreenCloseButton: 'Back' },
@@ -93,8 +93,9 @@ test('camera header stays bounded below the safe area and cancel/complete each p
       '@/utils/photo-vision': { analyzePhoto: async () => null },
       '@/utils/photo-place-resolution': { resolvePhotoPlace: async () => null },
       '@/utils/safe-navigation': loadNativeModule('utils/safe-navigation.ts', {}),
-      '@/utils/mossprout-life-activity-storage': { cancelMossproutNatureCapture: () => { cancellations++; }, finishMossproutNatureCapture: () => { photos++; } },
-      '@/utils/mossprout-nature-capture': { prepareMossproutNaturePhoto: () => ({ uri: 'file:///saved.jpg' }) },
+      '@/utils/companion-life-activity-storage': { cancelCompanionLifeCapture: () => { cancellations++; }, finishCompanionLifeCapture: () => { photos++; } },
+      '@/utils/companion-life-photo': { prepareCompanionLifePhoto: () => ({ uri: 'file:///saved.jpg' }) },
+      '@/constants/companion-daily/registry': { companionDailyConfig: () => ({ photo: { camera: { icon: 'leaf.fill', title: 'Show Mossprout something growing', subtitle: 'A plant', permissionTitle: 'Camera', permissionBody: 'Please', analysingLine: 'Looking' } } }) },
     });
     const Screen = loadNativeModule('app/moment-capture.tsx', mocks).default as React.ComponentType;
     let tree: ReactTestRenderer;

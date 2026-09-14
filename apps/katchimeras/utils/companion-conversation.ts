@@ -591,6 +591,29 @@ function advancePastReplyBeforeNextQuestion(
   }, next, occurredAt);
 }
 
+/**
+ * Finishes a conversation whose outcome has just been dismissed when nothing
+ * but its ending remains: a pending reply that leads nowhere or only to the
+ * end node, or the end node itself. A poll's village result stands in for
+ * its reply and closing line, so dismissing it completes the session instead
+ * of leaving it mid-reply, where the card never completed and paid nothing.
+ * A reply that leads on to another question is left for the player.
+ */
+export function finishConversationAfterOutcome(session: ConversationSession, definition: ConversationDefinition, at = Date.now()): ConversationSession {
+  let current = session;
+  for (let guard = 0; guard < 4 && current.status === 'active'; guard += 1) {
+    const node = conversationNode(definition, current.currentNodeId);
+    const onlyEndingRemains = current.pendingReply !== undefined
+      ? !current.pendingNextNodeId || conversationNode(definition, current.pendingNextNodeId)?.kind === 'end'
+      : node?.kind === 'end';
+    if (!onlyEndingRemains) break;
+    const next = continueConversation(current, definition, at);
+    if (next === current) break;
+    current = next;
+  }
+  return current;
+}
+
 function completeSession(session: ConversationSession, completedAt: number): ConversationSession {
   if (session.status === 'completed') return session;
   return { ...session, status: 'completed', completedAt, updatedAt: completedAt, ...(session.dialoguePresentation ? { dialogueAcknowledgedAt: completedAt } : {}) };

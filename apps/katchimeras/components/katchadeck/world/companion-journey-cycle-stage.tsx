@@ -1,7 +1,8 @@
 import { CompanionSceneOverlayHost, CompanionSlidingSubmenu } from './companion-scene-overlay';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
 import { StepplingActions } from './steppling-actions';
-import { HatchableActions } from './hatchable-actions';
+import { CompanionDailyActions } from './companion-daily-actions';
+import { companionDailyConfig } from '@/constants/companion-daily/registry';
 import { hatchableByCompanion } from '@/constants/hatchable-companions/registry';
 import { AUTHORED_COHORT_ORDER_POOLS } from '@/utils/companion-story';
 import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
@@ -40,10 +41,12 @@ export function CompanionJourneyCycleStage(props: ComponentProps<typeof Companio
   return <CompanionSceneOverlayHost><CompanionJourneyCycleStageContent {...props} /></CompanionSceneOverlayHost>;
 }
 
-function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpenMerge, onMore, onJournal, onGoal, onNarration, routineActions, routineSubmenuOpen = false, fallback, onBondRewardRequest, externalGesture }: {
+function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpenMerge, onMore, onJournal, onGoal, onNarration, routineActions, routineSubmenuOpen = false, fallback, onBondRewardRequest, externalGesture, cardsActive = true }: {
   onBondRewardRequest?: (source: DayActionSourceRect, onArrive: () => void, receipt?: CompanionBondAwardReceipt) => void; externalGesture?: GestureType;
   onOpenConversation?: (definitionId: string, origin: KatchimeraActionOrigin) => void;
   routineSubmenuOpen?: boolean;
+  /** Whether the cards are on screen and not behind a conversation: a completed card's reward waits otherwise. */
+  cardsActive?: boolean;
   /** Steppling and Mossprout have journey chapters; any other hatchable friend gets the same stage with their definition's daily cards. */
   familyId: string; onOpenMerge: (orderId?: string) => void;
   onMore: () => void; onJournal: () => void; onGoal: () => void; fallback?: ReactNode; routineActions?: ReactNode; onVisitSeed?: () => void; onNarration?: (text: string | null) => void;
@@ -122,15 +125,16 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   const story = familyId === 'steppling' ? loadAuthoredCohortStory('steppling') : null;
   // A hatchable friend without a journey chapter yet: their definition says what the page says and shows.
   const hatchable = familyId === 'steppling' || familyId === 'mossprout' ? null : hatchableByCompanion(familyId);
+  const daily = companionDailyConfig(familyId);
   const nextOrder = story?.orderDeck?.templateKeys.find((key) => !story.completedOrderIds.includes('merge-story:steppling:chapter-1:' + key));
   useEffect(() => { setReaction(null); }, [familyId, cycle?.id, run?.nodeId]);
   const narration = error ?? reaction ?? (!initialized ? 'Finding our place…' : pending
     ? ready ? journeyReturnLine(cycle)
       : checkInOpen ? 'What have you made room for since we paused?'
-        : familyId === 'steppling' ? 'Steppling is resting. Your steps and small moments still count. The Garden is open.' : hatchable?.daily?.restingLine ?? 'Mossprout is resting. A little quiet, a little growing.'
+        : daily?.restingLine ?? 'A little rest, a little growing.'
     : (node?.kind === 'scene' || node?.kind === 'task') && node.payload?.text ? String(node.payload.text)
       : day ? 'Journey Day ' + day.number + ': ' + day.title + '. ' + STEPPLING_CHAPTER_PURPOSE
-        : mossChapter?.purpose ?? hatchable?.daily?.idleLine ?? 'Our chapter is remembered. There is still more to share.');
+        : mossChapter?.purpose ?? daily?.idleLine ?? 'Our chapter is remembered. There is still more to share.');
   useEffect(() => { onNarration?.(managed ? narration : null); }, [managed, narration, onNarration]);
   useEffect(() => () => onNarration?.(null), [onNarration]);
 
@@ -199,7 +203,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   }) : [];
   const model = companionSceneModel({
     familyId, episodeId: !pending && day ? stepplingEpisodeId(day.number) : cycle?.episodeId ?? 'next', dayNumber: pending ? cycle.number : day?.number ?? cycle?.number ?? 1,
-    chapterTitle: familyId === 'steppling' ? 'The Path Outside' : hatchable?.daily?.chapterTitle ?? mossChapter?.title ?? 'Our Garden',
+    chapterTitle: mossChapter?.title ?? daily?.chapterTitle ?? 'Our Garden',
     episodeTitle: pending ? cycle.title : day?.title ?? cycle?.title ?? 'A little way together',
     phase: pending ? ready ? cycle.finale && !cycle.nextTitle ? 'finished' : 'ready' : 'meditating' : day ? 'active' : 'finished', nextTitle: cycle?.nextTitle,
   });
@@ -214,10 +218,10 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
     {initialized && !error ? <CompanionSceneCards
       hideJourney={submenuOpen || routineSubmenuOpen || (hatchable != null && !cycle) || !managed} model={model} onJourney={onStory} disabled={busy}
       timer={pending && !ready && rest ? <CompanionMeditationStage onPress={() => setReaction(journeyForeshadowLine(familyId))} title={model.journey.eyebrow} availableAt={rest.availableAt} startedAt={rest.startedAt} settledMs={rest.settledMs} now={now} companionName={familyId === 'steppling' ? 'Steppling' : 'Mossprout'} /> : undefined}>
-      {familyId === 'steppling' ? <StepplingActions onReaction={setReaction} onOpenConversation={onOpenConversation}
+      {familyId === 'steppling' ? <StepplingActions onReaction={setReaction} onOpenConversation={onOpenConversation} active={cardsActive}
         externalGesture={externalGesture} onBondRewardRequest={onBondRewardRequest} onSubmenuChange={setSubmenuOpen}
         onOpenMerge={onOpenMerge} requests={requests} />
-        : hatchable ? <HatchableActions definition={hatchable} onReaction={setReaction} onOpenConversation={onOpenConversation}
+        : hatchable ? <CompanionDailyActions definition={hatchable} onReaction={setReaction} onOpenConversation={onOpenConversation} active={cardsActive}
           externalGesture={externalGesture} onBondRewardRequest={onBondRewardRequest} onSubmenuChange={setSubmenuOpen}
           onOpenMerge={onOpenMerge} requests={requests} /> : routineActions}
     </CompanionSceneCards> : <ScrollView accessibilityLabel="Journey actions" style={{ maxHeight: 340 }} contentContainerStyle={styles.actions} keyboardShouldPersistTaps="handled">

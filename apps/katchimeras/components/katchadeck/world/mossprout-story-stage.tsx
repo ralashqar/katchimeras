@@ -1,6 +1,7 @@
 import { CompanionChoiceList } from './companion-choice-list';
 import { CompanionSceneCards } from './companion-scene-cards';
-import { MossproutLifeActivityCard } from './mossprout-life-activity-card';
+import { CompanionLifeActivityCard } from './companion-life-activity-card';
+import { MOSSPROUT_DAILY } from '@/constants/companion-daily/mossprout';
 import { CompanionSceneOverlayHost } from './companion-scene-overlay';
 import { CompanionGardenAction } from './companion-garden-action';
 import { useDailyCompanionConversation } from '@/hooks/use-daily-companion-conversation';
@@ -789,7 +790,7 @@ export function MossproutStoryStage({
       onOpenMerge(id);
     }} storyRequests={journeyRequestPreviews}>
     {(gardenCard) => <View style={{ gap: 8 }}>
-    <MossproutLifeActivityCard onBondRewardRequest={onBondRewardRequest} onOpenChange={setLifeOpen} onNarration={onActionNarration} />
+    <CompanionLifeActivityCard companion="mossprout" config={MOSSPROUT_DAILY} onBondRewardRequest={onBondRewardRequest} onOpenChange={setLifeOpen} onNarration={onActionNarration} />
     {gardenCard}
     {presentationAction && displayedPresentation ? <DayActionCompletedRow animateLayout={false}
       artwork={<MossproutActionArtwork action={presentationAction} />} enteringEnabled={false}

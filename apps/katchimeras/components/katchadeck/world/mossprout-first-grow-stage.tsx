@@ -9,7 +9,7 @@ import { katchimeraActionArt } from '@/constants/katchimera-action-art';
 import { advanceFtueActionDurably, loadFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
 import { MOSSPROUT_GARDEN_RETURN, MOSSPROUT_FIRST_NOTICE } from '@/features/onboarding/mossprout-first-grow';
 import { completeFirstNotice, loadFirstNoticeCompletion } from '@/features/onboarding/mossprout-first-grow-runtime';
-import { acknowledgeMossproutLifeCompletion, commitMossproutLifeCompletion, type MossproutLifeCompletion } from '@/utils/mossprout-life-activity-storage';
+import { acknowledgeCompanionLifeCompletion, commitCompanionLifeCompletion, type CompanionLifeCompletion } from '@/utils/companion-life-activity-storage';
 import { COMPANION_BOND_REWARDS, type CompanionBondAwardReceipt } from '@/utils/companion-bond';
 
 export function MossproutFirstGrowStage({ onNarration, onBondRewardRequest }: {
@@ -19,7 +19,7 @@ export function MossproutFirstGrowStage({ onNarration, onBondRewardRequest }: {
   const run = useFtueRun();
   const [open, setOpen] = useState(run?.stepId === 'companion.first_notice');
   const [finishing, setFinishing] = useState(false);
-  const [flight, setFlight] = useState<MossproutLifeCompletion>();
+  const [flight, setFlight] = useState<CompanionLifeCompletion>();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -37,8 +37,8 @@ export function MossproutFirstGrowStage({ onNarration, onBondRewardRequest }: {
   const advance = useCallback((actionId: string, optionId?: string) => advanceFtueActionDurably({
     expectedStepId: 'companion.first_notice', actionId, optionId,
   }), []);
-  const present = useCallback(async (completion: MossproutLifeCompletion) => {
-    const done = completion.status === 'pending' ? await commitMossproutLifeCompletion(completion.id) : completion;
+  const present = useCallback(async (completion: CompanionLifeCompletion) => {
+    const done = completion.status === 'pending' ? await commitCompanionLifeCompletion('mossprout', completion.id) : completion;
     if (!alive.current) return;
     if (done.presentedAt) await advance('companion.complete_first_notice', done.answer);
     else { setOpen(true); setFlight(done); }
@@ -92,7 +92,7 @@ export function MossproutFirstGrowStage({ onNarration, onBondRewardRequest }: {
       {flight ? <DayActionCompletedRow animateLayout={false} enteringEnabled={false} artwork={artwork} title="Notice one small thing" reward={reward}
         onRewardRequest={flight.receipt && onBondRewardRequest ? (source, arrive) => onBondRewardRequest(source, arrive, flight.receipt!) : undefined}
         onFinished={() => void perform(async () => {
-          acknowledgeMossproutLifeCompletion(flight.id);
+          acknowledgeCompanionLifeCompletion('mossprout', flight.id);
           await advance('companion.complete_first_notice', flight.answer);
         })} /> : null}
       {retryCard}

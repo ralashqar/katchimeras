@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { STEPPLING_SCENARIO_POLLS } from '@/constants/steppling-scenario-polls';
 import { BARISTABBIT_SCENARIO_POLLS } from '@/constants/baristabbit-scenario-polls';
-import { companionConversationDefinitionById, companionConversationDefinitionsForFamily } from '@/constants/companion-conversations-v2';
+import { companionConversationDefinitionById, companionConversationDefinitionsForFamily, poll } from '@/constants/companion-conversations-v2';
 import { scenarioJournalEntry, journalSummary } from '@/utils/companion-life';
 import {
   answerConversation,
@@ -12,6 +12,7 @@ import {
   conversationTraitPortrait,
   conversationTraitTally,
   createConversationSession,
+  finishConversationAfterOutcome,
 } from '@/utils/companion-conversation';
 import type { ConversationDefinition, ConversationSession } from '@/types/companion-conversation';
 
@@ -56,19 +57,11 @@ test('Steppling’s daily questions are scenarios with authored replies, two to 
   assert.equal(deeper.minimumBondLevel, 2, 'the deeper question waits for a little bond');
 });
 
-test('Steppling’s insight games are scenario flows with three results supported by every question', () => {
+test('Steppling has no insight games left: his questions are scenario polls', () => {
+  // The legacy insight games went with the interaction generation they belonged to (Sept 2026).
   const games = companionConversationDefinitionsForFamily('steppling').filter((definition) => definition.format === 'insight_game' && !definition.contextualOnly);
-  assert.deepEqual(games.map((definition) => definition.id).sort(), ['steppling:insight:free-day', 'steppling:insight:outside-conditions', 'steppling:insight:setting-out', 'steppling:insight:when-it-goes-wrong']);
-  for (const id of ['steppling:insight:setting-out', 'steppling:insight:free-day', 'steppling:insight:when-it-goes-wrong']) {
-    const definition = companionConversationDefinitionById.get(id)!;
-    const game = definition.nodes.find((node) => node.kind === 'insight_game')!;
-    const reveal = definition.nodes.find((node) => node.kind === 'insight_reveal')!;
-    assert.ok(game.kind === 'insight_game' && reveal.kind === 'insight_reveal');
-    assert.equal(game.questions.length, 5);
-    assert.ok(game.questions.every((question) => question.prompt.split(/\s+/).length <= 16 && question.options.length === 3), `${id}: short scenarios, three ways to meet each`);
-    assert.equal(reveal.results.length, 3);
-    for (const result of reveal.results) assert.equal(result.matchOptionIds.length, 5, `${id}:${result.id} is supported by all five scenarios`);
-  }
+  assert.deepEqual(games, []);
+  assert.ok(companionConversationDefinitionsForFamily('steppling').some((definition) => definition.format === 'poll'));
 });
 
 test('Mossprout’s daily questions are scenarios too, with the same ids so their card art and pins hold', () => {
@@ -129,7 +122,8 @@ test('answers tally into a trait portrait, and each scenario answered becomes a 
   // Previews and unfinished sessions never reach the journal; a question without trait tags is not a scenario.
   assert.equal(scenarioJournalEntry({ ...sessions[0]!, preview: true }, path), null);
   assert.equal(scenarioJournalEntry({ ...sessions[0]!, status: 'active' }, path), null);
-  const plain = companionConversationDefinitionById.get('flexel:poll:start')!;
+  // A question without trait tags is not a scenario: no page family ships one, so build one.
+  const plain = poll('baristabbit', { id: 'plain', prompt: 'Tea or coffee?', labels: ['Tea', 'Coffee'] }, 0);
   assert.equal(scenarioJournalEntry(playThrough(plain, (options) => options[0]!.id), plain), null);
 });
 
@@ -169,4 +163,23 @@ test('Baristabbit’s daily questions are scenarios in the same shape: authored 
   const polls = companionConversationDefinitionsForFamily('baristabbit').filter((definition) => definition.format === 'poll');
   assert.equal(polls.length, 31);
   assert.equal(companionConversationDefinitionById.get('baristabbit:poll:dangerous-sentence')!.minimumBondLevel, 2, 'the deeper question waits for a little bond');
+});
+
+test('dismissing a poll’s village result finishes the conversation; a reply that leads on is left for the player', () => {
+  const definition = companionConversationDefinitionsForFamily('baristabbit').find((item) => item.format === 'poll')!;
+  const poll = definition.nodes.find((node) => node.kind === 'poll')!;
+  assert.ok(poll.kind === 'poll');
+  assert.equal(poll.nextNodeId, 'end', 'the poll leads to its closing line');
+  let session = createConversationSession({ definition, formId: 'baristabbit', dayId: '2026-09-14', createdAt: 1, sessionId: 'poll:test' });
+  session = answerConversation({ ...session, dialoguePresentation: true }, definition, poll.options[0]!.id, 2).session;
+  assert.equal(session.status, 'active');
+  assert.equal(session.currentNodeId, 'end', 'the reply stays in the transcript and the closing line waits behind the village result');
+  const finished = finishConversationAfterOutcome(session, definition, 3);
+  assert.equal(finished.status, 'completed');
+  assert.ok(finished.dialogueAcknowledgedAt, 'a completed dialogue is acknowledged, so the action card can commit');
+  // A poll that led nowhere after its reply (the shape the catalog briefly had) finishes the same way.
+  const midReply = { ...session, currentNodeId: 'poll', pendingReply: 'A good choice.', pendingNextNodeId: null };
+  assert.equal(finishConversationAfterOutcome(midReply, definition, 3).status, 'completed');
+  const chained = { ...session, currentNodeId: 'poll', pendingReply: 'A good choice.', pendingNextNodeId: 'poll' };
+  assert.equal(finishConversationAfterOutcome(chained, definition, 3), chained, 'a reply that leads to another question is not skipped');
 });

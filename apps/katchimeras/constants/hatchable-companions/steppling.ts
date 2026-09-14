@@ -4,6 +4,7 @@ import { GLOW } from '@/constants/glow';
 import { GLOW_ORDER_IDS, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/constants/glow-discovery-ids';
 import { STEPPLING_DAY_ONE_CHOICES, STEPPLING_DAY_ONE_HANDOFFS, STEPPLING_DAY_ONE_OPENING } from '@/constants/steppling-day-one-copy';
 import { STEPPLING_EGG_POLICY } from '@/constants/steppling-egg-copy';
+import { STEPPLING_SCENARIO_POLLS } from '@/constants/steppling-scenario-polls';
 import { STEPPLING_WISP_LINES, STEPPLING_WISPS } from '@/features/onboarding/corruption-wisps';
 import { MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM } from '@/features/onboarding/opening-mist';
 
@@ -167,4 +168,12 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
   },
   egg: STEPPLING_EGG_POLICY,
   economy: { generatorId: 'journey-locker' },
+  daily: {
+    chapterTitle: 'The Path Outside',
+    restingLine: 'Steppling is resting. Your steps and small moments still count. The Garden is open.',
+    idleLine: 'The trail is waiting. Walk a little, or answer me something.',
+    questionSubtitle: 'One quick scene. The village answers too.',
+    presentation: 'rows',
+    polls: STEPPLING_SCENARIO_POLLS,
+  },
 };
