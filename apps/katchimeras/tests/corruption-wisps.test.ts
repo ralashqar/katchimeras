@@ -53,9 +53,9 @@ test('the Glow aims at the wisps: every burst at the first standing, the finale 
   assert.match(dock, /const aimed = sinkRef\.current\?\.aim\('finale'\) \?\? null;[\s\S]*?if \(aimed\) \{ push\(aimed\.point\); return id; \}/, 'the finale item strikes the last wisp');
   assert.match(dock, /if \(struck\?\.key != null\) \{\s*sinkRef\.current\?\.struck\(struck\.key\);\s*if \(struck\.group != null && !landedGroups\.current\.has\(struck\.group\)\) \{\s*landedGroups\.current\.add\(struck\.group\);\s*sinkRef\.current\?\.landed\(struck\.key, finale \? 'finale' : 'glow'\);/, 'a flinch per token, a hit per burst');
   // A strike on a wisp bursts as light meeting corruption: hot core, magenta ring, a dark puff, sparks and ember shards; the mist's own burst is untouched.
-  assert.match(dock, /\{ id, wisp: landed\.key != null, at: \{/);
-  assert.match(dock, /impact\.wisp\s*\? <WispStrikeBurst key=\{impact\.id\}[\s\S]*?: <ImpactBurst key=\{impact\.id\}/);
-  assert.match(dock, /function WispStrikeBurst\(\{ x, y, onDone \}/);
+  assert.match(dock, /const wisp = landed\.key != null;[\s\S]*?\{ id, wisp, at: \{/);
+  assert.match(dock, /const strikes = useMemo\(\(\) => impacts\.filter\(\(impact\) => impact\.wisp\), \[impacts\]\);[\s\S]*?<WispStrikeBurst key=\{slot\} impact=\{impact\}[\s\S]*?<ImpactBurst key=\{slot\} impact=\{impact\}/, 'a strike on a wisp bursts from its own pool');
+  assert.match(dock, /const WispStrikeBurst = memo\(function WispStrikeBurst\(\{ impact, origin, onDone \}: PooledBurstProps\)/);
   assert.match(dock, /const reach = 1 - Math\.pow\(1 - t\.value, 2\.2\);/, 'shards fly out with drag');
   assert.match(dock, /tintColor=\{STRIKE_PUFF\}/, 'the dark puff is the wisp’s own colour');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');

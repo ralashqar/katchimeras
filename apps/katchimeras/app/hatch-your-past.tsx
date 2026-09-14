@@ -16,6 +16,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EssenceReview } from '@/components/katchadeck/capture/essence-review';
+import { returnToTabs } from '@/features/navigation/return-to-tabs';
 import type { PhotoAnalysisInput } from '@/utils/intelligence/photo-analysis';
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
@@ -305,7 +306,7 @@ export default function HatchYourPastRoute() {
   }
 
   function finish() {
-    router.replace('/(tabs)');
+    returnToTabs(router);
   }
 
   const onSummary = index >= creatures.length;

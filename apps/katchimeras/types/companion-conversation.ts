@@ -1,18 +1,11 @@
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { CompanionEvidenceRef } from '@/types/companion-interaction';
 import type { WispId } from '@/types/wisp';
+import type { MergeCharacterId } from '@/types/merge-world';
+import { companionHasPage } from '@/features/companion/companion-page-policy';
 
-/** Every family with a complete authored V2 data pack. */
-export const CONVERSATION_V2_FAMILIES = [
-  'baristabbit', 'feastle', 'steppling', 'flexel', 'bedrotte', 'dawnle', 'mendle',
-  'gatherglow', 'heartmote', 'kindling', 'snuglet', 'waglet', 'tasklet', 'errandimp',
-  'pagelet', 'relicoon', 'museling', 'encora', 'flickerbun', 'pixooka', 'mossprout',
-  'shellio', 'skylo', 'voyagle', 'cheerlet',
-] as const;
-export type ConversationV2FamilyId = typeof CONVERSATION_V2_FAMILIES[number];
-
-/** Every authored family now uses the V2 chat lobby and conversation engine. */
-export const CONVERSATION_V2_ENABLED_FAMILIES: readonly ConversationV2FamilyId[] = CONVERSATION_V2_FAMILIES;
+/** A family with conversations: Mossprout, or a hatchable friend (any merge character with a definition). */
+export type ConversationV2FamilyId = 'mossprout' | MergeCharacterId;
 
 export type ConversationMode = 'talk' | 'play' | 'discover' | 'plan';
 
@@ -406,10 +399,8 @@ export type ConversationTelemetryEvent = {
 };
 
 export function isConversationV2Family(value: string | null | undefined): value is ConversationV2FamilyId {
-  return CONVERSATION_V2_ENABLED_FAMILIES.includes(value as ConversationV2FamilyId);
+  return companionHasPage(value);
 }
 
-export function isConversationV2AuthoredFamily(value: string | null | undefined): value is ConversationV2FamilyId {
-  return CONVERSATION_V2_FAMILIES.includes(value as ConversationV2FamilyId);
-}
+/** Only a family with a companion page has conversations: Mossprout and the hatchable friends. */
 

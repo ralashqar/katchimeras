@@ -3531,7 +3531,7 @@ function reconcileStory(
       ...(story.servedOrderIds ?? []),
     ]);
     const wanted = showsStoryOrders
-      ? (story.familyId === 'baristabbit' || story.familyId === 'steppling' || story.familyId === 'voyagle' || story.familyId === 'flexel' || story.familyId === 'bedrotte'
+      ? (story.familyId === 'baristabbit' || story.familyId === 'steppling'
           ? authoredCohortStoryOrders(next, story.familyId, now, effectiveActPhase, story.orderTemplateKeys)
           : genericFamilyStoryOrders(next, story.familyId, story.targetLevel, now, effectiveActPhase, story.orderTemplateKeys))
           .filter((order) => !servedIds.has(order.id))

@@ -1,13 +1,13 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View, type View as ViewType } from 'react-native';
-import Animated, { Easing, FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 
 import { MergePlaySurface } from '@/components/katchadeck/games/merge-play-surface';
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
-import { RewardTokenFlight, type RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
+import { REWARD_TOKEN_FLIGHT_MS, REWARD_TOKEN_HOVER_MS, REWARD_TOKEN_RISE_MS, REWARD_TOKEN_STAGGER_MS, RewardTokenFlight, type RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { mergeWorldItemArt } from '@/constants/merge-world-art';
 import { KatchaDeckUI } from '@/constants/theme';
@@ -65,6 +65,13 @@ const STRIKE_SPARK_HOT = '#FFFFFF';
 const STRIKE_EMBER = '#6A2FA0';
 const STRIKE_EMBER_DEEP = '#3B1657';
 const STRIKE_PARTICLES = 10;
+/** Glow tokens kept mounted from merge to merge: three merges' Glow in the air at once. Past that, a flight is mounted fresh. */
+const GLOW_TOKEN_POOL = 16;
+/** Bursts alive at once, a pool each. A landing past the cap still counts and still strikes; it only bursts nowhere. */
+const STRIKE_BURST_POOL = 6;
+const IMPACT_BURST_POOL = 4;
+/** How long the pooled views stay mounted after the last Glow has gone, so a streak never remounts them. */
+const GLOW_POOL_WARM_MS = 4_000;
 
 /**
  * The opening's mission board: its own independent board (own state, own
@@ -387,32 +394,206 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
 }) {
   const [origin, setOrigin] = useState<RewardFlightPoint>({ x: 0, y: 0 });
   useEffect(() => {
-    screenRef.current?.measureInWindow((x, y) => setOrigin({ x, y }));
+    screenRef.current?.measureInWindow((x, y) => setOrigin((current) => current.x === x && current.y === y ? current : { x, y }));
   }, [screenRef, flights.length]);
+  // Pooled views: a token or burst slot keeps its worklets and native views from one flight to the
+  // next; a new flight only moves it and restarts its clock. Mounting four tokens per merge and
+  // fifteen animated views per burst, then tearing them down a moment later, was the cost that
+  // grew with every fast merge in a streak.
+  const tokens = usePoolSlots(flights, GLOW_TOKEN_POOL);
+  const strikes = useMemo(() => impacts.filter((impact) => impact.wisp), [impacts]);
+  const plain = useMemo(() => impacts.filter((impact) => !impact.wisp), [impacts]);
+  const strikeSlots = usePoolSlots(strikes, STRIKE_BURST_POOL);
+  const impactSlots = usePoolSlots(plain, IMPACT_BURST_POOL);
   return <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.glowLayer]}>
-    {flights.map((flight) => <RewardTokenFlight key={flight.id} count={flight.count ?? OPENING_GLOWS_PER_MERGE} index={flight.index} tokenSize={flight.size ?? GLOW_SIZE}
+    {tokens.slots.map((flight, slot) => <PooledGlowToken key={slot} flight={flight} origin={origin} onArrive={onArrive} />)}
+    {tokens.overflow.map((flight) => <RewardTokenFlight key={flight.id} count={flight.count ?? OPENING_GLOWS_PER_MERGE} index={flight.index} tokenSize={flight.size ?? GLOW_SIZE}
       from={{ x: flight.from.x - origin.x, y: flight.from.y - origin.y }} to={{ x: flight.to.x - origin.x, y: flight.to.y - origin.y }}
       onArrive={() => onArrive(flight.id)}>
-      <View style={[styles.glow, flight.size ? { width: flight.size, height: flight.size } : null]}>
-        <Image source={flight.art ?? GAME_CURRENCY_ART.coins} contentFit="contain" style={[styles.glowArt, flight.size ? { width: flight.size, height: flight.size } : null]} accessible={false} />
-      </View>
+      <GlowTokenArt art={flight.art} size={flight.size} />
     </RewardTokenFlight>)}
-    {impacts.map((impact) => impact.wisp
-      ? <WispStrikeBurst key={impact.id} x={impact.at.x - origin.x} y={impact.at.y - origin.y} onDone={() => onImpactDone(impact.id)} />
-      : <ImpactBurst key={impact.id} x={impact.at.x - origin.x} y={impact.at.y - origin.y} onDone={() => onImpactDone(impact.id)} />)}
+    {strikeSlots.slots.map((impact, slot) => <WispStrikeBurst key={slot} impact={impact} origin={origin} onDone={onImpactDone} />)}
+    {impactSlots.slots.map((impact, slot) => <ImpactBurst key={slot} impact={impact} origin={origin} onDone={onImpactDone} />)}
   </View>;
 }
 
-/** A ring and a scatter of Glow motes from the landing point, gone in a moment. */
-function ImpactBurst({ x, y, onDone }: { x: number; y: number; onDone: () => void }) {
+/**
+ * Hands each live item a slot it keeps until it is gone. Slots are mounted up to the most used
+ * so far in this layer's life, never fewer and never past the pool; items past the pool are the
+ * overflow, drawn without a slot.
+ */
+function usePoolSlots<T extends { id: number }>(items: readonly T[], size: number): { slots: readonly (T | null)[]; overflow: readonly T[] } {
+  const assignedRef = useRef(new Map<number, number>());
+  const highWaterRef = useRef(0);
+  return useMemo(() => {
+    const assigned = assignedRef.current;
+    const live = new Set(items.map((item) => item.id));
+    for (const id of [...assigned.keys()]) if (!live.has(id)) assigned.delete(id);
+    const taken = new Set(assigned.values());
+    const placed: (T | null)[] = Array.from({ length: size }, () => null);
+    const overflow: T[] = [];
+    for (const item of items) {
+      let slot = assigned.get(item.id);
+      if (slot == null) {
+        slot = placed.findIndex((_, index) => !taken.has(index));
+        if (slot < 0) { overflow.push(item); continue; }
+        assigned.set(item.id, slot);
+        taken.add(slot);
+      }
+      placed[slot] = item;
+    }
+    for (const slot of taken) highWaterRef.current = Math.max(highWaterRef.current, slot + 1);
+    return { slots: placed.slice(0, highWaterRef.current), overflow };
+  }, [items, size]);
+}
+
+const GlowTokenArt = memo(function GlowTokenArt({ art, size }: { art?: number; size?: number }) {
+  const box = size ? { width: size, height: size } : null;
+  return <View style={[styles.glow, box]}>
+    <Image source={art ?? GAME_CURRENCY_ART.coins} contentFit="contain" style={[styles.glowArt, box]} accessible={false} />
+  </View>;
+});
+
+/** The reward flight's burst directions, one per token of a merge. */
+const GLOW_BURST_VECTORS = [
+  { rotation: -12, x: -31, y: -48 },
+  { rotation: -6, x: -16, y: -57 },
+  { rotation: 0, x: 0, y: -62 },
+  { rotation: 6, x: 16, y: -57 },
+  { rotation: 12, x: 31, y: -48 },
+] as const;
+
+/**
+ * One pooled Glow token: the reward flight's rise, hover and staggered homing flight (the same
+ * motion as `RewardTokenFlight`), on geometry it is handed per launch. Between flights it is
+ * hidden where it landed, its worklets idle.
+ */
+const PooledGlowToken = memo(function PooledGlowToken({ flight, origin, onArrive }: { flight: OpeningGlowFlight | null; origin: RewardFlightPoint; onArrive: (id: number) => void }) {
   const reduceMotion = useReducedMotion();
-  const t = useSharedValue(0);
+  const rise = useSharedValue(0);
+  const flightProgress = useSharedValue(0);
+  const hoverPhase = useSharedValue(0);
+  const shown = useSharedValue(0);
+  const fromX = useSharedValue(0);
+  const fromY = useSharedValue(0);
+  const toX = useSharedValue(0);
+  const toY = useSharedValue(0);
+  const slot = useSharedValue(0);
+  const tokenSize = useSharedValue(GLOW_SIZE);
+  const onArriveRef = useRef(onArrive);
+  onArriveRef.current = onArrive;
+  const land = useCallback((id: number) => onArriveRef.current(id), []);
+  // The last flight's art and size stay on the hidden token, so a slot never swaps its image for nothing.
+  const lastRef = useRef(flight);
+  if (flight) lastRef.current = flight;
+  const drawn = flight ?? lastRef.current;
+  const flightId = flight?.id ?? null;
+  const flightRef = useRef(flight);
+  flightRef.current = flight;
+  // Geometry follows the flight and the layer's origin without restarting the motion.
   useEffect(() => {
+    if (!flight) return;
+    fromX.value = flight.from.x - origin.x;
+    fromY.value = flight.from.y - origin.y;
+    toX.value = flight.to.x - origin.x;
+    toY.value = flight.to.y - origin.y;
+    slot.value = flight.index;
+    tokenSize.value = flight.size ?? GLOW_SIZE;
+  }, [flight, fromX, fromY, origin, slot, toX, toY, tokenSize]);
+  useEffect(() => {
+    if (flightId == null) { shown.value = 0; return; }
+    const riseDuration = reduceMotion ? 100 : REWARD_TOKEN_RISE_MS;
+    const hoverDuration = reduceMotion ? 90 : REWARD_TOKEN_HOVER_MS;
+    const stagger = (flightRef.current?.index ?? 0) * (reduceMotion ? 28 : REWARD_TOKEN_STAGGER_MS);
+    const flightDuration = reduceMotion ? 250 : REWARD_TOKEN_FLIGHT_MS;
+    cancelAnimation(rise);
+    cancelAnimation(hoverPhase);
+    cancelAnimation(flightProgress);
+    rise.value = 0;
+    hoverPhase.value = 0;
+    flightProgress.value = 0;
+    shown.value = 1;
+    // Every token of a merge rises together and hovers as one cluster; only the flights in are staggered.
+    rise.value = withTiming(1, { duration: riseDuration, easing: Easing.out(Easing.cubic) });
+    hoverPhase.value = reduceMotion
+      ? withTiming(1, { duration: 560, easing: Easing.linear })
+      : withRepeat(withTiming(1, { duration: 720, easing: Easing.linear }), -1, false);
+    flightProgress.value = withDelay(riseDuration + hoverDuration + stagger, withTiming(1, { duration: flightDuration, easing: Easing.in(Easing.cubic) }, (finished) => {
+      if (finished) runOnJS(land)(flightId);
+    }));
+    return () => {
+      cancelAnimation(rise);
+      cancelAnimation(hoverPhase);
+      cancelAnimation(flightProgress);
+    };
+  }, [flightId, flightProgress, hoverPhase, land, reduceMotion, rise, shown]);
+  const style = useAnimatedStyle(() => {
+    const index = slot.value;
+    const vector = GLOW_BURST_VECTORS[index] ?? GLOW_BURST_VECTORS[GLOW_BURST_VECTORS.length - 1]!;
+    const risen = rise.value;
+    const flown = flightProgress.value;
+    const inverse = 1 - flown;
+    const burstX = fromX.value + vector.x;
+    const burstY = fromY.value + vector.y;
+    const controlX = (burstX + toX.value) / 2 + (index % 2 === 0 ? -24 : 24);
+    const controlY = Math.min(burstY, toY.value) - 82 - index * 3;
+    const baseX = flown === 0 ? fromX.value + vector.x * risen : inverse * inverse * burstX + 2 * inverse * flown * controlX + flown * flown * toX.value;
+    const baseY = flown === 0 ? fromY.value + vector.y * risen : inverse * inverse * burstY + 2 * inverse * flown * controlY + flown * flown * toY.value;
+    const envelope = risen * inverse;
+    const phase = hoverPhase.value * Math.PI * 2 + index * 0.92;
+    const strength = reduceMotion ? 0.5 : 1;
+    const x = baseX + Math.cos(phase) * 3 * envelope * strength;
+    const y = baseY + Math.sin(phase) * 4 * envelope * strength;
+    const scale = (flown > 0 ? 1.06 - flown * 0.8 : 0.54 + risen * 0.52) * (1 + Math.sin(phase + 0.6) * 0.035 * envelope * strength);
+    const opacity = risen <= 0.04 ? risen / 0.04 : flown < 0.88 ? 1 : Math.max(0, (1 - flown) / 0.12);
+    const half = tokenSize.value / 2;
+    return {
+      opacity: shown.value ? opacity : 0,
+      transform: [{ translateX: x - half }, { translateY: y - half }, { rotate: `${vector.rotation * (1 - flown)}deg` }, { scale }],
+    };
+  });
+  const size = drawn?.size ?? GLOW_SIZE;
+  return <Animated.View style={[styles.token, { width: size, height: size }, style]}>
+    <GlowTokenArt art={drawn?.art} size={drawn?.size} />
+  </Animated.View>;
+});
+
+type PooledBurstProps = { impact: OpeningImpact | null; origin: RewardFlightPoint; onDone: (id: number) => void };
+
+/** The clock and place of one pooled burst: restarted for each impact the slot is handed, hidden between them. */
+function usePooledBurst({ impact, origin, onDone }: PooledBurstProps, reduceMotion: boolean) {
+  const t = useSharedValue(0);
+  const shown = useSharedValue(0);
+  const x = useSharedValue(0);
+  const y = useSharedValue(0);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  const impactId = impact?.id ?? null;
+  useEffect(() => {
+    if (!impact) return;
+    x.value = impact.at.x - origin.x;
+    y.value = impact.at.y - origin.y;
+  }, [impact, origin, x, y]);
+  useEffect(() => {
+    if (impactId == null) { shown.value = 0; return; }
     const duration = reduceMotion ? 220 : OPENING_IMPACT_BURST_MS;
+    cancelAnimation(t);
+    t.value = 0;
+    shown.value = 1;
     t.value = withTiming(1, { duration, easing: Easing.out(Easing.cubic) });
-    const timer = setTimeout(onDone, duration + 40);
+    // On its own clock, keyed to the impact: a landing elsewhere re-rendering the layer used to
+    // restart every live burst's timing and its removal, so a streak's bursts never died.
+    const timer = setTimeout(() => onDoneRef.current(impactId), duration + 40);
     return () => clearTimeout(timer);
-  }, [onDone, reduceMotion, t]);
+  }, [impactId, reduceMotion, shown, t]);
+  const rootStyle = useAnimatedStyle(() => ({ opacity: shown.value, transform: [{ translateX: x.value }, { translateY: y.value }] }));
+  return { t, rootStyle };
+}
+
+/** A ring and a scatter of Glow motes from the landing point, gone in a moment. A pooled slot, moved to each impact it is handed. */
+const ImpactBurst = memo(function ImpactBurst({ impact, origin, onDone }: PooledBurstProps) {
+  const reduceMotion = useReducedMotion();
+  const { t, rootStyle } = usePooledBurst({ impact, origin, onDone }, reduceMotion);
   const ringStyle = useAnimatedStyle(() => ({
     opacity: 0.85 * (1 - t.value),
     transform: [{ scale: 0.35 + t.value * 1.9 }],
@@ -421,30 +602,25 @@ function ImpactBurst({ x, y, onDone }: { x: number; y: number; onDone: () => voi
     opacity: Math.max(0, 1 - t.value * 1.6),
     transform: [{ scale: 0.8 + t.value * 0.8 }],
   }));
-  return <View pointerEvents="none" style={[styles.burst, { left: x, top: y }]}>
+  return <Animated.View pointerEvents="none" style={[styles.burst, rootStyle]}>
     {/* Glow is layered translucent discs, not a blurred shadow: cheap to animate. */}
     <Animated.View style={[styles.burstHalo, flashStyle]} />
     <Animated.View style={[styles.burstFlash, flashStyle]} />
     <Animated.View style={[styles.burstRing, ringStyle]} />
     {Array.from({ length: reduceMotion ? 0 : BURST_PARTICLES }, (_, index) => <ImpactMote key={index} index={index} t={t} />)}
-  </View>;
-}
+  </Animated.View>;
+});
 
 /**
  * Glow striking a wisp: a hot white-violet core that flashes and is gone, a
  * magenta ring that races outward, a dark puff of the wisp's own colour that
  * swells and thins, and a spray of bright sparks and dark ember shards thrown
  * out with drag and a little lift. Translucent discs and dots only, no blur.
+ * A pooled slot, moved to each strike it is handed.
  */
-function WispStrikeBurst({ x, y, onDone }: { x: number; y: number; onDone: () => void }) {
+const WispStrikeBurst = memo(function WispStrikeBurst({ impact, origin, onDone }: PooledBurstProps) {
   const reduceMotion = useReducedMotion();
-  const t = useSharedValue(0);
-  useEffect(() => {
-    const duration = reduceMotion ? 220 : OPENING_IMPACT_BURST_MS;
-    t.value = withTiming(1, { duration, easing: Easing.out(Easing.cubic) });
-    const timer = setTimeout(onDone, duration + 40);
-    return () => clearTimeout(timer);
-  }, [onDone, reduceMotion, t]);
+  const { t, rootStyle } = usePooledBurst({ impact, origin, onDone }, reduceMotion);
   const coreStyle = useAnimatedStyle(() => ({
     opacity: Math.max(0, 1 - t.value * 2.4),
     transform: [{ scale: 0.5 + t.value * 1.3 }],
@@ -462,7 +638,7 @@ function WispStrikeBurst({ x, y, onDone }: { x: number; y: number; onDone: () =>
     opacity: Math.max(0, Math.min(1, (t.value - 0.08) * 3)) * (1 - t.value) * 0.75,
     transform: [{ scale: 0.6 + t.value * 1.5 }],
   }));
-  return <View pointerEvents="none" style={[styles.burst, { left: x, top: y }]}>
+  return <Animated.View pointerEvents="none" style={[styles.burst, rootStyle]}>
     <Animated.View style={[styles.strikePuff, puffStyle]}>
       <Image source={SOFT_GLOW} contentFit="contain" style={StyleSheet.absoluteFill} tintColor={STRIKE_PUFF} accessible={false} />
     </Animated.View>
@@ -470,8 +646,8 @@ function WispStrikeBurst({ x, y, onDone }: { x: number; y: number; onDone: () =>
     <Animated.View style={[styles.strikeCore, coreStyle]} />
     <Animated.View style={[styles.strikeRing, ringStyle]} />
     {Array.from({ length: reduceMotion ? 0 : STRIKE_PARTICLES }, (_, index) => <StrikeShard key={index} index={index} t={t} />)}
-  </View>;
-}
+  </Animated.View>;
+});
 
 /** One shard of the strike: a bright spark or a dark ember, flung out and slowed by drag, lifting a little, turning as it goes. */
 function StrikeShard({ index, t }: { index: number; t: SharedValue<number> }) {
@@ -630,15 +806,20 @@ function createOpeningGlowStore(): OpeningGlowStore {
       // The mission is over the moment the last wisp has fallen: the hold lifts on that clock, not the burst's.
       setTimeout(() => { finaleHoldRef.current = false; setFinaleActive(false); }, OPENING_FINALE_SETTLE_MS);
     }
-    setFlights((current) => {
-      const landed = current.find((flight) => flight.id === id);
-      // Every other landing bursts (the first and third of four): half the particle
-      // views for the same read, since the impacts land 65 ms apart. The finale always bursts.
-      if (landed && (finale || landed.index % 2 === 0)) setImpacts((bursts) => [...bursts, { id, wisp: landed.key != null, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 10, y: landed.to.y } }]);
-      return current.filter((flight) => flight.id !== id);
+    const landed = struck;
+    // Every other landing bursts (the first and third of four): half the particle
+    // views for the same read, since the impacts land 65 ms apart. The finale always bursts.
+    // Past the pool, a burst is skipped rather than mounted fresh: a streak stays at its cap.
+    if (landed && (finale || landed.index % 2 === 0)) setImpacts((bursts) => {
+      const wisp = landed.key != null;
+      const live = bursts.reduce((count, burst) => count + (Boolean(burst.wisp) === wisp ? 1 : 0), 0);
+      if (!finale && live >= (wisp ? STRIKE_BURST_POOL : IMPACT_BURST_POOL)) return bursts;
+      return [...bursts, { id, wisp, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 10, y: landed.to.y } }];
     });
+    setFlights((current) => current.filter((flight) => flight.id !== id));
     setLanded((count) => count + 1);
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(finale ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+    // One haptic per burst of Glow (its first token) and one for the finale, not one per token.
+    if (process.env.EXPO_OS === 'ios' && (finale || landed?.index === 0)) void Haptics.impactAsync(finale ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
   });
   const impactDone = (id: number) => {
     setImpacts((current) => current.filter((impact) => impact.id !== id));
@@ -699,7 +880,15 @@ export function useOpeningGlow(targetNode: ViewType | null) {
 /** The Glow flights and bursts, subscribed on their own: a landing re-renders this layer, not the screen. */
 export const MissionGlowLayer = memo(function MissionGlowLayer({ store, screenRef }: { store: OpeningGlowStore; screenRef: RefObject<ViewType | null> }) {
   const { flights, impacts } = useSyncExternalStore(store.subscribe, store.getFlights, store.getFlights);
-  if (!flights.length && !impacts.length) return null;
+  const live = flights.length > 0 || impacts.length > 0;
+  // The pooled views stay mounted a while after the last landing: the next merge of a streak reuses them.
+  const [warm, setWarm] = useState(false);
+  useEffect(() => {
+    if (live) { setWarm(true); return; }
+    const timer = setTimeout(() => setWarm(false), GLOW_POOL_WARM_MS);
+    return () => clearTimeout(timer);
+  }, [live]);
+  if (!live && !warm) return null;
   return <OpeningGlowLayer flights={flights} impacts={impacts} onArrive={store.arrive} onImpactDone={store.impactDone} screenRef={screenRef} />;
 });
 
@@ -723,7 +912,8 @@ const styles = StyleSheet.create({
   glowLayer: { zIndex: 100 },
   glow: { width: GLOW_SIZE, height: GLOW_SIZE, alignItems: 'center', justifyContent: 'center' },
   glowArt: { width: GLOW_SIZE, height: GLOW_SIZE },
-  burst: { position: 'absolute', width: 0, height: 0, alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
+  token: { position: 'absolute', left: 0, top: 0, alignItems: 'center', justifyContent: 'center' },
+  burst: { position: 'absolute', left: 0, top: 0, width: 0, height: 0, alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
   burstHalo: { position: 'absolute', width: 96, height: 96, marginLeft: -48, marginTop: -48, borderRadius: 48, backgroundColor: 'rgba(143,211,255,0.28)' },
   burstFlash: { position: 'absolute', width: 54, height: 54, marginLeft: -27, marginTop: -27, borderRadius: 27, backgroundColor: 'rgba(214,240,255,0.95)' },
   burstRing: { position: 'absolute', width: 48, height: 48, marginLeft: -24, marginTop: -24, borderRadius: 24, borderWidth: 3, borderColor: GLOW_COLOR },

@@ -90,14 +90,10 @@ export function freshBaristabbitStory(now = Date.now()): CompanionStoryArc {
 const AUTHORED_STORY_CONFIG = {
   baristabbit: { id: 'baristabbit:pause-story', signatureKey: 'pause-table' },
   steppling: { id: 'steppling:path-outside-story', signatureKey: 'path-outside' },
-  voyagle: { id: 'voyagle:blank-spaces-story', signatureKey: 'map-with-blank-spaces' },
-  flexel: { id: 'flexel:rhythm-that-holds-story', signatureKey: 'rhythm-that-holds' },
-  bedrotte: { id: 'bedrotte:room-that-asks-nothing-story', signatureKey: 'room-that-asks-nothing' },
 } as const;
 
 export function isAuthoredCohortFamily(familyId: string): familyId is AuthoredCohortFamilyId {
-  return familyId === 'baristabbit' || familyId === 'steppling' || familyId === 'voyagle'
-    || familyId === 'flexel' || familyId === 'bedrotte';
+  return familyId === 'baristabbit' || familyId === 'steppling';
 }
 
 export function freshAuthoredCohortStory(familyId: AuthoredCohortFamilyId, now = Date.now()): CompanionStoryArc {

@@ -31,8 +31,16 @@ export function withDiscoveredKatchimeras(
 ): KingdomState {
   if (!records.length) return kingdom;
 
+  // A discovered friend is that friend: the misted tile held Baristabbit, not a day's hatch of his family in
+  // another form. A historical creature of a page family takes the friend's own art and name on the map.
+  const friendFamilyIds = new Set<string>(records.map((record) => record.characterId).filter((familyId) => companionHasPage(familyId)));
+  const creatures = kingdom.creatures.map((creature) => {
+    const family = creature.familyId && friendFamilyIds.has(creature.familyId) ? katchimeraFamilyById.get(creature.familyId) : null;
+    if (!family?.anchorVisualKey || (creature.skinId === family.anchorSkinId && creature.visualKey === family.anchorVisualKey)) return creature;
+    return { ...creature, aspectId: family.aspectId, skinId: family.anchorSkinId, name: family.displayName, visualKey: family.anchorVisualKey };
+  });
   const ownedFamilyIds = new Set(
-    kingdom.creatures.flatMap((creature) => creature.familyId ? [creature.familyId] : []),
+    creatures.flatMap((creature) => creature.familyId ? [creature.familyId] : []),
   );
   const virtualCreatures = [...records]
     // Only a friend with a page is discovered as a companion; the engine drops the rest durably, this is the read-side guard.
@@ -59,9 +67,9 @@ export function withDiscoveredKatchimeras(
       }];
     });
 
-  if (!virtualCreatures.length) return kingdom;
+  if (!virtualCreatures.length && creatures.every((creature, index) => creature === kingdom.creatures[index])) return kingdom;
   return {
     ...kingdom,
-    creatures: [...kingdom.creatures, ...virtualCreatures],
+    creatures: [...creatures, ...virtualCreatures],
   };
 }

@@ -13,8 +13,6 @@ import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { AuthoredCohortFamilyId } from '@/utils/companion-story';
 import { companionFriendshipProgress, recordCompanionBondEvent } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
-import { enqueueConversationSignal } from '@/utils/companion-content';
-import { loadCompanionContentState, saveCompanionContentState } from '@/utils/companion-content-storage';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import { mergeActivityRewards, mergeQuestActivityRewards } from '@/utils/merge-world/activity-rewards';
 import { buildCompanionAffinityProfile, nextEligibleCompanionGate, recommendCompanionPath } from '@/utils/merge-world/companion-discovery-progression';
@@ -62,10 +60,7 @@ const MergeWorldStateContext = createContext<MergeWorldStateContextValue | null>
 const MergeWorldActionsContext = createContext<MergeWorldActionsContextValue | null>(null);
 const MergeWorldLastResultContext = createContext<MergeWorldCommandResult | null | undefined>(undefined);
 const MergeWorldSelectorContext = createContext<ReturnType<typeof createSelectorStore<MergeWorldStateContextValue>> | null>(null);
-const SIGNATURE_LEVELS = new Set([4, 8, 12, 16, 20]);
-const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = [
-  'baristabbit', 'steppling', 'voyagle', 'flexel', 'bedrotte',
-];
+const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = ['baristabbit', 'steppling'];
 
 function mossproutProgressionSignals(days: readonly HomeDayRecord[], friendshipLevel: number, ownedWispIds: string[]) {
   const relationships = relationshipProgressionRepository.load();
@@ -184,19 +179,6 @@ export function MergeWorldProvider({
     return levels;
   }, [currentFriendshipLevels]);
 
-  const enqueueFriendshipInvitation = useCallback((characterId: MergeCharacterId, sourceId: string, createdAt: number) => {
-    const content = loadCompanionContentState();
-    const next = enqueueConversationSignal(content, {
-      id: `conversation-signal:merge:${characterId}:${sourceId}`,
-      kind: 'bond',
-      familyId: characterId,
-      sourceId,
-      dayId: new Date(createdAt).toISOString().slice(0, 10),
-      createdAt,
-      expiresAt: createdAt + 365 * 86_400_000,
-    });
-    if (next !== content) saveCompanionContentState(next);
-  }, []);
 
   const guardStoryReceiptMutation = useCallback((mutate: () => void) => {
     applyingStoryReceiptDepthRef.current += 1;
@@ -277,18 +259,16 @@ export function MergeWorldProvider({
         }
         const afterLevel = companionFriendshipProgress(awarded.state, companionIdForFamily(receipt.characterId)).level;
         for (let level = beforeLevel + 1; level <= afterLevel; level += 1) {
-          if (!SIGNATURE_LEVELS.has(level)) enqueueFriendshipInvitation(receipt.characterId, `friendship-level:${level}`, receipt.createdAt);
         }
       }
       return;
     }
     if (receipt.kind === 'conversation' && receipt.sourceId) {
       if (receipt.characterId === 'mossprout' && isIslandCampaignChapterId(receipt.sourceId)) return;
-      enqueueFriendshipInvitation(receipt.characterId, receipt.sourceId, receipt.createdAt);
       return;
     }
     if (receipt.wispId) wisps.grant(receipt.wispId, receipt.id, 'game');
-  }, [enqueueFriendshipInvitation, guardStoryReceiptMutation, wisps]);
+  }, [guardStoryReceiptMutation, wisps]);
 
   const reconcileFeastleStory = useCallback((current: MergeWorldState, now = Date.now()) => {
     const story = loadFeastleStory();

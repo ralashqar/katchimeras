@@ -243,7 +243,7 @@ export const MissionWisps = memo(function MissionWisps({ target, glow, screenRef
 });
 
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */
-function CorruptionWisp({ index, x, y, size, alive, leaving, strikeNonce }: { index: number; x: number; y: number; size: number; alive: boolean; leaving: boolean; strikeNonce: number }) {
+const CorruptionWisp = memo(function CorruptionWisp({ index, x, y, size, alive, leaving, strikeNonce }: { index: number; x: number; y: number; size: number; alive: boolean; leaving: boolean; strikeNonce: number }) {
   const reduceMotion = useReducedMotion();
   const hover = useSharedValue(0);
   const shake = useSharedValue(0);
@@ -338,10 +338,10 @@ function CorruptionWisp({ index, x, y, size, alive, leaving, strikeNonce }: { in
     </Animated.View>
     {!alive ? <DeathBurst size={size} reduceMotion={reduceMotion} /> : null}
   </View>;
-}
+});
 
 /** One ember: born low on the body, rising and fading, forever. Cheap: a tinted dot on the UI thread. */
-function Ember({ ember, size }: { ember: (typeof EMBERS)[number]; size: number }) {
+const Ember = memo(function Ember({ ember, size }: { ember: (typeof EMBERS)[number]; size: number }) {
   const t = useSharedValue(0);
   useEffect(() => {
     t.value = withDelay(ember.delay, withRepeat(withTiming(1, { duration: ember.duration, easing: Easing.out(Easing.quad) }), -1, false));
@@ -356,7 +356,7 @@ function Ember({ ember, size }: { ember: (typeof EMBERS)[number]; size: number }
     ],
   }));
   return <Animated.View style={[styles.ember, { width: ember.size, height: ember.size, borderRadius: ember.size / 2, left: size / 2 - ember.size / 2, top: size / 2, backgroundColor: ember.light ? EMBER_LIGHT : EMBER_DARK }, style]} />;
-}
+});
 
 /** The wisp's last breath: a ring of embers thrown outward and gone. */
 function DeathBurst({ size, reduceMotion }: { size: number; reduceMotion: boolean }) {

@@ -22,7 +22,10 @@ export default function OnboardingRoute() {
         preferenceIds: current.preferenceIds.length ? current.preferenceIds : ['cozy'],
       });
     }
-    router.navigate(mode === 'identity' ? '/(tabs)/you' : '/(tabs)/katchimeras');
+    // The identity replay was pushed over the tabs and pops back to them; the first run has
+    // nothing beneath it and replaces itself, so the tabs are the root stack's only route.
+    if (mode === 'identity') router.navigate('/(tabs)/you');
+    else router.replace('/(tabs)/katchimeras');
   }, [mode, router]);
 
   return <View style={styles.root}>

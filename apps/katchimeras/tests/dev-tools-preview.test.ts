@@ -42,7 +42,7 @@ test('a global four-finger emergency gesture can escape an FTUE soft lock only i
   const rootLayout = read('app/_layout.tsx');
   assert.match(rootLayout, /event\.nativeEvent\.touches\.length < 4/);
   assert.match(rootLayout, /DEV_TOOLS_ENABLED \? captureEmergencyDevGesture : undefined/);
-  assert.match(rootLayout, /router\.push\('\/dev-tools'\)/);
+  assert.match(rootLayout, /router\.navigate\('\/dev-tools'\)/);
   assert.match(rootLayout, /Stack\.Screen name="dev-tools"/);
   const ftueNavigation = read('features/onboarding/ftue-navigation-reconciler.tsx');
   assert.match(ftueNavigation, /ftueNavigationYieldsToDevRecovery\(pathnameRef\.current\)/);

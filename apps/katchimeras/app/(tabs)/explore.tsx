@@ -48,6 +48,7 @@ import { retryFtueSync } from '@/features/onboarding/ftue-sync';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
+import { restartOnboarding, returnToTabs } from '@/features/navigation/return-to-tabs';
 import {
   isJourneyQuickModeEnabled,
   setAllKatchimerasAvailableEnabled,
@@ -203,7 +204,7 @@ export default function ExploreScreen() {
         onPress: async () => {
           await resetKatchimeraProgressForDebug({ resetAt: Date.now() });
           resetOnboardingProfile();
-          router.replace('/onboarding');
+          restartOnboarding(router);
         },
       },
     ]);
@@ -244,7 +245,7 @@ export default function ExploreScreen() {
             clearAllStoredValues();
             clearBaseCustomisation();
             await resetKatchimeraProgressForDebug({ resetAt: Date.now(), resetDevAccess: true });
-            router.replace('/onboarding');
+            restartOnboarding(router);
           },
         },
       ]
@@ -262,7 +263,7 @@ export default function ExploreScreen() {
           style: 'destructive',
           onPress: async () => {
             await resetTodayForDebug();
-            router.replace('/(tabs)');
+            returnToTabs(router);
           },
         },
       ]
@@ -284,7 +285,7 @@ export default function ExploreScreen() {
               await resetKatchimeraProgressForDebug({ resetAt });
               setJourneyQuickMode(false);
               beginFirstSession({ restart: true });
-              router.navigate('/(tabs)/katchimeras');
+              returnToTabs(router);
             } catch (caught) {
               Alert.alert('Restart did not finish', caught instanceof Error ? caught.message : 'The first-session flow could not be restarted.');
             }
@@ -348,7 +349,7 @@ export default function ExploreScreen() {
       beginFirstSession({ restart: true });
       await prepareMossproutMergeFtueForDebug(step);
       jumpFtueToStep(step);
-      router.replace('/(tabs)/games');
+      returnToTabs(router, '/(tabs)/games');
     } catch (caught) {
       Alert.alert('Merge FTUE setup failed', caught instanceof Error ? caught.message : 'The Merge tutorial could not be prepared.');
     }
@@ -386,7 +387,7 @@ export default function ExploreScreen() {
               homeRepository.save(next, { allowHatchDowngrade: true });
               setStoredState(next);
               clearTodayPatch();
-              router.replace({
+              returnToTabs(router, {
                 pathname: '/(tabs)/today',
                 params: { recoveryHatchDayId: dailyReplay.dayId },
               });
@@ -407,7 +408,7 @@ export default function ExploreScreen() {
         style: 'destructive',
         onPress: () => {
           homeRepository.clear();
-          router.replace('/(tabs)');
+          returnToTabs(router);
         },
       },
     ]);
@@ -426,7 +427,7 @@ export default function ExploreScreen() {
       if (pendingReflectionDayIds.length > 0) {
         void enrichBackfillReflections(pendingReflectionDayIds);
       }
-      Alert.alert('Backfill', summary, [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]);
+      Alert.alert('Backfill', summary, [{ text: 'OK', onPress: () => returnToTabs(router) }]);
     } finally {
       setBackfilling(false);
     }
@@ -441,7 +442,7 @@ export default function ExploreScreen() {
     setBackfilling(true);
     try {
       const summary = await runBackfillPhotosOnly();
-      Alert.alert('Backfill (photos only)', summary, [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]);
+      Alert.alert('Backfill (photos only)', summary, [{ text: 'OK', onPress: () => returnToTabs(router) }]);
     } finally {
       setBackfilling(false);
     }
@@ -489,7 +490,7 @@ export default function ExploreScreen() {
       Alert.alert(
         'Photo prompt armed',
         `Loaded ${candidates.length} recent valid photos. Home will force the meaningful-photo prompt once, regardless of photo date.`,
-        [{ text: 'Open Home', onPress: () => router.replace('/(tabs)') }]
+        [{ text: 'Open Home', onPress: () => returnToTabs(router) }]
       );
     } finally {
       setPromptPhotoLoading(false);
@@ -554,7 +555,7 @@ export default function ExploreScreen() {
       Alert.alert('No stored day yet', 'Open Home once so a stored day exists, then apply a scenario.');
       return;
     }
-    router.replace('/(tabs)');
+    returnToTabs(router);
   }
 
   function handlePreviewRandomAchievement() {
@@ -592,7 +593,7 @@ export default function ExploreScreen() {
         accessibilityHint="Returns to your Haven"
         accessibilityLabel="Close Developer Tools"
         accessibilityRole="button"
-        onPress={() => router.navigate('/(tabs)/katchimeras')}
+        onPress={() => returnToTabs(router)}
         style={({ pressed }) => [styles.closeButton, { top: insets.top + 12 }, pressed && styles.closeButtonPressed]}>
         <IconSymbol color="#F8FBFF" name="xmark" size={20} weight="bold" />
       </Pressable>
@@ -892,7 +893,7 @@ export default function ExploreScreen() {
         <Animated.View entering={presenceEnter(420)}>
           <KatchaButton
             label={DEV_DEBUG_NAV_ENABLED ? 'Open Home' : 'Open art lab'}
-            onPress={() => (DEV_DEBUG_NAV_ENABLED ? router.replace('/(tabs)') : router.push('/art-lab'))}
+            onPress={() => (DEV_DEBUG_NAV_ENABLED ? returnToTabs(router) : router.push('/art-lab'))}
             variant="secondary"
           />
         </Animated.View>

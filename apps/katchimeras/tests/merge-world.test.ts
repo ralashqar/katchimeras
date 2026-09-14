@@ -1292,9 +1292,9 @@ test('a featured companion does not turn journal activity into item parcels', ()
 });
 
 test('a completed companion goal does not create an item chest', () => {
-  const state = reduceMergeWorld(createInitialMergeWorldState(NOW, ['bedrotte']), {
-    type: 'reconcileStory', familyId: 'bedrotte', status: 'order_active', targetLevel: 6,
-    actPhase: 'regular_orders', orderTemplateKeys: selectAuthoredCohortOrderKeys('bedrotte', 'goal'), now: NOW,
+  const state = reduceMergeWorld(createInitialMergeWorldState(NOW, ['steppling']), {
+    type: 'reconcileStory', familyId: 'steppling', status: 'order_active', targetLevel: 6,
+    actPhase: 'regular_orders', orderTemplateKeys: selectAuthoredCohortOrderKeys('steppling', 'goal'), now: NOW,
   }).state;
   const rewards = mergeActivityRewards([], new Date(NOW), {
     state,
@@ -1878,7 +1878,7 @@ test('Baristabbit chapter serves five escalating drink orders and a shared-chain
   assert.equal(signature.chapterId, 'baristabbit-chapter-1');
 });
 
-for (const familyId of ['steppling', 'voyagle', 'flexel', 'bedrotte'] as const) {
+for (const familyId of ['steppling'] as const) {
   test(`${familyId} chapter serves escalating shared-generator orders and an authored signature`, () => {
     const keys = selectAuthoredCohortOrderKeys(familyId, 'vertical-slice');
     let state = reduceMergeWorld(createInitialMergeWorldState(NOW, [familyId]), {
@@ -1890,11 +1890,7 @@ for (const familyId of ['steppling', 'voyagle', 'flexel', 'bedrotte'] as const) 
     assert.ok(visible[0].requirements[0].definitionId.endsWith(':2'));
     assert.ok(visible[1].requirements[0].definitionId.endsWith(':2'));
     assert.ok(visible[2].requirements.length >= 2);
-    const expectedChains = familyId === 'bedrotte'
-      ? ['comfort:rest:', 'comfort:care:']
-      : familyId === 'flexel'
-        ? ['adventure:trail:', 'comfort:care:']
-        : ['adventure:trail:', 'adventure:travel:'];
+    const expectedChains = ['adventure:trail:', 'adventure:travel:'];
     assert.ok(expectedChains.every((chain) => visible.flatMap((order) => order.requirements)
       .some((item) => item.definitionId.startsWith(chain))));
 

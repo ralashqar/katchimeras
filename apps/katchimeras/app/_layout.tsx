@@ -29,6 +29,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import '@/utils/travel-memory-task';
 import { initializeCrashReporting } from '@/utils/crash-reporting';
 import { runMossproutCampaignV2Migration } from '@/utils/mossprout-campaign-v2-migration';
+import { runLegacyStorageCleanup } from '@/utils/legacy-storage-cleanup';
 import { ContentFlowProvider } from '@/features/content-flow/content-flow-provider';
 import { ContentFlowNavigationCoordinator } from '@/features/content-flow/content-flow-navigation-coordinator';
 
@@ -63,15 +64,17 @@ function RootLayout() {
     if (now - lastEmergencyDevOpenRef.current < 1_500) return false;
     lastEmergencyDevOpenRef.current = now;
     if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    // Push a root copy of the complete Developer Tools page instead of
+    // Open a root copy of the complete Developer Tools page instead of
     // replacing the FTUE-owned companion route. The latter is protected by
-    // usePreventRemove during recovery.
-    router.push('/dev-tools');
+    // usePreventRemove during recovery. `navigate` returns to the copy already
+    // on the stack; `push` stacked a new one per gesture.
+    router.navigate('/dev-tools');
     return false;
   }, [router]);
 
   useEffect(() => {
     let active = true;
+    runLegacyStorageCleanup();
     void runMossproutCampaignV2Migration()
       .catch((error) => Sentry.captureException(error))
       .finally(() => { if (active) setCampaignReady(true); });

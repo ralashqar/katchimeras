@@ -186,7 +186,7 @@ test('fresh Bloom Garden uses one ordinary mystery panel without leaking Petalim
     'hosted friend-island stories enter a narrative-only renderer instead of the Mossprout interaction page');
   assert.match(interaction, /showSpeechBubble=\{!props\.suppressWorldSpeech &&/,
     'suppressed island speech cannot mount while the narrative overlay prepares or hands off');
-  assert.match(interaction, /props\.hostedNarrativeOnly && \(!conversationExperience \|\| \(route\.kind !== 'visit' && route\.kind !== 'conversation'\)\)[\s\S]*?\? null/,
+  assert.match(interaction, /props\.hostedNarrativeOnly && \(!conversationExperience \|\| route\.kind !== 'conversation'\)[\s\S]*?\? null/,
     'the narrative-only renderer stays blank before hydration and after conversation completion');
   assert.match(interaction, /!props\.hostedNarrativeOnly && dashboardRouteActive/,
     'Mossprout action UI cannot render during a friend-island narrative handoff');
@@ -386,14 +386,15 @@ test('a served Petalimp request becomes one persistent island return note withou
   assert.match(provider, /!isIslandCampaignId\(servedOrder\?\.storyArcId\)[\s\S]*?reconcileFeaturedStory/,
     'island orders never reconcile the legacy Mossprout journey');
 
+  // The retired conversation-signal queue is dropped on load: an old Petalimp receipt cannot interrupt the island return.
   const content = normaliseCompanionContentState({
     ...emptyCompanionContentState(),
     conversationSignals: [{
       id: 'conversation-signal:merge:mossprout:petalimp-bloom-level-1', kind: 'bond', familyId: 'mossprout',
       sourceId: 'petalimp-bloom-level-1', dayId: '2026-09-08', createdAt: NOW, expiresAt: NOW + 1000,
     }],
-  });
-  assert.equal(content.conversationSignals.length, 0, 'old Petalimp receipts cannot interrupt the island return');
+  } as unknown as Parameters<typeof normaliseCompanionContentState>[0]);
+  assert.equal('conversationSignals' in content, false, 'old Petalimp receipts cannot interrupt the island return');
 });
 
 test('Petalimp card is earned only after the complete four-level Welcome Garden story', () => {

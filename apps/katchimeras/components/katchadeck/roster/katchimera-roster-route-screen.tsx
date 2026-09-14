@@ -31,8 +31,6 @@ import { loadCompanionBondState } from '@/utils/companion-bond-storage';
 import { todayAtmosphereBackgroundForDay, todayAtmosphereBackgroundForScene, type TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests, questFor } from '@/utils/katchimera-quests';
-import { applyWardrobeToKingdom } from '@/utils/katchimera-wardrobe';
-import { loadKatchimeraWardrobe } from '@/utils/katchimera-wardrobe-storage';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
@@ -93,7 +91,6 @@ function loadRosterPersistentState() {
   return {
     bond: loadCompanionBondState(quests, resolveCompanionId, homeState),
     quests,
-    wardrobe: loadKatchimeraWardrobe(),
   };
 }
 
@@ -104,9 +101,7 @@ function rosterPersistentFingerprint(state: RosterPersistentState): string {
     .filter((quest) => !quest.completedAt)
     .map((quest) => quest.creatureId)
     .sort();
-  const equippedSkins = Object.entries(state.wardrobe.equippedByFamily)
-    .sort(([left], [right]) => left.localeCompare(right));
-  return JSON.stringify([state.bond.events, activeQuestOwners, equippedSkins]);
+  return JSON.stringify([state.bond.events, activeQuestOwners]);
 }
 
 function loadRosterPersistentSnapshot() {
@@ -259,15 +254,13 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
     publishWorldSession('mossprout');
   }, [activeWorldFamilyId, interactionRequest, publishWorldSession]);
 
+  // A friend on the map is always their own art: skins are cards kept from friends' arcs, never a swap of the friend.
   const kingdom = useMemo(
-    () => applyWardrobeToKingdom(
-      withDevAvailableKatchimeras(
-        withDiscoveredKatchimeras(deriveKingdom(days), discovery.records),
-        allKatchimerasAvailable,
-      ),
-      persistent.wardrobe,
+    () => withDevAvailableKatchimeras(
+      withDiscoveredKatchimeras(deriveKingdom(days), discovery.records),
+      allKatchimerasAvailable,
     ),
-    [allKatchimerasAvailable, days, discovery.records, persistent.wardrobe],
+    [allKatchimerasAvailable, days, discovery.records],
   );
   const hatches = useMemo<HatchRecord[]>(
     () => kingdom.creatures.map((creature, index) => ({

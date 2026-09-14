@@ -1,5 +1,4 @@
 import type { KatchimeraFamilyId } from '@/types/katchimera';
-import { SPECIALIST_COMPANION_SYSTEMS } from '@/constants/specialist-companion-catalogue';
 import { canonicalFamilyId } from '@/constants/katchimera-skins';
 
 export type CompanionQuickGoalTemplate = {
@@ -344,7 +343,6 @@ const legacyCompanionQuickGoalTemplates: readonly CompanionQuickGoalTemplate[] =
   ...whiskit,
   ...heartmote,
   ...kindling,
-  ...SPECIALIST_COMPANION_SYSTEMS.flatMap((system) => system.quickGoals),
 ];
 
 export const companionQuickGoalTemplates: readonly CompanionQuickGoalTemplate[] = legacyCompanionQuickGoalTemplates.map((item) => ({

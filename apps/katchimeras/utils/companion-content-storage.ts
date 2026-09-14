@@ -41,7 +41,6 @@ export function resetKatchimeraConversationDefinitionsForDebug(definitionIds: re
     memories: state.memories.filter((memory) => !memory.evidenceRefs.some((evidence) => removedSessionIds.has(evidence.sourceId))),
     insights: state.insights.filter((insight) => !definitions.has(insight.sourceDefinitionId) && !removedSessionIds.has(insight.sourceSessionId)),
     conversationSessions: state.conversationSessions.filter((session) => !removedSessionIds.has(session.id)),
-    processedConversationEvidenceIds: state.processedConversationEvidenceIds.filter((id) => !removedSessionIds.has(id)),
     servedConversationDayKeys: state.servedConversationDayKeys.filter((key) => (
       ![...removedServedDayIds].some((dayId) => key === `mossprout:${dayId}`)
     )),

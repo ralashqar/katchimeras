@@ -4,7 +4,6 @@ import { resetCompanionAchievementsForDebug } from '@/utils/companion-achievemen
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { resetAllKatchimeraBondsForDebug } from '@/utils/companion-bond-storage';
 import { resetAllKatchimeraContentForDebug } from '@/utils/companion-content-storage';
-import { resetCompanionDiscoveryForDebug } from '@/utils/companion-discovery-storage';
 import { resetCompanionJourneysForDebug } from '@/utils/companion-journey-storage';
 import { resetAllCompanionQuickGoalsForDebug } from '@/utils/companion-quick-goal-storage';
 import { resetCompanionStoriesForDebug } from '@/utils/companion-story-storage';
@@ -31,7 +30,6 @@ export async function resetKatchimeraProgressForDebug({
   resetAllKatchimeraBondsForDebug(resetAt);
   resetCompanionQuestsForDebug();
   resetCompanionJourneysForDebug();
-  resetCompanionDiscoveryForDebug();
   resetAllCompanionQuickGoalsForDebug();
   resetCompanionStoriesForDebug();
   resetCompanionAchievementsForDebug();

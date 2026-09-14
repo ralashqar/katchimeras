@@ -48,7 +48,7 @@ export const BARISTABBIT_CHAPTER_ONE_ORDER_POOL = [
   { key: 'window-table', title: 'The window table', description: 'A full hot-and-cold service for a pause shared at the best seat in the cafe.', definitionId: 'drink:hot:4', secondaryDefinitionId: 'drink:refresh:4', difficulty: 'major', signal: 'connection' },
 ] as const;
 
-export type AuthoredCohortFamilyId = 'baristabbit' | 'steppling' | 'voyagle' | 'flexel' | 'bedrotte';
+export type AuthoredCohortFamilyId = 'baristabbit' | 'steppling';
 
 export const STEPPLING_CHAPTER_ONE_ORDER_POOL = [
   { key: 'shoes-by-door', title: 'Shoes by the door', description: 'A small, ready pair for the easiest possible first step.', definitionId: 'adventure:trail:2', difficulty: 'small', signal: 'ease' },
@@ -63,51 +63,9 @@ export const STEPPLING_CHAPTER_ONE_ORDER_POOL = [
   { key: 'shared-stride', title: 'A shared stride', description: 'Two kinds of journey meeting at the same comfortable pace.', definitionId: 'adventure:trail:4', secondaryDefinitionId: 'adventure:travel:4', difficulty: 'major', signal: 'connection' },
 ] as const;
 
-export const VOYAGLE_CHAPTER_ONE_ORDER_POOL = [
-  { key: 'ticket-no-itinerary', title: 'Ticket, no itinerary', description: 'A small ticket that makes possibility feel more real than planning.', definitionId: 'adventure:travel:2', difficulty: 'small', signal: 'curiosity' },
-  { key: 'shoes-by-door', title: "Steppling's spare shoes", description: 'A ready pair for exploring somewhere close before going far.', definitionId: 'adventure:trail:2', difficulty: 'small', signal: 'ease' },
-  { key: 'window-seat', title: 'The window seat', description: 'A route and a ticket for watching the familiar become new.', definitionId: 'adventure:travel:3', secondaryDefinitionId: 'adventure:trail:2', difficulty: 'medium', signal: 'curiosity' },
-  { key: 'pack-light', title: 'Pack light', description: 'Only what supports the journey, plus good shoes for the unknown parts.', definitionId: 'adventure:travel:3', secondaryDefinitionId: 'adventure:trail:3', difficulty: 'medium', signal: 'ease' },
-  { key: 'local-day-trip', title: 'The local day trip', description: 'A nearby destination treated with the attention of somewhere far away.', definitionId: 'adventure:travel:4', secondaryDefinitionId: 'adventure:trail:3', difficulty: 'medium', signal: 'curiosity' },
-  { key: 'postcard-route', title: 'A route worth a postcard', description: 'Find a view that turns an ordinary path into a story.', definitionId: 'adventure:trail:4', secondaryDefinitionId: 'adventure:travel:3', difficulty: 'medium', signal: 'comfort' },
-  { key: 'rainy-arrival', title: 'The rainy arrival', description: 'A complete travel kit for arriving gently when the weather disagrees.', definitionId: 'adventure:travel:4', secondaryDefinitionId: 'adventure:trail:4', difficulty: 'major', signal: 'comfort' },
-  { key: 'unfamiliar-street', title: 'The unfamiliar street', description: 'Enough preparation to stay safe, with enough openness to be surprised.', definitionId: 'adventure:travel:5', secondaryDefinitionId: 'adventure:trail:3', difficulty: 'major', signal: 'curiosity' },
-  { key: 'shared-suitcase', title: 'The shared suitcase', description: 'A journey built around company, compromise, and stories to bring home.', definitionId: 'adventure:travel:4', secondaryDefinitionId: 'adventure:trail:4', difficulty: 'major', signal: 'connection' },
-  { key: 'homeward-keepsake', title: 'The homeward keepsake', description: 'A finished journey with one detail chosen to remember.', definitionId: 'adventure:travel:5', secondaryDefinitionId: 'adventure:trail:4', difficulty: 'major', signal: 'connection' },
-] as const;
-
-export const FLEXEL_CHAPTER_ONE_ORDER_POOL = [
-  { key: 'ready-not-rushed', title: 'Ready, not rushed', description: 'An easy trail marker for beginning without turning up the pressure.', definitionId: 'adventure:trail:2', difficulty: 'small', signal: 'ease' },
-  { key: 'recovery-pocket', title: 'The recovery pocket', description: 'A small care pouch prepared before effort asks for it.', definitionId: 'comfort:care:2', difficulty: 'small', signal: 'comfort' },
-  { key: 'movement-with-exit', title: 'Movement with an exit', description: 'A route with care already packed and permission to stop.', definitionId: 'adventure:trail:3', secondaryDefinitionId: 'comfort:care:3', difficulty: 'medium', signal: 'ease' },
-  { key: 'try-again-training', title: 'Try-again training', description: 'Enough structure to practise, enough care to return another day.', definitionId: 'adventure:trail:3', secondaryDefinitionId: 'comfort:care:2', difficulty: 'medium', signal: 'comfort' },
-  { key: 'play-session', title: 'The play session', description: 'A brighter route where enjoyment—not performance—sets the pace.', definitionId: 'adventure:trail:4', secondaryDefinitionId: 'comfort:care:2', difficulty: 'medium', signal: 'curiosity' },
-  { key: 'low-energy-route', title: 'A route for low energy', description: 'A shorter path with a more generous care plan.', definitionId: 'comfort:care:4', secondaryDefinitionId: 'adventure:trail:3', difficulty: 'medium', signal: 'comfort' },
-  { key: 'shared-momentum', title: 'Shared momentum', description: 'A substantial session shaped around company and a mutual pace.', definitionId: 'adventure:trail:4', secondaryDefinitionId: 'comfort:care:4', difficulty: 'major', signal: 'connection' },
-  { key: 'adaptive-session', title: 'The adaptive session', description: 'A strong plan designed to change when the body or day changes.', definitionId: 'comfort:care:5', secondaryDefinitionId: 'adventure:trail:4', difficulty: 'major', signal: 'ease' },
-  { key: 'capability-not-proof', title: 'Capability, not proof', description: 'Build something challenging without asking it to prove your worth.', definitionId: 'adventure:trail:5', secondaryDefinitionId: 'comfort:care:4', difficulty: 'major', signal: 'curiosity' },
-  { key: 'return-tomorrow', title: 'Enough to return tomorrow', description: 'A complete movement-and-recovery service that leaves something in reserve.', definitionId: 'adventure:trail:4', secondaryDefinitionId: 'comfort:care:5', difficulty: 'major', signal: 'connection' },
-] as const;
-
-export const BEDROTTE_CHAPTER_ONE_ORDER_POOL = [
-  { key: 'unclaimed-pillow', title: 'One unclaimed pillow', description: 'A simple cushion that does not need to be earned first.', definitionId: 'comfort:rest:2', difficulty: 'small', signal: 'comfort' },
-  { key: 'quiet-care-pouch', title: 'The quiet care pouch', description: 'A little practical care without advice or interrogation.', definitionId: 'comfort:care:2', difficulty: 'small', signal: 'ease' },
-  { key: 'blanket-no-deadline', title: 'A blanket without a deadline', description: 'A soft place to pause without scheduling when it must end.', definitionId: 'comfort:rest:3', secondaryDefinitionId: 'comfort:care:2', difficulty: 'medium', signal: 'comfort' },
-  { key: 'after-difficult-day', title: 'After a difficult day', description: 'Rest and care prepared for a nervous system that has done enough.', definitionId: 'comfort:rest:3', secondaryDefinitionId: 'comfort:care:3', difficulty: 'medium', signal: 'ease' },
-  { key: 'low-light-corner', title: 'The low-light corner', description: 'A deeper rest setup shaped around fewer demands and gentler senses.', definitionId: 'comfort:rest:4', secondaryDefinitionId: 'comfort:care:2', difficulty: 'medium', signal: 'comfort' },
-  { key: 'care-without-fixing', title: 'Care without fixing', description: 'Support that stays nearby without making rest into a problem.', definitionId: 'comfort:care:4', secondaryDefinitionId: 'comfort:rest:3', difficulty: 'medium', signal: 'connection' },
-  { key: 'protected-pause', title: 'The protected pause', description: 'A full rest nest with boundaries strong enough to hold it.', definitionId: 'comfort:rest:4', secondaryDefinitionId: 'comfort:care:4', difficulty: 'major', signal: 'ease' },
-  { key: 'sensory-landing', title: 'The sensory landing', description: 'A carefully softened place for light, sound, warmth, and texture.', definitionId: 'comfort:rest:5', secondaryDefinitionId: 'comfort:care:3', difficulty: 'major', signal: 'comfort' },
-  { key: 'supported-rest', title: 'Rest with company nearby', description: 'A generous rest arrangement that permits quiet connection.', definitionId: 'comfort:care:5', secondaryDefinitionId: 'comfort:rest:4', difficulty: 'major', signal: 'connection' },
-  { key: 'nothing-to-prove', title: 'Nothing to prove', description: 'A complete rest-and-care service with no productivity waiting outside.', definitionId: 'comfort:rest:5', secondaryDefinitionId: 'comfort:care:4', difficulty: 'major', signal: 'curiosity' },
-] as const;
-
 export const AUTHORED_COHORT_ORDER_POOLS = {
   baristabbit: BARISTABBIT_CHAPTER_ONE_ORDER_POOL,
   steppling: STEPPLING_CHAPTER_ONE_ORDER_POOL,
-  voyagle: VOYAGLE_CHAPTER_ONE_ORDER_POOL,
-  flexel: FLEXEL_CHAPTER_ONE_ORDER_POOL,
-  bedrotte: BEDROTTE_CHAPTER_ONE_ORDER_POOL,
 } as const;
 
 export type BaristabbitChapterOrderTemplate = (typeof BARISTABBIT_CHAPTER_ONE_ORDER_POOL)[number];

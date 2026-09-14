@@ -12,7 +12,7 @@ test('Feastle three-dish chapter advances to a remaining tray without requesting
   assert.equal(nextFeastleBundleOrderId([order(1), order(2), order(3)], 4, 3), null);
 });
 
-for (const familyId of ['steppling', 'voyagle', 'flexel', 'bedrotte'] as const) {
+for (const familyId of ['steppling'] as const) {
   test(`${familyId} chapter opens with two tier-two orders then escalates into shared multi-item journeys`, () => {
     const selected = selectAuthoredCohortOrderKeys(familyId, 'journey-seed');
     assert.equal(selected.length, 5);
@@ -21,11 +21,7 @@ for (const familyId of ['steppling', 'voyagle', 'flexel', 'bedrotte'] as const) 
     assert.ok(orders.slice(0, 2).every((item) => item.definitionId.endsWith(':2')));
     assert.ok(orders.slice(2).every((item) => item.difficulty === 'medium' || item.difficulty === 'major'));
     assert.ok(orders.slice(2).every((item) => 'secondaryDefinitionId' in item));
-    const expectedChains = familyId === 'bedrotte'
-      ? ['comfort:rest:', 'comfort:care:']
-      : familyId === 'flexel'
-        ? ['adventure:trail:', 'comfort:care:']
-        : ['adventure:trail:', 'adventure:travel:'];
+    const expectedChains = ['adventure:trail:', 'adventure:travel:'];
     assert.ok(expectedChains.every((chain) => orders.some((item) => item.definitionId.startsWith(chain)
       || ('secondaryDefinitionId' in item && item.secondaryDefinitionId.startsWith(chain)))));
   });

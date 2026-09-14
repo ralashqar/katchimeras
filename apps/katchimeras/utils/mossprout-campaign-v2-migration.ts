@@ -5,7 +5,6 @@ import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { loadCompanionAchievementState, saveCompanionAchievementState } from '@/utils/companion-achievements-storage';
 import { loadCompanionBondState, saveCompanionBondState } from '@/utils/companion-bond-storage';
 import { loadCompanionContentState, saveCompanionContentState } from '@/utils/companion-content-storage';
-import { loadCompanionDiscoveryState, saveCompanionDiscoveryState } from '@/utils/companion-discovery-storage';
 import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/companion-journey-storage';
 import { loadCompanionQuickGoalState, saveCompanionQuickGoalState } from '@/utils/companion-quick-goal-storage';
 import { loadCompanionQuests, saveCompanionQuests } from '@/utils/katchimera-quests';
@@ -56,21 +55,11 @@ export async function runMossproutCampaignV2Migration(now = Date.now()): Promise
   const content = loadCompanionContentState();
   saveCompanionContentState({
     ...content,
-    invitations: withoutMossprout(content.invitations),
-    memoryFacts: withoutMossprout(content.memoryFacts),
     memories: withoutMossprout(content.memories),
     insights: withoutMossprout(content.insights),
-    visitPlans: withoutMossprout(content.visitPlans),
-    conversationReceipts: withoutMossprout(content.conversationReceipts),
-    telemetry: withoutMossprout(content.telemetry),
-    events: withoutMossprout(content.events),
-    introductions: withoutMossprout(content.introductions),
-    visits: withoutMossprout(content.visits),
     conversationSessions: withoutMossprout(content.conversationSessions),
-    conversationSignals: withoutMossprout(content.conversationSignals),
     conversationTelemetry: withoutMossprout(content.conversationTelemetry),
     servedConversationDayKeys: content.servedConversationDayKeys.filter((key) => !key.startsWith('mossprout:')),
-    processedConversationEvidenceIds: content.processedConversationEvidenceIds.filter((id) => !id.includes('mossprout')),
   });
 
   const journey = loadCompanionJourneyState();
@@ -93,9 +82,6 @@ export async function runMossproutCampaignV2Migration(now = Date.now()): Promise
     completions: quickGoals.completions.filter((entry) => keptGoalIds.has(entry.goalId) && entry.familyId !== 'mossprout'),
     dismissals: quickGoals.dismissals.filter((entry) => keptGoalIds.has(entry.goalId) && entry.familyId !== 'mossprout'),
   });
-
-  const discovery = loadCompanionDiscoveryState();
-  saveCompanionDiscoveryState({ ...discovery, answers: withoutMossprout(discovery.answers) });
 
   const achievements = loadCompanionAchievementState();
   saveCompanionAchievementState({

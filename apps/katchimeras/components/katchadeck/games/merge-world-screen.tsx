@@ -223,9 +223,6 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   const [authoredStories, setAuthoredStories] = useState(() => ({
     baristabbit: loadAuthoredCohortStory('baristabbit'),
     steppling: loadAuthoredCohortStory('steppling'),
-    voyagle: loadAuthoredCohortStory('voyagle'),
-    flexel: loadAuthoredCohortStory('flexel'),
-    bedrotte: loadAuthoredCohortStory('bedrotte'),
   }));
   const [returnCharacterId, setReturnCharacterId] = useState<MergeOrder['characterId'] | null>(null);
   const [serveFlight, setServeFlight] = useState<MergeServeRewardFlight | null>(null);
@@ -415,9 +412,6 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     setAuthoredStories({
       baristabbit: loadAuthoredCohortStory('baristabbit'),
       steppling: loadAuthoredCohortStory('steppling'),
-      voyagle: loadAuthoredCohortStory('voyagle'),
-      flexel: loadAuthoredCohortStory('flexel'),
-      bedrotte: loadAuthoredCohortStory('bedrotte'),
     });
   }), []);
 

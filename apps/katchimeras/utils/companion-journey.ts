@@ -8,7 +8,6 @@ import {
 import { companionSpeechCopyIssues } from '@/constants/companion-speech-copy';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
-import type { CompanionDiscoveryState } from '@/utils/companion-discovery';
 import type { CompanionQuest } from '@/utils/katchimera-quests';
 import { questDefinition } from '@/utils/quests/definitions';
 import { canonicalFamilyId, companionIdForFamily } from '@/constants/katchimera-skins';
@@ -232,54 +231,6 @@ export function normaliseCompanionJourneyState(value: unknown): CompanionJourney
     reflectionEvents,
     checkIns,
   };
-}
-
-export function migrateLegacyDiscoveryGoals(
-  state: CompanionJourneyState,
-  discovery: CompanionDiscoveryState,
-  migratedAt = Date.now()
-): CompanionJourneyState {
-  const mapping: Record<string, { familyId: KatchimeraFamilyId; goalTypeId: string }> = {
-    'sleep-rest:wind-down-goal': { familyId: 'bedrotte', goalTypeId: 'wind-down' },
-    'tasklet:focus-goal': { familyId: 'tasklet', goalTypeId: 'project' },
-    'vesperitt:night-intention': { familyId: 'bedrotte', goalTypeId: 'understand' },
-  };
-  let next = state;
-  for (const answer of discovery.answers) {
-    const mapped = mapping[answer.promptId]
-      ?? (answer.promptId === `${answer.familyId}:quest-goal`
-        && companionJourneyByFamilyId.has(canonicalFamilyId(answer.familyId) ?? answer.familyId)
-        ? {
-            familyId: canonicalFamilyId(answer.familyId) ?? answer.familyId,
-            goalTypeId: `${answer.familyId}-direction`,
-          }
-        : undefined);
-    if (!mapped || !answer.value.trim()) continue;
-    const id = `legacy-goal:${answer.familyId}:${answer.promptId}`;
-    if (next.goals.some((goal) => goal.id === id)) continue;
-    const status = answer.goalStatus === 'completed'
-      ? 'completed'
-      : answer.goalStatus === 'paused'
-        ? 'paused'
-        : 'active';
-    const hasPrimary = next.goals.some(
-      (goal) => goal.familyId === mapped.familyId && goal.isPrimary && goal.status === 'active'
-    );
-    const goal: CompanionJourneyGoal = {
-      id,
-      familyId: mapped.familyId,
-      goalTypeId: mapped.goalTypeId,
-      title: answer.value.trim(),
-      status,
-      kind: 'plan',
-      isPrimary: status === 'active' && !hasPrimary,
-      createdAt: answer.answeredAt || migratedAt,
-      updatedAt: answer.answeredAt || migratedAt,
-      completedAt: status === 'completed' ? answer.answeredAt || migratedAt : undefined,
-    };
-    next = { ...next, goals: [...next.goals, goal] };
-  }
-  return next;
 }
 
 export function goalsForJourneyFamily(
