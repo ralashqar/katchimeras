@@ -53,10 +53,10 @@ export const MERGE_STARTING_OPEN_CELLS = new Set([
 ]);
 
 export const MERGE_CHAIN_IDS: readonly MergeChainId[] = [
-  'food:table', 'food:dessert', 'drink:hot', 'drink:refresh',
+  'food:table', 'food:dessert', 'food:cafe-pastry', 'drink:hot', 'drink:refresh',
   'adventure:trail', 'adventure:travel', 'nature:garden', 'nature:waterside',
   'nature:keepsake', 'nature:root-memory',
-  'comfort:rest', 'comfort:care', 'social:gathering', 'social:celebration',
+  'comfort:rest', 'comfort:care', 'social:gathering', 'social:celebration', 'social:cafe-sharing',
   'mind:work', 'mind:books', 'creative:art', 'creative:screen',
 ];
 
@@ -87,8 +87,9 @@ export const MERGE_ITEM_CATALOG: readonly MergeItemDefinition[] = [
   { id: 'mossprout:resident-card:key', familyId: 'nature', chainId: 'nature:root-memory', branchId: 'resident_card_legacy', tier: 1, name: 'Sealed Resident Card', icon: 'sparkles', color: '#E5CE79', nextItemId: null, sellValue: 0, progressionOnly: true },
   ...chain('food:table', 'fork.knife', '#F0B870', ['Ingredient', 'Snack', 'Dish', 'Meal', 'Feast', 'Banquet']),
   ...chain('food:dessert', 'sparkles', '#F2A9B8', ['Flour Scoop', 'Cake Batter', 'Cupcake', 'Layer Cake', 'Celebration Cake', 'Dream Cake']),
-  ...chain('drink:hot', 'sparkles', '#C98A66', ['Tea Leaf', 'Tea Cup', 'Teapot', 'Cocoa Tray', 'Café Service', 'Hearth Ceremony']),
-  ...chain('drink:refresh', 'water.waves', '#70C9C6', ['Berry', 'Fruit Juice', 'Smoothie', 'Lemonade Pitcher', 'Garden Drinks Cart', 'Festival Fountain']),
+  ...chain('food:cafe-pastry', 'fork.knife', '#E8A57D', ['Butter Biscuit', 'Cookie Pair', 'Berry Cupcake', 'Pastry Board', 'Afternoon Tea Stand', 'Dream Patisserie']),
+  ...chain('drink:hot', 'sparkles', '#C98A66', ['Tiny Espresso', 'Caramel Latte', 'Strawberry Boba', 'Matcha Cloud Frappe', 'Blueberry Star Shake', 'Grand Rainbow Café Float']),
+  ...chain('drink:refresh', 'water.waves', '#70C9C6', ['Small Juice Cup', 'Iced Fruit Tea', 'Berry Smoothie', 'Lemonade Pitcher', 'Garden Drinks Cart', 'Festival Drinks Fountain']),
   ...chain('adventure:trail', 'figure.walk', '#D6A66D', ['Sock', 'Shoe', 'Boot', 'Hiking Gear', 'Adventure Pack', 'Expedition Kit']),
   ...chain('adventure:travel', 'globe.americas.fill', '#A9A1E8', ['Ticket', 'Map', 'Travel Journal', 'Suitcase', 'Grand Journey', 'Memory Globe']),
   ...chain('nature:garden', 'leaf.fill', '#82C891', ['Seed', 'Sprout', 'Plant', 'Flower', 'Rare Flower', 'Magical Plant', 'Ancient Tree']),
@@ -98,6 +99,7 @@ export const MERGE_ITEM_CATALOG: readonly MergeItemDefinition[] = [
   ...chain('comfort:care', 'sparkles', '#EEA49C', ['Bandage', 'Care Pouch', 'First Aid Kit', 'Comfort Basket', 'Healing Cabinet', 'Sanctuary Kit']),
   ...chain('social:gathering', 'fork.knife', '#E9A86F', ['Place Card', 'Shared Plate', 'Picnic Cloth', 'Gathering Table', 'Community Supper', 'Village Festival']),
   ...chain('social:celebration', 'sparkles', '#F2C85B', ['Ribbon', 'Wrapped Gift', 'Party Hat', 'Celebration Hamper', 'Joyful Parade', 'Grand Jubilee']),
+  ...chain('social:cafe-sharing', 'sparkles', '#D98F70', ['Café Coaster', 'Two-Cup Tray', 'Coffee Table Set', 'Window Nook', 'Friends’ Café Table', 'Lantern Café Terrace']),
   ...chain('mind:work', 'sparkles', '#79A9C7', ['Sticky Note', 'Checklist', 'Planner', 'Tidy Desk', 'Project Station', 'Calm Command Centre']),
   ...chain('mind:books', 'sparkles', '#9D7C69', ['Bookmark', 'Pocket Book', 'Story Stack', 'Reading Nook', 'Library Cart', 'Wonder Library']),
   ...chain('creative:art', 'sparkles', '#D88CBC', ['Pencil', 'Sketchbook', 'Paint Set', 'Easel', 'Studio Corner', 'Gallery of Dreams']),
@@ -159,7 +161,8 @@ const generator = (
 
 export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
   generator('hearth-pantry', 'Hearth Pantry', 'fork.knife', '#C97847', 31, ['food:table', 'food:dessert'], 'Ingredients and baking basics for savoury tables and sweet finishes.'),
-  generator('ritual-bar', 'Ritual Bar', 'water.waves', '#A76E58', 32, ['drink:hot', 'drink:refresh'], 'Warm rituals and bright refreshments, chosen one small ingredient at a time.'),
+  generator('ritual-bar', 'Ritual Bar', 'water.waves', '#A76E58', 32, ['drink:refresh', 'drink:hot'], 'Colourful refreshments and warm rituals, poured one cup at a time.'),
+  generator('cafe-counter', 'Café Counter', 'fork.knife', '#C9825E', 41, ['food:cafe-pastry', 'social:cafe-sharing'], 'Small café treats and welcoming table pieces for pauses shared with company.'),
   generator('journey-locker', 'Journey Locker', 'figure.walk', '#967044', 33, ['adventure:trail', 'adventure:travel'], 'Walking gear and travel keepsakes for journeys near and far.'),
   generator('wild-garden', 'Garden Basket', 'leaf.fill', '#5E9E69', 38, ['nature:garden', 'nature:waterside'], 'Seeds and waterside treasures from one shared patch of wildness.'),
   generator('memory-nursery', 'Memory Nursery', 'sparkles', '#79AA76', 45, ['nature:keepsake', 'nature:keepsake'], 'Living keepsakes grown from the small nature moments Mossprout remembers with you.'),
@@ -185,7 +188,7 @@ const MERGE_LOCKED_TIER_ONE_ECHO_CELLS = [
   49, 50, // Creative Playroom
 ] as const;
 
-export const MERGE_LOCKED_TIER_ONE_ECHOES = MERGE_GENERATORS.filter((generator) => generator.id !== 'memory-nursery').flatMap((generator, generatorIndex) => (
+export const MERGE_LOCKED_TIER_ONE_ECHOES = MERGE_GENERATORS.filter((generator) => generator.id !== 'memory-nursery' && generator.id !== 'cafe-counter').flatMap((generator, generatorIndex) => (
   generator.tierOneDropDefinitionIds.map((definitionId, branchIndex) => ({
     cell: MERGE_LOCKED_TIER_ONE_ECHO_CELLS[generatorIndex * 2 + branchIndex],
     definitionId,
@@ -235,7 +238,7 @@ const profile = (
 ): KatchimeraMergeProfile => ({ characterId, coreChains, guestChains, narrativeTheme });
 
 export const KATCHIMERA_MERGE_PROFILES: Record<MergeCharacterId, KatchimeraMergeProfile> = {
-  baristabbit: profile('baristabbit', ['drink:hot', 'drink:refresh'], ['food:dessert', 'social:gathering'], 'notice the rituals that make a pause feel restorative'),
+  baristabbit: profile('baristabbit', ['drink:refresh', 'drink:hot'], ['food:cafe-pastry', 'social:cafe-sharing'], 'notice the rituals that make a pause feel restorative'),
   feastle: profile('feastle', ['food:table', 'food:dessert'], ['drink:hot', 'drink:refresh', 'social:gathering'], 'turn food memories into warmth, welcome, and shared tables'),
   steppling: profile('steppling', ['adventure:trail', 'adventure:travel'], ['drink:refresh', 'nature:waterside'], 'honour small steps and the places they gradually open'),
   flexel: profile('flexel', ['adventure:trail', 'comfort:care'], ['drink:refresh'], 'find a sustainable rhythm between movement and recovery'),

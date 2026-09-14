@@ -74,6 +74,7 @@ const MOSSPROUT_GARDEN_PLANT_SLOTS: readonly MossproutGardenPlantSlotId[] = [
 ];
 
 const STEPPLING_HAVEN_BOARD_SIZE = 42;
+export const BARISTABBIT_CAFE_COUNTER_ARRIVAL_ID = 'baristabbit:chapter-1:cafe-counter:v1';
 
 function createStepplingHavenBoard(now: number): HavenResidentMergeBoardState {
   const board: MergeBoardCell[] = Array.from({ length: STEPPLING_HAVEN_BOARD_SIZE }, () => ({
@@ -3522,6 +3523,9 @@ function reconcileStory(
   let next = showsStoryOrders
     ? ensureCharacterGenerators(state, story.familyId, now)
     : state;
+  if (showsStoryOrders && story.familyId === 'baristabbit') {
+    next = ensureBaristabbitCafeCounterParcel(next, now);
+  }
   if (story.familyId !== 'feastle') {
     const existing = next.activeOrders.filter((order) => order.characterId === story.familyId && Boolean(order.storyArcId));
     const servedIds = new Set([
@@ -3538,8 +3542,11 @@ function reconcileStory(
           .slice(0, effectiveActPhase === 'regular_orders' ? 3 : undefined)
       : [];
     const keep = next.activeOrders.filter((order) => order.characterId !== story.familyId || !order.storyArcId || order.storyArcId === DAILY_GARDEN_ARC || order.id.startsWith('journey-cycle:'));
+    // A saved Baristabbit order is a promise to the player. Preserve its old
+    // requirements through this café retheme; other stories retain their
+    // stricter authored-order reconciliation.
     const activeOrders = [...keep, ...wanted.map((order) => existing.find((item) => item.id === order.id
-      && JSON.stringify(item.requirements) === JSON.stringify(order.requirements)) ?? order)];
+      && (story.familyId === 'baristabbit' || JSON.stringify(item.requirements) === JSON.stringify(order.requirements))) ?? order)];
     if (activeOrders.length !== next.activeOrders.length || activeOrders.some((order, index) => order.id !== next.activeOrders[index]?.id)) {
       next = { ...next, activeOrders };
     }
@@ -3564,17 +3571,17 @@ function reconcileStory(
   return next === state ? state : touch(next, now);
 }
 
-function baristabbitStoryOrders(state: MergeWorldState, now: number, actPhase?: string, orderTemplateKeys: string[] = []): MergeOrder[] {
+function baristabbitStoryOrders(now: number, actPhase?: string, orderTemplateKeys: string[] = []): MergeOrder[] {
   if (actPhase === 'signature_order') return [{
     id: 'merge-story:baristabbit:chapter-1:pause-table',
     characterId: 'baristabbit',
     title: 'The Pause Table',
-    description: "A warm ritual, a bright reset, and, when Feastle's Pantry is open, something sweet to share.",
+    description: 'A colourful café favourite, a bright reset, and a window nook made for sharing the pause.',
     narrativeSignal: 'connection', difficulty: 'major',
     requirements: [
-      { definitionId: 'drink:hot:5', quantity: 1 },
-      { definitionId: 'drink:refresh:4', quantity: 1 },
-      ...(state.generators['hearth-pantry'] ? [{ definitionId: 'food:dessert:3', quantity: 1 }] : []),
+      { definitionId: 'drink:refresh:5', quantity: 1 },
+      { definitionId: 'drink:hot:4', quantity: 1 },
+      { definitionId: 'social:cafe-sharing:4', quantity: 1 },
     ],
     reward: { coins: 90, mergeXp: 70, friendshipXp: 30, energy: 5 },
     createdAt: now, signature: true, purpose: 'signature', chapterId: 'baristabbit-chapter-1',
@@ -3595,7 +3602,7 @@ function baristabbitStoryOrders(state: MergeWorldState, now: number, actPhase?: 
         { definitionId: template.definitionId, quantity: 1 },
         ...('secondaryDefinitionId' in template
           ? [{ definitionId: template.secondaryDefinitionId, quantity: 1 }]
-          : 'guestDefinitionId' in template && 'guestGeneratorId' in template && state.generators[template.guestGeneratorId]
+          : 'guestDefinitionId' in template && 'guestGeneratorId' in template
             ? [{ definitionId: template.guestDefinitionId, quantity: 1 }]
             : []),
       ],
@@ -3605,6 +3612,29 @@ function baristabbitStoryOrders(state: MergeWorldState, now: number, actPhase?: 
       storyTargetLevel: 7, storyStep: index + 1, storyStepCount: orderTemplateKeys.length,
     }];
   });
+}
+
+function ensureBaristabbitCafeCounterParcel(state: MergeWorldState, now: number): MergeWorldState {
+  if (state.generators['cafe-counter']
+    || state.arrivals.some((arrival) => arrival.id === BARISTABBIT_CAFE_COUNTER_ARRIVAL_ID)) return state;
+  return {
+    ...state,
+    arrivals: [...state.arrivals, {
+      id: BARISTABBIT_CAFE_COUNTER_ARRIVAL_ID,
+      kind: 'contextual_parcel',
+      generatorId: 'cafe-counter',
+      createdAt: now,
+      dayId: localDayId(now),
+      label: 'Café Counter',
+      theme: 'memory',
+      familyId: 'food',
+      chainId: 'food:cafe-pastry',
+      source: 'companion_story',
+      itemDefinitionIds: [],
+      claimedAt: null,
+      seenAt: null,
+    }],
+  };
 }
 
 const AUTHORED_MERGE_CHAPTERS = {
@@ -3635,7 +3665,7 @@ const AUTHORED_MERGE_CHAPTERS = {
 } as const;
 
 function authoredCohortStoryOrders(state: MergeWorldState, familyId: AuthoredCohortFamilyId, now: number, actPhase?: string, orderTemplateKeys: string[] = []): MergeOrder[] {
-  if (familyId === 'baristabbit') return baristabbitStoryOrders(state, now, actPhase, orderTemplateKeys);
+  if (familyId === 'baristabbit') return baristabbitStoryOrders(now, actPhase, orderTemplateKeys);
   const chapter = AUTHORED_MERGE_CHAPTERS[familyId];
   if (actPhase === 'signature_order') return [{
     id: `merge-story:${familyId}:chapter-1:${chapter.signatureKey}`,

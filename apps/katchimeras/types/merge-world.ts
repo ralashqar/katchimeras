@@ -4,12 +4,12 @@ import type { KatchimeraSkinId } from '@/types/katchimera';
 
 export type MergeFamilyId = 'food' | 'drink' | 'adventure' | 'nature' | 'comfort' | 'social' | 'mind' | 'creative';
 export type MergeChainId =
-  | 'food:table' | 'food:dessert'
+  | 'food:table' | 'food:dessert' | 'food:cafe-pastry'
   | 'drink:hot' | 'drink:refresh'
   | 'adventure:trail' | 'adventure:travel'
   | 'nature:garden' | 'nature:waterside' | 'nature:keepsake' | 'nature:root-memory'
   | 'comfort:rest' | 'comfort:care'
-  | 'social:gathering' | 'social:celebration'
+  | 'social:gathering' | 'social:celebration' | 'social:cafe-sharing'
   | 'mind:work' | 'mind:books'
   | 'creative:art' | 'creative:screen';
 export type MergeCharacterId =

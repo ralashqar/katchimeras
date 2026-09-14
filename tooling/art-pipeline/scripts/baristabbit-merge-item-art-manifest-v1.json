@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "styleReferences": [
+    "assets/images/katchimeras/world/hex/mossprout_focused_v1_main_hex_tile.webp",
+    "assets/images/katchimeras/baristabbit.png"
+  ],
+  "promptBrief": [
+    "Baristabbit cafe collectibles in the Katchimeras cozy cushion-toy 3D style: broad matte colors, thick rounded edges, large soft bevels, and gentle major-contact ambient occlusion.",
+    "Every drink tier is one increasingly large, colourful, elaborate beverage vessel; no trays, repeated cups, raw ingredients, photoreal texture, thin steam, text, logos, floor, or cast shadow.",
+    "Each 3x2 chain sheet uses one centered object per cell on uniform #FF00FF with 12 percent safe padding and silhouettes readable at 34-50px."
+  ],
+  "output": {
+    "size": 256,
+    "subjectExtent": 210,
+    "quality": 84,
+    "hardFileLimitBytes": 51200,
+    "dropLowerDetachedComponents": true,
+    "gridRows": 2,
+    "gridColumns": 3
+  },
+  "sheets": [
+    {
+      "id": "specialty-drinks",
+      "cells": [
+        { "row": 0, "column": 0, "definitionId": "drink:hot:1", "file": "drink-hot-1-tiny-espresso.webp" },
+        { "row": 0, "column": 1, "definitionId": "drink:hot:2", "file": "drink-hot-2-caramel-latte.webp" },
+        { "row": 0, "column": 2, "definitionId": "drink:hot:3", "file": "drink-hot-3-strawberry-boba.webp" },
+        { "row": 1, "column": 0, "definitionId": "drink:hot:4", "file": "drink-hot-4-matcha-cloud-frappe.webp" },
+        { "row": 1, "column": 1, "definitionId": "drink:hot:5", "file": "drink-hot-5-blueberry-star-shake.webp" },
+        { "row": 1, "column": 2, "definitionId": "drink:hot:6", "file": "drink-hot-6-grand-rainbow-cafe-float.webp" }
+      ]
+    },
+    {
+      "id": "refreshing-drinks",
+      "cells": [
+        { "row": 0, "column": 0, "definitionId": "drink:refresh:1", "file": "drink-refresh-1-small-juice-cup.webp" },
+        { "row": 0, "column": 1, "definitionId": "drink:refresh:2", "file": "drink-refresh-2-iced-fruit-tea.webp" },
+        { "row": 0, "column": 2, "definitionId": "drink:refresh:3", "file": "drink-refresh-3-berry-smoothie.webp" },
+        { "row": 1, "column": 0, "definitionId": "drink:refresh:4", "file": "drink-refresh-4-lemonade-pitcher.webp" },
+        { "row": 1, "column": 1, "definitionId": "drink:refresh:5", "file": "drink-refresh-5-garden-drinks-cart.webp" },
+        { "row": 1, "column": 2, "definitionId": "drink:refresh:6", "file": "drink-refresh-6-festival-drinks-fountain.webp" }
+      ]
+    },
+    {
+      "id": "cafe-pastry",
+      "cells": [
+        { "row": 0, "column": 0, "definitionId": "food:cafe-pastry:1", "file": "food-cafe-pastry-1-butter-biscuit.webp" },
+        { "row": 0, "column": 1, "definitionId": "food:cafe-pastry:2", "file": "food-cafe-pastry-2-cookie-pair.webp" },
+        { "row": 0, "column": 2, "definitionId": "food:cafe-pastry:3", "file": "food-cafe-pastry-3-berry-cupcake.webp" },
+        { "row": 1, "column": 0, "definitionId": "food:cafe-pastry:4", "file": "food-cafe-pastry-4-pastry-board.webp" },
+        { "row": 1, "column": 1, "definitionId": "food:cafe-pastry:5", "file": "food-cafe-pastry-5-afternoon-tea-stand.webp" },
+        { "row": 1, "column": 2, "definitionId": "food:cafe-pastry:6", "file": "food-cafe-pastry-6-dream-patisserie.webp" }
+      ]
+    },
+    {
+      "id": "cafe-sharing",
+      "cells": [
+        { "row": 0, "column": 0, "definitionId": "social:cafe-sharing:1", "file": "social-cafe-sharing-1-cafe-coaster.webp" },
+        { "row": 0, "column": 1, "definitionId": "social:cafe-sharing:2", "file": "social-cafe-sharing-2-two-cup-tray.webp" },
+        { "row": 0, "column": 2, "definitionId": "social:cafe-sharing:3", "file": "social-cafe-sharing-3-coffee-table-set.webp" },
+        { "row": 1, "column": 0, "definitionId": "social:cafe-sharing:4", "file": "social-cafe-sharing-4-window-nook.webp" },
+        { "row": 1, "column": 1, "definitionId": "social:cafe-sharing:5", "file": "social-cafe-sharing-5-friends-cafe-table.webp" },
+        { "row": 1, "column": 2, "definitionId": "social:cafe-sharing:6", "file": "social-cafe-sharing-6-lantern-cafe-terrace.webp" }
+      ]
+    }
+  ]
+}

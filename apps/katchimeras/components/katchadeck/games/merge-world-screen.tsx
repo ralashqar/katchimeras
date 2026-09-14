@@ -92,7 +92,7 @@ import { MergeGlowReadyGuide } from './merge-glow-ready-guide';
 const EARLY_DISCOVERY_REVEAL_COPY: Partial<Record<MergeCharacterId, { description: string; rewardBody: string }>> = {
   steppling: { description: 'Every path starts somewhere.', rewardBody: 'The final trail marker became a Journey Locker.' },
   feastle: { description: 'A warm table was waiting beneath the Mist.', rewardBody: 'The Dreambound Dish became a Hearth Pantry.' },
-  baristabbit: { description: 'A familiar warmth followed the light home.', rewardBody: 'The Dreambound Teapot became a Ritual Bar.' },
+  baristabbit: { description: 'A bright little refreshment followed the light home.', rewardBody: 'The dreambound juice cups became a Ritual Bar.' },
   bedrotte: { description: 'The quiet hollow finally felt safe enough to open.', rewardBody: 'The Dreambound Pillow became a Comfort Chest.' },
 };
 

@@ -34,29 +34,29 @@ export const BARISTABBIT_HATCHABLE: HatchableCompanionDefinition = {
     required: 8,
     camera: { kind: 'focus_target', target: { kind: 'haven_gateway' }, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 900 },
     seed: {
-      /** Tea things the Mist left by the window: three Tea Leaves along the bottom, two of them side by side. */
+      /** Café things the Mist left by the window: three Small Juice Cups along the bottom, two side by side. */
       items: [
-        { cell: 40, definitionId: 'drink:hot:1' },
-        { cell: 39, definitionId: 'drink:hot:1' },
-        { cell: 36, definitionId: 'drink:hot:1' },
+        { cell: 40, definitionId: 'drink:refresh:1' },
+        { cell: 39, definitionId: 'drink:refresh:1' },
+        { cell: 36, definitionId: 'drink:refresh:1' },
       ],
-      /** The one sleeper the player can see: a Tea Cup under a lower band of mist, bottom middle, that wakes as a Teapot. */
-      echoes: [{ cell: 38, id: 'baristabbit-hot-1', definitionId: 'drink:hot:2' }],
+      /** The visible sleeper: an Iced Fruit Tea under lower mist, bottom middle, that wakes as a Berry Smoothie. */
+      echoes: [{ cell: 38, id: 'baristabbit-hot-1', definitionId: 'drink:refresh:2' }],
       /**
        * The cells the Mist holds completely, climbing the other way from Steppling's board: 31 above
        * the sleeper; 24 and 32 above and beside that; 25 above 32; 26 beside 25. The top one (24)
-       * wants the Café Service two Cocoa Trays make.
+       * wants the Garden Drinks Cart two Lemonade Pitchers make.
        */
       veiled: [
-        { cell: 31, id: 'baristabbit-hot-2', definitionId: 'drink:hot:3' },
-        { cell: 24, id: 'baristabbit-hot-3', definitionId: 'drink:hot:5' },
-        { cell: 32, id: 'baristabbit-hot-4', definitionId: 'drink:hot:1' },
-        { cell: 25, id: 'baristabbit-hot-5', definitionId: 'drink:hot:2' },
-        { cell: 26, id: 'baristabbit-hot-6', definitionId: 'drink:hot:3' },
+        { cell: 31, id: 'baristabbit-hot-2', definitionId: 'drink:refresh:3' },
+        { cell: 24, id: 'baristabbit-hot-3', definitionId: 'drink:refresh:5' },
+        { cell: 32, id: 'baristabbit-hot-4', definitionId: 'drink:refresh:1' },
+        { cell: 25, id: 'baristabbit-hot-5', definitionId: 'drink:refresh:2' },
+        { cell: 26, id: 'baristabbit-hot-6', definitionId: 'drink:refresh:3' },
       ],
     },
     guides: {
-      firstMerge: { eyebrow: 'Left by the window', title: 'Two Tea Leaves. Together.', body: 'Every merge strikes a wisp.' },
+      firstMerge: { eyebrow: 'Left by the window', title: 'Two Small Juice Cups. Together.', body: 'Every merge strikes a wisp.' },
       wake: { eyebrow: 'Asleep under the Mist', title: 'Something under there wants {a} {name}.', body: 'Give it its match. What it was keeping warm comes with it.' },
       merge: { eyebrow: 'Two of a kind', title: 'Two of the same make {a} {name}.', body: 'Drag one onto the other. Every merge strikes a wisp.' },
       mergeFallbackTitle: 'Two of the same make the next one up.',
@@ -91,22 +91,22 @@ export const BARISTABBIT_HATCHABLE: HatchableCompanionDefinition = {
     flow: { id: 'baristabbit-garden-lesson', version: 1, runId: 'ftue:baristabbit-garden:1' },
     taskCapability: 'baristabbit.garden.task',
     eventPrefix: 'baristabbit.garden',
-    closing: 'A Tea Cup, some light, and a window the Mist does not own. We keep the kettle on, at your pace.',
+    closing: 'An Iced Fruit Tea, some light, and a window the Mist does not own. We keep a cup ready, at your pace.',
     summary: 'Your world grows where you look',
     generatorId: 'ritual-bar',
     parcelArrivalId: 'journey:baristabbit:day-1:ritual-bar',
-    growDefinitionId: 'drink:hot:2',
-    dropDefinitionId: 'drink:hot:1',
+    growDefinitionId: 'drink:refresh:2',
+    dropDefinitionId: 'drink:refresh:1',
     order: {
-      id: 'baristabbit:discovery:first-cup', characterId: 'baristabbit', title: 'Baristabbit’s first Tea Cup',
-      description: 'Merge two Tea Leaves into a Tea Cup for Baristabbit.', difficulty: 'small', requirements: [{ definitionId: 'drink:hot:2', quantity: 1 }],
+      id: 'baristabbit:discovery:first-cup', characterId: 'baristabbit', title: 'Baristabbit’s first Iced Fruit Tea',
+      description: 'Merge two Small Juice Cups into an Iced Fruit Tea for Baristabbit.', difficulty: 'small', requirements: [{ definitionId: 'drink:refresh:2', quantity: 1 }],
       reward: { coins: 20, mergeXp: 18, friendshipXp: 12, energy: 2 }, signature: false, purpose: 'normal', storyArcId: 'baristabbit:discovery',
     },
     copy: {
       parcel: { eyebrow: '', title: 'A parcel from Baristabbit.', body: 'Kept warm through the whole Mist. Tap to open it.' },
       room: { eyebrow: '', title: 'A little room', body: 'Merge or store an item, then we continue.' },
-      grow: { eyebrow: '', title: 'Yours now. Make a Tea Cup.', body: 'Two Tea Leaves from the Bar, together.' },
-      serve: { eyebrow: '', title: 'Baristabbit needs a Tea Cup.', body: 'Serve it, and the light is yours to spend.' },
+      grow: { eyebrow: '', title: 'Yours now. Make an Iced Fruit Tea.', body: 'Two Small Juice Cups from the Bar, together.' },
+      serve: { eyebrow: '', title: 'Baristabbit needs an Iced Fruit Tea.', body: 'Serve it, and the light is yours to spend.' },
       finale: { eyebrow: '', title: 'Back to Baristabbit.', body: '' },
       finaleAction: 'Our first pour',
     },

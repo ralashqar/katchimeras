@@ -95,12 +95,12 @@ export const COMPANION_DISCOVERY_CATALOG: readonly CompanionDiscoveryDefinition[
   },
   {
     id: 'discovery:baristabbit-warm-light', gateId: 'gate-3-first-choice', characterId: 'baristabbit', role: 'foundation',
-    pathId: 'warm-light', pathName: 'Warm Light', pathCells: [10, 11, 12], entryDefinitionId: 'drink:hot:1',
+    pathId: 'warm-light', pathName: 'Warm Light', pathCells: [10, 11, 12], entryDefinitionId: 'drink:refresh:1',
     permanentGeneratorId: 'ritual-bar', affinityWeights: { food: 0.65, social: 0.55, rest: 0.45, home: 0.35 },
     stages: [
-      { clue: 'Faint Tea Leaf', boundDefinitionId: 'drink:hot:1' },
-      { clue: 'Half-seen Tea Cup', boundDefinitionId: 'drink:hot:2' },
-      { clue: 'Dreambound Teapot', boundDefinitionId: 'drink:hot:3' },
+      { clue: 'Faint Juice Cup', boundDefinitionId: 'drink:refresh:1' },
+      { clue: 'Half-seen Iced Tea', boundDefinitionId: 'drink:refresh:2' },
+      { clue: 'Dreambound Berry Smoothie', boundDefinitionId: 'drink:refresh:3' },
     ],
   },
   {

@@ -27,7 +27,11 @@ def visible_bounds(image: Image.Image) -> tuple[int, int, int, int] | None:
     return image.getchannel("A").point(lambda value: 255 if value > ALPHA_THRESHOLD else 0).getbbox()
 
 
-def remove_tiny_islands(image: Image.Image, keep_largest_only: bool = False) -> Image.Image:
+def remove_tiny_islands(
+    image: Image.Image,
+    keep_largest_only: bool = False,
+    drop_lower_detached_components: bool = False,
+) -> Image.Image:
     """Drop detached matte debris while retaining every meaningful sub-object."""
     alpha = image.getchannel("A")
     mask = alpha.point(lambda value: 255 if value > ALPHA_THRESHOLD else 0)
@@ -55,12 +59,20 @@ def remove_tiny_islands(image: Image.Image, keep_largest_only: bool = False) -> 
     if not components:
         return image
     largest = max(len(component) for component in components)
+    largest_component = max(components, key=len)
+    largest_bottom = max(y for _, y in largest_component)
     minimum = largest if keep_largest_only else max(24, round(largest * 0.012))
     output = image.copy()
     output_alpha = output.getchannel("A")
     alpha_pixels = output_alpha.load()
     for component in components:
-        if len(component) >= minimum:
+        is_lower_debris = (
+            drop_lower_detached_components
+            and component is not largest_component
+            and min(y for _, y in component) > largest_bottom + 3
+            and len(component) < largest * 0.25
+        )
+        if len(component) >= minimum and not is_lower_debris:
             continue
         for x, y in component:
             alpha_pixels[x, y] = 0
@@ -68,8 +80,15 @@ def remove_tiny_islands(image: Image.Image, keep_largest_only: bool = False) -> 
     return output
 
 
-def normalize_cell(cell: Image.Image, size: int, extent: int, label: str, keep_largest_only: bool = False) -> Image.Image:
-    cell = remove_tiny_islands(cell, keep_largest_only)
+def normalize_cell(
+    cell: Image.Image,
+    size: int,
+    extent: int,
+    label: str,
+    keep_largest_only: bool = False,
+    drop_lower_detached_components: bool = False,
+) -> Image.Image:
+    cell = remove_tiny_islands(cell, keep_largest_only, drop_lower_detached_components)
     bounds = visible_bounds(cell)
     if not bounds:
         raise ValueError(f"{label}: no visible pixels")
@@ -169,7 +188,14 @@ def process(manifest: dict[str, Any], sources: dict[str, Path], out_dir: Path) -
             # become part of a sprite silhouette.
             left, top, right, bottom = left + 6, top + 6, right - 6, bottom - 6
             cell = source.crop((left, top, right, bottom))
-            normalized = normalize_cell(cell, settings["size"], settings["subjectExtent"], item["definitionId"], settings.get("keepLargestComponent", False))
+            normalized = normalize_cell(
+                cell,
+                settings["size"],
+                settings["subjectExtent"],
+                item["definitionId"],
+                settings.get("keepLargestComponent", False),
+                settings.get("dropLowerDetachedComponents", False),
+            )
             save_webp(normalized, out_dir / item["file"], settings["quality"], settings["hardFileLimitBytes"])
 
 

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "styleReferences": ["assets/images/katchimeras/world/hex/mossprout_focused_v1_main_hex_tile.webp"],
+  "promptBrief": [
+    "Two Baristabbit cafe generators in cozy low-detail cushion-toy 3D, isolated and readable at board scale.",
+    "Ritual Bar visibly produces hot and refreshing cups; Cafe Counter visibly produces pastries and welcoming table pieces.",
+    "No text, logo, raw ingredients, scenery, floor, cast shadow, fine texture, or detached fragments."
+  ],
+  "output": {
+    "size": 256,
+    "subjectExtent": 220,
+    "quality": 84,
+    "hardFileLimitBytes": 51200,
+    "keepLargestComponent": true,
+    "gridRows": 1,
+    "gridColumns": 2
+  },
+  "sheets": [{
+    "id": "cafe-generators",
+    "cells": [
+      { "row": 0, "column": 0, "definitionId": "ritual-bar", "file": "ritual-bar.webp" },
+      { "row": 0, "column": 1, "definitionId": "cafe-counter", "file": "cafe-counter.webp" }
+    ]
+  }]
+}

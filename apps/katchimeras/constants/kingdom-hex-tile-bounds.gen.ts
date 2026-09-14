@@ -15,7 +15,7 @@ export const KINGDOM_HEX_TILE_ALPHA_BOUNDS = {
   'floating_empty_hex_tile_v1.webp': { left: 16, top: 158, right: 1009, bottom: 987 },
   'floating_feastle_hex_tile_v1.webp': { left: 134, top: 131, right: 915, bottom: 908 },
   'floating_home_base_hex_tile_v1.webp': { left: 27, top: 160, right: 1013, bottom: 988 },
-  'floating_neighborhood_v2_baristabbit_hex_tile.webp': { left: 42, top: 25, right: 980, bottom: 952 },
+  'floating_neighborhood_v2_baristabbit_hex_tile.webp': { left: 45, top: 20, right: 979, bottom: 952 },
   'floating_neighborhood_v2_baristabbit_selector_cupheart_hex_tile.webp': { left: 0, top: 6, right: 1016, bottom: 1024 },
   'floating_neighborhood_v2_bedrotte_haven_stage_0_hex_tile.webp': { left: 43, top: 131, right: 980, bottom: 952 },
   'floating_neighborhood_v2_bedrotte_haven_stage_1_hex_tile.webp': { left: 44, top: 139, right: 979, bottom: 958 },

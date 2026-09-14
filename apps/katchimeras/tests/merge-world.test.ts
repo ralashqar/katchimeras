@@ -28,6 +28,7 @@ import { completeMossproutChapterZeroSlice } from '@/utils/merge-world/chapter-z
 import { nextEligibleCompanionGate, recommendCompanionPath } from '@/utils/merge-world/companion-discovery-progression';
 import { MERGE_ENERGY_REGEN_CAP, MERGE_ENERGY_REGEN_MS, MERGE_INITIAL_ENERGY, STEPS_PER_MERGE_ENERGY, mergeJournalRewardPreview, mergeYesterdayStepEnergyPreview } from '@/utils/merge-world/economy-policy';
 import {
+  BARISTABBIT_CAFE_COUNTER_ARRIVAL_ID,
   createInitialMergeWorldState,
   mergeWorldStateForBoard,
   mergeOrderReady,
@@ -1825,30 +1826,55 @@ test('legacy snapshots reset cleanly into Mossprout’s current personal world',
   assert.deepEqual(normalized.unlockedChains, []);
 });
 
-test('the shared catalog has nine generators, seventeen chains, and all twenty-five profiles', () => {
-  assert.equal(MERGE_GENERATORS.length, 9);
+test('the shared catalog has ten generators, nineteen chains, and all twenty-five profiles', () => {
+  assert.equal(MERGE_GENERATORS.length, 10);
   assert.ok(MERGE_GENERATORS.every((generator) => generator.chainIds.length === 2));
   assert.ok(MERGE_GENERATORS.every((generator) => generator.tierOneDropDefinitionIds.every((id) => id.endsWith(':1'))));
-  assert.equal(new Set(MERGE_GENERATORS.flatMap((generator) => generator.chainIds)).size, 17);
+  assert.equal(new Set(MERGE_GENERATORS.flatMap((generator) => generator.chainIds)).size, 19);
   assert.equal(Object.keys(KATCHIMERA_MERGE_PROFILES).length, 25);
   assert.ok(Object.values(KATCHIMERA_MERGE_PROFILES).every((profile) => profile.coreChains.length === 2));
+  assert.equal(MERGE_ITEMS_BY_ID.get('drink:hot:1')?.name, 'Tiny Espresso');
+  assert.equal(MERGE_ITEMS_BY_ID.get('drink:hot:3')?.name, 'Strawberry Boba');
+  assert.equal(MERGE_ITEMS_BY_ID.get('drink:hot:6')?.name, 'Grand Rainbow Café Float');
+  assert.equal(MERGE_ITEMS_BY_ID.get('drink:refresh:1')?.name, 'Small Juice Cup');
+  assert.equal(MERGE_ITEMS_BY_ID.get('food:cafe-pastry:6')?.name, 'Dream Patisserie');
+  assert.equal(MERGE_ITEMS_BY_ID.get('social:cafe-sharing:6')?.name, 'Lantern Café Terrace');
+  assert.deepEqual(KATCHIMERA_MERGE_PROFILES.baristabbit.coreChains, ['drink:refresh', 'drink:hot']);
+  assert.deepEqual(KATCHIMERA_MERGE_PROFILES.baristabbit.guestChains, ['food:cafe-pastry', 'social:cafe-sharing']);
 });
 
-test('guest-chain story orders fall back to core until the guest generator is unlocked', () => {
+test('Baristabbit café orders deliver one idempotent Café Counter parcel and preserve saved requirements', () => {
   let state = reduceMergeWorld(createInitialMergeWorldState(NOW, ['baristabbit']), {
     type: 'reconcileStory', familyId: 'baristabbit', status: 'order_active', targetLevel: 6,
     actPhase: 'regular_orders', orderTemplateKeys: ['cake-on-side'], now: NOW + 1,
   }).state;
   assert.deepEqual(Object.keys(state.generators), ['ritual-bar']);
-  assert.ok(state.activeOrders[0].requirements.every((requirement) => requirement.definitionId.startsWith('drink:')));
+  assert.deepEqual(state.activeOrders[0].requirements.map((requirement) => requirement.definitionId), ['drink:refresh:3', 'food:cafe-pastry:3']);
+  assert.equal(state.arrivals.filter((arrival) => arrival.id === BARISTABBIT_CAFE_COUNTER_ARRIVAL_ID).length, 1);
+
   state = reduceMergeWorld(state, {
-    type: 'reconcileStory', familyId: 'feastle', status: 'order_active', targetLevel: 2, now: NOW + 2,
+    type: 'reconcileStory', familyId: 'baristabbit', status: 'order_active', targetLevel: 6,
+    actPhase: 'regular_orders', orderTemplateKeys: ['cake-on-side'], now: NOW + 2,
   }).state;
+  assert.equal(state.arrivals.filter((arrival) => arrival.id === BARISTABBIT_CAFE_COUNTER_ARRIVAL_ID).length, 1);
+
+  const savedOrder = state.activeOrders.find((order) => order.characterId === 'baristabbit')!;
+  state = {
+    ...state,
+    activeOrders: state.activeOrders.map((order) => order.id === savedOrder.id
+      ? { ...order, requirements: [{ definitionId: 'drink:hot:3', quantity: 1 }, { definitionId: 'food:dessert:3', quantity: 1 }] }
+      : order),
+  };
   state = reduceMergeWorld(state, {
     type: 'reconcileStory', familyId: 'baristabbit', status: 'order_active', targetLevel: 6,
     actPhase: 'regular_orders', orderTemplateKeys: ['cake-on-side'], now: NOW + 3,
   }).state;
-  assert.ok(state.activeOrders.find((order) => order.characterId === 'baristabbit')?.requirements.some((requirement) => requirement.definitionId.startsWith('food:dessert:')));
+  assert.deepEqual(state.activeOrders.find((order) => order.id === savedOrder.id)?.requirements.map((item) => item.definitionId), ['drink:hot:3', 'food:dessert:3']);
+
+  state = reduceMergeWorld(state, { type: 'claimArrival', arrivalId: BARISTABBIT_CAFE_COUNTER_ARRIVAL_ID, now: NOW + 4 }).state;
+  assert.ok(state.generators['cafe-counter']);
+  assert.ok(state.board.some((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'cafe-counter'));
+  assert.deepEqual(MERGE_GENERATORS.find((generator) => generator.id === 'cafe-counter')?.tierOneDropDefinitionIds, ['food:cafe-pastry:1', 'social:cafe-sharing:1']);
 });
 
 test('Baristabbit chapter serves five escalating drink orders and a shared-chain signature table', () => {
@@ -1862,9 +1888,9 @@ test('Baristabbit chapter serves five escalating drink orders and a shared-chain
   }).state;
   const baristaOrders = state.activeOrders.filter((order) => order.characterId === 'baristabbit');
   assert.equal(baristaOrders.length, 3);
-  assert.equal(baristaOrders[0].requirements[0].definitionId, 'drink:hot:2');
-  assert.equal(baristaOrders[1].requirements[0].definitionId, 'drink:refresh:2');
-  assert.deepEqual(baristaOrders[2].requirements.map((item) => item.definitionId), ['drink:hot:3', 'drink:refresh:3']);
+  assert.equal(baristaOrders[0].requirements[0].definitionId, 'drink:refresh:2');
+  assert.equal(baristaOrders[1].requirements[0].definitionId, 'drink:refresh:3');
+  assert.deepEqual(baristaOrders[2].requirements.map((item) => item.definitionId), ['drink:refresh:3', 'drink:hot:3']);
   assert.ok(BARISTABBIT_CHAPTER_ONE_ORDER_POOL.filter((order) => 'secondaryDefinitionId' in order || 'guestDefinitionId' in order).length >= 7);
 
   state = reduceMergeWorld(state, {
@@ -1874,7 +1900,7 @@ test('Baristabbit chapter serves five escalating drink orders and a shared-chain
   }).state;
   const signature = state.activeOrders.find((order) => order.characterId === 'baristabbit')!;
   assert.equal(signature.id, 'merge-story:baristabbit:chapter-1:pause-table');
-  assert.deepEqual(signature.requirements.map((item) => item.definitionId), ['drink:hot:5', 'drink:refresh:4', 'food:dessert:3']);
+  assert.deepEqual(signature.requirements.map((item) => item.definitionId), ['drink:refresh:5', 'drink:hot:4', 'social:cafe-sharing:4']);
   assert.equal(signature.chapterId, 'baristabbit-chapter-1');
 });
 
