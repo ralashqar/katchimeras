@@ -133,6 +133,7 @@ type TodayNurtureExperienceProps = {
   energyHudPulseNonce?: number;
   energyHudTargetRef?: RefObject<View | null>;
   energyHudValueOverride?: number | null;
+  onboardingHeroHidden?: boolean;
   onboardingGuide?: {
     eyebrow: string;
     title: string;
@@ -232,6 +233,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   onboardingCameraDurationMs = 360,
   onboardingCameraPanY = 0,
   onboardingGuide = null,
+  onboardingHeroHidden = false,
   onboardingFocus = false,
   newDayIntro = false,
   onboardingTopHudVisible = false,
@@ -889,7 +891,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
       {!hatchReadyFocus && !onboardingFocus ? <MicrocopyToast message={microcopy} placementStyle={{ top: nurtureToastTop }} /> : null}
       {onboardingFocus && onboardingUiVisible && onboardingGuide && !actionListHidden ? (
         <>
-          <EggHeroGuide guide={onboardingGuide} topInset={topInset} />
+          {!onboardingHeroHidden ? <EggHeroGuide guide={onboardingGuide} topInset={topInset} /> : null}
           {scriptedRouteChoiceActions.length > 1 && scriptedPanelCareAction && onScriptedAction ? (
             <View style={[styles.onboardingActionStage, { bottom: actionDockBottom }]}>
               <InlineRouteActionChoice

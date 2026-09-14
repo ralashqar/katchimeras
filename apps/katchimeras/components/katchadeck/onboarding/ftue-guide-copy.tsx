@@ -1,6 +1,6 @@
 import { FTUE_SCENE_LAYERS } from '@/constants/ftue-scene-layers';
 import { normalizeSpeechText } from '@/utils/speech-text';
-import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeOut, FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import { Meadow } from '@/constants/meadow-theme';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type TextLayoutEventData, type TextStyle, type ViewStyle } from 'react-native';
@@ -27,10 +27,12 @@ export function EggHeroGuide({ guide, topInset, topOffset = 22 }: {
   </Animated.View>;
 }
 
-export function FtueGuideCopy({ guide, hero = false }: {
+export function FtueGuideCopy({ guide, hero = false, steadyHero = false }: {
   guide: FtueGuide;
   hero?: boolean;
+  steadyHero?: boolean;
 }) {
+  const reduceMotion = useReducedMotion();
   const titleStyle = hero ? styles.heroTitle : styles.inlineTitle;
   // The hero panel wears a warm rim glow, a deeper gradient and sparkle
   // ornaments; the inline panel stays plain so body copy reads cleanly.
@@ -56,14 +58,17 @@ export function FtueGuideCopy({ guide, hero = false }: {
           <ThemedText accessibilityElementsHidden pointerEvents="none" style={[styles.heroSparkleSmall, styles.heroSparkleSmallRight]} lightColor={KatchaDeckUI.ftue.gold} darkColor={KatchaDeckUI.ftue.gold}>✦</ThemedText>
         </> : null}
         <View style={styles.titleStack}>
-          {/* One text node: a second, absolutely placed copy for the drop shadow
-              fitted its font independently and could land on a different line
-              count, so the two overlapped. The shadow is a text shadow now. */}
-          <FittedTitle
-            text={normalizeSpeechText(guide.title)}
-            maxLines={hero ? 3 : 2}
-            style={[titleStyle, styles.titleShadow]}
-          />
+          {steadyHero ? (
+            <Animated.View
+              key={guide.title}
+              entering={FadeIn.duration(reduceMotion ? 80 : 300)}
+              exiting={FadeOut.duration(reduceMotion ? 80 : 200)}
+              style={styles.steadyTitle}>
+              <FittedTitle text={normalizeSpeechText(guide.title)} maxLines={3} style={[titleStyle, styles.titleShadow]} />
+            </Animated.View>
+          ) : (
+            <FittedTitle text={normalizeSpeechText(guide.title)} maxLines={hero ? 3 : 2} style={[titleStyle, styles.titleShadow]} />
+          )}
         </View>
         {!hero && guide.body ? (
           <ThemedText
@@ -74,6 +79,13 @@ export function FtueGuideCopy({ guide, hero = false }: {
           </ThemedText>
         ) : null}
       </Panel>
+      {steadyHero && guide.body ? (
+        <View style={styles.steadyBody}>
+          {guide.body ? <Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 300)}>
+            <ThemedText style={styles.body} lightColor={KatchaDeckUI.ftue.contentText} darkColor={KatchaDeckUI.ftue.contentText}>{guide.body}</ThemedText>
+          </Animated.View> : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -160,6 +172,8 @@ const styles = StyleSheet.create({
   heroSparkleSmall: { fontSize: 9, lineHeight: 12, opacity: 0.7, position: 'absolute', top: 10 },
   heroSparkleSmallLeft: { left: 30 },
   heroSparkleSmallRight: { right: 30 },
+  steadyTitle: { width: '100%' },
+  steadyBody: { width: '100%' },
   titleStack: { alignItems: 'center', maxWidth: 350, overflow: 'visible', width: '100%' },
   heroTitle: {
     ...KatchaDeckUI.typography.ftueHeroTitle,

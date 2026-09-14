@@ -70,9 +70,15 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
   const lift = mossproutFtueStep('world.mist_lift')!;
   assert.equal(lift.actions[0]?.id, 'world.mist_lifted');
   assert.equal(lift.actions[0]?.nextStepId, 'world.egg_intro');
-  assert.equal(lift.guide.title, 'The clearing opens. Look what was underneath.');
-  assert.equal(mossproutFtueStep('world.egg_intro')?.guide.title, 'An egg appears. Two wisps still cling to it.');
+  assert.equal(lift.guide.title, 'The Mist has cleared.');
+  assert.equal(mossproutFtueStep('world.egg_intro')?.guide.title, 'The Mist has cleared.');
   assert.equal(mossproutFtueStep('world.egg_intro')?.actions[0]?.nextStepId, 'egg.opening');
+  assert.deepEqual(lift.guide, mossproutFtueStep('world.egg_intro')?.guide, 'the reveal caption stays unchanged during the approach');
+  assert.deepEqual(lift.camera, mossproutFtueStep('world.egg_intro')?.camera, 'the intro must not restart the approach with a different camera directive');
+  const firstQuestion = mossproutFtueStep('egg.opening')!;
+  assert.equal(firstQuestion.guide.title, 'Your answers can clear the wisps.');
+  assert.equal(firstQuestion.actions[0].options?.length, 3);
+
   for (const stepId of MOSSPROUT_OPENING_STEP_IDS) {
     const step = mossproutFtueStep(stepId)!;
     assert.ok(step.navigation?.lock, `${stepId} locks navigation`);
@@ -181,11 +187,10 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   // Phase two: once the run is at the lift and the board is fading, the camera and the Egg's subject
   // presentation wait a further beat. The presentation's arrival changes the canvas's tutorial camera key
   // and would otherwise re-apply the clear step's camera against the revealed-Egg tile mid-fall.
-  assert.match(screen, /const OPENING_LIFT_CAMERA_DELAY_MS = 300;/);
+  assert.match(screen, /const OPENING_LIFT_CAMERA_DELAY_MS = 800;/);
   assert.match(screen, /const OPENING_CLEAR_CAMERA = mossproutFtueStep\(OPENING_MIST_CLEAR_STEP_ID\)\?\.camera \?\? null;/, 'one stable directive, so its key never changes while held');
   assert.match(screen, /const openingLiftCameraHeld = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID\s*&& \(openingFinaleHeld \|\| \(openingGlow\.finaleLanded && !openingLiftCameraReleased\)\);/);
   assert.match(screen, /if \(routeFtueStepId !== OPENING_MIST_LIFT_STEP_ID \|\| openingFinaleHeld \|\| !openingGlow\.finaleLanded\) \{ setOpeningLiftCameraReleased\(false\); return; \}\s*const timer = setTimeout\(\(\) => setOpeningLiftCameraReleased\(true\), OPENING_LIFT_CAMERA_DELAY_MS\);/, 'a cold resume at the lift (no finale landed) is not held');
-  assert.match(screen, /restorationCamera \?\? \(openingLiftCameraHeld \? OPENING_CLEAR_CAMERA : ftueStep\?\.camera \?\? null\)/, 'the clear camera is held past the step change');
   assert.match(screen, /worldSubjectPresentation=\{openingLiftCameraHeld \? null : worldSubjectPresentation\}/, 'the Egg presentation reaches the canvas only once the board is gone');
   // The run store advances a frame before the route's step id: the board must not unmount (and replay its entrance) in between.
   assert.match(screen, /\(ftueRun\.stepId === routeFtueStepId \|\| \(ftueRun\.stepId === OPENING_MIST_LIFT_STEP_ID && routeFtueStepId === OPENING_MIST_CLEAR_STEP_ID\)\)/, 'the opening run survives the frame between the store and the route');
@@ -209,10 +214,15 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(dock, /const impactKey = useSyncExternalStore\(landings\?\.subscribe \?\? subscribeToNothing, landings\?\.getLanded \?\? noLandings, landings\?\.getLanded \?\? noLandings\);/, 'the bar flashes on its own subscription');
   assert.match(dock, /const grew = progress > previous\.current;[\s\S]*?scale\.value = withSequence\(/, 'the bar swells once per landed Glow');
   assert.match(screen, /<MergeFtueOverlay blockedPulseNonce=\{openingBlockedNonce\}[\s\S]*?guide=\{openingBoardStep\?\.guide \?\? null\}[\s\S]*?spotlight=\{openingBoardStep\?\.spotlight \?\? null\}/);
-  // The lift caption keeps the screen for a beat, however quickly the crossblend finished.
-  assert.match(screen, /const LIFT_CAPTION_MIN_MS = 2400;/);
-  assert.match(screen, /if \(shownAt == null\) \{ liftCommitRef\.current = commitLift; return; \}\s*const remaining = Math\.max\(0, shownAt \+ LIFT_CAPTION_MIN_MS - Date\.now\(\)\);/, 'a crossblend that finishes before the caption waits for it');
-  assert.match(screen, /if \(presentation\.veilLift\) \{[\s\S]*?commitFtueAction\(\{ actionId: OPENING_LIFTED_ACTION_ID, evidenceRef: 'mossprout-world:veil-lifted' \}\);[\s\S]*?return;\s*\}\s*if \(tutorialUpgradeNonceRef\.current === presentation\.nonce\)/);
+  // The caption uses the cleared dock space during the reveal; the camera
+  // still waits until the crossblend and reading beat finish.
+  assert.match(screen, /if \(presentation\.veilLift\) \{[\s\S]*?setOpeningRevealComplete\(true\)/);
+  assert.match(screen, /!openingRevealComplete \|\| !screenFocused/);
+  assert.match(screen, /setLiftCaptionVisible\(true\), REVEAL_CAPTION_DELAY_MS/);
+  assert.match(screen, /ftueStepId !== OPENING_MIST_LIFT_STEP_ID \|\| liftCaptionVisible/);
+  assert.match(screen, /ftueStepId === OPENING_MIST_LIFT_STEP_ID \? OPENING_REVEAL_CAMERA/);
+
+  assert.match(screen, /const LIFT_CAPTION_MIN_MS = 1400;/);
   assert.match(screen, /if \(homeVeil !== 'lifting'\) return;[\s\S]*?veilLiftKeyRef\.current = key;[\s\S]*?veilLift: true/, 'the crossblend starts when the veil enters lifting, not when the step changes');
   // The mist clears on the frame the final item strikes the tile; the camera, caption and dock still wait for the burst to settle.
   assert.match(screen, /const homeVeil = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld && !openingGlow\.finaleLanded \? 'veiled' : homeVeilForStep\(routeFtueStepId\);/);

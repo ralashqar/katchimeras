@@ -58,7 +58,7 @@ export const MOSSPROUT_FTUE_RETURN_NOTE_ID = 'mossprout:chapter-0:return-note';
 const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   {
     id: 'egg.opening', surface: 'haven',
-    guide: { eyebrow: 'Two wisps remain', title: 'The Mist gathers where growth feels tangled.', body: 'Every answer creates Glow. There’s no wrong answer.' },
+    guide: { eyebrow: 'Two wisps remain', title: 'Your answers can clear the wisps.', body: '' },
     camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.opening'), anchorY: 0.5, durationMs: 520 },
     actions: [{
       id: 'egg.day_texture', title: HATCH_PROFILES.mossprout.questions[0].title, description: '', icon: 'leaf.fill',
@@ -69,7 +69,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   },
   {
     id: 'egg.context', surface: 'haven',
-    guide: { eyebrow: 'One wisp remains', title: 'Your answer cleared a little Mist.', body: 'Share what helps you grow. Clear the last wisp.' },
+    guide: { eyebrow: 'One wisp remains', title: 'Your answer cleared a mist wisp.', body: 'Share what helps you grow. Clear the last wisp.' },
     camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.context'), anchorY: 0.49, durationMs: 520 },
     actions: [{
       id: 'egg.desired_help', title: HATCH_PROFILES.mossprout.questions[1].title, description: '', icon: 'heart.fill',
@@ -155,16 +155,16 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.mist_lift', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'The Mist', title: COPY.mistThins, body: '' },
+      guide: { eyebrow: 'Two wisps remain', title: COPY.mistThins, body: '' },
       // Committed by the Kingdom when the veil crossblend completes.
       actions: [{ id: 'world.mist_lifted', title: 'Continue', description: 'The Mist lifts from the clearing.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.egg_intro' }],
-      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_ENTRY_ZOOM, anchorY: 0.42, durationMs: 700 },
+      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM, anchorY: 0.5, durationMs: 1400 },
     },
     {
       id: 'world.egg_intro', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'A new friend', title: COPY.eggHeardYou, body: '' },
+      guide: { eyebrow: 'Two wisps remain', title: COPY.eggHeardYou, body: '' },
       actions: [{ id: 'world.inspect_mossprout_egg', title: 'Come closer', description: 'See how the Egg responds to you.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'egg.opening' }],
-      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM, anchorY: 0.5, durationMs: 900 },
+      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM, anchorY: 0.5, durationMs: 1400 },
     },
     ...openingQuestionSteps,
     {

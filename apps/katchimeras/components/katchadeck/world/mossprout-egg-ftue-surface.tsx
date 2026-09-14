@@ -366,6 +366,7 @@ export function MossproutEggFtueSurface({ companionStageActive = false, onCompan
             hatchPresentation={isHatching ? hatchPresentation : null}
             microcopy={null}
             onboardingFocus
+            onboardingHeroHidden={worldHosted && stepId === 'egg.opening'}
             onboardingGuide={
               companionStageActive || (worldHosted && stepId === 'world.egg_intro') || (worldHosted && stepId === 'world.mist_lift')
                 ? null

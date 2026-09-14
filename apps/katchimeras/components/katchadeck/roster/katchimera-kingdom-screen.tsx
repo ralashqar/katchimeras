@@ -198,17 +198,22 @@ const RESTORATION_HINT_FINGER_DROP = 40;
 
 /** The clear step's camera, held past the run's own step change while the board fades. */
 const OPENING_CLEAR_CAMERA = mossproutFtueStep(OPENING_MIST_CLEAR_STEP_ID)?.camera ?? null;
+// Keep the current framing throughout the reveal, even as the egg mounts.
+const OPENING_REVEAL_CAMERA = OPENING_CLEAR_CAMERA?.kind === 'focus_target'
+  ? { ...OPENING_CLEAR_CAMERA, projectionOnly: true } : OPENING_CLEAR_CAMERA;
 /** After a finale lands: the struck wisp's fall (shrink, burst) before the mission is declared over. */
 const WISP_FALL_MS = 640;
 /** How long the opening's lift caption is on screen before the run moves on to the Egg. */
-const LIFT_CAPTION_MIN_MS = 2400;
+const LIFT_CAPTION_MIN_MS = 1400;
+// The merge dock fades out in 260ms; its space is then free for the caption.
+const REVEAL_CAPTION_DELAY_MS = 300;
 /** After the lift caption appears: when the first light is seen flying into the counter. */
 const OPENING_GLOW_ARRIVAL_DELAY_MS = 600;
 /**
  * After the finale has settled and the run reaches the lift: how long the camera and the Egg
  * wait, so the board (a 260ms fade) is gone before anything in the world moves.
  */
-const OPENING_LIFT_CAMERA_DELAY_MS = 300;
+const OPENING_LIFT_CAMERA_DELAY_MS = 800;
 /** The longest the screen is held still between a board's finale and its resolution story. */
 const RESTORATION_HANDOFF_MAX_MS = 12_000;
 
@@ -565,11 +570,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     kind: 'focus_target' as const, target: { kind: 'haven_nature_island' as const, islandId: restorationIslandId },
     zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700,
   } : null, [restorationIslandId, restorationOpen, screenFocused]);
-  const baseTutorialCamera = mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null);
+  const baseTutorialCamera = mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (ftueStepId === OPENING_MIST_LIFT_STEP_ID ? OPENING_REVEAL_CAMERA : openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null);
   const tutorialCamera = useMemo(() => {
     if (!ftueStepId?.startsWith('egg.') || baseTutorialCamera?.kind !== 'focus_target') return baseTutorialCamera;
     return { ...baseTutorialCamera, zoom: sharedEggZoom(worldSubjectPresentation?.wispsCleared
-      ?? (ftueStepId === 'egg.ready' ? 2 : ftueStepId === 'egg.context' ? 1 : 0)), durationMs: 600 };
+      ?? (ftueStepId === 'egg.ready' ? 2 : ftueStepId === 'egg.context' ? 1 : 0)), durationMs: ftueStepId === 'egg.opening' && !worldSubjectPresentation?.wispsCleared ? 1400 : 600 };
   }, [baseTutorialCamera, ftueStepId, worldSubjectPresentation?.wispsCleared]);
   const ftueReturnCamera = ftueReturnFocusCreatureId
     ? mossproutFtueStep('companion.chapter_zero_return')?.camera ?? null
@@ -594,7 +599,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       : undefined;
   useEffect(() => {
     const delays: Partial<Record<string, number>> = {
-      'world.egg_intro': 1_200,
       // The Seed is in the ground: straight on to the offer, nothing to read and nothing to tap.
       'world.seed_planted': 0,
     };
@@ -608,6 +612,17 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }, delay);
     return () => clearTimeout(timer);
   }, [activeFtueRunId, firstSeedPlanted, ftueStep?.autoAdvanceMs, ftueStepId]);
+  // The reveal and approach share one caption. Only expose answers after the
+  // canvas has actually settled, including when resuming directly at the egg.
+  useEffect(() => {
+    if (ftueStepId !== 'world.egg_intro' || !ftueCameraSettled || !screenFocused) return;
+    const revision = cameraSettleRevisionRef.current;
+    const timer = setTimeout(() => {
+      if (revision !== cameraSettleRevisionRef.current) return;
+      commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-camera-settled' });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [ftueStepId, ftueCameraSettled, screenFocused]);
   useEffect(() => {
     setInteractionLoadingVisible(false);
     if (!interactionCreatureId || interactionCameraReady) return;
@@ -981,24 +996,17 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }
   }, [ftueStepId, onFtueRestore]);
 
-  const liftCaptionShownAtRef = useRef<number | null>(null);
-  const liftCommitRef = useRef<(() => void) | null>(null);
-  const liftCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [openingRevealComplete, setOpeningRevealComplete] = useState(false);
+  const [liftCaptionVisible, setLiftCaptionVisible] = useState(false);
   const completeUpgradePresentation = useCallback((presentation: HavenTileUpgradePresentation) => {
     // The canvas may report completion more than once; a single story owns the ack.
     if (revealedUpgradeRef.current === presentation.nonce) return;
     revealedUpgradeRef.current = presentation.nonce;
     if (presentation.veilLift) {
-      // The opening's lift wrote nothing to the world; it only moves the run on. Not before the lift
-      // caption has had its beat: the crossblend runs while the last wisp is still falling, so it can
-      // finish before the caption is even on screen.
+      // Completion includes the mist crossblend. Keep the bottom caption and
+      // wide framing for a reading beat before approaching the egg.
       setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
-      const commitLift = () => commitFtueAction({ actionId: OPENING_LIFTED_ACTION_ID, evidenceRef: 'mossprout-world:veil-lifted' });
-      const shownAt = liftCaptionShownAtRef.current;
-      if (shownAt == null) { liftCommitRef.current = commitLift; return; }
-      const remaining = Math.max(0, shownAt + LIFT_CAPTION_MIN_MS - Date.now());
-      if (remaining === 0) commitLift();
-      else liftCommitTimerRef.current = setTimeout(commitLift, remaining);
+      setOpeningRevealComplete(true);
       return;
     }
     if (tutorialUpgradeNonceRef.current === presentation.nonce) {
@@ -1030,15 +1038,19 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     finishUpgradePresentation(presentation);
   }, [finishUpgradePresentation]);
 
-  // The lift caption ("The last one falls. The Mist lets go.") stays up for at least LIFT_CAPTION_MIN_MS
-  // before the run moves on to the Egg, however quickly the crossblend finished.
   useEffect(() => {
-    if (ftueStepId !== OPENING_MIST_LIFT_STEP_ID) { liftCaptionShownAtRef.current = null; return; }
-    liftCaptionShownAtRef.current = Date.now();
-    const pending = liftCommitRef.current;
-    if (pending) { liftCommitRef.current = null; liftCommitTimerRef.current = setTimeout(pending, LIFT_CAPTION_MIN_MS); }
-    return () => { if (liftCommitTimerRef.current) { clearTimeout(liftCommitTimerRef.current); liftCommitTimerRef.current = null; } };
-  }, [ftueStepId]);
+    if (ftueStepId !== OPENING_MIST_LIFT_STEP_ID || !screenFocused) return;
+    const timer = setTimeout(() => setLiftCaptionVisible(true), REVEAL_CAPTION_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [ftueStepId, screenFocused]);
+  // Let the caption be read at the wide framing before starting the approach.
+  useEffect(() => {
+    if (ftueStepId !== OPENING_MIST_LIFT_STEP_ID || !liftCaptionVisible || !openingRevealComplete || !screenFocused) return;
+    const timer = setTimeout(() => {
+      commitFtueAction({ actionId: OPENING_LIFTED_ACTION_ID, evidenceRef: 'mossprout-world:veil-lifted' });
+    }, LIFT_CAPTION_MIN_MS);
+    return () => clearTimeout(timer);
+  }, [ftueStepId, liftCaptionVisible, openingRevealComplete, screenFocused]);
   // The first light. The Glow that drove the wisps off stays with you: granted by the flow right
   // after the lift (`haven.opening_glow`), and here as well under the same receipt in case that effect
   // was interrupted. Seen arriving once: tokens fly from the tile into the counter, which counts them in.
@@ -1105,6 +1117,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const key = `${activeFtueRunId ?? 'current'}:${OPENING_MIST_LIFT_STEP_ID}`;
     if (veilLiftKeyRef.current === key) return;
     veilLiftKeyRef.current = key;
+    setOpeningRevealComplete(false);
+    setLiftCaptionVisible(false);
     revealedUpgradeRef.current = null;
     setUpgradePresentation({
       cameraAlreadyFocused: true, characterId: 'mossprout', coinCost: 0, coinOrigin: { x: 0, y: 0 },
@@ -2239,27 +2253,30 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           </View>
         </KatchaSheet>
       ) : null}
-      {havenOpeningActive && ftueStep && !activeInteractionResidentId && ftueStepId !== 'world.first_bloom_restore'
+      {(havenOpeningActive || ftueStepId === 'egg.opening') && ftueStep && !activeInteractionResidentId && ftueStepId !== 'world.first_bloom_restore'
         && ftueStepId !== OPENING_MIST_OPEN_STEP_ID && ftueStepId !== OPENING_MIST_CLEAR_STEP_ID
+        && (ftueStepId !== OPENING_MIST_LIFT_STEP_ID || liftCaptionVisible)
         && (ftueStepId !== 'world.seed_planted' || firstSeedPlacementFailed) ? (
         <View
           pointerEvents="box-none"
           style={[
             styles.discoveryCalloutLayer,
-            gardenWorldBottomCtaActive
+            ftueStepId === OPENING_MIST_LIFT_STEP_ID || ftueStepId === 'world.egg_intro'
+              ? { bottom: Math.max(insets.bottom, 12) + 22 }
+              : gardenWorldBottomCtaActive
               ? {
                   bottom: Math.max(insets.bottom, 12) + 22,
                   justifyContent: 'space-between',
                   top: insets.top + 18,
                 }
-              : gardenWorldGuidanceActive || ftueStepId === 'world.egg_intro' || ftueStepId === OPENING_MIST_LIFT_STEP_ID
+              : gardenWorldGuidanceActive || ftueStepId === 'egg.opening'
               ? { top: insets.top + 18 }
               : { bottom: Math.max(insets.bottom, 12) + 12 },
           ]}>
           <View collapsable={false} pointerEvents="none" ref={setHavenGuideNode} style={styles.discoveryCallout}>
-            <FtueGuideCopy guide={ftueStep.guide} hero />
+            <FtueGuideCopy guide={ftueStep.guide} hero steadyHero={ftueStepId === OPENING_MIST_LIFT_STEP_ID || ftueStepId === 'world.egg_intro' || ftueStepId === 'egg.opening'} />
           </View>
-          {(!['world.mist_lift', 'world.egg_intro', 'world.garden_arrival', 'world.garden_handoff', 'world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId ?? '')
+          {(!['egg.opening', 'world.mist_lift', 'world.egg_intro', 'world.garden_arrival', 'world.garden_handoff', 'world.first_bloom_offer', 'world.first_bloom_restore'].includes(ftueStepId ?? '')
               || (ftueStepId === 'world.first_bloom_offer' && firstLightFailed))
             && (ftueStepId !== 'world.seed_planted' || firstSeedPlacementFailed)
             && (ftueStepId !== 'world.first_seed_grew' || firstSeedGrown) ? <View style={styles.discoveryCalloutButton}>
