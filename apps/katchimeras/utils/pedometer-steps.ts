@@ -56,3 +56,13 @@ export async function readRecentPedometerStepDays(now = new Date(), count = 4): 
     return [];
   }
 }
+
+/** Prefer today on ties; never add the two days together. */
+export function bestRecentStepDay(days: readonly Pick<PedometerStepDay, 'dayId' | 'totalSteps'>[], now = new Date()) {
+  const id = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const today = id(now);
+  const yesterday = id(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+  return days.filter((day) => (day.dayId === today || day.dayId === yesterday) && Number.isFinite(day.totalSteps) && day.totalSteps >= 0)
+    .reduce((best, day) => day.totalSteps > best.totalSteps || (day.totalSteps === best.totalSteps && day.dayId === today)
+      ? { dayId: day.dayId, totalSteps: Math.floor(day.totalSteps) } : best, { dayId: today, totalSteps: 0 });
+}

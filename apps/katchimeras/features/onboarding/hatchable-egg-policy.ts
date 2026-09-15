@@ -17,6 +17,7 @@ export type HatchableEggProgress = {
   /** Full observed total explicitly fed for Bond; hatch progress stays capped at the target. */
   bondFedSteps?: number;
   alternative: string | null;
+  hatchSteps?: { dayId: string; observedSteps: number; stepsUsed: 300 };
   hatchStartedAt: number | null;
   hatchedAt: number | null;
 };
@@ -26,7 +27,7 @@ export type HatchableEggAction =
   | { kind: 'intent'; answer: string }
   | { kind: 'feed'; sourceDayId: string; observedSteps: number }
   | { kind: 'alternative'; answer: string }
-  | { kind: 'hatch' }
+  | { kind: 'hatch'; steps?: { dayId: string; observedSteps: number } }
   | { kind: 'finish' };
 
 const safeSteps = (steps: number) => Number.isFinite(steps) ? Math.max(0, Math.floor(steps)) : 0;
@@ -142,6 +143,14 @@ export function reduceHatchableEgg(state: MergeWorldState, definition: Hatchable
       egg = { ...egg, alternative: action.answer, legacyWispCredit: 2 };
     } else if (action.kind === 'hatch') {
       if (!hatchableEggReady(policy, egg) || egg.hatchStartedAt) return no();
+      if (action.steps) {
+        const date = new Date(now);
+        const dayId = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        const yesterday = new Date(date.getFullYear(), date.getMonth(), date.getDate() - 1);
+        const yesterdayId = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+        if (definition.companion !== 'steppling' || (action.steps.dayId !== dayId && action.steps.dayId !== yesterdayId) || safeSteps(action.steps.observedSteps) < 300) return no('These steps are not available for hatching.');
+        egg = { ...egg, hatchSteps: { dayId: action.steps.dayId, observedSteps: safeSteps(action.steps.observedSteps), stepsUsed: 300 } };
+      }
       egg = { ...egg, hatchStartedAt: now };
     } else {
       if (!egg.hatchStartedAt || !hatchableEggReady(policy, egg)) return no('This Egg is not ready yet.');

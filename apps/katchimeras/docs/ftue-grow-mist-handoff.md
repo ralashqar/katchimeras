@@ -11,7 +11,7 @@ The opening Egg question is “How do you feel?” with the original Radiant, Li
 3. An answered observation uses the normal daily activity journal and Bond reward animation. There is no confirmation button. It counts as that day's noticing action; retrying or reopening cannot award it twice. After the reward finishes, the existing Bond spotlight highlights the top bar with one short explanation underneath. Continue saves acknowledgement and opens the rest dialogue. Skipping the activity bypasses this spotlight.
 4. Mossprout explains that the next Journey waits while the garden remains available. The farewell uses three short speech beats, with Continue between them and Rest only on the last beat. Grow replies also use the shared 120-character page limit. Rest starts meditation. Until the mist handoff is accepted, the only activity is Explore the mist beneath the existing Journey timer.
 5. Explore the mist (including Back) saves the handoff and starts the existing two-request Glow mission before leaving the companion. The requests and 40 Glow mist cost are unchanged.
-6. The Steppling tile and sleeping Egg share the same reveal progress, so they fade in together after the tile art is ready. The Egg stays mounted into the questions without a second entrance fade. Its face wakes through the shared feeding expression sequence, and saved feeding keeps it awake on return. The reveal says Meet the egg. Pressing it records acceptance, hides the reveal, and opens the existing Steppling encounter with its camera framing. Only a mounted encounter with saved egg data and a settled camera completes the handoff. Players still answer, feed, and hatch themselves.
+6. The Steppling tile and sleeping Egg share the same reveal progress, so they fade in together after the tile art is ready. The Egg stays mounted into the questions without a second entrance fade. Its face wakes through the shared feeding expression sequence, and saved feeding keeps it awake on return. After the reveal finishes, the shared hatchable handoff automatically records entry and opens the egg encounter with its existing camera framing. There is no Meet the Egg button; this also applies to later companions and saves paused at the old reveal checkpoint. Only a mounted encounter with saved egg data and a settled camera completes the handoff. Players still answer, feed, and hatch themselves.
 
 The floating world Garden button is visible for planting/restoration and ordinary world exploration. It is hidden during the separately hosted FTUE companion dialogue, Grow, meditation, and any normal companion interaction.
 
@@ -31,7 +31,7 @@ Automated coverage: story graphs, existing two-request mission/economy, skipping
 
 Native visual walkthrough still required (no connected native test device available in this session):
 
-- Fresh profile: restore garden, each dialogue answer, notice/skip, Bond spotlight, Rest, mist mission, Meet the egg.
+- Fresh profile: restore garden, each dialogue answer, notice/skip, Bond spotlight, Rest, mist mission, automatic egg entry.
 - Verify Continue through the FTUE speech, no Back during the Grow introduction, and normal Back navigation after the tutorial.
 - Interrupt during reward flight, meditation handoff, mist reveal, and egg camera motion; resume without duplicate rewards or stranded CTAs.
 - Narrow screens, large text, and reduced motion: readable shared narrative panels and full card reward exits.

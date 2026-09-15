@@ -11,7 +11,7 @@ import { STEPPLING_HATCHABLE } from '../constants/hatchable-companions/registry'
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const reveal = (): ContentFlowRun => ({ ...createContentFlowRun(GLOW_DISCOVERY_FLOW, { runId: 'handoff' }), nodeId: 'gateway.egg', phase: 'awaiting_input' });
 
-test('Meet the egg saves acceptance once and waits for encounter readiness across relaunch', () => {
+test('the reveal checkpoint saves entry once and waits for encounter readiness across relaunch', () => {
   assert.equal(glowDiscoveryScene('gateway.egg')?.view.actionLabel, 'Meet the Egg');
   let run = reduceContentFlow(GLOW_DISCOVERY_FLOW, reveal(), { type: 'submit_scene', actionId: 'done' }).run;
   assert.equal(run.nodeId, 'egg.enter'); assert.equal(run.status, 'active');
@@ -25,6 +25,50 @@ test('Meet the egg saves acceptance once and waits for encounter readiness acros
   assert.equal(run.status, 'completed');
   assert.equal(glowDiscoveryLocksCamera(run), false);
   assert.equal(reduceContentFlow(GLOW_DISCOVERY_FLOW, run, { type: 'record_event', event }).run.status, 'completed');
+});
+
+test('revealed eggs advance automatically only when focused and available, and retry failed saves', async () => {
+  const { HATCHABLE_COMPANIONS } = await import('../constants/hatchable-companions/registry');
+  for (const definition of HATCHABLE_COMPANIONS) {
+    let submissions = 0;
+    let fail = true;
+    const module = loadNativeModule('features/onboarding/use-glow-egg-handoff.ts', {
+      './hatchable-runtime': {
+        recoverHatchableEggHandoff: async () => {},
+        acknowledgeHatchableEggEntry: async () => {},
+        submitHatchableAction: async (target: typeof definition, action: string) => {
+          assert.equal(target.companion, definition.companion);
+          assert.equal(action, 'done');
+          submissions++;
+          if (fail) throw new Error('disk');
+        },
+      },
+      './steppling-egg-policy': { hatchableEggProgress: () => null },
+      '@/constants/hatchable-companions/registry': { STEPPLING_HATCHABLE },
+    });
+    const run = reveal();
+    const world = createMossproutChapterZeroState();
+    let result: { error: boolean; retry: () => void };
+    function Host({ focused, available }: { focused: boolean; available: boolean }) {
+      result = module.useGlowEggHandoff({ run, world, definition, focused, available,
+        open: false, enter: async () => true, onOpening: () => {} });
+      return null;
+    }
+    let tree: ReactTestRenderer;
+    await act(async () => { tree = create(<Host focused={false} available />); });
+    assert.equal(submissions, 0);
+    await act(async () => tree!.update(<Host focused available={false} />));
+    assert.equal(submissions, 0, 'the reveal must finish before entry');
+    await act(async () => tree!.update(<Host focused available />));
+    assert.equal(submissions, 1);
+    assert.equal(result!.error, true);
+    fail = false;
+    await act(async () => result!.retry());
+    assert.equal(submissions, 2);
+    await act(async () => tree!.update(<Host focused available />));
+    assert.equal(submissions, 2, 'a rerender must not repeat entry');
+    await act(async () => tree!.unmount());
+  }
 });
 
 test('legacy accepted reveal resumes an unopened egg but never replays a visited or hatched encounter', () => {

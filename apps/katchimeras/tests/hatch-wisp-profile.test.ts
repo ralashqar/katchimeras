@@ -153,3 +153,28 @@ test('reloading an egg with retired choices preserves cleared wisps and hatch re
     assert.equal(restored.hatchStartedAt, now);
   }
 });
+
+test('only Steppling can hatch using 300 current-day steps, without bypassing questions', () => {
+  for (const definition of HATCHABLE_COMPANIONS) {
+    let state = createInitialMergeWorldState(now);
+    state = { ...state, worldUnlocks: { ...state.worldUnlocks, [definition.tile.unlockId]: { unlockedAt: now, paid: 0, destination: definition.companion, transferredAt: null, hatchedAt: null } } };
+    state = reduceHatchableEgg(state, definition, { kind: 'begin', sourceDayId: '2026-09-14' }, now).state;
+    const steps = { dayId: '2026-09-14', observedSteps: 300 };
+    assert.equal(reduceHatchableEgg(state, definition, { kind: 'hatch', steps }, now).changed, false);
+    for (const question of HATCH_PROFILES[definition.companion].questions) {
+      state = reduceHatchableEgg(state, definition, { kind: 'answer', questionId: question.id, answer: question.options[0].id }, now).state;
+    }
+    assert.equal(reduceHatchableEgg(state, definition, { kind: 'hatch', steps: { ...steps, observedSteps: 299 } }, now).changed, false);
+    assert.equal(reduceHatchableEgg(state, definition, { kind: 'hatch', steps: { ...steps, dayId: '2026-09-12' } }, now).changed, false);
+    const yesterday = reduceHatchableEgg(state, definition, { kind: 'hatch', steps: { ...steps, dayId: '2026-09-13' } }, now);
+    assert.equal(yesterday.changed, definition.companion === 'steppling');
+    if (yesterday.changed) assert.equal(hatchableEggProgress(yesterday.state, definition)?.hatchSteps?.dayId, '2026-09-13');
+    const result = reduceHatchableEgg(state, definition, { kind: 'hatch', steps }, now);
+    assert.equal(result.changed, definition.companion === 'steppling');
+    if (result.changed) {
+      assert.deepEqual(hatchableEggProgress(result.state, definition)?.hatchSteps, { ...steps, stepsUsed: 300 });
+      assert.equal(reduceHatchableEgg(result.state, definition, { kind: 'hatch', steps }, now).changed, false);
+    }
+    assert.equal(reduceHatchableEgg(state, definition, { kind: 'hatch' }, now).changed, true, 'ordinary hatch always remains available');
+  }
+});

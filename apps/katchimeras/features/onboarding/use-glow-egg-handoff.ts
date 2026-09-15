@@ -3,7 +3,7 @@ import type { ContentFlowRun } from '@/types/content-flow';
 import type { MergeWorldState } from '@/types/merge-world';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
-import { acknowledgeHatchableEggEntry, recoverHatchableEggHandoff } from './hatchable-runtime';
+import { acknowledgeHatchableEggEntry, recoverHatchableEggHandoff, submitHatchableAction } from './hatchable-runtime';
 import { hatchableEggProgress } from './steppling-egg-policy';
 
 /** Acceptance is durable; readiness belongs to the mounted encounter and camera. */
@@ -16,6 +16,7 @@ export function useGlowEggHandoff({ run, world, focused, available, open, enter,
   const [error, setError] = useState(false);
   const entering = useRef(false);
   const acknowledging = useRef(false);
+  const acceptedReveal = useRef<string | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const failed = useCallback(() => { if (mounted.current) setError(true); }, []);
@@ -25,6 +26,18 @@ export function useGlowEggHandoff({ run, world, focused, available, open, enter,
   useEffect(() => {
     if (focused) void recoverHatchableEggHandoff(definition, world).catch(failed);
   }, [definition, failed, focused, world]);
+  // The reveal checkpoint is reached only after the tile animation completes.
+  // Keep its durable transition for existing saves, but require no player tap.
+  useEffect(() => {
+    if (!focused || !available || error || hatched || run?.nodeId !== 'gateway.egg' || run.status !== 'active') return;
+    const key = `${run.runId}:${definition.companion}`;
+    if (acceptedReveal.current === key) return;
+    acceptedReveal.current = key;
+    void submitHatchableAction(definition, 'done').catch(() => {
+      acceptedReveal.current = null;
+      failed();
+    });
+  }, [available, definition, error, failed, focused, hatched, run?.nodeId, run?.runId, run?.status]);
   const begin = useCallback(async () => {
     if (entering.current) return;
     entering.current = true;

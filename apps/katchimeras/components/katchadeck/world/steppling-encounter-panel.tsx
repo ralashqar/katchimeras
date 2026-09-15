@@ -1,3 +1,4 @@
+import { StepplingHatchAction } from './steppling-hatch-action';
 import { useEffect, useMemo, useState } from 'react';
 import { Gesture } from 'react-native-gesture-handler';
 import { useReducedMotion } from 'react-native-reanimated';
@@ -14,7 +15,7 @@ import type { useHatchableEncounter } from '@/features/onboarding/use-steppling-
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 
-/** Main companion eggs ask two equal-value questions. Sensor activities stay in daily care. */
+/** Main companion eggs ask two equal-value questions. Steppling optionally uses steps for the final hatch. */
 export function HatchableEncounterPanel({ definition, encounter, egg, cameraReady, onReady }: {
   definition: HatchableCompanionDefinition;
   encounter: ReturnType<typeof useHatchableEncounter>;
@@ -38,6 +39,7 @@ export function HatchableEncounterPanel({ definition, encounter, egg, cameraRead
     <EggActionDock bottomInset={insets.bottom}>
       {encounter.error ? <GameSurface><ThemedText accessibilityRole="alert">{encounter.error}</ThemedText>{encounter.hatching ? <KatchaButton label="Try again" onPress={() => void encounter.finish()} /> : null}</GameSurface> : null}
       {!egg ? <KatchaButton label="Try again" onPress={() => void encounter.enter()} /> : ready ?
+        definition.companion === 'steppling' ? <StepplingHatchAction busy={encounter.busy} send={encounter.send} /> :
         <KatchaButton label="Hatch" disabled={encounter.busy} onPress={() => void encounter.send({ kind: 'hatch' })} /> : action && question ?
         <EggQuestionPanel key={question.id} action={action} options={question.options.map((option) => ({ ...option, icon: 'sparkles' }))}
           completionEvent={encounter.feedCompletionKey ? { action, id: encounter.feedCompletionKey } : null}
