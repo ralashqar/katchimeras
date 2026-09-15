@@ -362,8 +362,9 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
     }
     case 'reconcileJourneyMeditation': {
       const { cycle, now } = command;
-      if (cycle.familyId !== 'steppling' && cycle.familyId !== 'mossprout') return unchanged(current);
-      const characterId = cycle.familyId;
+      if (!COMPANION_JOURNEY_PROFILES[cycle.familyId]) return unchanged(current);
+      // A family with a journey profile is a merge character: its rest orders are its own.
+      const characterId = cycle.familyId as MergeCharacterId;
       const prefix = `journey-cycle:${characterId}:`;
       const kept = current.activeOrders.filter((order) => !order.id.startsWith(prefix));
       const orders: MergeOrder[] = now < command.availableAt && cycle.returnedAt == null ? cycle.requests.flatMap((request) => {

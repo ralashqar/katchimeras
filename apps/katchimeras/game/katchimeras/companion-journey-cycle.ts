@@ -77,7 +77,7 @@ export function completeMeditationRequest(state: RelationshipProgressState, cycl
  * baseline if it cannot safely be attributed to this meditation. */
 export function observeJourneySteps(state: RelationshipProgressState, cycleId: string, dayId: string, steps: number, measuredAt: number, dayStartedAt: number): RelationshipProgressState {
   const cycle = state.journeyCycles?.find((item) => item.id === cycleId);
-  if (!cycle || cycle.familyId !== 'steppling' || cycle.returnedAt != null || !Number.isFinite(measuredAt) || !Number.isFinite(dayStartedAt) || measuredAt < cycle.completedAt || !Number.isFinite(steps) || steps < 0 || journeyCycleReady(state, cycle, measuredAt)) return state;
+  if (!cycle || COMPANION_JOURNEY_PROFILES[cycle.familyId]?.tracker !== 'steps' || cycle.returnedAt != null || !Number.isFinite(measuredAt) || !Number.isFinite(dayStartedAt) || measuredAt < cycle.completedAt || !Number.isFinite(steps) || steps < 0 || journeyCycleReady(state, cycle, measuredAt)) return state;
   const highest = Math.max(cycle.observedSteps[dayId] ?? 0, Math.floor(steps));
   const baseline = cycle.stepBaselines[dayId] ?? (dayStartedAt >= cycle.completedAt ? 0 : highest);
   if (cycle.observedSteps[dayId] === highest && cycle.stepBaselines[dayId] != null) return state;
@@ -95,7 +95,7 @@ export function observeJourneySteps(state: RelationshipProgressState, cycleId: s
  * never add the two sources together. */
 export function observeJourneyStepWindow(state: RelationshipProgressState, cycleId: string, steps: number, now: number): RelationshipProgressState {
   const cycle = state.journeyCycles?.find((item) => item.id === cycleId);
-  if (!cycle || cycle.familyId !== 'steppling' || !Number.isFinite(steps) || steps < 0 || !Number.isFinite(now) || now < cycle.completedAt || cycle.returnedAt != null || journeyCycleReady(state, cycle, now)) return state;
+  if (!cycle || COMPANION_JOURNEY_PROFILES[cycle.familyId]?.tracker !== 'steps' || !Number.isFinite(steps) || steps < 0 || !Number.isFinite(now) || now < cycle.completedAt || cycle.returnedAt != null || journeyCycleReady(state, cycle, now)) return state;
   const stepProgress = Math.min(JOURNEY_STEP_TARGET, Math.max(cycle.stepProgress, Math.floor(steps)));
   if (stepProgress === cycle.stepProgress) return state;
   const next = { ...state, journeyCycles: state.journeyCycles!.map((item) => item.id === cycleId ? { ...item, stepProgress } : item) };

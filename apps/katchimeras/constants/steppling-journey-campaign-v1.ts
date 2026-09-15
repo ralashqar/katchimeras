@@ -1,9 +1,11 @@
 import type { ContentFlowDefinition, ContentFlowNode } from '@/types/content-flow';
-import type { JourneyChapterDefinition } from '@/types/journey-campaign';
 
-export const STEPPLING_CHAPTER_ID = 'steppling-chapter-1';
-export const STEPPLING_CHAPTER_PURPOSE = 'Find what everyday movement can offer you, and build a path with room for your pace.';
-export const STEPPLING_JOURNEY_DAYS = [
+/**
+ * Version 1 of Steppling's journey days, kept so a run saved on it still
+ * plays. New runs come from `companion-journey-chapters/episode-flow.ts`.
+ */
+const STEPPLING_CHAPTER_ID = 'steppling-chapter-1';
+const STEPPLING_JOURNEY_DAYS = [
   { number: 1, title: 'A little way together', prompt: 'What would feel good today?', choices: [['walk', 'A little walk'], ['adapted', 'Movement my way'], ['rest', 'A gentle day']], resolution: 'Small counts. We have a place to begin.', routes: 0 },
   { number: 2, title: 'A reason to go', prompt: 'What would you like a little movement to offer?', choices: [['headspace', 'Headspace'], ['purpose', 'A useful destination'], ['company', 'Company'], ['discovery', 'Something to discover'], ['rest', 'Room to take it slowly']], resolution: 'Our first route has a reason to exist. It can begin close to home.', routes: 1 },
   { number: 3, title: 'Something along the way', prompt: 'What caught your attention on a recent path?', choices: [['noticed', 'A small detail'], ['company', 'Someone along the way'], ['adapted', 'How movement felt'], ['not_yet', 'Nothing to share yet']], resolution: 'Another route belongs here. A familiar place can still have something to show us.', routes: 2 },
@@ -12,12 +14,7 @@ export const STEPPLING_JOURNEY_DAYS = [
   { number: 6, title: 'Room for your pace', prompt: 'What belongs in our finished path?', choices: [['curiosity', 'Room for discovery'], ['company', 'Room for company'], ['adapted', 'Room for different ways to move'], ['rest', 'Somewhere to pause']], resolution: 'The Path Outside is here: five village routes, with room for your pace. You do not have to go farther to belong.', routes: 5 },
 ] as const;
 
-export const stepplingEpisodeId = (number: number) => `steppling:journey:day-${number}`;
-export const STEPPLING_JOURNEY_CHAPTER: JourneyChapterDefinition = {
-  id: STEPPLING_CHAPTER_ID, title: 'The Path Outside', purpose: STEPPLING_CHAPTER_PURPOSE,
-  episodeIds: STEPPLING_JOURNEY_DAYS.map((day) => stepplingEpisodeId(day.number)),
-};
-
+const stepplingEpisodeId = (number: number) => `steppling:journey:day-${number}`;
 /** Content Flow owns every answer and the rest effect. Order receipts are
  * reconciled from Merge; a UI button cannot stand in for a served order. */
 export function legacyStepplingEpisodeFlow(number: number): ContentFlowDefinition {

@@ -6,9 +6,11 @@ import { DayActionCardSurface, DayActionIcon } from '@/components/katchadeck/ui/
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Meadow } from '@/constants/meadow-theme';
+import { journeyChapterFor } from '@/constants/companion-journey-chapters/registry';
 
 export function journeyForeshadowLine(familyId: string): string {
-  if (familyId === 'steppling') return 'I’ve got an idea for our next little adventure. I’ll tell you when I’ve rested!';
+  const chapter = journeyChapterFor(familyId);
+  if (chapter) return chapter.lines.foreshadow;
   if (familyId === 'mossprout') return 'Something lovely is taking root. I’ll have more to share with you when I wake.';
   return 'I’ll have something for us to discover together when I’m rested.';
 }

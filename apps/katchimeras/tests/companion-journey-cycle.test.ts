@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createJourneyCycle, installJourneyCycle, completeMeditationRequest, observeJourneySteps, finishJourneyReturn, journeyCycleReady, JOURNEY_REST_MS } from '../game/katchimeras/companion-journey-cycle';
 import { emptyRelationshipProgressState, beginKatchimeraMeditation, normalizeRelationshipProgressState, settleKatchimeraMeditation, startMossproutJourneyDay, completeMossproutJourneyDay, mossproutJourneyRuntimeDayId } from '../game/katchimeras/relationship-progression';
-import { STEPPLING_JOURNEY_DAYS, stepplingEpisodeFlow } from '../constants/steppling-journey-campaign';
+import { STEPPLING_CHAPTER } from '../constants/companion-journey-chapters/steppling';
+import { journeyEpisodeFlow } from '../constants/companion-journey-chapters/episode-flow';
 import { validateContentFlowDefinition } from '../features/content-flow/content-flow-compiler';
 import { createContentFlowRun, reduceContentFlow } from '../features/content-flow/content-flow-interpreter';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '../utils/merge-world/engine';
@@ -86,8 +87,8 @@ test('families progress independently and a pending return blocks only its famil
 });
 
 test('every Steppling branch leads to real orders before resolution and meditation', () => {
-  for (const day of STEPPLING_JOURNEY_DAYS.slice(1)) {
-    const flow = stepplingEpisodeFlow(day.number);
+  for (const day of STEPPLING_CHAPTER.days.slice(1)) {
+    const flow = journeyEpisodeFlow(STEPPLING_CHAPTER, day.number);
     assert.deepEqual(validateContentFlowDefinition(flow), []);
     const opening = flow.nodes.find((node) => node.id === flow.entryNodeId)!;
     assert.equal(opening.kind, 'scene');

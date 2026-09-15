@@ -1,4 +1,5 @@
-import { stepplingEpisodeFlow } from '../constants/steppling-journey-campaign';
+import { STEPPLING_CHAPTER } from '../constants/companion-journey-chapters/steppling';
+import { journeyEpisodeFlow } from '../constants/companion-journey-chapters/episode-flow';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadNativeModule } from './helpers/native-motion-harness';
@@ -96,20 +97,20 @@ function harness(legacy = false) {
 
 test('full Steppling chapter: existing Day 1, six cycles, five orders, finale, one gift per ordinary return', async () => {
   const app = harness();
-  assert.equal(await app.service.initializeStepplingJourney(), true);
+  assert.equal(await app.service.initializeJourney('steppling'), true);
   assert.equal(currentJourneyCycle(app.state, 'steppling')!.participation, 'not_yet', 'Day 1 intention must not become a completed walk');
   for (let number = 1; number <= 6; number++) {
     const cycle = currentJourneyCycle(app.state, 'steppling')!;
     assert.equal(cycle.number, number);
-    assert.equal(await app.service.beginNextStepplingEpisode(), null, 'return must be received first');
+    assert.equal(await app.service.beginNextEpisode('steppling'), null, 'return must be received first');
     app.clock.now += JOURNEY_REST_MS + 1;
     await app.service.claimCompanionJourneyReturn(cycle.id);
     await app.service.claimCompanionJourneyReturn(cycle.id);
     if (number === 6) break;
-    let run = await app.service.beginNextStepplingEpisode() as ContentFlowRun;
-    const same = await app.service.beginNextStepplingEpisode() as ContentFlowRun;
+    let run = await app.service.beginNextEpisode('steppling') as ContentFlowRun;
+    const same = await app.service.beginNextEpisode('steppling') as ContentFlowRun;
     assert.equal(same.runId, run.runId);
-    const flow = stepplingEpisodeFlow(number + 1);
+    const flow = journeyEpisodeFlow(STEPPLING_CHAPTER, number + 1);
     for (let guard = 0; guard < flow.nodes.length && run.nodeId !== 'activity'; guard++) {
       const node = flow.nodes.find((item) => item.id === run.nodeId)!;
       assert.equal(node.kind, 'scene');
@@ -118,28 +119,28 @@ test('full Steppling chapter: existing Day 1, six cycles, five orders, finale, o
       run = await app.dispatch(run.runId, { type: 'submit_scene', actionId: action.id });
     }
     assert.equal(run.nodeId, 'activity');
-    await app.service.reconcileStepplingEpisode(run);
+    await app.service.reconcileEpisode('steppling', run);
     assert.equal(app.story.status, 'order_active');
     const key = app.story.orderDeck!.templateKeys[number - 1];
     app.serve(`merge-story:steppling:chapter-1:${key}`);
     if (number === 5) {
-      await app.service.reconcileStepplingEpisode(run);
+      await app.service.reconcileEpisode('steppling', run);
       assert.equal(app.story.actPhase, 'signature_order');
       app.serve('merge-story:steppling:chapter-1:path-outside');
     }
-    run = await app.service.reconcileStepplingEpisode(run);
+    run = await app.service.reconcileEpisode('steppling', run);
     assert.equal(run.nodeId, 'resolution');
     await app.dispatch(run.runId, { type: 'submit_scene', actionId: 'continue' });
   }
   assert.equal(app.story.status, 'chapter_complete');
   assert.equal(app.state.journeyCycles!.length, 6);
   assert.equal(app.world.arrivals.length, 5);
-  assert.equal(await app.service.beginNextStepplingEpisode(), null);
+  assert.equal(await app.service.beginNextEpisode('steppling'), null);
   assert.equal(normalizeMergeWorldState(app.world).arrivals[0].itemDefinitionIds.length, 2);
 });
 
 test('a failed effect after saving a parcel retries without a second parcel or losing the pending return', async () => {
-  const app = harness(); await app.service.initializeStepplingJourney();
+  const app = harness(); await app.service.initializeJourney('steppling');
   const cycle = currentJourneyCycle(app.state, 'steppling')!;
   app.clock.now += JOURNEY_REST_MS + 1;
   app.failNextGift();
@@ -154,17 +155,17 @@ test('a failed effect after saving a parcel retries without a second parcel or l
 test('legacy completed chapter migrates without replaying Day 1 or granting gifts', async () => {
   const app = harness(true);
   app.setStory({ ...app.story, status: 'chapter_complete', completedOrderIds: ['merge-story:steppling:chapter-1:path-outside'] });
-  await app.service.initializeStepplingJourney();
+  await app.service.initializeJourney('steppling');
   assert.equal(app.state.journeyCycles!.length, 6);
   assert.equal(app.state.journeyCycles!.every((cycle) => cycle.migrated && cycle.returnedAt != null), true);
   assert.equal(app.world.arrivals.length, 0);
-  assert.equal(await app.service.beginNextStepplingEpisode(), null);
+  assert.equal(await app.service.beginNextEpisode('steppling'), null);
 });
 
 test('an existing unfinished legacy conversation is preserved before migration', async () => {
   const app = harness(true);
   app.setStory({ ...app.story, status: 'conversation_active', pendingConversationId: 'steppling:story:6' });
-  assert.equal(await app.service.initializeStepplingJourney(), false);
+  assert.equal(await app.service.initializeJourney('steppling'), false);
   assert.equal(app.state.journeyCycles?.length ?? 0, 0);
   assert.equal(app.story.pendingConversationId, 'steppling:story:6');
 });

@@ -5,7 +5,8 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { loadCompanionOverlay, loadNativeModule, nativeViews } from './helpers/native-motion-harness';
 import { emptyRelationshipProgressState } from '../game/katchimeras/relationship-progression';
 import { createContentFlowRun } from '../features/content-flow/content-flow-interpreter';
-import { stepplingEpisodeFlow } from '../constants/steppling-journey-campaign';
+import { STEPPLING_CHAPTER } from '../constants/companion-journey-chapters/steppling';
+import { journeyEpisodeFlow } from '../constants/companion-journey-chapters/episode-flow';
 import type { ContentFlowRun } from '../types/content-flow';
 import { createJourneyCycle, installJourneyCycle, JOURNEY_REST_MS } from '../game/katchimeras/companion-journey-cycle';
 
@@ -29,9 +30,9 @@ test('return UI blocks the next episode until receipt completion and prevents do
     '@/storage/repositories/relationship-progression-repository': { relationshipProgressionRepository: { update: (reducer: (value: typeof state) => typeof state) => { state = reducer(state); } } },
     '@/storage/repositories/home-repository': { homeRepository: { subscribe: () => () => {} } },
     '@/features/companion/companion-journey-service': {
-      initializeStepplingJourney: async () => true, reconcileCompanionMeditation: async () => {},
-      reconcileStepplingEpisode: async (run: ContentFlowRun | null) => run, stepplingActiveRun: async () => activeRun,
-      beginNextStepplingEpisode: async () => { activeRun = createContentFlowRun(stepplingEpisodeFlow(2), { runId: 'test:day-2', now: Date.now() }); },
+      initializeJourney: async () => true, reconcileCompanionMeditation: async () => {},
+      reconcileEpisode: async (_family: string, run: ContentFlowRun | null) => run, activeJourneyRun: async () => activeRun,
+      beginNextEpisode: async () => { activeRun = createContentFlowRun(journeyEpisodeFlow(STEPPLING_CHAPTER, 2), { runId: 'test:day-2', now: Date.now() }); },
       claimCompanionJourneyReturn: async () => { claims++; await new Promise<void>((resolve) => { resolveClaim = resolve; }); state = { ...state, journeyCycles: [{ ...cycle, returnedAt: Date.now() }] }; },
     },
     '@/features/content-flow/content-flow-director': {},
@@ -59,7 +60,7 @@ test('return UI blocks the next episode until receipt completion and prevents do
   await act(async () => { life().props.onJourney(); });
   assert.equal(life(), rootCards, 'opening Journey retains the root card section');
   const seen = tree!.root.findByType('Choices' as React.ElementType).props.options.map((option: { label: string }) => option.label);
-  const flow = stepplingEpisodeFlow(2);
+  const flow = journeyEpisodeFlow(STEPPLING_CHAPTER, 2);
   const opening = flow.nodes.find((node) => node.id === flow.entryNodeId)!;
   if (opening.kind === 'scene') for (const [, label] of opening.payload!.choices as string[][]) assert.ok(seen.includes(label));
   await act(async () => tree!.root.findByProps({ accessibilityLabel: 'Back to companion' }).props.onPress());
@@ -84,8 +85,8 @@ for (const familyId of ['mossprout', 'steppling'] as const) {
       '@/storage/repositories/relationship-progression-repository': { relationshipProgressionRepository: { update: (reducer: (value: typeof state) => typeof state) => { state = reducer(state); } } },
       '@/storage/repositories/home-repository': { homeRepository: { subscribe: () => () => {} } },
       '@/features/companion/companion-journey-service': {
-        initializeStepplingJourney: async () => true, adoptMossproutCycle() {}, reconcileCompanionMeditation: async () => {},
-        reconcileStepplingEpisode: async () => null, stepplingActiveRun: async () => null,
+        initializeJourney: async () => true, adoptMossproutCycle() {}, reconcileCompanionMeditation: async () => {},
+        reconcileEpisode: async () => null, activeJourneyRun: async () => null,
       },
       '@/features/content-flow/content-flow-director': {},
       '@/utils/companion-story-storage': { subscribeCompanionStories: () => () => {}, loadAuthoredCohortStory: () => ({}) },
