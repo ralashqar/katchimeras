@@ -1,3 +1,4 @@
+import { HATCH_PROFILES } from '@/features/onboarding/hatch-profile';
 import { BARISTABBIT_HATCHABLE } from '@/constants/hatchable-companions/baristabbit';
 import { HATCHABLE_COMPANIONS_BUNDLED } from '@/constants/hatchable-companions/registry';
 import { KATCHIMERA_MERGE_PROFILES, MERGE_CHARACTER_NAMES, MERGE_GENERATORS, MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
@@ -17,10 +18,10 @@ export type NewCompanionDraft = {
 const get=(o:any,path:string)=>path.split('/').reduce((v,k)=>v?.[k],o);
 function templateRevision(character:string){const text=JSON.stringify(companionTemplate(character));let hash=2166136261;for(const c of text)hash=Math.imul(hash^c.charCodeAt(0),16777619)>>>0;return `${hash.toString(16)}-${text.length}`;}
 export function newCompanionCatalog(){
-  return {characters:Object.keys(KATCHIMERA_MERGE_PROFILES).filter(id=>id!=='mossprout'&&id!=='petalimp'&&!HATCHABLE_COMPANIONS_BUNDLED.some(h=>h.companion===id)).filter(id=>MERGE_GENERATORS.some(g=>g.chainIds.includes(KATCHIMERA_MERGE_PROFILES[id].coreChains[0]))).map(id=>({id,name:MERGE_CHARACTER_NAMES[id]})),
+  return {characters:Object.keys(KATCHIMERA_MERGE_PROFILES).filter(id=>HATCH_PROFILES[id]&&id!=='mossprout'&&id!=='petalimp'&&!HATCHABLE_COMPANIONS_BUNDLED.some(h=>h.companion===id)).filter(id=>MERGE_GENERATORS.some(g=>g.chainIds.includes(KATCHIMERA_MERGE_PROFILES[id].coreChains[0]))).map(id=>({id,name:MERGE_CHARACTER_NAMES[id]})),
     predecessors:['mossprout',...HATCHABLE_COMPANIONS_BUNDLED.map(h=>h.companion)],occupied:arcCatalog().occupied};
 }
-export function newCompanionDraft(character='feastle'):NewCompanionDraft{
+export function newCompanionDraft(character=newCompanionCatalog().characters[0]?.id ?? ''):NewCompanionDraft{
   if(!newCompanionCatalog().characters.some(c=>c.id===character))throw new Error('Choose an available roster character');
   const occupied=new Set(arcCatalog().occupied.map(t=>`${t.q},${t.r}`));
   let q=0,r=-2;while(occupied.has(`${q},${r}`))q++;

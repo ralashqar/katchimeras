@@ -1,6 +1,6 @@
 import React,{useEffect,useState} from 'react';
 import './journey.css';
-const characters=['mossprout','steppling','petalimp','baristabbit'];
+const characters=['mossprout','steppling','petalimp','baristabbit','feastle'];
 const label=s=>s.replace(/([a-z])([A-Z])/g,'$1 $2').replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
 async function api(route,body){const r=await fetch(`/api/characters/${route}`,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const v=await r.json();if(!r.ok)throw new Error(v.error??v.issues?.join('\n'));return v;}
 const inside=(path,prefix)=>path===prefix||path.startsWith(prefix+'/');

@@ -1,3 +1,6 @@
+import { FEASTLE_HATCH_PROFILE } from '@/constants/feastle-hatch-profile';
+import { FEASTLE_CHAPTER } from '@/constants/companion-journey-chapters/feastle';
+import { FEASTLE_HATCHABLE } from '@/constants/hatchable-companions/feastle';
 import { MOSSPROUT_CHAPTER } from '@/constants/companion-journey-chapters/mossprout';
 import { STEPPLING_CHAPTER } from '@/constants/companion-journey-chapters/steppling';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/steppling';
@@ -13,7 +16,7 @@ import { missionWindow } from '@/features/mission-mechanics/board-window';
 import type { CompanionJourneyChapterDefinition } from '@/types/companion-journey-chapter';
 import type { AuthorField } from './journey-draft';
 
-export const CHARACTER_IDS = ['mossprout','steppling','petalimp','baristabbit'] as const;
+export const CHARACTER_IDS = ['mossprout','steppling','petalimp','baristabbit','feastle'] as const;
 export type CharacterId = typeof CHARACTER_IDS[number];
 export type CharacterDraft = { kind:'character-draft'; version:1; character:CharacterId; sourceRevision:string; name:string; edits:Record<string,string|number>; art:Record<string,string> };
 type RecordData = Record<string, unknown>;
@@ -25,6 +28,7 @@ const sources:Record<CharacterId,RecordData>={
   steppling:{chapter:STEPPLING_CHAPTER,hatchable:STEPPLING_HATCHABLE},
   petalimp:{campaign:PETALIMP_BLOOM_CAMPAIGN,island:MOSSPROUT_NATURE_ISLANDS_BUNDLED.find(i=>i.id==='bloom-garden')!},
   baristabbit:{hatchable:BARISTABBIT_HATCHABLE},
+  feastle:{chapter:FEASTLE_CHAPTER,hatchable:FEASTLE_HATCHABLE,hatchProfile:FEASTLE_HATCH_PROFILE},
 };
 const textKeys=new Set('title name shortName purpose text prompt message label reply description reveal foreshadow complete helperText body eyebrow opening endMessage closing summary handoffLabel actionLabel actionTitle readingTitle chapterTitle restingLine idleLine questionSubtitle subtitle permissionTitle permissionBody analysingLine openingConclusion returnLine resolutionLine closingLine revealTitle thanks'.split(' '));
 const copyContainers=new Set(['copy','lines','markerLines','guides','handoffs','callbackLine','actionLabels','stateLabels','speech','replies']);
@@ -34,6 +38,7 @@ const artSlots:Record<CharacterId,Record<string,string>>={
   mossprout:{'old-grove':'shared_world_mossprout_old_grove_hex_tile_v1_512.webp'},
   steppling:{home:'shared_world_steppling_trailhead_hex_tile_v1_512.webp'},
   baristabbit:{home:'shared_world_baristabbit_window_hex_tile_v1_512.webp'},
+  feastle:{home:'feastle_hearth_v1_hex_tile_512.webp'},
   petalimp:{'level-0':'mossprout_bloom_garden_level_0_hex_tile_512.webp','level-1':'mossprout_bloom_garden_level_1_hex_tile_512.webp','level-2':'mossprout_bloom_garden_level_2_hex_tile_512.webp','level-3':'mossprout_focused_v1_bloom_garden_hex_tile_512.webp','level-4':'mossprout_bloom_garden_level_4_hex_tile_512.webp'},
 };
 const serials=new Map<CharacterId,string>();
@@ -81,7 +86,7 @@ export function characterSource(id:CharacterId){
       (v.chapters as RecordData[]).forEach((e,i)=>sections.push({path:`campaign/chapters/${i}`,title:`Restoration ${i+1} · ${e.title}`}));
       sections.push({path:'campaign/copy',title:'Discovery and restoration copy'},{path:'campaign/payoff',title:'Final payoff'});
     }else if(key==='hatchable'&&isObject(v))for(const part of ['tile','mission','discoveryFlow','egg','dayOne','lesson','daily'])sections.push({path:`hatchable/${part}`,title:({tile:'Discovery tile',mission:'Mist mission',discoveryFlow:'Discovery guides',egg:'Egg and hatching',dayOne:'First day',lesson:'Merge tutorial',daily:'Daily interactions'} as Record<string,string>)[part]});
-    else if(key!=='conversations')sections.push({path:key,title:key==='island'?'Island upgrade costs':key==='tile'?'Old Grove':'Daily interactions'});
+    else if(key!=='conversations')sections.push({path:key,title:key==='hatchProfile'?'Egg Wisp questions':key==='island'?'Island upgrade costs':key==='tile'?'Old Grove':'Daily interactions'});
   }
   return {character:id,source,sections,fields:descriptors.get(id)!,artSlots:artSlots[id],revision:revision(id),draft:{kind:'character-draft',version:1,character:id,sourceRevision:revision(id),name:`${id} edits`,edits:{},art:{}} as CharacterDraft};
 }

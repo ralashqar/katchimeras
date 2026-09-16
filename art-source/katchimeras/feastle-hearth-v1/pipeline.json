@@ -1,0 +1,16 @@
+{
+  "generator": "scripts/generate-katchimera-hex-tile.py",
+  "kind": "floating-v2",
+  "model": "fal-ai/nano-banana-2/edit",
+  "reference": "art-source/katchimeras/mossprout-hex-neighborhood-v1/main-source.png",
+  "matting": "scripts/hex-tile-pipeline.py --skip-rerender --preserve-canvas",
+  "matteEndpoint": "remove-image-background",
+  "matteModel": "fal-ai/birefnet/v2",
+  "runtimeKey": "feastle_hearth_v1_hex_tile",
+  "sizes": [
+    1024,
+    512,
+    256
+  ],
+  "review": "Open centre and front approach; no baked creature. Alpha checked against dark and light backgrounds."
+}

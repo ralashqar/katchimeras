@@ -21,6 +21,28 @@ function loadCallback(name: string, context: Record<string, unknown>) {
   return runInNewContext(code, context);
 }
 
+test('a durably hatched Egg releases the resident even while the finish command is reconciling Bond', () => {
+  let open = true;
+  let phase = 'awaiting_claim';
+  const close = loadCallback('close', {
+    egg: { hatchedAt: 123 }, pending: { current: true }, feedingRef: { current: false }, hatching: false,
+    setOpen: (value: boolean) => { open = value; }, setPhase: (value: string) => { phase = value; },
+  });
+  close();
+  assert.equal(open, false, 'otherwise the tile stays an Egg and the resident camera can never finish');
+  assert.equal(phase, 'idle');
+});
+
+test('an unfinished hatch or answer still cannot be dismissed', () => {
+  for (const [pending, feeding, hatching] of [[true, false, false], [false, true, false], [false, false, true]]) {
+    let closed = false;
+    loadCallback('close', { egg: { hatchedAt: null }, pending: { current: pending }, feedingRef: { current: feeding }, hatching,
+      setOpen: () => { closed = true; }, setPhase: () => {},
+    })();
+    assert.equal(closed, false);
+  }
+});
+
 function harness(reduced = false, saveOk = true) {
   const egg: StepplingEggProgress = { sourceDayId: '2026-09-03', intent: null, fedSteps: 0, alternative: null, hatchStartedAt: null, hatchedAt: null };
   const view = { feeding: false, egg: undefined as StepplingEggProgress | undefined, completion: null as string | null, feedback: 0 };

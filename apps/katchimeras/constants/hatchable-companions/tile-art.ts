@@ -8,6 +8,11 @@ import { artKeys, artSource, artSourceSet, type ArtSource } from '@/utils/art-so
  * The registry test checks every definition has an entry here.
  */
 const TILE_ART: Readonly<Record<string, () => HatchableTileArt>> = {
+  'feastle-home': () => ({
+    full: require('@incubator/art-world/hex/feastle_hearth_v1_hex_tile.webp'),
+    medium: require('@incubator/art-world/hex/feastle_hearth_v1_hex_tile_512.webp'),
+    thumb: require('@incubator/art-world/hex/feastle_hearth_v1_hex_tile_256.webp'),
+  }),
   'steppling-home': () => ({
     full: require('@incubator/art-world/hex/shared_world_steppling_trailhead_hex_tile_v1.webp'),
     medium: require('@incubator/art-world/hex/shared_world_steppling_trailhead_hex_tile_v1_512.webp'),
@@ -24,6 +29,7 @@ export const HATCHABLE_TILE_ART_IDS: readonly string[] = Object.keys(TILE_ART);
 
 /** The friend's cut-out for the garden lesson's closing scene, by companion. */
 const CUTOUT_ART: Readonly<Record<string, () => number>> = {
+  feastle: () => require('@incubator/art-cutouts/feastle.png'),
   steppling: () => require('@incubator/art-cutouts/steppling.png'),
   baristabbit: () => require('@incubator/art-cutouts/baristabbit.png'),
 };

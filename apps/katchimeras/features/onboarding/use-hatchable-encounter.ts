@@ -62,7 +62,15 @@ export function useHatchableEncounter(world: MergeWorldState, definition: Hatcha
     const source = new Date();
     return send({ kind: 'begin', sourceDayId: localDayId(source) });
   }, [send]);
-  const close = useCallback(() => { if (!pending.current && !feedingRef.current && !hatching) { setOpen(false); setPhase('idle'); } }, [hatching]);
+  const close = useCallback(() => {
+    // World ownership is published before finish() reconciles the separate Bond
+    // store. Once hatchedAt is durable, the host must be able to release the Egg
+    // even during that final await: keeping it open hides the resident tile that
+    // the camera is waiting for, and the busy ref changing does not rerun the host.
+    if (egg?.hatchedAt || (!pending.current && !feedingRef.current && !hatching)) {
+      setOpen(false); setPhase('idle');
+    }
+  }, [egg?.hatchedAt, hatching]);
   const releaseFeedPanel = useCallback(() => {
     feedCompletionRef.current = null;
     setFeedCompletionKey(null);

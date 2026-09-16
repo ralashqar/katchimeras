@@ -3,6 +3,7 @@ import type { CompanionJourneyChapterDefinition, JourneyEpisodeDefinition } from
 import { journeyEpisodeConversation, journeyEpisodeConversationId, type JourneyEpisodeConversation } from './episode-conversation';
 import { STEPPLING_CHAPTER } from './steppling';
 import { MOSSPROUT_CHAPTER } from './mossprout';
+import { FEASTLE_CHAPTER } from './feastle';
 
 /**
  * Every authored journey chapter. A friend with one gets episodes that open
@@ -10,7 +11,7 @@ import { MOSSPROUT_CHAPTER } from './mossprout';
  * a friend without one shows their daily cards and idle line. Mossprout's
  * Garden campaign runs beside his arc and keeps his rests.
  */
-export const COMPANION_JOURNEY_CHAPTERS_BUNDLED: readonly CompanionJourneyChapterDefinition[] = [MOSSPROUT_CHAPTER, STEPPLING_CHAPTER];
+export const COMPANION_JOURNEY_CHAPTERS_BUNDLED: readonly CompanionJourneyChapterDefinition[] = [MOSSPROUT_CHAPTER, STEPPLING_CHAPTER, FEASTLE_CHAPTER];
 export const COMPANION_JOURNEY_CHAPTERS: readonly CompanionJourneyChapterDefinition[] = [...COMPANION_JOURNEY_CHAPTERS_BUNDLED, ...packEntries('chapters')];
 markRegistryBuilt('chapters');
 

@@ -1,7 +1,5 @@
 import { markRegistryBuilt, packEntries } from '@/features/content-packs/active-pack';
 import { STEPPLING_TRAIL_CONVERSATIONS } from '@/constants/steppling-activities';
-import { STEPPLING_SCENARIO_POLLS } from '@/constants/steppling-scenario-polls';
-import { BARISTABBIT_SCENARIO_POLLS } from '@/constants/baristabbit-scenario-polls';
 import { mossproutTheoryConversationDefinitions } from '@/constants/mossprout-theory-conversations';
 import { familyPack } from '@/constants/companion-poll-conversation';
 import type { ConversationDefinition } from '@/types/companion-conversation';
@@ -33,8 +31,7 @@ export const companionConversationDefinitionsBundled: readonly ConversationDefin
   ...ALL_ISLAND_CAMPAIGN_CONVERSATION_DEFINITIONS,
   ...mossproutStoryConversationDefinitions,
   ...mossproutTheoryConversationDefinitions,
-  ...familyPack('baristabbit', BARISTABBIT_SCENARIO_POLLS),
-  ...familyPack('steppling', STEPPLING_SCENARIO_POLLS),
+  ...HATCHABLE_COMPANIONS.flatMap((definition) => familyPack(definition.companion, definition.daily?.polls ?? [])),
   ...JOURNEY_EPISODE_CONVERSATIONS,
 ];
 export const companionConversationDefinitionsV2: readonly ConversationDefinition[] = [...companionConversationDefinitionsBundled, ...packEntries('conversations')];

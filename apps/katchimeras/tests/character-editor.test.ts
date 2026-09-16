@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CHARACTER_IDS, characterSource, validateCharacterDraft, characterDialogue } from '@/features/content-authoring/character-editor';
 
-test('all four existing experiences expose editable copy and validate unchanged',()=>{
+test('all bundled experiences expose editable copy and validate unchanged',()=>{
   for(const id of CHARACTER_IDS){const source=characterSource(id);assert.ok(source.fields.length>100);assert.deepEqual(validateCharacterDraft(source.draft).issues,[]);assert.ok(source.sections.length>1);}
   assert.ok(characterSource('steppling').fields.some(f=>f.path==='hatchable/egg/feed/target'));
   assert.ok(characterSource('petalimp').fields.some(f=>f.path==='campaign/chapters/0/choices/0/order/requirements/0/quantity'));

@@ -107,7 +107,7 @@ test('first Mossprout dialogue reflects both answers without claiming an unasked
 
 
 test('every current hatch question offers three distinct equally rewarded choices', () => {
-  assert.equal(Object.keys(HATCH_PROFILES).length, 7);
+  for (const definition of HATCHABLE_COMPANIONS) assert.ok(HATCH_PROFILES[definition.companion], `${definition.companion}: current Egg questions exist`);
   for (const profile of Object.values(HATCH_PROFILES)) {
     assert.equal(profile.version, 2);
     assert.equal(profile.questions.length, 2);
@@ -143,6 +143,7 @@ test('every saved four-choice answer remains readable with its original meaning 
 test('reloading an egg with retired choices preserves cleared wisps and hatch readiness', () => {
   for (const definition of HATCHABLE_COMPANIONS) {
     const old = LEGACY_HATCH_PROFILES[definition.companion];
+    if (!old) continue; // New companions have no retired version-one answers to migrate.
     const answers = old.questions.map((q) => makeHatchAnswer(definition.companion, q.id, q.options[3].id, now, 1)!);
     const raw = { sourceDayId: '2026-09-14', intent: null, fedSteps: 0, alternative: null,
       hatchStartedAt: now, hatchedAt: null, wispVersion: 1 as const, wispAnswers: answers };

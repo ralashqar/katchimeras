@@ -19,7 +19,7 @@ module.exports=function(app,{moduleAt,wrap,drafts,assets,assetFile}){
     await fs.mkdir(directory,{recursive:true});res.json({drafts:(await fs.readdir(directory)).filter(f=>f.startsWith(`${req.params.id}-`)&&f.endsWith('.json')).sort().reverse()});
   }));
   app.get('/api/characters/drafts/:file',wrap(async(req,res)=>{
-    if(!/^(mossprout|steppling|petalimp|baristabbit)-[0-9]+-[a-f0-9-]+\.json$/.test(req.params.file))throw new Error('Invalid draft filename');
+    if(!/^(mossprout|steppling|petalimp|baristabbit|feastle)-[0-9]+-[a-f0-9-]+\.json$/.test(req.params.file))throw new Error('Invalid draft filename');
     res.json(JSON.parse(await fs.readFile(path.join(directory,req.params.file),'utf8')));
   }));
   app.post('/api/characters/drafts',wrap(async(req,res)=>{

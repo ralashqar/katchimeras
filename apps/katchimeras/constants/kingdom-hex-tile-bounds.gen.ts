@@ -11,6 +11,7 @@ export const KINGDOM_HEX_TILE_ALPHA_BOUNDS = {
   'egg_hex_tile.webp': { left: 15, top: 145, right: 1010, bottom: 878 },
   'egg_hex_tile_v2.webp': { left: 26, top: 157, right: 1002, bottom: 888 },
   'egg_home_hex_tile.webp': { left: 14, top: 95, right: 1010, bottom: 929 },
+  'feastle_hearth_v1_hex_tile.webp': { left: 43, top: 22, right: 980, bottom: 952 },
   'floating_baristabbit_hex_tile_v1.webp': { left: 14, top: 38, right: 1010, bottom: 998 },
   'floating_empty_hex_tile_v1.webp': { left: 16, top: 158, right: 1009, bottom: 987 },
   'floating_feastle_hex_tile_v1.webp': { left: 134, top: 131, right: 915, bottom: 908 },

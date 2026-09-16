@@ -1,3 +1,4 @@
+import { FEASTLE_HATCH_PROFILE } from '@/constants/feastle-hatch-profile';
 /** Authored evidence, not a diagnosis or a permanent personality score. */
 export type HatchAnswer = {
   katchimeraId: string;
@@ -88,6 +89,7 @@ export const LEGACY_HATCH_PROFILES: Readonly<Record<string, HatchProfileDefiniti
 
 // Version 2 reauthors each trio as a distinct set. Version 1 stays readable for saved answers.
 export const HATCH_PROFILES: Readonly<Record<string, HatchProfileDefinition>> = Object.fromEntries([
+  FEASTLE_HATCH_PROFILE,
   profile('mossprout', 'growth',
     question('friction', 'What makes it hard to get going?', 'primaryFriction', [
       ['starting', 'Not sure where to start', 'The beginning gets tangled sometimes.'],

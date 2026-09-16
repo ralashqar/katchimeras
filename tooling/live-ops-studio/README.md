@@ -4,7 +4,8 @@
 
 Open `/new-companion`, or **Create a Katchimera** from `/characters`.
 This creates a new hatchable experience for a roster character without one,
-starting with Feastle. It reuses the character's existing family, skins,
+such as Bedrotte. Candidates must have an authored Egg question profile.
+It reuses the character's existing family, skins,
 animations, merge chains and generator. It does not create an unknown species,
 new mechanics or a new visual rig.
 
@@ -15,7 +16,7 @@ new mechanics or a new visual rig.
 3. Add Journey episodes and waits. They follow the first-day flow and each other
    in order. The template supplies introductory copy; author the character's
    final narrative before release.
-4. Upload tile art and a character cutout, or choose **Use existing Feastle art**.
+4. Upload tile art and a character cutout, or use the selected character's existing art.
    Still PNG/WebP/JPEG inputs up to 1.8 MB and 4096×4096 pixels are normalized
    into a transparent-padded 1024×1024 WebP. Visible bounds (alpha >=16), sizes
    and hashes are generated. The cutout serves the lesson finale; existing
@@ -43,13 +44,13 @@ use **Save draft** for a durable version. Starting a fresh template, switching
 characters and loading a version first save the current draft.
 
 `tests/new-companion-authoring.test.ts` verifies template validation and an
-isolated game boot using Feastle's generated pack and offline art references.
+isolated game boot using Bedrotte's generated pack and offline art references.
 That integration test is not a device gameplay test.
 
 ## Existing character editor
 
 Open `/characters` or choose **Characters** in Studio. The editor reads the
-actual bundled definitions for all four current experiences:
+actual bundled definitions for all five current experiences:
 
 | Character | Editable content |
 | --- | --- |
@@ -57,6 +58,7 @@ actual bundled definitions for all four current experiences:
 | Steppling | Journey, discovery tile and guides, Mist board, Egg requirements, first day, merge tutorial, daily interactions and home tile art |
 | Petalimp | Restoration chapters, choice outcomes, orders, board seeds and delivery cells, upgrade costs and five restoration-stage images |
 | Baristabbit | Discovery tile and guides, Mist board, Egg requirements, first day, merge tutorial, daily interactions and home tile art |
+| Feastle | Seven Journey episodes and orders, discovery tile, Mist board, Egg questions, first day, merge tutorial, food-photo and daily interactions, and hearth tile art |
 
 Select a section, search its fields, and edit copy, item references or numeric
 values. Journey dialogue uses the game's compiler; restoration and first-day
