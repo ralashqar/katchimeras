@@ -61,7 +61,7 @@ export function resolveMossproutJourneyHandoff(input: {
     return {
       availableAt,
       body: input.ftueStatus === 'complete'
-        ? 'Mossprout is resting for eight hours. Garden play stays open.'
+        ? 'Mossprout is resting and thinking today over. Garden play stays open.'
         : 'Your first day together is ready to finish.',
       dayNumber: 1,
       eyebrow: 'Mossprout · Journey Day 1',

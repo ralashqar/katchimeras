@@ -3,10 +3,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createJourneyCycle, installJourneyCycle, completeMeditationRequest, observeJourneySteps, finishJourneyReturn, journeyCycleReady, JOURNEY_REST_MS } from '../game/katchimeras/companion-journey-cycle';
 import { emptyRelationshipProgressState, beginKatchimeraMeditation, normalizeRelationshipProgressState, settleKatchimeraMeditation, startMossproutJourneyDay, completeMossproutJourneyDay, mossproutJourneyRuntimeDayId } from '../game/katchimeras/relationship-progression';
-import { STEPPLING_CHAPTER } from '../constants/companion-journey-chapters/steppling';
-import { journeyEpisodeFlow } from '../constants/companion-journey-chapters/episode-flow';
-import { validateContentFlowDefinition } from '../features/content-flow/content-flow-compiler';
-import { createContentFlowRun, reduceContentFlow } from '../features/content-flow/content-flow-interpreter';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '../utils/merge-world/engine';
 
 const at = new Date('2026-09-04T22:00:00').getTime();
@@ -84,29 +80,6 @@ test('families progress independently and a pending return blocks only its famil
   assert.equal(value.meditations!.length, 2);
   const returned = finishJourneyReturn(value, cycle().id, at + JOURNEY_REST_MS);
   assert.equal(returned.journeyCycles!.find((item) => item.familyId === 'mossprout')!.returnedAt, null);
-});
-
-test('every Steppling branch leads to real orders before resolution and meditation', () => {
-  for (const day of STEPPLING_CHAPTER.days.slice(1)) {
-    const flow = journeyEpisodeFlow(STEPPLING_CHAPTER, day.number);
-    assert.deepEqual(validateContentFlowDefinition(flow), []);
-    const opening = flow.nodes.find((node) => node.id === flow.entryNodeId)!;
-    assert.equal(opening.kind, 'scene');
-    if (opening.kind !== 'scene') continue;
-    for (const { id: choice } of opening.actions!) {
-      let run = createContentFlowRun(flow, { runId: `test:${day.number}:${choice}`, now: at });
-      run = reduceContentFlow(flow, run, { type: 'submit_scene', actionId: choice, now: at }).run;
-      for (let guard = 0; guard < flow.nodes.length && run.nodeId !== 'activity'; guard++) {
-        const node = flow.nodes.find((item) => item.id === run.nodeId)!;
-        assert.equal(node.kind, 'scene');
-        if (node.kind !== 'scene') break;
-        const action = node.actions?.find((item) => item.id === 'skip') ?? node.actions![0];
-        run = reduceContentFlow(flow, run, { type: 'submit_scene', actionId: action.id, now: at }).run;
-      }
-      assert.equal(run.nodeId, 'activity');
-      assert.equal(reduceContentFlow(flow, run, { type: 'submit_scene', actionId: 'continue', now: at }).run.nodeId, 'activity');
-    }
-  }
 });
 
 test('return parcels use stable identities and remain queued without free board cells', () => {

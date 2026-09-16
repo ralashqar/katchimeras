@@ -11,7 +11,7 @@ export const STEPPLING_LIFE_EPISODES: Readonly<Record<number, Episode>> = {
     ],
     followup: 'When would that fit most easily?',
     followupChoices: [['after', 'After something I already do.', 'A familiar moment can remind us.'], ['break', 'When I notice I need a break.', 'We’ll keep it ready for that moment.'], ['choose', 'I’d rather decide each day.', 'Then the timing stays yours.']],
-    bridge: 'I brought a little parcel for our Garden. Then I’ll rest for eight hours. When I’m back, we can find a reason for our first path.',
+    bridge: 'I brought a little parcel for our Garden. Then I’ll need a little while to think our first walk over. When I’m back, we can find a reason for our first path.',
     resolution: 'Small counts. We have a place to begin.',
   },
   2: {

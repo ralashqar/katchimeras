@@ -67,6 +67,8 @@ export type FtueGuide = { eyebrow: string; title: string; body: string; coaching
 
 export type FtueTarget =
   | { kind: 'haven_gateway' }
+  /** A shared-world structure by id: a story tile a journey board is docked under. */
+  | { kind: 'haven_structure'; structureId: string }
   | { kind: 'board_item'; instanceId: string }
   | { kind: 'board_items'; definitionId: string; occurrence: number }
   | { kind: 'board_generator'; generatorId: string }

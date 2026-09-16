@@ -156,6 +156,18 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
     const savedReceipt = command.receiptId ? state.storyWorldMutationReceipts.find((receipt) => receipt.id === command.receiptId) : undefined;
     if (savedReceipt) return { ...no(), storyWorldMutationReceipt: savedReceipt };
     if (existing && !command.receiptId) return no();
+    // A story tile: revealed by a journey episode, free, from the Mist whoever is already home.
+    if (definition.story) {
+      const receipt = command.receiptId ? {
+        id: command.receiptId, kind: 'haven_upgrade' as const,
+        target: { kind: 'haven_structure' as const, structureId: definition.tileId },
+        fromLevel: existing ? 1 : 0, toLevel: 1, economyMode: 'free' as const, coinCost: 0, createdAt: command.now,
+      } : undefined;
+      return { ...changed(state, { ...state,
+        storyWorldMutationReceipts: receipt ? [...state.storyWorldMutationReceipts, receipt] : state.storyWorldMutationReceipts,
+        worldUnlocks: { ...state.worldUnlocks, [command.targetId]: existing ?? { unlockedAt: command.now, paid: 0, destination: definition.destination, transferredAt: null, hatchedAt: null } },
+      }, command.now), storyWorldMutationReceipt: receipt };
+    }
     const owned = state.companionDiscovery.records.some((record) => record.characterId === definition.destination);
     const hatchable = hatchableByUnlock(command.targetId);
     if (hatchable && !existing && !owned && !hatchableAvailable(state, hatchable)) return no(hatchable.tile.markerLines.sleeping);

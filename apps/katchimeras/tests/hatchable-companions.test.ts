@@ -5,6 +5,7 @@ import { HATCHABLE_COMPANIONS, hatchableByCompanion, hatchableByMission, hatchab
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/steppling';
 import { HATCHABLE_TILE_ART_IDS } from '@/constants/hatchable-companions/tile-art';
 import { SHARED_WORLD_PURCHASES, SHARED_WORLD_TILES, STEPPLING_TILE } from '@/constants/shared-world';
+import { STORY_TILES } from '@/constants/story-tiles/registry';
 import { GLOW_GATEWAY_ID } from '@/constants/glow-discovery-ids';
 import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
 import { GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, GLOW_LESSON } from '@/features/onboarding/glow-discovery-flow';
@@ -45,9 +46,9 @@ test('Steppling on the definition is Steppling exactly: the three generated flow
 });
 
 test('the shared world is read from the registry: Mossprout fixed, every other tile a hatchable companion’s', () => {
-  assert.deepEqual(Object.keys(SHARED_WORLD_TILES), ['mossprout-home', ...HATCHABLE_COMPANIONS.map((definition) => definition.tile.id)]);
+  assert.deepEqual(Object.keys(SHARED_WORLD_TILES), ['mossprout-home', ...HATCHABLE_COMPANIONS.map((definition) => definition.tile.id), ...STORY_TILES.map((tile) => tile.id)]);
   assert.deepEqual(STEPPLING_TILE, { residentVisible: false, companion: 'steppling', coord: { q: 0, r: 0 }, unlockId: 'mossprout:overgrown-trail', price: 40, name: 'Misty clearing', revealPreset: 'mist-clear' });
-  assert.deepEqual(SHARED_WORLD_PURCHASES.map((purchase) => purchase.tileId), HATCHABLE_COMPANIONS.map((definition) => definition.tile.id));
+  assert.deepEqual(SHARED_WORLD_PURCHASES.filter((purchase) => !purchase.story).map((purchase) => purchase.tileId), HATCHABLE_COMPANIONS.map((definition) => definition.tile.id));
   for (const definition of HATCHABLE_COMPANIONS) {
     assert.equal(hatchableByCompanion(definition.companion), definition);
     assert.equal(hatchableByTile(definition.tile.id), definition);
@@ -189,7 +190,7 @@ test('a friend’s daily cards and photo feed are content, and the Kingdom begin
     assert.ok(definition.daily.presentation === 'rows', `${definition.companion}: a hatchable friend's cards are flat rows`);
   }
   assert.equal(HATCHABLE_COMPANIONS.find((definition) => definition.companion === 'baristabbit')?.egg.feed.kind, 'answer', 'Baristabbit’s Egg hatches on answers alone');
-  const panel = readFileSync('components/katchadeck/world/steppling-encounter-panel.tsx', 'utf8');
+  const panel = readFileSync('components/katchadeck/world/hatchable-encounter-panel.tsx', 'utf8');
   assert.match(panel, /HATCH_PROFILES/);
   assert.doesNotMatch(panel, /beginCompanionPhotoCapture|requestPermissions/);
   const actions = readFileSync('components/katchadeck/world/companion-daily-actions.tsx', 'utf8');
@@ -201,10 +202,11 @@ test('a friend’s daily cards and photo feed are content, and the Kingdom begin
   const camera = readFileSync('app/moment-capture.tsx', 'utf8');
   assert.match(camera, /finishCompanionPhotoCapture\(photoCaptureId, \{ matched: analysis\.summary \? category\?\.id === photoCategory : true/);
   const stage = readFileSync('components/katchadeck/world/companion-journey-cycle-stage.tsx', 'utf8');
-  assert.match(stage, /: hatchable \? <CompanionDailyActions definition=\{hatchable\}/, 'a hatchable friend’s page shows their own cards on the journey stage');
+  assert.match(stage, /\{hatchable \? <CompanionDailyActions definition=\{hatchable\}/, 'every hatchable friend’s page shows their own cards on the journey stage');
+  assert.doesNotMatch(stage, /StepplingActions|familyId === 'steppling'/, 'the stage has no family branch left');
   const sheet = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
   assert.doesNotMatch(sheet, /BaristabbitStoryStage|BARISTABBIT_FIRST_MEETING/, 'no legacy Baristabbit stage or opener');
-  assert.match(sheet, /isHatchableCompanion\(props\.familyId\) \|\| \(props\.familyId === 'mossprout'/);
+  assert.match(sheet, /isHatchableCompanion\(props\.familyId\) \|\| props\.familyId === 'mossprout'/);
   const kingdom = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   assert.match(kingdom, /if \(tappedHatchable && \(offer\.hatchable\?\.state === 'board' \|\| \(tappedRun && tappedRun\.status !== 'completed' && !GLOW_GATEWAY_NODE_IDS\.includes\(tappedRun\.nodeId\)\)\)\) \{\s*if \(!tappedRun\) await startHatchableDiscovery\(tappedHatchable\);\s*await resumeHatchableDiscovery\(tappedHatchable, mergeWorldRef\.current\);/, 'a paid ticket re-docks the board; otherwise the bubble opens the panel with the price');
   assert.match(kingdom, /result = await payStoredHatchableMission\(confirmedHatchable\.companion, hatchableTicketReceiptId\(confirmedHatchable\.discoveryFlow\.runId\)\);[\s\S]*?await startHatchableDiscovery\(confirmedHatchable\);\s*await resumeHatchableDiscovery\(confirmedHatchable, result\.state\);/, 'confirm pays the ticket before the story begins');

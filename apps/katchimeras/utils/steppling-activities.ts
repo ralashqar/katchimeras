@@ -1,16 +1,12 @@
 import { STEPPLING_STEP_MILESTONES } from '../constants/steppling-activities';
-import { recordCompanionBondEvent, type CompanionBondState } from './companion-bond';
-import { companionIdForFamily } from '../constants/katchimera-skins';
+import type { CompanionBondState } from './companion-bond';
+import { claimStepMilestone, nextStepMilestone, stepMilestoneId } from './companion-step-milestones';
 
-export function stepplingMilestoneId(dayId: string, steps: number) { return `steppling:steps:${dayId}:${steps}`; }
+/** Steppling's step ladder by its old names; the ladder itself is shared tech (`companion-step-milestones.ts`). */
+export function stepplingMilestoneId(dayId: string, steps: number) { return stepMilestoneId('steppling', dayId, steps); }
 export function nextStepplingMilestone(state: CompanionBondState, dayId: string) {
-  return STEPPLING_STEP_MILESTONES.find((goal) => !state.events.some((event) => event.id === stepplingMilestoneId(dayId, goal.steps))) ?? null;
+  return nextStepMilestone('steppling', STEPPLING_STEP_MILESTONES, state, dayId);
 }
 export function claimStepplingMilestone(state: CompanionBondState, dayId: string, target: number, recordedSteps: number, now = Date.now()) {
-  const goal = nextStepplingMilestone(state, dayId);
-  if (!goal || goal.steps !== target || !Number.isFinite(recordedSteps) || recordedSteps < target) return null;
-  return recordCompanionBondEvent(state, {
-    id: stepplingMilestoneId(dayId, goal.steps), creatureId: companionIdForFamily('steppling'),
-    kind: 'quick_goal_completed', points: goal.bond, dayId, occurredAt: now,
-  }, { queueCelebration: true });
+  return claimStepMilestone('steppling', STEPPLING_STEP_MILESTONES, state, dayId, target, recordedSteps, now);
 }

@@ -18,6 +18,7 @@ import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorl
 import type { MergeWorldCommand, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import { readFileSync } from './helpers/content-fs';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
+import { STORY_TILES } from '@/constants/story-tiles/registry';
 import { sharedResidentAnchor } from '@/components/katchadeck/world/shared-resident-presentation';
 import type { KingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { loadNativeModule, nativeViews } from './helpers/native-motion-harness';
@@ -99,6 +100,7 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
     './shared-resident-presentation': { sharedResidentAnchor },
     '@/constants/mossprout-memory-plants': { mossproutMemoryPlantById: new Map() },
     '@/constants/hatchable-companions/tile-art': { hatchableTileArt: (tileId: string) => ({ full: `${tileId}:full`, medium: `${tileId}:512`, thumb: `${tileId}:256` }) },
+    '@/constants/story-tiles/tile-art': { storyTileArt: (tileId: string) => ({ full: `${tileId}:full`, medium: `${tileId}:512`, thumb: `${tileId}:256` }) },
     '@/components/katchadeck/world/kingdom-hex-scene': {
       tileVisibleBounds: (x: number, y: number) => ({ left: x - 200, top: y - 200, right: x + 200, bottom: y + 200 }),
     },
@@ -146,6 +148,23 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
       else assert.equal(revealed.source, fallback, 'missing bespoke art reuses the island fallback');
     }
   }
+  // No two layers share a hex: a story tile has its own place beside the islands and the friends' tiles.
+  const hexes = baseline.tileArtLayers.filter((layer) => !layer.id.endsWith(':growth') && layer.id !== 'structure:mossprout-hex-garden').map((layer) => `${layer.coord.q},${layer.coord.r}`);
+  assert.equal(new Set(hexes).size, hexes.length, `every layer on its own hex: ${hexes.join(' ')}`);
+  // A story tile: mist until its episode reveals it; revealing it moves nothing else and keeps the envelope.
+  for (const tile of STORY_TILES) {
+    const id = `structure:${tile.id}`;
+    const before = build();
+    const misted = before.tileArtLayers.find((layer) => layer.id === id)!;
+    assert.ok(misted, `${id} is on the map under the Mist`);
+    const revealedScene = module.buildMossproutHexNeighborhoodScene([], levels, { level: 0, plantableMemories: [], storyTiles: { [tile.id]: 'revealed' } }) as KingdomHexScene;
+    assert.equal(revealedScene.width, baseline.width); assert.equal(revealedScene.height, baseline.height);
+    const revealed = revealedScene.tileArtLayers.find((layer) => layer.id === id)!;
+    assert.notEqual(revealed.source, misted.source, 'revealed, the tile paints its own art');
+    assert.deepEqual(revealed.interactionFrame, misted.interactionFrame, 'the footprint never moves');
+    assert.equal(revealed.residentAnchor, undefined, 'nobody stands on a story tile');
+    for (const layer of before.tileArtLayers.filter((candidate) => candidate.id !== id)) assert.deepEqual(revealedScene.tileArtLayers.find((candidate) => candidate.id === layer.id)?.frame, layer.frame);
+  }
   const catalog = module.MOSSPROUT_NATURE_ISLAND_ART as unknown as typeof import('@/components/katchadeck/world/mossprout-hex-neighborhood-scene').MOSSPROUT_NATURE_ISLAND_ART;
   const seed = catalog['seed-nursery'];
   const bespoke = catalog['pond-sanctuary'];
@@ -162,7 +181,9 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
 
 test('only the next authored level is offered, preserving costs and aggregate Haven progression', () => {
   const initial = worldUpgradeOffers(world());
-  assert.ok(initial.filter((offer) => offer.sleepingSkinId == null).every((offer) => offer.eligible));
+  // Resting friends and hatchable tiles still asleep under the Mist are on the map but not yet the player's business.
+  const awake = (offer: { sleepingSkinId?: unknown; hatchable?: { state: string } }) => offer.sleepingSkinId == null && offer.hatchable?.state !== 'sleeping';
+  assert.ok(initial.filter(awake).every((offer) => offer.eligible), 'every awake spot is eligible');
   assert.equal(initial.find((offer) => offer.id === 'nature:bloom-garden')?.transition, 'island_reveal');
   assert.equal(initial.find((offer) => offer.id === 'haven:mossprout')?.cost, 20);
   const offers = worldUpgradeOffers(restored());
@@ -185,7 +206,7 @@ test('unaffordable spots remain discoverable without story or resident prerequis
   const mist = offers.find((offer) => offer.id === 'mist:steppling-home')!;
   assert.equal(mist.eligible, true); assert.equal(mist.affordable, false); assert.equal(mist.missingGlow, 37);
   const locked = worldUpgradeOffers(createInitialMergeWorldState(NOW, ['mossprout']));
-  assert.ok(locked.filter((offer) => offer.sleepingSkinId == null).every((offer) => offer.eligible));
+  assert.ok(locked.filter((offer) => offer.sleepingSkinId == null && offer.hatchable?.state !== 'sleeping').every((offer) => offer.eligible), 'every awake spot is eligible');
   assert.equal(locked.find((offer) => offer.id === 'nature:bloom-garden')?.eligible, true);
   assert.ok(visibleWorldUpgradeOffers(locked, undefined, null).some((offer) => offer.sleepingSkinId != null), 'resting friends stay visible on the map');
 });

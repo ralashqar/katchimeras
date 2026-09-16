@@ -1,6 +1,6 @@
 import { ensureGardenLesson, hatchableForCompanion } from '@/features/onboarding/hatchable-runtime';
 import { gardenHandoffPendingFor } from '@/utils/steppling-day-one-session';
-import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from '@/features/content-flow/steppling-day-one-flow-v2';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from '@/features/content-flow/legacy/steppling-day-one-flow-v2';
 import { recordLifeFlow } from '@/utils/companion-life-recording';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadCompanionContentState, saveCompanionContentState } from '@/utils/companion-content-storage';
@@ -9,7 +9,7 @@ import { localDayId } from '@/utils/world-identity';
 import { bootstrapContentFlowCatalog } from '@/features/content-flow/content-flow-bootstrap';
 import { startContentFlow, dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
 import { loadContentFlowRun, reduceContentFlowRunAtomically } from '@/features/content-flow/content-flow-repository';
-import { LEGACY_STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/steppling-day-one-flow-v1';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/legacy/steppling-day-one-flow-v1';
 import { contentFlowDefinition } from '@/features/content-flow/content-flow-catalog';
 import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
 import { hatchableEggProgress } from '@/features/onboarding/steppling-egg-policy';

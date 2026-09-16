@@ -11,7 +11,7 @@ import { EggActionDock, EggQuestionPanel } from '@/components/katchadeck/home/to
 import { eggQuestionAction } from '@/features/onboarding/egg-question-action';
 import { hatchableEggReady, hatchWispClearedCount, type HatchableEggProgress } from '@/features/onboarding/hatchable-egg-policy';
 import { HATCH_PROFILES, HATCH_ANSWER_BOND } from '@/features/onboarding/hatch-profile';
-import type { useHatchableEncounter } from '@/features/onboarding/use-steppling-encounter';
+import type { useHatchableEncounter } from '@/features/onboarding/use-hatchable-encounter';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 

@@ -61,6 +61,7 @@ import { worldEggReadyEffectsVisible, type WorldFtueSubjectPresentation } from '
 import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
 import { hatchableByCompanion, hatchableByTile } from '@/constants/hatchable-companions/registry';
+import { STORY_TILES, storyTileById } from '@/constants/story-tiles/registry';
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
@@ -189,6 +190,8 @@ type Props = {
   onGatewayTargetChange?: (node: View | null) => void;
   /** Screen-space node of an island's tile, for Glow flights into it during its restoration. */
   onNatureIslandTargetChange?: (islandId: MossproutNatureIslandId, node: View | null) => void;
+  /** Screen-space node of a story tile, for Glow flights and wisps while a journey board is docked beneath it. */
+  onStoryTileTargetChange?: (tileId: string, node: View | null) => void;
   storyOperationsEnabled?: boolean;
   worldEggTargetRef?: RefObject<ViewType | null>;
   worldSubjectPresentation?: WorldFtueSubjectPresentation | null;
@@ -513,6 +516,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onSelectGateway,
   onGatewayTargetChange,
   onNatureIslandTargetChange,
+  onStoryTileTargetChange,
   storyOperationsEnabled = true,
   worldEggTargetRef,
   worldSubjectPresentation,
@@ -543,6 +547,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const revealingHatchableTileId = upgradePresentation?.visualTarget?.kind === 'haven_structure' && hatchableByTile(upgradePresentation.visualTarget.structureId)
     ? upgradePresentation.visualTarget.structureId : null;
   const revealingStepplingEgg = revealingHatchableTileId != null && upgradePresentation?.fromStage === 0;
+  // A story tile clearing from the Mist: a journey episode's consequence.
+  const revealingStoryTileId = upgradePresentation?.visualTarget?.kind === 'haven_structure' && storyTileById(upgradePresentation.visualTarget.structureId)
+    ? upgradePresentation.visualTarget.structureId : null;
   // One clock owns both the restored tile and its Egg, including slow art loads.
   const stepplingRevealProgress = useSharedValue(0);
   useLayoutEffect(() => {
@@ -633,6 +640,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       : mossproutNatureIslandLevels;
     const fromGarden = revealingHatchableTileId
       ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), hatchableTiles: { ...mossproutGarden?.hatchableTiles, [revealingHatchableTileId]: upgradePresentation.fromStage === 0 ? 'locked' as const : 'egg' as const } }
+      : revealingStoryTileId
+      ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), storyTiles: { ...mossproutGarden?.storyTiles, [revealingStoryTileId]: 'misted' as const } }
       : upgradePresentation.visualTarget?.kind === 'haven_structure'
       && upgradePresentation.visualTarget.structureId === 'mossprout-hex-garden'
       ? { ...(mossproutGarden ?? { plantableMemories: [] }), level: upgradePresentation.fromStage }
@@ -647,7 +656,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     // The opening's lift keeps the veiled, solo world: the from-scene must not
     // bring the Garden and the islands in for the length of the crossblend.
     return buildMossproutHexNeighborhoodScene(fromSlots, fromNatureLevels, fromGarden, fromReveals, { homeVeiled: homeVeil === 'veiled' || homeVeil === 'lifting', homeSolo });
-  }, [committedScene, companionSlots, focusedMossproutWorld, homeSolo, homeVeil, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingHatchableTileId, upgradePresentation]);
+  }, [committedScene, companionSlots, focusedMossproutWorld, homeSolo, homeVeil, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingHatchableTileId, revealingStoryTileId, upgradePresentation]);
   const scene = upgradePresentation
     ? upgradeFromScene
     : storySceneGuard?.scene ?? committedScene;
@@ -711,6 +720,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const atStage = (state: 'locked' | 'egg') => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels!, { ...mossproutGarden, level: mossproutGarden?.level ?? 0, plantableMemories: mossproutGarden?.plantableMemories ?? [], hatchableTiles: { ...mossproutGarden?.hatchableTiles, [revealingHatchableTileId]: state } });
       const fromLayer = atStage(upgradePresentation.fromStage === 0 ? 'locked' : 'egg').tileArtLayers.find((layer) => layer.id === layerId);
       const toLayer = atStage('egg').tileArtLayers.find((layer) => layer.id === layerId);
+      return fromLayer && toLayer ? { fromLayer, toLayer, tile: { id: toLayer.id, cx: toLayer.frame.left + toLayer.frame.width / 2, cy: toLayer.frame.top + toLayer.frame.height / 2 } } : null;
+    }
+    if (focusedMossproutWorld && revealingStoryTileId) {
+      const layerId = `structure:${revealingStoryTileId}`;
+      const atState = (state: 'misted' | 'revealed') => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels!, { ...mossproutGarden, level: mossproutGarden?.level ?? 0, plantableMemories: mossproutGarden?.plantableMemories ?? [], storyTiles: { ...mossproutGarden?.storyTiles, [revealingStoryTileId]: state } }, mossproutNatureIslandReveals);
+      const fromLayer = atState('misted').tileArtLayers.find((layer) => layer.id === layerId);
+      const toLayer = atState('revealed').tileArtLayers.find((layer) => layer.id === layerId);
       return fromLayer && toLayer ? { fromLayer, toLayer, tile: { id: toLayer.id, cx: toLayer.frame.left + toLayer.frame.width / 2, cy: toLayer.frame.top + toLayer.frame.height / 2 } } : null;
     }
     if (focusedMossproutWorld && upgradePresentation.natureIslandId && mossproutNatureIslandLevels) {
@@ -778,7 +794,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const toLayer = toScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const tile = toScene.tiles.find((candidate) => candidate.id === `family:${upgradePresentation.characterId}`);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingHatchableTileId, scene.centerTile, upgradePresentation, verticalAlignmentSelection]);
+  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingHatchableTileId, revealingStoryTileId, scene.centerTile, upgradePresentation, verticalAlignmentSelection]);
   const discoveryLayers = useMemo(() => {
     if (!discoveryRevealFamilyId) return null;
     const revealed = companionSlots.find((slot) => slot.familyId === discoveryRevealFamilyId && slot.kind === 'revealed_egg');
@@ -825,6 +841,15 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (onNatureIslandTargetChange) for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) refs.set(islandId, (node) => onNatureIslandTargetChange(islandId, node));
     return refs;
   }, [onNatureIslandTargetChange]);
+  const storyTileTargetRefs = useMemo(() => {
+    const refs = new Map<string, (node: View | null) => void>();
+    if (onStoryTileTargetChange) for (const tile of STORY_TILES) refs.set(tile.id, (node) => onStoryTileTargetChange(tile.id, node));
+    return refs;
+  }, [onStoryTileTargetChange]);
+  const storyTileFrames = useMemo(() => STORY_TILES.flatMap((tile) => {
+    const layer = scene.tileArtLayers.find((candidate) => candidate.id === `structure:${tile.id}`);
+    return layer ? [{ tileId: tile.id, frame: layer.interactionFrame ?? layer.frame }] : [];
+  }), [scene.tileArtLayers]);
   const natureIslandFrames = useMemo(() => scene.tileArtLayers.flatMap((layer) => {
     if (!layer.id.startsWith('nature:mossprout:') || layer.id.endsWith(':growth') || !layer.interactionFrame) return [];
     return [{
@@ -871,8 +896,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const initialTutorialFocus = useMemo(() => {
     if (!initialTutorialCameraScale || !tutorialCamera || tutorialCamera.kind !== 'focus_target') return null;
     const target = tutorialCamera.target;
-    if (target.kind === 'haven_gateway') {
-      const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${gatewayTileId}`)?.frame;
+    if (target.kind === 'haven_gateway' || target.kind === 'haven_structure') {
+      const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${target.kind === 'haven_structure' ? target.structureId : gatewayTileId}`)?.frame;
       return frame ? {
         durationMs: tutorialCamera.durationMs,
         initialScale: initialTutorialCameraScale,
@@ -1065,8 +1090,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const targetCharacterId = target.kind === 'haven_tile' || target.kind === 'haven_resident'
       ? target.characterId
       : null;
-    if (target.kind === 'haven_gateway') {
-      const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${gatewayTileId}`)?.frame;
+    if (target.kind === 'haven_gateway' || target.kind === 'haven_structure') {
+      const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${target.kind === 'haven_structure' ? target.structureId : gatewayTileId}`)?.frame;
       if (!frame) return;
       appliedTutorialCameraRef.current = applicationKey;
       focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, { anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom, unbounded: true });
@@ -1858,6 +1883,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 />
               );
             }) : null}
+            {focusedMossproutWorld && onStoryTileTargetChange ? storyTileFrames.map(({ tileId, frame }) => (
+              <View key={`story-tile-target-${tileId}`} ref={storyTileTargetRefs.get(tileId)} collapsable={false} pointerEvents="none" style={[styles.natureIslandHitTarget, frame]} />
+            )) : null}
             {focusedMossproutWorld && (mossproutGarden?.hatchableTiles?.[gatewayTileId] ?? mossproutGarden?.gateway) ? scene.tileArtLayers.filter((layer) => layer.id === `structure:${gatewayTileId}`).map((layer) => (
               <Pressable ref={onGatewayTargetChange} collapsable={false} key={gatewayTileId} accessibilityRole="button" accessibilityLabel={(mossproutGarden.hatchableTiles?.[gatewayTileId] ?? mossproutGarden.gateway) === 'locked' ? `${hatchableByTile(gatewayTileId)?.tile.name ?? 'Misty clearing'}, clear mist for ${hatchableByTile(gatewayTileId)?.tile.price ?? 40} Glow` : 'A new friend is resting here'} onPress={interactionEnabled && !upgradePresentation ? onSelectGateway : undefined} style={[styles.natureIslandHitTarget, layer.frame]}>
               </Pressable>

@@ -22,6 +22,7 @@ type Frame = { height: number; width: number; x: number; y: number };
 
 export function havenFtueTargetKey(target: FtueTarget): string | null {
   if (target.kind === 'haven_gateway') return 'shared-world:gateway';
+  if (target.kind === 'haven_structure') return `shared-world:${target.structureId}`;
   if (target.kind === 'haven_tile') return `tile:${target.characterId}`;
   if (target.kind === 'haven_tile_hud') return `hud:${target.characterId}`;
   if (target.kind === 'haven_upgrade_button') return `upgrade:${target.characterId}`;

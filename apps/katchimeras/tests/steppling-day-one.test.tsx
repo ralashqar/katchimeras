@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { stepplingDayOneConversation, legacyStepplingDayOneConversation, legacyStepplingDayOneConversationV2 } from '@/constants/steppling-day-one-conversation';
 import { STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/steppling-day-one-flow';
-import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from '@/features/content-flow/steppling-day-one-flow-v2';
-import { LEGACY_STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/steppling-day-one-flow-v1';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from '@/features/content-flow/legacy/steppling-day-one-flow-v2';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/legacy/steppling-day-one-flow-v1';
 import { createConversationSession, answerConversation } from '@/utils/companion-conversation';
 import { migrateStepplingDayOneSession, stepplingGardenHandoffPending } from '@/utils/steppling-day-one-session';
 import { normalizeSpeechText } from '@/utils/speech-text';
@@ -114,7 +114,7 @@ function settlement(initial?: ContentFlowRun) {
     '@/features/onboarding/hatchable-flows': { hatchableFlows: () => ({ dayOne: STEPPLING_DAY_ONE_FLOW }) },
     '@/features/onboarding/steppling-egg-policy': { hatchableEggProgress: (world: { stepplingEgg?: unknown }) => world.stepplingEgg },
     '@/constants/hatchable-companions/registry': { STEPPLING_HATCHABLE: { companion: 'steppling', displayName: 'Steppling', dayOne: { conversationId: stepplingDayOneConversation.id, flow: { runId: 'journey:steppling:day-1', version: STEPPLING_DAY_ONE_FLOW.version }, choiceVariable: 'movementChoice' } } },
-    '@/features/content-flow/steppling-day-one-flow-v2': { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 },
+    '@/features/content-flow/legacy/steppling-day-one-flow-v2': { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 },
     '@/utils/companion-life-recording': { recordLifeFlow() {} },
     '@/constants/steppling-day-one-conversation': { STEPPLING_DAY_ONE_CONVERSATION_ID: stepplingDayOneConversation.id },
     '@/utils/companion-content-storage': { loadCompanionContentState: () => state, saveCompanionContentState: (next: typeof state) => { state = next; } },
@@ -134,7 +134,7 @@ function settlement(initial?: ContentFlowRun) {
       reduceContentFlowRunAtomically: async ({ reduce }: { reduce: (current: ContentFlowRun) => ContentFlowRun }) => { run = reduce(run!); return { run }; },
     },
     '@/features/content-flow/steppling-day-one-flow': { STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID: 'journey:steppling:day-1' },
-    '@/features/content-flow/steppling-day-one-flow-v1': { LEGACY_STEPPLING_DAY_ONE_FLOW },
+    '@/features/content-flow/legacy/steppling-day-one-flow-v1': { LEGACY_STEPPLING_DAY_ONE_FLOW },
     '@/features/content-flow/content-flow-catalog': { contentFlowDefinition: (_id: string, version: number) => definitions.find((candidate) => candidate.version === version) },
   });
   return { module, grants: () => grants, pending: () => stepplingGardenHandoffPending(state.conversationSessions[0]), fail: (value: boolean) => { fail = value; } };

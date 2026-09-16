@@ -91,6 +91,10 @@ const BUILT_INS: readonly StoryCapabilityDefinition[] = [
   } },
   { id: 'glow.discovery.scene', kind: 'scene' },
   { id: 'glow.discovery.task', kind: 'task' },
+  // A journey episode's Dark Wisp: the consequence run waits on its board's bar.
+  { id: 'journey.mission', kind: 'task' },
+  { id: 'journey.garden_orders', kind: 'effect', idempotent: true, validatePayload: (payload) =>
+    typeof payload.objectiveId === 'string' && payload.objectiveId && typeof payload.storyArcId === 'string' && Array.isArray(payload.orders) && payload.orders.length > 0 ? null : 'Garden orders need an objective, an arc and at least one order' },
   ...['haven.start_glow_discovery', 'glow.lesson.prepare'].map((id) => ({ id, kind: 'effect' as const, idempotent: true })),
   { id: 'legacy.ftue.scene', kind: 'scene' },
   { id: 'legacy.ftue.task', kind: 'task' },

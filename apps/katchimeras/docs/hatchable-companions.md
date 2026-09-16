@@ -29,6 +29,15 @@ nothing in the screens, flows or engine names a friend.
 4. **A journey profile** in `constants/companion-journey-profiles.ts` (daily garden titles, request
    titles), and the friend's `KATCHIMERA_MERGE_PROFILES` entry and spawner must already exist in the
    merge catalogue.
+5. **Daily cards** as the definition's `daily` block (`types/companion-daily.ts`): the day's question
+   polls, an optional photo, noticing prompt, water, a daily moment, and an optional step goal with the
+   friend's milestones and lines. The shared cards (`companion-daily-actions.tsx`) draw all of it.
+6. **A journey chapter** (optional) in `constants/companion-journey-chapters/<name>.ts`, registered in
+   `COMPANION_JOURNEY_CHAPTERS`; see `journey-chapters.md`. Without one the page shows the daily cards
+   and the idle line.
+
+`tests/legacy-guard.test.ts` keeps the shared tech free of friend names and of imports of what the
+refactor removed; `tests/companion-registry.test.ts` walks every chapter and daily config.
 
 `tests/hatchable-companions.test.ts` walks every definition: unique ids and tiles, art registered and
 bounded, flows that compile, a lesson the spawner can feed, and a mission board with no dead end and
@@ -42,7 +51,7 @@ one legal move at every strike after the first.
   cleared and the Egg entered, advances the mist upgrade, repairs and reconciles lessons, and reads
   every friend's runs in one subscription (`useHatchableRuns`, `activeHatchableFor`).
 - `features/onboarding/hatchable-egg-policy.ts` reduces any Egg on its policy (steps, photo or
-  answer feed); `use-steppling-encounter.ts` and `steppling-encounter-panel.tsx` export the generic
+  answer feed); `use-hatchable-encounter.ts` and `hatchable-encounter-panel.tsx` export the generic
   hook and panel with Steppling's names as wrappers.
 - `utils/merge-world/glow-discovery-policy.ts`: tile state (`sleeping | saving | ready | egg | open`),
   availability, the purchase refusal while a tile sleeps, the gate written at the hatch.
@@ -69,6 +78,7 @@ one legal move at every strike after the first.
   a hatchable friend's column and `companion-daily-question.tsx` the day's question for anyone,
   Steppling included. Only Steppling's step goal is still his own. A photo feed for the Egg
   (`feed.kind: 'photo'`) uses the Egg's own capture session; Baristabbit's Egg hatches on answers alone.
-- Journey chapters (journey days with merge orders and rest cycles) are still authored per family
-  (Steppling, Mossprout); a hatchable friend without one shows their daily cards and idle line.
+- Journey chapters are episodes unlocked by progress, played as conversations (see
+  `journey-chapters.md`); Steppling has one, a hatchable friend without one shows their daily
+  cards and idle line.
 - Fixtures: no "Before Baristabbit" profile snapshot yet.

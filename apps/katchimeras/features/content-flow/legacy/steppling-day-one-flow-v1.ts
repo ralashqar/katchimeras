@@ -1,4 +1,4 @@
-import { defineStory, story } from './story-manifest';
+import { defineStory, story } from '../story-manifest';
 import { STEPPLING_MOVEMENT_OPTIONS } from '@/features/onboarding/steppling-egg-policy';
 
 export const STEPPLING_DAY_ONE_RUN_ID = 'journey:steppling:day-1';

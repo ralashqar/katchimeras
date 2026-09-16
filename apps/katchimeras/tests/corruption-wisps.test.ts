@@ -69,7 +69,7 @@ test('the Glow aims at the wisps: every burst at the first standing, the finale 
   assert.match(screen, /specs: activeHatchable\.mission\.wisps, lines: activeHatchable\.mission\.lines, settled: ftueCameraSettled, revealNonce: stepplingRevealNonce \}/);
   // Full mist bursting open on the board: the dock reports it, the Kingdom bumps the nonce, the wisps say the line once, a beat after the strike.
   assert.equal(STEPPLING_WISP_LINES.reveal, 'It was holding more.');
-  assert.match(readFileSync('components/katchadeck/world/steppling-mission-dock.tsx', 'utf8'), /if \(result\?\.revealedMistCells\?\.length\) onReveal\?\.\(result\.revealedMistCells\.length\);/);
+  assert.match(readFileSync('components/katchadeck/world/hatchable-mission-dock.tsx', 'utf8'), /if \(result\?\.revealedMistCells\?\.length\) onReveal\?\.\(result\.revealedMistCells\.length\);/);
   assert.match(screen, /onFinale=\{launchStepplingFinale\} onReveal=\{bumpStepplingReveal\}/);
   assert.match(layerSource, /if \(!key \|\| !revealNonce \|\| spokenRevealRef\.current === key \|\| !lines\?\.reveal\) return;[\s\S]*?setTimeout\(\(\) => setCaption\(\{ id: \+\+captionSeq\.current, text \}\), REVEAL_LINE_DELAY_MS\)/);
   assert.match(screen, /specs: OPENING_WISPS, lines: OPENING_WISP_LINES, settled: ftueCameraSettled \}/);

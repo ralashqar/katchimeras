@@ -12,7 +12,7 @@ Egg then starts this encounter; no world route or transition curtain is involved
   Scenes use `journey.reflection`; its optional choices are action edges. Closing
   leads to the reusable `journey.grant_generator_parcel` effect. Keep the reward
   ID stable when changing copy so existing players do not receive another parcel.
-- `components/katchadeck/world/steppling-encounter-panel.tsx`: uses the original
+- `components/katchadeck/world/hatchable-encounter-panel.tsx`: uses the original
   `EggQuestionPanel` and `EggActionDock` from Today Nurture, including the question,
   Bond reward header, illustrated options, typefaces and selection lifecycle.
   Both Eggs use the same `eggQuestionAction` adapter. The steps offer retains the

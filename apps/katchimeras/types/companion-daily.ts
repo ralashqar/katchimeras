@@ -75,6 +75,33 @@ export type CompanionNoticeActivityConfig = {
   prompts: readonly CompanionNoticePrompt[];
 };
 
+/**
+ * A Daily Moment: one tap a day, apart from the chapters. What the friend
+ * asks, the answers, and the reply to each; a journey line can read the
+ * answer back as `{{today}}`.
+ */
+export type CompanionDailyMomentConfig = {
+  title: string;
+  prompt: string;
+  artKey: KatchimeraActionArtKey;
+  options: readonly { id: string; label: string; icon?: string }[];
+  replies: Readonly<Record<string, string>>;
+  /** The reply when an answer has none of its own. */
+  thanks: string;
+};
+
+/** A friend's daily step ladder and what they say about it. */
+export type CompanionStepGoalConfig = {
+  kind: 'steps';
+  milestones: readonly { steps: number; bond: number }[];
+  lines: {
+    /** Said when the goal is tapped before it is reached, with the steps left. */
+    remaining: (steps: number) => string;
+    /** Said once the milestone's Bond has flown. */
+    claimed: (steps: number) => string;
+  };
+};
+
 export type CompanionDailyConfig = {
   /** The chapter name over the journey card until a journey chapter says otherwise. */
   chapterTitle: string;
@@ -93,6 +120,10 @@ export type CompanionDailyConfig = {
   notice?: CompanionNoticeActivityConfig;
   /** The friend's water break (Mossprout's garden water). */
   water?: boolean;
+  /** One tap a day: what today was like, in the friend's words. */
+  moment?: CompanionDailyMomentConfig;
+  /** A daily goal the friend keeps with the player (Steppling's steps). */
+  goal?: CompanionStepGoalConfig;
   /** The day's question is one of these scenario polls. */
   polls: readonly ConversationPollSeed[];
 };

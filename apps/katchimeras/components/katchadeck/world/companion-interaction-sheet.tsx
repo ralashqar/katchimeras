@@ -59,8 +59,6 @@ import { CompanionFtueCoachmark } from '@/components/katchadeck/onboarding/compa
 import { MossproutFtueStoryStage } from './mossprout-ftue-story-stage';
 import { CompanionMeditationStage, journeyForeshadowLine } from './companion-meditation-stage';
 import { CompanionJourneyCycleStage } from './companion-journey-cycle-stage';
-import { currentJourneyCycle } from '@/game/katchimeras/companion-journey-cycle';
-import { adoptMossproutCycle } from '@/features/companion/companion-journey-service';
 import { isAuthoredCohortFamily, loadAuthoredCohortStory } from '@/utils/companion-story-storage';
 import { MossproutStoryStage } from './mossprout-story-stage';
 import { CompanionConversationScene, conversationSpeechLine } from './companion-conversation-scene';
@@ -189,10 +187,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const shownFtueMemoryNoticeRef = useRef<string | null>(null);
   const shownFtueBondMemoryNoticeRef = useRef<string | null>(null);
   const relationships = useRelationshipProgression();
-  const journeyCycle = currentJourneyCycle(relationships, props.familyId);
-  useEffect(() => {
-    if (props.familyId === 'mossprout' && !props.ftueCompanionSurfaceOwned && !props.ftueProfileStep) adoptMossproutCycle();
-  }, [props.familyId, props.ftueCompanionSurfaceOwned, props.ftueProfileStep, relationships.journeyDays]);
   const storedMeditation = katchimeraMeditationRecord(relationships, props.familyId);
   const meditationAvailableAt = storedMeditation?.availableAt;
   const [meditationNow, setMeditationNow] = useState(Date.now());
@@ -296,8 +290,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const onInitialConversationComplete = props.onInitialConversationComplete;
   const onCompletedConversationExit = props.onCompletedConversationExit;
   const unifiedJourneyActive = !props.ftueCompanionSurfaceOwned && !props.ftueProfileStep && (
-    // Every hatchable friend (Steppling first) lives on the journey stage; Mossprout joins it while a cycle is open.
-    isHatchableCompanion(props.familyId) || (props.familyId === 'mossprout' && journeyCycle != null && journeyCycle.returnedAt == null)
+    // Every friend with a chapter lives on the journey stage: the hatchable friends, and Mossprout once his first session is over.
+    isHatchableCompanion(props.familyId) || props.familyId === 'mossprout'
   );
   const onBondCelebrationComplete = props.onBondCelebrationComplete;
   const bondRewardTargetRef = useRef<ViewType | null>(null);

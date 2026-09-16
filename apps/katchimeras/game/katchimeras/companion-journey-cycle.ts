@@ -34,7 +34,7 @@ export function createJourneyCycle(input: Pick<CompanionJourneyCycle, 'id' | 'fa
   };
 }
 
-export function installJourneyCycle(state: RelationshipProgressState, cycle: CompanionJourneyCycle): RelationshipProgressState {
+export function installJourneyCycle(state: RelationshipProgressState, cycle: CompanionJourneyCycle, restMs = JOURNEY_REST_MS): RelationshipProgressState {
   if (state.journeyCycles?.some((item) => item.id === cycle.id)) return state;
   const current = currentJourneyCycle(state, cycle.familyId);
   if (current && !current.returnedAt) return state;
@@ -42,7 +42,7 @@ export function installJourneyCycle(state: RelationshipProgressState, cycle: Com
   return {
     ...state, journeyCycles: [...(state.journeyCycles ?? []), cycle],
     meditations: [...(state.meditations ?? []).filter((item) => item.familyId !== cycle.familyId), {
-      ...(existingRest ?? { familyId: cycle.familyId, startedAt: cycle.completedAt, availableAt: cycle.completedAt + JOURNEY_REST_MS, reason: 'journey_rest' as const, settledMs: 0, settlementReceiptIds: [] }),
+      ...(existingRest ?? { familyId: cycle.familyId, startedAt: cycle.completedAt, availableAt: cycle.completedAt + restMs, reason: 'journey_rest' as const, settledMs: 0, settlementReceiptIds: [] }),
       sourceId: existingRest?.sourceId ?? cycle.id, cycleId: cycle.id,
     }],
   };

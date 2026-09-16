@@ -1,5 +1,5 @@
-import { defineStory, story } from './story-manifest';
-import { lifeQuestion, lifeHabitOfferNodes } from './companion-life-flow';
+import { defineStory, story } from '../story-manifest';
+import { lifeQuestion, lifeHabitOfferNodes } from '../companion-life-flow';
 import { STEPPLING_LIFE_EPISODES } from '@/constants/steppling-life-chapter';
 
 export const STEPPLING_DAY_ONE_RUN_ID = 'journey:steppling:day-1';

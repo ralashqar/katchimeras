@@ -1,35 +1,43 @@
-import { COMPANION_JOURNEY_CHAPTERS, journeyChapterFor, journeyChapterForEpisode } from '@/constants/companion-journey-chapters/registry';
-import { journeyEpisodeFlow, journeyEpisodeId } from '@/constants/companion-journey-chapters/episode-flow';
+import { COMPANION_JOURNEY_CHAPTERS, journeyChapterFor, journeyEpisodeById, journeyEpisodeRecordId } from '@/constants/companion-journey-chapters/registry';
 import { COMPANION_JOURNEY_PROFILES } from '@/constants/companion-journey-profiles';
-import { MOSSPROUT_CAMPAIGN_EPISODES } from '@/constants/mossprout-campaign';
 import { beginJourneyReturnPresentation, completeMeditationRequest, settleDailyGardenDelivery, createJourneyCycle, currentJourneyCycle, finishJourneyReturn, installJourneyCycle, journeyCycleReady, observeJourneySteps, observeJourneyStepWindow } from '@/game/katchimeras/companion-journey-cycle';
 import { relationshipProgressionRepository as repository } from '@/storage/repositories/relationship-progression-repository';
 import { homeRepository } from '@/storage/repositories/home-repository';
-import { beginAuthoredCohortStory, loadAuthoredCohortStory, saveAuthoredCohortStory } from '@/utils/companion-story-storage';
+import { beginAuthoredCohortStory, isAuthoredCohortFamily, loadAuthoredCohortStory, saveAuthoredCohortStory } from '@/utils/companion-story-storage';
+import { katchimeraMeditationRecord, mossproutStory } from '@/game/katchimeras/relationship-progression';
+import type { RelationshipProgressState } from '@/types/relationship-progression';
 import { grantStoredJourneyReturn, loadMergeWorldState, reconcileStoredJourneyMeditation } from '@/utils/merge-world/repository';
+import { JOURNEY_GARDEN_ORDERS_EFFECT, episodeConsequences } from '@/constants/companion-journey-chapters/consequence-flow';
 import { localDayId } from '@/utils/world-identity';
 import type { JourneyParticipation } from '@/types/companion-journey-cycle';
-import type { CompanionJourneyChapterDefinition } from '@/types/companion-journey-chapter';
-import type { ContentFlowRun, ContentFlowDefinition } from '@/types/content-flow';
+import type { CompanionJourneyChapterDefinition, JourneyEpisodeDefinition } from '@/types/companion-journey-chapter';
+import type { ConversationSession } from '@/types/companion-conversation';
+import type { ContentFlowDefinition } from '@/types/content-flow';
 import type { LifeCompanionFamily } from '@/constants/companion-life-content';
+import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { registerContentFlowEffect } from '@/features/content-flow/content-flow-capabilities';
 import { registerContentFlowDefinition } from '@/features/content-flow/content-flow-catalog';
-import { dispatchContentFlowCommand, publishContentFlowDomainEvent, startContentFlow } from '@/features/content-flow/content-flow-director';
+import { dispatchContentFlowCommand, startContentFlow } from '@/features/content-flow/content-flow-director';
 import { loadContentFlowRun } from '@/features/content-flow/content-flow-repository';
 import { hatchableEggProgress } from '@/features/onboarding/hatchable-egg-policy';
-import { acceptDailyStoryHabit } from '@/utils/companion-life-storage';
+import { acceptDailyStoryHabit, rememberCompanionMoment } from '@/utils/companion-life-storage';
 import { recordLifeFlow } from '@/utils/companion-life-recording';
 import { selectedStoryHabit } from '@/utils/companion-life';
 import { loadCompanionQuickGoalState, saveCompanionQuickGoalState } from '@/utils/companion-quick-goal-storage';
 import { updateCompanionQuickGoal } from '@/utils/companion-quick-goals';
+import { COMPANION_BOND_REWARDS, recordCompanionBondEvent } from '@/utils/companion-bond';
+import { loadCompanionBondState, saveCompanionBondState } from '@/utils/companion-bond-storage';
+import { companionIdForFamily } from '@/constants/katchimera-skins';
+import { registerJourneyConsequenceFlows, resumeJourneyConsequences, startJourneyConsequence } from '@/features/companion/journey-consequences';
 
 /**
- * The journey service, generic over a friend's chapter: it starts each rest,
- * migrates a save from before the chapter system, projects the chapter's
- * orders into the friend's story, begins and reconciles each journey day's
- * flow, settles a rest from the Garden and the friend's evidence, and pays
- * the return. Which friend it is comes from the chapter registry; Mossprout's
- * campaign is adopted as his chapter.
+ * The journey service, generic over a friend's chapter: it brings a save
+ * under the chapter (migrating the day-and-rest era), records an episode's
+ * completion with its answers and facts, pays its Bond, starts the
+ * reflecting pause, keeps the friend's Garden orders in step, settles a rest
+ * from the Garden and the friend's evidence, and pays the return. Which
+ * episode opens next is the trigger module's answer
+ * (`features/companion/journey-triggers.ts`).
  */
 export const journeyCycleId = (familyId: string, episodeId: string) => `journey-cycle:${familyId}:${episodeId}`;
 const inFlight = new Map<string, Promise<unknown>>();
@@ -53,18 +61,70 @@ function stepBaselines() {
   return Object.fromEntries(home ? [home.today, ...home.archivedDays].map((day) => [day.stepsCountDayId ?? day.isoDate, Math.max(0, day.stepsCount)]) : []);
 }
 
-const orderId = (chapter: CompanionJourneyChapterDefinition, key: string) => `${chapter.orders.idPrefix}${key}`;
-const signatureOrderId = (chapter: CompanionJourneyChapterDefinition) => orderId(chapter, chapter.orders.signature.key);
+const orderId = (chapter: CompanionJourneyChapterDefinition, key: string) => `${chapter.orders?.idPrefix ?? ''}${key}`;
+const signatureOrderId = (chapter: CompanionJourneyChapterDefinition) => chapter.orders ? orderId(chapter, chapter.orders.signature.key) : null;
+const episodeIndex = (chapter: CompanionJourneyChapterDefinition, episodeId: string) => chapter.episodes.findIndex((episode) => episode.id === episodeId);
 
-export function startJourneyRest(familyId: string, number: number, participation: JourneyParticipation = 'not_yet', now = Date.now()) {
+/** The friend rests after an episode: a cycle (its requests shorten the pause) and a meditation record. */
+export function startJourneyRest(familyId: string, episodeId: string, participation: JourneyParticipation = 'not_yet', now = Date.now()) {
   const chapter = requireChapter(familyId);
-  const day = chapter.days[number - 1];
-  if (!day) throw new Error(`Unknown episode of ${chapter.title}`);
+  const index = episodeIndex(chapter, episodeId);
+  const episode = chapter.episodes[index];
+  if (!episode) throw new Error(`Unknown episode of ${chapter.title}`);
+  const reflectMs = episode.reflectMs ?? chapter.reflectMs;
   repository.update((state) => installJourneyCycle(state, createJourneyCycle({
-    id: journeyCycleId(chapter.familyId, journeyEpisodeId(chapter, number)), familyId: chapter.familyId, episodeId: journeyEpisodeId(chapter, number), number,
-    chapterId: chapter.chapterId, title: day.title, nextTitle: chapter.days[number]?.title ?? null,
-    completedAt: now, finale: number === chapter.days.length, participation, stepBaselines: stepBaselines(),
-  })));
+    id: journeyCycleId(chapter.familyId, episode.id), familyId: chapter.familyId, episodeId: episode.id, number: index + 1,
+    chapterId: chapter.chapterId, title: episode.title, nextTitle: chapter.episodes[index + 1]?.title ?? null,
+    completedAt: now, finale: index === chapter.episodes.length - 1, participation, stepBaselines: stepBaselines(),
+  }), reflectMs));
+}
+
+/** Marks an episode complete: once, with what the player answered, its facts, its Bond and a journal moment; then the friend reflects. */
+export function completeJourneyEpisode(familyId: string, episodeId: string, input: { session?: ConversationSession | null; now?: number } = {}) {
+  const found = journeyEpisodeById(familyId, episodeId);
+  if (!found) throw new Error(`Unknown episode ${episodeId} for ${familyId}`);
+  const { chapter, episode, compiled } = found;
+  const now = input.now ?? Date.now();
+  const recordId = journeyEpisodeRecordId(chapter.familyId, episode.id);
+  if (repository.load().journeyEpisodes?.[recordId]) return false;
+  const answers: Record<string, string> = {};
+  const facts: Record<string, string> = {};
+  for (const turn of input.session?.turns ?? []) {
+    answers[turn.nodeId] = turn.optionId;
+    const fact = compiled?.facts[turn.optionId];
+    if (fact) facts[fact.key] = fact.value;
+  }
+  repository.update((state) => chapter.onEpisodeComplete?.({ ...state, journeyEpisodes: { ...(state.journeyEpisodes ?? {}), [recordId]: { familyId: chapter.familyId, episodeId: episode.id, completedAt: now, answers, facts } } }, episode, now)
+    ?? { ...state, journeyEpisodes: { ...(state.journeyEpisodes ?? {}), [recordId]: { familyId: chapter.familyId, episodeId: episode.id, completedAt: now, answers, facts } } });
+  // A beat that grows the friend's home: the stage is recorded on their story, where the Haven reads it.
+  if (episode.habitatStage && chapter.familyId === 'mossprout') {
+    repository.update((state) => {
+      const story = mossproutStory(state, now);
+      if (story.habitatStage >= episode.habitatStage!) return state;
+      return { ...state, stories: { ...state.stories, mossprout: { ...story, habitatStage: episode.habitatStage!, updatedAt: now } } };
+    });
+  }
+  if (!episode.dayOne) {
+    const bond = loadCompanionBondState();
+    const award = recordCompanionBondEvent(bond, { id: `journey:${recordId}`, kind: 'journey_day_completed', creatureId: companionIdForFamily(chapter.familyId as KatchimeraFamilyId),
+      points: episode.bond ?? COMPANION_BOND_REWARDS.journey_day_completed, occurredAt: now, dayId: localDayId(new Date(now)) }, { queueCelebration: false });
+    if (award.awarded) saveCompanionBondState(award.state);
+    const journalFacts: Record<string, string> = {};
+    for (const turn of input.session?.turns ?? []) {
+      const node = compiled?.definition.nodes.find((item) => item.id === turn.nodeId);
+      if (node?.kind !== 'choice' || node.options.length < 2) continue;
+      const option = node.options.find((item) => item.id === turn.optionId);
+      if (option) journalFacts[`${chapter.familyId}:${episode.id}:${node.id}`] = `${node.prompt} You chose “${option.label}”.`;
+    }
+    rememberCompanionMoment({ id: `journey:${recordId}`, familyId: chapter.familyId as LifeCompanionFamily, kind: episodeIndex(chapter, episode.id) === chapter.episodes.length - 1 ? 'chapter' : 'conversation',
+      title: episode.title, createdAt: now, updatedAt: now, facts: journalFacts });
+  }
+  // A chapter with no pauses of its own (Mossprout's, beside his campaign) leaves the friend's rests to what already keeps them.
+  if ((episode.reflectMs ?? chapter.reflectMs) > 0) startJourneyRest(chapter.familyId, episode.id, 'not_yet', now);
+  projectJourneyOrders(chapter.familyId);
+  // The episode's world consequence plays on the Kingdom; its run is durable, so a failure here is retried on resume.
+  if (episodeConsequences(episode).length) void startJourneyConsequence(chapter.familyId, episode.id).catch((error) => console.warn('The journey consequence could not start', error));
+  return true;
 }
 
 let registered = false;
@@ -78,6 +138,7 @@ const RETURN_FLOW: ContentFlowDefinition = {
 export function registerCompanionJourneyFlows() {
   if (registered) return;
   registered = true;
+  registerJourneyConsequenceFlows();
   registerContentFlowEffect('companion.life.habit', async ({ run, payload, effectKey }) => {
     const familyId = String(payload.familyId);
     const chapter = journeyChapterFor(familyId);
@@ -94,6 +155,11 @@ export function registerCompanionJourneyFlows() {
     return { effectKey };
   });
   registerContentFlowDefinition(RETURN_FLOW);
+  // An episode's Garden orders are placed by the Garden's own reconcile, from the episode record; the effect only marks the step.
+  registerContentFlowEffect(JOURNEY_GARDEN_ORDERS_EFFECT, async ({ effectKey, payload }) => {
+    const orders = payload.orders as { id: string }[];
+    return { effectKey, orderIds: orders.map((order) => order.id) };
+  });
   registerContentFlowEffect('journey.cycle.return', async ({ run, effectKey }) => {
     const cycle = repository.load().journeyCycles?.find((item) => item.id === run.variables.cycleId);
     if (!cycle) throw new Error('Journey return is missing');
@@ -101,23 +167,16 @@ export function registerCompanionJourneyFlows() {
     if (!journeyCycleReady(repository.load(), cycle, Date.now())) throw new Error('Your companion is still reflecting');
     await grantStoredJourneyReturn(cycle, localDayId());
     repository.update((state) => finishJourneyReturn(state, cycle.id, Date.now()));
-    if (journeyChapterFor(cycle.familyId)) projectJourneyOrders(cycle.familyId, null);
+    if (journeyChapterFor(cycle.familyId)) projectJourneyOrders(cycle.familyId);
     return { effectKey, rewardId: cycle.rewardId };
   });
-  for (const chapter of COMPANION_JOURNEY_CHAPTERS) {
-    for (const day of chapter.days) {
-      if (day.number === 1) continue;
-      if (chapter.legacyEpisodeFlow) registerContentFlowDefinition(chapter.legacyEpisodeFlow(day.number));
-      registerContentFlowDefinition(journeyEpisodeFlow(chapter, day.number));
-    }
-  }
+  // Episode runs from the day-and-rest era: their rest effect still lands, on the chapter's episode of that number.
   registerContentFlowEffect('journey.cycle.rest', async ({ run, payload, effectKey }) => {
     recordLifeFlow(run);
-    // Flows from before the chapter system name no family; their episode id does.
-    const chapter = (typeof payload.familyId === 'string' ? journeyChapterFor(payload.familyId) : null) ?? journeyChapterForEpisode(run.definitionId);
-    if (!chapter) throw new Error('Unknown journey chapter');
-    startJourneyRest(chapter.familyId, Number(payload.number), run.definitionVersion < 2 ? (run.variables.participation as JourneyParticipation) ?? 'not_yet' : 'not_yet', run.updatedAt);
-    projectJourneyOrders(chapter.familyId, null);
+    const chapter = COMPANION_JOURNEY_CHAPTERS.find((candidate) => candidate.legacyEpisodeIdPrefix && run.definitionId.startsWith(candidate.legacyEpisodeIdPrefix));
+    const episode = chapter?.episodes[Number(payload.number) - 1];
+    if (!chapter || !episode) throw new Error('Unknown journey chapter');
+    completeJourneyEpisode(chapter.familyId, episode.id, { now: run.updatedAt });
     return { effectKey };
   });
 }
@@ -139,8 +198,17 @@ export async function initializeJourney(familyId: string) {
 async function initializeJourneyOnce(chapter: CompanionJourneyChapterDefinition) {
   registerCompanionJourneyFlows();
   const familyId = chapter.familyId;
+  if (!isAuthoredCohortFamily(familyId)) {
+    // Mossprout: the first session is his first meeting; the farewell's rest (or a finished Garden day) says it happened.
+    const dayOneAt = mossproutDayOneAt(repository.load());
+    if (dayOneAt == null) return false;
+    const dayOne = chapter.episodes.find((episode) => episode.dayOne);
+    if (dayOne) completeJourneyEpisode(familyId, dayOne.id, { now: dayOneAt });
+    migrateCampaignJourneyDays(chapter);
+    return true;
+  }
   let story = loadAuthoredCohortStory(familyId);
-  if (story.journeyManaged) return true;
+  if (story.journeyManaged) { migrateDayAndRestCycles(chapter); return true; }
   if (story.pendingConversationId) return false;
   const firstDay = await loadContentFlowRun(chapter.dayOne.runId);
   const world = await loadMergeWorldState();
@@ -150,107 +218,115 @@ async function initializeJourneyOnce(chapter: CompanionJourneyChapterDefinition)
   if (!legacy && firstDay?.status !== 'completed') return false;
   if (story.status === 'intro_available') story = beginAuthoredCohortStory(familyId);
   const served = new Set([...story.completedOrderIds, ...(story.orderDeck?.servedOrderIds ?? []), ...world.externalRewardReceipts.filter((receipt) => receipt.kind === 'story_order_served').map((receipt) => receipt.id.replace('merge-story-served:', ''))]);
-  const finished = story.status === 'chapter_complete' || served.has(signatureOrderId(chapter));
+  const signature = signatureOrderId(chapter);
+  const finished = story.status === 'chapter_complete' || (signature != null && served.has(signature));
   const count = story.orderDeck?.templateKeys.filter((key) => served.has(orderId(chapter, key))).length ?? 0;
-  const total = chapter.days.length;
+  const total = chapter.episodes.length;
   if (legacy) {
+    // A save from before the chapter system: its served orders say how far it got; no episode pays again.
     const through = finished ? total : Math.min(total - 1, count + 1);
     repository.update((state) => {
-      const existing = new Set(state.journeyCycles?.map((cycle) => cycle.id));
-      const migrated = chapter.days.slice(0, through).map((day) => ({ ...createJourneyCycle({
-        id: journeyCycleId(familyId, journeyEpisodeId(chapter, day.number)), familyId, episodeId: journeyEpisodeId(chapter, day.number), number: day.number,
-        chapterId: chapter.chapterId, title: day.title, nextTitle: chapter.days.find((next) => next.number === day.number + 1)?.title ?? null, completedAt: story.updatedAt, finale: day.number === total,
-      }), migrated: true, returnedAt: story.updatedAt }));
-      return { ...state, journeyCycles: [...(state.journeyCycles ?? []), ...migrated.filter((cycle) => !existing.has(cycle.id))] };
+      const records = { ...(state.journeyEpisodes ?? {}) };
+      for (const episode of chapter.episodes.slice(0, through)) {
+        const id = journeyEpisodeRecordId(familyId, episode.id);
+        if (!records[id]) records[id] = { familyId, episodeId: episode.id, completedAt: story.updatedAt, answers: {}, facts: {}, migrated: true };
+      }
+      return { ...state, journeyEpisodes: records };
     });
   } else {
     // The first meeting captures intention, not proof of an activity.
-    startJourneyRest(familyId, 1, 'not_yet', firstDay?.completedAt ?? Date.now());
+    const dayOne = chapter.episodes.find((episode) => episode.dayOne);
+    if (dayOne) completeJourneyEpisode(familyId, dayOne.id, { now: firstDay?.completedAt ?? Date.now() });
   }
-  const chapterOrders = (ids: Iterable<string>) => [...ids].filter((id) => id.startsWith(chapter.orders.idPrefix));
+  const chapterOrders = (ids: Iterable<string>) => [...ids].filter((id) => chapter.orders && id.startsWith(chapter.orders.idPrefix));
   saveAuthoredCohortStory(familyId, { ...story, journeyManaged: true, status: finished ? 'chapter_complete' : 'conversation_active', pendingConversationId: null,
     completedOrderIds: chapterOrders(served), orderDeck: story.orderDeck ? { ...story.orderDeck, servedOrderIds: chapterOrders(served) } : null });
+  projectJourneyOrders(familyId);
   return true;
 }
 
-/** Keeps the friend's story arc in step with the journey: which orders are open, and whether the signature order is due. */
-export function projectJourneyOrders(familyId: string, run: ContentFlowRun | null) {
+/** When Mossprout's first session ended: the farewell began his first rest; an older save may only have its first Garden day. */
+function mossproutDayOneAt(state: RelationshipProgressState): number | null {
+  const rest = [...(state.meditations ?? [])].filter((record) => record.familyId === 'mossprout').sort((a, b) => a.startedAt - b.startedAt)[0] ?? katchimeraMeditationRecord(state, 'mossprout');
+  const firstDay = state.journeyDays.find((day) => day.familyId === 'mossprout' && day.status === 'complete');
+  const cycle = state.journeyCycles?.find((item) => item.familyId === 'mossprout');
+  const at = [rest?.startedAt, firstDay?.completedAt ?? undefined, cycle?.completedAt].filter((value): value is number => typeof value === 'number');
+  return at.length ? Math.min(...at) : null;
+}
+
+/**
+ * Journey days from the Garden campaign's day-and-rest era: every completed
+ * day is its beat's opening and resolution, recorded once with no answers.
+ * The story summary those days wrote (beats, chapter, habitat stage) is
+ * already in place, so nothing pays or reveals again.
+ */
+function migrateCampaignJourneyDays(chapter: CompanionJourneyChapterDefinition) {
+  const state = repository.load();
+  const days = state.journeyDays.filter((day) => day.familyId === chapter.familyId && day.status === 'complete' && day.completedAt != null);
+  if (!days.length) return;
+  const records = { ...(state.journeyEpisodes ?? {}) };
+  let changed = false;
+  for (const day of days) {
+    for (const episode of chapter.episodes.filter((item) => item.id === day.beatId || item.id === `${day.beatId}:resolution`)) {
+      const id = journeyEpisodeRecordId(chapter.familyId, episode.id);
+      if (records[id]) continue;
+      records[id] = { familyId: chapter.familyId, episodeId: episode.id, completedAt: day.completedAt!, answers: {}, facts: {}, migrated: true };
+      changed = true;
+    }
+  }
+  if (changed) repository.update((current) => ({ ...current, journeyEpisodes: records }));
+}
+
+/** Cycles written by the day-and-rest era name their episode by number: every returned cycle is a complete episode. */
+function migrateDayAndRestCycles(chapter: CompanionJourneyChapterDefinition) {
+  const prefix = chapter.legacyEpisodeIdPrefix;
+  if (!prefix) return;
+  const state = repository.load();
+  const cycles = (state.journeyCycles ?? []).filter((cycle) => cycle.familyId === chapter.familyId && cycle.episodeId.startsWith(prefix));
+  if (!cycles.length) return;
+  const records = { ...(state.journeyEpisodes ?? {}) };
+  let changed = false;
+  for (const cycle of cycles) {
+    const episode = chapter.episodes[cycle.number - 1];
+    if (!episode) continue;
+    const id = journeyEpisodeRecordId(chapter.familyId, episode.id);
+    if (records[id]) continue;
+    records[id] = { familyId: chapter.familyId, episodeId: episode.id, completedAt: cycle.completedAt, answers: {}, facts: {}, migrated: true };
+    changed = true;
+  }
+  if (changed) repository.update((current) => ({ ...current, journeyEpisodes: records }));
+}
+
+/** Keeps the friend's story arc in step with the chapter: orders stay open while episodes remain; the signature comes once enough are served. */
+export function projectJourneyOrders(familyId: string) {
   const chapter = requireChapter(familyId);
+  if (!chapter.orders || !isAuthoredCohortFamily(chapter.familyId)) return;
   const story = loadAuthoredCohortStory(chapter.familyId);
   if (!story.journeyManaged) return;
-  const cycle = currentJourneyCycle(repository.load(), chapter.familyId);
-  const complete = cycle?.number === chapter.days.length && cycle.returnedAt != null;
-  const active = run?.nodeId === 'activity';
+  const state = repository.load();
+  const complete = chapter.episodes.every((episode) => state.journeyEpisodes?.[journeyEpisodeRecordId(chapter.familyId, episode.id)]);
   const served = story.orderDeck?.templateKeys.filter((key) => story.completedOrderIds.includes(orderId(chapter, key))).length ?? 0;
-  const status = complete ? 'chapter_complete' : active ? 'order_active' : 'conversation_active';
+  const status = complete ? 'chapter_complete' : 'order_active';
   const actPhase = complete ? 'complete' : served >= chapter.orders.requiredCount ? 'signature_order' : 'regular_orders';
   if (story.status === status && story.actPhase === actPhase && !story.pendingConversationId) return;
   saveAuthoredCohortStory(chapter.familyId, { ...story, status, actPhase, pendingConversationId: null, unreadReturn: false });
 }
 
-/** The run of the journey day after the friend's last return, if one has begun. */
-export async function activeJourneyRun(familyId: string) {
-  const chapter = journeyChapterFor(familyId);
-  if (!chapter) return null;
-  const cycle = currentJourneyCycle(repository.load(), chapter.familyId);
-  if (!cycle || !cycle.returnedAt || cycle.number >= chapter.days.length) return null;
-  return loadContentFlowRun(journeyEpisodeId(chapter, cycle.number + 1));
-}
-
-/** Repairs the order projection if the app stopped after a saved scene answer
- * but before the companion panel could publish its next activity. */
+/** Repairs the order projection after a relaunch, and resumes any episode consequence still to play. */
 export async function resumeCompanionJourneys() {
   for (const chapter of COMPANION_JOURNEY_CHAPTERS) {
-    if (loadAuthoredCohortStory(chapter.familyId).journeyManaged) await reconcileEpisode(chapter.familyId, await activeJourneyRun(chapter.familyId));
+    if (isAuthoredCohortFamily(chapter.familyId) && loadAuthoredCohortStory(chapter.familyId).journeyManaged) { migrateDayAndRestCycles(chapter); projectJourneyOrders(chapter.familyId); }
   }
+  await resumeJourneyConsequences();
 }
 
-export function beginNextEpisode(familyId: string) {
-  const chapter = requireChapter(familyId);
-  return serialize(chapter.familyId, async () => {
-    const cycle = currentJourneyCycle(repository.load(), chapter.familyId);
-    if (!cycle || !cycle.returnedAt || cycle.number >= chapter.days.length) return null;
-    const definition = journeyEpisodeFlow(chapter, cycle.number + 1);
-    const run = await loadContentFlowRun(definition.id) ?? await startContentFlow(definition, { runId: definition.id, variables: { journalTitle: cycle.nextTitle ?? chapter.title } });
-    projectJourneyOrders(chapter.familyId, run);
-    return run;
-  });
-}
-
-export async function reconcileEpisode(familyId: string, run: ContentFlowRun | null) {
-  if (!run) return null;
-  const chapter = requireChapter(familyId);
-  recordLifeFlow(run);
-  if (run.nodeId === 'activity') {
-    const definitionId = run.definitionId;
-    const day = chapter.days.find((item) => journeyEpisodeId(chapter, item.number) === definitionId)!;
-    const story = loadAuthoredCohortStory(chapter.familyId);
-    const served = story.orderDeck?.templateKeys.filter((key) => story.completedOrderIds.includes(orderId(chapter, key))).length ?? 0;
-    if (served >= day.routes && (day.number !== chapter.days.length || story.completedOrderIds.includes(signatureOrderId(chapter)))) {
-      await publishContentFlowDomainEvent({ eventId: `${run.runId}:orders`, type: 'journey.episode_orders_complete', payload: { episodeId: run.definitionId } });
-      run = await loadContentFlowRun(run.runId);
-    }
-  }
-  if (run?.status === 'failed_recoverable' || run?.nodeId === 'rest') run = await dispatchContentFlowCommand(run.runId, { type: 'retry' });
-  projectJourneyOrders(chapter.familyId, run);
-  return run;
-}
-
-export function adoptMossproutCycle() {
-  repository.update((state) => {
-    const latest = [...state.journeyDays].reverse().find((day) => day.familyId === 'mossprout');
-    if (!latest || latest.status !== 'complete' || latest.completedAt == null) return state;
-    const episode = MOSSPROUT_CAMPAIGN_EPISODES.find((item) => item.beatId === latest.beatId);
-    if (!episode) return state;
-    const rest = state.meditations?.find((item) => item.familyId === 'mossprout');
-    // First rest starts at the FTUE's explicit farewell, never at the Bloom.
-    if (episode.episodeNumber === 1 && !rest) return state;
-    return installJourneyCycle(state, createJourneyCycle({
-      id: journeyCycleId('mossprout', latest.beatId), familyId: 'mossprout', episodeId: latest.beatId, number: episode.episodeNumber,
-      chapterId: episode.chapterId, title: episode.title, nextTitle: MOSSPROUT_CAMPAIGN_EPISODES[episode.episodeNumber]?.title ?? null,
-      completedAt: latest.completedAt, finale: !MOSSPROUT_CAMPAIGN_EPISODES[episode.episodeNumber] || MOSSPROUT_CAMPAIGN_EPISODES[episode.episodeNumber].chapterId !== episode.chapterId,
-    }));
-  });
+/** Whether a friend's first meeting has finished: the day-one flow, or the story already managed. */
+export async function journeyDayOneComplete(familyId: string): Promise<boolean> {
+  const chapter = journeyChapterFor(familyId);
+  if (!chapter) return false;
+  if (!isAuthoredCohortFamily(chapter.familyId)) return mossproutDayOneAt(repository.load()) != null;
+  if (loadAuthoredCohortStory(chapter.familyId).journeyManaged) return true;
+  return (await loadContentFlowRun(chapter.dayOne.runId))?.status === 'completed';
 }
 
 export async function reconcileCompanionMeditation(familyId: string) {
@@ -312,3 +388,5 @@ export function claimCompanionJourneyReturn(cycleId: string) {
     if (result?.status !== 'completed') throw new Error('The return gift could not be saved');
   });
 }
+
+export type { JourneyEpisodeDefinition };

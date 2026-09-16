@@ -25,6 +25,7 @@ import { createSelectorStore, selectedSnapshot } from '@/utils/merge-world/selec
 import { loadFirstSession } from '@/features/onboarding/first-session';
 import { completeMossproutResidentCardDiscovery, mossproutDailyActionDeck, mossproutJourneyForDay, mossproutJourneyRuntimeDayId, mossproutStory, recordKatchimeraActionCompletion, recordMossproutFirstGardenRestored, recordMossproutJourneyOrderServed, recordMossproutMatchedCard, startMossproutJourneyDay } from '@/game/katchimeras/relationship-progression';
 import { completeMeditationRequest, currentJourneyCycle, settleDailyGardenDelivery } from '@/game/katchimeras/companion-journey-cycle';
+import { mossproutGardenActivity, mossproutResolvedBeatDayIds } from '@/features/companion/mossprout-garden-activity';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { completeMossproutChapterZeroSlice, isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
 import { loadMergeWorldState, MergeWorldStaleWriteError, saveMergeWorldState, subscribeMergeWorldResets, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
@@ -67,6 +68,7 @@ function mossproutProgressionSignals(days: readonly HomeDayRecord[], friendshipL
   const completedBeatIds = mossproutStory(relationships).completedBeatIds ?? [];
   const activeJourneyDayIds = [...new Set([
     ...relationships.journeyDays.filter((journey) => journey.familyId === 'mossprout' && journey.status === 'complete').map((journey) => journey.dayId),
+    ...mossproutResolvedBeatDayIds(relationships, (at) => localDayId(new Date(at))),
     ...relationships.actionCompletions.filter((event) => event.familyId === 'mossprout').map((event) => event.dayId),
   ])].sort();
   if (isJourneyQuickModeEnabled()) {
@@ -290,10 +292,12 @@ export function MergeWorldProvider({
     const dayId = mossproutJourneyRuntimeDayId(relationships, localDayId(new Date(now)), isJourneyQuickModeEnabled());
     const journey = mossproutJourneyForDay(relationships, dayId);
     const journeyEpisode = journey ? mossproutCampaignEpisodeByBeatId.get(journey.beatId) : null;
+    // A journey day of the first session still owns the Garden while it lasts; afterwards the chapter's beat under way does.
+    const chapterGarden = journey && journey.status !== 'complete' ? null : mossproutGardenActivity(relationships, current);
     const journeyActivity = journey?.activity && journeyEpisode ? {
       ...journey.activity,
       dropDefinitionIds: mossproutCampaignOrderDrops(journeyEpisode),
-    } : journey?.activity ?? null;
+    } : journey?.activity ?? chapterGarden?.activity ?? null;
     const story = mossproutStory(relationships, now);
     const matchedCardIds = [...new Set(relationships.journeyDays.flatMap((journeyDay) => {
       if (journeyDay.familyId !== 'mossprout' || typeof journeyDay.matchedCardId !== 'string') return [];
@@ -308,7 +312,7 @@ export function MergeWorldProvider({
       type: 'reconcileCharacterActivity',
       familyId: 'mossprout',
       dayId,
-      status: journey?.status ?? 'idle',
+      status: journey && journey.status !== 'complete' ? journey.status : chapterGarden?.status ?? 'idle',
       activity: journeyActivity,
       residentSignals: {
         completedObjectiveIds: story.completedObjectiveIds,
@@ -866,10 +870,11 @@ export function MergeWorldProvider({
       ? current.arrivals.find((arrival) => arrival.id === command.arrivalId) ?? null
       : null;
     const servedJourneyObjectiveId = command.type === 'serveOrder'
-      ? [...relationshipProgressionRepository.load().journeyDays].reverse().find((journey) => (
+      ? ([...relationshipProgressionRepository.load().journeyDays].reverse().find((journey) => (
           journey.status === 'activity_in_progress'
           && (journey.activity?.mergeOrderIds ?? (journey.activity ? [journey.activity.mergeOrderId] : [])).includes(command.orderId)
         ))?.activity?.objectiveId
+        ?? (() => { const garden = mossproutGardenActivity(relationshipProgressionRepository.load(), current); return garden.activity?.mergeOrderIds?.includes(command.orderId) ? garden.activity.objectiveId : undefined; })())
       : undefined;
     const finishReduction = measureMergeWork(`reduce:${command.type}`);
     let reduced: MergeWorldCommandResult;

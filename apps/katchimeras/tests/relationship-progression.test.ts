@@ -95,7 +95,7 @@ test('first Journey Day handoff changes from completion to waiting and then Day 
 
   const waiting = resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'complete', relationships, now: completedAt + 1 });
   assert.equal(waiting?.state, 'waiting_for_next_day');
-  assert.match(waiting?.body ?? '', /eight hours/);
+  assert.match(waiting?.body ?? '', /thinking today over/);
 
   const ready = resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'complete', relationships, now: completedAt + 8 * 60 * 60 * 1000 });
   assert.equal(ready?.state, 'ready_to_begin');

@@ -1,4 +1,5 @@
-import type { CompanionDailyConfig, CompanionNoticePrompt, CompanionPhotoFollowUp } from '@/types/companion-daily';
+import type { CompanionDailyConfig, CompanionDailyMomentConfig, CompanionNoticePrompt, CompanionPhotoFollowUp } from '@/types/companion-daily';
+import { MOSSPROUT_DAY_OPTIONS, MOSSPROUT_FTUE_COPY } from '@/features/onboarding/mossprout-ftue-copy';
 
 /**
  * Mossprout's daily activities: water, a photo of something growing, and
@@ -31,6 +32,22 @@ export const MOSSPROUT_NOTICE_PROMPTS: readonly CompanionNoticePrompt[] = [
   ] },
 ];
 
+/** The weather question from the first session, asked every day: one tap, and a journey line can read it back. */
+export const MOSSPROUT_DAILY_MOMENT: CompanionDailyMomentConfig = {
+  title: 'Today’s weather',
+  prompt: MOSSPROUT_FTUE_COPY.dayQuestion,
+  artKey: 'mossprout:nature-light',
+  options: MOSSPROUT_DAY_OPTIONS.map((option) => ({ id: option.id, label: option.label, icon: option.icon })),
+  replies: {
+    radiant: 'Full sun. I felt it from here.',
+    light: 'Mostly bright. Good growing weather.',
+    meh: 'Grey and still. Roots grow on those days too.',
+    heavy: 'Heavy rain. Let it fall; the soil keeps what it needs.',
+    stormy: 'A proper storm. You are here, though. That counts.',
+  },
+  thanks: 'Kept. Thank you for telling me.',
+};
+
 export const MOSSPROUT_DAILY: CompanionDailyConfig = {
   chapterTitle: 'Our Garden',
   restingLine: 'Mossprout is resting. A little quiet, a little growing.',
@@ -40,6 +57,7 @@ export const MOSSPROUT_DAILY: CompanionDailyConfig = {
   menu: { title: 'Grow with Mossprout', subtitle: 'Water, a nature photo, or a quiet moment.', artKey: 'mossprout:plant-care' },
   savingLine: 'Let’s keep this little moment.',
   water: true,
+  moment: MOSSPROUT_DAILY_MOMENT,
   photo: {
     category: 'nature',
     title: 'Show Mossprout something growing',

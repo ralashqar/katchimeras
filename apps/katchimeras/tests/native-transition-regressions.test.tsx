@@ -120,7 +120,7 @@ test('Steppling retains the answering card across camera unsettles and changed s
   const Question = host('Question');
   const List = host('List');
   const clock = nativeMotionHarness();
-  const module = loadNativeModule('components/katchadeck/world/steppling-encounter-panel.tsx', {
+  const module = loadNativeModule('components/katchadeck/world/hatchable-encounter-panel.tsx', {
     'react-native': { ...nativeViews, AppState: { addEventListener: (_event: string, fn: typeof onActive) => { onActive = fn; return { remove() {} }; } } },
     'react-native-reanimated': clock.animated,
     'react-native-gesture-handler': { Gesture: { Pan: () => ({ enabled: () => ({}) }) } },
@@ -163,7 +163,7 @@ test('Steppling asks for step access in voice before any Motion prompt; allow re
     const List = host('List');
     const Guide = host('Guide');
     const clock = nativeMotionHarness();
-    const module = loadNativeModule('components/katchadeck/world/steppling-encounter-panel.tsx', {
+    const module = loadNativeModule('components/katchadeck/world/hatchable-encounter-panel.tsx', {
       'react-native': { ...nativeViews, AppState: { addEventListener: () => ({ remove() {} }) } },
       'react-native-reanimated': clock.animated,
       'react-native-gesture-handler': { Gesture: { Pan: () => ({ enabled: () => ({}) }) } },

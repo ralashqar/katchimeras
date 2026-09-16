@@ -5,6 +5,7 @@ import { GLOW_ORDER_IDS, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/constants/glow-di
 import { STEPPLING_DAY_ONE_CHOICES, STEPPLING_DAY_ONE_HANDOFFS, STEPPLING_DAY_ONE_OPENING } from '@/constants/steppling-day-one-copy';
 import { STEPPLING_EGG_POLICY } from '@/constants/steppling-egg-copy';
 import { STEPPLING_SCENARIO_POLLS } from '@/constants/steppling-scenario-polls';
+import { STEPPLING_STEP_MILESTONES } from '@/constants/steppling-activities';
 import { STEPPLING_WISP_LINES, STEPPLING_WISPS } from '@/features/onboarding/corruption-wisps';
 import { MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM } from '@/features/onboarding/opening-mist';
 
@@ -175,5 +176,13 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
     questionSubtitle: 'One quick scene. The village answers too.',
     presentation: 'rows',
     polls: STEPPLING_SCENARIO_POLLS,
+    goal: {
+      kind: 'steps',
+      milestones: STEPPLING_STEP_MILESTONES,
+      lines: {
+        remaining: (steps) => `Not quite yet—${steps.toLocaleString()} more ${steps === 1 ? 'step' : 'steps'} to this little milestone. We can take them at your pace.`,
+        claimed: (steps) => `${steps.toLocaleString()} steps! Look how far those little moments carried us. I’m glad we’re finding our rhythm together.`,
+      },
+    },
   },
 };

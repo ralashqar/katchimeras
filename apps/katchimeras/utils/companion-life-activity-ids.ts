@@ -1,4 +1,4 @@
-export type CompanionLifeActivity = 'photo' | 'notice';
+export type CompanionLifeActivity = 'photo' | 'notice' | 'moment';
 
 /** One store per friend; Mossprout's key and ids are the ones he always had. */
 export const companionLifeActivityKey = (companion: string) => `companion:${companion}-life-activities:v1`;

@@ -18,7 +18,7 @@ export const MOSSPROUT_FTUE_COPY = {
   mergePurpose: 'Come. I’ll show you how we make more of it.',
   growth: 'Look. Your day is growing here. The Mist can’t hold a place someone is watching.',
   waterQuestion: 'Your turn. Look up from this for a moment.',
-  farewell: 'I need to rest. Roots do, after they grow.\n\nBehind the Mist there are more of us. When I wake, I’ll show you the trail. Something in the Mist there moves when you do.',
+  farewell: 'I need to rest, and think today over. Roots do, after they grow.\n\nBehind the Mist there are more of us. When I wake, I’ll show you the trail. Something in the Mist there moves when you do.',
   restAction: 'Rest, Mossprout',
   wakeAsk: 'May I wake you when I’m back? I’d like to show you what grew.',
   wakeAllow: 'Wake me',

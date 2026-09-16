@@ -18,6 +18,7 @@ export function lifeConversationEntryId(definitionId: string) {
 }
 
 export function recordLifeConversation(session: ConversationSession, definition: ConversationDefinition) {
+  if (definition.tags?.includes('journey-episode')) return;
   const id = lifeConversationEntryId(definition.id);
   if (!id || session.preview || !session.turns.length) return;
   const familyId = definition.familyId;

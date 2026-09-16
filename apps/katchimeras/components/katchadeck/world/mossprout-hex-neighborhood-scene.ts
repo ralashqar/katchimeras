@@ -10,6 +10,8 @@ import { HATCHABLE_COMPANIONS, hatchableByCompanion } from '@/constants/hatchabl
 import { hatchableTileArt } from '@/constants/hatchable-companions/tile-art';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { STEPPLING_TILE, SHARED_WORLD_TILES } from '@/constants/shared-world';
+import { STORY_TILES, type StoryTileDefinition, type StoryTileState } from '@/constants/story-tiles/registry';
+import { storyTileArt } from '@/constants/story-tiles/tile-art';
 import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants/mossprout-memory-plants';
 import type { MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel, PlantableMemoryInstance } from '@/types/merge-world';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
@@ -91,6 +93,8 @@ export type MossproutGardenSceneState = {
   gateway?: 'locked' | 'egg' | 'open';
   /** Every hatchable companion's tile by tile id: misted, an Egg on it, or open with the friend home. */
   hatchableTiles?: Partial<Record<string, 'locked' | 'egg' | 'open'>>;
+  /** Every story tile by tile id: under the Mist until a journey episode reveals it. */
+  storyTiles?: Partial<Record<string, StoryTileState>>;
   level: number;
   plantableMemories: readonly PlantableMemoryInstance[];
   previewMemoryId?: string;
@@ -354,12 +358,20 @@ export function buildMossproutHexNeighborhoodScene(
     return layer;
   };
   const hatchableLayers = HATCHABLE_COMPANIONS.map((definition) => ({ definition, locked: hatchableLayer(definition, true), revealed: hatchableLayer(definition, false) }));
+  // Every story tile, from its definition: full mist until its episode reveals it, its own art after. No marker, no resident.
+  const storyTileLayer = (tile: StoryTileDefinition, revealed: boolean) => layerFor(`structure:${tile.id}`, 'structure', {
+    coord: tile.coord,
+    alphaBounds: revealed ? KINGDOM_HEX_TILE_ALPHA_BOUNDS[tile.alphaBoundsKey as keyof typeof KINGDOM_HEX_TILE_ALPHA_BOUNDS] : DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS,
+    sources: revealed ? storyTileArt(tile.id) : DREAM_MIST_LOCKED_NATURE_SOURCES,
+  });
+  const storyTileLayers = STORY_TILES.map((tile) => ({ tile, misted: storyTileLayer(tile, false), revealed: storyTileLayer(tile, true) }));
   // Mist is opaque: while veiled, the home tile must paint over the Garden
   // structure that normally sits above it.
   if (options.homeVeiled) mainLayer.depth = gardenLayer.depth + 2;
   // The Garden is part of what the Mist hides: it is not drawn until the veil lifts.
   const neighbourLayers = options.homeSolo ? [] : [
     ...hatchableLayers.map(({ definition, locked, revealed }) => (hatchableTileState(definition) === 'locked' ? locked : revealed)),
+    ...storyTileLayers.map(({ tile, misted, revealed }) => ((gardenState.storyTiles?.[tile.id] ?? 'misted') === 'revealed' ? revealed : misted)),
     ...MOSSPROUT_NATURE_ISLANDS.map((island) => natureLayerFor(
       island.id,
       natureIslandLevels[island.id] ?? 0,
@@ -376,7 +388,7 @@ export function buildMossproutHexNeighborhoodScene(
   // A reveal must never shift the scene origin (and every other island/camera).
   const natureBoundsLayers = MOSSPROUT_NATURE_ISLANDS.flatMap((island) =>
     [natureLayerFor(island.id, 0), natureLayerFor(island.id, 0, true), ...island.levels.map((level) => natureLayerFor(island.id, level.level, true))]);
-  const boundsLayers = [...rawLayers, ...hatchableLayers.flatMap(({ locked, revealed }) => [locked, revealed]), ...natureBoundsLayers];
+  const boundsLayers = [...rawLayers, ...hatchableLayers.flatMap(({ locked, revealed }) => [locked, revealed]), ...storyTileLayers.flatMap(({ misted, revealed }) => [misted, revealed]), ...natureBoundsLayers];
   // Veiled or solo scenes leave layers out; their frames still shape the envelope.
   boundsLayers.push(unveiledMain, gardenLayer);
   const { dx, dy, width, height } = mossproutSceneEnvelope(boundsLayers.map(layer => layer.frame));

@@ -1,5 +1,9 @@
 # Unified Companion Journeys
 
+> Superseded in September 2026 by journey chapters (`journey-chapters.md`): episodes unlocked by
+> progress, played as conversations, with world consequences. What follows describes the day-and-rest
+> era; the first session's own day still runs on it.
+
 ## Product contract
 
 A Journey Day is an episode, not a calendar date. The rhythm is opening →

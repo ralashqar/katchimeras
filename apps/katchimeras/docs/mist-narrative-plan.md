@@ -76,7 +76,7 @@ down ("One gone. Two still hold it."), second down ("One left, and it knows."), 
 | `mergePurpose` | Come, I'll show you how we make some. | Come. I'll show you how we make more of it. |
 | `growth` | Look. Your day is growing in my garden. That's how this works. | Look. Your day is growing here. The Mist can't hold a place someone is watching. |
 | `nextRequest` | Every request makes a little light. Light wakes places, and places wake friends. | Every request makes light. Light pushes the Mist back. Behind the Mist there are more of us. |
-| `farewell` | I need to rest… Someone's close. Look at the mist. | I need to rest; roots do. When I wake I'll show you the trail. Something in the Mist there moves when you do. |
+| `farewell` | I need to rest… Someone's close. Look at the mist. | I need to rest, and think today over. Roots do, after they grow. When I wake I'll show you the trail. Something in the Mist there moves when you do. (Sept 16: the rest is now his first reflecting pause; Arc 1 opens after it.) |
 | `meditationHelp` | The garden stays open. Something in the mist is still waiting. | The garden stays open. Past it, the Mist is still holding someone. |
 | Greeting reply `garden` | My Garden. It's been quiet for a while… | My garden. The Mist had it for years. It's ours again now, mostly. |
 

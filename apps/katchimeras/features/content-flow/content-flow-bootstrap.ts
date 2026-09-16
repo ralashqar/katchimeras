@@ -1,13 +1,13 @@
 import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
 import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
-import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from './steppling-day-one-flow-v2';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from './legacy/steppling-day-one-flow-v2';
 import { completeMossproutHavenUpgrade } from '@/utils/companion-story-storage';
 import { LEGACY_WORLD_UPGRADE_FLOWS, WORLD_UPGRADE_FLOWS } from '@/features/world-upgrades/world-upgrade-flows';
 import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campaign';
 import { registerCompanionJourneyFlows } from '@/features/companion/companion-journey-service';
 import { nextUnearnedMossproutResident } from '@/constants/resident-card-discovery';
 import { MOSSPROUT_FTUE_VARIANTS } from '@/features/onboarding/mossprout-ftue-flow';
-import { LEGACY_STEPPLING_DAY_ONE_FLOW } from './steppling-day-one-flow-v1';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW } from './legacy/steppling-day-one-flow-v1';
 import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime';
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';

@@ -1,9 +1,10 @@
 import { CompanionSceneOverlayHost, CompanionSlidingSubmenu } from './companion-scene-overlay';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
-import { StepplingActions } from './steppling-actions';
 import { CompanionDailyActions } from './companion-daily-actions';
-import { companionDailyConfig } from '@/constants/companion-daily/registry';
 import { hatchableByCompanion } from '@/constants/hatchable-companions/registry';
+import { journeyChapterFor } from '@/constants/companion-journey-chapters/registry';
+import { journeyEpisodeConversationId } from '@/constants/companion-journey-chapters/episode-conversation';
+import { companionDailyConfig } from '@/constants/companion-daily/registry';
 import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import type { GestureType } from 'react-native-gesture-handler';
 import type { DayActionSourceRect } from '@/components/katchadeck/ui/day-action-row';
@@ -15,18 +16,17 @@ import { ThemedText } from '@/components/themed-text';
 import { DayActionCardSurface, DayActionIcon } from '@/components/katchadeck/ui/day-action-card';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import { JOURNEY_MEDITATION_ORDER_GLOW, JOURNEY_MEDITATION_ORDER_MINUTES } from '@/constants/companion-journey-profiles';
-import { journeyChapterFor } from '@/constants/companion-journey-chapters/registry';
-import { journeyEpisodeFlow, journeyEpisodeId } from '@/constants/companion-journey-chapters/episode-flow';
-import { MOSSPROUT_JOURNEY_CAMPAIGN } from '@/constants/mossprout-journey-campaign';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
 import { completeMeditationRequest, currentJourneyCycle, journeyCycleReady, journeyReturnLine } from '@/game/katchimeras/companion-journey-cycle';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { homeRepository } from '@/storage/repositories/home-repository';
-import { activeJourneyRun, adoptMossproutCycle, beginNextEpisode, claimCompanionJourneyReturn, initializeJourney, reconcileCompanionMeditation, reconcileEpisode } from '@/features/companion/companion-journey-service';
-import { dispatchContentFlowCommand } from '@/features/content-flow/content-flow-director';
-import { subscribeCompanionStories, loadAuthoredCohortStory } from '@/utils/companion-story-storage';
-import { subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
-import type { ContentFlowRun } from '@/types/content-flow';
+import { claimCompanionJourneyReturn, initializeJourney, journeyDayOneComplete, reconcileCompanionMeditation } from '@/features/companion/companion-journey-service';
+import { journeyChapterState, type JourneyChapterState } from '@/features/companion/journey-triggers';
+import { isAuthoredCohortFamily, subscribeCompanionStories, loadAuthoredCohortStory } from '@/utils/companion-story-storage';
+import { loadMergeWorldState, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
+import { loadCompanionBondState, subscribeCompanionBondState } from '@/utils/companion-bond-storage';
+import { loadCompanionContentState } from '@/utils/companion-content-storage';
+import type { MergeWorldState } from '@/types/merge-world';
 import { type CompanionMergeRequest } from './companion-merge-request-tray';
 import { CompanionSceneCards } from './companion-scene-cards';
 import { companionSceneModel } from '@/game/katchimeras/companion-scene-model';
@@ -40,29 +40,37 @@ export function CompanionJourneyCycleStage(props: ComponentProps<typeof Companio
   return <CompanionSceneOverlayHost><CompanionJourneyCycleStageContent {...props} /></CompanionSceneOverlayHost>;
 }
 
+/**
+ * The journey stage: the friend's chapter as it stands. While they reflect,
+ * the timer, the check-in and the Garden requests; when the rest is over,
+ * the return; then the next episode that has opened, or the friend's hint at
+ * what would open it. An episode is a conversation; the card opens it.
+ */
 function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpenMerge, onMore, onJournal, onGoal, onNarration, routineActions, routineSubmenuOpen = false, fallback, onBondRewardRequest, externalGesture, cardsActive = true }: {
   onBondRewardRequest?: (source: DayActionSourceRect, onArrive: () => void, receipt?: CompanionBondAwardReceipt) => void; externalGesture?: GestureType;
-  onOpenConversation?: (definitionId: string, origin: KatchimeraActionOrigin) => void;
+  onOpenConversation?: (definitionId: string, origin?: KatchimeraActionOrigin) => void;
   routineSubmenuOpen?: boolean;
   /** Whether the cards are on screen and not behind a conversation: a completed card's reward waits otherwise. */
   cardsActive?: boolean;
-  /** Steppling and Mossprout have journey chapters; any other hatchable friend gets the same stage with their definition's daily cards. */
+  /** Any friend with a page: a chapter from the registry, Mossprout's campaign, or daily cards alone. */
   familyId: string; onOpenMerge: (orderId?: string) => void;
   onMore: () => void; onJournal: () => void; onGoal: () => void; fallback?: ReactNode; routineActions?: ReactNode; onVisitSeed?: () => void; onNarration?: (text: string | null) => void;
 }) {
   const relationships = useRelationshipProgression();
   const cycle = currentJourneyCycle(relationships, familyId);
-  // The friend's journey chapter, if one is authored: their days, orders, evidence and lines.
   const chapter = journeyChapterFor(familyId);
-  const [run, setRun] = useState<ContentFlowRun | null>(null);
+  const daily = companionDailyConfig(familyId);
   const [initialized, setInitialized] = useState(false);
   const [managed, setManaged] = useState(true);
+  const [dayOneComplete, setDayOneComplete] = useState(false);
+  const [world, setWorld] = useState<MergeWorldState | null>(null);
+  const [bond, setBond] = useState(loadCompanionBondState);
+  const [contentRevision, setContentRevision] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [submenuOpen, setSubmenuOpen] = useState(false);
-  const [journeyOpen, setJourneyOpen] = useState(false);
   const [reaction, setReaction] = useState<string | null>(null);
   const refreshRef = useRef<() => Promise<void>>(async () => undefined);
   const mounted = useRef(true);
@@ -76,12 +84,10 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
       if (!live || refreshing) return;
       refreshing = true;
       try {
-        const ready = chapter ? await initializeJourney(chapter.familyId) : familyId === 'mossprout' ? (adoptMossproutCycle(), true) : true;
-        if (ready) {
-          await reconcileCompanionMeditation(familyId);
-          const latest = chapter ? await reconcileEpisode(chapter.familyId, await activeJourneyRun(chapter.familyId)) : null;
-          if (live) setRun(latest);
-        }
+        const ready = chapter ? await initializeJourney(chapter.familyId) : true;
+        if (ready) await reconcileCompanionMeditation(familyId);
+        const [latestWorld, dayOne] = await Promise.all([loadMergeWorldState(), chapter ? journeyDayOneComplete(chapter.familyId) : Promise.resolve(false)]);
+        if (live) { setWorld(latestWorld); setDayOneComplete(dayOne); setBond(loadCompanionBondState()); setContentRevision((value) => value + 1); }
         if (live) { setManaged(ready); setInitialized(true); setError(null); setNow(Date.now()); }
       } catch { if (live) setError('Your Journey could not be restored. Please try again.'); }
       finally { refreshing = false; }
@@ -91,21 +97,31 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
     const unsubscribeWorld = subscribeMergeWorldSnapshots(() => { void refresh(); });
     const unsubscribeStory = subscribeCompanionStories(() => { void refresh(); });
     const unsubscribeHome = homeRepository.subscribe(() => { void refresh(); });
+    const unsubscribeBond = subscribeCompanionBondState(() => { if (live) setBond(loadCompanionBondState()); });
     const app = AppState.addEventListener('change', (state) => { if (state === 'active') void refresh(); });
     const stepsTimer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 60000);
-    return () => { live = false; mounted.current = false; clearInterval(stepsTimer); unsubscribeWorld(); unsubscribeStory(); unsubscribeHome(); app.remove(); };
+    return () => { live = false; mounted.current = false; clearInterval(stepsTimer); unsubscribeWorld(); unsubscribeStory(); unsubscribeHome(); unsubscribeBond(); app.remove(); };
   }, [chapter, familyId]);
 
   const rest = relationships.meditations?.find((item) => (item.cycleId ?? item.sourceId) === cycle?.id);
-  const availableAt = rest?.availableAt;
+  const pending = cycle && cycle.returnedAt == null;
+  // The chapter as it stands for this player: what is complete, what has opened, what still waits.
+  const state: JourneyChapterState | null = chapter ? journeyChapterState(chapter, {
+    familyId: chapter.familyId, now, world, relationships, bond, content: loadCompanionContentState(), dayOneComplete,
+  }) : null;
+  void contentRevision;
+  const next = state?.next ?? null;
+  // An episode that only time still holds back counts down like a rest.
+  const timeLock = !pending && next?.status === 'locked' && next.opensAt != null && next.opensAt > now ? next : null;
+  const availableAt = rest?.availableAt ?? timeLock?.opensAt ?? undefined;
   useEffect(() => {
-    if (!availableAt || cycle?.returnedAt != null) return;
+    if (!availableAt || (rest && cycle?.returnedAt != null)) return;
     const timer = setInterval(() => {
       const time = Date.now(); setNow(time);
       if (time >= availableAt) { clearInterval(timer); void refreshRef.current(); }
     }, 1000);
     return () => clearInterval(timer);
-  }, [availableAt, cycle?.returnedAt]);
+  }, [availableAt, cycle?.returnedAt, rest]);
 
   const perform = useCallback(async (action: () => Promise<unknown>) => {
     if (actionPending.current) return;
@@ -115,44 +131,38 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
     finally { actionPending.current = false; if (mounted.current) setBusy(false); }
   }, []);
 
-  const pending = cycle && cycle.returnedAt == null;
   const ready = cycle && journeyCycleReady(relationships, cycle, now);
   useEffect(() => { if (!pending || ready) setCheckInOpen(false); }, [pending, ready]);
-  // The next journey day of the chapter, and the flow of its run (a save from before version 2 still plays its own).
-  const day = chapter?.days[(cycle?.number ?? 0)];
-  const definition = run && day && chapter ? (run.definitionVersion < 2 && chapter.legacyEpisodeFlow ? chapter.legacyEpisodeFlow(day.number) : journeyEpisodeFlow(chapter, day.number)) : null;
-  const node = definition?.nodes.find((item) => item.id === run?.nodeId);
   const life = cycle?.requests.find((request) => request.kind === 'life');
-  const mossChapter = MOSSPROUT_JOURNEY_CAMPAIGN.chapters?.find((chapter) => chapter.id === cycle?.chapterId);
-  const story = chapter ? loadAuthoredCohortStory(chapter.familyId) : null;
-  // A hatchable friend without a journey chapter yet: their definition says what the page says and shows.
-  const hatchable = familyId === 'steppling' || familyId === 'mossprout' ? null : hatchableByCompanion(familyId);
-  const daily = companionDailyConfig(familyId);
-  const orderId = (key: string) => (chapter?.orders.idPrefix ?? '') + key;
-  const nextOrder = chapter && story ? story.orderDeck?.templateKeys.find((key) => !story.completedOrderIds.includes(orderId(key))) : undefined;
-  useEffect(() => { setReaction(null); }, [familyId, cycle?.id, run?.nodeId]);
+  const story = chapter?.orders && isAuthoredCohortFamily(chapter.familyId) ? loadAuthoredCohortStory(chapter.familyId) : null;
+  // Any hatchable friend: their definition says what the page says and shows. Mossprout's stage is his own.
+  const hatchable = familyId === 'mossprout' ? null : hatchableByCompanion(familyId);
+  useEffect(() => { setReaction(null); }, [familyId, cycle?.id, next?.episode.id]);
   const narration = error ?? reaction ?? (!initialized ? 'Finding our place…' : pending
     ? ready ? journeyReturnLine(cycle)
       : checkInOpen ? 'What have you made room for since we paused?'
         : daily?.restingLine ?? 'A little rest, a little growing.'
-    : (node?.kind === 'scene' || node?.kind === 'task') && node.payload?.text ? String(node.payload.text)
-      : day && chapter ? 'Journey Day ' + day.number + ': ' + day.title + '. ' + chapter.purpose
-        : mossChapter?.purpose ?? daily?.idleLine ?? 'Our chapter is remembered. There is still more to share.');
+    : timeLock ? daily?.restingLine ?? 'A little rest, a little growing.'
+    : state && next ? next.status === 'available' ? `${next.episode.title}. ${state.chapter.purpose}` : next.hint ?? state.chapter.purpose
+      : state?.complete ? state.chapter.lines.complete
+        : daily?.idleLine ?? 'Our chapter is remembered. There is still more to share.');
   useEffect(() => { onNarration?.(managed ? narration : null); }, [managed, narration, onNarration]);
   useEffect(() => () => onNarration?.(null), [onNarration]);
 
-  // A hatchable friend (Steppling included) keeps their daily cards even before their journey chapter can be
-  // managed (day one not yet finished); the journey card alone waits. Mossprout's unmanaged stage falls back to his own.
+  // A hatchable friend keeps their daily cards even before their journey chapter can be managed (day one not
+  // yet finished); the journey card alone waits. Mossprout's unmanaged stage falls back to his own.
   if (!managed && familyId === 'mossprout') return <>{fallback}</>;
   type Action = { id: string; title: string; subtitle?: string; icon: IconSymbolName; onPress: () => void };
   let actions: Action[] = [];
   const journal: Action = { id: 'journal', title: 'Check in', icon: 'book.closed.fill', onPress: onJournal };
   const goal: Action = { id: 'goal', title: 'Choose a small goal', icon: 'sparkles', onPress: onGoal };
   const more: Action = { id: 'more', title: 'More together', icon: 'ellipsis', onPress: onMore };
+  const openEpisode = () => {
+    if (!state || !next || next.status !== 'available' || !onOpenConversation) return;
+    onOpenConversation(journeyEpisodeConversationId(state.chapter.familyId, next.episode.id));
+  };
   if (error) {
-    actions = [{ id: 'retry', title: 'Try again', icon: 'arrow.clockwise', onPress: () => void perform(async () => {
-      if (run?.status === 'failed_recoverable' && chapter) await reconcileEpisode(chapter.familyId, run);
-    }) }, journal, more];
+    actions = [{ id: 'retry', title: 'Try again', icon: 'arrow.clockwise', onPress: () => void perform(async () => undefined) }, journal, more];
   } else if (!initialized) {
     actions = [];
   } else if (pending && !ready) {
@@ -161,7 +171,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
       actions = options.map(([id, title]) => ({
         id, title, subtitle: '60 minutes sooner', icon: id === 'rest' ? 'moon.fill' : 'leaf.fill',
         onPress: () => void perform(async () => {
-          relationshipProgressionRepository.update((state) => completeMeditationRequest(state, cycle.id, life.id, cycle.id + ':check-in', Date.now(), id));
+          relationshipProgressionRepository.update((current) => completeMeditationRequest(current, cycle.id, life.id, cycle.id + ':check-in', Date.now(), id));
           setCheckInOpen(false);
         }),
       }));
@@ -180,67 +190,55 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
     }
   } else if (pending && ready) {
     actions = [{ id: 'return', title: cycle.finale ? 'Remember this chapter' : 'Receive our keepsake and gift', icon: 'gift.fill', onPress: () => void perform(() => claimCompanionJourneyReturn(cycle.id)) }, journal, more];
-  } else if (node?.kind === 'scene') {
-    const choices = (node.payload?.choices as readonly (readonly [string, string])[] ?? []).filter(([id]) => !node.id.startsWith('habit.') || id !== 'choose');
-    actions = choices.map(([id, title]) => ({ id, title, icon: 'bubble.left.and.bubble.right.fill', onPress: () => void perform(async () => {
-      const updated = await dispatchContentFlowCommand(run!.runId, { type: 'submit_scene', actionId: id });
-      if (updated?.status === 'failed_recoverable') throw new Error('Journey effect pending');
-      if (chapter) await reconcileEpisode(chapter.familyId, updated);
-    }) }));
-  } else if (node?.kind === 'task') {
-    actions = [{ id: 'build', title: chapter?.lines.buildAction ?? 'Build together', icon: chapter?.lines.buildIcon ?? 'leaf.fill', onPress: () => onOpenMerge(orderId(nextOrder ?? chapter?.orders.signature.key ?? '')) }, goal, more];
-  } else if (day) {
-    actions = [{ id: 'begin', title: 'Begin Journey Day ' + day.number, subtitle: day.title, icon: 'sparkles', onPress: () => void perform(() => beginNextEpisode(familyId)) }, journal, more];
+  } else if (next?.status === 'available') {
+    actions = [{ id: 'begin', title: next.episode.title, subtitle: 'Continue our story', icon: 'sparkles', onPress: openEpisode }, journal, more];
   } else {
     actions = [journal, goal, more];
   }
 
+  const orderId = (key: string) => (chapter?.orders?.idPrefix ?? '') + key;
   const requests: CompanionMergeRequest[] = pending && !ready ? cycle.requests.filter((request) => request.kind === 'merge' && request.definitionId).map((request) => ({
     id: request.orderId!, title: request.title, definitionIds: [request.definitionId!], badge: request.completedAt != null ? 'Completed' : `+${JOURNEY_MEDITATION_ORDER_GLOW} Glow · ${JOURNEY_MEDITATION_ORDER_MINUTES} min sooner`, served: request.completedAt != null,
-  })) : chapter && story?.status === 'order_active' ? story.actPhase === 'signature_order' ? [{ id: orderId(chapter.orders.signature.key), title: chapter.orders.signature.title, definitionIds: [...chapter.orders.signature.definitionIds] }] : (story.orderDeck?.templateKeys ?? []).slice(Math.max(0, (day?.routes ?? 1) - 1), day?.routes ?? 0).flatMap((key) => {
-    const order = chapter.orders.pool.find((item) => item.key === key);
+  })) : chapter?.orders && story?.status === 'order_active' ? story.actPhase === 'signature_order' ? [{ id: orderId(chapter.orders.signature.key), title: chapter.orders.signature.title, definitionIds: [...chapter.orders.signature.definitionIds] }] : (story.orderDeck?.templateKeys ?? []).filter((key) => !story.completedOrderIds.includes(orderId(key))).slice(0, 1).flatMap((key) => {
+    const order = chapter.orders!.pool.find((item) => item.key === key);
     const id = orderId(key);
     return order ? [{ id, title: order.title, definitionIds: [order.definitionId], served: story.orderDeck?.servedOrderIds.includes(id) ?? false }] : [];
   }) : [];
+  const episodeNumber = next ? state!.chapter.episodes.indexOf(next.episode) + 1 : cycle?.number ?? 1;
   const model = companionSceneModel({
-    familyId, episodeId: !pending && day && chapter ? journeyEpisodeId(chapter, day.number) : cycle?.episodeId ?? 'next', dayNumber: pending ? cycle.number : day?.number ?? cycle?.number ?? 1,
-    chapterTitle: mossChapter?.title ?? daily?.chapterTitle ?? 'Our Garden',
-    episodeTitle: pending ? cycle.title : day?.title ?? cycle?.title ?? 'A little way together',
-    phase: pending ? ready ? cycle.finale && !cycle.nextTitle ? 'finished' : 'ready' : 'meditating' : day ? 'active' : 'finished', nextTitle: cycle?.nextTitle,
+    familyId, episodeId: next ? next.episode.id : cycle?.episodeId ?? 'next', dayNumber: pending ? cycle.number : episodeNumber,
+    chapterTitle: state?.chapter.title ?? daily?.chapterTitle ?? 'Our Garden',
+    episodeTitle: pending ? cycle.title : next?.episode.title ?? cycle?.title ?? 'A little way together',
+    phase: pending ? ready ? cycle.finale && !cycle.nextTitle ? 'finished' : 'ready' : 'meditating' : timeLock ? 'meditating' : next ? next.status === 'available' ? 'active' : 'waiting' : 'finished',
+    nextTitle: cycle?.nextTitle, waitingHint: next?.status === 'locked' ? next.hint ?? undefined : undefined,
   });
-  const openBuild = () => onOpenMerge(requests.find((request) => !request.served)?.id);
   const onStory = pending && ready ? () => void perform(() => claimCompanionJourneyReturn(cycle.id))
-    : !pending && day && !node ? () => { setJourneyOpen(true); void perform(() => beginNextEpisode(familyId)); }
-      : node?.kind === 'scene' ? () => setJourneyOpen(true) : node?.kind === 'task' ? openBuild : onMore;
+    : next?.status === 'available' ? openEpisode
+      : next?.status === 'locked' ? () => setReaction(next.hint) : onMore;
 
-  const dialogueOpen = checkInOpen || (journeyOpen && node?.kind === 'scene');
   return <View style={styles.stage}>
     {!onNarration && !submenuOpen ? <JourneyText style={styles.prompt}>{narration}</JourneyText> : null}
     {initialized && !error ? <CompanionSceneCards
       hideJourney={submenuOpen || routineSubmenuOpen || (hatchable != null && !chapter && !cycle) || !managed} model={model} onJourney={onStory} disabled={busy}
-      timer={pending && !ready && rest ? <CompanionMeditationStage onPress={() => setReaction(journeyForeshadowLine(familyId))} title={model.journey.eyebrow} availableAt={rest.availableAt} startedAt={rest.startedAt} settledMs={rest.settledMs} now={now} companionName={familyId === 'steppling' ? 'Steppling' : 'Mossprout'} /> : undefined}>
-      {familyId === 'steppling' ? <StepplingActions onReaction={setReaction} onOpenConversation={onOpenConversation} active={cardsActive}
-        externalGesture={externalGesture} onBondRewardRequest={onBondRewardRequest} onSubmenuChange={setSubmenuOpen}
-        onOpenMerge={onOpenMerge} requests={requests} />
-        : hatchable ? <CompanionDailyActions definition={hatchable} onReaction={setReaction} onOpenConversation={onOpenConversation} active={cardsActive}
+      timer={pending && !ready && rest ? <CompanionMeditationStage onPress={() => setReaction(journeyForeshadowLine(familyId))} title={model.journey.eyebrow} availableAt={rest.availableAt} startedAt={rest.startedAt} settledMs={rest.settledMs} now={now} companionName={hatchableByCompanion(familyId)?.displayName ?? 'Mossprout'} />
+        : timeLock ? <CompanionMeditationStage onPress={() => setReaction(timeLock.hint ?? journeyForeshadowLine(familyId))} title={model.journey.eyebrow} availableAt={timeLock.opensAt!} startedAt={timeLock.opensFrom ?? timeLock.opensAt!} settledMs={0} now={now} companionName={hatchableByCompanion(familyId)?.displayName ?? 'Mossprout'} /> : undefined}>
+      {hatchable ? <CompanionDailyActions definition={hatchable} onReaction={setReaction} onOpenConversation={onOpenConversation} active={cardsActive}
           externalGesture={externalGesture} onBondRewardRequest={onBondRewardRequest} onSubmenuChange={setSubmenuOpen}
           onOpenMerge={onOpenMerge} requests={requests} /> : routineActions}
     </CompanionSceneCards> : <ScrollView accessibilityLabel="Journey actions" style={{ maxHeight: 340 }} contentContainerStyle={styles.actions} keyboardShouldPersistTaps="handled">
-
       {actions.map((action) => <Pressable key={action.id} accessibilityRole="button" accessibilityLabel={action.title}
         accessibilityState={{ disabled: busy }} disabled={busy} onPress={action.onPress}
         style={({ pressed }) => [pressed && styles.pressed, busy && styles.disabled]}>
         <DayActionCardSurface artwork={<DayActionIcon icon={action.icon} />} title={action.title} subtitle={action.subtitle} />
       </Pressable>)}
     </ScrollView>}
-    <CompanionSlidingSubmenu visible={dialogueOpen}>
+    <CompanionSlidingSubmenu visible={checkInOpen}>
       <ScrollView accessibilityLabel="Journey choices" style={{ maxHeight: 340 }} contentContainerStyle={styles.actions} keyboardShouldPersistTaps="handled">
         <CompanionChoiceList disabled={busy} options={actions.filter((action) => action.id !== 'back').map((action) => ({ id: action.id, label: action.title }))} onSelect={(id) => actions.find((action) => action.id === id)?.onPress()} />
         <Pressable accessibilityRole="button" accessibilityLabel="Back to companion" disabled={busy}
-          onPress={() => { setJourneyOpen(false); setCheckInOpen(false); }} style={{ minHeight: 44 }}><JourneyText>Back to companion</JourneyText></Pressable>
+          onPress={() => { setCheckInOpen(false); }} style={{ minHeight: 44 }}><JourneyText>Back to companion</JourneyText></Pressable>
       </ScrollView>
     </CompanionSlidingSubmenu>
-
   </View>;
 }
 

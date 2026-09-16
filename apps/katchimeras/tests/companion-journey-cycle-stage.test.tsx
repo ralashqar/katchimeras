@@ -4,101 +4,119 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { loadCompanionOverlay, loadNativeModule, nativeViews } from './helpers/native-motion-harness';
 import { emptyRelationshipProgressState } from '../game/katchimeras/relationship-progression';
-import { createContentFlowRun } from '../features/content-flow/content-flow-interpreter';
-import { STEPPLING_CHAPTER } from '../constants/companion-journey-chapters/steppling';
-import { journeyEpisodeFlow } from '../constants/companion-journey-chapters/episode-flow';
-import type { ContentFlowRun } from '../types/content-flow';
-import { createJourneyCycle, installJourneyCycle, JOURNEY_REST_MS } from '../game/katchimeras/companion-journey-cycle';
+import { createJourneyCycle, installJourneyCycle } from '../game/katchimeras/companion-journey-cycle';
+import { emptyCompanionBondState } from '../utils/companion-bond';
+import { emptyCompanionContentState } from '../utils/companion-content';
+import type { RelationshipProgressState } from '../types/relationship-progression';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const HOUR = 60 * 60 * 1000;
 const SceneCards = (props: { timer?: React.ReactNode; life?: React.ReactNode; garden?: React.ReactNode; children?: React.ReactNode }) => React.createElement('SceneCards', props, props.timer, props.children, props.life, props.garden);
 const ViewForTest = () => React.createElement('OriginalActionSystem');
 const Button = 'Pressable' as unknown as React.ComponentType<Record<string, unknown>>;
-test('return UI blocks the next episode until receipt completion and prevents double submission', async () => {
-  const cycle = createJourneyCycle({ id: 'journey-cycle:steppling:one', familyId: 'steppling', episodeId: 'one', number: 1, chapterId: 'steppling-chapter-1', title: 'A little way together', nextTitle: 'A reason to go', completedAt: Date.now() - JOURNEY_REST_MS - 1, finale: false });
-  let state = installJourneyCycle(emptyRelationshipProgressState(), cycle);
-  let claims = 0;
-  let activeRun: ContentFlowRun | null = null;
-  let resolveClaim: () => void = () => {};
-  const module = loadNativeModule('components/katchadeck/world/companion-journey-cycle-stage.tsx', {
-      './companion-scene-overlay': loadCompanionOverlay(),
+
+function withEpisodes(state: RelationshipProgressState, familyId: 'steppling' | 'mossprout', episodeIds: string[], completedAt: number): RelationshipProgressState {
+  return { ...state, journeyEpisodes: Object.fromEntries(episodeIds.map((id) => [`${familyId}:${id}`, { familyId, episodeId: id, completedAt, answers: {}, facts: {} }])) };
+}
+
+function loadStage(getState: () => RelationshipProgressState, setState: (value: RelationshipProgressState) => void, service: Record<string, unknown>) {
+  return loadNativeModule('components/katchadeck/world/companion-journey-cycle-stage.tsx', {
+    './companion-scene-overlay': loadCompanionOverlay(),
     'react-native': { ...nativeViews, ScrollView: 'ScrollView', Pressable: Button, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
     '@/constants/katcha-ui': { KatchaUI: { companionScenePanel: { ink: '#fff' } } },
     '@/components/themed-text': { ThemedText: 'Text' },
     '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: 'ActionCard', DayActionIcon: 'ActionIcon' },
-    '@/hooks/use-relationship-progression': { useRelationshipProgression: () => state },
-    '@/storage/repositories/relationship-progression-repository': { relationshipProgressionRepository: { update: (reducer: (value: typeof state) => typeof state) => { state = reducer(state); } } },
+    '@/hooks/use-relationship-progression': { useRelationshipProgression: getState },
+    '@/storage/repositories/relationship-progression-repository': { relationshipProgressionRepository: { load: getState, update: (reducer: (value: RelationshipProgressState) => RelationshipProgressState) => { setState(reducer(getState())); } } },
     '@/storage/repositories/home-repository': { homeRepository: { subscribe: () => () => {} } },
     '@/features/companion/companion-journey-service': {
-      initializeJourney: async () => true, reconcileCompanionMeditation: async () => {},
-      reconcileEpisode: async (_family: string, run: ContentFlowRun | null) => run, activeJourneyRun: async () => activeRun,
-      beginNextEpisode: async () => { activeRun = createContentFlowRun(journeyEpisodeFlow(STEPPLING_CHAPTER, 2), { runId: 'test:day-2', now: Date.now() }); },
-      claimCompanionJourneyReturn: async () => { claims++; await new Promise<void>((resolve) => { resolveClaim = resolve; }); state = { ...state, journeyCycles: [{ ...cycle, returnedAt: Date.now() }] }; },
+      initializeJourney: async () => true, reconcileCompanionMeditation: async () => {}, journeyDayOneComplete: async () => true,
+      claimCompanionJourneyReturn: async () => {},
+      ...service,
     },
-    '@/features/content-flow/content-flow-director': {},
-    '@/utils/companion-story-storage': { subscribeCompanionStories: () => () => {}, loadAuthoredCohortStory: () => ({}) },
-    '@/utils/merge-world/repository': { subscribeMergeWorldSnapshots: () => () => {} },
+    '@/utils/companion-story-storage': { subscribeCompanionStories: () => () => {}, loadAuthoredCohortStory: () => ({}), isAuthoredCohortFamily: (familyId: string) => familyId === 'steppling' || familyId === 'baristabbit' },
+    '@/utils/merge-world/repository': { subscribeMergeWorldSnapshots: () => () => {}, loadMergeWorldState: async () => null },
+    '@/utils/companion-bond-storage': { loadCompanionBondState: () => emptyCompanionBondState(), subscribeCompanionBondState: () => () => {} },
+    '@/utils/companion-content-storage': { loadCompanionContentState: () => emptyCompanionContentState() },
     './companion-merge-request-tray': { CompanionMergeRequestTray: 'MissionTray', COMPANION_MERGE_REQUEST_PALETTE: {} },
     './companion-choice-list': { CompanionChoiceList: 'Choices' },
     './companion-scene-cards': { CompanionSceneCards: SceneCards },
     './companion-life-actions': { CompanionLifeActions: 'LifeActions' },
-    './steppling-actions': { StepplingActions: 'StepplingActions' },
     './companion-daily-actions': { CompanionDailyActions: 'CompanionDailyActions' },
-    './companion-meditation-stage': { CompanionMeditationStage: 'Timer' },
+    './companion-meditation-stage': { CompanionMeditationStage: 'Timer', journeyForeshadowLine: () => 'Soon.' },
   }, { setInterval, clearInterval });
+}
+
+test('the return UI opens the next episode once the friend has reflected, without double submission, and the episode is a conversation', async () => {
+  const completedAt = Date.now() - 4 * HOUR - 1;
+  const cycle = createJourneyCycle({ id: 'journey-cycle:steppling:day-1', familyId: 'steppling', episodeId: 'day-1', number: 1, chapterId: 'steppling-chapter-1', title: 'A little way together', nextTitle: 'A reason to go', completedAt, finale: false });
+  let state = installJourneyCycle(withEpisodes(emptyRelationshipProgressState(), 'steppling', ['day-1'], completedAt), cycle, 4 * HOUR);
+  let claims = 0;
+  let resolveClaim: () => void = () => {};
+  const opened: string[] = [];
+  const module = loadStage(() => state, (value) => { state = value; }, {
+    claimCompanionJourneyReturn: async () => { claims++; await new Promise<void>((resolve) => { resolveClaim = resolve; }); state = { ...state, journeyCycles: [{ ...cycle, returnedAt: Date.now() }] }; },
+  });
   const Stage = module.CompanionJourneyCycleStage as React.ComponentType<Record<string, unknown>>;
   let tree: ReactTestRenderer;
-  await act(async () => { tree = create(<Stage familyId="steppling" onMore={() => {}} onJournal={() => {}} onGoal={() => {}} onOpenMerge={() => {}} />); });
+  await act(async () => { tree = create(<Stage familyId="steppling" onMore={() => {}} onJournal={() => {}} onGoal={() => {}} onOpenMerge={() => {}} onOpenConversation={(id: string) => opened.push(id)} />); });
   assert.equal(tree!.root.findAllByType(Button).some((button) => String(button.props.accessibilityLabel).startsWith('Begin Journey')), false);
   const life = () => tree!.root.findByType('SceneCards' as React.ElementType);
   assert.equal(life().props.model.phase, 'ready');
   await act(async () => { life().props.onJourney(); life().props.onJourney(); });
   assert.equal(claims, 1);
   await act(async () => { resolveClaim(); });
+  assert.equal(life().props.model.phase, 'active', 'day two opened: day one is done and four hours have passed');
   assert.equal(life().props.model.journey.eyebrow, 'The Path Outside · Journey Day 2');
   const rootCards = life();
   await act(async () => { life().props.onJourney(); });
-  assert.equal(life(), rootCards, 'opening Journey retains the root card section');
-  const seen = tree!.root.findByType('Choices' as React.ElementType).props.options.map((option: { label: string }) => option.label);
-  const flow = journeyEpisodeFlow(STEPPLING_CHAPTER, 2);
-  const opening = flow.nodes.find((node) => node.id === flow.entryNodeId)!;
-  if (opening.kind === 'scene') for (const [, label] of opening.payload!.choices as string[][]) assert.ok(seen.includes(label));
-  await act(async () => tree!.root.findByProps({ accessibilityLabel: 'Back to companion' }).props.onPress());
-  assert.equal(life(), rootCards);
+  assert.deepEqual(opened, ['steppling:journey:day-2'], 'the episode plays as a conversation');
+  assert.equal(life(), rootCards, 'opening an episode retains the root card section');
   assert.equal(tree!.root.findAllByType('Choices' as React.ElementType).length, 0);
   await act(async () => { tree!.unmount(); });
 });
 
+test('an episode that only time holds back counts down on the timer card, like a rest', async () => {
+  let state = withEpisodes(emptyRelationshipProgressState(), 'steppling', ['day-1'], Date.now() - HOUR);
+  const module = loadStage(() => state, (value) => { state = value; }, {});
+  const Stage = module.CompanionJourneyCycleStage as React.ComponentType<Record<string, unknown>>;
+  let tree: ReactTestRenderer;
+  let narration: string | null = null;
+  await act(async () => { tree = create(<Stage familyId="steppling" onMore={() => {}} onJournal={() => {}} onGoal={() => {}} onOpenMerge={() => {}} onNarration={(text: string | null) => { narration = text; }} onOpenConversation={() => {}} />); });
+  const scene = tree!.root.findByType('SceneCards' as React.ElementType);
+  assert.equal(scene.props.model.phase, 'meditating');
+  const timer = tree!.root.findByType('Timer' as React.ElementType);
+  assert.equal(timer.props.availableAt, state.journeyEpisodes!['steppling:day-1']!.completedAt + 4 * HOUR, 'the timer ends when the episode opens');
+  assert.match(narration!, /resting/);
+  await act(async () => { tree!.unmount(); });
+});
+
+test('an episode that has not opened yet waits with the friend’s hint, and the hint is the card’s reaction', async () => {
+  // Day one done an hour ago, and two moments still to share: time is not the only thing in the way, so the hint speaks.
+  let state = withEpisodes(emptyRelationshipProgressState(), 'steppling', ['day-1', 'day-2'], Date.now() - HOUR);
+  const opened: string[] = [];
+  let narration: string | null = null;
+  const module = loadStage(() => state, (value) => { state = value; }, {});
+  const Stage = module.CompanionJourneyCycleStage as React.ComponentType<Record<string, unknown>>;
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Stage familyId="steppling" onMore={() => {}} onJournal={() => {}} onGoal={() => {}} onOpenMerge={() => {}} onNarration={(text: string | null) => { narration = text; }} onOpenConversation={(id: string) => opened.push(id)} />); });
+  const scene = tree!.root.findByType('SceneCards' as React.ElementType);
+  assert.equal(scene.props.model.phase, 'waiting');
+  assert.equal(scene.props.model.journey.command, 'hint');
+  assert.match(String(scene.props.model.journey.subtitle), /small moments/);
+  assert.match(narration!, /small moments/);
+  await act(async () => { scene.props.onJourney(); });
+  assert.deepEqual(opened, [], 'a locked episode does not open');
+  await act(async () => { tree!.unmount(); });
+});
+
 for (const familyId of ['mossprout', 'steppling'] as const) {
-  test(familyId + ' meditation keeps the compact header and flat companion activities', async () => {
-    const cycle = createJourneyCycle({ id: 'journey-cycle:' + familyId + ':one', familyId, episodeId: 'one', number: 1, chapterId: familyId + '-chapter-1', title: 'A beginning', nextTitle: 'A new day', completedAt: Date.now(), finale: false });
-    let state = installJourneyCycle(emptyRelationshipProgressState(), cycle);
+  test(familyId + ' reflecting keeps the compact header and flat companion activities', async () => {
+    const cycle = createJourneyCycle({ id: 'journey-cycle:' + familyId + ':one', familyId, episodeId: 'day-1', number: 1, chapterId: familyId + '-chapter-1', title: 'A beginning', nextTitle: 'A new day', completedAt: Date.now(), finale: false });
+    let state = installJourneyCycle(emptyRelationshipProgressState(), cycle, 4 * HOUR);
     const opened: string[] = [];
     let narration: string | null = null;
-    const module = loadNativeModule('components/katchadeck/world/companion-journey-cycle-stage.tsx', {
-      './companion-scene-overlay': loadCompanionOverlay(),
-      'react-native': { ...nativeViews, ScrollView: 'ScrollView', Pressable: Button, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
-      '@/constants/katcha-ui': { KatchaUI: { companionScenePanel: { ink: '#fff' } } },
-    '@/components/themed-text': { ThemedText: 'Text' },
-      '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: 'ActionCard', DayActionIcon: 'ActionIcon' },
-      '@/hooks/use-relationship-progression': { useRelationshipProgression: () => state },
-      '@/storage/repositories/relationship-progression-repository': { relationshipProgressionRepository: { update: (reducer: (value: typeof state) => typeof state) => { state = reducer(state); } } },
-      '@/storage/repositories/home-repository': { homeRepository: { subscribe: () => () => {} } },
-      '@/features/companion/companion-journey-service': {
-        initializeJourney: async () => true, adoptMossproutCycle() {}, reconcileCompanionMeditation: async () => {},
-        reconcileEpisode: async () => null, activeJourneyRun: async () => null,
-      },
-      '@/features/content-flow/content-flow-director': {},
-      '@/utils/companion-story-storage': { subscribeCompanionStories: () => () => {}, loadAuthoredCohortStory: () => ({}) },
-      '@/utils/merge-world/repository': { subscribeMergeWorldSnapshots: () => () => {} },
-      './companion-merge-request-tray': { CompanionMergeRequestTray: 'MissionTray', COMPANION_MERGE_REQUEST_PALETTE: {} },
-    './companion-choice-list': { CompanionChoiceList: 'Choices' },
-    './companion-scene-cards': { CompanionSceneCards: SceneCards },
-    './companion-life-actions': { CompanionLifeActions: 'LifeActions' },
-    './steppling-actions': { StepplingActions: 'StepplingActions' },
-    './companion-daily-actions': { CompanionDailyActions: 'CompanionDailyActions' },
-    './companion-meditation-stage': { CompanionMeditationStage: 'Timer' },
-    }, { setInterval, clearInterval });
+    const module = loadStage(() => state, (value) => { state = value; }, {});
     const Stage = module.CompanionJourneyCycleStage as React.ComponentType<Record<string, unknown>>;
     let tree: ReactTestRenderer;
     await act(async () => { tree = create(<Stage familyId={familyId} routineActions={<ViewForTest />} onMore={() => {}} onJournal={() => {}} onGoal={() => {}} onNarration={(text: string | null) => { narration = text; }} onOpenMerge={(id: string) => opened.push(id)} />); });
@@ -110,7 +128,8 @@ for (const familyId of ['mossprout', 'steppling'] as const) {
     assert.equal(tree!.root.findAllByType('LifeActions' as React.ElementType).length, 0);
     if (familyId === 'mossprout') assert.equal(tree!.root.findAllByType(ViewForTest).length, 1);
     else {
-      const steppling = tree!.root.findByType('StepplingActions' as React.ElementType);
+      const steppling = tree!.root.findByType('CompanionDailyActions' as React.ElementType);
+      assert.equal(steppling.props.definition.companion, 'steppling', 'Steppling draws the shared daily cards like any hatchable friend');
       assert.equal(steppling.props.requests.length, 0, 'new cycles no longer create separate trivial orders');
       assert.equal(steppling.props.onMovementCheckIn, undefined, 'steps do not offer a check-in submenu');
       assert.equal(tree!.root.findAllByType('Choices' as React.ElementType).length, 0);

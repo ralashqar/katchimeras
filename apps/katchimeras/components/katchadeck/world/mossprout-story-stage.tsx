@@ -1,6 +1,7 @@
 import { CompanionChoiceList } from './companion-choice-list';
 import { CompanionSceneCards } from './companion-scene-cards';
 import { CompanionLifeActivityCard } from './companion-life-activity-card';
+import { mossproutGardenActivity, mossproutGardenRequestPreviews } from '@/features/companion/mossprout-garden-activity';
 import { MOSSPROUT_DAILY } from '@/constants/companion-daily/mossprout';
 import { CompanionSceneOverlayHost } from './companion-scene-overlay';
 import { CompanionGardenAction } from './companion-garden-action';
@@ -253,14 +254,16 @@ export function MossproutStoryStage({
   const gardenRequests = useMemo(() => mossproutOrders.filter((order) => (
     mergeWorldState?.activeOrders.find((candidate) => candidate.id === order.id)?.storyArcId === 'mossprout:casual-garden'
   )), [mergeWorldState?.activeOrders, mossproutOrders]);
+  // The beat under way on the journey system: its orders are the Garden's business, listed on the Garden card.
+  const chapterGarden = useMemo(() => mossproutGardenActivity(relationships, mergeWorldState ?? null), [mergeWorldState, relationships]);
   const journeyGardenRequest = useMemo(() => {
-    const orderIds = journey?.activity?.mergeOrderIds ?? (journey?.activity ? [journey.activity.mergeOrderId] : []);
+    const orderIds = journey?.activity?.mergeOrderIds ?? (journey?.activity ? [journey.activity.mergeOrderId] : chapterGarden.activity?.mergeOrderIds ?? []);
     return orderIds.length ? mossproutOrders.find((order) => orderIds.includes(order.id)) ?? null : null;
-  }, [journey?.activity, mossproutOrders]);
+  }, [chapterGarden.activity?.mergeOrderIds, journey?.activity, mossproutOrders]);
   const journeyMergeActive = journey?.status === 'activity_available' || journey?.status === 'activity_in_progress';
   const journeyEpisode = journey ? mossproutCampaignEpisodeByBeatId.get(journey.beatId) : null;
   const journeyRequestPreviews = useMemo(() => {
-    if (!journeyMergeActive || !journeyEpisode) return [];
+    if (!journeyMergeActive || !journeyEpisode) return mossproutGardenRequestPreviews(chapterGarden);
     const servedOrderIds = new Set(journey?.activity?.servedOrderIds ?? []);
     return journeyEpisode.mergeOrders.map((order, index, orders) => ({
       id: order.id,
@@ -271,7 +274,7 @@ export function MossproutStoryStage({
       quantity: order.requirements.length === 1 ? order.requirements[0]?.quantity : undefined,
       served: servedOrderIds.has(order.id),
     }));
-  }, [journey?.activity?.servedOrderIds, journeyEpisode, journeyMergeActive]);
+  }, [chapterGarden, journey?.activity?.servedOrderIds, journeyEpisode, journeyMergeActive]);
 
   useEffect(() => {
     if (!dayOneActionChoiceActive || journey?.beatId !== 'quiet-patch:first-flower') return;

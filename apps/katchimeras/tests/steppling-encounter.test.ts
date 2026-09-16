@@ -94,7 +94,7 @@ test('waiting Egg rays are mutually exclusive with every hatch phase and residen
 
 test('Steppling uses shared prompt, Bond landing and hatch phase haptics', () => {
   const host = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  const steppling = readFileSync('features/onboarding/use-steppling-encounter.ts', 'utf8');
+  const steppling = readFileSync('features/onboarding/use-hatchable-encounter.ts', 'utf8');
   const original = readFileSync('features/today/use-today-hatch-reveal-controller.ts', 'utf8');
   const card = readFileSync('components/katchadeck/onboarding/scripted-action-list.tsx', 'utf8');
   const questions = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
@@ -153,7 +153,7 @@ test('invalid saved hatch intent cannot lock an unready Egg', () => {
 
 test('Steppling uses the original full-sized Egg renderer and shared feed/hatch tech', () => {
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
-  const controller = readFileSync('features/onboarding/use-steppling-encounter.ts', 'utf8');
+  const controller = readFileSync('features/onboarding/use-hatchable-encounter.ts', 'utf8');
   assert.match(canvas, /<RevealedCompanionEgg idleDiscovery=\{!discoveredEggInteraction\} fullSize eggSkinId="moss"/);
   assert.match(canvas, /const growthProgress = fullSize \? 1 : presentation\?\.growthProgress \?\? 0/);
   assert.match(controller, /useEggFeedController\(\)/);
@@ -180,14 +180,14 @@ test('both world residents share tile placement, full-size Egg framing and the h
 
 test('Egg question UI is shared, and hatching automatically enters regular resident interaction', () => {
   const first = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
-  const second = readFileSync('components/katchadeck/world/steppling-encounter-panel.tsx', 'utf8');
+  const second = readFileSync('components/katchadeck/world/hatchable-encounter-panel.tsx', 'utf8');
   for (const source of [first, second]) {
     assert.match(source, /<EggActionDock bottomInset=\{/);
     assert.match(source, /<EggQuestionPanel/);
   }
   assert.match(first, /export function EggQuestionPanel[\s\S]*?<InlineCheckInPanel/);
   assert.doesNotMatch(second, /INTENT_CARDS|MOVEMENT_CARDS|Meet Steppling|StepplingDayOnePanel/);
-  const controller = readFileSync('features/onboarding/use-steppling-encounter.ts', 'utf8');
+  const controller = readFileSync('features/onboarding/use-hatchable-encounter.ts', 'utf8');
   assert.match(controller, /phase !== 'awaiting_claim'[\s\S]*?void finish\(\)/);
   assert.match(controller, /egg: feedingEgg \?\? egg/);
   const world = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
@@ -258,7 +258,7 @@ test('steps pay one Bond per 300, rounded cumulatively, independently of the hat
 });
 
 test('second Egg beat asks support without requesting steps', () => {
-  const panel = readFileSync('components/katchadeck/world/steppling-encounter-panel.tsx', 'utf8');
+  const panel = readFileSync('components/katchadeck/world/hatchable-encounter-panel.tsx', 'utf8');
   assert.doesNotMatch(panel, /Find my own pace|Check steps|steps fed\.|Feed yesterday’s steps|setAlternative|stepsMessage/);
   assert.match(panel, /HATCH_PROFILES/);
   assert.doesNotMatch(panel, /requestPermissions|displayedSteps|stepCount=/);
@@ -268,7 +268,7 @@ test('second Egg beat asks support without requesting steps', () => {
 
 test('steps launch the shared Bond batch from the right-hand reward section into the Egg', () => {
   const card = readFileSync('components/katchadeck/onboarding/scripted-action-list.tsx', 'utf8');
-  const controller = readFileSync('features/onboarding/use-steppling-encounter.ts', 'utf8');
+  const controller = readFileSync('features/onboarding/use-hatchable-encounter.ts', 'utf8');
   const payload = readFileSync('features/today/egg-bond-feed.ts', 'utf8');
   assert.match(card, /action.id === 'egg.feed_steps' \? bondSourceRef : cardRef/);
   assert.match(card, /sourceRef.current\?\.measureInWindow/);

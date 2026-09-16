@@ -78,7 +78,8 @@ export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [
     action: islandCampaignForIsland(island.id) && level.level === 1 ? 'Restore' : level.level === 1 ? 'Clear mist' : 'Upgrade',
     ...(islandCampaignForIsland(island.id) && level.level === 1 ? { economyMode: 'free' as const } : {}),
   }))),
-  ...SHARED_WORLD_PURCHASES.map((purchase): WorldUpgradeDefinition => ({
+  // A story tile is revealed by a journey episode, never bought: no offer, no marker.
+  ...SHARED_WORLD_PURCHASES.filter((purchase) => !purchase.story).map((purchase): WorldUpgradeDefinition => ({
     id: `mist:${purchase.tileId}`, target: { kind: 'haven_structure', structureId: purchase.tileId },
     visualTarget: { kind: 'haven_structure', structureId: purchase.tileId }, name: purchase.name,
     nextName: 'A new clearing', description: 'Spend light here and see who the Mist was keeping.',

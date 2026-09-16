@@ -4,6 +4,7 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { emptyCompanionBondState } from '../utils/companion-bond';
 import { claimStepplingMilestone, nextStepplingMilestone } from '../utils/steppling-activities';
+import { STEPPLING_HATCHABLE } from '../constants/hatchable-companions/steppling';
 import { STEPPLING_STEP_MILESTONES, STEPPLING_TRAIL_CONVERSATIONS } from '../constants/steppling-activities';
 import { STEPPLING_SCENARIO_POLLS } from '../constants/steppling-scenario-polls';
 import { companionConversationDefinitionById } from '../constants/companion-conversations-v2';
@@ -77,8 +78,13 @@ test('Steppling keeps the claimed row through its flight, restores Garden naviga
   mocks['@/game/katchimeras/action-completion'] = { reconcilePendingActionRewards: () => 0 };
   // The day's question is the shared slot, loaded through the same mocks so its rows are the test's rows.
   mocks['@/components/katchadeck/world/companion-daily-question'] = loadNativeModule('components/katchadeck/world/companion-daily-question.tsx', mocks, { setInterval, clearInterval });
-  const module = loadNativeModule('components/katchadeck/world/steppling-actions.tsx', mocks, { setInterval, clearInterval });
-  const Cards = module.StepplingActions as React.ComponentType<Record<string, unknown>>;
+  mocks['./companion-daily-question'] = mocks['@/components/katchadeck/world/companion-daily-question'];
+  // The step goal is shared tech too, loaded through the same mocks so its row is the test's row.
+  mocks['./companion-step-goal'] = loadNativeModule('components/katchadeck/world/companion-step-goal.tsx', mocks, { setInterval, clearInterval });
+  mocks['./companion-life-activity-card'] = { CompanionLifeActivityCard: 'LifeCard' };
+  const module = loadNativeModule('components/katchadeck/world/companion-daily-actions.tsx', mocks, { setInterval, clearInterval });
+  const Daily = module.CompanionDailyActions as React.ComponentType<Record<string, unknown>>;
+  const Cards = (props: Record<string, unknown>) => <Daily definition={STEPPLING_HATCHABLE} {...props} />;
   let tree: ReactTestRenderer;
   let reaction = '';
   const props = { onReaction: (text: string) => { reaction = text; }, onOpenConversation: (id: string, actionOrigin: KatchimeraActionOrigin) => { definitionId = id; origin = actionOrigin; }, requests: [{ id: 'order-one', title: 'A garden path', definitionIds: ['trail'], badge: '+8 Glow · 5 min sooner' }], onOpenMerge: (id: string) => opened.push(id), onBondRewardRequest: (_source: unknown, arrive: () => void, receipt: { points: number }) => { flights++; assert.ok([1, 8].includes(receipt.points)); finishFlight = arrive; } };

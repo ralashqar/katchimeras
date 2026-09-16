@@ -1,6 +1,7 @@
 import { CompanionGardenAction } from './companion-garden-action';
 import { CompanionDailyQuestionSlot } from './companion-daily-question';
 import { CompanionLifeActivityCard } from './companion-life-activity-card';
+import { CompanionStepGoal } from './companion-step-goal';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
@@ -12,9 +13,10 @@ import { type CompanionMergeRequest } from './companion-merge-request-tray';
 
 /**
  * A hatchable friend's daily cards, all from their definition's daily
- * config: the life activities (a photo of what they asked for, a small
- * thing noticed), the garden request, and the day's question. Nothing
- * here knows which friend it is drawing.
+ * config: a daily goal (Steppling's steps), the life activities (a photo of
+ * what they asked for, a small thing noticed, today in a word), the garden
+ * request, and the day's question. Nothing here knows which friend it is
+ * drawing.
  */
 export function CompanionDailyActions({ definition, onReaction, onOpenConversation, requests, onOpenMerge, onSubmenuChange, onBondRewardRequest, externalGesture, active = true }: {
   definition: HatchableCompanionDefinition;
@@ -32,9 +34,10 @@ export function CompanionDailyActions({ definition, onReaction, onOpenConversati
   const [gardenOpen, setGardenOpen] = useState(false);
   const [lifeOpen, setLifeOpen] = useState(false);
   useEffect(() => { onSubmenuChange?.(gardenOpen || lifeOpen); }, [gardenOpen, lifeOpen, onSubmenuChange]);
-  const hasLife = Boolean(daily?.photo || daily?.notice || daily?.water);
+  const hasLife = Boolean(daily?.photo || daily?.notice || daily?.water || daily?.moment);
   return <CompanionGardenAction familyId={companion} onOpenMerge={onOpenMerge} storyRequests={requests} onSubmenuChange={setGardenOpen}>
     {(gardenCard) => <View style={{ gap: 7 }}>
+      {daily?.goal ? <CompanionStepGoal companion={companion} config={daily.goal} onReaction={onReaction} onBondRewardRequest={onBondRewardRequest} externalGesture={externalGesture} /> : null}
       {daily && hasLife ? <CompanionLifeActivityCard companion={companion} config={daily} onNarration={onReaction} onOpenChange={setLifeOpen}
         onBondRewardRequest={onBondRewardRequest} externalGesture={externalGesture} /> : null}
       {gardenCard}

@@ -5,7 +5,6 @@ import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-
 import { mergeFtueAllowsCommand, mergeFtueEventForCommand } from '@/features/onboarding/merge-ftue';
 import { createMergeBoardSession } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import { missionBoardStep, missionProgress } from '@/features/onboarding/steppling-mission';
-import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 import type { HatchableMissionDefinition } from '@/types/hatchable-companion';
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
@@ -87,9 +86,4 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
     interactionKey={`${mission.id}:${boardStep?.id ?? 'free'}`} sessionId={sessionId} hiddenItemIds={hiddenItemIds}
     width={width} bottomInset={bottomInset} landings={landings}
     onCommand={dispatch} onBoardMetrics={handleMetrics} onBlockedInteraction={onBlockedInteraction} onEntranceSettled={onEntranceSettled} />;
-});
-
-/** Steppling's dock, by its old name. */
-export const StepplingMissionDock = memo(function StepplingMissionDock(props: Omit<HatchableMissionDockProps, 'mission'>) {
-  return <HatchableMissionDock mission={STEPPLING_HATCHABLE.mission} {...props} />;
 });

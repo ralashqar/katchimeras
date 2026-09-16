@@ -78,6 +78,10 @@ import { resolveMossproutFtueConversation } from '@/constants/mossprout-ftue-con
 import { legacyStepplingDayOneConversation, legacyStepplingDayOneConversationV2 } from '@/constants/steppling-day-one-conversation';
 import { recordLifeConversation, recordScenarioAnswer } from '@/utils/companion-life-recording';
 import { nextMossproutTheory } from '@/utils/companion-theory';
+import { journeyLineContext, resolveJourneyConversation } from '@/utils/companion-journey-personalisation';
+import { todayMomentAnswer } from '@/utils/companion-daily-moment';
+import { journeyEpisodeForConversation } from '@/constants/companion-journey-chapters/registry';
+import { completeJourneyEpisode } from '@/features/companion/companion-journey-service';
 import { MOSSPROUT_THEORY_TITLE } from '@/constants/mossprout-theory-conversations';
 import { loadOnboardingProfile as loadLifeOnboardingProfile } from '@/utils/onboarding-state';
 import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/companion-journey-storage';
@@ -153,6 +157,8 @@ function settleActionConversationCompletion(
 
 function conversationHasIndependentBond(definitionId: string, dayId?: string | null) {
   if (definitionId.startsWith('steppling:trail-chat:')) return false;
+  // A journey episode pays its own Bond when it is recorded.
+  if (journeyEpisodeForConversation(definitionId)) return false;
   if (!definitionId.startsWith('mossprout:') || !dayId) return true;
   const relationships = relationshipProgressionRepository.load();
   const runtimeDayId = mossproutJourneyRuntimeDayId(relationships, dayId, isJourneyQuickModeEnabled());
@@ -328,6 +334,10 @@ export function useKingdomQuests({ kingdom, residents, today }: Args) {
       const insight = loadHatchProfile(definition.familyId).initialInsight;
       if (insight) return { ...definition, nodes: definition.nodes.map((node) => node.id === definition.entryNodeId && node.kind === 'choice' ? { ...node, prompt: `${insight}\n\n${node.prompt}` } : node) };
     }
+    // A journey episode is said to this player: variants by their theory, tokens from their earlier answers.
+    if (definition && journeyEpisodeForConversation(definition.id)) {
+      return resolveJourneyConversation(definition, journeyLineContext(definition.familyId, companionContentState.conversationSessions, relationshipProgressionRepository.load(), todayMomentAnswer(definition.familyId, localDayId())));
+    }
     if (!definition || definition.familyId !== 'mossprout') return definition;
     if (definition.id.startsWith('mossprout:ftue:first-meeting:')) return resolveMossproutFtueConversation(definition, loadLifeOnboardingProfile().mossproutAnswers.growthIntentId, selectedConversationSession.definitionVersion, loadHatchProfile('mossprout').initialInsight);
     return resolveMossproutCampaignConversation(
@@ -336,7 +346,7 @@ export function useKingdomQuests({ kingdom, residents, today }: Args) {
       selectedConversationSession.turns,
       homeResidentSkinIds,
     );
-  }, [homeResidentSkinIds, selectedConversationSession]);
+  }, [companionContentState.conversationSessions, homeResidentSkinIds, selectedConversationSession]);
   useEffect(() => {
     if (selectedConversationSession && selectedConversationDefinition) {
       recordLifeConversation(selectedConversationSession, selectedConversationDefinition);
@@ -349,6 +359,12 @@ export function useKingdomQuests({ kingdom, residents, today }: Args) {
     settleActionConversationCompletion(selectedConversationSession, selectedConversationDefinition);
     const authoredMatch = /^(baristabbit|steppling):story:(\d+)$/.exec(selectedConversationSession.definitionId);
     if (authoredMatch && isAuthoredCohortFamily(authoredMatch[1])) completeAuthoredCohortConversation(authoredMatch[1], Number(authoredMatch[2]), completedAt);
+    // A finished journey episode is recorded once, with its answers; the friend then reflects.
+    const episode = journeyEpisodeForConversation(selectedConversationSession.definitionId);
+    if (episode) {
+      try { completeJourneyEpisode(episode.chapter.familyId, episode.episode.id, { session: selectedConversationSession, now: completedAt }); }
+      catch (error) { console.warn('The journey episode could not be recorded', error); }
+    }
   }, [selectedConversationDefinition, selectedConversationSession]);
   useEffect(() => {
     if (!selectedConversationSession || selectedConversationSession.preview || selectedConversationSession.status !== 'active') return;

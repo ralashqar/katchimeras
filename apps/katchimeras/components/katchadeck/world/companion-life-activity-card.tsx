@@ -22,7 +22,7 @@ import { CompanionSceneOverlay, useCompanionActionNavigation } from './companion
 import { CompanionChoiceList } from './companion-choice-list';
 import { MossproutWaterAction } from './mossprout-water-action';
 
-type Mode = 'menu' | 'notice' | 'photo-confirm' | 'photo-question' | 'no-match' | 'response' | 'saving' | 'error';
+type Mode = 'menu' | 'notice' | 'moment' | 'photo-confirm' | 'photo-question' | 'no-match' | 'response' | 'saving' | 'error';
 type Answer = { kind: CompanionLifeActivity; answer: string; response: string; photo?: CompanionLifePhoto };
 
 /**
@@ -43,6 +43,7 @@ export function CompanionLifeActivityCard({ companion, config, onOpenChange, onN
   const inline = config.presentation === 'rows';
   const photoConfig = config.photo ?? null;
   const noticeConfig = config.notice ?? null;
+  const momentConfig = config.moment ?? null;
   const router = useRouter();
   const returnTo = usePathname();
   const navigation = useCompanionActionNavigation();
@@ -123,6 +124,7 @@ export function CompanionLifeActivityCard({ companion, config, onOpenChange, onN
   }, [dayId, finishAnswer, photoConfig, showError, state.capture]);
   const supportInvitation = hatchSupportInvitation(companion);
   const narration = !open && !inline ? null : mode === 'notice' ? prompt ? [supportInvitation, prompt.prompt].filter(Boolean).join('\n\n') : null
+    : mode === 'moment' ? momentConfig?.prompt ?? null
     : mode === 'photo-confirm' ? photoConfig?.lines.unsure ?? 'What did you find?'
     : mode === 'photo-question' ? photoConfig?.lines.question ?? 'What caught your eye?'
     : mode === 'no-match' ? photoConfig?.lines.noMatch ?? null
@@ -153,11 +155,11 @@ export function CompanionLifeActivityCard({ companion, config, onOpenChange, onN
     }
   };
   const artFor = (kind: CompanionLifeActivity | 'gateway') => <Image contentFit="contain" transition={0}
-    source={katchimeraActionArt(kind === 'photo' ? photoConfig?.artKey : kind === 'notice' ? noticeConfig?.artKey : config.menu?.artKey)}
+    source={katchimeraActionArt(kind === 'photo' ? photoConfig?.artKey : kind === 'notice' ? noticeConfig?.artKey : kind === 'moment' ? momentConfig?.artKey : config.menu?.artKey)}
     style={{ width: 48, height: 48 }} />;
   const reward = <DayActionRewardChip reward={{ kind: 'bond', amount: COMPANION_BOND_REWARDS.life_activity_completed }} />;
   const activity = (kind: CompanionLifeActivity, index: number) => {
-    const title = kind === 'photo' ? photoConfig?.title : noticeConfig?.title;
+    const title = kind === 'photo' ? photoConfig?.title : kind === 'moment' ? momentConfig?.title : noticeConfig?.title;
     if (!title) return null;
     if (flight?.kind === kind) return <DayActionCompletedRow key={flight.id} enteringEnabled={false} animateLayout artwork={artFor(kind)} title={title}
       reward={reward} start
@@ -171,12 +173,13 @@ export function CompanionLifeActivityCard({ companion, config, onOpenChange, onN
     return <DayActionActiveRow key={kind} enteringEnabled={false} animateLayout={inline} entryDelayMs={inline ? DAY_ACTION_MOTION.entryBaseDelayMs + index * DAY_ACTION_MOTION.entryStaggerMs : undefined}
       externalGesture={inline ? externalGesture : undefined} disabled={busy} label={title}>
       <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityHint={kind === 'photo' ? photoConfig?.subtitle : undefined} disabled={busy}
-        onPress={kind === 'photo' ? camera : () => { setNoticeReply(null); if (noticeConfig) setPrompt(noticePromptForDay(noticeConfig, dayId)); setMode('notice'); }}>
+        onPress={kind === 'photo' ? camera : kind === 'moment' ? () => { setNoticeReply(null); setMode('moment'); } : () => { setNoticeReply(null); if (noticeConfig) setPrompt(noticePromptForDay(noticeConfig, dayId)); setMode('notice'); }}>
         <DayActionCardSurface artwork={artFor(kind)} title={title} subtitle={inline && kind === 'photo' ? photoConfig?.subtitle : undefined} reward={reward} />
       </Pressable>
     </DayActionActiveRow>;
   };
-  const choices = mode === 'notice' && prompt ? [
+  const choices = mode === 'moment' && momentConfig ? [...momentConfig.options.map((option) => ({ id: option.id, label: option.label })), { id: 'later', label: 'Not right now' }]
+    : mode === 'notice' && prompt ? [
     ...prompt.choices.map((choice) => ({ id: choice.id, label: choice.label })), { id: 'later', label: 'Not right now' },
   ] : mode === 'photo-confirm' ? [...(photoConfig?.confirm ?? []).map((choice) => ({ id: choice.id, label: choice.label })), { id: 'other', label: 'Something else' }]
     : mode === 'photo-question' ? (photoConfig?.followUps ?? []).map((choice) => ({ id: choice.id, label: choice.label }))
@@ -185,7 +188,13 @@ export function CompanionLifeActivityCard({ companion, config, onOpenChange, onN
     : mode === 'error' ? [{ id: 'retry', label: 'Try again' }] : [];
   const select = (id: string) => {
     if (id === 'later') { back(); return; }
-    if (mode === 'notice' && prompt) {
+    if (mode === 'moment' && momentConfig) {
+      const choice = momentConfig.options.find((item) => item.id === id);
+      if (choice) {
+        const selected: Answer = { kind: 'moment', answer: choice.label, response: momentConfig.replies[choice.id] ?? momentConfig.thanks };
+        setAnswer(selected); setNoticeReply(selected.response); finishAnswer(selected);
+      }
+    } else if (mode === 'notice' && prompt) {
       const choice = prompt.choices.find((item) => item.id === id);
       if (choice) {
         const selected: Answer = { kind: 'notice', answer: choice.label, response: choice.reply };
@@ -217,7 +226,7 @@ export function CompanionLifeActivityCard({ companion, config, onOpenChange, onN
   };
   const rows = <View style={{ gap: inline ? 7 : 8 }}>
     {config.water ? <MossproutWaterAction disabled={Boolean(flight)} onBusyChange={setWaterBusy} enteringEnabled={false} onBondRewardRequest={onBondRewardRequest} onError={showError} /> : null}
-    {activity('photo', 0)}{activity('notice', 1)}
+    {momentConfig ? activity('moment', 0) : null}{activity('photo', 1)}{activity('notice', 2)}
   </View>;
   const dialogue = mode !== 'menu' ? <View style={{ position: 'absolute', bottom: 64, left: 0, right: 0 }}>
     {mode === 'notice' ? <MossproutNoticeChoices options={choices} onSelect={select} /> : <CompanionChoiceList presentation="single-column" disabled={mode === 'saving'} options={choices} onSelect={select} />}

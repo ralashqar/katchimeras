@@ -1,6 +1,6 @@
-import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from '@/features/content-flow/steppling-day-one-flow-v2';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from '@/features/content-flow/legacy/steppling-day-one-flow-v2';
 import type { ConversationDefinition, ConversationNode } from '@/types/companion-conversation';
-import { LEGACY_STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/steppling-day-one-flow-v1';
+import { LEGACY_STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/legacy/steppling-day-one-flow-v1';
 import type { ContentFlowDefinition } from '@/types/content-flow';
 import { STEPPLING_DAY_ONE_FLOW } from '@/features/content-flow/steppling-day-one-flow';
 

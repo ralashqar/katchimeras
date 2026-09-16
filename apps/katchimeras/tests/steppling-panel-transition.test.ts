@@ -7,7 +7,7 @@ import { type StepplingEggProgress } from '@/features/onboarding/steppling-egg-p
 import { eggFeedOffer, hatchWispClearedCount } from '@/features/onboarding/hatchable-egg-policy';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 
-const controller = readFileSync('features/onboarding/use-steppling-encounter.ts', 'utf8');
+const controller = readFileSync('features/onboarding/use-hatchable-encounter.ts', 'utf8');
 const source = ts.createSourceFile('controller.ts', controller, ts.ScriptTarget.Latest, true);
 function loadCallback(name: string, context: Record<string, unknown>) {
   let callback: ts.Expression | undefined;
@@ -100,7 +100,7 @@ test('reduced motion still hands off through panel completion; failed saves rele
 });
 
 test('main companion question cards reuse the original panel lifecycle', () => {
-  const panel = readFileSync('components/katchadeck/world/steppling-encounter-panel.tsx', 'utf8');
+  const panel = readFileSync('components/katchadeck/world/hatchable-encounter-panel.tsx', 'utf8');
   const nurture = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
   const steps = readFileSync('components/katchadeck/onboarding/scripted-action-list.tsx', 'utf8');
   assert.match(panel, /<EggHeroGuide topInset=\{insets.top\}/);

@@ -110,7 +110,7 @@ async function commit(companion: string, id: string) {
     await saveCompanionPhotoMemory(completion, keepPhoto);
   }
   if (generation !== resetGeneration) throw new Error('Activity was reset');
-  const title = completion.kind === 'photo' ? config?.photo?.title ?? 'A photo shared' : config?.notice?.title ?? 'One small thing noticed';
+  const title = completion.kind === 'photo' ? config?.photo?.title ?? 'A photo shared' : completion.kind === 'moment' ? config?.moment?.title ?? 'Today, in a word' : config?.notice?.title ?? 'One small thing noticed';
   rememberCompanionMoment({ id, familyId: companion as LifeCompanionFamily, kind: 'activity', title,
     createdAt: completion.occurredAt, updatedAt: completion.occurredAt,
     facts: { noticed: completion.answer, response: completion.response },

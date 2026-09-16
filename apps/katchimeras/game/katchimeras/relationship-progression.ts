@@ -1,7 +1,7 @@
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { normalizeJourneyCycles, currentJourneyCycle, createJourneyCycle, installJourneyCycle } from './companion-journey-cycle';
 import type { ConversationSession } from '@/types/companion-conversation';
-import type { ActionCompletionRecord, ActionPresentationRecord, JourneyDayActionRecord, JourneyDayRecord, KatchimeraActionCompletionRecord, KatchimeraActionOrigin, KatchimeraActionRewardReceipt, KatchimeraActionSlotId, KatchimeraDayAction, KatchimeraMeditationRecord, KatchimeraStoryProgress, MossproutDailyActionDeck, MossproutStoryFactKey, RelationshipProgressState } from '@/types/relationship-progression';
+import type { ActionCompletionRecord, ActionPresentationRecord, JourneyDayActionRecord, JourneyDayRecord, KatchimeraActionCompletionRecord, KatchimeraActionOrigin, KatchimeraActionRewardReceipt, KatchimeraActionSlotId, KatchimeraDayAction, KatchimeraMeditationRecord, KatchimeraStoryProgress, MossproutDailyActionDeck, MossproutStoryFactKey, RelationshipProgressState, JourneyEpisodeRecord } from '@/types/relationship-progression';
 import { MOSSPROUT_HEARTWOOD_CHAPTER_ID, mossproutExtendedBeatById } from '@/constants/mossprout-journey-chapters';
 import {
   MOSSPROUT_CAMPAIGN_EPISODES,
@@ -112,7 +112,18 @@ export function normalizeRelationshipProgressState(value: unknown, options: {
         settledMs: Math.max(0, Number(record.settledMs) || 0),
       })).slice(-20)
     : [];
-  return { schemaVersion: 7, journeyDays, stories, milestones, skippedActionIds, actionCompletions, actionPresentations, mossproutDailyActionDecks: normalizedDecks, meditations, journeyCycles: normalizeJourneyCycles(candidate.journeyCycles) };
+  return { schemaVersion: 7, journeyDays, stories, milestones, skippedActionIds, actionCompletions, actionPresentations, mossproutDailyActionDecks: normalizedDecks, meditations, journeyCycles: normalizeJourneyCycles(candidate.journeyCycles), journeyEpisodes: normalizeJourneyEpisodes(candidate.journeyEpisodes) };
+}
+
+function normalizeJourneyEpisodes(value: unknown): Record<string, JourneyEpisodeRecord> {
+  if (!value || typeof value !== 'object') return {};
+  const records: Record<string, JourneyEpisodeRecord> = {};
+  for (const [id, raw] of Object.entries(value as Record<string, Partial<JourneyEpisodeRecord>>)) {
+    if (!raw || typeof raw !== 'object' || typeof raw.familyId !== 'string' || typeof raw.episodeId !== 'string' || typeof raw.completedAt !== 'number') continue;
+    const strings = (input: unknown) => Object.fromEntries(Object.entries(input && typeof input === 'object' ? input as Record<string, unknown> : {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+    records[id] = { familyId: raw.familyId as JourneyEpisodeRecord['familyId'], episodeId: raw.episodeId, completedAt: raw.completedAt, answers: strings(raw.answers), facts: strings(raw.facts), ...(raw.migrated ? { migrated: true } : {}) };
+  }
+  return records;
 }
 
 function isKatchimeraMeditationRecord(value: unknown): value is KatchimeraMeditationRecord {

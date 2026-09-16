@@ -12,7 +12,7 @@ export function CompanionSceneCards({ model, onJourney, timer, children, life, g
 }) {
   const { height, width } = useWindowDimensions();
   const waiting = model.journey.command === 'wait';
-  const label = model.phase === 'ready' ? 'Begin next Journey' : model.phase === 'finished' ? 'Chapter complete · View memories' : 'Continue Journey';
+  const label = model.phase === 'ready' ? 'Begin next Journey' : model.phase === 'finished' ? 'Chapter complete · View memories' : model.phase === 'waiting' ? model.journey.subtitle : 'Continue Journey';
   // Match the shared action rows' full-screen motion gutter. A card-width
   // ScrollView clips their leftward wind-up before the rightward exit starts.
   // Equal padding keeps the resting cards and Journey panel in the same place.

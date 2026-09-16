@@ -212,7 +212,7 @@ test('the Glow story opens the mission from the bubble and pays the reveal only 
   assert.equal(STEPPLING_MISSION_CAMERA.kind === 'focus_target' ? STEPPLING_MISSION_CAMERA.zoom : null, MISSION_CAMERA_ZOOM);
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
-  assert.match(screen, /const soloLayerId = stepplingBoardBusy \? `structure:\$\{activeHatchable\.tile\.id\}` : restorationBoardBusy && restorationIslandId \? `nature:mossprout:\$\{restorationIslandId\}` : null;/, 'only the board’s tile stays on the map');
+  assert.match(screen, /const soloLayerId = stepplingBoardBusy \? `structure:\$\{activeHatchable\.tile\.id\}` : journeyBoardBusy && journeyMission \? `structure:\$\{journeyMission\.tile\.id\}` : restorationBoardBusy && restorationIslandId \? `nature:mossprout:\$\{restorationIslandId\}` : null;/, 'only the board’s tile stays on the map');
   assert.match(screen, /const stepplingBoardBusy = stepplingMissionActive && !stepplingMissionLanded;\s*const restorationBoardBusy = restorationBoardVisible && !restorationLanded;/, 'the map comes back the moment the last item lands');
   assert.match(canvas, /setFadeSolo\(soloLayerId\);\s*othersOpacity\.value = withTiming\(0, \{ duration, easing/, 'the other tiles fade out while a board is up');
   assert.match(canvas, /<Animated\.View pointerEvents=\{soloLayerId \? 'none' : 'box-none'\} style=\{\[StyleSheet\.absoluteFill, othersStyle\]\}>\{creatureNodes\}<\/Animated\.View>/, 'and every Katchimera with them');
@@ -224,13 +224,13 @@ test('the Glow story opens the mission from the bubble and pays the reveal only 
 
 test('the Kingdom docks the mission under Steppling’s tile and clears the mist when its final item lands', () => {
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  const dock = readFileSync('components/katchadeck/world/steppling-mission-dock.tsx', 'utf8');
+  const dock = readFileSync('components/katchadeck/world/hatchable-mission-dock.tsx', 'utf8');
   const store = readFileSync('features/onboarding/use-opening-mission-board.ts', 'utf8');
   const runtime = readFileSync('features/onboarding/hatchable-runtime.ts', 'utf8');
   const upgrade = runtime;
   const offers = readFileSync('features/world-upgrades/world-upgrade-offers.ts', 'utf8');
   assert.match(screen, /const stepplingMissionActive = glowRun\?\.status === 'active' && glowRun\.nodeId === GLOW_MISSION_CLEAR_NODE_ID;/);
-  assert.match(screen, /useOpeningGlow\(stepplingMissionActive \? gatewayTileNode : islandRestoration \? restorationTileNode : homeTileNode\)/, 'Glow flies into the misted clearing during its mission');
+  assert.match(screen, /useOpeningGlow\(stepplingMissionActive \? gatewayTileNode : journeyMissionActive \? journeyTileNode : islandRestoration \? restorationTileNode : homeTileNode\)/, 'Glow flies into the misted clearing during its mission');
   assert.match(screen, /const stepplingMission = useMissionBoard\(activeHatchable\.mission\.storageKey, stepplingMissionActive \? activeHatchable\.mission\.id : null, createActiveMission\);/, 'its own board and store');
   assert.match(screen, /stepplingFinaleIdRef\.current = launchGlowFinale\(from, definitionId\);/);
   assert.match(screen, /const stepplingMissionLanded = stepplingFinaleIdRef\.current != null && openingGlow\.finaleLandedId === stepplingFinaleIdRef\.current;/);

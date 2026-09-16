@@ -331,9 +331,24 @@ export type MossproutStoryFactKey =
 
 export type MossproutStoryFacts = Partial<Record<MossproutStoryFactKey, string>>;
 
+/** A journey episode the player has been through: when, what they answered, what it established. */
+export type JourneyEpisodeRecord = {
+  familyId: KatchimeraFamilyId;
+  episodeId: string;
+  completedAt: number;
+  /** Ask id → option id. */
+  answers: Record<string, string>;
+  /** Facts the answers established, read back by later lines. */
+  facts: Record<string, string>;
+  /** Written from a save of the day-and-rest era, with no answers to keep. */
+  migrated?: boolean;
+};
+
 export type RelationshipProgressState = {
   /** Versioned episode/cycle extension; absent in legacy schema-7 saves. */
   journeyCycles?: import('./companion-journey-cycle').CompanionJourneyCycle[];
+  /** Journey episodes completed, by `${familyId}:${episodeId}`. */
+  journeyEpisodes?: Record<string, JourneyEpisodeRecord>;
   schemaVersion: 7;
   journeyDays: JourneyDayRecord[];
   stories: Partial<Record<KatchimeraFamilyId, KatchimeraStoryProgress>>;
