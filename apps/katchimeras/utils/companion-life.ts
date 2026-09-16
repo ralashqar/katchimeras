@@ -1,3 +1,4 @@
+import { hasCompanionLife } from '@/constants/hatchable-companions/registry';
 import { lifeHabitById, type LifeCompanionFamily } from '@/constants/companion-life-content';
 import type { ConversationDefinition, ConversationOption, ConversationSession, ConversationTraitId } from '@/types/companion-conversation';
 import { CONVERSATION_TRAIT_PHRASES } from '@/utils/companion-conversation';
@@ -62,7 +63,7 @@ export function journalSummary(entry: CompanionJournalEntry) {
 export function scenarioJournalEntry(session: ConversationSession, definition: ConversationDefinition): CompanionJournalEntry | null {
   if (session.preview || session.status !== 'completed') return null;
   const familyId = definition.familyId;
-  if (familyId !== 'mossprout' && familyId !== 'steppling') return null;
+  if (!hasCompanionLife(familyId)) return null;
   const at = session.completedAt ?? session.updatedAt;
   // "Mossprout thinks he knows you": what he said, and what the player said back.
   if (definition.tags?.includes('theory')) {

@@ -265,24 +265,21 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
       complete: 'Garden story complete',
     },
     speech: {
-      available: ({ coins, cost }) => cost <= 0
-        ? 'I know just where to begin.'
-        : coins >= cost
-          ? 'I know just where to begin. Whenever you are ready.'
-          : `${coins} of ${cost} Glow so far. The beds will keep until there is light enough.`,
-      delivery_requested: () => 'This patch is spent. What we need next is on your board.',
-      restoration_ready: ({ coins, cost }) => cost <= 0
-        ? 'Everything is ready. This one is my gift.'
-        : coins >= cost
-          ? 'We have what we need. Whenever you are ready.'
-          : coins < cost / 2
-            ? `${coins} of ${cost} Glow so far. The garden is patient.`
-            : 'We are close now. A little more light and this part can grow.',
+      available: { text: '{{coins|raw}} of {{cost|raw}} Glow so far. The beds will keep until there is light enough.', variants: [
+        { when: { fact: 'cost', lte: 0 }, text: 'I know just where to begin.' },
+        { when: { fact: 'affordable', eq: true }, text: 'I know just where to begin. Whenever you are ready.' },
+      ] },
+      delivery_requested: 'This patch is spent. What we need next is on your board.',
+      restoration_ready: { text: 'We are close now. A little more light and this part can grow.', variants: [
+        { when: { fact: 'cost', lte: 0 }, text: 'Everything is ready. This one is my gift.' },
+        { when: { fact: 'affordable', eq: true }, text: 'We have what we need. Whenever you are ready.' },
+        { when: { fact: 'halfway', eq: false }, text: '{{coins|raw}} of {{cost|raw}} Glow so far. The garden is patient.' },
+      ] },
     },
-    fallbackReturn: (chapterTitle) => `Everything for ${chapterTitle} is here. Set it down and the Mist has to let go.`,
-    fallbackResolution: (level) => level === 4
-      ? 'Every bloom found room. The Mist has nothing left here to keep.'
-      : 'The garden remembered a little more, because we came back and looked at it.',
+    fallbackReturn: 'Everything for {{chapterTitle}} is here. Set it down and the Mist has to let go.',
+    fallbackResolution: { text: 'The garden remembered a little more, because we came back and looked at it.', variants: [
+      { when: { fact: 'level', eq: 4 }, text: 'Every bloom found room. The Mist has nothing left here to keep.' },
+    ] },
     wakeHandoffLine: 'I was tending a garden nobody could see. Then you looked. Past the beds, the Wildgrowth is still under the Mist. Someone’s resting in there.',
     sleepingHint: 'The Mist is keeping someone in this garden. They will wake once the friend before them is home.',
     wispLines: {

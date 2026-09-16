@@ -9,7 +9,9 @@ const HAVEN_ORDER_FILLERS_KEY = 'katchadeck.dev.haven-order-fillers-v1';
 const HAVEN_ORDER_FILLER_SEED_KEY = 'katchadeck.dev.haven-order-filler-seed-v1';
 const HAVEN_ORDER_FILLER_SLOT_SEEDS_KEY = 'katchadeck.dev.haven-order-filler-slot-seeds-v1';
 const HAVEN_ORDER_FILLER_BOARD_SLOT_SEEDS_KEY = 'katchadeck.dev.haven-order-filler-board-slot-seeds-v1';
+const MISSION_MECHANIC_PREVIEW_KEY = 'katchadeck.dev.mission-mechanic-preview-v1';
 const allKatchimerasListeners = new Set<() => void>();
+const missionMechanicPreviewListeners = new Set<() => void>();
 const journeyQuickModeListeners = new Set<() => void>();
 const havenOrderFillerListeners = new Set<() => void>();
 
@@ -26,6 +28,22 @@ export function setAllKatchimerasAvailableEnabled(enabled: boolean): void {
 export function subscribeAllKatchimerasAvailable(listener: () => void): () => void {
   allKatchimerasListeners.add(listener);
   return () => allKatchimerasListeners.delete(listener);
+}
+
+/** The mechanic every docked mission board is swapped to (under its own storage key), or none. */
+export function getDevMissionMechanicPreview(): 'column-shot' | null {
+  return isDevBuild() && getStoredJson<string | null>(MISSION_MECHANIC_PREVIEW_KEY, null) === 'column-shot' ? 'column-shot' : null;
+}
+
+export function setDevMissionMechanicPreview(preview: 'column-shot' | null): void {
+  if (!isDevBuild()) return;
+  setStoredJson(MISSION_MECHANIC_PREVIEW_KEY, preview);
+  missionMechanicPreviewListeners.forEach((listener) => listener());
+}
+
+export function subscribeDevMissionMechanicPreview(listener: () => void): () => void {
+  missionMechanicPreviewListeners.add(listener);
+  return () => missionMechanicPreviewListeners.delete(listener);
 }
 
 export function isJourneyQuickModeEnabled(): boolean {

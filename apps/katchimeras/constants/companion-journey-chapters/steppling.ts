@@ -60,7 +60,7 @@ export const STEPPLING_CHAPTER: CompanionJourneyChapterDefinition = {
     complete: 'The Path Outside is here: five village routes, with room for your pace. You do not have to go farther to belong.',
     checkIn: [['adapted', 'I moved in my own way'], ['rest', 'I took a moment to rest']],
     lifeIcon: 'figure.walk',
-    lifeRequestSubtitle: (stepProgress) => `${Math.min(stepProgress, 500)}/500 new steps · or check in`,
+    lifeRequestSubtitle: '{{stepProgress|cap:500|raw}}/500 new steps · or check in',
     hints: {
       since_previous: 'I’m still thinking about our last path. Come back a little later.',
       interactions: 'Let’s share a few more small moments first. Then I’ll have something to tell you.',

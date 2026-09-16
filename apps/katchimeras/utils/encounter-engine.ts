@@ -1,5 +1,5 @@
 import { encounterCastBySeedId, encounterLiveCast, type EncounterCastEntry } from '@/constants/encounter-cast';
-import { homeCreatureVisuals } from '@/constants/home-mvp';
+import { creatureVisual } from '@/constants/home-mvp';
 import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
 import type {
   KatchimeraCompanionId,
@@ -415,7 +415,7 @@ export function buildCreatureFromMatch(
   secondaryTrait: HomeScoreKey
 ): LocalCreatureRecord {
   const { profile, castEntry, signal, repeatDepth, rarity, livingRarity } = match;
-  const visual = homeCreatureVisuals[castEntry.visualKey];
+  const visual = creatureVisual(castEntry.visualKey);
   const bondVisitCount = repeatDepth + 1;
   const bondStage = resolveBondStage(bondVisitCount);
   const lines = pickEncounterLines(profile, castEntry, repeatDepth, rarity, signal.isRecovery, bondStage);

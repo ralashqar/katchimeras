@@ -1,4 +1,5 @@
 import type { HatchableTileArt } from '@/types/hatchable-companion';
+import { artSourceSet } from '@/utils/art-source';
 
 /**
  * The revealed art of every story tile, by tile id. Kept apart from the
@@ -15,7 +16,12 @@ const TILE_ART: Readonly<Record<string, () => HatchableTileArt>> = {
 
 export const STORY_TILE_ART_IDS: readonly string[] = Object.keys(TILE_ART);
 
+/** Whether a story tile has revealed art anywhere: brought by a pack, or bundled. */
+export const hasStoryTileArt = (tileId: string): boolean => artSourceSet(`tile:${tileId}`) != null || tileId in TILE_ART;
+
 export function storyTileArt(tileId: string): HatchableTileArt {
+  const registered = artSourceSet(`tile:${tileId}`);
+  if (registered) return registered;
   const art = TILE_ART[tileId];
   if (!art) throw new Error(`No revealed tile art is registered for ${tileId}.`);
   return art();

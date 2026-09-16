@@ -1,7 +1,9 @@
 import type { ConversationInsightResultDefinition, ConversationOption } from '@/types/companion-conversation';
+import type { MissionMechanicDefinition } from '@/types/mission-mechanic';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeOrder, MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
 import type { CorruptionWispLines } from '@/features/onboarding/corruption-wisps';
+import type { ContentLine } from '@/types/content-predicate';
 
 export type IslandCampaignChapterLevel = Exclude<MossproutNatureIslandLevel, 0>;
 export type IslandCampaignChapterStatus = 'available' | 'orders_active' | 'return_ready' | 'board_open' | 'delivery_requested' | 'restoration_ready' | 'resolution_ready' | 'complete';
@@ -24,6 +26,8 @@ export type RestorationBoardDefinition = {
   echoes: readonly RestorationEcho[];
   /** Delivered items land here in order, then on any free window cell. */
   deliveryCells: readonly number[];
+  /** How merges strike the wisps over the island; absent, glow strikes carried by the item each merge makes. */
+  mechanic?: MissionMechanicDefinition;
 };
 
 export type IslandCampaignChapterOrder = Pick<MergeOrder, 'title' | 'description' | 'difficulty' | 'requirements' | 'narrativeSignal'>;
@@ -90,9 +94,12 @@ export type IslandCampaignCopy = {
   actionLabels: Record<Exclude<IslandCampaignPanelAction, 'continue_restoring'>, string> & Partial<Record<'continue_restoring', string>>;
   /** Machine-readable panel states; `speech` voices the ones the friend cares about. Restoration-board states fall back to shared labels. */
   stateLabels: Record<Exclude<IslandCampaignChapterStatus, 'board_open' | 'delivery_requested'>, string> & Partial<Record<'board_open' | 'delivery_requested', string>>;
-  speech?: Partial<Record<IslandCampaignChapterStatus, (context: IslandCampaignSpeechContext) => string>>;
-  fallbackReturn: (chapterTitle: string) => string;
-  fallbackResolution: (level: IslandCampaignChapterLevel) => string;
+  /** Lines read the facts `coins`, `cost`, `affordable`, `halfway`, `chapterTitle`, `level`, `choiceId`. */
+  speech?: Partial<Record<IslandCampaignChapterStatus, ContentLine<IslandCampaignSpeechContext>>>;
+  /** Read `{{chapterTitle}}`. */
+  fallbackReturn: ContentLine<string>;
+  /** Read `{{level}}`. */
+  fallbackResolution: ContentLine<IslandCampaignChapterLevel>;
   /** Said after the friend's card is revealed; points at the next sleeping island. */
   wakeHandoffLine: string;
   /** Shown on a sleeping island's panel before its turn. */

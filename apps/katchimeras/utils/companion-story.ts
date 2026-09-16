@@ -50,7 +50,8 @@ export const BARISTABBIT_CHAPTER_ONE_ORDER_POOL = [
   { key: 'window-table', title: 'The window table', description: 'Two vivid café favourites for a pause shared at the best seat in the cafe.', definitionId: 'drink:refresh:5', secondaryDefinitionId: 'drink:hot:4', difficulty: 'major', signal: 'connection' },
 ] as const;
 
-export type AuthoredCohortFamilyId = 'baristabbit' | 'steppling';
+/** A friend whose Garden story is authored: every hatchable friend. */
+export type AuthoredCohortFamilyId = string;
 
 export const STEPPLING_CHAPTER_ONE_ORDER_POOL = [
   { key: 'shoes-by-door', title: 'Shoes by the door', description: 'A small, ready pair for the easiest possible first step.', definitionId: 'adventure:trail:2', difficulty: 'small', signal: 'ease' },
@@ -84,9 +85,17 @@ export function selectBaristabbitChapterOrderKeys(seed: string): string[] {
   ];
 }
 
+/** One authored order of a friend's Garden story. */
+export type AuthoredCohortOrderTemplate = (typeof AUTHORED_COHORT_ORDER_POOLS)[keyof typeof AUTHORED_COHORT_ORDER_POOLS][number];
+
+/** A friend's authored order pool, or none for a friend whose story has no pool yet. */
+export function authoredCohortOrderPool(familyId: AuthoredCohortFamilyId): readonly AuthoredCohortOrderTemplate[] {
+  return (AUTHORED_COHORT_ORDER_POOLS as Record<string, readonly AuthoredCohortOrderTemplate[] | undefined>)[familyId] ?? [];
+}
+
 export function selectAuthoredCohortOrderKeys(familyId: AuthoredCohortFamilyId, seed: string): string[] {
   if (familyId === 'baristabbit') return selectBaristabbitChapterOrderKeys(seed);
-  const pool = AUTHORED_COHORT_ORDER_POOLS[familyId];
+  const pool = authoredCohortOrderPool(familyId);
   const fixed = pool.slice(0, 2);
   const medium = pool.filter((item) => item.difficulty === 'medium');
   const major = pool.filter((item) => item.difficulty === 'major');

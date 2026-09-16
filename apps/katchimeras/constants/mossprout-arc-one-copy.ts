@@ -20,7 +20,7 @@ const end = (text: string, variants?: Extract<JourneyBeat, { kind: 'end' }>['var
 export const MOSSPROUT_ARC_ONE_BEATS: Readonly<Record<string, readonly JourneyBeat[]>> = {
   'tiny-beginnings': [
     say('tiny.1', 'You looked, and the Mist let go of my garden. I kept thinking about that while I rested.', [
-      { when: (ctx) => Boolean(ctx.today), text: 'You looked, and the Mist let go of my garden. Today you called the weather “{{today}}”. I keep that. It tells me what kind of day you carried in here.' },
+      { when: { fact: 'today', exists: true }, text: 'You looked, and the Mist let go of my garden. Today you called the weather “{{today}}”. I keep that. It tells me what kind of day you carried in here.' },
     ]),
     ask('tiny.pace', 'When something new starts for you, what usually happens first?', [
       ['rush', 'Everything at once', 'Then the first days are the loud ones. I can work with loud.', { spontaneity: 1, ambition: 1 }, 'all at once'],
@@ -43,8 +43,8 @@ export const MOSSPROUT_ARC_ONE_BEATS: Readonly<Record<string, readonly JourneyBe
   petalimp: [
     say('petal.1', 'Petalimp is home. She used to leave flowers on my path before I knew her name.'),
     say('petal.2', 'She is braver than me. She will tell anyone anything.', [
-      { when: (ctx) => ctx.theory.friction === 'completion', text: 'She starts a hundred things and finishes about four. You two might have that in common.' },
-      { when: (ctx) => ctx.theory.friction === 'starting', text: 'She never waits to be ready. I think you know what that costs.' },
+      { when: { fact: 'theory.friction', eq: 'completion' }, text: 'She starts a hundred things and finishes about four. You two might have that in common.' },
+      { when: { fact: 'theory.friction', eq: 'starting' }, text: 'She never waits to be ready. I think you know what that costs.' },
     ]),
     ask('petal.friend', 'What do you look for in a friend, mostly?', [
       ['listen', 'Someone who listens', 'I can do that. Roots are good at it.', { support_listen: 2 }, 'listening'],
@@ -66,8 +66,8 @@ export const MOSSPROUT_ARC_ONE_BEATS: Readonly<Record<string, readonly JourneyBe
   'grove-kept': [
     say('kept.1', 'I went back into the Grove after you had gone. Under the roots, the Mist had kept something of mine.'),
     say('kept.2', 'You said you would look back. So I did.', [
-      { when: (ctx) => ctx.answers['old-garden.grove.back'] === 'grove.back:no', text: 'You said forward is enough. I think you would still want this one.' },
-      { when: (ctx) => ctx.answers['old-garden.grove.back'] === 'grove.back:with', text: 'You said only with someone. I went in alone, but I was thinking of you.' },
+      { when: { answer: 'old-garden.grove.back', eq: 'grove.back:no' }, text: 'You said forward is enough. I think you would still want this one.' },
+      { when: { answer: 'old-garden.grove.back', eq: 'grove.back:with' }, text: 'You said only with someone. I went in alone, but I was thinking of you.' },
     ]),
     ask('kept.thing', 'What is a thing you have kept far longer than you needed to?', [
       ['object', 'A thing in a drawer', 'Drawers are where the Mist starts. Take it out sometime.', { routine: 1, caution: 1 }, 'a thing in a drawer'],
@@ -88,8 +88,8 @@ export const MOSSPROUT_ARC_ONE_BEATS: Readonly<Record<string, readonly JourneyBe
   'growing-again': [
     say('again.1', 'The Grove is ours again. Both gardens, the old and the new, and nothing between them holding on.'),
     say('again.2', 'You kept coming back. I noticed that.', [
-      { when: (ctx) => ctx.theory.reward === 'calm', text: 'You never made a fuss of any of it. I noticed that.' },
-      { when: (ctx) => ctx.theory.reward === 'achievement', text: 'You wanted it finished, properly. I noticed that.' },
+      { when: { fact: 'theory.reward', eq: 'calm' }, text: 'You never made a fuss of any of it. I noticed that.' },
+      { when: { fact: 'theory.reward', eq: 'achievement' }, text: 'You wanted it finished, properly. I noticed that.' },
     ]),
     ask('again.next', 'What should we grow next, now there is room?', [
       ['new', 'Something new', 'New it is. I have seeds I have never dared plant.', { novelty: 1, curiosity: 1 }, 'something new'],

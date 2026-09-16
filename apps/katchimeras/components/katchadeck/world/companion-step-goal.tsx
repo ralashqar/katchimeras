@@ -1,3 +1,5 @@
+import { resolveContentLine } from '@/utils/content-predicate';
+import type { ContentLine } from '@/types/content-predicate';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
 import { Meadow } from '@/constants/meadow-theme';
 import { useRelationshipProgression } from '@/hooks/use-relationship-progression';
@@ -52,7 +54,7 @@ export function CompanionStepGoal({ companion, config, onReaction, onBondRewardR
     reward={<DayActionRewardChip reward={{ kind: 'bond', amount: goal.bond }} />}
     accessibilityHint={ready ? 'Tap to claim your step reward.' : 'Hear how many steps remain and refresh your pedometer.'}
     hideCompletionControl highlighted={ready} completeOnPress={ready} disabled={disabled || Boolean(completing) || presenting} onOpen={() => {
-      onReaction?.(config.lines.remaining(Math.max(0, goal.steps - steps)));
+      onReaction?.(stepLine(config.lines.remaining, Math.max(0, goal.steps - steps)));
       void syncSteps();
     }}
     onBeginCompletion={() => setCompleting({ ...goal, dayId })}
@@ -70,10 +72,15 @@ export function CompanionStepGoal({ companion, config, onReaction, onBondRewardR
     }}
     onFinished={() => {
       if (claimedSteps.current != null) {
-        onReaction?.(config.lines.claimed(claimedSteps.current));
+        onReaction?.(stepLine(config.lines.claimed, claimedSteps.current));
         claimedSteps.current = null;
       }
       setBond(loadCompanionBondState()); setCompleting(null); setAttempt((value) => value + 1);
     }}
   />;
+}
+
+/** A step line from its count: `{{steps}}` and `{{steps|plural:step,steps}}`. */
+function stepLine(line: ContentLine<number>, steps: number): string {
+  return resolveContentLine(line, steps, () => ({ steps }));
 }

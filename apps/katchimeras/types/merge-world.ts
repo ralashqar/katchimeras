@@ -2,23 +2,16 @@ import type { WispId } from '@/types/wisp';
 import type { HavenRevealState, HavenStage } from '@/constants/haven-catalog';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 
-export type MergeFamilyId = 'food' | 'drink' | 'adventure' | 'nature' | 'comfort' | 'social' | 'mind' | 'creative';
-export type MergeChainId =
-  | 'food:table' | 'food:dessert' | 'food:cafe-pastry'
-  | 'drink:hot' | 'drink:refresh'
-  | 'adventure:trail' | 'adventure:travel'
-  | 'nature:garden' | 'nature:waterside' | 'nature:keepsake' | 'nature:root-memory'
-  | 'comfort:rest' | 'comfort:care'
-  | 'social:gathering' | 'social:celebration' | 'social:cafe-sharing'
-  | 'mind:work' | 'mind:books'
-  | 'creative:art' | 'creative:screen';
-export type MergeCharacterId =
-  | 'baristabbit' | 'feastle' | 'steppling' | 'flexel' | 'bedrotte'
-  | 'dawnle' | 'mendle' | 'gatherglow' | 'heartmote' | 'kindling'
-  | 'snuglet' | 'waglet' | 'tasklet' | 'errandimp' | 'pagelet'
-  | 'relicoon' | 'museling' | 'encora' | 'flickerbun' | 'pixooka'
-  | 'mossprout' | 'shellio' | 'skylo' | 'voyagle' | 'cheerlet';
-export type MergeBoardId = 'mossprout' | 'steppling';
+/**
+ * Content ids are strings: the bundled catalogue names the families, chains,
+ * characters and boards it ships, and a content pack may add more without a
+ * build. What an id means is read from a registry (`constants/merge-world-catalog.ts`,
+ * `constants/hatchable-companions/registry.ts`, ...), never from the type.
+ */
+export type MergeFamilyId = string;
+export type MergeChainId = string;
+export type MergeCharacterId = string;
+export type MergeBoardId = string;
 export type MergeOrderDifficulty = 'small' | 'medium' | 'major';
 export type MergeOrderPurpose = 'normal' | 'signature';
 
@@ -396,13 +389,8 @@ export type HavenResidentMergeBoardState = {
   updatedAt: number;
 };
 
-export type MossproutNatureIslandId =
-  | 'seed-nursery'
-  | 'bloom-garden'
-  | 'pond-sanctuary'
-  | 'orchard-grove'
-  | 'ancient-tree-grove'
-  | 'wildgrowth-grove';
+/** An island of Mossprout's neighbourhood; the bundled six are in `constants/mossprout-nature-islands.ts`, a pack may add more. */
+export type MossproutNatureIslandId = string;
 
 export type MossproutNatureIslandLevel = 0 | 1 | 2 | 3 | 4;
 

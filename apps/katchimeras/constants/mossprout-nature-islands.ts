@@ -1,3 +1,5 @@
+import { markRegistryBuilt, packEntries } from '@/features/content-packs/active-pack';
+import type { HexCoord } from '@incubator/environments/hex';
 import type { HavenStoryGate } from '@/constants/haven-catalog';
 import type {
   MossproutNatureIslandId,
@@ -15,6 +17,8 @@ export type MossproutNatureIslandLevelDefinition = {
 export type MossproutNatureIslandDefinition = {
   accent: string;
   id: MossproutNatureIslandId;
+  /** Where the island sits; the bundled six are placed by the scene's art table, an island a pack adds says so here. */
+  coord?: HexCoord;
   levels: readonly MossproutNatureIslandLevelDefinition[];
   name: string;
   shortName: string;
@@ -34,7 +38,7 @@ function levels(
   ];
 }
 
-export const MOSSPROUT_NATURE_ISLANDS: readonly MossproutNatureIslandDefinition[] = [
+export const MOSSPROUT_NATURE_ISLANDS_BUNDLED: readonly MossproutNatureIslandDefinition[] = [
   {
     accent: '#B9DB77',
     id: 'seed-nursery',
@@ -138,6 +142,9 @@ export const MOSSPROUT_NATURE_ISLANDS: readonly MossproutNatureIslandDefinition[
     ),
   },
 ] as const;
+/** The bundled six, then any island a content pack brought. */
+export const MOSSPROUT_NATURE_ISLANDS: readonly MossproutNatureIslandDefinition[] = [...MOSSPROUT_NATURE_ISLANDS_BUNDLED, ...packEntries('islands')];
+markRegistryBuilt('islands');
 
 export const MOSSPROUT_NATURE_ISLAND_IDS = MOSSPROUT_NATURE_ISLANDS.map((island) => island.id);
 

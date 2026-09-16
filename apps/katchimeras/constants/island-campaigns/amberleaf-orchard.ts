@@ -221,18 +221,16 @@ export const AMBERLEAF_ORCHARD_CAMPAIGN: IslandCampaignDefinition<AmberleafSeaso
       complete: 'Orchard story complete',
     },
     speech: {
-      restoration_ready: ({ coins, cost }) => cost <= 0
-        ? 'The first season is my gift. I will press a leaf from it.'
-        : coins >= cost
-          ? 'We have enough. This season can turn whenever you like.'
-          : coins < cost / 2
-            ? `${coins} of ${cost} Glow so far. Seasons are not hurried, and neither is this.`
-            : 'Nearly there. I have the journal open already.',
+      restoration_ready: { text: 'Nearly there. I have the journal open already.', variants: [
+        { when: { fact: 'cost', lte: 0 }, text: 'The first season is my gift. I will press a leaf from it.' },
+        { when: { fact: 'affordable', eq: true }, text: 'We have enough. This season can turn whenever you like.' },
+        { when: { fact: 'halfway', eq: false }, text: '{{coins|raw}} of {{cost|raw}} Glow so far. Seasons are not hurried, and neither is this.' },
+      ] },
     },
-    fallbackReturn: (chapterTitle) => `Everything for ${chapterTitle} is in the basket. The orchard can grow whenever we have the Glow.`,
-    fallbackResolution: (level) => level === 4
-      ? 'The orchard has a picnic roof and a journal full of seasons. I am staying.'
-      : 'The orchard turned one more season, and I pressed a leaf from it.',
+    fallbackReturn: 'Everything for {{chapterTitle}} is in the basket. The orchard can grow whenever we have the Glow.',
+    fallbackResolution: { text: 'The orchard turned one more season, and I pressed a leaf from it.', variants: [
+      { when: { fact: 'level', eq: 4 }, text: 'The orchard has a picnic roof and a journal full of seasons. I am staying.' },
+    ] },
     wakeHandoffLine: 'The seasons kept turning. No one counted them, so they stopped meaning anything. Beneath the old tree there is a friend who hides in the mist. Look slowly; they are shy.',
     sleepingHint: 'Someone is resting under the sapling. They will wake once the friend before them is home.',
   },

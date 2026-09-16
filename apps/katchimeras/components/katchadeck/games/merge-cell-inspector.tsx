@@ -22,7 +22,7 @@ import { mossproutRootConditionCopy, mossproutRootReadyCopy, mossproutRootReward
 const DREAM_MIST_LOWER = require('@incubator/art-merge-world/locked/dream-mist-lower.webp');
 
 type InspectorModel = {
-  art: ImageSource | null;
+  art: ImageSource | number | null;
   body: string;
   dreamMist?: 'lower';
   eyebrow: string;

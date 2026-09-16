@@ -29,7 +29,7 @@ import {
   MOSSPROUT_ROOTBOUND_GATES_BY_ID,
   mergeLevelForXp,
   MERGE_WORLD_COLUMNS,
-  MERGE_WORLD_ROWS,
+  MERGE_WORLD_ROWS, MERGE_CHARACTER_IDS,
 } from '@/constants/merge-world-catalog';
 import { advanceGlowRequests, glowTutorialDrop, normalizeGlowDiscoveryFields, reduceGlowDiscovery } from './glow-discovery-policy';
 import { normalizeHatchableEgg, reduceHatchableEgg } from '@/features/onboarding/hatchable-egg-policy';
@@ -45,9 +45,10 @@ import {
   MERGE_INITIAL_ENERGY,
   STEPS_PER_MERGE_ENERGY,
 } from '@/utils/merge-world/economy-policy';
-import { AUTHORED_COHORT_ORDER_POOLS, BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, type AuthoredCohortFamilyId } from '@/utils/companion-story';
+import { AUTHORED_COHORT_ORDER_POOLS, BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, type AuthoredCohortFamilyId, authoredCohortOrderPool } from '@/utils/companion-story';
 import type {
   MergeBoardCell,
+  MergeItemDefinition,
   MergeBoardId,
   MergeBoardItem,
   HavenResidentMergeBoardState,
@@ -162,7 +163,7 @@ import {
 } from '@/utils/merge-world/board-mist-progression';
 import { isDevHavenOrderFiller } from '@/utils/merge-world/dev-haven-order-fillers';
 
-const KNOWN_CHARACTERS = new Set<MergeCharacterId>(Object.keys(KATCHIMERA_MERGE_PROFILES) as MergeCharacterId[]);
+const KNOWN_CHARACTERS = new Set<MergeCharacterId>(MERGE_CHARACTER_IDS);
 const RECENT_ORDER_LIMIT = 8;
 const DISCOVERY_EVENT_LIMIT = 100;
 const DISCOVERY_FIRST_ORDER_COPY: Partial<Record<MergeCharacterId, { title: string; description: string }>> = {
@@ -2154,7 +2155,7 @@ function themeForFamily(familyId: MergeWorldArrival['familyId']): MergeWorldArri
   if (familyId === 'social') return 'connection';
   if (familyId === 'mind') return 'focus';
   if (familyId === 'creative') return 'creativity';
-  return familyId;
+  return familyId === 'food' || familyId === 'nature' ? familyId : 'memory';
 }
 
 function discoveryArrival(definition: CompanionDiscoveryDefinition, now: number): MergeWorldArrival {
@@ -2358,7 +2359,12 @@ function ackResidentCardReveal(state: MergeWorldState, discoveryId: string, now:
   return updated ? changed(touch({ ...state, residentCardDiscovery: { ...state.residentCardDiscovery, records } }, now)) : unchanged(state);
 }
 
-function moveItem(state: MergeWorldState, from: number, to: number, now: number): MergeWorldCommandResult {
+/** Mission validation uses the candidate catalogue without mutating live registries. */
+export function reduceMissionMove(state: MergeWorldState, from: number, to: number, now: number, items: ReadonlyMap<string, MergeItemDefinition>): MergeWorldCommandResult {
+  return moveItem(state, from, to, now, items);
+}
+
+function moveItem(state: MergeWorldState, from: number, to: number, now: number, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): MergeWorldCommandResult {
   if (!validCell(from) || !validCell(to) || from === to) return unchanged(state, 'Choose an open board space.');
   const source = state.board[from].occupant;
   const target = state.board[to].occupant;
@@ -2414,7 +2420,7 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
   const echo = state.board[to].mist?.kind === 'echo' ? state.board[to].mist : null;
   if (echo) {
     if (source.kind !== 'item' || source.definitionId !== echo.definitionId) return unchanged(state, 'Find its match.', 'wrong_echo_match');
-    const resultId = MERGE_ITEMS_BY_ID.get(echo.definitionId)?.nextItemId ?? null;
+    const resultId = items.get(echo.definitionId)?.nextItemId ?? null;
     if (!resultId) return unchanged(state, 'This Dream Echo cannot grow any further.');
     const board = [...state.board];
     board[from] = { ...board[from], occupant: null };
@@ -2476,7 +2482,7 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number)
     board[to] = { ...board[to], occupant: source };
     return changed(touch({ ...state, board }, now));
   }
-  const sourceDefinition = MERGE_ITEMS_BY_ID.get(source.definitionId);
+  const sourceDefinition = items.get(source.definitionId);
   let resultId = source.definitionId === target.definitionId ? sourceDefinition?.nextItemId ?? null : null;
   if (!resultId) resultId = MERGE_HYBRID_RECIPES.get([source.definitionId, target.definitionId].sort().join('+')) ?? null;
   if (!resultId) {
@@ -3667,7 +3673,9 @@ const AUTHORED_MERGE_CHAPTERS = {
 
 function authoredCohortStoryOrders(state: MergeWorldState, familyId: AuthoredCohortFamilyId, now: number, actPhase?: string, orderTemplateKeys: string[] = []): MergeOrder[] {
   if (familyId === 'baristabbit') return baristabbitStoryOrders(now, actPhase, orderTemplateKeys);
-  const chapter = AUTHORED_MERGE_CHAPTERS[familyId];
+  const chapter = (AUTHORED_MERGE_CHAPTERS as Record<string, (typeof AUTHORED_MERGE_CHAPTERS)[keyof typeof AUTHORED_MERGE_CHAPTERS] | undefined>)[familyId];
+  // A friend with no authored Garden chapter (one a pack added) has no story orders of that kind.
+  if (!chapter) return [];
   if (actPhase === 'signature_order') return [{
     id: `merge-story:${familyId}:chapter-1:${chapter.signatureKey}`,
     characterId: familyId,
@@ -3681,7 +3689,7 @@ function authoredCohortStoryOrders(state: MergeWorldState, familyId: AuthoredCoh
     storyTargetLevel: 8, storyStep: 1, storyStepCount: 1,
   }];
   if (actPhase !== 'regular_orders') return [];
-  const pool = AUTHORED_COHORT_ORDER_POOLS[familyId];
+  const pool = authoredCohortOrderPool(familyId);
   return orderTemplateKeys.flatMap((key, index) => {
     const template = pool.find((item) => item.key === key);
     if (!template) return [];

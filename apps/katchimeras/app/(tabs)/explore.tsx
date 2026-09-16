@@ -50,8 +50,10 @@ import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
 import { restartOnboarding, returnToTabs } from '@/features/navigation/return-to-tabs';
 import {
+  getDevMissionMechanicPreview,
   isJourneyQuickModeEnabled,
   setAllKatchimerasAvailableEnabled,
+  setDevMissionMechanicPreview,
   setHavenOrderFillersEnabled,
   setJourneyQuickModeEnabled,
 } from '@/utils/dev-settings';
@@ -111,6 +113,7 @@ export default function ExploreScreen() {
   const [devWallet, setDevWallet] = useState({ glow: 0, energy: 0 });
   const [journeyToolsOpen, setJourneyToolsOpen] = useState(false);
   const [journeyQuickMode, setJourneyQuickMode] = useState(isJourneyQuickModeEnabled());
+  const [missionMechanicPreview, setMissionMechanicPreview] = useState(getDevMissionMechanicPreview() === 'column-shot');
 
   const handleResetKatchimerasProgress = () => {
     Alert.alert(
@@ -162,6 +165,7 @@ export default function ExploreScreen() {
       setProfile(loadOnboardingProfile());
       setStoredState(homeRepository.load());
       setJourneyQuickMode(isJourneyQuickModeEnabled());
+      setMissionMechanicPreview(getDevMissionMechanicPreview() === 'column-shot');
 
       void loadMergeWorldState().then((state) => {
         if (active) setDevWallet({ glow: state.coins, energy: state.energy.value });
@@ -657,6 +661,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Restart first-session onboarding · keep profile" onPress={handleRestartFirstSession} variant="primary" />
                 <KatchaButton label="Profile Snapshots" onPress={() => router.push('/dev-profile-snapshots' as Href)} variant="primary" />
                 <KatchaButton label="Content Flow Inspector" onPress={() => router.push('/dev-content-flow' as Href)} variant="secondary" />
+                <KatchaButton label="Content Packs (live ops)" onPress={() => router.push('/dev-content-packs' as Href)} variant="secondary" />
                 <KatchaButton label={currencyToolsOpen ? 'Hide currency tools' : 'Currency tools'} onPress={() => setCurrencyToolsOpen((open) => !open)} variant="primary" />
                 {currencyToolsOpen ? <View style={styles.journeyTools}>
                   <View style={styles.devToggleCopy}>
@@ -693,6 +698,21 @@ export default function ExploreScreen() {
                     />
                   </View>
                   <KatchaButton label="Reset all Journey + Merge progress" onPress={handleResetJourneyAndBoard} variant="destructive" />
+                  <View style={styles.devToggleRow}>
+                    <View style={styles.devToggleCopy}>
+                      <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">Mist board: column shot</ThemedText>
+                      <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">Every docked mist board (a friend’s, a journey tile’s, an island’s) plays the column-shot preview: merges fire straight up, bigger tiers hit harder, wisps on a grid above the board. Saved apart from the real boards.</ThemedText>
+                    </View>
+                    <Switch
+                      accessibilityLabel="Preview the column-shot mist board mechanic"
+                      onValueChange={(enabled) => {
+                        setDevMissionMechanicPreview(enabled ? 'column-shot' : null);
+                        setMissionMechanicPreview(enabled);
+                      }}
+                      trackColor={{ false: 'rgba(200,216,255,0.2)', true: '#5FA87B' }}
+                      value={missionMechanicPreview}
+                    />
+                  </View>
                 </View> : null}
                 {ftueRun ? <View style={styles.devToggleCopy}>
                   <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">FTUE: {ftueRun.stepId}</ThemedText>

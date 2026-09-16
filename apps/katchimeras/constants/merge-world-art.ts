@@ -1,3 +1,4 @@
+import { artKeys, artSource, type ArtSource } from '@/utils/art-source';
 import { MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
 import { VEILED_MEMORY_CARD_ART } from '@/constants/memory-card-art';
 
@@ -149,8 +150,8 @@ export const MERGE_WORLD_GENERATOR_ART = {
 } as const;
 export type MergeWorldAuthoredGeneratorId = keyof typeof MERGE_WORLD_GENERATOR_ART;
 
-export function mergeWorldItemArt(definitionId: string) {
-  return MERGE_WORLD_ITEM_ART[definitionId as MergeWorldAuthoredItemId] ?? null;
+export function mergeWorldItemArt(definitionId: string): ArtSource | null {
+  return artSource(artKeys.item(definitionId)) ?? MERGE_WORLD_ITEM_ART[definitionId as MergeWorldAuthoredItemId] ?? null;
 }
 
 /**

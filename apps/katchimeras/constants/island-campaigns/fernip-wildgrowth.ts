@@ -290,24 +290,21 @@ export const FERNIP_WILDGROWTH_CAMPAIGN: IslandCampaignDefinition<FernipRestStyl
       complete: 'Grove story complete',
     },
     speech: {
-      available: ({ coins, cost }) => cost <= 0
-        ? 'The next patch is under them. No hurry.'
-        : coins >= cost
-          ? 'The next patch is under them. Whenever you feel like it.'
-          : `${coins} of ${cost} Glow so far. The grove is in no rush.`,
-      delivery_requested: () => 'This patch is done. What we need next is on your board.',
-      restoration_ready: ({ coins, cost }) => cost <= 0
-        ? 'This first stretch is mine to give. No hurry.'
-        : coins >= cost
-          ? 'We have enough. Whenever you feel like it.'
-          : coins < cost / 2
-            ? `${coins} of ${cost} Glow so far. The grove is in no rush.`
-            : 'Nearly there. The grove can wait a little longer.',
+      available: { text: '{{coins|raw}} of {{cost|raw}} Glow so far. The grove is in no rush.', variants: [
+        { when: { fact: 'cost', lte: 0 }, text: 'The next patch is under them. No hurry.' },
+        { when: { fact: 'affordable', eq: true }, text: 'The next patch is under them. Whenever you feel like it.' },
+      ] },
+      delivery_requested: 'This patch is done. What we need next is on your board.',
+      restoration_ready: { text: 'Nearly there. The grove can wait a little longer.', variants: [
+        { when: { fact: 'cost', lte: 0 }, text: 'This first stretch is mine to give. No hurry.' },
+        { when: { fact: 'affordable', eq: true }, text: 'We have enough. Whenever you feel like it.' },
+        { when: { fact: 'halfway', eq: false }, text: '{{coins|raw}} of {{cost|raw}} Glow so far. The grove is in no rush.' },
+      ] },
     },
-    fallbackReturn: (chapterTitle) => `Everything for ${chapterTitle} is gathered. Set it down and the Mist will move.`,
-    fallbackResolution: (level) => level === 4
-      ? 'The whole grove is ours again, and the Mist has nothing left to hold. Now it can rest, and so can I.'
-      : 'The grove grew a little wilder, and a little more like home.',
+    fallbackReturn: 'Everything for {{chapterTitle}} is gathered. Set it down and the Mist will move.',
+    fallbackResolution: { text: 'The grove grew a little wilder, and a little more like home.', variants: [
+      { when: { fact: 'level', eq: 4 }, text: 'The whole grove is ours again, and the Mist has nothing left to hold. Now it can rest, and so can I.' },
+    ] },
     wakeHandoffLine: 'I was resting under a grove nobody could see. Then you looked. Past here there’s a nursery, still under the Mist. Someone’s in there, counting seeds.',
     sleepingHint: 'Someone is resting under the ferns, and the Mist is resting on them. They will wake once the friend before them is home.',
     wispLines: {

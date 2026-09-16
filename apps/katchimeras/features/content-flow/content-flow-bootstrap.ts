@@ -1,3 +1,4 @@
+import { packEntries } from '@/features/content-packs/active-pack';
 import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
 import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
 import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from './legacy/steppling-day-one-flow-v2';
@@ -55,6 +56,8 @@ export function bootstrapContentFlowCatalog() {
   }
   registerContentFlowDefinition(LEGACY_STEPPLING_DAY_ONE_FLOW);
   registerContentFlowDefinition(LEGACY_STEPPLING_DAY_ONE_FLOW_V2);
+  // Flows a content pack brought, validated before the pack was accepted.
+  packEntries('flows').forEach(registerContentFlowDefinition);
   registerContentFlowEffect('journey.grant_generator_parcel', async ({ run, payload }) => {
     const generatorId = String(payload.generatorId);
     const rewardId = String(payload.rewardId);

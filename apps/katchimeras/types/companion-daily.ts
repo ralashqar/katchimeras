@@ -1,6 +1,7 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { KatchimeraActionArtKey } from '@/types/relationship-progression';
 import type { ConversationPollSeed } from '@/types/companion-conversation';
+import type { ContentLine } from '@/types/content-predicate';
 
 /**
  * A friend's daily activities once they are home, all content. One shared
@@ -59,7 +60,8 @@ export type CompanionPhotoActivityConfig = {
   confirm?: readonly CompanionPhotoConfirmChoice[];
   followUps?: readonly CompanionPhotoFollowUp[];
   /** Keep the photo as a memory of its day (copied out of the camera cache into `directory`). */
-  keepPhoto?: { directory: string; memoryArchetype: string; memoryLabel: (answer: string) => string };
+  /** `memoryLabel` reads `{{answer}}`. */
+  keepPhoto?: { directory: string; memoryArchetype: string; memoryLabel: ContentLine<string> };
 };
 
 export type CompanionNoticePrompt = {
@@ -95,10 +97,10 @@ export type CompanionStepGoalConfig = {
   kind: 'steps';
   milestones: readonly { steps: number; bond: number }[];
   lines: {
-    /** Said when the goal is tapped before it is reached, with the steps left. */
-    remaining: (steps: number) => string;
-    /** Said once the milestone's Bond has flown. */
-    claimed: (steps: number) => string;
+    /** Said when the goal is tapped before it is reached, with `{{steps}}` left. */
+    remaining: ContentLine<number>;
+    /** Said once the milestone's Bond has flown, with `{{steps}}` walked. */
+    claimed: ContentLine<number>;
   };
 };
 

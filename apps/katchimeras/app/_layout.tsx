@@ -1,3 +1,5 @@
+// First of all: the stored content pack is primed before any module builds a registry from it.
+import '@/features/content-packs/prime';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
@@ -17,6 +19,7 @@ import { EggAvatarProvider } from '@/features/egg-avatar/egg-avatar-provider';
 import { WispProvider } from '@/features/wisps/wisp-provider';
 import { SceneProvider } from '@/features/scenes/scene-provider';
 import { EconomyProvider } from '@/features/economy/economy-provider';
+import { ContentPackProvider } from '@/features/content-packs/content-pack-provider';
 import { AvatarAccessReconciler } from '@/features/economy/avatar-access-reconciler';
 import { AppActivityProvider } from '@/features/performance/app-activity';
 import { GameScreenTransitionProvider, TransitionAwareStatusBar } from '@/features/navigation/game-screen-transition';
@@ -126,6 +129,7 @@ function RootLayout() {
       <ThemeProvider value={navigationTheme}>
         <GameUIProvider>
           <EconomyProvider>
+            <ContentPackProvider>
             <GameWalletProvider>
               <GameFeedbackProvider>
                 <EggAvatarProvider>
@@ -154,6 +158,7 @@ function RootLayout() {
           <Stack.Screen name="dev-profile-snapshots" options={{ title: 'Profile Snapshots' }} />
           <Stack.Screen name="dev-profile-snapshot-capture" options={{ contentStyle: { backgroundColor: 'transparent' }, presentation: 'formSheet', sheetAllowedDetents: [0.5, 1], sheetGrabberVisible: true, title: 'Capture Profile' }} />
           <Stack.Screen name="dev-content-flow" options={{ title: 'Content Flow Inspector' }} />
+          <Stack.Screen name="dev-content-packs" options={{ title: 'Content Packs' }} />
           <Stack.Screen name="intelligence-lab" options={{ title: 'Intelligence Lab' }} />
           <Stack.Screen name="moment-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="note-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
@@ -186,6 +191,7 @@ function RootLayout() {
                 </EggAvatarProvider>
               </GameFeedbackProvider>
             </GameWalletProvider>
+            </ContentPackProvider>
           </EconomyProvider>
         </GameUIProvider>
       </ThemeProvider>

@@ -1,3 +1,4 @@
+import { markRegistryBuilt, packEntries } from '@/features/content-packs/active-pack';
 import type { HexCoord } from '@incubator/environments/hex';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { MOSSPROUT_OLD_GROVE } from './mossprout-old-grove';
@@ -31,7 +32,9 @@ export type StoryTileDefinition = {
 
 export type StoryTileState = 'misted' | 'revealed';
 
-export const STORY_TILES: readonly StoryTileDefinition[] = [MOSSPROUT_OLD_GROVE];
+export const STORY_TILES_BUNDLED: readonly StoryTileDefinition[] = [MOSSPROUT_OLD_GROVE];
+export const STORY_TILES: readonly StoryTileDefinition[] = [...STORY_TILES_BUNDLED, ...packEntries('storyTiles')];
+markRegistryBuilt('storyTiles');
 
 const byId = new Map(STORY_TILES.map((tile) => [tile.id, tile]));
 const byUnlock = new Map(STORY_TILES.map((tile) => [tile.unlockId, tile]));

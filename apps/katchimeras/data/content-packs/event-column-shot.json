@@ -1,0 +1,301 @@
+{
+  "id": "harvest-2026",
+  "version": 1,
+  "contentSchemaVersion": 1,
+  "title": "Harvest Grove (stand-in art: the Old Grove tile, Mossprout, the Garden chain)",
+  "minAppVersion": "1.0.0",
+  "mergeChains": [
+    {
+      "chainId": "nature:orchard",
+      "icon": "leaf.fill",
+      "color": "#D98F4A",
+      "names": [
+        "Windfall",
+        "Apple Pair",
+        "Basket",
+        "Orchard Pie",
+        "Harvest Table",
+        "Festival Feast"
+      ]
+    }
+  ],
+  "characters": [
+    {
+      "id": "harvest-hare",
+      "name": "Harvest Hare",
+      "coreChains": [
+        "nature:orchard",
+        "nature:garden"
+      ],
+      "guestChains": [
+        "food:dessert"
+      ],
+      "narrativeTheme": "gather what the season gives, and share it"
+    }
+  ],
+  "skins": [
+    {
+      "id": "harvest-hare",
+      "displayName": "Harvest Hare",
+      "aspectId": "food-cooking",
+      "familyId": "harvest-hare",
+      "focusLaneIds": [
+        "gather"
+      ],
+      "hatchCues": [
+        "harvest",
+        "orchard",
+        "apples"
+      ],
+      "visualKey": "harvest-hare",
+      "status": "live"
+    }
+  ],
+  "families": [
+    {
+      "id": "harvest-hare",
+      "displayName": "Harvest Hare",
+      "lifeAreaLabel": "Seasonal gathering",
+      "description": "Orchards, harvests and the tables they fill.",
+      "aspectId": "food-cooking",
+      "anchorSkinId": "harvest-hare",
+      "anchorVisualKey": "harvest-hare",
+      "skinIds": [
+        "harvest-hare"
+      ],
+      "focusLanes": [
+        {
+          "id": "gather",
+          "label": "Gathering",
+          "description": "Notice what the season gives."
+        }
+      ]
+    }
+  ],
+  "storyTiles": [
+    {
+      "id": "harvest-grove",
+      "coord": {
+        "q": 3,
+        "r": -2
+      },
+      "unlockId": "harvest-grove:reveal",
+      "name": "Harvest Grove",
+      "companion": "mossprout",
+      "revealPreset": "mist-clear",
+      "alphaBoundsKey": "tile:harvest-grove",
+      "lines": {
+        "reveal": "The orchard kept its own light under there."
+      }
+    }
+  ],
+  "missions": [
+    {
+      "id": "mission:harvest-grove",
+      "storageKey": "katchimeras.mist-mission.harvest-grove.v1",
+      "required": 14,
+      "barTitle": "Drive the Mist from the Grove",
+      "mechanic": {
+        "kind": "column-shot",
+        "damageByTier": [
+          1,
+          3,
+          7,
+          15
+        ],
+        "overflow": "carry-up",
+        "emptyColumn": "nearest",
+        "wisps": {
+          "rows": 2,
+          "rowPitch": 0.9,
+          "cells": [
+            {
+              "id": "sky-0-0",
+              "column": 0,
+              "row": 0,
+              "hp": 3
+            },
+            {
+              "id": "sky-2-0",
+              "column": 2,
+              "row": 0,
+              "hp": 4
+            },
+            {
+              "id": "sky-4-0",
+              "column": 4,
+              "row": 0,
+              "hp": 3
+            },
+            {
+              "id": "sky-2-1",
+              "column": 2,
+              "row": 1,
+              "hp": 4,
+              "size": 1.05
+            }
+          ]
+        }
+      },
+      "seed": {
+        "items": [
+          {
+            "cell": 36,
+            "definitionId": "nature:orchard:1"
+          },
+          {
+            "cell": 37,
+            "definitionId": "nature:orchard:1"
+          },
+          {
+            "cell": 38,
+            "definitionId": "nature:orchard:1"
+          },
+          {
+            "cell": 39,
+            "definitionId": "nature:orchard:1"
+          },
+          {
+            "cell": 40,
+            "definitionId": "nature:orchard:1"
+          },
+          {
+            "cell": 30,
+            "definitionId": "nature:orchard:1"
+          },
+          {
+            "cell": 31,
+            "definitionId": "nature:orchard:1"
+          },
+          {
+            "cell": 32,
+            "definitionId": "nature:orchard:1"
+          }
+        ],
+        "echoes": [],
+        "veiled": []
+      },
+      "guides": {
+        "firstMerge": {
+          "eyebrow": "The Grove",
+          "title": "Drag one Windfall onto another.",
+          "body": "What you make flies straight up."
+        },
+        "wake": {
+          "eyebrow": "The Grove",
+          "title": "Something under there wants {a} {name}.",
+          "body": "Drop the match on it."
+        },
+        "merge": {
+          "eyebrow": "The Grove",
+          "title": "Two of the same make {a} {name}.",
+          "body": "Drag one onto the other."
+        },
+        "mergeFallbackTitle": "Merge two of the same.",
+        "free": {
+          "eyebrow": "The Grove",
+          "title": "Keep merging.",
+          "body": "Every merge fires up its column."
+        },
+        "aim": {
+          "eyebrow": "Aim",
+          "title": "Merge under a wisp.",
+          "body": "What you make flies straight up. Bigger things hit harder."
+        }
+      },
+      "wisps": [],
+      "lines": {
+        "firstStrike": "It felt that.",
+        "fell": [
+          "One down.",
+          "Two down.",
+          "One left."
+        ],
+        "last": "The last one falls. The orchard is open."
+      }
+    }
+  ],
+  "conversations": [
+    {
+      "id": "harvest-hare:hello",
+      "version": 1,
+      "familyId": "mossprout",
+      "speakerSkinId": "harvest-hare",
+      "title": "Windfall",
+      "trigger": "evergreen",
+      "minimumBondLevel": 1,
+      "cooldownDays": 0,
+      "entryNodeId": "end",
+      "contextualOnly": true,
+      "format": "narrative",
+      "purpose": "journey",
+      "returnTarget": "character_home",
+      "repeatPolicy": "once_ever",
+      "nodes": [
+        {
+          "id": "end",
+          "kind": "end",
+          "message": "The apples fall when they are ready. So do I."
+        }
+      ]
+    }
+  ],
+  "art": {
+    "tile:harvest-grove:full": {
+      "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/content-pack-art/harvest-2026/1/tile-harvest-grove-full.webp",
+      "bytes": 104040,
+      "md5": "f47b9c4a1d91fe79228e8337f061468e",
+      "alphaBounds": {
+        "left": 38,
+        "top": 23,
+        "right": 997,
+        "bottom": 952
+      }
+    },
+    "tile:harvest-grove:thumb": {
+      "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/content-pack-art/harvest-2026/1/tile-harvest-grove-thumb.webp",
+      "bytes": 13892,
+      "md5": "8fcafb313c3f9cae692145650d3dd143"
+    },
+    "cutout:harvest-hare": {
+      "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/content-pack-art/harvest-2026/1/cutout-harvest-hare.png",
+      "bytes": 1269409,
+      "md5": "de1f06e2dab0f02a5963988af89f8d72"
+    },
+    "creature:harvest-hare": {
+      "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/content-pack-art/harvest-2026/1/creature-harvest-hare.png",
+      "bytes": 1269409,
+      "md5": "de1f06e2dab0f02a5963988af89f8d72"
+    },
+    "item:nature:orchard:1": {
+      "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/content-pack-art/harvest-2026/1/item-nature-orchard-1.webp",
+      "bytes": 11050,
+      "md5": "b36400aa135bcc480e8de2d2536ff8d9"
+    },
+    "item:nature:orchard:2": {
+      "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/content-pack-art/harvest-2026/1/item-nature-orchard-2.webp",
+      "bytes": 14706,
+      "md5": "9927d128a4ffc12871a1ec2049fa133b"
+    },
+    "item:nature:orchard:3": {
+      "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/content-pack-art/harvest-2026/1/item-nature-orchard-3.webp",
+      "bytes": 14414,
+      "md5": "6148534f0fb97a0e19dd8e53c57135c9"
+    },
+    "item:nature:orchard:4": {
+      "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/content-pack-art/harvest-2026/1/item-nature-orchard-4.webp",
+      "bytes": 34944,
+      "md5": "1aa0ca0c410ac623dd789f4dd0e328f4"
+    },
+    "item:nature:orchard:5": {
+      "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/content-pack-art/harvest-2026/1/item-nature-orchard-5.webp",
+      "bytes": 40890,
+      "md5": "ae6f612d0467acbcf8aae018139e7779"
+    },
+    "item:nature:orchard:6": {
+      "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/content-pack-art/harvest-2026/1/item-nature-orchard-6.webp",
+      "bytes": 21396,
+      "md5": "50283c60ff725d256dc08085f75b945a"
+    }
+  }
+}

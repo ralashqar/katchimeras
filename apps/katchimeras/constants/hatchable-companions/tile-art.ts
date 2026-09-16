@@ -1,4 +1,5 @@
 import type { HatchableTileArt } from '@/types/hatchable-companion';
+import { artKeys, artSource, artSourceSet, type ArtSource } from '@/utils/art-source';
 
 /**
  * The cleared tile art of every hatchable companion, by tile id. Kept apart
@@ -27,13 +28,20 @@ const CUTOUT_ART: Readonly<Record<string, () => number>> = {
   baristabbit: () => require('@incubator/art-cutouts/baristabbit.png'),
 };
 export const HATCHABLE_CUTOUT_ART_IDS: readonly string[] = Object.keys(CUTOUT_ART);
-export function hatchableCutoutArt(companion: string): number {
+export function hatchableCutoutArt(companion: string): ArtSource {
+  const registered = artSource(artKeys.cutout(companion));
+  if (registered) return registered;
   const art = CUTOUT_ART[companion];
   if (!art) throw new Error(`No cut-out art is registered for ${companion}.`);
   return art();
 }
 
+/** Whether a tile has cleared art anywhere: brought by a pack, or bundled. */
+export const hasHatchableTileArt = (tileId: string): boolean => artSourceSet(`tile:${tileId}`) != null || tileId in TILE_ART;
+
 export function hatchableTileArt(tileId: string): HatchableTileArt {
+  const registered = artSourceSet(`tile:${tileId}`);
+  if (registered) return registered;
   const art = TILE_ART[tileId];
   if (!art) throw new Error(`No cleared tile art is registered for ${tileId}.`);
   return art();

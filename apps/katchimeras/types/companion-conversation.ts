@@ -5,7 +5,8 @@ import type { MergeCharacterId } from '@/types/merge-world';
 import { companionHasPage } from '@/features/companion/companion-page-policy';
 
 /** A family with conversations: Mossprout, or a hatchable friend (any merge character with a definition). */
-export type ConversationV2FamilyId = 'mossprout' | MergeCharacterId;
+/** A family with a companion page: Mossprout and the hatchable friends, bundled or from a pack. */
+export type ConversationV2FamilyId = string;
 
 export type ConversationMode = 'talk' | 'play' | 'discover' | 'plan';
 

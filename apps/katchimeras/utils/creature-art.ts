@@ -5,7 +5,7 @@ import {
   type CreatureHatchlingLod,
 } from '@/constants/creature-hatchling-sources.gen';
 import { CREATURE_LOD_SOURCES, CREATURE_ORDER_SOURCES } from '@/constants/creature-lod-sources.gen';
-import { homeCreatureVisuals } from '@/constants/home-mvp';
+import { creatureVisual } from '@/constants/home-mvp';
 import type { HomeVisualKey } from '@/types/home';
 import { resolveCreatureVariantSource } from '@/utils/creature-variant';
 
@@ -45,13 +45,13 @@ function grownSource(
   if (lod === 'thumb') {
     return CREATURE_LOD_SOURCES.thumb[visualKey]
       ?? CREATURE_LOD_SOURCES.medium[visualKey]
-      ?? homeCreatureVisuals[visualKey].source;
+      ?? creatureVisual(visualKey).source;
   }
   if (lod === 'medium') {
     return CREATURE_LOD_SOURCES.medium[visualKey]
-      ?? homeCreatureVisuals[visualKey].source;
+      ?? creatureVisual(visualKey).source;
   }
-  return homeCreatureVisuals[visualKey].source;
+  return creatureVisual(visualKey).source;
 }
 
 export function hasCreatureHatchlingArt(visualKey: HomeVisualKey): boolean {
@@ -82,7 +82,7 @@ export function resolveCreatureArtSource(
 export function resolveCreatureOrderArtSource(visualKey: HomeVisualKey): ImageSourcePropType {
   return CREATURE_ORDER_SOURCES[visualKey]
     ?? CREATURE_LOD_SOURCES.medium[visualKey]
-    ?? homeCreatureVisuals[visualKey].source;
+    ?? creatureVisual(visualKey).source;
 }
 
 /** Optional full-resolution pose used while a companion is in durable meditation state. */

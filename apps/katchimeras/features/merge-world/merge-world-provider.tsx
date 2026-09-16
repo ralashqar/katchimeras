@@ -1,3 +1,4 @@
+import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
 import { createContext, type PropsWithChildren, use, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 import { isAppForeground, useAppForeground } from '@/hooks/use-app-foreground';
@@ -19,6 +20,9 @@ import { buildCompanionAffinityProfile, nextEligibleCompanionGate, recommendComp
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import { mossproutFocusStage } from '@/utils/merge-world/mossprout-focus-progression';
 import { mergeWorldPendingPersistence, type MergeWorldPendingPersistence } from '@/utils/merge-world/persistence-buffer';
+import type { GameplayEvent } from '@/types/gameplay-event';
+import { mergeCommandEvents } from '@/features/live-ops/merge-events';
+import { contentRegistrySnapshot } from '@/features/content-packs/active-pack';
 import { createMergeSaveDeadline } from '@/utils/merge-world/save-deadline';
 import { measureMergeWork } from '@/utils/merge-world/performance';
 import { createSelectorStore, selectedSnapshot } from '@/utils/merge-world/selector-store';
@@ -61,7 +65,7 @@ const MergeWorldStateContext = createContext<MergeWorldStateContextValue | null>
 const MergeWorldActionsContext = createContext<MergeWorldActionsContextValue | null>(null);
 const MergeWorldLastResultContext = createContext<MergeWorldCommandResult | null | undefined>(undefined);
 const MergeWorldSelectorContext = createContext<ReturnType<typeof createSelectorStore<MergeWorldStateContextValue>> | null>(null);
-const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = ['baristabbit', 'steppling'];
+const AUTHORED_COHORT_FAMILIES: readonly AuthoredCohortFamilyId[] = HATCHABLE_COMPANIONS.map((definition) => definition.companion);
 
 function mossproutProgressionSignals(days: readonly HomeDayRecord[], friendshipLevel: number, ownedWispIds: string[]) {
   const relationships = relationshipProgressionRepository.load();
@@ -490,7 +494,7 @@ export function MergeWorldProvider({
       for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
         if (workerGeneration !== persistenceGenerationRef.current) return;
         try {
-          await saveMergeWorldState(pending.state, [...pending.receiptIds], { baseRevision: baseRevisionRef.current ?? undefined });
+          await saveMergeWorldState(pending.state, [...pending.receiptIds], { baseRevision: baseRevisionRef.current ?? undefined, gameplayEvents: pending.gameplayEvents });
           if (workerGeneration !== persistenceGenerationRef.current) return;
           baseRevisionRef.current = pending.state.revision;
           saved = true;
@@ -521,6 +525,7 @@ export function MergeWorldProvider({
         pendingPersistenceRef.current,
         pending.state,
         [...pending.receiptIds],
+        pending.gameplayEvents,
       );
       if (mountedRef.current) setError(caughtError instanceof Error ? caughtError.message : 'Progress could not be saved.');
       break;
@@ -542,8 +547,8 @@ export function MergeWorldProvider({
 
   if (!saveDeadlineRef.current) saveDeadlineRef.current = createMergeSaveDeadline(() => { void startPersistenceWorker(); });
 
-  const enqueuePersistence = useCallback((next: MergeWorldState, receiptIds: readonly string[] = [], bufferOrdinaryCommand = false) => {
-    pendingPersistenceRef.current = mergeWorldPendingPersistence(pendingPersistenceRef.current, next, receiptIds);
+  const enqueuePersistence = useCallback((next: MergeWorldState, receiptIds: readonly string[] = [], bufferOrdinaryCommand = false, gameplayEvents: readonly GameplayEvent[] = []) => {
+    pendingPersistenceRef.current = mergeWorldPendingPersistence(pendingPersistenceRef.current, next, receiptIds, gameplayEvents);
     if (receiptIds.length || !bufferOrdinaryCommand) {
       saveDeadlineRef.current?.cancel();
       void startPersistenceWorker();
@@ -966,7 +971,7 @@ export function MergeWorldProvider({
     stateRef.current = result.state;
     setState(result.state);
     setError(null);
-    enqueuePersistence(result.state, receiptIds, options?.persist !== 'immediate' && (command.type === 'move' || command.type === 'tapGenerator'));
+    enqueuePersistence(result.state, receiptIds, options?.persist !== 'immediate' && (command.type === 'move' || command.type === 'tapGenerator'), mergeCommandEvents(current, command, result, contentRegistrySnapshot().revision));
     if (result.state.externalRewardReceipts.some((receipt) => receipt.appliedAt == null)) {
       void applyPendingExternalRewards();
     }

@@ -1,3 +1,4 @@
+import { artKeys, artSource, hasArtSource } from '@/utils/art-source';
 import type { ImageSourcePropType } from 'react-native';
 
 import type {
@@ -175,13 +176,8 @@ export const homeScorePresentation: Record<
   },
 };
 
-export const homeCreatureVisuals: Record<
-  HomeVisualKey,
-  {
-    source: ImageSourcePropType;
-    accentColor: string;
-  }
-> = {
+export type HomeCreatureVisual = { source: ImageSourcePropType; accentColor: string };
+export const homeCreatureVisuals: Record<string, HomeCreatureVisual> = {
   heartmote: {
     source: require('@incubator/art-cutouts/heartmote.png'),
     accentColor: '#F28D9C',
@@ -637,3 +633,13 @@ export const homeInspirationQuotes: readonly InspirationQuote[] = [
     tags: ['quiet_day', 'today_empty'],
   },
 ];
+
+/** The accent a creature wears when its art came from a pack that named none. */
+const PACK_CREATURE_ACCENT = '#9FAFFF';
+/** A creature's cutout and accent: art a pack brought, else the bundled table, else Mossprout standing in for art the app does not have. */
+export function creatureVisual(visualKey: HomeVisualKey): HomeCreatureVisual {
+  const registered = artSource(artKeys.creature(visualKey));
+  if (registered) return { source: registered, accentColor: homeCreatureVisuals[visualKey]?.accentColor ?? PACK_CREATURE_ACCENT };
+  return homeCreatureVisuals[visualKey] ?? homeCreatureVisuals.mossprout!;
+}
+export const hasCreatureVisual = (visualKey: string): boolean => hasArtSource(artKeys.creature(visualKey)) || Object.prototype.hasOwnProperty.call(homeCreatureVisuals, visualKey);

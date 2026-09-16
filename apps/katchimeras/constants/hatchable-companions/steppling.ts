@@ -180,8 +180,8 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
       kind: 'steps',
       milestones: STEPPLING_STEP_MILESTONES,
       lines: {
-        remaining: (steps) => `Not quite yet—${steps.toLocaleString()} more ${steps === 1 ? 'step' : 'steps'} to this little milestone. We can take them at your pace.`,
-        claimed: (steps) => `${steps.toLocaleString()} steps! Look how far those little moments carried us. I’m glad we’re finding our rhythm together.`,
+        remaining: 'Not quite yet—{{steps}} more {{steps|plural:step,steps}} to this little milestone. We can take them at your pace.',
+        claimed: '{{steps}} steps! Look how far those little moments carried us. I’m glad we’re finding our rhythm together.',
       },
     },
   },

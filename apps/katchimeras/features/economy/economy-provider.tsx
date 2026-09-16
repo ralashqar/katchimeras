@@ -1,6 +1,6 @@
 import { createContext, type PropsWithChildren, use, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { FALLBACK_ECONOMY_CONFIG, emptyEconomySnapshot, normalizeEconomyConfig } from '@/utils/economy-config';
+import { FALLBACK_ECONOMY_CONFIG, emptyEconomySnapshot, normalizeEconomyConfig, avatarEssencePrice } from '@/utils/economy-config';
 import { useEssence } from '@/hooks/use-essence';
 import type { AvatarAccessState, AvatarPurchaseInput, EconomyConfig, EconomyMutationResult, EconomySnapshot, RevenueCatPackageSummary } from '@/types/economy';
 import type { WispId } from '@/types/wisp';
@@ -9,7 +9,6 @@ import { ensureStreakIdentity } from '@/utils/streak-sync';
 import { supabase } from '@/utils/supabase';
 import { isSubscriptionSimulatorEnabled, subscriptionApi } from '@/utils/subscription-api';
 import { migrateLegacyEconomy } from '@/utils/economy-migration';
-import { avatarEssencePrice } from '@/utils/economy-config';
 import { useAllDays } from '@/hooks/use-all-days';
 import { syncEconomyEvents } from '@/utils/economy-sync';
 import { useDevSubscriptionSimulator } from '@/hooks/use-dev-subscription-simulator';
@@ -114,8 +113,12 @@ export function EconomyProvider({ children }: PropsWithChildren) {
 
   const mutate = useCallback(async (rpc: string, payload: Record<string, unknown>): Promise<EconomyMutationResult> => {
     if (isDevProfileSandboxActive()) return { ok: false, reason: 'disabled' };
-    const { error } = await supabase.rpc(rpc, payload);
+    const { data, error } = await supabase.rpc(rpc, payload);
     if (error) return { ok: false, reason: /insufficient/i.test(error.message) ? 'insufficient_essence' : 'server_error' };
+    if (data && typeof data === 'object' && (data as { ok?: boolean }).ok === false) {
+      const reason = (data as { reason?: string }).reason;
+      return { ok: false, reason: reason === 'disabled' || reason === 'invalid_offer' || reason === 'insufficient_essence' || reason === 'not_eligible' ? reason : 'server_error' };
+    }
     await refresh();
     return { ok: true };
   }, [refresh]);

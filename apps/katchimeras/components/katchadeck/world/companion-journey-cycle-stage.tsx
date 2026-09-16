@@ -1,3 +1,4 @@
+import { resolveContentLine } from '@/utils/content-predicate';
 import { CompanionSceneOverlayHost, CompanionSlidingSubmenu } from './companion-scene-overlay';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
 import { CompanionDailyActions } from './companion-daily-actions';
@@ -58,7 +59,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
 }) {
   const relationships = useRelationshipProgression();
   const cycle = currentJourneyCycle(relationships, familyId);
-  const chapter = journeyChapterFor(familyId);
+  const chapter = journeyChapterFor(familyId, relationships.journeyEpisodes, cycle && cycle.returnedAt == null ? cycle.chapterId : undefined);
   const daily = companionDailyConfig(familyId);
   const [initialized, setInitialized] = useState(false);
   const [managed, setManaged] = useState(true);
@@ -181,7 +182,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
         id: request.id,
         title: request.kind === 'life' ? 'Share a real-life moment' : request.title,
         subtitle: request.kind === 'life' && chapter?.lines.lifeRequestSubtitle
-          ? chapter.lines.lifeRequestSubtitle(cycle.stepProgress)
+          ? resolveContentLine(chapter.lines.lifeRequestSubtitle, cycle.stepProgress, () => ({ stepProgress: cycle.stepProgress }))
           : request.reductionMs / 60000 + ' minutes sooner',
         icon: request.kind === 'merge' ? 'leaf.fill' : chapter?.lines.lifeIcon ?? 'bubble.left.and.bubble.right.fill',
         onPress: () => request.kind === 'merge' ? onOpenMerge(request.orderId) : setCheckInOpen(true),

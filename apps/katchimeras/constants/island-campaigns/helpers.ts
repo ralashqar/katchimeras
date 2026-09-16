@@ -2,13 +2,16 @@ import type { ConversationDefinition } from '@/types/companion-conversation';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { IslandCampaignProgress, IslandRestorationProgress, MergeOrder, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import { mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
+import { resolveContentLine } from '@/utils/content-predicate';
 import { ISLAND_CAMPAIGNS } from './registry';
 import type {
   IslandCampaignChapter,
+  IslandCampaignChapterLevel,
   IslandCampaignChapterStatus,
   IslandCampaignChoice,
   IslandCampaignDefinition,
   IslandCampaignPanelAction,
+  IslandCampaignSpeechContext,
 } from './types';
 
 export const islandCampaignChapter = (campaign: IslandCampaignDefinition, level: MossproutNatureIslandLevel) => (
@@ -155,11 +158,12 @@ export function islandCampaignUpgradePanelState(world: MergeWorldState, campaign
   const action = PANEL_ACTIONS[status];
   const choice = islandCampaignChapterChoice(campaign, chapter.level, chapterProgress?.selectedOptionId);
   const cost = chapter.level === 1 ? 0 : mossproutNatureIslandLevelDefinition(campaign.islandId, chapter.level)?.coinCost ?? 0;
-  const voiced = campaign.copy.speech?.[status]?.({ chapter, choice, coins: world.coins, cost });
+  const speechLine = campaign.copy.speech?.[status];
+  const voiced = speechLine ? islandSpeech(speechLine, { chapter, choice, coins: world.coins, cost }) : undefined;
   // A board chapter's return happens at the beds: the served delivery is greeted with the same line.
   const deliveredToBeds = status === 'board_open' && orderComplete && chapterProgress?.restoration?.deliveryRequestedAt != null;
   const speech = status === 'return_ready' || status === 'restoration_ready' || deliveredToBeds
-    ? choice?.returnLine ?? campaign.copy.fallbackReturn(chapter.title)
+    ? choice?.returnLine ?? islandFallbackReturn(campaign, chapter.title)
     : null;
   const completedChapters = campaign.chapters
     .filter((candidate) => islandCampaignChapterStatus(world, campaign, candidate.level) === 'complete')
@@ -167,7 +171,7 @@ export function islandCampaignUpgradePanelState(world: MergeWorldState, campaign
       level: candidate.level,
       title: candidate.title,
       line: islandCampaignChapterChoice(campaign, candidate.level, progress.chapters[String(candidate.level)]?.selectedOptionId)?.resolutionLine
-        ?? campaign.copy.fallbackResolution(candidate.level),
+        ?? islandFallbackResolution(campaign, candidate.level),
     }));
   return {
     campaignId: campaign.campaignId,
@@ -364,11 +368,11 @@ export function islandCampaignConversationDefinitions(campaign: IslandCampaignDe
     const resolutionTags = [...campaign.tags, 'resolution', 'required-narrative-overlay'];
     const fallbackReturn: ConversationDefinition = {
       ...baseDefinition(campaign, islandCampaignReturnBaseId(chapter), chapter.title), entryNodeId: 'end', tags: returnTags,
-      nodes: [endNode(campaign.copy.fallbackReturn(chapter.title))],
+      nodes: [endNode(islandFallbackReturn(campaign, chapter.title))],
     };
     const fallbackResolution: ConversationDefinition = {
       ...baseDefinition(campaign, islandCampaignResolutionBaseId(chapter), chapter.title), entryNodeId: 'end', tags: resolutionTags,
-      nodes: [endNode(campaign.copy.fallbackResolution(chapter.level))],
+      nodes: [endNode(islandFallbackResolution(campaign, chapter.level))],
     };
     const branches = chapter.choices.flatMap((choice): ConversationDefinition[] => {
       const choiceReturn: ConversationDefinition = {
@@ -414,4 +418,20 @@ export function islandCampaignSelectedChoice(campaign: IslandCampaignDefinition,
     if (choice) return choice;
   }
   return null;
+}
+
+/** A friend's line over their board, from the panel's facts: what the stage costs and what the player holds. */
+export function islandSpeech(line: NonNullable<IslandCampaignDefinition['copy']['speech']>[IslandCampaignChapterStatus] & {}, context: IslandCampaignSpeechContext): string {
+  return resolveContentLine(line, context, () => ({
+    coins: context.coins, cost: context.cost, affordable: context.coins >= context.cost, halfway: context.coins >= context.cost / 2,
+    chapterTitle: context.chapter.title, level: context.chapter.level, choiceId: context.choice?.id ?? null,
+  }));
+}
+
+export function islandFallbackReturn(campaign: IslandCampaignDefinition, chapterTitle: string): string {
+  return resolveContentLine(campaign.copy.fallbackReturn, chapterTitle, () => ({ chapterTitle }));
+}
+
+export function islandFallbackResolution(campaign: IslandCampaignDefinition, level: IslandCampaignChapterLevel): string {
+  return resolveContentLine(campaign.copy.fallbackResolution, level, () => ({ level }));
 }

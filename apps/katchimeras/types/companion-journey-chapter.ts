@@ -1,3 +1,4 @@
+import type { ContentLine, ContentPredicate } from './content-predicate';
 import type { HatchableMissionDefinition } from '@/types/hatchable-companion';
 import type { WispId } from '@/types/wisp';
 import type { ConversationPollSeed, ConversationTraitTags } from '@/types/companion-conversation';
@@ -5,7 +6,6 @@ import type { LifeChoice } from '@/features/content-flow/companion-life-flow';
 import type { MergeCharacterId, MossproutNatureIslandId } from '@/types/merge-world';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { JourneyParticipation } from '@/types/companion-journey-cycle';
-import type { AuthoredCohortFamilyId } from '@/utils/companion-story';
 import type { TheoryOfYou } from '@/utils/companion-theory';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 
@@ -64,8 +64,13 @@ export type JourneyLineContext = {
   today: string | null;
 };
 
-/** A line with alternatives: the first variant whose condition holds is said; the base text otherwise. */
-export type JourneyLineVariant = { when: (context: JourneyLineContext) => boolean; text: string };
+/**
+ * A line with alternatives: the first variant whose condition holds is said;
+ * the base text otherwise. The condition is data over the line facts
+ * (`theory.friction`, `today`, `fact.<key>`, `answer.<episode>.<ask>`), or
+ * code over the context while bundled copy migrates.
+ */
+export type JourneyLineVariant = { when: ContentPredicate<JourneyLineContext>; text: string };
 
 export type JourneyAskOption = {
   id: string;
@@ -106,7 +111,8 @@ export type JourneyGardenOrder = {
 
 export type JourneyConsequence =
   | { kind: 'reveal_story_tile'; tileId: string }
-  | { kind: 'mist_mission'; tileId: string; mission: JourneyMissionDefinition }
+  /** A Dark Wisp on a story tile: a board docked beneath it, carried here or named by id from the missions registry. */
+  | { kind: 'mist_mission'; tileId: string; mission?: JourneyMissionDefinition; missionId?: string }
   | { kind: 'reveal_island'; islandId: MossproutNatureIslandId }
   | { kind: 'grant'; rewardId: string; generatorId: string }
   /** Garden orders placed for the player; the next episode usually unlocks on them being served. */
@@ -135,6 +141,8 @@ export type JourneyEpisodeDefinition = {
   habitatStage?: 1 | 2 | 3 | 4;
   /** Bond the episode pays; the journey-day reward when absent. */
   bond?: number;
+  /** What else the episode's completion records: a Garden campaign beat done (Mossprout's story summary moves on). */
+  completes?: { kind: 'campaign_beat'; beatId: string };
 };
 
 export type CompanionJourneyOrderTemplate = {
@@ -151,8 +159,11 @@ export type CompanionJourneyOrderTemplate = {
 export type JourneyBondReward = { level: 2 | 3 | 4; kind: 'episode' | 'place' | 'gift'; id: string; label: string };
 
 export type CompanionJourneyChapterDefinition = {
-  familyId: 'mossprout' | AuthoredCohortFamilyId;
+  /** Mossprout or a hatchable friend. */
+  familyId: string;
   chapterId: string;
+  /** A continuation opens after every episode of this chapter is complete. */
+  afterChapterId?: string;
   title: string;
   purpose: string;
   /** Authored order is the arc's order; unlocks decide when each opens. */
@@ -182,12 +193,11 @@ export type CompanionJourneyChapterDefinition = {
     /** The check-in answers that count as a life moment during a rest. */
     checkIn: readonly (readonly [id: JourneyParticipation, title: string])[];
     lifeIcon: IconSymbolName;
-    lifeRequestSubtitle?: (stepProgress: number) => string;
+    /** Under the life request while a rest runs, with `{{stepProgress}}` (steps since the rest began). */
+    lifeRequestSubtitle?: ContentLine<number>;
     /** How the friend hints at a locked episode, by what still blocks it. */
     hints?: Partial<Record<JourneyUnlockCondition['kind'], string>>;
   };
   /** Steppling's saves from the day-and-rest era: cycle numbers map onto these episode ids in order. */
   legacyEpisodeIdPrefix?: string;
-  /** What else an episode's completion writes to the relationship state (Mossprout's story summary), applied once with the record. */
-  onEpisodeComplete?: (state: import('./relationship-progression').RelationshipProgressState, episode: JourneyEpisodeDefinition, now: number) => import('./relationship-progression').RelationshipProgressState;
 };

@@ -1,5 +1,5 @@
 import { preferenceOptions } from '@/constants/katchadeck';
-import { homeCreatureVisuals, homeScorePresentation } from '@/constants/home-mvp';
+import { creatureVisual, homeScorePresentation } from '@/constants/home-mvp';
 import type {
   DayScores,
   EggVisualState,
@@ -16,7 +16,7 @@ export function getCreatureVisual(
   visualKey: LocalCreatureRecord['visualKey'],
   stage: CreatureGrowthStage = 'hatchling',
 ) {
-  const visual = homeCreatureVisuals[visualKey];
+  const visual = creatureVisual(visualKey);
   return {
     ...visual,
     // Keep both identities available: the app defaults to the just-hatched

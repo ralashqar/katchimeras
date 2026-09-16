@@ -306,7 +306,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   const boardFile = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
   assert.match(screen, /const islandRestoration = useMemo\(\(\) => activeIslandRestoration\(mergeWorld\), \[mergeWorld\]\);/);
   assert.match(screen, /const restorationBoardRunId = islandRestoration && restorationDefinition \? restorationRunId\(islandRestoration\.campaign\.campaignId, islandRestoration\.level, islandRestoration\.progress\.startedAt, restorationDefinition\) : null;/, 'a restarted or re-authored stage never inherits a saved board');
-  assert.match(screen, /useMissionBoard\(islandRestoration \? restorationStorageKey\(islandRestoration\.campaign\.campaignId, islandRestoration\.level\) : 'katchimeras\.mist-mission\.none\.v1', restorationBoardRunId, createRestorationBoard, repairRestorationBoard\)/, 'its own store per chapter, repaired on load');
+  assert.match(screen, /useMissionBoard\(islandRestoration \? previewMissionStorageKey\(restorationStorageKey\(islandRestoration\.campaign\.campaignId, islandRestoration\.level\), mechanicPreview\) : 'katchimeras\.mist-mission\.none\.v1', restorationBoardRunId, createRestorationBoard, repairRestorationBoard, restorationBinding\)/, 'its own store per chapter, repaired on load, played by the board\u2019s mechanic');
   assert.match(screen, /target: \{ kind: 'haven_nature_island' as const, islandId: restorationIslandId \},\s*zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y/, 'the board framing on the island');
   assert.match(screen, /const soloOfferId = stepplingBoardBusy \? `mist:\$\{activeHatchable\.tile\.id\}` : null;/, 'no marker percentage while the board is up');
   // The request lives on the dock's tray: open on the Main Board it leads there; served, its items fly into the cells.
@@ -326,14 +326,15 @@ test('the Kingdom docks the board under the island, sends the order at the check
   const parcel = readFileSync('components/katchadeck/games/merge-parcel-overlay.tsx', 'utf8');
   assert.match(parcel, /\{opening \? <ParcelOpening from=\{flight\.from\} rootMatch=\{Boolean\(flight\.rootMatch\)\} \/> : null\}/);
   assert.match(screen, /: null, \[restorationIslandId, restorationOpen, screenFocused\]\);/, 'the camera directive only changes with the island and whether the board is open, never per merge');
-  assert.match(screen, /if \(!restorationCheckpointReached\(restorationDefinition, restorationStore\.state, restorationStore\.merges\)\) return;[\s\S]*?requestStoredIslandCampaignDelivery\(islandRestoration\.campaign\.campaignId, islandRestoration\.level, \[order\]\)/, 'the checkpoint publishes the chapter’s order');
+  assert.match(screen, /if \(!restorationCheckpointReached\(restorationDefinition, restorationStore\.state, restorationStore\.merges, restorationDone\)\) return;[\s\S]*?requestStoredIslandCampaignDelivery\(islandRestoration\.campaign\.campaignId, islandRestoration\.level, \[order\]\)/, 'the checkpoint publishes the chapter’s order');
   assert.match(screen, /const pending = deliveriesToPlace\(islandRestoration\.progress, restorationStore\.placedDeliveries\);[\s\S]*?restorationPlace\(entries\)/, 'deliveries land on the board');
   assert.match(screen, /if \(!\(restorationDone && restorationLanded\)\) return;[\s\S]*?setTimeout\(finishIslandRestoration, WISP_FALL_MS\)/, 'the last merge’s impact finishes the board, once the wisp it struck has fallen');
-  assert.match(screen, /if \(restorationDefinition && restorationComplete\(restorationDefinition, restorationStore\.merges\)\) finishIslandRestoration\(\);/, 'a board saved full finishes on arrival');
+  assert.match(screen, /if \(restorationDone\) finishIslandRestoration\(\);/, 'a board saved full finishes on arrival');
+  assert.match(screen, /const restorationDone = Boolean\(restorationBinding && restorationStore\.mechanicState && mechanicComplete\(resolveMechanic\(restorationBinding\.host\), restorationBinding\.host, restorationStore\.mechanicState\)\);/, 'full by the board\u2019s mechanic');
   assert.match(screen, /if \(status === 'restoration_ready' && chapter\.restoration\) \{[\s\S]*?const key = `restore-board:\$\{campaign\.campaignId\}:\$\{status\}`;[\s\S]*?purchaseWorldUpgrade\(offer, \{ beforeValidation: flushMergeWorld \}\)/, 'the finished board grows the island for free');
   assert.match(screen, /if \(chapter\.restoration\) \{[\s\S]*?requestResidentInteractionExit\(\);\s*return;\s*\}\s*if \(!campaignProgress\?\.orderIds\[0\]\)/, 'the answer opens the board, not the Garden');
   assert.match(screen, /if \(progress\.action === 'continue_restoring'\) \{[\s\S]*?setSelectedUpgrade\(null\);/);
-  assert.match(screen, /<IslandRestorationDock[\s\S]*?merges=\{restorationStore\.merges\} mergesRef=\{restorationStore\.mergesRef\}[\s\S]*?onFinale=\{launchRestorationFinale\}/);
+  assert.match(screen, /<IslandRestorationDock[\s\S]*?progress=\{restorationSummary \?\? \{ current: 0, total: 1 \}\}[\s\S]*?onFinale=\{launchRestorationFinale\}/);
   assert.match(screen, /\|\| restorationBoardVisible\}/, 'the camera holds while the board is up');
   // The board is optional: opened on purpose, put away freely, never forced.
   assert.match(screen, /const restorationBoardVisible = Boolean\(islandRestoration && restorationStore\.state\) && restorationOpen && screenFocused/, 'the board shows only when opened');
@@ -355,10 +356,11 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(mergeScreen, /requestIslandRestorationOpen\(campaign\.campaignId\);\s*transitionTo\(\{/, 'the return note leaves the intent before it navigates');
   assert.match(screen, /if \(screenFocused && restorationCampaignId && consumeIslandRestorationOpen\(restorationCampaignId\)\) setRestorationOpen\(true\);/, 'the Kingdom opens the board on arrival');
   assert.match(screen, /if \(restorationCampaignId && islandCampaignForOffer\(offer\.id\)\?\.campaignId === restorationCampaignId\) \{\s*setRestorationOpen\(true\);\s*return;\s*\}/, 'the marker is the board while a stage is open');
-  assert.match(dock, /if \(\(mergesRef\.current \?\? 0\) >= required\) \{[\s\S]*?setHiddenItemIds[\s\S]*?onFinale\?\.\(from, made\);\s*\} else \{\s*onMerge\?\.\(from, made\);/, 'every merge sends the thing it made into the tile; the last one leaves the board');
+  assert.match(dock, /if \(strike\.finale\) \{[\s\S]*?setHiddenItemIds[\s\S]*?onFinale\?\.\(from, strike\.resultDefinitionId, strike\);\s*\} else \{\s*onStrike\?\.\(from, strike\);/, 'every merge sends the thing it made into the tile; the last one leaves the board');
   assert.match(dock, /barTitle=\{`Drive the Mist from \$\{islandName\}`\}/, 'the bar names the island and what is being driven off it');
 
-  assert.match(screen, /<IslandRestorationDock[\s\S]*?onMerge=\{openingGlow\.launchItem\}/, 'items, not Glow, fly into an island being restored');
+  assert.match(screen, /<IslandRestorationDock[\s\S]*?onStrike=\{launchRestorationStrike\}/);
+  assert.match(screen, /if \(restorationShot\) launchGlowShot\(from, strike\);\s*else launchGlowItem\(from, strike\.resultDefinitionId, strike\);/, 'items, not Glow, fly into an island being restored');
   const glowDock = readFileSync('components/katchadeck/world/kingdom-opening-merge-dock.tsx', 'utf8');
   assert.match(glowDock, /\{header && headerBottom != null \? <Animated\.View entering=\{headerIn\} exiting=\{headerOut\}/, 'the tray card fades in and out');
   assert.match(glowDock, /const headerIn = FadeIn\.duration\(reduceMotion \? 80 : 240\);\s*const headerOut = FadeOut\.duration\(reduceMotion \? 60 : 180\);/);
@@ -381,7 +383,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /if \(restorationLanded && restorationBoardRunId\) setRestorationHandoff\(restorationBoardRunId\);/);
   assert.match(screen, /if \(pendingIslandCampaign\?\.phase === 'resolution' \|\| upgradeError\) \{ setRestorationHandoff\(null\); return; \}/);
   assert.match(screen, /homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS :/, 'no marker during the hand-off');
-  assert.match(screen, /const missionBoardDocked = openingBoardActive \|\| stepplingMissionActive \|\| restorationBoardVisible;\s*const visibleUpgradeOffers = [^\n]*missionBoardDocked \? NO_UPGRADE_OFFERS :/, 'no marker at all while any mini board is docked');
+  assert.match(screen, /const missionBoardDocked = openingBoardActive \|\| stepplingMissionActive \|\| journeyMissionActive \|\| restorationBoardVisible;\s*const visibleUpgradeOffers = [^\n]*missionBoardDocked \? NO_UPGRADE_OFFERS :/, 'no marker at all while any mini board is docked');
   // The tray and its bubble draw over the wisps; the Glow still strikes the wisps from above.
   assert.match(readFileSync('components/katchadeck/world/corruption-wisp-layer.tsx', 'utf8'), /layer: \{ zIndex: 58 \}/);
   assert.match(glowDock, /dock: \{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60,/);
@@ -399,7 +401,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   // A paid stage shows its Glow leaving: the counter holds the old balance until the write lands, then coins fly from the top bar into the island as it counts down.
   assert.match(screen, /const stageCost = chapter\.restoration && chapter\.level > 1 \? mossproutNatureIslandLevelDefinition\(campaign\.islandId, chapter\.level\)\?\.coinCost \?\? 0 : 0;\s*if \(stageCost > 0\) setGlowSpend\(\{ amount: stageCost, counting: false \}\);/);
   assert.match(screen, /const node = islandTileNodesRef\.current\[campaign\.islandId\] \?\? null;\s*if \(!node && attempt < 30\) \{ requestAnimationFrame\(\(\) => aim\(attempt \+ 1\)\); return; \}\s*openingGlow\.launch\(origin, node\);\s*setGlowSpend\(\{ amount: stageCost, counting: true \}\);\s*setDisplayedGlow\(spent\);/, 'aimed at the island’s own node, never at whatever tile the hook last pointed at');
-  assert.match(glowDock, /const launch = \(from: RewardFlightPoint, targetNode\?: ViewType \| null\) => \{[\s\S]*?const target = targetNode \?\? targetRef\.current;/);
+  assert.match(glowDock, /const launch = \(from: RewardFlightPoint, targetNode\?: ViewType \| null, strike\?: MissionStrike \| null\) => \{[\s\S]*?const target = targetNode \?\? targetRef\.current;/);
   assert.match(screen, /if \(upgradePurchasing \|\| upgradeCommitted \|\| glowSpend\) return;/, 'the counter is not re-synced under the spend');
   assert.match(screen, /animateValue: Boolean\(upgradePresentation\?\.showCoins && upgradePresentation\.coinCost > 0\) \|\| Boolean\(glowSpend\?\.counting\),/);
   assert.match(screen, /const restorationHintCue = useMemo<FtueCueDefinition \| null>\(\(\) => restorationOrderId\s*\? \{ kind: 'tap', target: \{ kind: 'order_card', orderId: restorationOrderId \}, offset: \{ y: RESTORATION_HINT_FINGER_DROP \} \}/, 'the finger sits under the card’s items, one cue object per request');
@@ -407,7 +409,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(dock, /<Animated\.View key=\{text\} entering=\{FadeIn\.duration\([^)]*\)\.delay\([^)]*\)\} exiting=\{FadeOut\.duration\([^)]*\)\}/, 'the bubble fades in and out, and crossfades between lines');
   assert.match(dock, /railTargetRefs\.current\.set\(targetKey, view\)/, 'the dock shares the card’s targets with the overlay');
   assert.match(rail, /if \(onPressCard\) \{[\s\S]*?onPressCard\(\);\s*return;\s*\}\s*if \(interactionLocked\)/, 'the portrait never opens the reward popup on a card that leads somewhere');
-  assert.match(glowDock, /const launchItem = \(from: RewardFlightPoint, definitionId: string\) => \{[\s\S]*?\{ id, index: 0, count: 1, from, to, art, size: 44, group: \+\+groupSeq\.current, key: aimed\?\.key \}/, 'one item flight per merge');
+  assert.match(glowDock, /const launchItem = \(from: RewardFlightPoint, definitionId: string, strike\?: MissionStrike \| null\) => \{[\s\S]*?\{ id, index: 0, count: 1, from, to, art, size: 44, group: \+\+groupSeq\.current, key: aimed\?\.key \}/, 'one item flight per merge');
   assert.match(canvas, /if \(target\.kind === 'haven_nature_island'\) \{[\s\S]*?`nature:mossprout:\$\{target\.islandId\}`[\s\S]*?focusTutorialResident\([^;]*?unbounded: true \}\);/, 'the island is a camera target, framed exactly where asked: the scene bounds never pull an edge island back');
   const hexCamera = readFileSync('../../packages/environments/src/hex-camera.ts', 'utf8');
   assert.match(hexCamera, /const clamped = unbounded \? \{ tx: nextTx, ty: nextTy \} : clampCameraTranslation\(\{ tx: nextTx, ty: nextTy \}, cameraViewport, cameraScene, clampedZoom\);/);
@@ -418,7 +420,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.doesNotMatch(canvas, /ref=\{onNatureIslandTargetChange \?/);
   assert.match(marker, /offer\.restorationProgress \? offer\.restorationProgress\.current/, 'the marker’s bar is the board while it is open');
   assert.match(panel, /disabled=\{busy \|\| closing \|\| Boolean\(campaignState\.actionCost && world\.coins < campaignState\.actionCost\)\}/, 'the stage waits for its Glow');
-  assert.match(store, /const place = useCallback\(\(entries: readonly \{ cell: number; definitionId: string \}\[\]\) => \{[\s\S]*?saveMission\(storageKey, activeRunId, next, mergesRef\.current, placed\);/, 'placed deliveries are saved with the board');
+  assert.match(store, /const place = useCallback\(\(entries: readonly \{ cell: number; definitionId: string \}\[\]\) => \{[\s\S]*?saveMission\(storageKey, activeRunId, next, mergesRef\.current, placed, mechanicSaveState\(mechanicStateRef\.current\)\);/, 'placed deliveries are saved with the board');
   assert.doesNotMatch(engine, /'rooted'/, 'no bed mechanic remains in the engine');
   assert.doesNotMatch(boardFile, /rooted|bedRing/, 'nor in the board renderer');
 });

@@ -51,7 +51,7 @@ test('the provider registers its flush, adopts store writes, and never retries a
   const provider = readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
   assert.match(provider, /useEffect\(\(\) => registerMergeWorldWriterFlush\(flush\), \[flush\]\)/);
   assert.match(provider, /subscribeMergeWorldSnapshots\(\(freshState, origin\) => \{[\s\S]*?if \(origin === 'provider' && freshState\.revision <= \(stateRef\.current\?\.revision \?\? -1\)\) return;[\s\S]*?if \(origin === 'store' && freshState\.revision <= \(baseRevisionRef\.current \?\? -1\)\) return;[\s\S]*?baseRevisionRef\.current = freshState\.revision;/);
-  assert.match(provider, /await saveMergeWorldState\(pending\.state, \[\.\.\.pending\.receiptIds\], \{ baseRevision: baseRevisionRef\.current \?\? undefined \}\);[\s\S]*?baseRevisionRef\.current = pending\.state\.revision;/);
+  assert.match(provider, /await saveMergeWorldState\(pending\.state, \[\.\.\.pending\.receiptIds\], \{ baseRevision: baseRevisionRef\.current \?\? undefined, gameplayEvents: pending\.gameplayEvents \}\);[\s\S]*?baseRevisionRef\.current = pending\.state\.revision;/);
   assert.match(provider, /if \(caught instanceof MergeWorldStaleWriteError\) \{[\s\S]*?baseRevisionRef\.current = caught\.current\.revision;[\s\S]*?stateRef\.current = caught\.current;[\s\S]*?return;/);
   assert.match(provider, /options\?\.persist !== 'immediate' && \(command\.type === 'move' \|\| command\.type === 'tapGenerator'\)/);
   const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');

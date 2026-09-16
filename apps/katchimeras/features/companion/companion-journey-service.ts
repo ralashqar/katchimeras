@@ -8,6 +8,7 @@ import { katchimeraMeditationRecord, mossproutStory } from '@/game/katchimeras/r
 import type { RelationshipProgressState } from '@/types/relationship-progression';
 import { grantStoredJourneyReturn, loadMergeWorldState, reconcileStoredJourneyMeditation } from '@/utils/merge-world/repository';
 import { JOURNEY_GARDEN_ORDERS_EFFECT, episodeConsequences } from '@/constants/companion-journey-chapters/consequence-flow';
+import { applyEpisodeCompletes } from '@/features/companion/journey-consequence-state';
 import { localDayId } from '@/utils/world-identity';
 import type { JourneyParticipation } from '@/types/companion-journey-cycle';
 import type { CompanionJourneyChapterDefinition, JourneyEpisodeDefinition } from '@/types/companion-journey-chapter';
@@ -50,8 +51,14 @@ function serialize<T>(key: string, work: () => Promise<T>): Promise<T> {
   return promise;
 }
 
-function requireChapter(familyId: string): CompanionJourneyChapterDefinition {
-  const chapter = journeyChapterFor(familyId);
+export function activeJourneyChapter(familyId: string): CompanionJourneyChapterDefinition | null {
+  const state = repository.load();
+  const cycle = currentJourneyCycle(state, familyId);
+  return journeyChapterFor(familyId, state.journeyEpisodes, cycle && cycle.returnedAt == null ? cycle.chapterId : undefined);
+}
+
+function requireChapter(familyId: string, episodeId?: string): CompanionJourneyChapterDefinition {
+  const chapter = episodeId ? journeyEpisodeById(familyId, episodeId)?.chapter : activeJourneyChapter(familyId);
   if (!chapter) throw new Error(`No journey chapter is authored for ${familyId}`);
   return chapter;
 }
@@ -67,7 +74,7 @@ const episodeIndex = (chapter: CompanionJourneyChapterDefinition, episodeId: str
 
 /** The friend rests after an episode: a cycle (its requests shorten the pause) and a meditation record. */
 export function startJourneyRest(familyId: string, episodeId: string, participation: JourneyParticipation = 'not_yet', now = Date.now()) {
-  const chapter = requireChapter(familyId);
+  const chapter = requireChapter(familyId, episodeId);
   const index = episodeIndex(chapter, episodeId);
   const episode = chapter.episodes[index];
   if (!episode) throw new Error(`Unknown episode of ${chapter.title}`);
@@ -94,8 +101,7 @@ export function completeJourneyEpisode(familyId: string, episodeId: string, inpu
     const fact = compiled?.facts[turn.optionId];
     if (fact) facts[fact.key] = fact.value;
   }
-  repository.update((state) => chapter.onEpisodeComplete?.({ ...state, journeyEpisodes: { ...(state.journeyEpisodes ?? {}), [recordId]: { familyId: chapter.familyId, episodeId: episode.id, completedAt: now, answers, facts } } }, episode, now)
-    ?? { ...state, journeyEpisodes: { ...(state.journeyEpisodes ?? {}), [recordId]: { familyId: chapter.familyId, episodeId: episode.id, completedAt: now, answers, facts } } });
+  repository.update((state) => applyEpisodeCompletes({ ...state, journeyEpisodes: { ...(state.journeyEpisodes ?? {}), [recordId]: { familyId: chapter.familyId, episodeId: episode.id, completedAt: now, answers, facts } } }, episode, now));
   // A beat that grows the friend's home: the stage is recorded on their story, where the Haven reads it.
   if (episode.habitatStage && chapter.familyId === 'mossprout') {
     repository.update((state) => {
@@ -188,8 +194,9 @@ export function registerCompanionJourneyFlows() {
  * to manage and is ready at once.
  */
 export async function initializeJourney(familyId: string) {
-  const chapter = journeyChapterFor(familyId);
+  const chapter = activeJourneyChapter(familyId);
   if (!chapter) return true;
+  if (chapter.afterChapterId) { registerCompanionJourneyFlows(); return true; }
   return serialize(`${chapter.familyId}-initialize`, () => initializeJourneyOnce(chapter));
 }
 

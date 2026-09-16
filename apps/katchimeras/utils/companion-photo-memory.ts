@@ -1,3 +1,4 @@
+import { resolveContentLine } from '@/utils/content-predicate';
 import type { CompanionLifeCompletion } from './companion-life-activity-storage';
 import type { CompanionPhotoActivityConfig } from '@/types/companion-daily';
 import { homeRepository } from '@/storage/repositories/home-repository';
@@ -17,7 +18,7 @@ export async function saveCompanionPhotoMemory(completion: CompanionLifeCompleti
   const next = applyCapturedMomentForDay(state, {
     energy: {}, vision: photo.vision, captureMode: 'evidence_only', sourceId: photo.uri,
     classifiedMemory: photo.memory, evidence: photo.evidence,
-    meaning: { archetype: keepPhoto.memoryArchetype, label: keepPhoto.memoryLabel(completion.answer), thumbnailUri: photo.uri, sourceId: photo.uri },
+    meaning: { archetype: keepPhoto.memoryArchetype, label: resolveContentLine(keepPhoto.memoryLabel, completion.answer, () => ({ answer: completion.answer })), thumbnailUri: photo.uri, sourceId: photo.uri },
   }, day.id, profile, now, new Date(photo.capturedAt).toISOString());
   // Completion must observe a failed write; the deferred Home writer is best-effort.
   homeRepository.save(next);

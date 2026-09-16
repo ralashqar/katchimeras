@@ -22,7 +22,7 @@ Deno.serve(async (request) => {
   const expiresAt = plus?.expires_date ?? null;
   const active = Boolean(plus && (!expiresAt || Date.parse(expiresAt) > Date.now()));
   const admin = createClient(url, required('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false } });
-  await admin.from('economy_subscriptions').upsert({
+  const { error: saveError } = await admin.from('economy_subscriptions').upsert({
     user_id: user.id,
     revenuecat_app_user_id: user.id,
     entitlement_id: 'plus',
@@ -33,6 +33,7 @@ Deno.serve(async (request) => {
     last_event_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   });
+  if (saveError) return json({ error: 'Purchase status could not be saved' }, 500);
   return json({ ok: true, activePlus: active });
 });
 

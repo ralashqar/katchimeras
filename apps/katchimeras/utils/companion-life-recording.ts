@@ -1,3 +1,4 @@
+import { hasCompanionLife } from '@/constants/hatchable-companions/registry';
 import type { ConversationDefinition, ConversationSession } from '@/types/companion-conversation';
 import type { ContentFlowRun } from '@/types/content-flow';
 import { rememberCompanionMoment, acceptDailyStoryHabit, loadCompanionLife } from './companion-life-storage';
@@ -22,7 +23,7 @@ export function recordLifeConversation(session: ConversationSession, definition:
   const id = lifeConversationEntryId(definition.id);
   if (!id || session.preview || !session.turns.length) return;
   const familyId = definition.familyId;
-  if (familyId !== 'mossprout' && familyId !== 'steppling') return;
+  if (!hasCompanionLife(familyId)) return;
   const facts: Record<string, string> = {};
   for (const turn of session.turns) {
     const node = definition.nodes.find((item) => item.id === turn.nodeId);

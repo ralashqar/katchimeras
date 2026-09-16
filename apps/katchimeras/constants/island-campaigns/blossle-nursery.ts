@@ -221,18 +221,16 @@ export const BLOSSLE_NURSERY_CAMPAIGN: IslandCampaignDefinition<BlossleBeginning
       complete: 'Nursery story complete',
     },
     speech: {
-      restoration_ready: ({ coins, cost }) => cost <= 0
-        ? 'The first bed is my gift. I have been saving it.'
-        : coins >= cost
-          ? 'We have what we need. I can almost see it already.'
-          : coins < cost / 2
-            ? `${coins} of ${cost} Glow so far. Seeds start in the dark, too.`
-            : 'Nearly enough. I keep picturing it.',
+      restoration_ready: { text: 'Nearly enough. I keep picturing it.', variants: [
+        { when: { fact: 'cost', lte: 0 }, text: 'The first bed is my gift. I have been saving it.' },
+        { when: { fact: 'affordable', eq: true }, text: 'We have what we need. I can almost see it already.' },
+        { when: { fact: 'halfway', eq: false }, text: '{{coins|raw}} of {{cost|raw}} Glow so far. Seeds start in the dark, too.' },
+      ] },
     },
-    fallbackReturn: (chapterTitle) => `Everything for ${chapterTitle} is on the shelf. The nursery can grow whenever we have the Glow.`,
-    fallbackResolution: (level) => level === 4
-      ? 'The nursery sent its seedlings out into the world. I saved one pot for something brave.'
-      : 'The nursery grew a little fuller, and a little more like the picture in my head.',
+    fallbackReturn: 'Everything for {{chapterTitle}} is on the shelf. The nursery can grow whenever we have the Glow.',
+    fallbackResolution: { text: 'The nursery grew a little fuller, and a little more like the picture in my head.', variants: [
+      { when: { fact: 'level', eq: 4 }, text: 'The nursery sent its seedlings out into the world. I saved one pot for something brave.' },
+    ] },
     wakeHandoffLine: 'I saved a pot for something brave. It turns out that was you coming back. Down at the pond, someone has been listening for rain. Go and say hello for me.',
     sleepingHint: 'Someone is resting among the empty pots. They will wake once the friend before them is home.',
   },

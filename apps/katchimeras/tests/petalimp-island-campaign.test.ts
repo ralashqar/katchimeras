@@ -1,3 +1,4 @@
+import { islandFallbackResolution, islandFallbackReturn } from '@/constants/island-campaigns/helpers';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from './helpers/content-fs';
@@ -473,7 +474,7 @@ test('Petalimp speaks in the Mist’s voice rules: no exclamation near the Mist,
     }
   }
   const copy = campaign.copy;
-  for (const line of [copy.discoveryDialogue, copy.revealReactionLine, copy.mistDescription, copy.wakeHandoffLine, copy.sleepingHint, copy.fallbackReturn('x'), copy.fallbackResolution(1), copy.fallbackResolution(4), ...(copy.wispLines ? [copy.wispLines.firstStrike, ...copy.wispLines.fell, copy.wispLines.last] : [])]) {
+  for (const line of [copy.discoveryDialogue, copy.revealReactionLine, copy.mistDescription, copy.wakeHandoffLine, copy.sleepingHint, islandFallbackReturn(campaign, 'x'), islandFallbackResolution(campaign, 1), islandFallbackResolution(campaign, 4), ...(copy.wispLines ? [copy.wispLines.firstStrike, ...copy.wispLines.fell, copy.wispLines.last] : [])]) {
     assert.doesNotMatch(line, /\bmist\b/, line);
     if (/Mist/.test(line)) assert.doesNotMatch(line, /!/, line);
   }

@@ -39,7 +39,7 @@ type NatureIslandSources = {
 };
 
 /** Temporary art contract: every visible level uses the approved final-form master. */
-const NATURE_ISLAND_SOURCES: Record<MossproutNatureIslandId, NatureIslandSources> = {
+const NATURE_ISLAND_SOURCES: Record<string, NatureIslandSources> = {
   'seed-nursery': {
     full: require('@incubator/art-world/square/mossprout-seed-nursery-l4.webp'),
     medium: require('@incubator/art-world/square/mossprout-seed-nursery-l4-512.webp'),
@@ -72,7 +72,7 @@ const NATURE_ISLAND_SOURCES: Record<MossproutNatureIslandId, NatureIslandSources
   },
 };
 
-const POSITIONS: Record<MossproutNatureIslandId, MossproutNatureIslandPosition> = {
+const POSITIONS: Record<string, MossproutNatureIslandPosition> = {
   'seed-nursery': 'upper-left',
   'bloom-garden': 'upper-right',
   'pond-sanctuary': 'middle-left',
@@ -87,10 +87,10 @@ function natureIslandLayers(
   return MOSSPROUT_NATURE_ISLANDS.flatMap((island, index) => {
     const level = levels[island.id] ?? 0;
     if (level < 1) return [];
-    const frame = mossproutNatureIslandFrame(POSITIONS[island.id]);
+    const frame = mossproutNatureIslandFrame(POSITIONS[island.id] ?? 'upper-left');
     const row = Math.floor(index / 2);
     const depth = 1 + row * 3;
-    const sources = NATURE_ISLAND_SOURCES[island.id];
+    const sources = NATURE_ISLAND_SOURCES[island.id] ?? NATURE_ISLAND_SOURCES['seed-nursery']!;
     return [{
       alphaBounds: FULL_BOUNDS,
       coord: { q: index % 2 === 0 ? -1 : 1, r: row },

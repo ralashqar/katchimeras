@@ -65,11 +65,21 @@ def render(entries: list[tuple[str, tuple[int, int, int, int]]]) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Fail when the checked-in manifest is stale.")
+    parser.add_argument("--json", metavar="OUT", help="Write the bounds as JSON ({name: {left, top, right, bottom}}) for a content pack instead of the TypeScript manifest.")
+    parser.add_argument("--dir", metavar="DIR", help="Measure the full hex tiles in this directory instead of the bundled hex art (with --json).")
     args = parser.parse_args()
 
-    assets = sorted((path for path in HEX_DIR.glob("*.webp") if is_full_hex_tile(path)), key=lambda path: path.name)
+    hex_dir = Path(args.dir) if args.dir else HEX_DIR
+    assets = sorted((path for path in hex_dir.glob("*.webp") if is_full_hex_tile(path)), key=lambda path: path.name)
     if not assets:
         raise SystemExit("No full hex tile WebPs found.")
+
+    if args.json:
+        import json
+        measured = {path.name: dict(zip(("left", "top", "right", "bottom"), measure(path))) for path in assets}
+        Path(args.json).write_text(json.dumps(measured, indent=2) + "\n", encoding="utf-8")
+        print(f"Wrote bounds for {len(measured)} assets to {args.json}.")
+        return
 
     try:
         content = render([(path.name, measure(path)) for path in assets])

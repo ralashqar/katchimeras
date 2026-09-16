@@ -110,13 +110,16 @@ const SERVE_CONFETTI = [
   { color: '#A7D766', dx: 51, fall: 12, lift: 59, rotate: 190, round: true },
 ] as const;
 
-const CHARACTER_VISUALS: Record<MergeCharacterId, HomeVisualKey> = {
+const CHARACTER_VISUALS: Record<string, HomeVisualKey> = {
   baristabbit: 'baristabbit', feastle: 'feastle', steppling: 'steppling', flexel: 'flexel', bedrotte: 'bedrotte',
   dawnle: 'dawnle', mendle: 'mendle', gatherglow: 'gatherglow', heartmote: 'heartmote', kindling: 'kindling',
   snuglet: 'snuglet', waglet: 'waglet', tasklet: 'tasklet', errandimp: 'errandimp', pagelet: 'pagelet',
   relicoon: 'relicoon', museling: 'museling', encora: 'encora', flickerbun: 'flickerbun', pixooka: 'pixooka',
   mossprout: 'mossprout', shellio: 'shellio', skylo: 'skylo', voyagle: 'voyagle', cheerlet: 'cheerlet',
 };
+
+/** A character's portrait: the bundled table, else the character's own id (a pack character names its art after itself). */
+const characterVisualKey = (characterId: string): HomeVisualKey => CHARACTER_VISUALS[characterId] ?? characterId;
 
 export type MergeTrayEntry =
   | {
@@ -167,7 +170,7 @@ export function EmptyMergeOrderTrayCard() {
 
 export function FrozenMergeOrderTrayCard({ entry }: { entry: MergeOrderTrayEntry }) {
   const recipient = entry.order.recipientSkinId ? katchimeraSkinById.get(entry.order.recipientSkinId) : null;
-  const visualKey = recipient?.visualKey ?? CHARACTER_VISUALS[entry.order.characterId];
+  const visualKey = recipient?.visualKey ?? characterVisualKey(entry.order.characterId);
   const requestedItems = entry.order.requirements
     .flatMap((requirement) => Array.from({ length: requirement.quantity }, () => requirement.definitionId))
     .slice(0, 3);
@@ -397,7 +400,7 @@ export function MergeOrderTrayCard({ animateEntrance = true, effectsActive = tru
   const itemRefs = useRef<(View | null)[]>([]);
   const recipient = order.recipientSkinId ? katchimeraSkinById.get(order.recipientSkinId) : null;
   const recipientName = recipient?.displayName ?? MERGE_CHARACTER_NAMES[order.characterId];
-  const recipientVisualKey = recipient?.visualKey ?? CHARACTER_VISUALS[order.characterId];
+  const recipientVisualKey = recipient?.visualKey ?? characterVisualKey(order.characterId);
   const characterSource = resolveCreatureOrderArtSource(recipientVisualKey);
   const orderCardTargetKey = `order-card:${order.id}`;
   const serveTargetKey = `order-serve:${order.id}`;
@@ -652,7 +655,7 @@ function ChatNoteTrayCard({ entry, onPress, onRailTargetRef, reduceMotion }: {
   reduceMotion: boolean;
 }) {
   const portraitSkin = entry.portraitSkinId ? katchimeraSkinById.get(entry.portraitSkinId) : null;
-  const characterSource = resolveCreatureArtSource(portraitSkin?.visualKey ?? CHARACTER_VISUALS[entry.characterId], { lod: 'medium' });
+  const characterSource = resolveCreatureArtSource(portraitSkin?.visualKey ?? characterVisualKey(entry.characterId), { lod: 'medium' });
   const targetKey = `chat-note:${entry.id}`;
   const setTargetRef = useCallback(
     (view: View | null) => onRailTargetRef?.(targetKey, view),

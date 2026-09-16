@@ -221,18 +221,16 @@ export const DRIZZLET_POND_CAMPAIGN: IslandCampaignDefinition<DrizzletFeelingSty
       complete: 'Pond story complete',
     },
     speech: {
-      restoration_ready: ({ coins, cost }) => cost <= 0
-        ? 'The first pool is my gift. I brought the rain for it.'
-        : coins >= cost
-          ? 'We have enough. The pond is ready when you are.'
-          : coins < cost / 2
-            ? `${coins} of ${cost} Glow so far. Rain fills a pond one drop at a time.`
-            : 'Nearly there. I can hear the water coming.',
+      restoration_ready: { text: 'Nearly there. I can hear the water coming.', variants: [
+        { when: { fact: 'cost', lte: 0 }, text: 'The first pool is my gift. I brought the rain for it.' },
+        { when: { fact: 'affordable', eq: true }, text: 'We have enough. The pond is ready when you are.' },
+        { when: { fact: 'halfway', eq: false }, text: '{{coins|raw}} of {{cost|raw}} Glow so far. Rain fills a pond one drop at a time.' },
+      ] },
     },
-    fallbackReturn: (chapterTitle) => `Everything for ${chapterTitle} is at the water’s edge. The pond can fill whenever we have the Glow.`,
-    fallbackResolution: (level) => level === 4
-      ? 'The pond holds the whole sky again, and a little quiet for us.'
-      : 'The pond filled a little further, and the rain had somewhere to land.',
+    fallbackReturn: 'Everything for {{chapterTitle}} is at the water’s edge. The pond can fill whenever we have the Glow.',
+    fallbackResolution: { text: 'The pond filled a little further, and the rain had somewhere to land.', variants: [
+      { when: { fact: 'level', eq: 4 }, text: 'The pond holds the whole sky again, and a little quiet for us.' },
+    ] },
     wakeHandoffLine: 'Rain only falls where someone is looking up. Up in the orchard someone has been saving leaves for you. Autumn-coloured ones.',
     sleepingHint: 'Someone is resting by the dry hollow. They will wake once the friend before them is home.',
   },

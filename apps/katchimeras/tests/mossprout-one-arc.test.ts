@@ -1,3 +1,4 @@
+import { applyEpisodeCompletes } from '@/features/companion/journey-consequence-state';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { MOSSPROUT_CHAPTER, resolutionEpisodeId } from '@/constants/companion-journey-chapters/mossprout';
@@ -168,8 +169,10 @@ test('resolving a beat writes the story summary the campaign day wrote, once: th
   // The chapter's completion hook applies it when a resolution episode is recorded, and only then.
   const resolution = CHAPTER.episodes.find((episode) => episode.id === resolutionEpisodeId(pondKnock.beatId))!;
   const opening = CHAPTER.episodes.find((episode) => episode.id === pondKnock.beatId)!;
-  assert.ok(mossproutStory(CHAPTER.onEpisodeComplete!(before, resolution, NOW), NOW).completedBeatIds?.includes(pondKnock.beatId));
-  assert.equal(CHAPTER.onEpisodeComplete!(before, opening, NOW), before, 'an opening changes no summary');
+  assert.deepEqual(resolution.completes, { kind: 'campaign_beat', beatId: pondKnock.beatId }, 'the resolution says which beat it completes, as data');
+  assert.equal(opening.completes, undefined);
+  assert.ok(mossproutStory(applyEpisodeCompletes(before, resolution, NOW), NOW).completedBeatIds?.includes(pondKnock.beatId));
+  assert.equal(applyEpisodeCompletes(before, opening, NOW), before, 'an opening changes no summary');
   const last = MOSSPROUT_CAMPAIGN_EPISODES.at(-1)!;
   const done = mossproutStory(completeMossproutBeat(MOSSPROUT_CAMPAIGN_EPISODES.slice(1).reduce((state, beat) => completeMossproutBeat(state, beat.beatId, NOW), before), last.beatId, NOW), NOW);
   assert.equal(done.activeBeatId, 'heartwood:complete');

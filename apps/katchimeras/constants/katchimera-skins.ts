@@ -1,3 +1,4 @@
+import { markRegistryBuilt, packEntries } from '@/features/content-packs/active-pack';
 import type { HomeVisualKey } from '@/types/home';
 import type {
   KatchimeraCompanionId,
@@ -74,7 +75,7 @@ const plannedForm = (
  * Named forms stay visible to the player, but all progression is owned by one
  * of the 25 durable life-area families below.
  */
-export const katchimeraSkins: readonly KatchimeraSkinDefinition[] = [
+export const katchimeraSkinsBundled: readonly KatchimeraSkinDefinition[] = [
   form('baristabbit', 'Baristabbit', 'daily-ritual', 'baristabbit', ['cafe', 'home-ritual']),
   form('lattelet', 'Lattelet', 'daily-ritual', 'baristabbit', ['cafe', 'home-ritual'], ['latte', 'coffee', 'cafe'], 'dormant'),
   form('hearthsip', 'Hearthsip', 'daily-ritual', 'baristabbit', ['home-ritual', 'shared-drink'], ['tea', 'warm drink', 'home ritual'], 'dormant'),
@@ -277,6 +278,7 @@ export const katchimeraSkins: readonly KatchimeraSkinDefinition[] = [
   plannedForm('traditail', 'Traditail', 'milestones-chapters', 'cheerlet', ['celebrate', 'transition'], ['tradition', 'annual ritual', 'meaningful occasion']),
   plannedForm('closurecub', 'Closurecub', 'milestones-chapters', 'cheerlet', ['closure', 'transition'], ['ending', 'say goodbye', 'gentle closure']),
 ] as const;
+export const katchimeraSkins: readonly KatchimeraSkinDefinition[] = [...katchimeraSkinsBundled, ...packEntries('skins')];
 
 export const katchimeraSkinById = new Map(katchimeraSkins.map((skin) => [skin.id, skin]));
 export const katchimeraSkinByVisualKey = new Map(
@@ -317,7 +319,7 @@ const family = (
   focusLanes,
 });
 
-export const katchimeraFamilies: readonly KatchimeraFamilyDefinition[] = [
+export const katchimeraFamiliesBundled: readonly KatchimeraFamilyDefinition[] = [
   family('baristabbit', 'Baristabbit', 'Cafes & drinks', 'Small drink rituals that give the day a welcome pause.', 'daily-ritual', 'baristabbit', ['baristabbit', 'lattelet', 'hearthsip', 'bobaloo', 'dripkin', 'matchamallow', 'chaihare', 'cocoabun', 'frostaflop', 'infusprig', 'zestlet'], [lane('cafe', 'Cafe time', 'Enjoy a cafe or drink outing with intention.'), lane('home-ritual', 'Home ritual', 'Make an ordinary drink feel like a real pause.'), lane('shared-drink', 'Shared drinks', 'Use a drink as an easy point of connection.')]),
   family('feastle', 'Feastle', 'Food & cooking', 'Everyday nourishment, cooking, new flavours and shared tables.', 'food-cooking', 'feastle', ['feastle', 'cartle', 'crumbun', 'hayhorn', 'crustling', 'nigirimp', 'noodloo', 'sundael'], [lane('nourish', 'Everyday nourishment', 'Make food more dependable and manageable without turning it into a score.'), lane('cook', 'Cooking', 'Build confidence through small, repeatable cooking steps.'), lane('try', 'Try something', 'Explore a flavour, dish or place without pressure.'), lane('share', 'Shared food', 'Make room for connection around a meal.')]),
   family('steppling', 'Steppling', 'Walking, running & hiking', 'Everyday movement on foot, from a short walk to a trail.', 'movement-fitness', 'steppling', ['steppling', 'sprintail', 'peakle', 'promenip', 'metrostep', 'wanderling', 'dashkit', 'enduroo', 'trekkin', 'treadlet'], [lane('walk', 'Walking', 'Find realistic ways to walk more or enjoy the walk you take.'), lane('run', 'Running', 'Support a flexible running or run-walk rhythm.'), lane('hike', 'Hiking', 'Explore longer walks and trails at your own level.')]),
@@ -344,6 +346,8 @@ export const katchimeraFamilies: readonly KatchimeraFamilyDefinition[] = [
   family('voyagle', 'Voyagle', 'Travel', 'Trips, unfamiliar places and the stories brought home.', 'travel-exploration', 'voyagle', ['voyagle', 'ironette', 'skysette', 'roadaroo', 'ferryfin', 'packling', 'roamrest', 'compassette'], [lane('plan', 'Anticipate', 'Prepare for a trip without planning every moment.'), lane('journey', 'The journey', 'Notice the experience of getting there.'), lane('discover', 'Discover', 'Engage with an unfamiliar place.'), lane('return', 'Bring it home', 'Keep what mattered after returning.')]),
   family('cheerlet', 'Cheerlet', 'Celebrations & chapters', 'Progress, achievements, beginnings and endings.', 'milestones-chapters', 'cheerlet', ['cheerlet', 'chapterling', 'milestowl', 'gatherglee', 'traditail', 'closurecub'], [lane('notice-progress', 'Notice progress', 'Make effort and change visible.'), lane('celebrate', 'Celebrate', 'Mark something meaningful in a fitting way.'), lane('transition', 'Life chapters', 'Acknowledge a beginning, ending or change.'), lane('closure', 'Closure', 'Create a gentle stopping point before moving on.')]),
 ] as const;
+export const katchimeraFamilies: readonly KatchimeraFamilyDefinition[] = [...katchimeraFamiliesBundled, ...packEntries('families')];
+markRegistryBuilt('skins');
 
 export const katchimeraFamilyById = new Map(katchimeraFamilies.map((entry) => [entry.id, entry]));
 

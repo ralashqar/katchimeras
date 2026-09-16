@@ -1,3 +1,4 @@
+import { hasCompanionLife } from '@/constants/hatchable-companions/registry';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { emptyCompanionLifeState, upsertCompanionJournal, selectDailyStoryHabit, type CompanionJournalEntry, type CompanionLifeState } from './companion-life';
 import { loadCompanionQuickGoalState, saveCompanionQuickGoalState } from './companion-quick-goal-storage';
@@ -8,7 +9,7 @@ const listeners = new Set<() => void>();
 export function loadCompanionLife(): CompanionLifeState {
   const value = getStoredJson<CompanionLifeState>(KEY, emptyCompanionLifeState());
   if (!value || !Array.isArray(value.entries)) return emptyCompanionLifeState();
-  return { schemaVersion: 1, habitReceipts: Array.isArray(value.habitReceipts) ? value.habitReceipts.filter((item) => typeof item === 'string') : [], entries: value.entries.filter((entry) => entry && typeof entry.id === 'string' && entry.facts && ['mossprout', 'steppling'].includes(entry.familyId)) };
+  return { schemaVersion: 1, habitReceipts: Array.isArray(value.habitReceipts) ? value.habitReceipts.filter((item) => typeof item === 'string') : [], entries: value.entries.filter((entry) => entry && typeof entry.id === 'string' && entry.facts && hasCompanionLife(entry.familyId)) };
 }
 function save(state: CompanionLifeState) { setStoredJson(KEY, state); listeners.forEach((listener) => listener()); }
 export function subscribeCompanionLife(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }

@@ -1,10 +1,13 @@
 import type { FtueCameraDirective, FtueGuide, FtueStepDefinition, FtueTarget } from './ftue-types';
 import type { MergeBoardCell, MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import type { HatchableMissionDefinition, HatchableMissionSeed } from '@/types/hatchable-companion';
+import type { MissionMechanicState } from '@/types/mission-mechanic';
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/steppling';
+import { missionWakes, missionWindow } from '@/features/mission-mechanics/board-window';
+import { createMechanicState, mechanicMove, resolveMechanic } from '@/features/mission-mechanics/mechanic';
 import { createOpeningMissionState } from './opening-mission-state';
-import { closestOpeningPair, OPENING_MERGE_WINDOW_CELLS } from './opening-mist';
+import { OPENING_MERGE_WINDOW_CELLS } from './opening-mist';
 
 /**
  * A hatchable companion's mist mission: the misted tile is cleared on a small
@@ -91,20 +94,8 @@ export function stepplingMissionProgress(merges: number): number {
  * lowest sleeper first, so the column is climbed in order when two are awake.
  */
 export function stepplingMissionWake(state: MergeWorldState): { from: number; to: number; definitionId: string } | null {
-  const sleepers = OPENING_MERGE_WINDOW_CELLS
-    .filter((index) => state.board[index]?.mist?.kind === 'echo')
-    .sort((a, b) => b - a);
-  for (const to of sleepers) {
-    const mist = state.board[to]!.mist;
-    if (mist?.kind !== 'echo') continue;
-    const wanted = mist.definitionId;
-    const from = OPENING_MERGE_WINDOW_CELLS.find((index) => {
-      const candidate = state.board[index];
-      return candidate && !candidate.mist && candidate.occupant?.kind === 'item' && candidate.occupant.definitionId === wanted;
-    });
-    if (from != null) return { from, to, definitionId: wanted };
-  }
-  return null;
+  const wake = missionWakes(state, OPENING_MERGE_WINDOW_CELLS)[0];
+  return wake?.definitionId ? { from: wake.from, to: wake.to, definitionId: wake.definitionId } : null;
 }
 
 const article = (name: string) => (/^[aeiou]/i.test(name) ? 'an' : 'a');
@@ -118,17 +109,19 @@ const fill = (guide: FtueGuide, name: string): FtueGuide => ({
  * and nothing else is allowed. After that nothing is spotlit and the board is
  * free; the finger only shows the next move (a match to wake a sleeper, or a
  * pair to merge) once the player has paused for a couple of seconds. Waking a
- * sleeper bursts the mist beside it open on its own.
+ * sleeper bursts the mist beside it open on its own. Which move the finger
+ * shows is the mechanic's to say: a sleeper first, then the closest pair, for
+ * glow strikes; the merge that lands under a wisp standing, for a column shot.
  */
-export function missionBoardStep(mission: HatchableMissionDefinition, state: MergeWorldState | null, merges: number): FtueStepDefinition | null {
+export function missionBoardStep(mission: Omit<HatchableMissionDefinition, 'camera'>, state: MergeWorldState | null, merges: number, mechanicState?: MissionMechanicState | null): FtueStepDefinition | null {
   if (!state) return null;
   const { guides } = mission;
   const idPrefix = `mission.${mission.id.replace(/^mission:/, '')}`;
-  const wake = stepplingMissionWake(state);
-  const pair = closestOpeningPair(state);
-  if (merges === 0 && !wake && pair) {
-    const from: FtueTarget = { kind: 'board_cell', cell: pair.from };
-    const to: FtueTarget = { kind: 'board_cell', cell: pair.to };
+  const mechanic = resolveMechanic(mission);
+  const move = mechanicMove(mechanic, state, mechanicState ?? createMechanicState(mechanic), missionWindow());
+  if (merges === 0 && move?.kind === 'merge') {
+    const from: FtueTarget = { kind: 'board_cell', cell: move.from };
+    const to: FtueTarget = { kind: 'board_cell', cell: move.to };
     return {
       id: `${idPrefix}.first_merge`, surface: 'merge', actions: [],
       guide: guides.firstMerge,
@@ -137,24 +130,27 @@ export function missionBoardStep(mission: HatchableMissionDefinition, state: Mer
       spotlight: { targets: [from, to], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.62 },
     };
   }
-  if (wake) {
-    const name = MERGE_ITEMS_BY_ID.get(wake.definitionId)?.name ?? 'match';
+  if (move?.kind === 'wake') {
+    const name = (move.definitionId ? MERGE_ITEMS_BY_ID.get(move.definitionId)?.name : null) ?? 'match';
     return {
       id: `${idPrefix}.wake`, surface: 'merge', actions: [],
       guide: fill(guides.wake, name),
       interaction: { mode: 'none' },
-      cue: { kind: 'drag', from: { kind: 'board_cell', cell: wake.from }, to: { kind: 'board_cell', cell: wake.to } },
+      cue: { kind: 'drag', from: { kind: 'board_cell', cell: move.from }, to: { kind: 'board_cell', cell: move.to } },
     };
   }
-  if (pair) {
-    const occupant = state.board[pair.from]?.occupant;
+  if (move) {
+    const occupant = state.board[move.from]?.occupant;
     const definition = occupant?.kind === 'item' ? MERGE_ITEMS_BY_ID.get(occupant.definitionId) : null;
     const next = definition?.nextItemId ? MERGE_ITEMS_BY_ID.get(definition.nextItemId) : null;
+    // Where the column matters, the merge beat has its own words when authored.
+    const aimed = mechanic.kind === 'column-shot' && guides.aim ? guides.aim : null;
+    const mergeGuide = aimed ?? guides.merge;
     return {
-      id: `${idPrefix}.merge`, surface: 'merge', actions: [],
-      guide: next ? fill(guides.merge, next.name) : { ...guides.merge, title: guides.mergeFallbackTitle },
+      id: `${idPrefix}.${aimed ? 'aim' : 'merge'}`, surface: 'merge', actions: [],
+      guide: next ? fill(mergeGuide, next.name) : aimed ?? { ...guides.merge, title: guides.mergeFallbackTitle },
       interaction: { mode: 'none' },
-      cue: { kind: 'drag', from: { kind: 'board_cell', cell: pair.from }, to: { kind: 'board_cell', cell: pair.to } },
+      cue: { kind: 'drag', from: { kind: 'board_cell', cell: move.from }, to: { kind: 'board_cell', cell: move.to } },
     };
   }
   return {

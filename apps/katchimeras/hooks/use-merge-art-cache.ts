@@ -1,3 +1,4 @@
+import type { ArtSource } from '@/utils/art-source';
 import { Image, type ImageRef } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager } from 'react-native';
@@ -48,7 +49,7 @@ export function useMergeArtCache(
     const generation = ++generationRef.current;
     let cancelled = false;
     const cancellation = new AbortController();
-    const desired = new Map<string, number>();
+    const desired = new Map<string, ArtSource>();
     pinnedItems.forEach((definitionId) => {
       const source = mergeWorldItemArt(definitionId);
       if (source) desired.set(mergeItemArtCacheKey(definitionId), source);

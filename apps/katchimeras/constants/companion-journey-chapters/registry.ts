@@ -1,3 +1,4 @@
+import { markRegistryBuilt, packEntries } from '@/features/content-packs/active-pack';
 import type { CompanionJourneyChapterDefinition, JourneyEpisodeDefinition } from '@/types/companion-journey-chapter';
 import { journeyEpisodeConversation, journeyEpisodeConversationId, type JourneyEpisodeConversation } from './episode-conversation';
 import { STEPPLING_CHAPTER } from './steppling';
@@ -9,12 +10,31 @@ import { MOSSPROUT_CHAPTER } from './mossprout';
  * a friend without one shows their daily cards and idle line. Mossprout's
  * Garden campaign runs beside his arc and keeps his rests.
  */
-export const COMPANION_JOURNEY_CHAPTERS: readonly CompanionJourneyChapterDefinition[] = [MOSSPROUT_CHAPTER, STEPPLING_CHAPTER];
+export const COMPANION_JOURNEY_CHAPTERS_BUNDLED: readonly CompanionJourneyChapterDefinition[] = [MOSSPROUT_CHAPTER, STEPPLING_CHAPTER];
+export const COMPANION_JOURNEY_CHAPTERS: readonly CompanionJourneyChapterDefinition[] = [...COMPANION_JOURNEY_CHAPTERS_BUNDLED, ...packEntries('chapters')];
+markRegistryBuilt('chapters');
 
-const byFamily = new Map(COMPANION_JOURNEY_CHAPTERS.map((chapter) => [chapter.familyId as string, chapter]));
+export function journeyChaptersFor(familyId: string): readonly CompanionJourneyChapterDefinition[] {
+  return COMPANION_JOURNEY_CHAPTERS.filter((chapter) => chapter.familyId === familyId);
+}
 
-export function journeyChapterFor(familyId: string): CompanionJourneyChapterDefinition | null {
-  return byFamily.get(familyId) ?? null;
+export function selectJourneyChapter(chapters: readonly CompanionJourneyChapterDefinition[], completed: Readonly<Record<string, unknown>> = {}, activeChapterId?: string): CompanionJourneyChapterDefinition | null {
+  const active = activeChapterId ? chapters.find((chapter) => chapter.chapterId === activeChapterId) : null;
+  if (active) return active;
+  let chapter = chapters.find((entry) => !entry.afterChapterId) ?? null;
+  const visited = new Set<string>();
+  while (chapter && !visited.has(chapter.chapterId)) {
+    visited.add(chapter.chapterId);
+    if (!chapter.episodes.every((episode) => completed[journeyEpisodeRecordId(chapter!.familyId, episode.id)])) return chapter;
+    const next = chapters.find((entry) => entry.afterChapterId === chapter!.chapterId);
+    if (!next) return chapter;
+    chapter = next;
+  }
+  return chapter;
+}
+
+export function journeyChapterFor(familyId: string, completed?: Readonly<Record<string, unknown>>, activeChapterId?: string): CompanionJourneyChapterDefinition | null {
+  return selectJourneyChapter(journeyChaptersFor(familyId), completed, activeChapterId);
 }
 
 /** The record id an episode's completion is kept under. */
@@ -39,7 +59,7 @@ export function journeyEpisodeForConversation(definitionId: string) {
 }
 
 export function journeyEpisodeById(familyId: string, episodeId: string) {
-  const chapter = journeyChapterFor(familyId);
+  const chapter = journeyChaptersFor(familyId).find((entry) => entry.episodes.some((episode) => episode.id === episodeId));
   const episode = chapter?.episodes.find((item) => item.id === episodeId) ?? null;
   return chapter && episode ? { chapter, episode, compiled: conversations.get(episode.conversationId ?? journeyEpisodeConversationId(familyId, episodeId))?.compiled ?? null } : null;
 }

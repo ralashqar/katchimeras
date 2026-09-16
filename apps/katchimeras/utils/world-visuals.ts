@@ -1,3 +1,4 @@
+import { artSource } from '@/utils/art-source';
 import type { ImageSourcePropType } from 'react-native';
 
 import { KINGDOM_HEX_TILE_ALPHA_BOUNDS } from '@/constants/kingdom-hex-tile-bounds.gen';
@@ -1850,6 +1851,9 @@ export function worldAssetSource(assetKey: string, lod: WorldObjectLod = 'full')
   if (override) {
     return override;
   }
+  // Art a content pack brought under this key.
+  const registered = artSource(assetKey);
+  if (registered) return registered;
   if (assetKey.startsWith(CREATURE_PREFIX)) {
     const key = assetKey.slice(CREATURE_PREFIX.length) as HomeVisualKey;
     return resolveCreatureArtSource(key, { lod });

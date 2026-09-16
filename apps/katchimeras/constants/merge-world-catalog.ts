@@ -1,3 +1,4 @@
+import { markRegistryBuilt, packEntries } from '@/features/content-packs/active-pack';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type {
   MergeChainId,
@@ -52,13 +53,14 @@ export const MERGE_STARTING_OPEN_CELLS = new Set([
   45,
 ]);
 
-export const MERGE_CHAIN_IDS: readonly MergeChainId[] = [
+export const MERGE_CHAIN_IDS_BUNDLED: readonly MergeChainId[] = [
   'food:table', 'food:dessert', 'food:cafe-pastry', 'drink:hot', 'drink:refresh',
   'adventure:trail', 'adventure:travel', 'nature:garden', 'nature:waterside',
   'nature:keepsake', 'nature:root-memory',
   'comfort:rest', 'comfort:care', 'social:gathering', 'social:celebration', 'social:cafe-sharing',
   'mind:work', 'mind:books', 'creative:art', 'creative:screen',
 ];
+export const MERGE_CHAIN_IDS: readonly MergeChainId[] = [...MERGE_CHAIN_IDS_BUNDLED, ...packEntries('mergeChains').map((entry) => entry.chainId)];
 
 const chain = (
   chainId: MergeChainId,
@@ -119,6 +121,8 @@ export const MERGE_ITEM_CATALOG: readonly MergeItemDefinition[] = [
   { id: 'hybrid:memory-bloom', familyId: 'nature', chainId: 'nature:keepsake', branchId: 'hybrid', tier: 1, name: 'Memory Bloom', icon: 'sparkles', color: '#EEA7B8', nextItemId: null, sellValue: 56 },
   { id: 'hybrid:rain-mirror', familyId: 'nature', chainId: 'nature:keepsake', branchId: 'hybrid', tier: 1, name: 'Rain Mirror', icon: 'water.waves', color: '#87CBCD', nextItemId: null, sellValue: 64 },
   { id: 'hybrid:heartwood-sanctuary', familyId: 'nature', chainId: 'nature:keepsake', branchId: 'hybrid', tier: 1, name: 'Heartwood Sanctuary', icon: 'leaf.fill', color: '#D9B85F', nextItemId: null, sellValue: 256 },
+  // Chains a content pack brought: the same six-tier shape, art under `item:<chainId>:<tier>`.
+  ...packEntries('mergeChains').flatMap((entry) => chain(entry.chainId, entry.icon, entry.color, entry.names)),
 ];
 
 export const MERGE_ITEMS_BY_ID = new Map(MERGE_ITEM_CATALOG.map((item) => [item.id, item]));
@@ -170,6 +174,7 @@ export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
   generator('community-cart', 'Community Cart', 'sparkles', '#D88762', 40, ['social:gathering', 'social:celebration'], 'Everything needed to welcome people and mark a joyful moment.'),
   generator('study-desk', 'Study Desk', 'sparkles', '#668EAA', 46, ['mind:work', 'mind:books'], 'Small tools for focus, planning, stories, and thoughtful curiosity.'),
   generator('creative-playroom', 'Creative Playroom', 'sparkles', '#9A72C4', 47, ['creative:art', 'creative:screen'], 'Art materials and playful screens for making and imagining.'),
+  ...packEntries('mergeGenerators').map((entry) => generator(entry.id, entry.name, entry.icon, entry.color, entry.initialCell, entry.chainIds, entry.unlockDescription)),
 ];
 
 export const MERGE_GENERATORS_BY_ID = new Map(MERGE_GENERATORS.map((item) => [item.id, item]));
@@ -205,7 +210,7 @@ export const MERGE_GENERATOR_MIGRATION_ALIASES: Readonly<Record<string, string>>
   'travel-trunk': 'journey-locker',
 };
 
-export const MERGE_CHARACTER_NAMES: Record<MergeCharacterId, string> = {
+export const MERGE_CHARACTER_NAMES: Record<string, string> = {
   baristabbit: 'Baristabbit', feastle: 'Feastle', steppling: 'Steppling', flexel: 'Flexel', bedrotte: 'Bedrotte',
   dawnle: 'Dawnle', mendle: 'Mendle', gatherglow: 'Gatherglow', heartmote: 'Heartmote', kindling: 'Kindling',
   snuglet: 'Snuglet', waglet: 'Waglet', tasklet: 'Tasklet', errandimp: 'Errandimp', pagelet: 'Pagelet',
@@ -237,7 +242,7 @@ const profile = (
   narrativeTheme: string,
 ): KatchimeraMergeProfile => ({ characterId, coreChains, guestChains, narrativeTheme });
 
-export const KATCHIMERA_MERGE_PROFILES: Record<MergeCharacterId, KatchimeraMergeProfile> = {
+export const KATCHIMERA_MERGE_PROFILES: Record<string, KatchimeraMergeProfile> = {
   baristabbit: profile('baristabbit', ['drink:refresh', 'drink:hot'], ['food:cafe-pastry', 'social:cafe-sharing'], 'notice the rituals that make a pause feel restorative'),
   feastle: profile('feastle', ['food:table', 'food:dessert'], ['drink:hot', 'drink:refresh', 'social:gathering'], 'turn food memories into warmth, welcome, and shared tables'),
   steppling: profile('steppling', ['adventure:trail', 'adventure:travel'], ['drink:refresh', 'nature:waterside'], 'honour small steps and the places they gradually open'),
@@ -265,7 +270,21 @@ export const KATCHIMERA_MERGE_PROFILES: Record<MergeCharacterId, KatchimeraMerge
   cheerlet: profile('cheerlet', ['social:celebration', 'social:gathering'], ['food:dessert', 'drink:refresh'], 'spot reasons for joy without forcing positivity'),
 };
 
-export const GENERATOR_BY_CHAIN = Object.fromEntries(MERGE_GENERATORS.flatMap((item) => item.chainIds.map((chainId) => [chainId, item.id]))) as Record<MergeChainId, string>;
+export const GENERATOR_BY_CHAIN = Object.fromEntries(MERGE_GENERATORS.flatMap((item) => item.chainIds.map((chainId) => [chainId, item.id]))) as Record<string, string>;
+
+/** The bundled characters and generators, before any a content pack brought. */
+export const MERGE_CHARACTER_IDS_BUNDLED: readonly MergeCharacterId[] = Object.keys(KATCHIMERA_MERGE_PROFILES);
+export const MERGE_GENERATORS_BUNDLED: readonly MergeGeneratorDefinition[] = MERGE_GENERATORS.filter((item) => !packEntries('mergeGenerators').some((entry) => entry.id === item.id));
+for (const character of packEntries('characters')) {
+  KATCHIMERA_MERGE_PROFILES[character.id] = profile(character.id, character.coreChains, character.guestChains, character.narrativeTheme);
+  MERGE_CHARACTER_NAMES[character.id] = character.name;
+}
+markRegistryBuilt('mergeCatalog');
+/** Every merge character the catalogue knows, in authored order. */
+export const MERGE_CHARACTER_IDS: readonly MergeCharacterId[] = Object.keys(KATCHIMERA_MERGE_PROFILES);
+export const isMergeCharacter = (id: string | null | undefined): id is MergeCharacterId => id != null && Object.prototype.hasOwnProperty.call(KATCHIMERA_MERGE_PROFILES, id);
+export const mergeCharacterProfile = (id: string): KatchimeraMergeProfile | null => (isMergeCharacter(id) ? KATCHIMERA_MERGE_PROFILES[id]! : null);
+export const mergeCharacterName = (id: string, fallback = 'Your Katchimera'): string => MERGE_CHARACTER_NAMES[id] ?? fallback;
 
 export type MergeOrderTemplate = {
   key: string;

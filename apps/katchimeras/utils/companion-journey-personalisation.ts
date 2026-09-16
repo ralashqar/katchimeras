@@ -4,6 +4,8 @@ import type { JourneyLineContext, JourneyLineVariant } from '@/types/companion-j
 import { journeyEpisodeForConversation } from '@/constants/companion-journey-chapters/registry';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
 import { conversationTraitTally } from '@/utils/companion-conversation';
+import { fillTemplate, resolvePredicate } from '@/utils/content-predicate';
+import type { ContentFacts } from '@/types/content-predicate';
 import { theoryOfYou } from '@/utils/companion-theory';
 import { hatchableByCompanion } from '@/constants/hatchable-companions/registry';
 
@@ -31,23 +33,28 @@ export function journeyLineContext(familyId: string, sessions: readonly Conversa
   };
 }
 
+/** The line facts a condition or token reads: `friend`, `today`, `theory.*`, `fact.<key>`, `answer.<episode>.<ask>`. */
+export function journeyLineFacts(context: JourneyLineContext): ContentFacts {
+  const facts: Record<string, string | null> = {
+    friend: context.friendName,
+    today: context.today,
+    'theory.style': context.theory.style,
+    'theory.friction': context.theory.friction ?? null,
+    'theory.reward': context.theory.reward ?? null,
+  };
+  for (const [key, value] of Object.entries(context.facts)) facts[`fact.${key}`] = value;
+  for (const [key, value] of Object.entries(context.answers)) facts[`answer.${key}`] = value;
+  return facts;
+}
+
 export function renderJourneyLine(text: string, context: JourneyLineContext): string {
-  return text.replace(/\{\{([^}]+)\}\}/g, (_match, raw: string) => {
-    const token = raw.trim();
-    if (token === 'friend') return context.friendName;
-    if (token === 'today') return context.today ?? '';
-    if (token === 'theory.style') return context.theory.style;
-    if (token === 'theory.friction') return context.theory.friction ?? '';
-    if (token === 'theory.reward') return context.theory.reward ?? '';
-    if (token.startsWith('fact.')) return context.facts[token.slice('fact.'.length)] ?? '';
-    if (token.startsWith('answer.')) return context.answers[token.slice('answer.'.length)] ?? '';
-    return '';
-  });
+  return fillTemplate(text, journeyLineFacts(context));
 }
 
 function pick(base: string, variants: readonly JourneyLineVariant[] | undefined, context: JourneyLineContext): string {
-  const variant = variants?.find((candidate) => { try { return candidate.when(context); } catch { return false; } });
-  return renderJourneyLine(variant?.text ?? base, context);
+  const facts = journeyLineFacts(context);
+  const variant = variants?.find((candidate) => resolvePredicate(candidate.when, context, () => facts));
+  return fillTemplate(variant?.text ?? base, facts);
 }
 
 /** The episode's conversation as this player hears it; any other definition is returned as is. */

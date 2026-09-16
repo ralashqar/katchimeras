@@ -221,18 +221,16 @@ export const MISTLE_ANCIENT_TREE_CAMPAIGN: IslandCampaignDefinition<MistleMistSt
       complete: 'Grove story complete',
     },
     speech: {
-      restoration_ready: ({ coins, cost }) => cost <= 0
-        ? 'The first patch is my gift. The roots have been waiting.'
-        : coins >= cost
-          ? 'We have enough. The tree can grow whenever you are ready.'
-          : coins < cost / 2
-            ? `${coins} of ${cost} Glow so far. The tree has waited longer than this.`
-            : 'Nearly there. The fog is thinning already.',
+      restoration_ready: { text: 'Nearly there. The fog is thinning already.', variants: [
+        { when: { fact: 'cost', lte: 0 }, text: 'The first patch is my gift. The roots have been waiting.' },
+        { when: { fact: 'affordable', eq: true }, text: 'We have enough. The tree can grow whenever you are ready.' },
+        { when: { fact: 'halfway', eq: false }, text: '{{coins|raw}} of {{cost|raw}} Glow so far. The tree has waited longer than this.' },
+      ] },
     },
-    fallbackReturn: (chapterTitle) => `Everything for ${chapterTitle} is at the roots. The tree can grow whenever we have the Glow.`,
-    fallbackResolution: (level) => level === 4
-      ? 'The heartwood glows through the mist. Anyone lost can see it now.'
-      : 'The tree grew a little, and the fog let a little more through.',
+    fallbackReturn: 'Everything for {{chapterTitle}} is at the roots. The tree can grow whenever we have the Glow.',
+    fallbackResolution: { text: 'The tree grew a little, and the fog let a little more through.', variants: [
+      { when: { fact: 'level', eq: 4 }, text: 'The heartwood glows through the mist. Anyone lost can see it now.' },
+    ] },
     wakeHandoffLine: 'The Mist began at my roots. Not from anything wicked. From a quiet nobody broke. You broke it. Keep living your days with Mossprout and the rest will find you.',
     sleepingHint: 'Someone is resting at the roots of the old tree. They will wake once the friend before them is home.',
   },

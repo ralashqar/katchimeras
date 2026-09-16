@@ -1,0 +1,64 @@
+import React, { useEffect, useState } from 'react';
+import './journey.css';
+
+const cache = 'katchimeras-arc-builder-v1';
+async function api(route, body) {
+  const r = await fetch(`/api/arcs/${route}`, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const result = await r.json(); if (!r.ok) throw new Error(result.error ?? result.issues?.join('\n')); return result;
+}
+export function ArcStudio() {
+  const [catalog,setCatalog] = useState(null), [draft,setDraft] = useState(null), [selected,setSelected] = useState(0);
+  const [status,setStatus] = useState('Loading arc templates…'), [issues,setIssues] = useState([]), [pack,setPack] = useState(null), [busy,setBusy] = useState(false);
+  const [saved,setSaved] = useState([]), [load,setLoad] = useState('');
+  useEffect(() => { let alive = true; Promise.all([api('source'),api('drafts')]).then(([c,s]) => {
+    if (!alive) return; setCatalog(c); setSaved(s.drafts); let stored;
+    try { stored=JSON.parse(localStorage.getItem(cache)); } catch { /* disk versions remain available */ }
+    setDraft(stored?.kind === 'arc-draft' && Array.isArray(stored.episodes) && Array.isArray(stored.tiles) ? stored : c.draft); setStatus('Create a continuation after an existing Journey. Save a version before starting another arc.');
+  }).catch(e=>setStatus(e.message)); return () => { alive=false; }; },[]);
+  useEffect(()=>{ if (draft) try { localStorage.setItem(cache,JSON.stringify(draft)); } catch { setStatus('Browser storage is full. Save a draft to disk.'); } },[draft]);
+  const change = next => { setDraft(next); setPack(null); setIssues([]); setStatus('Draft changed · browser autosaved'); };
+  const patch = fields => change({...draft,...fields});
+  async function run(task) { if (busy) return; setBusy(true); try { await task(); } catch(e) { setStatus(e.message); } finally { setBusy(false); } }
+  if (!catalog || !draft) return <p role="status">{status}</p>;
+  const episode=draft.episodes[selected];
+  const updateEpisode=fields=>patch({episodes:draft.episodes.map((e,i)=>i===selected?{...e,...fields}:e)});
+  const updateTile=(index,fields)=>patch({tiles:draft.tiles.map((t,i)=>i===index?{...t,...fields}:t)});
+  const field=(label,value,onChange,type='text')=><label className="field"><span>{label}</span>{type==='textarea'?<textarea value={value} onChange={e=>onChange(e.target.value)}/>:<input type={type} value={value} onChange={e=>onChange(type==='number'?Number(e.target.value):e.target.value)}/>}</label>;
+  const nextId=prefix=>`${prefix}-${crypto.randomUUID().slice(0,8)}`;
+  const move=direction=>{const next=selected+direction; const episodes=[...draft.episodes]; [episodes[selected],episodes[next]]=[episodes[next],episodes[selected]]; patch({episodes});setSelected(next);};
+  const points=[...catalog.occupied.map(t=>({...t,existing:true})),...draft.tiles];
+  const positions=points.map(t=>({...t,x:Math.sqrt(3)*(Number(t.q)+Number(t.r)/2)*22,y:Number(t.r)*33})).filter(t=>Number.isFinite(t.x)&&Number.isFinite(t.y));
+  const minX=Math.min(...positions.map(t=>t.x))-35,minY=Math.min(...positions.map(t=>t.y))-35;
+  const width=Math.max(...positions.map(t=>t.x))-minX+35,height=Math.max(...positions.map(t=>t.y))-minY+35;
+  return <div className="journey-studio"><header><a className="brand" href="/arcs">Katchimeras<span>Content Studio / New arc</span></a><div className="toolbar"><a href="/journeys">Existing Journey drafts</a><a href="/">Live events</a>
+    <button disabled={busy} onClick={()=>run(async()=>{const s=await api('drafts',draft);setSaved((await api('drafts')).drafts);setStatus(`Saved ${s.saved}`);})}>Save arc draft</button>
+    <button disabled={busy} onClick={()=>run(async()=>{const c=await api('validate',draft);setIssues(c.issues);setPack(c.pack);setStatus(c.pack?'Valid content pack · review the generated links below':'Resolve the issues below');})}>Validate arc</button>
+    <button className="primary" disabled={busy} onClick={()=>run(async()=>{const p=await api('export',draft);setPack(p);setIssues([]);const url=URL.createObjectURL(new Blob([JSON.stringify(p,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=`${p.id}-${p.version}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus('Content pack exported. Install with Developer Tools → Content Packs on a test profile. No server release was published.');})}>Export content pack</button>
+  <button disabled={busy} onClick={()=>run(async()=>{const r=await fetch('/api/arcs/bundle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(draft)});if(!r.ok){const e=await r.json();throw new Error(e.error??e.issues?.join('\n'));}const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download=`${draft.id}-${draft.releaseVersion}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus('Release bundle downloaded: manifest, draft and local images. Upload assets to the chosen hosting folder before installing.');})}>Export release bundle</button>
+  </div></header><div className="journey-status" role="status">{busy?'Working…':status}{issues.map((s,i)=><p className="error" key={i}>{s}</p>)}</div>
+  <main className="journey-layout"><aside className="journey-outline"><div className="eyebrow">New continuation</div><h2>{draft.title}</h2><nav aria-label="Arc episodes">{draft.episodes.map((e,i)=><button key={i} disabled={busy} className={selected===i?'selected':''} onClick={()=>setSelected(i)}>{i+1}. {e.title}<small>{e.itemId?'Merge order → next episode':e.tileId?'Reveal tile':'Dialogue'}</small></button>)}</nav>
+    <button disabled={busy} onClick={()=>{patch({episodes:[...draft.episodes,{id:nextId('episode'),title:'New episode',text:'What do we find here?',hours:0,tileId:'',itemId:'',quantity:1,coins:0}]});setSelected(draft.episodes.length);}}>Add episode</button>
+    <label className="field"><span>Saved arcs</span><select value={load} onChange={e=>setLoad(e.target.value)}><option value="">Choose a version</option>{saved.map(s=><option key={s}>{s}</option>)}</select></label>
+    <button disabled={busy||!load} onClick={()=>run(async()=>{await api('drafts',draft);change(await api(`drafts/${load}`));setSelected(0);setSaved((await api('drafts')).drafts);setStatus('Loaded arc. Previous workspace saved to disk.');})}>Load arc</button>
+    <button disabled={busy} onClick={()=>run(async()=>{await api('drafts',draft);change({...catalog.draft,id:nextId('arc')});setSelected(0);setSaved((await api('drafts')).drafts);setStatus('New arc started. Previous workspace saved to disk.');})}>Save and start another arc</button>
+  </aside><section className="journey-editor"><h1>Build the next chapter</h1><p className="intro">A linear continuation for an existing friend. Reordering rebuilds episode and order gates. Use a new release ID for each independently published arc.</p><fieldset disabled={busy}>
+    {field('Asset hosting folder (HTTPS, for uploaded images)',draft.assetBaseUrl??'',v=>patch({assetBaseUrl:v}))}{field('Release ID',draft.id,v=>patch({id:v}))}{field('Release version',draft.releaseVersion,v=>patch({releaseVersion:v}),'number')}
+    <label className="field"><span>Continue after</span><select value={draft.afterChapterId} onChange={e=>patch({afterChapterId:e.target.value})}>{catalog.predecessors.map(c=><option key={c.id} value={c.id}>{c.familyId} · {c.title}</option>)}</select></label>
+    {field('Arc title',draft.title,v=>patch({title:v}))}{field('Purpose',draft.purpose,v=>patch({purpose:v}),'textarea')}
+    {episode&&<><h2>Episode {selected+1}</h2><div className="toolbar"><button disabled={!selected} onClick={()=>move(-1)}>Move up</button><button disabled={selected===draft.episodes.length-1} onClick={()=>move(1)}>Move down</button><button disabled={draft.episodes.length===1} onClick={()=>{patch({episodes:draft.episodes.filter((_,i)=>i!==selected)});setSelected(Math.max(0,selected-1));}}>Remove episode</button></div>
+      {field('Episode ID',episode.id,v=>updateEpisode({id:v}))}{field('Episode title',episode.title,v=>updateEpisode({title:v}))}{field('Dialogue',episode.text,v=>updateEpisode({text:v}),'textarea')}{field('Wait before episode (hours)',episode.hours,v=>updateEpisode({hours:v}),'number')}
+      <label className="field"><span>Reveal a tile on completion</span><select value={episode.tileId} onChange={e=>updateEpisode({tileId:e.target.value})}><option value="">No reveal</option>{draft.tiles.map((t,i)=><option key={i} value={t.id}>{t.name} ({t.id})</option>)}</select></label>
+      <label className="field"><span>Merge order · blocks the next episode until served</span><select value={episode.itemId} onChange={e=>updateEpisode({itemId:e.target.value})}><option value="">No order</option>{catalog.items.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></label>
+      {episode.itemId&&<>{field('Required quantity',episode.quantity,v=>updateEpisode({quantity:v}),'number')}{field('Coin reward',episode.coins,v=>updateEpisode({coins:v}),'number')}</>}
+      <section className="journey-dialogue"><h2>Dialogue preview</h2><p>{episode.text}</p><small>Single closing line in this builder. Branching dialogue remains in the existing Journey editor.</small></section>
+    </>}
+  </fieldset>{pack&&<details><summary>Review generated content pack and progression links</summary><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere'}}>{JSON.stringify(pack,null,2)}</pre></details>}</section>
+  <section className="journey-art"><h2>Hex layout</h2><svg role="img" aria-label="Arc hex layout: gray existing tiles, green new tiles" viewBox={`${minX} ${minY} ${width} ${height}`} style={{width:'100%',maxHeight:330}}>{positions.map((t,i)=><g key={i}><polygon points={Array.from({length:6},(_,j)=>{const a=(j*60-30)*Math.PI/180;return `${t.x+21*Math.cos(a)},${t.y+21*Math.sin(a)}`;}).join(' ')} fill={t.existing?'#d3d7cf':'#447855'} stroke="#fafaf6"/><text x={t.x} y={t.y+3} textAnchor="middle" fontSize="8" fill={t.existing?'#333':'white'}>{t.q},{t.r}</text><title>{t.id}</title></g>)}</svg><p className="muted">Gray: existing world. Green: this arc. Duplicate coordinates block export. This is a layout preview, not the rendered game world.</p>
+    <fieldset disabled={busy}>{draft.tiles.map((t,i)=><details key={i} open><summary>{t.name}</summary>{field('Tile ID',t.id,v=>{patch({tiles:draft.tiles.map((x,n)=>n===i?{...x,id:v}:x),episodes:draft.episodes.map(e=>e.tileId===t.id?{...e,tileId:v}:e)});})}{field('Tile name',t.name,v=>updateTile(i,{name:v}))}{field('Hex q',t.q,v=>updateTile(i,{q:v}),'number')}{field('Hex r',t.r,v=>updateTile(i,{r:v}),'number')}{field('Reveal line',t.reveal,v=>updateTile(i,{reveal:v}),'textarea')}<label className="field"><span>Upload tile image · 1024 × 1024 · max 1.8 MB</span><input type="file" accept="image/png,image/webp,image/jpeg" onChange={e=>{const file=e.target.files[0];if(!file)return;if(file.size>1800000){setStatus('Use an image smaller than 1.8 MB');return;}run(async()=>{const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});const asset=await api('assets',{data});updateTile(i,{localAsset:asset.id,bounds:asset.bounds,imageUrl:''});setStatus('Tile uploaded and visible bounds measured automatically.');});}}/></label>
+      {t.localAsset?<><img className="journey-tile" alt={`Uploaded art for ${t.name}`} src={`/api/arcs/assets/${t.localAsset}`}/><p className="muted">Measured bounds: {Object.entries(t.bounds).map(([key,value])=>`${key} ${value}`).join(' · ')}. The server verifies these at export.</p><button onClick={()=>updateTile(i,{localAsset:undefined,imageUrl:'',bounds:{left:0,top:0,right:0,bottom:0}})}>Use a hosted image instead</button></>:field('Hosted image URL (HTTPS)',t.imageUrl,v=>updateTile(i,{imageUrl:v}))}
+      <p className="muted">Uploaded images are measured automatically. For external images, enter measured bounds below.</p>{!t.localAsset&&['left','top','right','bottom'].map(side=><React.Fragment key={side}>{field(`Bounds ${side}`,t.bounds[side],v=>updateTile(i,{bounds:{...t.bounds,[side]:v}}),'number')}</React.Fragment>)}
+      <button onClick={()=>patch({tiles:draft.tiles.filter((_,n)=>n!==i)})}>Remove tile</button></details>)}</fieldset>
+    <button disabled={busy} onClick={()=>patch({tiles:[...draft.tiles,{id:nextId('tile'),name:'New place',q:0,r:0,reveal:'A new place comes into view.',imageUrl:'',bounds:{left:0,top:0,right:0,bottom:0}}]})}>Add hex tile</button>
+    <p className="preview-note">Export creates an additive game content pack. Local images and measured bounds can be exported together. Hosting and live publishing are separate. Install on a test profile to verify world placement and progression before staging.</p>
+  </section></main></div>;
+}

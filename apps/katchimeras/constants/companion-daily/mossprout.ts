@@ -83,7 +83,7 @@ export const MOSSPROUT_DAILY: CompanionDailyConfig = {
       { id: 'flowers', label: 'Flowers', qualityId: 'nature.flowers', subject: 'Flowers' },
     ],
     followUps: NATURE_PHOTO_CHOICES,
-    keepPhoto: { directory: 'mossprout-memories', memoryArchetype: 'nature', memoryLabel: (answer) => `With Mossprout: ${answer}` },
+    keepPhoto: { directory: 'mossprout-memories', memoryArchetype: 'nature', memoryLabel: 'With Mossprout: {{answer}}' },
   },
   notice: { title: 'Notice one small thing', artKey: 'mossprout:nature-observation', prompts: MOSSPROUT_NOTICE_PROMPTS },
   polls: [],

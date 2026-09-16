@@ -1,3 +1,4 @@
+import type { ArtSource } from '@/utils/art-source';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View, type View as ViewType } from 'react-native';
 import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
@@ -18,6 +19,7 @@ import { OPENING_BOARD_LAYOUT, OPENING_MERGE_REQUIRED, OPENING_MERGE_WINDOW_COLU
 import { dispatchFtueEvent } from '@/features/onboarding/ftue-runtime';
 import { useFtueMergeDispatch } from '@/features/onboarding/use-ftue-merge-dispatch';
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
+import type { MissionStrike } from '@/types/mission-mechanic';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
 
 /** Glow per merge: a burst that peels off one after another, each landing with its own impact. */
@@ -41,15 +43,17 @@ const GLOW_COLOR = '#8FD3FF';
 const BAR_FILL_COLOR = '#6A46C9';
 const BAR_TRACK_COLOR = 'rgba(84,66,128,0.24)';
 
-export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint; art?: number; size?: number; count?: number; group?: number; key?: number };
+export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint; art?: ArtSource; size?: number; count?: number; group?: number; key?: number };
 
 /**
  * Something over the mist that takes the Glow instead of the tile (the
  * corruption wisps). It aims each burst and hears each landing: every token
- * strikes, and once per burst the first to land counts a hit.
+ * strikes, and once per burst the first to land counts a hit. A burst that
+ * carries the strike its board resolved is aimed at that strike's wisp and
+ * lands its hits; one without (the opening's) is dealt by the sink itself.
  */
 export type GlowSink = {
-  aim: (kind: 'glow' | 'finale') => { point: RewardFlightPoint; key: number } | null;
+  aim: (kind: 'glow' | 'finale', strike?: MissionStrike | null) => { point: RewardFlightPoint; key: number } | null;
   struck: (key: number) => void;
   landed: (key: number, kind: 'glow' | 'finale') => void;
 };
@@ -447,7 +451,7 @@ function usePoolSlots<T extends { id: number }>(items: readonly T[], size: numbe
   }, [items, size]);
 }
 
-const GlowTokenArt = memo(function GlowTokenArt({ art, size }: { art?: number; size?: number }) {
+const GlowTokenArt = memo(function GlowTokenArt({ art, size }: { art?: ArtSource; size?: number }) {
   const box = size ? { width: size, height: size } : null;
   return <View style={[styles.glow, box]}>
     <Image source={art ?? GAME_CURRENCY_ART.coins} contentFit="contain" style={[styles.glowArt, box]} accessible={false} />
@@ -716,11 +720,13 @@ export type OpeningGlowStore = GlowLandingSource & {
   /** The tile the Glow is aimed at when nothing over it takes it; the screen sets it each render. */
   targetRef: { current: ViewType | null };
   /** A burst of Glow into the wisp the sink names, else the tile the hook is aimed at, else the node given (a spend that lands before the screen has re-aimed). */
-  launch: (from: RewardFlightPoint, targetNode?: ViewType | null) => void;
+  launch: (from: RewardFlightPoint, targetNode?: ViewType | null, strike?: MissionStrike | null) => void;
   /** One merge's item, alone, into the tile: a restoration board sends what it just made, not Glow. */
-  launchItem: (from: RewardFlightPoint, definitionId: string) => void;
+  launchItem: (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null) => void;
+  /** A column shot: the item a merge made, straight up its column into the wisp the strike names; a wasted one rises and fades over the board. */
+  launchShot: (from: RewardFlightPoint, strike: MissionStrike) => void;
   /** The final merge's item, large and alone, straight up into the mist. */
-  launchFinale: (from: RewardFlightPoint, definitionId: string) => number;
+  launchFinale: (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null) => number;
   arrive: (id: number) => void;
   impactDone: (id: number) => void;
 };
@@ -777,9 +783,9 @@ function createOpeningGlowStore(): OpeningGlowStore {
   const sinkRef = { current: null as GlowSink | null };
   const landedGroups = { current: new Set<number>() };
 
-  const launch = (from: RewardFlightPoint, targetNode?: ViewType | null) => {
+  const launch = (from: RewardFlightPoint, targetNode?: ViewType | null, strike?: MissionStrike | null) => {
     const group = ++groupSeq.current;
-    const aimed = targetNode ? null : sinkRef.current?.aim('glow') ?? null;
+    const aimed = targetNode ? null : sinkRef.current?.aim('glow', strike) ?? null;
     const push = (to: RewardFlightPoint) => setFlights((current) => [
       ...current,
       ...Array.from({ length: OPENING_GLOWS_PER_MERGE }, (_, index) => ({ id: ++nextId.current, index, from, to, group, key: aimed?.key })),
@@ -824,25 +830,33 @@ function createOpeningGlowStore(): OpeningGlowStore {
   const impactDone = (id: number) => {
     setImpacts((current) => current.filter((impact) => impact.id !== id));
   };
-  const launchItem = (from: RewardFlightPoint, definitionId: string) => {
+  const launchItem = (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null) => {
     const id = ++nextId.current;
-    const art = mergeWorldItemArt(definitionId) as number | undefined;
-    const aimed = sinkRef.current?.aim('glow') ?? null;
+    const art = mergeWorldItemArt(definitionId) ?? undefined;
+    const aimed = sinkRef.current?.aim('glow', strike) ?? null;
     const push = (to: RewardFlightPoint) => setFlights((current) => [...current, { id, index: 0, count: 1, from, to, art, size: 44, group: ++groupSeq.current, key: aimed?.key }]);
     if (aimed) { push(aimed.point); return; }
     const target = targetRef.current;
     if (!target) { push({ x: from.x, y: from.y - 220 }); return; }
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.55 }));
   };
-  const launchFinale = (from: RewardFlightPoint, definitionId: string): number => {
+  const launchShot = (from: RewardFlightPoint, strike: MissionStrike) => {
+    const id = ++nextId.current;
+    const art = mergeWorldItemArt(strike.resultDefinitionId) ?? undefined;
+    // Straight up the column: into the wisp the strike names, or, wasted, to the top of the sky and gone.
+    const aimed = sinkRef.current?.aim('glow', strike) ?? null;
+    const to = aimed?.point ?? { x: from.x, y: from.y - 220 };
+    setFlights((current) => [...current, { id, index: 0, count: 1, from, to, art, size: 44, group: ++groupSeq.current, key: aimed?.key }]);
+  };
+  const launchFinale = (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null): number => {
     const id = ++nextId.current;
     finaleIdRef.current = id;
     finaleHoldRef.current = true;
     setFinaleActive(true);
     setFinaleLanded(false);
-    const art = mergeWorldItemArt(definitionId) as number | undefined;
+    const art = mergeWorldItemArt(definitionId) ?? undefined;
     // The last merge's item strikes the last wisp standing; its landing is the one that lifts the mist.
-    const aimed = sinkRef.current?.aim('finale') ?? null;
+    const aimed = sinkRef.current?.aim('finale', strike) ?? null;
     const push = (to: RewardFlightPoint) => setFlights((current) => [...current, { id, index: 2, count: 5, from, to, art, size: 64, group: ++groupSeq.current, key: aimed?.key }]);
     if (aimed) { push(aimed.point); return id; }
     const target = targetRef.current;
@@ -856,7 +870,7 @@ function createOpeningGlowStore(): OpeningGlowStore {
     getFlights: () => flightsSnapshot,
     getFinale: () => finaleSnapshot,
     finaleHoldRef, sinkRef, targetRef,
-    launch, launchItem, launchFinale, arrive, impactDone,
+    launch, launchItem, launchShot, launchFinale, arrive, impactDone,
   };
 }
 
@@ -871,7 +885,7 @@ export function useOpeningGlow(targetNode: ViewType | null) {
   const finale = useSyncExternalStore(store.subscribe, store.getFinale, store.getFinale);
   return useMemo(() => ({
     store,
-    launch: store.launch, launchItem: store.launchItem, launchFinale: store.launchFinale,
+    launch: store.launch, launchItem: store.launchItem, launchShot: store.launchShot, launchFinale: store.launchFinale,
     finaleHoldRef: store.finaleHoldRef, sinkRef: store.sinkRef,
     finaleActive: finale.finaleActive, finaleLanded: finale.finaleLanded, finaleLandedId: finale.finaleLandedId,
   }), [finale, store]);

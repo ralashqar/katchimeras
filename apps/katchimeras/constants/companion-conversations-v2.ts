@@ -1,3 +1,4 @@
+import { markRegistryBuilt, packEntries } from '@/features/content-packs/active-pack';
 import { STEPPLING_TRAIL_CONVERSATIONS } from '@/constants/steppling-activities';
 import { STEPPLING_SCENARIO_POLLS } from '@/constants/steppling-scenario-polls';
 import { BARISTABBIT_SCENARIO_POLLS } from '@/constants/baristabbit-scenario-polls';
@@ -23,7 +24,7 @@ import { JOURNEY_EPISODE_CONVERSATIONS } from '@/constants/companion-journey-cha
 
 export { poll, familyPack } from '@/constants/companion-poll-conversation';
 
-export const companionConversationDefinitionsV2: readonly ConversationDefinition[] = [
+export const companionConversationDefinitionsBundled: readonly ConversationDefinition[] = [
   stepplingDayOneConversation,
   ...HATCHABLE_COMPANIONS.filter((definition) => definition.companion !== 'steppling').map(hatchableDayOneConversation),
   ...STEPPLING_TRAIL_CONVERSATIONS,
@@ -36,6 +37,8 @@ export const companionConversationDefinitionsV2: readonly ConversationDefinition
   ...familyPack('steppling', STEPPLING_SCENARIO_POLLS),
   ...JOURNEY_EPISODE_CONVERSATIONS,
 ];
+export const companionConversationDefinitionsV2: readonly ConversationDefinition[] = [...companionConversationDefinitionsBundled, ...packEntries('conversations')];
+markRegistryBuilt('conversations');
 
 export const companionConversationDefinitionById = new Map(
   companionConversationDefinitionsV2.map((definition) => [definition.id, definition])

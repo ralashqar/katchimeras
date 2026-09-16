@@ -10,11 +10,13 @@ import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-
 import type { IslandCampaignDefinition } from '@/constants/island-campaigns/types';
 import { AppFontFamilies } from '@/constants/theme';
 import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
-import { restorationDeliveryCells, restorationLayout, restorationProgress } from '@/features/island-restoration/island-restoration';
+import { restorationDeliveryCells, restorationLayout } from '@/features/island-restoration/island-restoration';
 import type { FtueStepDefinition } from '@/features/onboarding/ftue-types';
 import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
 import { createMergeBoardSession } from '@/features/onboarding/merge-ftue-interaction-coordinator';
-import type { MergeOrder, MergeWorldCommand, MergeWorldCommandResult, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
+import type { MissionCommandResult } from '@/features/onboarding/use-opening-mission-board';
+import type { MergeOrder, MergeWorldCommand, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
+import type { MissionStrike } from '@/types/mission-mechanic';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
 import { MistMissionDock, type GlowLandingSource } from './kingdom-opening-merge-dock';
 
@@ -64,16 +66,15 @@ const FriendSpeechBubble = memo(function FriendSpeechBubble({ text, reduceMotion
  * one arrives. The board is put away from Back, not from a button of its own.
  */
 export const IslandRestorationDock = memo(function IslandRestorationDock({
-  campaign, level, state, send, merges, mergesRef, boardStep, order, orderServed, pendingDeliveries, speech, width, bottomInset, landings,
-  onMerge, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onOpenOrder, onPlaceDelivery, railTargetRefs,
+  campaign, level, state, send, progress, boardStep, order, orderServed, pendingDeliveries, speech, width, bottomInset, landings,
+  onStrike, onFinale, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onOpenOrder, onPlaceDelivery, railTargetRefs,
 }: {
   campaign: IslandCampaignDefinition;
   level: MossproutNatureIslandLevel;
   state: MergeWorldState;
-  send: (command: MergeWorldCommand) => MergeWorldCommandResult | null;
-  merges: number;
-  /** The store's merge count as of the last command, readable in the same tick as `send`. */
-  mergesRef: RefObject<number>;
+  send: (command: MergeWorldCommand) => MissionCommandResult | null;
+  /** The bar, by the board's mechanic. */
+  progress: { current: number; total: number };
   boardStep: FtueStepDefinition | null;
   /** The chapter's request once the board has asked for it; null before the checkpoint. */
   order: MergeOrder | null;
@@ -85,10 +86,10 @@ export const IslandRestorationDock = memo(function IslandRestorationDock({
   width: number;
   bottomInset: number;
   landings?: GlowLandingSource;
-  /** Every merge sends the thing it made into the tile (a copy; the item stays on the board). */
-  onMerge?: (from: RewardFlightPoint, definitionId: string) => void;
+  /** Every merge strikes the wisps with the thing it made (a copy; the item stays on the board). */
+  onStrike?: (from: RewardFlightPoint, strike: MissionStrike) => void;
   /** The merge that fills the bar: its item leaves the board for the tile. */
-  onFinale?: (from: RewardFlightPoint, definitionId: string) => void;
+  onFinale?: (from: RewardFlightPoint, definitionId: string, strike: MissionStrike) => void;
   onBoardMetrics?: (metrics: MergeBoardScreenMetrics | null) => void;
   onBlockedInteraction?: () => void;
   onEntranceSettled?: () => void;
@@ -104,7 +105,6 @@ export const IslandRestorationDock = memo(function IslandRestorationDock({
   if (!sessionRef.current) sessionRef.current = createMergeBoardSession();
   const sessionId = sessionRef.current.id;
   const definition = campaign.chapters.find((candidate) => candidate.level === level)?.restoration ?? null;
-  const required = definition?.merges ?? 1;
   const stateRef = useRef(state);
   const stepRef = useRef(boardStep);
   stateRef.current = state;
@@ -117,7 +117,7 @@ export const IslandRestorationDock = memo(function IslandRestorationDock({
     onBoardMetrics?.(metrics);
   }, [onBoardMetrics]);
   const [hiddenItemIds, setHiddenItemIds] = useState<ReadonlySet<string>>(() => new Set());
-  const dispatch = useCallback((command: MergeWorldCommand): MergeWorldCommandResult | null => {
+  const dispatch = useCallback((command: MergeWorldCommand): MissionCommandResult | null => {
     const current = stateRef.current;
     if (!mergeFtueAllowsCommand(stepRef.current, current, command)) {
       onBlockedInteraction?.();
@@ -126,21 +126,22 @@ export const IslandRestorationDock = memo(function IslandRestorationDock({
     const effective = command.type === 'tapGenerator' ? { ...command, spendEnergy: false as const } : command;
     const result = send(effective);
     if (result) stateRef.current = result.state;
-    if (!result?.changed || command.type !== 'move' || result.mergedCell == null) return result;
+    // A merge (a match into a misted cell too) is a strike; the store resolved what it does by the board's mechanic.
+    const strike = result?.strike ?? null;
+    if (!result || !strike) return result;
     const metrics = boardMetricsRef.current;
     if (!metrics) return result;
-    const center = mergeCellCenter(metrics.geometry, result.mergedCell);
+    const center = mergeCellCenter(metrics.geometry, strike.fromCell);
     const from = { x: metrics.x + center.x, y: metrics.y + center.y };
-    const occupant = result.state.board[result.mergedCell]?.occupant;
-    const made = occupant?.kind === 'item' ? occupant.definitionId : 'nature:garden:4';
-    if ((mergesRef.current ?? 0) >= required) {
+    if (strike.finale) {
+      const occupant = result.state.board[strike.fromCell]?.occupant;
       if (occupant?.kind === 'item') setHiddenItemIds((hidden) => new Set([...hidden, occupant.instanceId]));
-      onFinale?.(from, made);
+      onFinale?.(from, strike.resultDefinitionId, strike);
     } else {
-      onMerge?.(from, made);
+      onStrike?.(from, strike);
     }
     return result;
-  }, [mergesRef, onBlockedInteraction, onFinale, onMerge, required, send]);
+  }, [onBlockedInteraction, onFinale, onStrike, send]);
 
   // The card's item slots, by index, so each delivered item can leave from its own slot.
   const itemNodesRef = useRef(new Map<number, View | null>());
@@ -231,7 +232,6 @@ export const IslandRestorationDock = memo(function IslandRestorationDock({
     </View>
   ) : null;
 
-  const progress = definition ? restorationProgress(definition, merges) : { current: 0, total: 1 };
   const islandName = mossproutNatureIslandById.get(campaign.islandId)?.name ?? 'the garden';
   return <MistMissionDock
     state={state} boardStep={boardStep} progress={progress.current} required={Math.max(1, progress.total)}

@@ -5,7 +5,9 @@ import { sharedResidentAnchor } from './shared-resident-presentation';
 
 import type { KingdomHexScene, KingdomTileArtLayer, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { KINGDOM_HEX_TILE_ALPHA_BOUNDS } from '@/constants/kingdom-hex-tile-bounds.gen';
-import { MOSSPROUT_NATURE_ISLANDS } from '@/constants/mossprout-nature-islands';
+import { MOSSPROUT_NATURE_ISLANDS, mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
+import { hexAlphaBounds } from '@/utils/hex-alpha-bounds';
+import { artSourceSet } from '@/utils/art-source';
 import { HATCHABLE_COMPANIONS, hatchableByCompanion } from '@/constants/hatchable-companions/registry';
 import { hatchableTileArt } from '@/constants/hatchable-companions/tile-art';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
@@ -120,7 +122,30 @@ type NatureArtSpec = ArtSpec & {
   revealedArt?: Omit<ArtSpec, 'coord'>;
   levelArt?: Partial<Record<Exclude<MossproutNatureIslandLevel, 0>, Omit<ArtSpec, 'coord'>>>;
 };
-export const MOSSPROUT_NATURE_ISLAND_ART: Record<MossproutNatureIslandId, NatureArtSpec> = {
+/**
+ * An island's art: the bundled table; else art a content pack brought under
+ * `island:<id>[:level:<n>]`, with its bounds and its definition's coord; else
+ * the seed nursery's, standing in for an island the app has no art for.
+ */
+export function natureIslandArt(islandId: MossproutNatureIslandId): NatureArtSpec {
+  const bundled = MOSSPROUT_NATURE_ISLAND_ART[islandId];
+  if (bundled) return bundled;
+  const fallback = MOSSPROUT_NATURE_ISLAND_ART['seed-nursery']!;
+  const sources = artSourceSet(`island:${islandId}`);
+  if (!sources) return fallback;
+  const levelArt: NonNullable<NatureArtSpec['levelArt']> = {};
+  for (const level of [1, 2, 3, 4] as const) {
+    const levelSources = artSourceSet(`island:${islandId}:level:${level}`);
+    if (levelSources) levelArt[level] = { alphaBounds: hexAlphaBounds(`island:${islandId}:level:${level}`), sources: levelSources };
+  }
+  return {
+    alphaBounds: hexAlphaBounds(`island:${islandId}`),
+    coord: mossproutNatureIslandById.get(islandId)?.coord ?? fallback.coord,
+    sources,
+    ...(Object.keys(levelArt).length ? { levelArt } : {}),
+  };
+}
+export const MOSSPROUT_NATURE_ISLAND_ART: Record<string, NatureArtSpec> = {
   'seed-nursery': {
     alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_focused_v1_seed_nursery_hex_tile.webp'],
     coord: { q: -1, r: 1 },
@@ -248,7 +273,7 @@ function natureLayerFor(
   level: MossproutNatureIslandLevel,
   revealed = false,
 ): KingdomTileArtLayer {
-  const fallback = MOSSPROUT_NATURE_ISLAND_ART[islandId];
+  const fallback = natureIslandArt(islandId);
   const authored = level === 0 && revealed && fallback.revealedArt
     ? { ...fallback, ...fallback.revealedArt }
     : level > 0
@@ -348,7 +373,7 @@ export function buildMossproutHexNeighborhoodScene(
   const hatchableTileState = (definition: HatchableCompanionDefinition): 'locked' | 'egg' | 'open' =>
     gardenState.hatchableTiles?.[definition.tile.id] ?? (definition.companion === 'steppling' ? gardenState.gateway : undefined) ?? 'locked';
   const hatchableLayer = (definition: HatchableCompanionDefinition, locked: boolean) => {
-    const bounds = KINGDOM_HEX_TILE_ALPHA_BOUNDS[definition.tile.alphaBoundsKey as keyof typeof KINGDOM_HEX_TILE_ALPHA_BOUNDS];
+    const bounds = hexAlphaBounds(definition.tile.alphaBoundsKey);
     const layer = layerFor(`structure:${definition.tile.id}`, 'structure', {
       coord: definition.tile.coord,
       alphaBounds: locked ? DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS : bounds,
@@ -361,7 +386,7 @@ export function buildMossproutHexNeighborhoodScene(
   // Every story tile, from its definition: full mist until its episode reveals it, its own art after. No marker, no resident.
   const storyTileLayer = (tile: StoryTileDefinition, revealed: boolean) => layerFor(`structure:${tile.id}`, 'structure', {
     coord: tile.coord,
-    alphaBounds: revealed ? KINGDOM_HEX_TILE_ALPHA_BOUNDS[tile.alphaBoundsKey as keyof typeof KINGDOM_HEX_TILE_ALPHA_BOUNDS] : DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS,
+    alphaBounds: revealed ? hexAlphaBounds(tile.alphaBoundsKey) : DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS,
     sources: revealed ? storyTileArt(tile.id) : DREAM_MIST_LOCKED_NATURE_SOURCES,
   });
   const storyTileLayers = STORY_TILES.map((tile) => ({ tile, misted: storyTileLayer(tile, false), revealed: storyTileLayer(tile, true) }));

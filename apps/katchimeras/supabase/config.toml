@@ -446,6 +446,11 @@ enabled = true
 verify_jwt = true
 entrypoint = "./functions/reconcile-revenuecat/index.ts"
 
+[functions.verify-merge]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/verify-merge/index.ts"
+
 [functions.generate-katchimera-idle]
 enabled = true
 verify_jwt = false

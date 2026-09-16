@@ -1,7 +1,6 @@
 import type { CompanionJourneyChapterDefinition, JourneyEpisodeDefinition, JourneyUnlockCondition } from '@/types/companion-journey-chapter';
 import type { KatchimeraSkinId } from '@/types/katchimera';
-import { MOSSPROUT_CAMPAIGN_EPISODES, mossproutCampaignEpisodeByBeatId, type MossproutCampaignEpisode } from '@/constants/mossprout-campaign';
-import { completeMossproutBeat } from '@/game/katchimeras/mossprout-beats';
+import { MOSSPROUT_CAMPAIGN_EPISODES, type MossproutCampaignEpisode } from '@/constants/mossprout-campaign';
 import { MOSSPROUT_JOURNEY_WISP_IDS } from '@/utils/journey-wisp-affinity';
 import { MOSSPROUT_ARC_ONE_BEATS, MOSSPROUT_ARC_ONE_LINES, OLD_GROVE_MISSION } from '@/constants/mossprout-arc-one-copy';
 import { MOSSPROUT_OLD_GROVE } from '@/constants/story-tiles/mossprout-old-grove';
@@ -53,6 +52,8 @@ function campaignEpisodes(episode: MossproutCampaignEpisode, previousId: string)
     unlock: [done(episode.beatId), ...(orderIds.length ? [{ kind: 'orders_served' as const, orderIds }] : [])],
     reflectMs: MOSSPROUT_ONE_ARC_REFLECT_MS,
     ...(HABITAT_STAGE[episode.episodeNumber] ? { habitatStage: HABITAT_STAGE[episode.episodeNumber] } : {}),
+    // The beat is done when its resolution is: the story summary the campaign wrote moves on with it.
+    completes: { kind: 'campaign_beat', beatId: episode.beatId },
     consequences: [
       ...(episode.episodeNumber >= 2 && episode.episodeNumber <= 9 ? [{ kind: 'wisp_reward' as const, rewardId: `mossprout:journey-wisp:${episode.beatId}`, candidateWispIds: MOSSPROUT_JOURNEY_WISP_IDS, fallbackWispId: 'sprout' as const }] : []),
     ],
@@ -115,8 +116,6 @@ export const MOSSPROUT_CHAPTER: CompanionJourneyChapterDefinition = {
     lifeIcon: 'leaf.fill',
     hints: { ...MOSSPROUT_ARC_ONE_LINES.hints, orders_served: 'Serve what I asked for on the Garden first. Then I will tell you how it went.' },
   },
-  onEpisodeComplete: (state, episode, now) => episode.id.endsWith(':resolution') && mossproutCampaignEpisodeByBeatId.has(beatIdOf(episode.id))
-    ? completeMossproutBeat(state, beatIdOf(episode.id), now) : state,
 };
 
 /** The one-arc chapter by its working name. */

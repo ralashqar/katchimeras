@@ -4,6 +4,14 @@ import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 import { COMPANION_JOURNEY_CHAPTERS } from '@/constants/companion-journey-chapters/registry';
 import { episodeConsequences, JOURNEY_MISSION_CLEAR_NODE_ID, JOURNEY_MISSION_FOCUS_NODE_ID, journeyConsequenceRunId, journeyMissionOf } from '@/constants/companion-journey-chapters/consequence-flow';
 import { storyTileById, type StoryTileDefinition } from '@/constants/story-tiles/registry';
+import { completeMossproutBeat } from '@/game/katchimeras/mossprout-beats';
+import type { RelationshipProgressState } from '@/types/relationship-progression';
+
+/** What else an episode's completion records on the relationship state, as its definition says; nothing for most. */
+export function applyEpisodeCompletes(state: RelationshipProgressState, episode: JourneyEpisodeDefinition, now: number): RelationshipProgressState {
+  if (episode.completes?.kind === 'campaign_beat') return completeMossproutBeat(state, episode.completes.beatId, now);
+  return state;
+}
 
 /**
  * What the Kingdom reads of an episode's world consequence, with no runtime

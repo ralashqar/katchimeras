@@ -3,9 +3,15 @@ import { StyleSheet, Text, View, type View as ViewType } from 'react-native';
 import Animated, { cancelAnimation, Easing, FadeInDown, FadeOut, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 
+import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import type { GlowSink } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
-import { wispHitPlan, wispLineForFall, wispStates, wispTargetIndex, type CorruptionWispLines, type CorruptionWispSpec } from '@/features/onboarding/corruption-wisps';
+import type { MissionWindow } from '@/features/mission-mechanics/board-window';
+import { glowStrikeAt } from '@/features/mission-mechanics/glow-strikes';
+import { applyStrike, resolveMechanic, wispViews, type MissionMechanicHost } from '@/features/mission-mechanics/mechanic';
+import { wispLineForFall, type CorruptionWispLines } from '@/features/onboarding/corruption-wisps';
+import type { MissionMechanicState, MissionStrike, MissionWispView } from '@/types/mission-mechanic';
+import { mergeCellCenter, mergeCellFrame } from '@/utils/merge-world/board-geometry';
 
 const WISP_ART = require('@incubator/art-cutouts/corruption-wisp.png');
 const SOFT_GLOW = require('@incubator/art-characters/soft-glow.png');
@@ -34,13 +40,20 @@ const EMBERS = [
 ] as const;
 const DEATH_MOTES = 8;
 
-/** The misted tile a set of wisps hangs over: which mission, its tile on screen, how many merges it takes, how many are already in. */
+/**
+ * The misted tile a set of wisps hangs over: which mission, its tile on screen, what the board plays
+ * by and where its strikes stand. Wisps over the tile are placed against the tile's measured frame;
+ * a mechanic that hangs them above the board (a column shot) anchors them to the board's metrics.
+ */
 export type CorruptionWispTarget = {
   key: string;
   node: ViewType | null;
-  required: number;
-  merges: number;
-  specs: readonly CorruptionWispSpec[];
+  /** Wisps above the board itself: their frame is the board's, no measuring. */
+  anchor?: { kind: 'board'; metrics: MergeBoardScreenMetrics | null; window: MissionWindow };
+  /** What the board is authored on: its bar, its wisps, its mechanic. */
+  host: MissionMechanicHost;
+  /** Where the board's strikes stand when the target is first seen: a resumed board starts with its wisps already felled. */
+  mechanicState: MissionMechanicState;
   /** What the board says as the wisps are struck and fall. */
   lines?: CorruptionWispLines;
   /** False while the camera is still gliding onto the tile: the wisps wait, and measure where it stops. */
@@ -54,16 +67,20 @@ const SETTLE_GRACE_MS = 200;
 const CAPTION_MS = 1_700;
 /** After the strike that burst the mist open: when its line is said. */
 const REVEAL_LINE_DELAY_MS = 1_100;
+/** A wisp on the sky grid, against a board cell; and the space between its rows. */
+const BOARD_WISP_SIZE = 0.9;
+const BOARD_ROW_PITCH = 0.9;
 
 type WispFrame = { x: number; y: number; width: number; height: number };
+/** Where every wisp is drawn, window-space, and where the line under them goes. */
+export type WispLayout = { frame: WispFrame; wisps: readonly { x: number; y: number; size: number }[]; captionTop: number };
 
 export type CorruptionWisps = {
   visible: boolean;
   /** The mission's target is gone while the layer lingers: standing wisps play their exit. */
   leaving: boolean;
-  frame: WispFrame | null;
-  specs: readonly CorruptionWispSpec[];
-  states: readonly { hits: number; hp: number; alive: boolean }[];
+  layout: WispLayout | null;
+  views: readonly MissionWispView[];
   /** Bumps when a Glow strikes that wisp. */
   strikes: Readonly<Record<number, number>>;
   /** The Glow hook's aim: where the next burst goes, and what each landing does. */
@@ -72,17 +89,47 @@ export type CorruptionWisps = {
   caption: { id: number; text: string } | null;
 };
 
+/** Every wisp's place on screen: over the tile by its fractions, or on the sky grid above the board. */
+export function wispLayout(target: CorruptionWispTarget, views: readonly MissionWispView[], tileFrame: WispFrame | null): WispLayout | null {
+  const mechanic = resolveMechanic(target.host);
+  const anchor = target.anchor;
+  if (anchor) {
+    const metrics = anchor.metrics;
+    if (!metrics) return null;
+    const { geometry } = metrics;
+    const columns = anchor.window.cellIndices.slice(0, anchor.window.columns);
+    if (!columns.length) return null;
+    const first = mergeCellFrame(geometry, columns[0]!).bounds;
+    const last = mergeCellFrame(geometry, columns[columns.length - 1]!).bounds;
+    const rows = mechanic.kind === 'column-shot' ? Math.max(1, mechanic.wisps.rows) : 1;
+    const pitch = (mechanic.kind === 'column-shot' ? mechanic.wisps.rowPitch ?? BOARD_ROW_PITCH : BOARD_ROW_PITCH) * geometry.cellSize;
+    const top = metrics.y + first.top;
+    const frame = { x: metrics.x + first.left, y: top - rows * pitch, width: last.left + last.width - first.left, height: rows * pitch };
+    const wisps = views.map((view) => {
+      if (view.placement.kind !== 'board') return { x: frame.x + frame.width / 2, y: frame.y, size: geometry.cellSize * BOARD_WISP_SIZE };
+      const cell = columns[Math.max(0, Math.min(columns.length - 1, view.placement.column))]!;
+      return { x: metrics.x + mergeCellCenter(geometry, cell).x, y: top - (view.placement.row + 0.5) * pitch, size: geometry.cellSize * (view.placement.size ?? BOARD_WISP_SIZE) };
+    });
+    return { frame, wisps, captionTop: frame.y - 44 };
+  }
+  if (!tileFrame) return null;
+  const wisps = views.map((view) => view.placement.kind === 'tile'
+    ? { x: tileFrame.x + view.placement.fx * tileFrame.width, y: tileFrame.y + view.placement.fy * tileFrame.height, size: Math.max(48, view.placement.size * tileFrame.width) }
+    : { x: tileFrame.x + tileFrame.width / 2, y: tileFrame.y + tileFrame.height * 0.2, size: Math.max(48, 0.18 * tileFrame.width) });
+  return { frame: tileFrame, wisps, captionTop: tileFrame.y + tileFrame.height * 0.62 };
+}
+
 /**
- * Owns the wisps over a misted tile: measures the tile, deals the clearing's
- * merges across the wisps in order, aims every Glow burst at the first wisp
- * still standing, shakes it on each token and counts one hit per merge. The
- * last wisp falls on the final merge's own item, the same landing that lifts
- * the mist. A board resumed part-way starts with the wisps its merges already
- * felled.
+ * Owns the wisps over a misted tile: measures the tile (or takes the board's
+ * frame), draws each wisp where its mechanic puts it, aims every burst at the
+ * wisp its strike names, shakes it on each token and lands the strike's hits
+ * once per burst. The last wisp falls on the final strike's own item, the
+ * same landing that lifts the mist. A board resumed part-way starts with the
+ * wisps its strikes already felled.
  */
 export function useCorruptionWisps(target: CorruptionWispTarget | null): CorruptionWisps {
   const [frame, setFrame] = useState<WispFrame | null>(null);
-  const [landed, setLanded] = useState(0);
+  const [applied, setApplied] = useState<MissionMechanicState | null>(null);
   const [strikes, setStrikes] = useState<Record<number, number>>({});
   // Held from the mission's first frame until a beat after its last: the layer never unmounts in
   // between, so a wisp that fell stays gone through the mist's lift instead of replaying its death.
@@ -90,24 +137,26 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
   const [leaving, setLeaving] = useState(false);
   const assignedRef = useRef(0);
   const keyRef = useRef<string | null>(null);
-  const lastRef = useRef<{ specs: readonly CorruptionWispSpec[]; plan: number[] } | null>(null);
+  const lastRef = useRef<{ host: MissionMechanicHost; layout: WispLayout | null } | null>(null);
+  // Strikes in the air, by the wisp they are aimed at: each landing takes the next one's hits.
+  const queuedRef = useRef(new Map<number, MissionStrike[]>());
   const key = target?.key ?? null;
   const node = target?.node ?? null;
   const settled = target?.settled ?? true;
   // Whether the camera has been seen moving since the last measurement: a settle after motion is measured at once.
   const movedRef = useRef(false);
   useEffect(() => { if (!settled) movedRef.current = true; }, [settled]);
-  const plan = useMemo(() => target ? wispHitPlan(target.required, target.specs.length) : lastRef.current?.plan ?? [], [target]);
-  const specs = target?.specs ?? lastRef.current?.specs ?? [];
-  if (target) lastRef.current = { specs: target.specs, plan };
+  const host = target?.host ?? lastRef.current?.host ?? null;
+  const mechanic = host ? resolveMechanic(host) : null;
 
-  // A new mission: the wisps start where its merges already are; nothing is in flight yet.
+  // A new mission: the wisps start where its strikes already are; nothing is in flight yet.
   useEffect(() => {
     if (!key || !target) return;
     if (keyRef.current === key) return;
     keyRef.current = key;
-    assignedRef.current = target.merges;
-    setLanded(target.merges);
+    assignedRef.current = target.mechanicState.strikes;
+    queuedRef.current = new Map();
+    setApplied(target.mechanicState);
     setStrikes({});
   }, [key, target]);
   // The tile on screen, measured only while the camera is still: a board opening sends the camera onto its
@@ -130,19 +179,22 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
   useEffect(() => {
     if (target) { setHeld(true); setLeaving(false); return; }
     setLeaving(true);
-    const timer = setTimeout(() => { setHeld(false); setLeaving(false); lastRef.current = null; keyRef.current = null; setFrame(null); }, LINGER_MS);
+    const timer = setTimeout(() => { setHeld(false); setLeaving(false); lastRef.current = null; keyRef.current = null; setFrame(null); setApplied(null); }, LINGER_MS);
     return () => clearTimeout(timer);
   }, [target]);
 
-  const shownFrame = frame;
-  const states = useMemo(() => wispStates(plan, landed), [landed, plan]);
+  const state = applied ?? target?.mechanicState ?? null;
+  const views = useMemo(() => host && mechanic && state ? wispViews(mechanic, host, state) : [], [host, mechanic, state]);
+  const layout = useMemo(() => target ? wispLayout(target, views, frame) : null, [frame, target, views]);
+  if (target) lastRef.current = { host: target.host, layout: layout ?? lastRef.current?.layout ?? null };
+  const shownLayout = layout ?? lastRef.current?.layout ?? null;
   // The wisps answer back: once on the first strike, once as each falls, once more for the last.
   const [caption, setCaption] = useState<{ id: number; text: string } | null>(null);
   const captionSeq = useRef(0);
   const spokenStrikeRef = useRef<string | null>(null);
   const fallenRef = useRef<number>(0);
   const struckCount = Object.values(strikes).reduce((sum, count) => sum + count, 0);
-  const fallen = states.filter((wisp) => !wisp.alive).length;
+  const fallen = views.filter((wisp) => !wisp.alive).length;
   const lines = target?.lines ?? null;
   useEffect(() => {
     if (!key) { fallenRef.current = 0; spokenStrikeRef.current = null; return; }
@@ -152,14 +204,14 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
     let text: string | null = null;
     if (fallen > fallenRef.current) {
       fallenRef.current = fallen;
-      text = lines ? wispLineForFall(lines, fallen, plan.length) : null;
+      text = lines ? wispLineForFall(lines, fallen, views.length) : null;
     } else if (struckCount > 0 && spokenStrikeRef.current !== key) {
       spokenStrikeRef.current = key;
       text = lines?.firstStrike ?? null;
     }
     if (!text) return;
     setCaption({ id: ++captionSeq.current, text });
-  }, [fallen, key, lines, plan.length, struckCount]);
+  }, [fallen, key, lines, views.length, struckCount]);
   useEffect(() => {
     if (!caption) return;
     const timer = setTimeout(() => setCaption((current) => current?.id === caption.id ? null : current), CAPTION_MS);
@@ -176,30 +228,34 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
     return () => clearTimeout(timer);
   }, [key, lines, revealNonce]);
   const sink = useMemo<GlowSink | null>(() => {
-    if (!target || !shownFrame || !plan.length) return null;
-    const point = (index: number): RewardFlightPoint => {
-      const spec = target.specs[index]!;
-      return { x: shownFrame.x + spec.fx * shownFrame.width, y: shownFrame.y + spec.fy * shownFrame.height };
-    };
+    if (!target || !layout || !mechanic || !views.length) return null;
+    const { host: aimedHost } = target;
     return {
-      aim: (kind) => {
-        // The finale strikes whichever wisp still stands; an ordinary burst takes the next hit in the deal.
-        const index = kind === 'finale' ? wispTargetIndex(plan, Math.max(assignedRef.current, plan.reduce((sum, hp) => sum + hp, 0) - 1)) : wispTargetIndex(plan, assignedRef.current);
-        if (index == null) return null;
+      aim: (kind, strike) => {
+        // A burst carrying its board's strike goes where the strike says; one without is dealt here, the old way:
+        // the next hit in the deal, the finale on whichever wisp still stands.
+        const resolved = strike ?? (mechanic.kind === 'glow-strikes' ? glowStrikeAt(aimedHost, assignedRef.current, kind) : null);
+        if (!resolved || resolved.target == null || !layout.wisps[resolved.target]) return null;
         assignedRef.current += 1;
-        return { point: point(index), key: index };
+        const queue = queuedRef.current.get(resolved.target) ?? [];
+        queue.push(resolved);
+        queuedRef.current.set(resolved.target, queue);
+        const point = layout.wisps[resolved.target]!;
+        return { point: { x: point.x, y: point.y }, key: resolved.target };
       },
       struck: (index) => setStrikes((current) => ({ ...current, [index]: (current[index] ?? 0) + 1 })),
-      landed: () => setLanded((count) => count + 1),
+      landed: (index) => {
+        const strike = queuedRef.current.get(index)?.shift() ?? null;
+        setApplied((current) => current && strike ? applyStrike(mechanic, current, strike) : current);
+      },
     };
-  }, [plan, shownFrame, target]);
+  }, [layout, mechanic, target, views.length]);
 
   return {
-    visible: Boolean(shownFrame && specs.length && (target || held)),
+    visible: Boolean(shownLayout && views.length && (target || held)),
     leaving: !target && leaving,
-    frame: shownFrame,
-    specs,
-    states,
+    layout: shownLayout,
+    views,
     strikes,
     sink,
     caption,
@@ -211,17 +267,18 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
   const [origin, setOrigin] = useState<RewardFlightPoint>({ x: 0, y: 0 });
   useEffect(() => {
     screenRef.current?.measureInWindow((x, y) => setOrigin({ x, y }));
-  }, [screenRef, wisps.frame]);
-  const frame = wisps.frame;
-  if (!frame) return null;
+  }, [screenRef, wisps.layout]);
+  const layout = wisps.layout;
+  if (!layout) return null;
   return <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.layer]}>
-    {wisps.specs.map((spec, index) => <CorruptionWisp
-      key={spec.id} index={index}
-      x={frame.x + spec.fx * frame.width - origin.x} y={frame.y + spec.fy * frame.height - origin.y}
-      size={Math.max(48, spec.size * frame.width)}
-      alive={wisps.states[index]?.alive ?? true} leaving={wisps.leaving} strikeNonce={wisps.strikes[index] ?? 0} />)}
+    {wisps.views.map((view, index) => <CorruptionWisp
+      key={view.id} index={index}
+      x={(layout.wisps[index]?.x ?? layout.frame.x) - origin.x} y={(layout.wisps[index]?.y ?? layout.frame.y) - origin.y}
+      size={layout.wisps[index]?.size ?? 48}
+      pip={view.hp > 1 ? `${Math.max(0, view.hp - view.damage)}` : null}
+      alive={view.alive} leaving={wisps.leaving} strikeNonce={wisps.strikes[index] ?? 0} />)}
     {wisps.caption ? <Animated.View key={wisps.caption.id} entering={FadeInDown.duration(220)} exiting={FadeOut.duration(260)} pointerEvents="none"
-      style={[styles.caption, { left: frame.x - origin.x, width: frame.width, top: frame.y + frame.height * 0.62 - origin.y }]}>
+      style={[styles.caption, { left: layout.frame.x - origin.x, width: layout.frame.width, top: layout.captionTop - origin.y }]}>
       <Text style={styles.captionText}>{wisps.caption.text}</Text>
     </Animated.View> : null}
   </View>;
@@ -243,7 +300,7 @@ export const MissionWisps = memo(function MissionWisps({ target, glow, screenRef
 });
 
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */
-const CorruptionWisp = memo(function CorruptionWisp({ index, x, y, size, alive, leaving, strikeNonce }: { index: number; x: number; y: number; size: number; alive: boolean; leaving: boolean; strikeNonce: number }) {
+const CorruptionWisp = memo(function CorruptionWisp({ index, x, y, size, pip, alive, leaving, strikeNonce }: { index: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
   const reduceMotion = useReducedMotion();
   const hover = useSharedValue(0);
   const shake = useSharedValue(0);
@@ -337,6 +394,7 @@ const CorruptionWisp = memo(function CorruptionWisp({ index, x, y, size, alive, 
       <Image accessibilityIgnoresInvertColors accessibilityLabel="A corruption wisp" contentFit="contain" source={WISP_ART} style={StyleSheet.absoluteFill} transition={0} />
     </Animated.View>
     {!alive ? <DeathBurst size={size} reduceMotion={reduceMotion} /> : null}
+    {pip && alive ? <View style={[styles.pip, { top: size * 0.86 }]}><Text style={styles.pipText}>{pip}</Text></View> : null}
   </View>;
 });
 
@@ -388,6 +446,8 @@ const styles = StyleSheet.create({
   // Over the map and its markers, under the docked board (60) and everything the board's beats draw; the Glow (100) strikes them from above.
   layer: { zIndex: 58 },
   caption: { position: 'absolute', alignItems: 'center', zIndex: 4 },
+  pip: { position: 'absolute', alignSelf: 'center', zIndex: 3, paddingHorizontal: 7, paddingVertical: 1, borderRadius: 9, backgroundColor: 'rgba(38,18,58,0.78)' },
+  pipText: { fontFamily: 'FredokaBold', fontSize: 12, color: '#F3E6FF', textAlign: 'center' },
   captionText: { fontFamily: 'FredokaBold', fontSize: 17, color: '#FFF4D6', textAlign: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, backgroundColor: 'rgba(38,18,58,0.72)', overflow: 'hidden' },
   wisp: { position: 'absolute', alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
   rim: { zIndex: 0 },

@@ -6,6 +6,7 @@ import type { CorruptionWispLines, CorruptionWispSpec } from '@/features/onboard
 import type { FtueCameraDirective, FtueGuide } from '@/features/onboarding/ftue-types';
 import type { ConversationPollSeed } from '@/types/companion-conversation';
 import type { MergeLessonBeat } from '@/features/content-flow/merge-lesson-recipe';
+import type { MissionMechanicDefinition } from './mission-mechanic';
 
 /**
  * A hatchable companion: a friend the Mist is keeping on a hex tile of the
@@ -55,17 +56,25 @@ export type HatchableMissionGuides = {
   merge: FtueGuide;
   mergeFallbackTitle: string;
   free: FtueGuide;
+  /** A merge on a board where the column matters (a column-shot mechanic); falls back to `merge`. */
+  aim?: FtueGuide;
 };
 
 export type HatchableMissionDefinition = {
   id: string;
   storageKey: string;
+  /** Strikes that fill the bar. Under a column-shot mechanic the wisps' hit points fill it instead, and this equals their sum. */
   required: number;
   camera: FtueCameraDirective;
   seed: HatchableMissionSeed;
   guides: HatchableMissionGuides;
+  /** The wisps over the tile, for glow strikes; a column-shot mechanic places its own above the board. */
   wisps: readonly CorruptionWispSpec[];
   lines: CorruptionWispLines;
+  /** How merges strike the wisps; absent, glow strikes: one per merge or waking, in order. */
+  mechanic?: MissionMechanicDefinition;
+  /** The bar's title; absent, the mist mission's own. */
+  barTitle?: string;
 };
 
 export type HatchableFlowCopy = { guide: FtueGuide; actionLabel: string };

@@ -3,6 +3,8 @@ import { islandCampaignChapter } from '@/constants/island-campaigns/helpers';
 import type { FtueStepDefinition } from '@/features/onboarding/ftue-types';
 import { createOpeningMissionState } from '@/features/onboarding/opening-mission-state';
 import { closestOpeningPair, OPENING_BOARD_LAYOUT, OPENING_MERGE_WINDOW_CELLS } from '@/features/onboarding/opening-mist';
+import { wispsForClearing } from '@/features/onboarding/corruption-wisps';
+import type { MissionMechanicHost } from '@/features/mission-mechanics/mechanic';
 import type { IslandRestorationProgress, MergeBoardCell, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 
 /**
@@ -95,6 +97,15 @@ export function restorationComplete(definition: RestorationBoardDefinition, merg
   return merges >= definition.merges;
 }
 
+/**
+ * The board as a mission mechanic sees it: its bar, the wisps over the island
+ * (three for a short bar, four for a long one), and how merges strike them;
+ * absent an authored mechanic, glow strikes carried by the item each merge makes.
+ */
+export function restorationMechanicHost(definition: RestorationBoardDefinition): MissionMechanicHost {
+  return { required: definition.merges, wisps: wispsForClearing(definition.merges), mechanic: definition.mechanic ?? { kind: 'glow-strikes', flight: 'item' } };
+}
+
 export type RestorationMove = { kind: 'unlock' | 'merge'; from: number; to: number };
 
 function freeItems(state: MergeWorldState, cells: readonly number[]) {
@@ -124,8 +135,8 @@ export function restorationNextMove(state: MergeWorldState, cells: readonly numb
 }
 
 /** The board is spent and the bar is not full: the Main Board has to bring more. */
-export function restorationCheckpointReached(definition: RestorationBoardDefinition, state: MergeWorldState, merges: number): boolean {
-  if (restorationComplete(definition, merges)) return false;
+export function restorationCheckpointReached(definition: RestorationBoardDefinition, state: MergeWorldState, merges: number, complete = restorationComplete(definition, merges)): boolean {
+  if (complete) return false;
   const cells = restorationWindowCells(definition.rows);
   if (cells.some((index) => state.board[index]?.occupant?.kind === 'generator')) return false;
   return restorationNextMove(state, cells) == null;
@@ -156,12 +167,14 @@ export function restorationBoardStep(
   level: MossproutNatureIslandLevel,
   state: MergeWorldState | null,
   merges: number,
+  /** Whether the bar is full; by the merge count unless the board's mechanic says otherwise. */
+  complete?: boolean,
 ): FtueStepDefinition | null {
   const chapter = islandCampaignChapter(campaign, level);
   const definition = chapter?.restoration;
   if (!state || !chapter || !definition) return null;
   const id = `restoration.${campaign.campaignId}.${level}`;
-  if (restorationComplete(definition, merges)) {
+  if (complete ?? restorationComplete(definition, merges)) {
     return { id: `${id}.complete`, surface: 'merge', actions: [], guide: { eyebrow: campaign.residentName, title: 'The mist is clearing.', body: 'Watch the garden grow.' }, interaction: { mode: 'blocked' } };
   }
   return { id: `${id}.free`, surface: 'merge', actions: [], guide: { eyebrow: '', title: '', body: '' }, interaction: { mode: 'none' } };

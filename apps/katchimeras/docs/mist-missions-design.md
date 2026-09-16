@@ -99,3 +99,13 @@ storage key v3, so a Locker board saved mid-mission is left behind. Veiled cells
 `normalizeDreamMist` (unknown owner or item decays to plain mist), cannot be dropped on, and only a
 waking sleeper opens them: an ordinary merge beside one does nothing.
 mist), cannot be dropped on, and only a waking sleeper opens them: an ordinary merge beside one does nothing.
+
+## Mechanic presets (Sept 17, 2026)
+
+A mission board's rule for turning merges into strikes is data on the definition: `mechanic?: MissionMechanicDefinition` on `HatchableMissionDefinition` (so on a journey tile's mission too) and on `RestorationBoardDefinition`. Absent, the board plays `glow-strikes`: one strike per merge or waking, wisps over the tile at their `fx/fy`, the clearing dealt across them in order, the last falling on the final strike. Every shipped board is unchanged and its saves still load.
+
+`column-shot` is the second preset: a merge fires what it made straight up the board's column; `damageByTier` says how hard (tier 1 first, the last entry repeating); `overflow` carries leftover damage up the column or loses it; `emptyColumn` sends a shot up empty sky to the nearest wisp standing or wastes it; `wisps.cells` place each wisp on the grid above the board (`column`, `row` 0 = just above the top row, `hp`). The bar is the wisps' hit points, the mission is done when every wisp is down, and the shot that fells the last is the finale.
+
+Everything reads the mechanic through `features/mission-mechanics/mechanic.ts` (`strikeFor`, `mechanicProgress`, `mechanicComplete`, `wispViews`, `mechanicMove`, `normalizeMechanicState`); the store resolves each merge into a `MissionStrike` and saves a column-shot board's damage vector with the board; the docks fly the strike; the wisp layer draws `wispViews` and applies a strike as its flight lands; the Kingdom docks both mist missions through `useMistMission`. A new mechanic is a new `kind` inside that module and nowhere else.
+
+Developer Tools > Journey tools > "Mist board: column shot" lays `COLUMN_SHOT_PREVIEW` over every docked board (a friend's, a journey tile's, an island's) under `<storage key>.preview-column-shot`, so the real boards and their saves are untouched. `tests/mission-mechanics.test.ts` proves glow strikes equal the old maths on every shipped board, the column rules, and that every board the preview is laid over finishes on every path.

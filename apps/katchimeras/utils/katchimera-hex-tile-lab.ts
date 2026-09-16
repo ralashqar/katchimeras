@@ -2,7 +2,7 @@ import { File } from 'expo-file-system';
 import type { ImageSourcePropType } from 'react-native';
 
 import { encounterLiveCast, type EncounterCastEntry } from '@/constants/encounter-cast';
-import { homeCreatureVisuals } from '@/constants/home-mvp';
+import { creatureVisual, hasCreatureVisual } from '@/constants/home-mvp';
 import type { HomeVisualKey } from '@/types/home';
 import type { KingdomCreature } from '@/types/kingdom';
 import type { KatchimeraSkinId, LifeAspectId } from '@/types/katchimera';
@@ -52,13 +52,13 @@ export function tileCandidateFromCreature(creature: KingdomCreature): Katchimera
     skinId: creature.skinId ?? identity?.skinId ?? null,
     themeLabel: cast?.categoryLabel ?? creature.name,
     themePrompt: [cast?.categoryLabel, cast?.voice, cast?.seedId].filter(Boolean).join('; '),
-    source: homeCreatureVisuals[creature.visualKey].source,
+    source: creatureVisual(creature.visualKey).source,
   };
 }
 
 export function tileCandidatesFromCast(): KatchimeraTileCandidate[] {
   return encounterLiveCast
-    .filter((entry) => homeCreatureVisuals[entry.visualKey])
+    .filter((entry) => hasCreatureVisual(entry.visualKey))
     .map((entry) => {
       const identity = identityForEncounter(entry.profileId, entry.visualKey);
       return {
@@ -69,7 +69,7 @@ export function tileCandidatesFromCast(): KatchimeraTileCandidate[] {
         skinId: identity?.skinId ?? null,
         themeLabel: entry.categoryLabel,
         themePrompt: [entry.categoryLabel, entry.voice, entry.seedId].filter(Boolean).join('; '),
-        source: homeCreatureVisuals[entry.visualKey].source,
+        source: creatureVisual(entry.visualKey).source,
       };
     });
 }

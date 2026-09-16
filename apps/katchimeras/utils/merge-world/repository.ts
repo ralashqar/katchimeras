@@ -1,5 +1,11 @@
 import { recordHatchProfileAnswers } from '@/features/onboarding/hatch-profile-storage';
 import { GLOW } from '@/constants/glow';
+import type { GameplayEvent } from '@/types/gameplay-event';
+import type { HarmonyState, LiveEventProgress } from '@/types/live-ops';
+import { contentRegistrySnapshot } from '@/features/content-packs/active-pack';
+import { appendGameplayEvents, GAMEPLAY_JOURNAL_SCHEMA } from '@/features/live-ops/journal';
+import { newWorldMilestones, worldMilestoneEvents } from '@/features/live-ops/merge-events';
+import { emptyHarmony } from '@/features/live-ops/rules';
 import * as SQLite from 'expo-sqlite';
 import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { WORLD_UPGRADE_STORIES } from '@/features/world-upgrades/world-upgrade-stories';
@@ -55,6 +61,7 @@ async function database() {
       const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
       await db.execAsync(`
         PRAGMA journal_mode = WAL;
+        ${GAMEPLAY_JOURNAL_SCHEMA}
         CREATE TABLE IF NOT EXISTS merge_world_snapshot (
           profile_id TEXT PRIMARY KEY NOT NULL,
           schema_version INTEGER NOT NULL,
@@ -117,6 +124,7 @@ export async function saveMergeWorldState(
      * carrying the newer snapshot, instead of reverting another writer.
      */
     baseRevision?: number;
+    gameplayEvents?: readonly GameplayEvent[];
   } = {},
 ): Promise<void> {
   // Companion/story resets notify their subscribers asynchronously. Do not
@@ -152,6 +160,14 @@ export async function saveMergeWorldState(
     await db.withTransactionAsync(async () => {
       if (generation !== resetGeneration) return;
       if (resetInProgress) return;
+      const previous = await db.getFirstAsync<{ state_json: string }>('SELECT state_json FROM merge_world_snapshot WHERE profile_id = ?', [LOCAL_PROFILE_ID]);
+      const projection = await db.getFirstAsync<{ projection_id: string }>('SELECT projection_id FROM gameplay_projections WHERE projection_id = ?', ['harmony:v1']);
+      let priorState: MergeWorldState | null = null;
+      try { priorState = previous ? JSON.parse(previous.state_json) as MergeWorldState : null; }
+      catch { /* Loading already reported the damaged snapshot; recovered facts are historical. */ }
+      const revision = contentRegistrySnapshot().revision;
+      const backfill = !projection && priorState ? worldMilestoneEvents(priorState, revision, true) : [];
+      await appendGameplayEvents(db, [...backfill, ...newWorldMilestones(priorState, state, revision), ...(options.gameplayEvents ?? [])], contentRegistrySnapshot().packs.filter((record) => !record.retiredAt).flatMap((record) => record.pack.liveEvents ?? []));
       await db.runAsync(
         `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
          VALUES (?, ?, ?, ?, ?, ?)
@@ -205,6 +221,10 @@ async function reduceStoredMergeWorld(
     }
     const reduced = reduce(current);
     if (!reduced.changed || generation !== resetGeneration || resetInProgress) return reduced;
+    await db.withTransactionAsync(async () => {
+    const projection = await db.getFirstAsync<{ projection_id: string }>('SELECT projection_id FROM gameplay_projections WHERE projection_id = ?', ['harmony:v1']);
+    const revision = contentRegistrySnapshot().revision;
+    await appendGameplayEvents(db, [...(!projection ? worldMilestoneEvents(current, revision, true) : []), ...newWorldMilestones(current, reduced.state, revision)], contentRegistrySnapshot().packs.filter((record) => !record.retiredAt).flatMap((record) => record.pack.liveEvents ?? []));
     await db.runAsync(
       `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
        VALUES (?, ?, ?, ?, ?, ?)
@@ -212,10 +232,29 @@ async function reduceStoredMergeWorld(
        updated_at = excluded.updated_at, backup_json = merge_world_snapshot.state_json, state_json = excluded.state_json`,
       [LOCAL_PROFILE_ID, reduced.state.version, reduced.state.revision, reduced.state.updatedAt, JSON.stringify(reduced.state), row?.state_json ?? null],
     );
+    });
     return reduced;
   });
   if (result.changed && generation === resetGeneration && !resetInProgress) publishSnapshot(result.state, 'store');
   return result;
+}
+
+export async function loadGameplayJournal(limit = 100): Promise<GameplayEvent[]> {
+  const db = await database();
+  const rows = await db.getAllAsync<{ payload_json: string }>('SELECT payload_json FROM gameplay_events ORDER BY occurred_at DESC, event_id LIMIT ?', [Math.max(1, Math.min(500, Math.floor(limit)))]);
+  return rows.map((row) => JSON.parse(row.payload_json) as GameplayEvent);
+}
+
+export async function loadHarmonyProgress(): Promise<HarmonyState> {
+  const db = await database();
+  const row = await db.getFirstAsync<{ payload_json: string }>('SELECT payload_json FROM gameplay_projections WHERE projection_id = ?', ['harmony:v1']);
+  return row ? JSON.parse(row.payload_json) as HarmonyState : emptyHarmony();
+}
+
+export async function loadLiveEventProgress(): Promise<LiveEventProgress[]> {
+  const db = await database();
+  const rows = await db.getAllAsync<{ payload_json: string }>("SELECT payload_json FROM gameplay_projections WHERE projection_id LIKE 'event:%'");
+  return rows.map((row) => JSON.parse(row.payload_json) as LiveEventProgress);
 }
 
 export function saveUpgradeStoryRead(storyId: string, count: number, now = Date.now()) {
@@ -680,6 +719,8 @@ export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<vo
       await db.withTransactionAsync(async () => {
         await db.runAsync('DELETE FROM merge_world_snapshot WHERE profile_id = ?', [LOCAL_PROFILE_ID]);
         await db.runAsync('DELETE FROM merge_world_outbox');
+        await db.runAsync('DELETE FROM gameplay_events');
+        await db.runAsync('DELETE FROM gameplay_projections');
       });
     });
     const freshState = createInitialMergeWorldState(now);
@@ -716,6 +757,9 @@ export async function installMergeWorldStateForDebug(input: unknown, now = Date.
           [LOCAL_PROFILE_ID, installed.version, installed.revision, installed.updatedAt, JSON.stringify(installed), existing?.state_json ?? null],
         );
         await db.runAsync('DELETE FROM merge_world_outbox');
+        await db.runAsync('DELETE FROM gameplay_events');
+        await db.runAsync('DELETE FROM gameplay_projections');
+        await appendGameplayEvents(db, worldMilestoneEvents(installed, contentRegistrySnapshot().revision, true));
       });
     });
   } finally {

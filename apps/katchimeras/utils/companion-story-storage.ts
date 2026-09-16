@@ -1,3 +1,4 @@
+import { hatchableByCompanion } from '@/constants/hatchable-companions/registry';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { accumulateQuietBond, nextFeastleBundleOrderId, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys, type AuthoredCohortFamilyId } from '@/utils/companion-story';
 
@@ -93,11 +94,16 @@ const AUTHORED_STORY_CONFIG = {
 } as const;
 
 export function isAuthoredCohortFamily(familyId: string): familyId is AuthoredCohortFamilyId {
-  return familyId === 'baristabbit' || familyId === 'steppling';
+  return hatchableByCompanion(familyId) != null;
+}
+
+/** A friend's story ids: authored for the bundled friends, derived from the family for any other. */
+function authoredStoryConfig(familyId: string): { id: string; signatureKey: string } {
+  return (AUTHORED_STORY_CONFIG as Record<string, { id: string; signatureKey: string } | undefined>)[familyId] ?? { id: `${familyId}:story`, signatureKey: 'signature' };
 }
 
 export function freshAuthoredCohortStory(familyId: AuthoredCohortFamilyId, now = Date.now()): CompanionStoryArc {
-  const config = AUTHORED_STORY_CONFIG[familyId];
+  const config = authoredStoryConfig(familyId);
   return {
     id: config.id, familyId, version: 3,
     currentLevel: 1, targetLevel: 6, beatId: `${familyId}-story:first-meeting`,
@@ -352,7 +358,7 @@ export function markAuthoredCohortOrderServed(familyId: AuthoredCohortFamilyId, 
     ...current, completedOrderIds, orderDeck, activeOrderId: null, updatedAt: now,
   });
   const prefix = `merge-story:${familyId}:chapter-1:`;
-  if (orderId === `${prefix}${AUTHORED_STORY_CONFIG[familyId].signatureKey}`) return saveAuthoredCohortStory(familyId, {
+  if (orderId === `${prefix}${authoredStoryConfig(familyId).signatureKey}`) return saveAuthoredCohortStory(familyId, {
     ...current, currentLevel: 8, targetLevel: 8, status: 'return_available', actPhase: 'finale_return',
     activeOrderId: null, pendingConversationId: `${familyId}:story:8`, unreadReturn: true,
     completedOrderIds, orderDeck, updatedAt: now,

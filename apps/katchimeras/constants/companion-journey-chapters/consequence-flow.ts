@@ -1,3 +1,4 @@
+import { missionById } from '@/constants/missions/registry';
 import type { ContentFlowDefinition, ContentFlowNode } from '@/types/content-flow';
 import type { CompanionJourneyChapterDefinition, JourneyConsequence, JourneyEpisodeDefinition, JourneyMissionDefinition } from '@/types/companion-journey-chapter';
 import { defineStory, story } from '@/features/content-flow/story-manifest';
@@ -60,7 +61,7 @@ export function journeyConsequenceFlow(chapter: CompanionJourneyChapterDefinitio
         nodes.push(
           storyOperations.focusCamera({ id: `${prefix}${JOURNEY_MISSION_FOCUS_NODE_ID}`, target, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 900, next: `${prefix}${JOURNEY_MISSION_CLEAR_NODE_ID}` }),
           story.task({ id: `${prefix}${JOURNEY_MISSION_CLEAR_NODE_ID}`, capability: JOURNEY_MISSION_TASK_CAPABILITY, surface: 'haven', taskId: JOURNEY_MISSION_CLEAR_NODE_ID,
-            requirements: [{ id: 'cleared', event: { type: JOURNEY_MISSION_CLEARED_EVENT } }], next: reveal[0]!.id, payload: { tileId: tile.id, missionId: consequence.mission.id } }),
+            requirements: [{ id: 'cleared', event: { type: JOURNEY_MISSION_CLEARED_EVENT } }], next: reveal[0]!.id, payload: { tileId: tile.id, missionId: consequence.mission?.id ?? consequence.missionId ?? '' } }),
           ...reveal,
         );
       }
@@ -102,5 +103,7 @@ function firstNodeId(consequence: JourneyConsequence, index: number): string {
 export function journeyMissionOf(episode: JourneyEpisodeDefinition): { tileId: string; mission: JourneyMissionDefinition & { camera: FtueCameraDirective } } | null {
   const consequence = episodeConsequences(episode).find((item) => item.kind === 'mist_mission');
   if (consequence?.kind !== 'mist_mission') return null;
-  return { tileId: consequence.tileId, mission: { ...consequence.mission, camera: journeyMissionCamera(consequence.tileId) } };
+  const mission = consequence.mission ?? (consequence.missionId ? missionById(consequence.missionId) : null);
+  if (!mission) return null;
+  return { tileId: consequence.tileId, mission: { ...mission, camera: journeyMissionCamera(consequence.tileId) } };
 }
