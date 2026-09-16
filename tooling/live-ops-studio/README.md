@@ -1,5 +1,90 @@
 # Live Ops Studio
 
+## Create a Katchimera from a template
+
+Open `/new-companion`, or **Create a Katchimera** from `/characters`.
+This creates a new hatchable experience for a roster character without one,
+starting with Feastle. It reuses the character's existing family, skins,
+animations, merge chains and generator. It does not create an unknown species,
+new mechanics or a new visual rig.
+
+1. Choose the character, rescue cost, unoccupied hex coordinates and predecessor.
+2. Edit the Mist mission, answer-based Egg, first conversation, parcel/merge
+   lesson and daily moment. IDs and flow connections are generated. The lesson
+   must grow and serve one tier-two item from its generator's tier-one drops.
+3. Add Journey episodes and waits. They follow the first-day flow and each other
+   in order. The template supplies introductory copy; author the character's
+   final narrative before release.
+4. Upload tile art and a character cutout, or choose **Use existing Feastle art**.
+   Still PNG/WebP/JPEG inputs up to 1.8 MB and 4096×4096 pixels are normalized
+   into a transparent-padded 1024×1024 WebP. Visible bounds (alpha >=16), sizes
+   and hashes are generated. The cutout serves the lesson finale; existing
+   roster portraits and animations remain unchanged.
+5. Enter the real HTTPS asset hosting folder, then validate and export. Validation
+   includes the actual content-pack, flow and mission validators. Draft source
+   fingerprints prevent silent reapplication after the template changes.
+6. Upload the ZIP's `assets/` files to that folder, keeping filenames unchanged.
+   Import `manifest.json` through **Developer Tools → Content Packs** on a test
+   profile and restart. No registry editing is required. The app must contain
+   the candidate-hatchable validation fix delivered with this editor; build that
+   app version once before testing these packs. Content/art installation needs
+   connectivity; installed content uses the existing offline pack cache.
+
+Export neither hosts files nor activates production content. Its URLs are intended
+destinations, not proof that files exist there. Validate against other planned
+releases before promotion. Check rescue gating, mission completion, Egg answers,
+hatching, first-day parcel, lesson rewards, Journey progression, daily moment,
+restart/resume and offline play on device. Existing installed versions are
+immutable; save published IDs and use the release/migration workflow for changes.
+
+Draft versions live under `drafts/new-companions/`, images under its `assets/`
+subdirectory. Copy both when moving workstations. Browser autosave is a convenience;
+use **Save draft** for a durable version. Starting a fresh template, switching
+characters and loading a version first save the current draft.
+
+`tests/new-companion-authoring.test.ts` verifies template validation and an
+isolated game boot using Feastle's generated pack and offline art references.
+That integration test is not a device gameplay test.
+
+## Existing character editor
+
+Open `/characters` or choose **Characters** in Studio. The editor reads the
+actual bundled definitions for all four current experiences:
+
+| Character | Editable content |
+| --- | --- |
+| Mossprout | Journey episodes and linked dialogue, orders, rewards, reflection timing, daily interactions and Old Grove tile copy/art |
+| Steppling | Journey, discovery tile and guides, Mist board, Egg requirements, first day, merge tutorial, daily interactions and home tile art |
+| Petalimp | Restoration chapters, choice outcomes, orders, board seeds and delivery cells, upgrade costs and five restoration-stage images |
+| Baristabbit | Discovery tile and guides, Mist board, Egg requirements, first day, merge tutorial, daily interactions and home tile art |
+
+Select a section, search its fields, and edit copy, item references or numeric
+values. Journey dialogue uses the game's compiler; restoration and first-day
+choices show their authored outcomes. Validate checks source revision, allowed
+paths, item references, numeric bounds, images and board occupancy. It does not
+prove puzzle solvability or economy balance. IDs, branching structure, episode
+order, mechanics and progression predicates remain protected.
+
+Each character has a separate browser autosave. **Save character draft** stores
+versioned files under `drafts/characters/`; loading/resetting first saves the
+current workspace. Shared uploaded images are under `drafts/journeys/assets/`.
+
+**Export review bundle** creates a ZIP containing the draft, materialized
+definitions, before/after field diff and assigned images. This is **not an
+installable content pack**: edits to existing bundled IDs need reviewed source
+integration, production art processing, a rebuild and game playtesting. Saving
+or exporting never changes shipped gameplay or player saves. New additive arcs
+remain available separately at `/arcs`; Mossprout's isolated native dialogue
+walkthrough remains at `/journeys`. Character drafts are a separate format.
+
+Restart Studio after changing source definitions. Stale drafts remain saved but
+cannot be exported against a different source revision. There is no automatic
+rebase or live publishing. Mossprout's initial onboarding, arbitrary new branches,
+creature portraits and outfits are outside this editor's current coverage.
+
+Focused checks (from `apps/katchimeras`):
+`npx tsx --test tests/character-editor.test.ts`.
+
 Run `npm run live-ops:studio` from the repository root, then open
 http://127.0.0.1:5181. This workstation tool is bound to loopback only.
 

@@ -1,9 +1,9 @@
 import { createContentFlowCompiler } from '@incubator/story/compiler';
 import type { ContentFlowValidationIssue, ContentFlowNode } from '@/types/content-flow';
-import { validateStoryNodeCapability } from './story-capability-registry';
+import { validateStoryNodeCapability, type CandidateStoryContext } from './story-capability-registry';
 import { isRegisteredStoryRoute } from './story-route-registry';
-export const { validateContentFlowDefinition, defineContentFlow } = createContentFlowCompiler({
-validateStoryNodeCapability, isRegisteredStoryRoute,
+export const candidateContentFlowCompiler = (candidate: CandidateStoryContext) => createContentFlowCompiler({
+validateStoryNodeCapability: node => validateStoryNodeCapability(node, candidate), isRegisteredStoryRoute,
 validateDefinition(definition) {
  const issues: ContentFlowValidationIssue[] = [];
  const nodes = new Map<string, ContentFlowNode>();
@@ -21,3 +21,5 @@ validateDefinition(definition) {
  return issues;
 }
 });
+
+export const { validateContentFlowDefinition, defineContentFlow } = candidateContentFlowCompiler({});

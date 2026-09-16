@@ -43,6 +43,7 @@ module.exports = function journeyApi(app, { moduleAt, wrap, drafts }) {
     if (!valid(id) || !(await assets()).some((asset) => asset.id === id)) throw new Error('Unknown image asset');
     return path.join(id.startsWith('upload-') ? uploads : artRoot, id);
   }
+  require('./character-api.cjs')(app,{moduleAt,wrap,drafts,assets,assetFile});
   async function check(draft) {
     const checked = api().validateJourneyDraft(draft);
     if (checked.draft?.tileArt) {

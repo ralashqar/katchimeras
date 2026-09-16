@@ -13,9 +13,9 @@ import { MISSIONS_BUNDLED } from '@/constants/missions/registry';
 import { MOSSPROUT_NATURE_ISLANDS_BUNDLED } from '@/constants/mossprout-nature-islands';
 import { STORY_TILES_BUNDLED } from '@/constants/story-tiles/registry';
 import { hasStoryTileArt } from '@/constants/story-tiles/tile-art';
-import { validateContentFlowDefinition } from '@/features/content-flow/content-flow-compiler';
+import { validateContentFlowDefinition, candidateContentFlowCompiler } from '@/features/content-flow/content-flow-compiler';
 import { validateMissionDefinition } from '@/features/mission-mechanics/validate';
-import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
+import { createHatchableDiscoveryFlow, createHatchableDayOneFlow, createHatchableGardenLessonFlow } from '@/features/onboarding/hatchable-flows';
 import { CONTENT_SCHEMA_VERSION, type ContentPack, type ContentPackArtEntry } from '@/types/content-pack';
 import { validateConversationDefinitions } from '@/utils/companion-conversation';
 import { isAlphaBounds } from '@/utils/hex-alpha-bounds';
@@ -220,8 +220,9 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     }
     if (issues.length) continue;
     try {
-      const built = hatchableFlows(definition as never);
-      for (const flow of [built.discovery, built.dayOne, built.gardenLesson]) for (const issue of validateContentFlowDefinition(flow)) issues.push(`hatchable ${id} flow ${flow.id}: ${issue.path} ${issue.message}`);
+      const compiler = candidateContentFlowCompiler({purchaseIds:hatchables.map(h=>String((h.tile as Record<string,unknown>)?.id)),taskIds:hatchables.map(h=>String((h.lesson as Record<string,unknown>)?.taskCapability))});
+      const built = [createHatchableDiscoveryFlow, createHatchableDayOneFlow, createHatchableGardenLessonFlow].map(build=>build(definition as never, compiler.defineContentFlow as never));
+      for (const flow of built) for (const issue of compiler.validateContentFlowDefinition(flow)) issues.push(`hatchable ${id} flow ${flow.id}: ${issue.path} ${issue.message}`);
     } catch (error) {
       issues.push(`hatchable ${id}: its flows cannot be built (${error instanceof Error ? error.message : String(error)})`);
     }

@@ -34,11 +34,11 @@ function validateCameraPayload(payload: Readonly<Record<string, unknown>>) {
   return typeof payload.snapshotId === 'string' && payload.snapshotId ? null : 'restore camera requires snapshotId';
 }
 
-function validateUpgradeEffect(payload: Readonly<Record<string, unknown>>) {
+function validateUpgradeEffect(payload: Readonly<Record<string, unknown>>, purchases: readonly string[] = []) {
   const targetError = validateStoryTarget(payload.target);
   if (targetError) return targetError;
   const target = payload.target as { kind?: unknown; structureId?: unknown };
-  if (target.kind === 'haven_structure' && (typeof target.structureId !== 'string' || !sharedWorldPurchase(target.structureId) || payload.toLevel !== 1 || !['normal', 'free'].includes((payload.economy as { mode?: string })?.mode ?? ''))) return 'Unknown shared-world purchase';
+  if (target.kind === 'haven_structure' && (typeof target.structureId !== 'string' || (!sharedWorldPurchase(target.structureId) && !purchases.includes(target.structureId)) || payload.toLevel !== 1 || !['normal', 'free'].includes((payload.economy as { mode?: string })?.mode ?? ''))) return 'Unknown shared-world purchase';
   if (target.kind !== 'haven_tile' && target.kind !== 'haven_nature_island' && target.kind !== 'haven_structure') return 'world.upgrade target must be a Haven tile, shared-world tile, or nature island';
   if (!Number.isInteger(payload.toLevel) || Number(payload.toLevel) < 1) return 'toLevel must be a positive integer';
   if (!payload.economy || typeof payload.economy !== 'object') return 'economy policy is required';
@@ -149,11 +149,13 @@ export function registeredStoryCapabilities() {
   return [...capabilities.values()];
 }
 
-export function validateStoryNodeCapability(node: Exclude<ContentFlowNode, { kind: 'branch' | 'complete' }>): string | null {
-  const capability = storyCapability(node.capability);
+export type CandidateStoryContext = { purchaseIds?: readonly string[]; taskIds?: readonly string[] };
+export function validateStoryNodeCapability(node: Exclude<ContentFlowNode, { kind: 'branch' | 'complete' }>, candidate: CandidateStoryContext = {}): string | null {
+  const capability = storyCapability(node.capability) ?? (candidate.taskIds?.includes(node.capability) ? { id: node.capability, kind: 'task' as const } : null);
   if (!capability) return `Unknown capability ${node.capability}`;
   if (capability.kind !== node.kind) return `Capability ${node.capability} renders ${capability.kind}, not ${node.kind}`;
   if (node.kind === 'effect' && !capability.idempotent) return `Effect capability ${node.capability} must declare idempotent execution`;
   const payload = 'payload' in node ? node.payload ?? {} : {};
+  if(node.capability === STORY_WORLD_UPGRADE_EFFECT) return validateUpgradeEffect(payload, candidate.purchaseIds);
   return capability.validatePayload?.(payload) ?? null;
 }

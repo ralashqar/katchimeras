@@ -34,11 +34,11 @@ export const HATCHABLE_DISCOVERY_TASK_CAPABILITY = 'glow.discovery.task';
 export const HATCHABLE_LESSON_BEATS = ['parcel', 'grow', 'serve'] as const;
 export const HATCHABLE_LESSON_FINALE_NODE_IDS: readonly string[] = ['closing', 'summary'];
 
-export function createHatchableDiscoveryFlow(definition: HatchableCompanionDefinition) {
+export function createHatchableDiscoveryFlow(definition: HatchableCompanionDefinition, compile: typeof defineStory = defineStory) {
   const { discoveryFlow: flow } = definition;
   const target = hatchableStoryTarget(definition);
   const lesson = flow.gardenLesson;
-  return defineStory({
+  return compile({
     // Without a lesson the story begins at the pay step, on the marker the player is already looking at.
     id: flow.id, version: flow.version, entryNodeId: lesson ? 'gateway.focus' : HATCHABLE_MISSION_PAY_NODE_ID, metadata: { kind: 'story' },
     nodes: [
@@ -65,9 +65,9 @@ export function createHatchableDiscoveryFlow(definition: HatchableCompanionDefin
   });
 }
 
-export function createHatchableDayOneFlow(definition: HatchableCompanionDefinition) {
+export function createHatchableDayOneFlow(definition: HatchableCompanionDefinition, compile: typeof defineStory = defineStory) {
   const { dayOne } = definition;
-  return defineStory({
+  return compile({
     id: dayOne.flow.id, version: dayOne.flow.version, entryNodeId: 'reflection',
     metadata: { kind: 'journey_day', familyId: definition.companion, day: 1, title: dayOne.flow.title },
     migrations: dayOne.flow.migrations ?? {},
@@ -86,9 +86,9 @@ export function createHatchableDayOneFlow(definition: HatchableCompanionDefiniti
   });
 }
 
-export function createHatchableGardenLessonFlow(definition: HatchableCompanionDefinition) {
+export function createHatchableGardenLessonFlow(definition: HatchableCompanionDefinition, compile: typeof defineStory = defineStory) {
   const { lesson } = definition;
-  return defineStory({
+  return compile({
     id: lesson.flow.id, version: lesson.flow.version, entryNodeId: 'parcel', metadata: { kind: 'story' },
     migrations: lesson.flow.migrations ?? {},
     nodes: [

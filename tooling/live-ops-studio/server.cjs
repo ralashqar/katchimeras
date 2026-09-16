@@ -24,6 +24,7 @@ async function main() {
   });
   app.use(express.json({ limit: '3mb' }));
   require('./journey-api.cjs')(app, { moduleAt, wrap, drafts });
+  require('./new-companion-api.cjs')(app, { moduleAt, wrap, drafts });
   app.get('/api/drafts', wrap(async (_, res) => {
     await fs.mkdir(drafts, { recursive: true });
     res.json({ drafts: (await fs.readdir(drafts)).filter((name) => /^[a-z0-9-]+\.json$/.test(name)).sort().reverse() });
