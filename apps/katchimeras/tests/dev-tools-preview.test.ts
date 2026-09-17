@@ -57,7 +57,7 @@ test('Journey developer tools expose scoped reset, quick mode, and full reset co
   const fullReset = read('utils/reset-katchimera-progress-for-debug.ts');
   const snapshots = read('utils/player-profile-snapshots.ts');
 
-  assert.match(devPage, /Reset current Journey Day/);
+  assert.match(devPage, /Reset current Chapter/);
   assert.match(devPage, /Journey quick mode/);
   assert.match(devPage, /Reset all Journey \+ Merge progress/);
   assert.match(journeyTools, /resetLastMossproutJourneyForDebug/);

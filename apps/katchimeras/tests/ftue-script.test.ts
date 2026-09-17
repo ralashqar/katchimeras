@@ -1339,23 +1339,23 @@ test('FTUE starts a relationship before the Garden, shows First Bloom, and conti
   assert.match(kingdom, /ftueDayOneActionActive && receipt\.kind === 'journey_day_completed'[\s\S]*?variant: 'journey_complete'/);
   assert.match(kingdom, /ftueDayOneActionActive[\s\S]*?onFtueJourneyDayComplete\?\.\(\)[\s\S]*?continueFtueAfter/);
   assert.match(kingdom, /autoContinue=\{!ftueDayOneActionActive\}[\s\S]*?Hear Mossprout\\'s story[\s\S]*?dismissible=\{!ftueDayOneActionActive\}[\s\S]*?onFtueJourneyDayComplete/);
-  assert.match(bondCelebration, /onRequestClose=\{dismissible \? onContinue : \(\) => \{\}\}[\s\S]*?<GameSurface[\s\S]*?Journey Day \$\{journeyHandoff\.dayNumber\} timeline/);
+  assert.match(bondCelebration, /onRequestClose=\{dismissible \? onContinue : \(\) => \{\}\}[\s\S]*?<GameSurface[\s\S]*?Chapter \$\{journeyHandoff\.dayNumber\} timeline/);
   assert.match(companion, /scheduleMossproutJourneyDayReminder\(completedDayId\)/);
   assert.match(
     companion,
     /ftueRouteOrigin && navigationFtueRun\?\.status !== 'active'[\s\S]*?router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/,
   );
   assert.match(mossproutStage, /<KatchimeraJourneyStatusPlaque[\s\S]*?dayNumber=\{journeyDayNumber\}[\s\S]*?status=\{journey\.status === 'complete'/);
-  assert.match(journeyMilestone, /Journey Day \{dayNumber\}[\s\S]*?complete \? 'Complete' : 'In progress'/);
+  assert.match(journeyMilestone, /Chapter \{dayNumber\}[\s\S]*?complete \? 'Complete' : 'In progress'/);
   assert.match(mossproutStage, /relationshipProgressionRepository\.update\(reconcileMossproutDayOneChoices\)/);
   assert.match(mossproutStage, /dayOneChoiceActionIds[\s\S]*?includeActionIds: dayOneActionChoiceActive \? dayOneChoiceActionIds : undefined/);
   assert.match(interaction, /status === 'profile_available'[\s\S]*?requestStoryConversation\(definitionId\)/);
   assert.match(interaction, /residentStoryResumeActive: props\.ftueResidentStoryResume,\s*residentStoryResumeTitle/);
   assert.doesNotMatch(interaction, /A VEILED PARCEL IS WAITING/);
   assert.match(mossproutStage, /Coin-only requests remain in the Garden[\s\S]*?const presentedActionCandidates = actions/);
-  assert.match(bondCelebration, /resolvedJourneyDayNumber = journeyDayNumber \?\? journeyHandoff\?\.dayNumber \?\? 1[\s\S]*?<CelebrationHeroNumber[\s\S]*?label="JOURNEY DAY"/);
+  assert.match(bondCelebration, /resolvedJourneyDayNumber = journeyDayNumber \?\? journeyHandoff\?\.dayNumber \?\? 1[\s\S]*?<CelebrationHeroNumber[\s\S]*?label="CHAPTER"/);
   assert.doesNotMatch(bondCelebration, /journeyBondRatio|journeyProgressCard|receipt\.points|COMPANION_RELATIONSHIP_STAGES|journeyStageNode/);
-  assert.match(bondCelebration, /accessibilityLabel=\{`Journey Day \$\{journeyHandoff\.dayNumber\} timeline`\}[\s\S]*?styles\.timelineLockedMarker/);
+  assert.match(bondCelebration, /accessibilityLabel=\{`Chapter \$\{journeyHandoff\.dayNumber\} timeline`\}[\s\S]*?styles\.timelineLockedMarker/);
   assert.match(coachmark, /useEggAvatar\(\)[\s\S]*?<EggAvatar/);
   assert.match(coachmark, /<SpeechTooltip[\s\S]*?styles\.guideAvatar[\s\S]*?<EggAvatar/);
   assert.doesNotMatch(coachmark, /avatarBadge(?:Background|Ring)?/);

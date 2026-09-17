@@ -556,7 +556,7 @@ export function LegacyTodayScreen() {
   const openMossproutJourney = useCallback(() => {
     transitionTo({
       announcement: mossproutJourneyHandoff?.state === 'ready_to_begin'
-        ? 'Opening Mossprout Journey Day 2'
+        ? 'Opening Mossprout Chapter 2'
         : 'Opening Mossprout',
       target: 'companion',
       navigate: () => router.push({

@@ -24,7 +24,7 @@ export function CompanionSkinsThread({ companionName, familyId, showHeading = tr
         <ThemedText selectable style={styles.description} lightColor={tokens.textSecondary} darkColor={tokens.textSecondary}>
           Each resident has one card. Help with their garden requests to reveal the whole set.
         </ThemedText>
-        {!collectionOpen && !loading ? <ThemedText selectable style={styles.lockedMessage} lightColor={tokens.accentPressed} darkColor={tokens.accentPressed}>A new visitor will bring the first card during an early Journey Day.</ThemedText> : null}
+        {!collectionOpen && !loading ? <ThemedText selectable style={styles.lockedMessage} lightColor={tokens.accentPressed} darkColor={tokens.accentPressed}>A new visitor will bring the first card during an early chapter.</ThemedText> : null}
       </View>
       {collectionOpen ? <KatchimeraCardDeckCarousel cards={cards} /> : null}
     </View>

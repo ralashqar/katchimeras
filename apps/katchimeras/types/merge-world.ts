@@ -503,6 +503,7 @@ export type IslandCampaignProgress = {
 };
 
 export type MergeWorldState = {
+  localLiveOps?: import('./local-live-ops').LocalLiveOpsState;
   /** Reading is independent of purchase flow runs; cursors count revealed lines. */
   upgradeStoryRead?: Record<string, number>;
   upgradeSkinGrants?: Record<string, { skinId: string; grantedAt: number }>;

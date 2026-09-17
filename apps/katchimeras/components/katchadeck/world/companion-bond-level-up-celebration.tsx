@@ -214,8 +214,8 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
               entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.duration(340).delay(130)}
               style={styles.journeyDayHero}>
               <CelebrationHeroNumber
-                accessibilityLabel={`Journey Day ${resolvedJourneyDayNumber} complete`}
-                label="JOURNEY DAY"
+                accessibilityLabel={`Chapter ${resolvedJourneyDayNumber} complete`}
+                label="CHAPTER"
                 numberSize={compactHeight ? 70 : 82}
                 value={resolvedJourneyDayNumber}
               />
@@ -248,7 +248,7 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
 
           {journeyComplete && journeyHandoff ? (
             <GameSurface contentStyle={styles.journeyTimelineContent} density="feature" style={styles.handoffCard} tone="cream">
-              <View accessibilityLabel={`Journey Day ${journeyHandoff.dayNumber} timeline`} style={styles.timeline}>
+              <View accessibilityLabel={`Chapter ${journeyHandoff.dayNumber} timeline`} style={styles.timeline}>
                 {journeyHandoff.recap.map((item, index) => (
                   <Animated.View
                     entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.duration(240).delay(90 + index * 70)}
@@ -272,7 +272,7 @@ export function CompanionBondLevelUpCelebration({ autoContinue = true, continueL
                     </View>
                   </View>
                   <View style={styles.timelineTomorrowCopy}>
-                    <ThemedText style={styles.timelineTomorrowTitle} lightColor="#3B452F" darkColor="#3B452F">Journey Day {journeyHandoff.dayNumber + 1}</ThemedText>
+                    <ThemedText style={styles.timelineTomorrowTitle} lightColor="#3B452F" darkColor="#3B452F">Chapter {journeyHandoff.dayNumber + 1}</ThemedText>
                     <ThemedText style={styles.timelineTomorrowText} lightColor="#5C624D" darkColor="#5C624D">{journeyHandoff.tomorrowPreview}</ThemedText>
                   </View>
                 </Animated.View>

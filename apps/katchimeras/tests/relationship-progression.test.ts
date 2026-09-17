@@ -88,7 +88,7 @@ function finishDayOneResident(state: RelationshipProgressState, dayId: string, n
   return completeMossproutResidentCardDiscovery(matched, dayId, 'petalimp', `test-resident:${dayId}`, now);
 }
 
-test('first Journey Day handoff changes from completion to waiting and then Day 2 ready', () => {
+test('first Chapter handoff changes from completion to waiting and then Day 2 ready', () => {
   const relationships = firstJourneyCompleteState();
   const completedAt = relationships.journeyDays[0]!.completedAt!;
   assert.equal(resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'active', relationships, now: completedAt })?.state, 'completed_today');
@@ -99,7 +99,7 @@ test('first Journey Day handoff changes from completion to waiting and then Day 
 
   const ready = resolveMossproutJourneyHandoff({ dayId: '2026-08-23', ftueStatus: 'complete', relationships, now: completedAt + 8 * 60 * 60 * 1000 });
   assert.equal(ready?.state, 'ready_to_begin');
-  assert.equal(ready?.title, 'Journey Day 2 is ready');
+  assert.equal(ready?.title, 'Chapter 2 is ready');
   assert.equal(mossproutJourneyDayNumber(relationships, '2026-08-24'), 2);
 });
 
@@ -119,7 +119,7 @@ test('starting Day 2 removes the initial Home handoff hook', () => {
   assert.equal(resolveMossproutJourneyHandoff({ dayId: '2026-08-24', ftueStatus: 'complete', relationships }), null);
 });
 
-test('the eight-hour rest can start Journey Day 2 on the same calendar date', () => {
+test('the eight-hour rest can start Chapter 2 on the same calendar date', () => {
   const state = firstJourneyCompleteState();
   const completedAt = state.journeyDays[0]!.completedAt!;
   assert.equal(startMossproutJourneyDay(state, '2026-08-23', completedAt + 8 * 60 * 60 * 1000 - 1, 1).reason, 'resting');
@@ -188,7 +188,7 @@ test('ordinary Bond actions settle meditation from their durable completion rece
   assert.equal(meditation?.settlementReceiptIds?.length, 1);
 });
 
-test('Journey Day 1 supports a complete manual narrative flow without FTUE', () => {
+test('Chapter 1 supports a complete manual narrative flow without FTUE', () => {
   const dayId = '2026-08-23';
   let state = startMossproutJourneyDay(emptyRelationshipProgressState(), dayId, 1, 0).state;
   let journey = mossproutJourneyForDay(state, dayId);
@@ -211,7 +211,7 @@ test('Journey Day 1 supports a complete manual narrative flow without FTUE', () 
   assert.equal(mossproutJourneyForDay(state, dayId)?.status, 'complete');
 });
 
-test('Journey Day 1 manual opening is authored in Mossprout’s first-person voice', () => {
+test('Chapter 1 manual opening is authored in Mossprout’s first-person voice', () => {
   const definition = mossproutCampaignConversationDefinitions.find((candidate) => (
     candidate.id === MOSSPROUT_CAMPAIGN_EPISODES[0].openingConversationId
   ));
@@ -220,7 +220,7 @@ test('Journey Day 1 manual opening is authored in Mossprout’s first-person voi
   assert.match(definition.nodes[1]?.kind === 'end' ? definition.nodes[1].message : '', /^Let’s grow/);
 });
 
-test('Journey Day 2 runs opening, two authored orders, return, and completion', () => {
+test('Chapter 2 runs opening, two authored orders, return, and completion', () => {
   let state = emptyRelationshipProgressState();
   state = startMossproutJourneyDay(state, '2026-08-23', 1, 0).state;
   state = completeMossproutJourneyDay(state, '2026-08-23', {
@@ -272,7 +272,7 @@ test('Journey Day 2 runs opening, two authored orders, return, and completion', 
   assert.equal(mossproutJourneyDayNumberForCompletionEvent(progressed, eventId), 2);
 });
 
-test('an active Journey Day exclusively owns Mossprout action cards', () => {
+test('an active Chapter exclusively owns Mossprout action cards', () => {
   let state = firstJourneyCompleteState('2026-08-23');
   state = startMossproutJourneyDay(state, '2026-08-24', 3, 1, true).state;
   let journey = mossproutJourneyForDay(state, '2026-08-24');
@@ -307,7 +307,7 @@ test('an active Journey Day exclusively owns Mossprout action cards', () => {
   assert.equal(actions.some((action) => action.title === 'Optional goal' || action.title === 'Routine order' || action.title === 'Take a photo'), false);
 });
 
-test('reset latest Journey Day rewinds Day 2 while preserving Day 1', () => {
+test('reset latest Chapter rewinds Day 2 while preserving Day 1', () => {
   let state = emptyRelationshipProgressState();
   state = startMossproutJourneyDay(state, '2026-08-23', 1, 0).state;
   state = completeMossproutJourneyDay(state, '2026-08-23', {
@@ -331,14 +331,14 @@ test('reset latest Journey Day rewinds Day 2 while preserving Day 1', () => {
   assert.equal(mossproutStory(reset).habitatStage, 0);
 });
 
-test('the next unstarted Mossprout chapter is labelled as Journey Day 2', () => {
+test('the next unstarted Mossprout chapter is labelled as Chapter 2', () => {
   const actions = resolveMossproutDayActions({
     goals: [],
     journey: null,
     journeyDayNumber: 2,
     storyComplete: false,
   });
-  assert.equal(actions[0]?.title, 'Begin Journey Day 2');
+  assert.equal(actions[0]?.title, 'Begin Chapter 2');
 });
 
 test('incompatible relationship state starts empty without migration', () => {
@@ -1324,7 +1324,7 @@ test('Mossprout home always gives a clear return target after a completed day', 
   assert.equal(view.waitingForTomorrow, true);
 });
 
-test.skip('legacy Mossprout macro progression advances once across distinct Journey Days', () => {
+test.skip('legacy Mossprout macro progression advances once across distinct Chapters', () => {
   let state = startMossproutJourneyDay(emptyRelationshipProgressState(), '2026-08-21', 1).state;
   state = completeMossproutJourneyDay(state, '2026-08-21', { objectiveId: 'mossprout:objective:first-flower', activityReceiptId: 'a', resolutionId: 'flower' }, 2);
   assert.equal(mossproutStory(state).habitatStage, 1);

@@ -143,7 +143,7 @@ function inspectorModel(state: MergeWorldState, cell: number | null): InspectorM
     const current = Math.min(state.mossproutBoardProgression.activeDayIds.length, mist.revealDay);
     return {
       art: null,
-      body: `Opens on Mossprout Journey Day ${mist.revealDay}. You don’t need an item.`,
+      body: `Opens on Mossprout Chapter ${mist.revealDay}. You don’t need an item.`,
       eyebrow: `GARDEN GROWING · ${current} OF ${mist.revealDay} DAYS`,
       grovelightGateId: null,
       icon: 'cloud.fog.fill',

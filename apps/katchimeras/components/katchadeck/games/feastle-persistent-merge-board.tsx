@@ -1,3 +1,4 @@
+import { gameNow } from '@/utils/game-clock';
 import * as Haptics from 'expo-haptics';
 import { Image, type ImageRef } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -627,7 +628,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       if (targetOperationId != null) interruptedOperationIds.add(targetOperationId);
     }
 
-    const command: MergeWorldCommand = { type: 'move', from: sprite.cell, to, now: Date.now() };
+    const command: MergeWorldCommand = { type: 'move', from: sprite.cell, to, now: gameNow() };
     const predicted = onCommand(command);
     if (!predicted) returnHome();
     if (!predicted) return;
@@ -714,7 +715,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     const current = presentationRef.current;
     const currentSprites = spritesRef.current;
     const from = current.board.findIndex((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === generatorId);
-    const now = Date.now();
+    const now = gameNow();
     const command: MergeWorldCommand = { type: 'tapGenerator', generatorId, now, seed: `${now}:${current.revision}:${generatorId}` };
     const predicted = onCommand(command);
     if (!predicted) return;
@@ -1171,7 +1172,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
             : echoDefinition ? `Sleeping ${echoDefinition.name}. Bring another ${echoDefinition.name} here to wake it.`
               : discoveryStage ? `${discoveryStage.clue}. ${cell.mist?.kind === 'dreambound_item' && cell.mist.active ? `Bring another ${MERGE_ITEMS_BY_ID.get(cell.mist.boundDefinitionId)?.name ?? 'matching item'} here.` : 'Follow the trail to wake this item.'}`
                 : cell.mist?.kind === 'discovery_fork' ? 'Several paths are moving beneath the Dream Mist. Choose one to investigate.'
-                  : cell.mist?.kind === 'garden_growth' ? `Hidden garden patch. It opens on Mossprout Journey Day ${cell.mist.revealDay}. You do not need an item.`
+                  : cell.mist?.kind === 'garden_growth' ? `Hidden garden patch. It opens on Mossprout Chapter ${cell.mist.revealDay}. You do not need an item.`
                     : cell.mist?.kind === 'discovery_dormant' ? dormantNames.length
                       ? `A path to ${dormantNames.join(' or ')}. Meet them to open this space.`
                       : 'A future Katchimera story will open this space.'

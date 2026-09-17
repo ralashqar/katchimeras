@@ -1,4 +1,6 @@
-import { getStoredJson, setStoredJson } from '@/utils/app-storage';
+import { gameNow } from '@/utils/game-clock';
+import { saveWithGameplayOutbox } from '@/features/live-ops/source-outbox';
+import { getStoredJson } from '@/utils/app-storage';
 import {
   backfillHatchBondEvents,
   backfillQuestBondEvents,
@@ -29,7 +31,7 @@ export function loadCompanionBondState(
 }
 
 export function saveCompanionBondState(state: CompanionBondState): void {
-  setStoredJson(STORAGE_KEY, normaliseCompanionBondState(state));
+  saveWithGameplayOutbox(STORAGE_KEY, normaliseCompanionBondState(state));
   queueMicrotask(() => listeners.forEach((listener) => listener()));
 }
 
@@ -38,7 +40,7 @@ export function subscribeCompanionBondState(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-export function resetLaunchCompanionBondsForDebug(resetAt = Date.now()): void {
+export function resetLaunchCompanionBondsForDebug(resetAt = gameNow()): void {
   const stored = normaliseCompanionBondState(
     getStoredJson<CompanionBondState>(STORAGE_KEY, emptyCompanionBondState())
   );
@@ -49,7 +51,7 @@ export function resetLaunchCompanionBondsForDebug(resetAt = Date.now()): void {
   ));
 }
 
-export function resetAllKatchimeraBondsForDebug(resetAt = Date.now()): void {
+export function resetAllKatchimeraBondsForDebug(resetAt = gameNow()): void {
   const stored = normaliseCompanionBondState(
     getStoredJson<CompanionBondState>(STORAGE_KEY, emptyCompanionBondState())
   );

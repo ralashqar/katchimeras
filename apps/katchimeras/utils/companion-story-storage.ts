@@ -1,4 +1,6 @@
+import { gameNow } from '@/utils/game-clock';
 import { hatchableByCompanion } from '@/constants/hatchable-companions/registry';
+import { journeyChapterFor } from '@/constants/companion-journey-chapters/registry';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { accumulateQuietBond, nextFeastleBundleOrderId, selectAuthoredCohortOrderKeys, selectFeastleActTwoOrderKeys, type AuthoredCohortFamilyId } from '@/utils/companion-story';
 
@@ -57,7 +59,7 @@ type CompanionStoryState = { schemaVersion: 3; arcs: CompanionStoryArc[] };
 const STORAGE_KEY = 'katchadeck.companion-stories-v1';
 const listeners = new Set<() => void>();
 
-export function freshFeastleStory(now = Date.now()): CompanionStoryArc {
+export function freshFeastleStory(now = gameNow()): CompanionStoryArc {
   return {
     id: 'feastle:table-story', familyId: 'feastle', version: 3,
     currentLevel: 1, targetLevel: 2, beatId: 'feastle-story:level-1',
@@ -71,7 +73,7 @@ export function freshFeastleStory(now = Date.now()): CompanionStoryArc {
   };
 }
 
-export function freshMossproutStory(now = Date.now()): CompanionStoryArc {
+export function freshMossproutStory(now = gameNow()): CompanionStoryArc {
   return {
     id: 'mossprout:where-water-goes', familyId: 'mossprout', version: 3,
     currentLevel: 1, targetLevel: 2, beatId: 'mossprout-story:level-1',
@@ -84,7 +86,7 @@ export function freshMossproutStory(now = Date.now()): CompanionStoryArc {
   };
 }
 
-export function freshBaristabbitStory(now = Date.now()): CompanionStoryArc {
+export function freshBaristabbitStory(now = gameNow()): CompanionStoryArc {
   return freshAuthoredCohortStory('baristabbit', now);
 }
 
@@ -102,7 +104,7 @@ function authoredStoryConfig(familyId: string): { id: string; signatureKey: stri
   return (AUTHORED_STORY_CONFIG as Record<string, { id: string; signatureKey: string } | undefined>)[familyId] ?? { id: `${familyId}:story`, signatureKey: 'signature' };
 }
 
-export function freshAuthoredCohortStory(familyId: AuthoredCohortFamilyId, now = Date.now()): CompanionStoryArc {
+export function freshAuthoredCohortStory(familyId: AuthoredCohortFamilyId, now = gameNow()): CompanionStoryArc {
   const config = authoredStoryConfig(familyId);
   return {
     id: config.id, familyId, version: 3,
@@ -153,7 +155,7 @@ function normalize(value: unknown): CompanionStoryState {
 export function markFeastleJournalFtue(
   status: 'saved' | 'skipped',
   journalRecordId: string | null = null,
-  now = Date.now(),
+  now = gameNow(),
 ): CompanionStoryArc {
   const current = loadFeastleStory();
   if (current.journalFtueStatus === 'saved') return current;
@@ -189,7 +191,7 @@ export function saveMossproutStory(arc: CompanionStoryArc): CompanionStoryArc {
   return arc;
 }
 
-export function beginMossproutChapterOne(now = Date.now()): CompanionStoryArc {
+export function beginMossproutChapterOne(now = gameNow()): CompanionStoryArc {
   const current = loadMossproutStory();
   if (current.status !== 'intro_available') return current;
   return saveMossproutStory({
@@ -198,13 +200,13 @@ export function beginMossproutChapterOne(now = Date.now()): CompanionStoryArc {
   });
 }
 
-export function markMossproutOrderActive(orderId: string, now = Date.now()): CompanionStoryArc {
+export function markMossproutOrderActive(orderId: string, now = gameNow()): CompanionStoryArc {
   const current = loadMossproutStory();
   if (current.status !== 'order_active' || current.activeOrderId === orderId) return current;
   return saveMossproutStory({ ...current, activeOrderId: orderId, updatedAt: now });
 }
 
-export function markMossproutOrderServed(orderId: string, targetLevel: number, now = Date.now()): CompanionStoryArc {
+export function markMossproutOrderServed(orderId: string, targetLevel: number, now = gameNow()): CompanionStoryArc {
   const current = loadMossproutStory();
   if (current.completedOrderIds.includes(orderId)) return current;
   const level = Math.max(2, Math.min(4, targetLevel));
@@ -216,13 +218,13 @@ export function markMossproutOrderServed(orderId: string, targetLevel: number, n
   });
 }
 
-export function beginMossproutReturn(now = Date.now()): CompanionStoryArc {
+export function beginMossproutReturn(now = gameNow()): CompanionStoryArc {
   const current = loadMossproutStory();
   if (current.status !== 'return_available') return current;
   return saveMossproutStory({ ...current, status: 'conversation_active', unreadReturn: false, updatedAt: now });
 }
 
-export function completeMossproutConversation(level: number, now = Date.now()): CompanionStoryArc {
+export function completeMossproutConversation(level: number, now = gameNow()): CompanionStoryArc {
   const current = loadMossproutStory();
   if (current.status !== 'conversation_active' || current.pendingConversationId !== `mossprout:story:${level}`) return current;
   const beatId = `mossprout-story:level-${level}`;
@@ -235,7 +237,7 @@ export function completeMossproutConversation(level: number, now = Date.now()): 
   });
 }
 
-export function completeMossproutHavenUpgrade(stage: number, now = Date.now()): CompanionStoryArc {
+export function completeMossproutHavenUpgrade(stage: number, now = gameNow()): CompanionStoryArc {
   const current = loadMossproutStory();
   if (current.status !== 'haven_upgrade_available' || current.pendingHavenStage !== stage) return current;
   if (stage >= 4) return saveMossproutStory({
@@ -258,7 +260,7 @@ export function completeMossproutHavenUpgrade(stage: number, now = Date.now()): 
   });
 }
 
-export function recordMossproutQuietBond(receiptId: string, points: number, now = Date.now()): CompanionStoryArc {
+export function recordMossproutQuietBond(receiptId: string, points: number, now = gameNow()): CompanionStoryArc {
   const current = loadMossproutStory();
   const accumulated = accumulateQuietBond(current.pendingBondPoints, current.processedQuietBondReceiptIds, receiptId, points);
   if (!accumulated.changed) return current;
@@ -289,11 +291,11 @@ export function saveAuthoredCohortStory(familyId: AuthoredCohortFamilyId, arc: C
   return arc;
 }
 
-export function beginBaristabbitStory(now = Date.now()): CompanionStoryArc {
+export function beginBaristabbitStory(now = gameNow()): CompanionStoryArc {
   return beginAuthoredCohortStory('baristabbit', now);
 }
 
-export function beginAuthoredCohortStory(familyId: AuthoredCohortFamilyId, now = Date.now()): CompanionStoryArc {
+export function beginAuthoredCohortStory(familyId: AuthoredCohortFamilyId, now = gameNow()): CompanionStoryArc {
   const current = loadAuthoredCohortStory(familyId);
   if (current.status !== 'intro_available') return current;
   const seed = `${familyId}:chapter-1:${now}`;
@@ -307,11 +309,11 @@ export function beginAuthoredCohortStory(familyId: AuthoredCohortFamilyId, now =
   });
 }
 
-export function markBaristabbitJournalFtue(journalRecordId: string, now = Date.now()): CompanionStoryArc {
+export function markBaristabbitJournalFtue(journalRecordId: string, now = gameNow()): CompanionStoryArc {
   return markAuthoredCohortJournalFtue('baristabbit', journalRecordId, now);
 }
 
-export function markAuthoredCohortJournalFtue(familyId: AuthoredCohortFamilyId, journalRecordId: string, now = Date.now()): CompanionStoryArc {
+export function markAuthoredCohortJournalFtue(familyId: AuthoredCohortFamilyId, journalRecordId: string, now = gameNow()): CompanionStoryArc {
   const current = loadAuthoredCohortStory(familyId);
   if (current.journalFtueStatus === 'saved' && current.journalFtueRecordId === journalRecordId) return current;
   return saveAuthoredCohortStory(familyId, {
@@ -322,39 +324,40 @@ export function markAuthoredCohortJournalFtue(familyId: AuthoredCohortFamilyId, 
   });
 }
 
-export function markBaristabbitOrderActive(orderId: string, now = Date.now()): CompanionStoryArc {
+export function markBaristabbitOrderActive(orderId: string, now = gameNow()): CompanionStoryArc {
   return markAuthoredCohortOrderActive('baristabbit', orderId, now);
 }
 
-export function markAuthoredCohortOrderActive(familyId: AuthoredCohortFamilyId, orderId: string, now = Date.now()): CompanionStoryArc {
+export function markAuthoredCohortOrderActive(familyId: AuthoredCohortFamilyId, orderId: string, now = gameNow()): CompanionStoryArc {
   const current = loadAuthoredCohortStory(familyId);
   if (current.status !== 'order_active' || current.activeOrderId === orderId) return current;
   return saveAuthoredCohortStory(familyId, { ...current, activeOrderId: orderId, updatedAt: now });
 }
 
-export function recordBaristabbitQuietBond(receiptId: string, points: number, now = Date.now()): CompanionStoryArc {
+export function recordBaristabbitQuietBond(receiptId: string, points: number, now = gameNow()): CompanionStoryArc {
   return recordAuthoredCohortQuietBond('baristabbit', receiptId, points, now);
 }
 
-export function recordAuthoredCohortQuietBond(familyId: AuthoredCohortFamilyId, receiptId: string, points: number, now = Date.now()): CompanionStoryArc {
+export function recordAuthoredCohortQuietBond(familyId: AuthoredCohortFamilyId, receiptId: string, points: number, now = gameNow()): CompanionStoryArc {
   const current = loadAuthoredCohortStory(familyId);
   const accumulated = accumulateQuietBond(current.pendingBondPoints, current.processedQuietBondReceiptIds, receiptId, points);
   if (!accumulated.changed) return current;
   return saveAuthoredCohortStory(familyId, { ...current, pendingBondPoints: accumulated.points, processedQuietBondReceiptIds: accumulated.processedReceiptIds, updatedAt: now });
 }
 
-export function markBaristabbitOrderServed(orderId: string, now = Date.now()): CompanionStoryArc {
+export function markBaristabbitOrderServed(orderId: string, now = gameNow()): CompanionStoryArc {
   return markAuthoredCohortOrderServed('baristabbit', orderId, now);
 }
 
-export function markAuthoredCohortOrderServed(familyId: AuthoredCohortFamilyId, orderId: string, now = Date.now()): CompanionStoryArc {
+export function markAuthoredCohortOrderServed(familyId: AuthoredCohortFamilyId, orderId: string, now = gameNow()): CompanionStoryArc {
   const current = loadAuthoredCohortStory(familyId);
   if (current.completedOrderIds.includes(orderId)) return current;
   const completedOrderIds = [...current.completedOrderIds, orderId];
   const orderDeck = current.orderDeck
     ? { ...current.orderDeck, servedOrderIds: [...new Set([...current.orderDeck.servedOrderIds, orderId])] }
     : null;
-  if (current.journeyManaged) return saveAuthoredCohortStory(familyId, {
+  const chapter = journeyChapterFor(familyId);
+  if (current.journeyManaged || (chapter && !chapter.orders)) return saveAuthoredCohortStory(familyId, {
     ...current, completedOrderIds, orderDeck, activeOrderId: null, updatedAt: now,
   });
   const prefix = `merge-story:${familyId}:chapter-1:`;
@@ -377,21 +380,21 @@ export function markAuthoredCohortOrderServed(familyId: AuthoredCohortFamilyId, 
   return saveAuthoredCohortStory(familyId, { ...current, status: 'order_active', activeOrderId: null, completedOrderIds, orderDeck, updatedAt: now });
 }
 
-export function beginBaristabbitReturn(now = Date.now()): CompanionStoryArc {
+export function beginBaristabbitReturn(now = gameNow()): CompanionStoryArc {
   return beginAuthoredCohortReturn('baristabbit', now);
 }
 
-export function beginAuthoredCohortReturn(familyId: AuthoredCohortFamilyId, now = Date.now()): CompanionStoryArc {
+export function beginAuthoredCohortReturn(familyId: AuthoredCohortFamilyId, now = gameNow()): CompanionStoryArc {
   const current = loadAuthoredCohortStory(familyId);
   if (current.status !== 'return_available') return current;
   return saveAuthoredCohortStory(familyId, { ...current, status: 'conversation_active', unreadReturn: false, updatedAt: now });
 }
 
-export function completeBaristabbitConversation(level: number, now = Date.now()): CompanionStoryArc {
+export function completeBaristabbitConversation(level: number, now = gameNow()): CompanionStoryArc {
   return completeAuthoredCohortConversation('baristabbit', level, now);
 }
 
-export function completeAuthoredCohortConversation(familyId: AuthoredCohortFamilyId, level: number, now = Date.now()): CompanionStoryArc {
+export function completeAuthoredCohortConversation(familyId: AuthoredCohortFamilyId, level: number, now = gameNow()): CompanionStoryArc {
   const current = loadAuthoredCohortStory(familyId);
   if (current.status !== 'conversation_active' || current.pendingConversationId !== `${familyId}:story:${level}`) return current;
   const beatId = `${familyId}-story:level-${level}`;
@@ -415,7 +418,7 @@ export function completeAuthoredCohortConversation(familyId: AuthoredCohortFamil
   });
 }
 
-export function beginFeastleStory(now = Date.now()): CompanionStoryArc {
+export function beginFeastleStory(now = gameNow()): CompanionStoryArc {
   const current = loadFeastleStory();
   if (current.status !== 'intro_available') return current;
   return saveFeastleStory({
@@ -424,7 +427,7 @@ export function beginFeastleStory(now = Date.now()): CompanionStoryArc {
   });
 }
 
-export function beginFeastleActTwo(now = Date.now()): CompanionStoryArc {
+export function beginFeastleActTwo(now = gameNow()): CompanionStoryArc {
   const current = loadFeastleStory();
   if (current.currentActId !== 'act-1' || current.status !== 'chapter_complete') return current;
   return saveFeastleStory({
@@ -434,7 +437,7 @@ export function beginFeastleActTwo(now = Date.now()): CompanionStoryArc {
   });
 }
 
-export function recordFeastleJournalEvidence(recordId: string, signal?: FeastleStorySignalValue | null, now = Date.now()): CompanionStoryArc {
+export function recordFeastleJournalEvidence(recordId: string, signal?: FeastleStorySignalValue | null, now = gameNow()): CompanionStoryArc {
   const current = loadFeastleStory();
   const relevantJournalRecordIds = [...new Set([...current.relevantJournalRecordIds, recordId])];
   const storySignals = signal && !current.storySignals.some((item) => item.id === `journal:${recordId}`)
@@ -444,7 +447,7 @@ export function recordFeastleJournalEvidence(recordId: string, signal?: FeastleS
   return saveFeastleStory({ ...current, relevantJournalRecordIds, storySignals, updatedAt: now });
 }
 
-export function recordFeastleStorySignal(sourceId: string, value: FeastleStorySignalValue, now = Date.now()): CompanionStoryArc {
+export function recordFeastleStorySignal(sourceId: string, value: FeastleStorySignalValue, now = gameNow()): CompanionStoryArc {
   const current = loadFeastleStory();
   const id = `conversation:${sourceId}`;
   if (current.storySignals.some((signal) => signal.id === id)) return current;
@@ -455,19 +458,19 @@ export function recordFeastleStorySignal(sourceId: string, value: FeastleStorySi
   });
 }
 
-export function recordFeastleConfirmedMemory(memoryKey: string, now = Date.now()): CompanionStoryArc {
+export function recordFeastleConfirmedMemory(memoryKey: string, now = gameNow()): CompanionStoryArc {
   const current = loadFeastleStory();
   if (current.confirmedMemoryKeys.includes(memoryKey)) return current;
   return saveFeastleStory({ ...current, confirmedMemoryKeys: [...current.confirmedMemoryKeys, memoryKey], updatedAt: now });
 }
 
-export function markFeastleOrderActive(orderId: string, now = Date.now()): CompanionStoryArc {
+export function markFeastleOrderActive(orderId: string, now = gameNow()): CompanionStoryArc {
   const current = loadFeastleStory();
   if (current.status !== 'order_active' || current.activeOrderId === orderId) return current;
   return saveFeastleStory({ ...current, activeOrderId: orderId, updatedAt: now });
 }
 
-export function recordFeastleQuietBond(receiptId: string, points: number, now = Date.now()): CompanionStoryArc {
+export function recordFeastleQuietBond(receiptId: string, points: number, now = gameNow()): CompanionStoryArc {
   const current = loadFeastleStory();
   const accumulated = accumulateQuietBond(current.pendingBondPoints, current.processedQuietBondReceiptIds, receiptId, points);
   if (!accumulated.changed) return current;
@@ -479,7 +482,9 @@ export function recordFeastleQuietBond(receiptId: string, points: number, now = 
   });
 }
 
-export function markFeastleOrderServed(orderId: string, targetLevel: number, now = Date.now(), storyStepCount = 1): CompanionStoryArc {
+export function markFeastleOrderServed(orderId: string, targetLevel: number, now = gameNow(), storyStepCount = 1): CompanionStoryArc {
+  // Authored chapters own narrative unlocks, including the first pantry lesson.
+  if (journeyChapterFor('feastle')) return markAuthoredCohortOrderServed('feastle', orderId, now);
   const current = loadFeastleStory();
   if (current.completedOrderIds.includes(orderId)) return current;
   const completedOrderIds = [...current.completedOrderIds, orderId];
@@ -532,13 +537,13 @@ export function markFeastleOrderServed(orderId: string, targetLevel: number, now
   });
 }
 
-export function beginFeastleReturn(now = Date.now()): CompanionStoryArc {
+export function beginFeastleReturn(now = gameNow()): CompanionStoryArc {
   const current = loadFeastleStory();
   if (current.status !== 'return_available') return current;
   return saveFeastleStory({ ...current, status: 'conversation_active', unreadReturn: false, updatedAt: now });
 }
 
-export function completeFeastleConversation(level: number, now = Date.now()): CompanionStoryArc {
+export function completeFeastleConversation(level: number, now = gameNow()): CompanionStoryArc {
   const current = loadFeastleStory();
   const beatId = `feastle-story:level-${level}`;
   if (current.status !== 'conversation_active' || current.pendingConversationId !== `feastle:friendship:${level}`) return current;
@@ -613,7 +618,7 @@ function isStorySignal(value: unknown): value is FeastleStorySignal {
     && typeof signal.recordedAt === 'number';
 }
 
-export function setFeastleStoryStateForDebug(status: CompanionStoryStatus, level: number, now = Date.now()): CompanionStoryArc {
+export function setFeastleStoryStateForDebug(status: CompanionStoryStatus, level: number, now = gameNow()): CompanionStoryArc {
   const targetLevel = status === 'order_active' ? Math.min(4, level + 1) : level;
   return saveFeastleStory({
     ...freshFeastleStory(now), currentLevel: level, targetLevel,

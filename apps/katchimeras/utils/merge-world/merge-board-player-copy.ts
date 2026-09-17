@@ -6,7 +6,7 @@ import { MERGE_GENERATORS_BY_ID, MERGE_ITEMS_BY_ID, type MossproutRootGateDefini
  */
 export function mossproutRootConditionCopy(root: MossproutRootGateDefinition) {
   if (root.kind === 'journey_day' || root.kind === 'mastery') {
-    return `Reach Mossprout Journey Day ${root.target}.`;
+    return `Reach Mossprout Chapter ${root.target}.`;
   }
   if (root.kind === 'friendship') return `Reach Friendship Level ${root.target} with Mossprout.`;
   if (root.kind === 'memory') return root.target === 1

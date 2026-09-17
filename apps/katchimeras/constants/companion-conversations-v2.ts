@@ -44,3 +44,9 @@ export const companionConversationDefinitionById = new Map(
 export function companionConversationDefinitionsForFamily(familyId: string): readonly ConversationDefinition[] {
   return companionConversationDefinitionsV2.filter((definition) => definition.familyId === familyId);
 }
+
+/** Explicit hosted stories may be registered from a pinned event, outside random chat pools. */
+export function explicitCompanionConversation(familyId: string, definitionId: string): ConversationDefinition | null {
+  const definition = companionConversationDefinitionById.get(definitionId);
+  return definition?.familyId === familyId ? definition : null;
+}

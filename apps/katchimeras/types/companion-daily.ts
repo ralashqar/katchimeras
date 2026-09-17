@@ -105,6 +105,8 @@ export type CompanionStepGoalConfig = {
 };
 
 export type CompanionDailyConfig = {
+  /** Merge request card and submenu title. Blank or absent uses "Tend garden". */
+  gardenActionLabel?: string;
   /** The chapter name over the journey card until a journey chapter says otherwise. */
   chapterTitle: string;
   /** Said while the friend rests between journey days. */

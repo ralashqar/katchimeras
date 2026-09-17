@@ -1,3 +1,4 @@
+import { resetDevGameTime } from '@/utils/dev-game-clock';
 import { resetAllCompanionLifeActivities } from '@/utils/companion-life-activity-storage';
 import { resetCompanionWaterCounts } from '@/utils/companion-water-storage';
 import { resetCompanionAchievementsForDebug } from '@/utils/companion-achievements-storage';
@@ -22,6 +23,7 @@ export async function resetKatchimeraProgressForDebug({
   resetAt?: number;
   resetDevAccess?: boolean;
 } = {}): Promise<void> {
+  resetDevGameTime();
   resetAllCompanionLifeActivities();
   resetCompanionWaterCounts();
   setJourneyQuickModeEnabled(false);

@@ -1,4 +1,6 @@
+import { gameNow } from '@/utils/game-clock';
 import { COMPANION_JOURNEY_CHAPTERS, journeyChapterFor, journeyEpisodeById, journeyEpisodeRecordId } from '@/constants/companion-journey-chapters/registry';
+import { explicitCompanionConversation } from '@/constants/companion-conversations-v2';
 import { COMPANION_JOURNEY_PROFILES } from '@/constants/companion-journey-profiles';
 import { beginJourneyReturnPresentation, completeMeditationRequest, settleDailyGardenDelivery, createJourneyCycle, currentJourneyCycle, finishJourneyReturn, installJourneyCycle, journeyCycleReady, observeJourneySteps, observeJourneyStepWindow } from '@/game/katchimeras/companion-journey-cycle';
 import { relationshipProgressionRepository as repository } from '@/storage/repositories/relationship-progression-repository';
@@ -6,7 +8,7 @@ import { homeRepository } from '@/storage/repositories/home-repository';
 import { beginAuthoredCohortStory, isAuthoredCohortFamily, loadAuthoredCohortStory, saveAuthoredCohortStory } from '@/utils/companion-story-storage';
 import { katchimeraMeditationRecord, mossproutStory } from '@/game/katchimeras/relationship-progression';
 import type { RelationshipProgressState } from '@/types/relationship-progression';
-import { grantStoredJourneyReturn, loadMergeWorldState, reconcileStoredJourneyMeditation } from '@/utils/merge-world/repository';
+import { ensureStoredJourneyGardenOrders, grantStoredJourneyReturn, loadMergeWorldState, reconcileStoredJourneyMeditation } from '@/utils/merge-world/repository';
 import { JOURNEY_GARDEN_ORDERS_EFFECT, episodeConsequences } from '@/constants/companion-journey-chapters/consequence-flow';
 import { applyEpisodeCompletes } from '@/features/companion/journey-consequence-state';
 import { localDayId } from '@/utils/world-identity';
@@ -73,7 +75,7 @@ const signatureOrderId = (chapter: CompanionJourneyChapterDefinition) => chapter
 const episodeIndex = (chapter: CompanionJourneyChapterDefinition, episodeId: string) => chapter.episodes.findIndex((episode) => episode.id === episodeId);
 
 /** The friend rests after an episode: a cycle (its requests shorten the pause) and a meditation record. */
-export function startJourneyRest(familyId: string, episodeId: string, participation: JourneyParticipation = 'not_yet', now = Date.now()) {
+export function startJourneyRest(familyId: string, episodeId: string, participation: JourneyParticipation = 'not_yet', now = gameNow()) {
   const chapter = requireChapter(familyId, episodeId);
   const index = episodeIndex(chapter, episodeId);
   const episode = chapter.episodes[index];
@@ -91,7 +93,7 @@ export function completeJourneyEpisode(familyId: string, episodeId: string, inpu
   const found = journeyEpisodeById(familyId, episodeId);
   if (!found) throw new Error(`Unknown episode ${episodeId} for ${familyId}`);
   const { chapter, episode, compiled } = found;
-  const now = input.now ?? Date.now();
+  const now = input.now ?? gameNow();
   const recordId = journeyEpisodeRecordId(chapter.familyId, episode.id);
   if (repository.load().journeyEpisodes?.[recordId]) return false;
   const answers: Record<string, string> = {};
@@ -161,8 +163,9 @@ export function registerCompanionJourneyFlows() {
     return { effectKey };
   });
   registerContentFlowDefinition(RETURN_FLOW);
-  // An episode's Garden orders are placed by the Garden's own reconcile, from the episode record; the effect only marks the step.
+  // Persist authored deliveries immediately; ordinary Garden entry also repairs older saves.
   registerContentFlowEffect(JOURNEY_GARDEN_ORDERS_EFFECT, async ({ effectKey, payload }) => {
+    await ensureStoredJourneyGardenOrders(repository.load());
     const orders = payload.orders as { id: string }[];
     return { effectKey, orderIds: orders.map((order) => order.id) };
   });
@@ -170,9 +173,9 @@ export function registerCompanionJourneyFlows() {
     const cycle = repository.load().journeyCycles?.find((item) => item.id === run.variables.cycleId);
     if (!cycle) throw new Error('Journey return is missing');
     if (cycle.returnedAt != null) return { effectKey };
-    if (!journeyCycleReady(repository.load(), cycle, Date.now())) throw new Error('Your companion is still reflecting');
+    if (!journeyCycleReady(repository.load(), cycle, gameNow())) throw new Error('Your companion is still reflecting');
     await grantStoredJourneyReturn(cycle, localDayId());
-    repository.update((state) => finishJourneyReturn(state, cycle.id, Date.now()));
+    repository.update((state) => finishJourneyReturn(state, cycle.id, gameNow()));
     if (journeyChapterFor(cycle.familyId)) projectJourneyOrders(cycle.familyId);
     return { effectKey, rewardId: cycle.rewardId };
   });
@@ -196,8 +199,12 @@ export function registerCompanionJourneyFlows() {
 export async function initializeJourney(familyId: string) {
   const chapter = activeJourneyChapter(familyId);
   if (!chapter) return true;
-  if (chapter.afterChapterId) { registerCompanionJourneyFlows(); return true; }
-  return serialize(`${chapter.familyId}-initialize`, () => initializeJourneyOnce(chapter));
+  return serialize(`${chapter.familyId}-initialize`, async () => {
+    registerCompanionJourneyFlows();
+    const ready = chapter.afterChapterId ? true : await initializeJourneyOnce(chapter);
+    if (ready) await ensureStoredJourneyGardenOrders(repository.load());
+    return ready;
+  });
 }
 
 /** Preserve legacy conversations already in progress; migrate once they close.
@@ -215,6 +222,11 @@ async function initializeJourneyOnce(chapter: CompanionJourneyChapterDefinition)
     return true;
   }
   let story = loadAuthoredCohortStory(familyId);
+  // Retired friendship dialogue must not block the replacement chapter.
+  // A real pending conversation still keeps its existing handoff below.
+  if (!chapter.orders && story.pendingConversationId && !explicitCompanionConversation(familyId, story.pendingConversationId)) {
+    story = saveAuthoredCohortStory(familyId, { ...story, pendingConversationId: null, unreadReturn: false });
+  }
   if (story.journeyManaged) { migrateDayAndRestCycles(chapter); return true; }
   if (story.pendingConversationId) return false;
   const firstDay = await loadContentFlowRun(chapter.dayOne.runId);
@@ -243,9 +255,9 @@ async function initializeJourneyOnce(chapter: CompanionJourneyChapterDefinition)
   } else {
     // The first meeting captures intention, not proof of an activity.
     const dayOne = chapter.episodes.find((episode) => episode.dayOne);
-    if (dayOne) completeJourneyEpisode(familyId, dayOne.id, { now: firstDay?.completedAt ?? Date.now() });
+    if (dayOne) completeJourneyEpisode(familyId, dayOne.id, { now: firstDay?.completedAt ?? gameNow() });
   }
-  const chapterOrders = (ids: Iterable<string>) => [...ids].filter((id) => chapter.orders && id.startsWith(chapter.orders.idPrefix));
+  const chapterOrders = (ids: Iterable<string>) => [...ids].filter((id) => !chapter.orders || id.startsWith(chapter.orders.idPrefix));
   saveAuthoredCohortStory(familyId, { ...story, journeyManaged: true, status: finished ? 'chapter_complete' : 'conversation_active', pendingConversationId: null,
     completedOrderIds: chapterOrders(served), orderDeck: story.orderDeck ? { ...story.orderDeck, servedOrderIds: chapterOrders(served) } : null });
   projectJourneyOrders(familyId);
@@ -343,12 +355,12 @@ export async function reconcileCompanionMeditation(familyId: string) {
   // A walker's rest listens to steps: the day's aggregates, and the pedometer window since the rest began.
   const tracksSteps = COMPANION_JOURNEY_PROFILES[cycle.familyId]?.tracker === 'steps';
   let windowSteps: number | null = null;
-  if (tracksSteps && cycle.returnedAt == null && !journeyCycleReady(repository.load(), cycle, Date.now()) && Date.now() - (lastStepQuery.get(cycle.id) ?? 0) >= 30000) {
-    lastStepQuery.set(cycle.id, Date.now());
+  if (tracksSteps && cycle.returnedAt == null && !journeyCycleReady(repository.load(), cycle, gameNow()) && gameNow() - (lastStepQuery.get(cycle.id) ?? 0) >= 30000) {
+    lastStepQuery.set(cycle.id, gameNow());
     try {
       const { Pedometer } = await import('expo-sensors');
       const permission = await Pedometer.getPermissionsAsync();
-      if (permission.granted && await Pedometer.isAvailableAsync()) {
+      if (permission.granted && cycle.completedAt <= Date.now() && await Pedometer.isAvailableAsync()) {
         windowSteps = (await Pedometer.getStepCountAsync(new Date(cycle.completedAt), new Date(Date.now()))).steps;
       }
     } catch { /* Unsupported/denied Motion keeps the adapted and rest paths available. */ }
@@ -371,23 +383,23 @@ export async function reconcileCompanionMeditation(familyId: string) {
         const dayId = day.stepsCountDayId ?? day.isoDate;
         if (!day.stepsUpdatedAt) continue;
         const measuredAt = Date.parse(day.stepsUpdatedAt);
-        if (!Number.isFinite(measuredAt) || measuredAt > Date.now()) continue;
+        if (!Number.isFinite(measuredAt) || measuredAt > gameNow()) continue;
         state = observeJourneySteps(state, cycle.id, dayId, day.stepsCount, measuredAt, new Date(`${dayId}T00:00:00`).getTime());
       }
-      if (windowSteps != null) state = observeJourneyStepWindow(state, cycle.id, windowSteps, Date.now());
+      if (windowSteps != null) state = observeJourneyStepWindow(state, cycle.id, windowSteps, gameNow());
     }
     return state;
   });
   const latest = currentJourneyCycle(repository.load(), familyId)!;
   const rest = repository.load().meditations?.find((item) => (item.cycleId ?? item.sourceId) === latest.id);
-  await reconcileStoredJourneyMeditation(latest, rest?.availableAt ?? latest.completedAt, Date.now());
-  repository.update((state) => beginJourneyReturnPresentation(state, latest.id, Date.now()));
+  await reconcileStoredJourneyMeditation(latest, rest?.availableAt ?? latest.completedAt, gameNow());
+  repository.update((state) => beginJourneyReturnPresentation(state, latest.id, gameNow()));
 }
 
 export function claimCompanionJourneyReturn(cycleId: string) {
   return serialize(cycleId, async () => {
     const cycle = repository.load().journeyCycles?.find((item) => item.id === cycleId);
-    if (!cycle || cycle.returnedAt != null || !journeyCycleReady(repository.load(), cycle, Date.now())) return;
+    if (!cycle || cycle.returnedAt != null || !journeyCycleReady(repository.load(), cycle, gameNow())) return;
     registerCompanionJourneyFlows();
     const runId = `journey-return:${cycleId}`;
     const existing = await loadContentFlowRun(runId);

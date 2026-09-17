@@ -7,6 +7,9 @@ import { createInitialMergeWorldState, reduceMergeWorld } from '../utils/merge-w
 import { createContentFlowRun, reduceContentFlow } from '../features/content-flow/content-flow-interpreter';
 import { STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID } from '../features/content-flow/steppling-day-one-flow';
 import { STEPPLING_CHAPTER } from '../constants/companion-journey-chapters/steppling';
+import { FEASTLE_CHAPTER } from '../constants/companion-journey-chapters/feastle';
+import { reconcileJourneyGardenOrders } from '../features/companion/journey-garden-orders';
+import { hatchableByCompanion } from '../constants/hatchable-companions/registry';
 import { journeyEpisodeConversation } from '../constants/companion-journey-chapters/episode-conversation';
 import { emptyCompanionBondState } from '../utils/companion-bond';
 import type { ContentFlowCommand, ContentFlowDefinition, ContentFlowRun } from '../types/content-flow';
@@ -53,6 +56,7 @@ function harness(legacy = false) {
   }
   let failGift = false;
   const service = loadNativeModule('features/companion/companion-journey-service.ts', {
+    '@/utils/game-clock': { gameNow: () => clock.now },
     '@/storage/repositories/relationship-progression-repository': { relationshipProgressionRepository: {
       load: () => relationships, update: (reduce: (value: typeof relationships) => typeof relationships) => { relationships = reduce(relationships); return relationships; },
     } },
@@ -66,7 +70,7 @@ function harness(legacy = false) {
     '@/constants/katchimera-skins': { companionIdForFamily: (family: string) => `companion:${family}` },
     '@/utils/companion-bond-storage': { loadCompanionBondState: () => bond, saveCompanionBondState: (state: typeof bond) => { bond = state; } },
     '@/utils/companion-story-storage': {
-      isAuthoredCohortFamily: (familyId: string) => familyId === 'steppling' || familyId === 'baristabbit',
+      isAuthoredCohortFamily: (familyId: string) => hatchableByCompanion(familyId) != null,
       loadAuthoredCohortStory: () => story,
       saveAuthoredCohortStory: (_family: string, value: CompanionStoryArc) => { story = value; return story; },
       beginAuthoredCohortStory: () => {
@@ -75,6 +79,7 @@ function harness(legacy = false) {
       },
     },
     '@/utils/merge-world/repository': {
+      ensureStoredJourneyGardenOrders: async () => { world = reconcileJourneyGardenOrders(world, relationships, clock.now); },
       loadMergeWorldState: async () => world,
       reconcileStoredJourneyMeditation: async (cycle: CompanionJourneyCycle, availableAt: number, now: number) => {
         const result = reduceMergeWorld(world, { type: 'reconcileJourneyMeditation', cycle, availableAt, now }); world = result.state; return result;
@@ -212,6 +217,37 @@ test('an existing unfinished legacy conversation is preserved before migration',
   assert.equal(await app.service.initializeJourney('steppling'), false);
   assert.equal(Object.keys(app.state.journeyEpisodes ?? {}).length, 0);
   assert.equal(app.story.pendingConversationId, 'steppling:story:6');
+});
+
+test('Feastle recovers retired pantry return dialogue and opens his authored chapter without replaying rewards', async () => {
+  const app = harness();
+  app.setStory({ ...app.story, familyId: 'feastle', status: 'return_available', pendingConversationId: 'feastle:friendship:2', completedOrderIds: ['feastle:discovery:first-snack'] });
+  const first = app.runs.get(STEPPLING_DAY_ONE_RUN_ID)!;
+  app.runs.set(FEASTLE_CHAPTER.dayOne.runId, { ...first, runId: FEASTLE_CHAPTER.dayOne.runId, definitionId: FEASTLE_CHAPTER.dayOne.flowId });
+  assert.equal(await app.service.initializeJourney('feastle'), true);
+  assert.equal(app.story.pendingConversationId, null);
+  assert.equal(app.story.journeyManaged, true);
+  assert.ok(app.state.journeyEpisodes?.['feastle:day-1']);
+  assert.equal(app.state.journeyEpisodes?.['feastle:day-2'], undefined);
+  assert.ok(app.story.completedOrderIds.includes('feastle:discovery:first-snack'), 'keep delivery history');
+  assert.equal(await app.service.initializeJourney('feastle'), true);
+  assert.equal(Object.keys(app.state.journeyEpisodes ?? {}).length, 1);
+  assert.equal(app.bond.events.length, 0);
+  assert.equal(app.world.arrivals.length, 0);
+});
+
+test('reopening an already-managed Feastle chapter repairs missing Garden orders without resetting progress', async () => {
+  const app = harness();
+  app.setStory({ ...app.story, familyId: 'feastle', journeyManaged: true, status: 'conversation_active' });
+  app.setRelationships({ ...app.state, journeyEpisodes: Object.fromEntries(['day-1', 'day-2'].map(episodeId => [`feastle:${episodeId}`, { familyId: 'feastle', episodeId, completedAt: app.clock.now, answers: {}, facts: {} }])) });
+  const before = JSON.stringify(app.state);
+  assert.equal(await app.service.initializeJourney('feastle'), true);
+  assert.ok(app.world.activeOrders.some(order => order.id === 'feastle:chapter-1:doorstep-snacks'));
+  assert.equal(JSON.stringify(app.state), before);
+  const world = app.world;
+  await app.service.initializeJourney('feastle');
+  assert.equal(app.world, world);
+  assert.equal(app.bond.events.length, 0);
 });
 
 test('orders reach the signature once enough are served and the chapter completes with its last episode', async () => {

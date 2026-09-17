@@ -51,6 +51,7 @@ export function glowGatewayState(state: MergeWorldState): 'egg' | 'open' | 'lock
 /** Whether a hatchable tile has woken: its definition says what has to have happened first. */
 export function hatchableAvailable(state: MergeWorldState, definition: HatchableCompanionDefinition): boolean {
   const { availability } = definition;
+  if (availability.kind === 'event_joined') return Boolean(state.localLiveOps?.runs[availability.eventId]);
   if (availability.kind === 'after_ftue') return true;
   if (availability.kind === 'kingdom_goal_introduced') return state.kingdomGoal?.introducedAt != null;
   return state.companionDiscovery.records.some((record) => record.characterId === availability.companion);

@@ -1,3 +1,5 @@
+import { gameNow } from '@/utils/game-clock';
+import type { ReactNode } from 'react';
 import { conversationUsesNarrativeOverlay } from '@/utils/conversation-presentation';
 import { ftueDialoguePages } from '@/features/onboarding/ftue-dialogue-pages';
 import { useCompanionDestinationMotion } from '@/hooks/use-companion-destination-motion';
@@ -101,6 +103,7 @@ export type CompanionInteractionSheetProps = {
   houseLevel?: number;
   initialDestination?: CompanionDestination | null;
   initialConversationDefinitionId?: string;
+  worldEventAction?: ReactNode;
   onInitialConversationComplete?: (session: ConversationSession) => void | Promise<void>;
   onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
   ftueOrderPreviewActive?: boolean;
@@ -189,7 +192,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const relationships = useRelationshipProgression();
   const storedMeditation = katchimeraMeditationRecord(relationships, props.familyId);
   const meditationAvailableAt = storedMeditation?.availableAt;
-  const [meditationNow, setMeditationNow] = useState(Date.now());
+  const [meditationNow, setMeditationNow] = useState(gameNow());
   const [actionSubmenuOpen, setActionSubmenuOpen] = useState(false);
   const [actionNarration, setActionNarration] = useState<string | null>(null);
   const [journeyNarration, setJourneyNarration] = useState<string | null>(null);
@@ -203,9 +206,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       ? interactionAvailability
       : null;
   useEffect(() => {
-    setMeditationNow(Date.now());
-    if (!meditationAvailableAt || meditationAvailableAt <= Date.now()) return;
-    const timer = setInterval(() => setMeditationNow(Date.now()), 1_000);
+    setMeditationNow(gameNow());
+    if (!meditationAvailableAt || meditationAvailableAt <= gameNow()) return;
+    const timer = setInterval(() => setMeditationNow(gameNow()), 1_000);
     return () => clearInterval(timer);
   }, [meditationAvailableAt, props.familyId]);
   const mossproutJourney = props.familyId === 'mossprout'
@@ -460,12 +463,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       && props.conversationDefinition?.id === definitionId
     ) {
       pendingStoryConversationRef.current = null;
-      if (openedStoryConversationRef.current !== definitionId) {
-        openedStoryConversationRef.current = definitionId;
-        showConversation();
-      }
+      // An explicit tap must reopen an unfinished conversation even if this
+      // retained screen has already shown it and returned to the dashboard.
+      openedStoryConversationRef.current = definitionId;
+      showConversation();
       return;
     }
+    openedStoryConversationRef.current = null;
     pendingStoryConversationRef.current = definitionId;
     startConversation({ definitionId, actionOrigin });
   }, [props.conversationDefinition?.id, props.conversationSession?.definitionId, props.conversationSession?.status, showConversation, startConversation]);
@@ -1183,6 +1187,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   ]}
                 />
               ) : null}
+              {dashboardRouteActive && !props.ftueCompanionSurfaceOwned ? props.worldEventAction : null}
               {questionnaireExperience && props.journeyDefinition ? (
                 <CompanionJourneyQuestionnairePage
                   accentColor={props.accentColor}

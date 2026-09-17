@@ -1,4 +1,5 @@
-import { getStoredJson, setStoredJson } from '@/utils/app-storage';
+import { saveWithGameplayOutbox } from '@/features/live-ops/source-outbox';
+import { getStoredJson } from '@/utils/app-storage';
 import { emptyRelationshipProgressState, normalizeRelationshipProgressState } from '@/game/katchimeras/relationship-progression';
 import type { RelationshipProgressState } from '@/types/relationship-progression';
 
@@ -11,7 +12,7 @@ function hydrateRelationshipProgression(): RelationshipProgressState {
   // Hydration dismisses presentations that were already claimed before an
   // interrupted animation. Visual work is never replayed as progression.
   const normalized = normalizeRelationshipProgressState(stored, { dismissClaimedPresentations: true });
-  if (JSON.stringify(stored) !== JSON.stringify(normalized)) setStoredJson(STORAGE_KEY, normalized);
+  if (JSON.stringify(stored) !== JSON.stringify(normalized)) saveWithGameplayOutbox(STORAGE_KEY, normalized);
   return normalized;
 }
 
@@ -22,8 +23,8 @@ export const relationshipProgressionRepository = {
   },
   save(state: RelationshipProgressState) {
     const normalized = normalizeRelationshipProgressState(state);
+    saveWithGameplayOutbox(STORAGE_KEY, normalized);
     cache = normalized;
-    setStoredJson(STORAGE_KEY, normalized);
     listeners.forEach((listener) => listener(normalized));
   },
   update(reducer: (state: RelationshipProgressState) => RelationshipProgressState) {

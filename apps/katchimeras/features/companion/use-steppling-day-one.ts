@@ -1,3 +1,4 @@
+import { gameNow } from '@/utils/game-clock';
 import { ensureGardenLesson, hatchableForCompanion } from '@/features/onboarding/hatchable-runtime';
 import { gardenHandoffPendingFor } from '@/utils/steppling-day-one-session';
 import { LEGACY_STEPPLING_DAY_ONE_FLOW_V2 } from '@/features/content-flow/legacy/steppling-day-one-flow-v2';
@@ -34,7 +35,7 @@ export function acknowledgeHatchableDayOneGarden(definition: HatchableCompanionD
   const pending = (session: Parameters<typeof gardenHandoffPendingFor>[0]) => gardenHandoffPendingFor(session, definition.dayOne.conversationId, definition.dayOne.flow.version);
   if (!state.conversationSessions.some(pending)) return;
   saveCompanionContentState({ ...state, conversationSessions: state.conversationSessions.map((session) =>
-    pending(session) ? { ...session, gardenHandoffAt: Date.now() } : session) });
+    pending(session) ? { ...session, gardenHandoffAt: gameNow() } : session) });
 }
 export function acknowledgeStepplingDayOneGarden() {
   return acknowledgeHatchableDayOneGarden(STEPPLING_HATCHABLE);

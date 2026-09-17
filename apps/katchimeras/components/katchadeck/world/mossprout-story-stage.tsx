@@ -1,3 +1,4 @@
+import { gameNow } from '@/utils/game-clock';
 import { CompanionChoiceList } from './companion-choice-list';
 import { CompanionSceneCards } from './companion-scene-cards';
 import { CompanionLifeActivityCard } from './companion-life-activity-card';
@@ -194,7 +195,7 @@ export function MossproutStoryStage({
   const { state: mergeWorldState } = useMossproutMergeWorldState();
   const quickMode = isJourneyQuickModeEnabled();
   const dayOneLessonCompleted = Boolean(relationships.milestones.dayOneLessonCompletedAt);
-  const dayId = mossproutJourneyRuntimeDayId(relationships, localDayId(), quickMode);
+  const dayId = mossproutJourneyRuntimeDayId(relationships, localDayId(new Date(gameNow())), quickMode);
   const stageLocalReplacement = useCallback((
     slotId: KatchimeraDayAction['slotId'],
     commitReplacement: () => void,
@@ -282,7 +283,7 @@ export function MossproutStoryStage({
   }, [dayOneActionChoiceActive, journey?.beatId, journey?.id, journey?.actions.length]);
 
   useEffect(() => {
-    if (journey?.status !== 'living' || (journey.resolutionAvailableAt ?? Infinity) > Date.now()) return;
+    if (journey?.status !== 'living' || (journey.resolutionAvailableAt ?? Infinity) > gameNow()) return;
     relationshipProgressionRepository.update((current) => makeMossproutResolutionAvailable(current, dayId));
   }, [dayId, journey?.resolutionAvailableAt, journey?.status]);
 
@@ -319,7 +320,7 @@ export function MossproutStoryStage({
       return recordKatchimeraActionCompletion(state, {
         dayId, familyId: 'mossprout', actionId, instanceId, slotId, sequence, kind: 'goal_checkoff',
         title: item.goal.title, subtitle: 'A small promise kept', icon: 'checkmark.circle.fill', artKey: mossproutGoalArtKey(item.goal.templateId), artworkDefinitionIds: [],
-        reward: { kind: 'bond', amount: 5 }, completedAt: Date.now(),
+        reward: { kind: 'bond', amount: 5 }, completedAt: gameNow(),
       });
     }, current));
   }, [dayId, goals]);
@@ -422,7 +423,7 @@ export function MossproutStoryStage({
   const openJourney = (sourceAction?: KatchimeraDayAction) => {
     if (!journey || journey.status === 'complete') {
       const activeDayCount = mergeWorldState?.mossproutBoardProgression.activeDayIds.length ?? 0;
-      const started = relationshipProgressionRepository.update((current) => startMossproutJourneyDay(current, dayId, Date.now(), activeDayCount, quickMode).state);
+      const started = relationshipProgressionRepository.update((current) => startMossproutJourneyDay(current, dayId, gameNow(), activeDayCount, quickMode).state);
       const startedJourney = mossproutJourneyForDay(started, dayId);
       if (!startedJourney) return;
       const opening = startedJourney.openingConversationId;
@@ -527,7 +528,7 @@ export function MossproutStoryStage({
         artKey: mossproutGoalArtKey(goal.templateId),
         artworkDefinitionIds: [],
         reward: action.reward,
-        completedAt: Date.now(),
+        completedAt: gameNow(),
       });
     });
     if (receipt.bondAward && source) onBondRewardRequest(source, onRewardArrive);
@@ -620,7 +621,7 @@ export function MossproutStoryStage({
         standalone
         title={journeyEpisode.title}
       />
-    </View> : <View ref={actionStackTargetRef} accessibilityLabel="Mossprout Journey Day actions" style={[styles.actionStack, visibleActionCount === 2 && { height: 139 }]}>
+    </View> : <View ref={actionStackTargetRef} accessibilityLabel="Mossprout Chapter actions" style={[styles.actionStack, visibleActionCount === 2 && { height: 139 }]}>
       <View style={[styles.actionSlot, visibleActionCount === 2 && { height: 139 }]}>
       {boardSnapshot.slots.slice(0, visibleActionCount).map((slot) => {
         const presentedAction = slot.action;

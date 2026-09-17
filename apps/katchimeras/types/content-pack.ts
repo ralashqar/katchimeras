@@ -16,7 +16,7 @@ import type { AlphaBounds } from '@/utils/hex-alpha-bounds';
  * the bundle. A pack only adds: an id the bundle already has is refused. The
  * schema version gates what an older app will load.
  */
-export const CONTENT_SCHEMA_VERSION = 2;
+export const CONTENT_SCHEMA_VERSION = 4;
 
 export type ContentPackArtEntry = {
   /** Where to fetch the file (https, or file:// for a pack on the device). */
@@ -58,6 +58,7 @@ export type ContentPackGenerator = {
 
 /** What a pack can carry; each kind is optional. */
 export type ContentPackContent = {
+  harmonyDefinitions?: readonly import('./local-live-ops').HarmonyDefinition[];
   liveEvents?: readonly import('./live-ops').LiveEventDefinition[];
   characters?: readonly ContentPackCharacter[];
   families?: readonly KatchimeraFamilyDefinition[];

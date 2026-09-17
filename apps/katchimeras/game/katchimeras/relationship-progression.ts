@@ -1,3 +1,4 @@
+import { isWorldEventDailyAction } from '@/features/live-ops/world-event-identity';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { normalizeJourneyCycles, currentJourneyCycle, createJourneyCycle, installJourneyCycle } from './companion-journey-cycle';
 import type { ConversationSession } from '@/types/companion-conversation';
@@ -85,6 +86,7 @@ export function normalizeRelationshipProgressState(value: unknown, options: {
       .filter((completion) => !completion.actionId.startsWith('mossprout:conversation:mossprout:island:'))
       .slice(-160)
     : [];
+  const eventCompletionIds = new Set(actionCompletions.filter(item => isWorldEventDailyAction(item.actionId)).map(item => item.id));
   const actionPresentations = Array.isArray(candidate.actionPresentations)
     // A claim is the card's live animation: every save passes through here, so it must survive
     // a save (the card's row was vanishing the instant it claimed its reward). Only hydration
@@ -93,6 +95,13 @@ export function normalizeRelationshipProgressState(value: unknown, options: {
       ? { ...item, status: 'dismissed' as const, dismissedAt: item.dismissedAt ?? Date.now() }
       : item).filter((item) => actionCompletions.some((completion) => completion.id === item.completionId)).slice(-80)
     : [];
+  // Repair older event builds without undoing any earned Bond or world progress.
+  for (let index = 0; index < actionPresentations.length; index++) {
+    const item = actionPresentations[index];
+    if (eventCompletionIds.has(item.completionId) && item.status !== 'dismissed') {
+      actionPresentations[index] = { ...item, status: 'dismissed', dismissedAt: item.dismissedAt ?? item.claimedAt ?? item.createdAt };
+    }
+  }
   const milestones = {
     dayOneLessonCompletedAt: typeof candidate.milestones?.dayOneLessonCompletedAt === 'number' ? candidate.milestones.dayOneLessonCompletedAt : null,
     dayOneLessonFlowRunId: typeof candidate.milestones?.dayOneLessonFlowRunId === 'string' ? candidate.milestones.dayOneLessonFlowRunId : null,

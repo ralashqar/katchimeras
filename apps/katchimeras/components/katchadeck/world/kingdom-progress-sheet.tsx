@@ -1,3 +1,7 @@
+import { useState } from 'react';
+import { LocalWorldEvents } from './local-world-events';
+import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
+import { harmonyDefinition } from '@/features/live-ops/local-catalog';
 import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
@@ -11,7 +15,7 @@ import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands'
 import { AppFontFamilies } from '@/constants/theme';
 import type { KingdomNext, KingdomPlaceEntry, KingdomProgress } from '@/features/kingdom-progress/kingdom-progress';
 import { getCreatureVisual } from '@/game/days/visuals';
-import type { MossproutNatureIslandId } from '@/types/merge-world';
+import type { MergeWorldState, MossproutNatureIslandId } from '@/types/merge-world';
 import { KingdomProgressSummary } from './kingdom-progress-summary';
 
 const PLACE_STATUS: Record<KingdomPlaceEntry['status'], string> = {
@@ -22,20 +26,31 @@ const PLACE_STATUS: Record<KingdomPlaceEntry['status'], string> = {
 };
 
 /** The Kingdom's long-term goal at a glance: who is home, what is restored, and the one next step. */
-export function KingdomProgressSheet({ progress, onClose, onNext }: {
+export function KingdomProgressSheet({ progress, onClose, onNext, world, onMerge, onExplore }: {
   progress: KingdomProgress;
   onClose: () => void;
   onNext: (next: KingdomNext) => void;
+  world: MergeWorldState;
+  onMerge: () => void;
+  onExplore: (eventId: string) => void;
 }) {
+  const [eventsOpen, setEventsOpen] = useState(false);
+  const harmony = useHarmonyProgress();
   const actionable = progress.next.kind !== 'journey' && progress.next.kind !== 'complete';
   return <KatchaSheet
-    header={{ eyebrow: 'THE GARDEN', title: 'Waking the friends', subtitle: 'One clearing, one friend, one small thing at a time.' }}
+    header={eventsOpen ? { eyebrow: 'THE LIVING GROVE', title: 'World events', subtitle: `${harmony.points} Harmony · lasting progress` } : { eyebrow: 'THE GARDEN', title: 'Waking the friends', subtitle: 'One clearing, one friend, one small thing at a time.' }}
     onRequestClose={onClose}
     scroll
     size="tall"
     surface="parchment">
-    <View style={styles.content}>
+    {eventsOpen ? <LocalWorldEvents world={world} initiallyOpen embedded onMerge={onMerge} onExplore={onExplore} /> : <View style={styles.content}>
       <KingdomProgressSummary progress={progress} />
+      <View style={styles.next}>
+        <ThemedText lightColor="#8E7130" darkColor="#8E7130" style={styles.sectionTitle}>HARMONY · {harmony.points}</ThemedText>
+        <ThemedText lightColor="#332918" darkColor="#332918">Every rescued friend, restored place and discovered story brings the world back together.</ThemedText>
+        <ThemedText lightColor="#332918" darkColor="#332918">{harmony.points < harmonyDefinition().incursionThreshold ? `Next: returning Mist at ${harmonyDefinition().incursionThreshold} Harmony.` : 'Returning Mist is unlocked. Complete an incursion to start your keepsake collection.'}</ThemedText>
+        <KatchaButton label="World events" onPress={() => setEventsOpen(true)} />
+      </View>
       <View style={styles.section}>
         <ThemedText style={styles.sectionTitle} lightColor="#8E7130" darkColor="#8E7130">PLACES</ThemedText>
         {progress.places.entries.map((place) => <View accessibilityLabel={`${place.name}, ${PLACE_STATUS[place.status].toLowerCase()}, level ${place.level} of ${place.maxLevel}`} key={place.id} style={styles.place}>
@@ -51,7 +66,7 @@ export function KingdomProgressSheet({ progress, onClose, onNext }: {
         <ThemedText selectable style={styles.nextLabel} lightColor="#332918" darkColor="#332918">{progress.next.label}</ThemedText>
         {actionable ? <KatchaButton fullWidth glow label="Show me" onPress={() => onNext(progress.next)} /> : null}
       </View>
-    </View>
+    </View>}
   </KatchaSheet>;
 }
 

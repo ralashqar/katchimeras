@@ -126,6 +126,7 @@ export type KingdomTileUpgradeOffer = WorldTileActionPlacement & {
   }>;
 };
 type Props = {
+  gardenEventAdornment?: React.ReactNode;
   background: TodayAtmosphereBackground;
   companionSlots: KingdomHexCompanionSlot[];
   identity?: WorldIdentityState | null;
@@ -484,6 +485,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onCameraSnapshotChange,
   onCameraMotionChange,
   onOpenGarden,
+  gardenEventAdornment,
   upgradeOffers = [],
   selectedUpgradeOffer = null,
   upgradePanel,
@@ -1831,6 +1833,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 </Fragment>
               );
             })}
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && gardenFrame && gardenEventAdornment ? <View style={{ position: 'absolute', left: gardenFrame.left + gardenFrame.width * 0.72, top: gardenFrame.top + gardenFrame.height * 0.3, zIndex: 35 }}>{gardenEventAdornment}</View> : null}
             {focusedMossproutWorld && onGardenPlotTargetChange
               ? gardenPlotFrames.map(({ frame, slotId }) => (
                   <GardenPlotTarget

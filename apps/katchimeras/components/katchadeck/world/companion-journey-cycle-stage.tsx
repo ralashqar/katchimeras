@@ -1,3 +1,5 @@
+import { gameClock, gameNow } from '@/utils/game-clock';
+import { journeyGardenOrders } from '@/features/companion/journey-garden-orders';
 import { resolveContentLine } from '@/utils/content-predicate';
 import { CompanionSceneOverlayHost, CompanionSlidingSubmenu } from './companion-scene-overlay';
 import type { KatchimeraActionOrigin } from '@/types/relationship-progression';
@@ -69,7 +71,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   const [contentRevision, setContentRevision] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(gameNow());
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [submenuOpen, setSubmenuOpen] = useState(false);
   const [reaction, setReaction] = useState<string | null>(null);
@@ -89,7 +91,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
         if (ready) await reconcileCompanionMeditation(familyId);
         const [latestWorld, dayOne] = await Promise.all([loadMergeWorldState(), chapter ? journeyDayOneComplete(chapter.familyId) : Promise.resolve(false)]);
         if (live) { setWorld(latestWorld); setDayOneComplete(dayOne); setBond(loadCompanionBondState()); setContentRevision((value) => value + 1); }
-        if (live) { setManaged(ready); setInitialized(true); setError(null); setNow(Date.now()); }
+        if (live) { setManaged(ready); setInitialized(true); setError(null); setNow(gameNow()); }
       } catch { if (live) setError('Your Journey could not be restored. Please try again.'); }
       finally { refreshing = false; }
     };
@@ -112,13 +114,15 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   }) : null;
   void contentRevision;
   const next = state?.next ?? null;
+  useEffect(() => gameClock.subscribe(() => { setNow(gameNow()); void refreshRef.current(); }), []);
+
   // An episode that only time still holds back counts down like a rest.
   const timeLock = !pending && next?.status === 'locked' && next.opensAt != null && next.opensAt > now ? next : null;
   const availableAt = rest?.availableAt ?? timeLock?.opensAt ?? undefined;
   useEffect(() => {
     if (!availableAt || (rest && cycle?.returnedAt != null)) return;
     const timer = setInterval(() => {
-      const time = Date.now(); setNow(time);
+      const time = gameNow(); setNow(time);
       if (time >= availableAt) { clearInterval(timer); void refreshRef.current(); }
     }, 1000);
     return () => clearInterval(timer);
@@ -160,7 +164,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   const more: Action = { id: 'more', title: 'More together', icon: 'ellipsis', onPress: onMore };
   const openEpisode = () => {
     if (!state || !next || next.status !== 'available' || !onOpenConversation) return;
-    onOpenConversation(journeyEpisodeConversationId(state.chapter.familyId, next.episode.id));
+    onOpenConversation(next.episode.conversationId ?? journeyEpisodeConversationId(state.chapter.familyId, next.episode.id));
   };
   if (error) {
     actions = [{ id: 'retry', title: 'Try again', icon: 'arrow.clockwise', onPress: () => void perform(async () => undefined) }, journal, more];
@@ -172,7 +176,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
       actions = options.map(([id, title]) => ({
         id, title, subtitle: '60 minutes sooner', icon: id === 'rest' ? 'moon.fill' : 'leaf.fill',
         onPress: () => void perform(async () => {
-          relationshipProgressionRepository.update((current) => completeMeditationRequest(current, cycle.id, life.id, cycle.id + ':check-in', Date.now(), id));
+          relationshipProgressionRepository.update((current) => completeMeditationRequest(current, cycle.id, life.id, cycle.id + ':check-in', gameNow(), id));
           setCheckInOpen(false);
         }),
       }));
@@ -198,13 +202,19 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   }
 
   const orderId = (key: string) => (chapter?.orders?.idPrefix ?? '') + key;
-  const requests: CompanionMergeRequest[] = pending && !ready ? cycle.requests.filter((request) => request.kind === 'merge' && request.definitionId).map((request) => ({
+  const legacyRequests: CompanionMergeRequest[] = pending && !ready ? cycle.requests.filter((request) => request.kind === 'merge' && request.definitionId).map((request) => ({
     id: request.orderId!, title: request.title, definitionIds: [request.definitionId!], badge: request.completedAt != null ? 'Completed' : `+${JOURNEY_MEDITATION_ORDER_GLOW} Glow · ${JOURNEY_MEDITATION_ORDER_MINUTES} min sooner`, served: request.completedAt != null,
   })) : chapter?.orders && story?.status === 'order_active' ? story.actPhase === 'signature_order' ? [{ id: orderId(chapter.orders.signature.key), title: chapter.orders.signature.title, definitionIds: [...chapter.orders.signature.definitionIds] }] : (story.orderDeck?.templateKeys ?? []).filter((key) => !story.completedOrderIds.includes(orderId(key))).slice(0, 1).flatMap((key) => {
     const order = chapter.orders!.pool.find((item) => item.key === key);
     const id = orderId(key);
     return order ? [{ id, title: order.title, definitionIds: [order.definitionId], served: story.orderDeck?.servedOrderIds.includes(id) ?? false }] : [];
   }) : [];
+  const authoredRequests: CompanionMergeRequest[] = world ? journeyGardenOrders(relationships, world)
+    .filter((order) => order.characterId === familyId)
+    .map((order) => ({ id: order.id, title: order.title, description: order.description,
+      definitionIds: order.requirements.flatMap((item) => Array.from({ length: item.quantity }, () => item.definitionId)),
+      badge: `+${order.reward.coins} Glow` })) : [];
+  const requests = [...authoredRequests, ...legacyRequests.filter((request) => !authoredRequests.some((item) => item.id === request.id))];
   const episodeNumber = next ? state!.chapter.episodes.indexOf(next.episode) + 1 : cycle?.number ?? 1;
   const model = companionSceneModel({
     familyId, episodeId: next ? next.episode.id : cycle?.episodeId ?? 'next', dayNumber: pending ? cycle.number : episodeNumber,
@@ -215,12 +225,18 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   });
   const onStory = pending && ready ? () => void perform(() => claimCompanionJourneyReturn(cycle.id))
     : next?.status === 'available' ? openEpisode
-      : next?.status === 'locked' ? () => setReaction(next.hint) : onMore;
+      : next?.status === 'locked' ? () => {
+        const blocker = next.blockedBy.find((condition) => condition.kind === 'orders_served');
+        const request = blocker?.kind === 'orders_served' ? requests.find((item) => blocker.orderIds.includes(item.id) && !item.served) : null;
+        if (request) onOpenMerge(request.id);
+        else setReaction(next.hint);
+      } : onMore;
 
   return <View style={styles.stage}>
     {!onNarration && !submenuOpen ? <JourneyText style={styles.prompt}>{narration}</JourneyText> : null}
     {initialized && !error ? <CompanionSceneCards
-      hideJourney={submenuOpen || routineSubmenuOpen || (hatchable != null && !chapter && !cycle) || !managed} model={model} onJourney={onStory} disabled={busy}
+      hideJourney={submenuOpen || routineSubmenuOpen}
+      journeyUnavailable={(hatchable != null && !chapter && !cycle) || !managed} model={model} onJourney={onStory} disabled={busy}
       timer={pending && !ready && rest ? <CompanionMeditationStage onPress={() => setReaction(journeyForeshadowLine(familyId))} title={model.journey.eyebrow} availableAt={rest.availableAt} startedAt={rest.startedAt} settledMs={rest.settledMs} now={now} companionName={hatchableByCompanion(familyId)?.displayName ?? 'Mossprout'} />
         : timeLock ? <CompanionMeditationStage onPress={() => setReaction(timeLock.hint ?? journeyForeshadowLine(familyId))} title={model.journey.eyebrow} availableAt={timeLock.opensAt!} startedAt={timeLock.opensFrom ?? timeLock.opensAt!} settledMs={0} now={now} companionName={hatchableByCompanion(familyId)?.displayName ?? 'Mossprout'} /> : undefined}>
       {hatchable ? <CompanionDailyActions definition={hatchable} onReaction={setReaction} onOpenConversation={onOpenConversation} active={cardsActive}

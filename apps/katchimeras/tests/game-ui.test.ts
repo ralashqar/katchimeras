@@ -144,15 +144,15 @@ test('Mossprout Journey status uses the shared compact plaque without joining ac
   assert.match(stage, /journey && !storyComplete[\s\S]*?<KatchimeraJourneyStatusPlaque/);
   assert.match(stage, /status=\{journey\.status === 'complete' \? 'complete' : 'in_progress'\}/);
   assert.match(milestone, /position: 'absolute'/);
-  assert.match(milestone, /Journey Day \{dayNumber\}/);
+  assert.match(milestone, /Chapter \{dayNumber\}/);
   assert.match(milestone, /complete \? 'Complete' : 'In progress'/);
   assert.match(milestone, /complete \? 'checkmark' : 'circle\.fill'/);
-  assert.doesNotMatch(milestone, /FIRST JOURNEY DAY|tomorrow/);
+  assert.doesNotMatch(milestone, /FIRST CHAPTER|tomorrow/);
   assert.match(milestone, /minHeight: 50/);
   assert.match(milestone, /useReducedMotion\(\)/);
   assert.match(sheet, /showNameplate=\{route\.kind === 'dashboard' && props\.familyId !== 'mossprout'\}/);
   assert.doesNotMatch(sheet, /mossproutJourneyDayStatus|mossproutNameplate/);
-  assert.match(celebration, /styles\.journeyEyebrowChip[\s\S]*?<CelebrationHeroNumber[\s\S]*?label="JOURNEY DAY"/);
+  assert.match(celebration, /styles\.journeyEyebrowChip[\s\S]*?<CelebrationHeroNumber[\s\S]*?label="CHAPTER"/);
   assert.doesNotMatch(celebration, /journeyStageNode|COMPANION_RELATIONSHIP_STAGES/);
   assert.match(streakTitle, /<CelebrationHeroNumber[\s\S]*?label="DAY STREAK"/);
   assert.match(heroNumber, /withRepeat[\s\S]*?1_450[\s\S]*?AppFontFamilies\.fredokaBold/);

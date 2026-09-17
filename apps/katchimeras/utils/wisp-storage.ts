@@ -1,5 +1,6 @@
+import { saveWithGameplayOutbox } from '@/features/live-ops/source-outbox';
 import type { WispCollectionState, WispGrantSource, WispId } from '@/types/wisp';
-import { getStoredJson, getStoredRaw, setStoredJson } from '@/utils/app-storage';
+import { getStoredJson, getStoredRaw } from '@/utils/app-storage';
 import { applyWispGrant, EMPTY_WISP_STATE, normalizeWispState } from '@/utils/wisp-state';
 
 export const WISP_STORAGE_KEY = 'katchimera.wisps.v2';
@@ -13,7 +14,7 @@ export function loadWispState() {
 
 export function saveWispState(state: WispCollectionState) {
   const normalized = normalizeWispState(state);
-  setStoredJson(WISP_STORAGE_KEY, normalized);
+  saveWithGameplayOutbox(WISP_STORAGE_KEY, normalized);
   listeners.forEach((listener) => listener(normalized));
   return normalized;
 }

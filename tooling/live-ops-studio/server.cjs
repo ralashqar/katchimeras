@@ -57,6 +57,7 @@ async function main() {
     }
     res.json({ progress, tiers: event.tiers.map((tier) => ({ ...tier, reached: progress.points >= tier.points })) });
   }));
+  app.get('/api/local-event-template', wrap(async (req, res) => { const { createLocalEventPilot } = await moduleAt('features/live-ops/local-catalog.ts'); res.json(createLocalEventPilot()); }));
   app.post('/api/drafts', wrap(async (req, res) => {
     const { normalizeContentRelease } = await moduleAt('features/content-packs/normalize-release.ts');
     const checked = normalizeContentRelease([req.body.pack]);
@@ -82,7 +83,7 @@ async function main() {
     const pack = { ...draft, ...(draft.liveEvents ? { liveEvents: draft.liveEvents.map((event) => ({ ...event, enabled: true })) } : {}) };
     // Definitions are immutable and disabled. A partial staging failure can be
     // retried safely; no player availability changes before release acceptance.
-    for (const definition of pack.liveEvents ?? []) {
+    for (const definition of (pack.liveEvents ?? []).filter(event => event.authority !== 'local')) {
       const staged = await fetch(`${url.replace(/\/$/, '')}/rest/v1/rpc/stage_live_event_definition_v1`, {
         method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ event_definition: definition }),

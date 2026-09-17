@@ -14,6 +14,12 @@ export type LiveEventDefinition = {
   title: string;
   description: string;
   enabled: boolean;
+  /** Omission retains the existing server-verified claim contract. */
+  authority?: 'local' | 'verified';
+  requiresRestoredGarden?: boolean;
+  encounters?: readonly import('./local-live-ops').LocalEncounterDefinition[];
+  keepsakes?: readonly import('./local-live-ops').KeepsakeDefinition[];
+  completionKeepsakeId?: string;
   startsAt: string;
   endsAt: string;
   claimEndsAt: string;

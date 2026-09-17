@@ -12,7 +12,7 @@ export function CompanionJourneyHookCard({ model, onPress }: {
   const ready = model.state === 'ready_to_begin';
   return (
     <Pressable
-      accessibilityHint={ready ? 'Opens Mossprout so you can begin the next Journey Day' : 'Opens Mossprout and the Garden'}
+      accessibilityHint={ready ? 'Opens Mossprout so you can begin the next Chapter' : 'Opens Mossprout and the Garden'}
       accessibilityLabel={`${model.title}. ${model.body}`}
       accessibilityRole="button"
       onPress={onPress}

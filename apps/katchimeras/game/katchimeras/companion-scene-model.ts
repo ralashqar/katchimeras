@@ -18,7 +18,7 @@ export function companionSceneModel(input: {
     familyId: input.familyId, phase, slots: ['tracker', 'garden', 'conversation'],
     journey: {
       id: `${input.familyId}:${input.episodeId}:journey`,
-      eyebrow: `${input.chapterTitle} · Journey Day ${input.dayNumber}`,
+      eyebrow: `${input.chapterTitle} · Chapter ${input.dayNumber}`,
       title: phase === 'ready' ? 'Welcome back' : phase === 'finished' ? 'Revisit our chapter' : input.episodeTitle,
       subtitle: phase === 'meditating'
         ? input.nextTitle ? `Next: ${input.nextTitle}. Your day and Garden are still open.` : 'Your day and Garden are still open.'

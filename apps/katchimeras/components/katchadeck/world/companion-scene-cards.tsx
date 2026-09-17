@@ -5,9 +5,11 @@ import { CompanionSceneOverlayHost, useCompanionActionNavigation } from './compa
 import type { CompanionSceneModel } from '@/game/katchimeras/companion-scene-model';
 
 /** One compact story status above the original, equal-weight activity cards. */
-export function CompanionSceneCards({ model, onJourney, timer, children, life, garden, hideJourney = false, disabled = false }: {
+export function CompanionSceneCards({ model, onJourney, timer, children, life, garden, hideJourney = false, journeyUnavailable = false, disabled = false }: {
   model: CompanionSceneModel; onJourney?: () => void; timer?: ReactNode; children?: ReactNode;
   hideJourney?: boolean;
+  /** Content eligibility, independent of the submenu's animated visibility. */
+  journeyUnavailable?: boolean;
   life?: ReactNode; garden?: ReactNode; disabled?: boolean;
 }) {
   const { height, width } = useWindowDimensions();
@@ -20,14 +22,14 @@ export function CompanionSceneCards({ model, onJourney, timer, children, life, g
     removeClippedSubviews={false} showsVerticalScrollIndicator={false}
     style={{ marginHorizontal: -width, maxHeight: Math.max(240, height * 0.53) }}
     contentContainerStyle={[styles.stack, { paddingHorizontal: width }]} keyboardShouldPersistTaps="handled">
-    <JourneyVisibility hidden={hideJourney}>
+    {!journeyUnavailable ? <JourneyVisibility hidden={hideJourney}>
       {waiting ? timer : <Pressable accessibilityRole="button" accessibilityLabel={label}
         accessibilityState={{ disabled: disabled || !onJourney }} disabled={disabled || !onJourney} onPress={onJourney}>
         <DayActionCardSurface
           artwork={<DayActionIcon icon={model.phase === 'ready' ? 'gift.fill' : 'book.closed.fill'} />}
           title={model.journey.eyebrow} subtitle={label} />
       </Pressable>}
-    </JourneyVisibility>
+    </JourneyVisibility> : null}
     {children ?? <>{life}{garden}</>}
   </ScrollView></CompanionSceneOverlayHost>;
 }

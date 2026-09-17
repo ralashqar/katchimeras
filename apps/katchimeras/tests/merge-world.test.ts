@@ -1401,7 +1401,7 @@ test('Merge board keeps a persistent selected-cell inspector below the playable 
   assert.match(screen, /if \(cell != null\) setInspectedCell\(cell\)/);
   assert.match(board, /if \(boardCell\?\.mist \|\| boardCell\?\.locked\) \{\s*onSelectRef\.current\(cell\)/);
   assert.match(inspector, /Tap an item or covered cell for details/);
-  assert.match(inspector, /Opens on Mossprout Journey Day/);
+  assert.match(inspector, /Opens on Mossprout Chapter/);
   assert.match(playerCopy, /Save one nature memory/);
   assert.match(playerCopy, /Choose a nature direction with Mossprout/);
   assert.match(playerCopy, /Complete 3 activities that support your nature direction/);
@@ -1415,7 +1415,7 @@ test('Merge board keeps a persistent selected-cell inspector below the playable 
   assert.doesNotMatch(playerCopy, /upgrades .* to Level/);
   assert.doesNotMatch(inspector, /ITEM MAKER .* LEVEL/);
   assert.doesNotMatch(inspector, /ITEM · LEVEL/);
-  assert.doesNotMatch(board, /Root Match Parcel|Board fallback|active Journey Day|Garden Growth Mist|Discovery Mist|tier \$\{definition\.tier\}|Feastle merge board/);
+  assert.doesNotMatch(board, /Root Match Parcel|Board fallback|active Chapter|Garden Growth Mist|Discovery Mist|tier \$\{definition\.tier\}|Feastle merge board/);
   assert.doesNotMatch(screen, /New generator unlocked|new merge chain/);
 });
 

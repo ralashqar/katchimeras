@@ -1,5 +1,5 @@
 /** Public action contract. These are observations, never client authority to grant money. */
-export type GameplayEventKind = 'merge' | 'order_completed' | 'mist_cleared' | 'hex_restored' | 'structure_upgraded' | 'friend_rescued' | 'bond_gained' | 'wisp_discovered' | 'journey_completed' | 'expedition_completed';
+export type GameplayEventKind = 'merge' | 'order_completed' | 'mist_cleared' | 'hex_restored' | 'structure_upgraded' | 'friend_rescued' | 'bond_gained' | 'wisp_discovered' | 'journey_completed' | 'expedition_completed' | 'incursion_completed';
 
 export type GameplayEvent = {
   version: 1;

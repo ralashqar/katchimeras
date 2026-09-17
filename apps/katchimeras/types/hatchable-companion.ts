@@ -38,7 +38,9 @@ export type HatchableTileDefinition = {
 export type HatchableAvailability =
   | { kind: 'after_ftue' }
   | { kind: 'kingdom_goal_introduced' }
-  | { kind: 'after_companion'; companion: MergeCharacterId };
+  | { kind: 'after_companion'; companion: MergeCharacterId }
+  /** An event introduces this permanent tile; its normal rescue arc takes over. */
+  | { kind: 'event_joined'; eventId: string };
 
 export type HatchableMissionSeed = {
   items: readonly { cell: number; definitionId: string }[];

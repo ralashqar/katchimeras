@@ -1,3 +1,4 @@
+import { gameNow } from '@/utils/game-clock';
 import { useEffect, useState } from 'react';
 import type { ContentFlowRun } from '@/types/content-flow';
 import { journeyEpisodeRecordId } from '@/constants/companion-journey-chapters/registry';
@@ -83,6 +84,6 @@ export async function completeJourneyMission(mission: ActiveJourneyMission) {
   const run = await loadContentFlowRun(mission.runId);
   if (!run || !run.nodeId.endsWith(JOURNEY_MISSION_CLEAR_NODE_ID) || run.status !== 'active') return run;
   return dispatchContentFlowCommand(run.runId, { type: 'record_event', event: {
-    eventId: `${run.runId}:${run.nodeId}:cleared:${run.revision}`, type: JOURNEY_MISSION_CLEARED_EVENT, runId: run.runId, nodeId: run.nodeId, payload: {}, occurredAt: Date.now(),
+    eventId: `${run.runId}:${run.nodeId}:cleared:${run.revision}`, type: JOURNEY_MISSION_CLEARED_EVENT, runId: run.runId, nodeId: run.nodeId, payload: {}, occurredAt: gameNow(),
   } });
 }

@@ -1,3 +1,4 @@
+import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -5,9 +6,10 @@ import { ThemedText } from '@/components/themed-text';
 import { AppFontFamilies } from '@/constants/theme';
 import type { KingdomProgress } from '@/features/kingdom-progress/kingdom-progress';
 
-/** Compact "friends home · places restored" readout for the Kingdom top bar. */
+/** Compact "friends home · places restored · Harmony" readout for the Kingdom top bar. */
 export function KingdomProgressPill({ progress, onPress }: { progress: KingdomProgress; onPress: () => void }) {
-  const label = `${progress.friends.home} of ${progress.friends.total} friends home, ${progress.places.restored} of ${progress.places.total} places restored`;
+  const harmony = useHarmonyProgress();
+  const label = `${progress.friends.home} of ${progress.friends.total} friends home, ${progress.places.restored} of ${progress.places.total} places restored, ${harmony.points} Harmony`;
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityHint="Opens the Kingdom progress" onPress={onPress} style={({ pressed }) => [styles.pill, pressed && styles.pressed]}>
     <View style={styles.stat}>
       <IconSymbol color="#FFE9A6" name="house.fill" size={13} />
@@ -17,6 +19,11 @@ export function KingdomProgressPill({ progress, onPress }: { progress: KingdomPr
     <View style={styles.stat}>
       <IconSymbol color="#BFE59A" name="leaf.fill" size={13} />
       <ThemedText style={styles.value} lightColor="#FFF4C7" darkColor="#FFF4C7">{progress.places.restored}<ThemedText style={styles.total} lightColor="#E4D3A4" darkColor="#E4D3A4">/{progress.places.total}</ThemedText></ThemedText>
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.stat}>
+      <IconSymbol color="#D8C8F5" name="sparkles" size={13} />
+      <ThemedText style={styles.value} lightColor="#FFF4C7" darkColor="#FFF4C7">{harmony.points}</ThemedText>
     </View>
   </Pressable>;
 }

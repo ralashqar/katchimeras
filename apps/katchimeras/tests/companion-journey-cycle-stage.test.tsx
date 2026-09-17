@@ -8,6 +8,7 @@ import { createJourneyCycle, installJourneyCycle } from '../game/katchimeras/com
 import { emptyCompanionBondState } from '../utils/companion-bond';
 import { emptyCompanionContentState } from '../utils/companion-content';
 import type { RelationshipProgressState } from '../types/relationship-progression';
+import { createInitialMergeWorldState } from '../utils/merge-world/engine';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const HOUR = 60 * 60 * 1000;
@@ -15,7 +16,7 @@ const SceneCards = (props: { timer?: React.ReactNode; life?: React.ReactNode; ga
 const ViewForTest = () => React.createElement('OriginalActionSystem');
 const Button = 'Pressable' as unknown as React.ComponentType<Record<string, unknown>>;
 
-function withEpisodes(state: RelationshipProgressState, familyId: 'steppling' | 'mossprout', episodeIds: string[], completedAt: number): RelationshipProgressState {
+function withEpisodes(state: RelationshipProgressState, familyId: string, episodeIds: string[], completedAt: number): RelationshipProgressState {
   return { ...state, journeyEpisodes: Object.fromEntries(episodeIds.map((id) => [`${familyId}:${id}`, { familyId, episodeId: id, completedAt, answers: {}, facts: {} }])) };
 }
 
@@ -35,7 +36,7 @@ function loadStage(getState: () => RelationshipProgressState, setState: (value: 
       ...service,
     },
     '@/utils/companion-story-storage': { subscribeCompanionStories: () => () => {}, loadAuthoredCohortStory: () => ({}), isAuthoredCohortFamily: (familyId: string) => familyId === 'steppling' || familyId === 'baristabbit' },
-    '@/utils/merge-world/repository': { subscribeMergeWorldSnapshots: () => () => {}, loadMergeWorldState: async () => null },
+    '@/utils/merge-world/repository': { subscribeMergeWorldSnapshots: () => () => {}, loadMergeWorldState: async () => createInitialMergeWorldState(Date.now()) },
     '@/utils/companion-bond-storage': { loadCompanionBondState: () => emptyCompanionBondState(), subscribeCompanionBondState: () => () => {} },
     '@/utils/companion-content-storage': { loadCompanionContentState: () => emptyCompanionContentState() },
     './companion-merge-request-tray': { CompanionMergeRequestTray: 'MissionTray', COMPANION_MERGE_REQUEST_PALETTE: {} },
@@ -67,13 +68,47 @@ test('the return UI opens the next episode once the friend has reflected, withou
   assert.equal(claims, 1);
   await act(async () => { resolveClaim(); });
   assert.equal(life().props.model.phase, 'active', 'day two opened: day one is done and four hours have passed');
-  assert.equal(life().props.model.journey.eyebrow, 'The Path Outside · Journey Day 2');
+  assert.equal(life().props.model.journey.eyebrow, 'The Path Outside · Chapter 2');
   const rootCards = life();
   await act(async () => { life().props.onJourney(); });
   assert.deepEqual(opened, ['steppling:journey:day-2'], 'the episode plays as a conversation');
   assert.equal(life(), rootCards, 'opening an episode retains the root card section');
   assert.equal(tree!.root.findAllByType('Choices' as React.ElementType).length, 0);
   await act(async () => { tree!.unmount(); });
+});
+
+test('Feastle’s chapter card opens the authored Cold Hearth narrative after day one', async () => {
+  let state = withEpisodes(emptyRelationshipProgressState(), 'feastle', ['day-1'], Date.now());
+  const opened: string[] = [];
+  const module = loadStage(() => state, (value) => { state = value; }, {});
+  const Stage = module.CompanionJourneyCycleStage as React.ComponentType<Record<string, unknown>>;
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Stage familyId="feastle" onMore={() => {}} onJournal={() => {}} onGoal={() => {}} onOpenMerge={() => {}} onOpenConversation={(id: string) => opened.push(id)} />); });
+  const scene = tree!.root.findByType('SceneCards' as React.ElementType);
+  assert.equal(scene.props.model.journey.eyebrow, 'The Table We Remember · Chapter 2');
+  assert.equal(scene.props.model.phase, 'active');
+  assert.equal(scene.props.journeyUnavailable, false);
+  await act(async () => { scene.props.onJourney(); });
+  assert.deepEqual(opened, ['feastle:journey:day-2']);
+  await act(async () => { tree!.unmount(); });
+});
+
+test('Feastle day three lists the missing delivery in Tend garden and opens it from the blocked Journey card', async () => {
+  let state = withEpisodes(emptyRelationshipProgressState(), 'feastle', ['day-1', 'day-2'], Date.now() - 3 * HOUR);
+  const opened: string[] = [];
+  const module = loadStage(() => state, (value) => { state = value; }, {});
+  const Stage = module.CompanionJourneyCycleStage as React.ComponentType<Record<string, unknown>>;
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Stage familyId="feastle" onMore={() => {}} onJournal={() => {}} onGoal={() => {}} onOpenMerge={(id: string) => opened.push(id)} onOpenConversation={() => assert.fail('delivery must finish first')} />); });
+  const scene = tree!.root.findByType('SceneCards' as React.ElementType);
+  assert.equal(scene.props.model.phase, 'waiting');
+  assert.match(scene.props.model.journey.eyebrow, /Chapter 3/);
+  const daily = tree!.root.findByType('CompanionDailyActions' as React.ElementType);
+  assert.equal(daily.props.requests[0].id, 'feastle:chapter-1:doorstep-snacks');
+  assert.equal(daily.props.requests[0].definitionIds.join(','), 'food:table:2,food:table:2');
+  await act(async () => scene.props.onJourney());
+  assert.deepEqual(opened, ['feastle:chapter-1:doorstep-snacks']);
+  await act(async () => tree!.unmount());
 });
 
 test('an episode that only time holds back counts down on the timer card, like a rest', async () => {

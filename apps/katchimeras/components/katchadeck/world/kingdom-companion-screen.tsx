@@ -1,3 +1,5 @@
+import { gameNow } from '@/utils/game-clock';
+import type { ReactNode } from 'react';
 import { acceptDailyStoryHabit } from '@/utils/companion-life-storage';
 import { useUpgradeSkinGrants } from '@/hooks/use-upgrade-skin-grants';
 import { lifeConversationEntryId } from '@/utils/companion-life-recording';
@@ -100,6 +102,7 @@ export function KingdomCompanionScreen({
   onOpenMerge,
   ftueConversationDefinitionId,
   initialConversationDefinitionId,
+  worldEventAction,
   onInitialConversationComplete,
   onFtueConversationComplete,
   onCompletedConversationExit,
@@ -132,6 +135,7 @@ export function KingdomCompanionScreen({
   onOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
   ftueConversationDefinitionId?: string;
   initialConversationDefinitionId?: string;
+  worldEventAction?: ReactNode;
   onInitialConversationComplete?: (session: ConversationSession) => void | Promise<void>;
   onFtueConversationComplete?: () => void | Promise<void>;
   onCompletedConversationExit?: (definitionId: string) => boolean | Promise<boolean>;
@@ -408,7 +412,7 @@ export function KingdomCompanionScreen({
       {!hostedNarrativeOnly && homeIdentityOpen ? <HomeIdentitySheet identity={identity} onChange={updateIdentity} onClose={() => setHomeIdentityOpen(false)} /> : null}
 
       {quests.selectedResident && !embeddedJournal ? (
-        <CompanionInteractionSheet
+        <CompanionInteractionSheet worldEventAction={worldEventAction}
           active={isFocused}
           key={quests.selectedResident.creature.creatureId}
           embedded={presentation === 'companion'}
@@ -553,7 +557,7 @@ export function KingdomCompanionScreen({
               session,
               node,
               target: 'today',
-              now: Date.now(),
+              now: gameNow(),
             });
             setEmbeddedJournal({
               origin: 'conversation',

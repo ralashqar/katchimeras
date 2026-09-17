@@ -1,12 +1,13 @@
+import { DEFAULT_HARMONY } from './local-catalog';
+import type { HarmonyDefinition } from '@/types/local-live-ops';
 import type { GameplayEvent } from '@/types/gameplay-event';
 import type { HarmonyState, LiveEventDefinition, LiveEventProgress } from '@/types/live-ops';
 
 export const emptyHarmony = (): HarmonyState => ({ version: 1, points: 0, milestones: {} });
 
 /** Stable milestone receipts prevent replay and backfill from inflating world progress. */
-export function applyHarmonyEvent(state: HarmonyState, event: GameplayEvent): HarmonyState {
-  const awards: Partial<Record<GameplayEvent['kind'], number>> = { friend_rescued: 100, hex_restored: 25, structure_upgraded: 25, mist_cleared: 10, journey_completed: 50, wisp_discovered: 10 };
-  const points = awards[event.kind];
+export function applyHarmonyEvent(state: HarmonyState, event: GameplayEvent, definition: HarmonyDefinition = DEFAULT_HARMONY): HarmonyState {
+  const points = definition.awards[event.kind];
   if (!points || !event.context.targetId) return state;
   const key = JSON.stringify([event.kind, event.context.targetId, event.context.level ?? 0]);
   if (Object.hasOwn(state.milestones, key)) return state;

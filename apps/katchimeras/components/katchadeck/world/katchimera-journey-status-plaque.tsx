@@ -30,7 +30,7 @@ export function KatchimeraJourneyStatusPlaque({
   return (
     <Animated.View
       accessible
-      accessibilityLabel={`Journey Day ${dayNumber}, ${complete ? 'complete' : 'in progress'}`}
+      accessibilityLabel={`Chapter ${dayNumber}, ${complete ? 'complete' : 'in progress'}`}
       entering={animateReveal ? FadeInDown.duration(300) : undefined}
       pointerEvents="none"
       style={styles.root}>
@@ -41,7 +41,7 @@ export function KatchimeraJourneyStatusPlaque({
           style={styles.title}
           lightColor="#FFE08A"
           darkColor="#FFE08A">
-          Journey Day {dayNumber}
+          Chapter {dayNumber}
         </ThemedText>
         <Animated.View
           entering={reduceMotion ? undefined : FadeIn.duration(180)}

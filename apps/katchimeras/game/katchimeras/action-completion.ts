@@ -1,3 +1,4 @@
+import { isWorldEventConversation, isWorldEventDailyAction } from '@/features/live-ops/world-event-identity';
 import type { ConversationDefinition, ConversationSession } from '@/types/companion-conversation';
 import type { ActionCompletionRecord, KatchimeraActionOrigin } from '@/types/relationship-progression';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
@@ -39,7 +40,8 @@ export function commitKatchimeraActionCompletion(input: {
   definition: ConversationDefinition;
 }): KatchimeraActionCompletionCommit {
   const { definition, session } = input;
-  if (session.preview
+  if (isWorldEventConversation(definition.id)
+    || session.preview
     || (definition.tags?.includes('island-campaign') && !session.actionOrigin)
     || (session.dialoguePresentation && (!session.dialogueAcknowledgedAt || session.outcomePresentation || session.outcomeCompletionPending))
     || session.status !== 'completed'
@@ -162,7 +164,8 @@ export function commitKatchimeraActionCompletion(input: {
 export function reconcilePendingActionRewards(): number {
   let relationships = relationshipProgressionRepository.load();
   const pending = relationships.actionCompletions.filter((completion) => (
-    completion.rewardIntent?.kind === 'bond'
+    !isWorldEventDailyAction(completion.actionId)
+    && completion.rewardIntent?.kind === 'bond'
     && completion.rewardIntent.amount > 0
     && !completion.rewardReceipt
     && completion.rewardEventId

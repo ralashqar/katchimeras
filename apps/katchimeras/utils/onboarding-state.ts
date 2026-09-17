@@ -1,3 +1,4 @@
+import { resetDevGameTime } from '@/utils/dev-game-clock';
 import type { HatchAnswer } from '@/features/onboarding/hatch-profile';
 import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-storage';
 import { resetEggAvatarSelection } from '@/utils/egg-avatar-storage';
@@ -85,6 +86,7 @@ export function sanitizePlayerNickname(value: string): string | null {
 }
 
 export function resetOnboardingProfile() {
+  resetDevGameTime();
   resetCompanionWaterCounts();
   removeStoredValue(ONBOARDING_STORAGE_KEY);
   resetEggAvatarSelection();

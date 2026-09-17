@@ -222,3 +222,17 @@ This supersedes the manual-measurement requirement above for local uploads;
 external URL assignments still require manually supplied measured bounds.
 
 Asset checks: `node --test tooling/live-ops-studio/arc-assets.test.cjs` from the root.
+
+## Free offline world events
+
+Choose **New offline events** on the event editor for Moonlit Mist and Restoration
+Week. Both use schema 3, local-only rewards and disabled-by-default availability.
+The editor includes Harmony awards/unlocks, encounter copy and sequence, merge
+requirements, board seeds, keepsakes and scoring simulation. Use new occurrence
+IDs for each scheduled run; enrolled players retain the original definition.
+
+See `apps/katchimeras/docs/local-world-events.md` for the device pilot, authority
+boundary and release acceptance checks. No paid or verified rewards are enabled
+by exporting a local event.
+
+World event encounters now use hosted tile dialogue, ordinary Merge orders, persistent action cards and the existing mission dock. The editor exposes companion, tile and action-title fields; these exports require schema 4. A regular hatchable in the same release may use `availability: { kind: "event_joined", eventId: "..." }` to permanently introduce its normal rescue arc through an event. The event overview is for schedules/rewards only.

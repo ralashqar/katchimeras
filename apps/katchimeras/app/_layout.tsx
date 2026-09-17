@@ -1,5 +1,6 @@
 // First of all: the stored content pack is primed before any module builds a registry from it.
 import '@/features/content-packs/prime';
+import '@/utils/dev-game-clock';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';

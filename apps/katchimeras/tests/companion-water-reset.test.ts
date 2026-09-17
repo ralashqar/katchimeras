@@ -18,6 +18,7 @@ test('resetting the profile clears all daily water counters and preserves unrela
   const profile = loadNativeModule('utils/onboarding-state.ts', {
     '@/utils/app-storage': storage,
     '@/utils/companion-water-storage': water,
+    '@/utils/dev-game-clock': { resetDevGameTime: () => {} },
     '@/utils/egg-avatar-storage': { resetEggAvatarSelection: () => { avatarResets++; } },
   });
   profile.resetOnboardingProfile();

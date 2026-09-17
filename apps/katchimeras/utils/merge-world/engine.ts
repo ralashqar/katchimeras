@@ -949,6 +949,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     characterProgress: source.characterProgress && typeof source.characterProgress === 'object'
       ? source.characterProgress
       : fallback.characterProgress,
+    localLiveOps: source.localLiveOps,
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
     storyWorldMutationReceipts: normalizeStoryWorldMutationReceipts(source.storyWorldMutationReceipts),
     companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, source.activeOrders, rawVersion, now),
@@ -2513,6 +2514,7 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number,
 function serveOrder(state: MergeWorldState, orderId: string, now: number): MergeWorldCommandResult {
   const storedOrder = state.activeOrders.find((item) => item.id === orderId);
   const order = storedOrder ? ensureOrderGlowReward(storedOrder) : undefined;
+  if (orderId.startsWith('local-event:') && (!order?.expiresAt || Math.max(now, state.localLiveOps?.clock ?? 0) >= order.expiresAt)) return unchanged(state, 'This event has ended. Your items are yours to keep.');
   if (orderId.startsWith('journey-cycle:') && (!order?.expiresAt || now >= order.expiresAt)) {
     return unchanged(state, 'Your companion is ready to return. These items are yours to keep.');
   }
@@ -2524,6 +2526,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     const bonus = next.coins - state.coins > order.reward.coins;
     return { ...changed(touch(ensureProceduralOrders(next, now), now), bonus ? `Today’s garden complete! +${order.reward.coins} Glow + ${DAILY_GARDEN_BONUS} bonus Glow.` : `+${order.reward.coins} Glow`), servedOrderId: order.id };
   }
+  if (orderId.startsWith('local-event:') && (!order?.expiresAt || Math.max(now, state.localLiveOps?.clock ?? 0) >= order.expiresAt)) return unchanged(state, 'This event has ended. Your items are yours to keep.');
   if (orderId.startsWith('journey-cycle:')) return { ...changed(touch({
     ...state, board, coins: state.coins + order.reward.coins, activeOrders: state.activeOrders.filter((item) => item.id !== orderId),
     externalRewardReceipts: [...state.externalRewardReceipts, {

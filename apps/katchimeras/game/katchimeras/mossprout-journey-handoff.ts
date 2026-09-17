@@ -49,9 +49,9 @@ export function resolveMossproutJourneyHandoff(input: {
     availableAt,
     body: 'Mossprout is awake and ready to learn how you like to be supported.',
     dayNumber: 2,
-    eyebrow: 'Mossprout · Journey Day 2',
+    eyebrow: 'Mossprout · Chapter 2',
     state: 'ready_to_begin',
-    title: 'Journey Day 2 is ready',
+    title: 'Chapter 2 is ready',
   };
 
   if (firstJourney.dayId === input.dayId) {
@@ -64,9 +64,9 @@ export function resolveMossproutJourneyHandoff(input: {
         ? 'Mossprout is resting and thinking today over. Garden play stays open.'
         : 'Your first day together is ready to finish.',
       dayNumber: 1,
-      eyebrow: 'Mossprout · Journey Day 1',
+      eyebrow: 'Mossprout · Chapter 1',
       state,
-      title: 'Journey Day 1 complete',
+      title: 'Chapter 1 complete',
     };
   }
 

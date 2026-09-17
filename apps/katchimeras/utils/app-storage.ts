@@ -1,3 +1,4 @@
+import { gameClock } from '@/utils/game-clock';
 import 'expo-sqlite/localStorage/install';
 import Storage from 'expo-sqlite/kv-store';
 
@@ -136,6 +137,7 @@ export function getStoredKeys(): string[] {
 // reset" to return to a genuinely fresh first-run. Does not touch native OS
 // permissions (camera / photos).
 export function clearAllStoredValues() {
+  gameClock.setOffset(0);
   for (const pending of deferredWrites.values()) clearTimeout(pending.timer);
   deferredWrites.clear();
   const storage = getStorage();

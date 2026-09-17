@@ -1,3 +1,5 @@
+import { gameNow } from '@/utils/game-clock';
+import type { ReactNode } from 'react';
 import { gardenLessonFor, useHatchableRuns } from '@/features/onboarding/hatchable-runtime';
 import { HATCHABLE_LESSON_FINALE_NODE_IDS } from '@/features/onboarding/hatchable-flows';
 import { hatchableByCompanion } from '@/constants/hatchable-companions/registry';
@@ -77,7 +79,7 @@ function isResidentFtueStep(stepId: string) {
     || stepId.startsWith('merge.resident_');
 }
 
-function prepareMossproutFirstResidentHandoff(now = Date.now()) {
+function prepareMossproutFirstResidentHandoff(now = gameNow()) {
   ensureMossproutFtueFirstResident();
   relationshipProgressionRepository.update((current) => {
     let journey = [...current.journeyDays].reverse().find((candidate) => candidate.familyId === 'mossprout') ?? null;
@@ -93,8 +95,9 @@ function prepareMossproutFirstResidentHandoff(now = Date.now()) {
   });
 }
 
-export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, hostedNarrativeRequired = false, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false, onHostedClose, onHostedFtueComplete, onHostedInitialConversationComplete, onHostedOpenMerge, onVisibleCreatureRewardPulse }: {
+export function KatchimeraCompanionRouteScreen({ creatureId, worldEventAction, source, ftueRouteOrigin = false, ftueConversationDefinitionId, journeyReturnConversationDefinitionId, hostedNarrativeRequired = false, residentStoryResumeRequested = false, renderRegularStage = false, reuseUnderlyingStage = false, hostedInHaven = false, onHostedClose, onHostedFtueComplete, onHostedInitialConversationComplete, onHostedOpenMerge, onVisibleCreatureRewardPulse }: {
   creatureId: string;
+  worldEventAction?: ReactNode;
   source?: 'merge-world';
   ftueRouteOrigin?: boolean;
   ftueConversationDefinitionId?: string;
@@ -252,7 +255,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     // Repair an older/in-flight FTUE save that reached the closing beat before
     // meditation became durable game state. The repository guard prevents a
     // live timer from ever being restarted by a rerender.
-    const now = Date.now();
+    const now = gameNow();
     relationshipProgressionRepository.update((current) => (
       katchimeraMeditationRecord(current, 'mossprout')
         ? current
@@ -295,7 +298,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       onCovered: () => releaseSource?.(),
       navigate: async () => {
         try {
-          const completedAt = Date.now();
+          const completedAt = gameNow();
           // Do not release FTUE ownership until the source narrative is fully
           // hidden. Otherwise its completion rerender exposes the regular
           // companion dashboard/Haven during the curtain's cover animation.
@@ -337,7 +340,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     const repairKey = `${ftueRun.runId}:${ftueRun.completedAt ?? 'complete'}`;
     if (postFtueGardenRepairRef.current === repairKey) return;
     postFtueGardenRepairRef.current = repairKey;
-    const now = Date.now();
+    const now = gameNow();
     void seedStoredMossproutGardenAfterFtue(localDayId(new Date(now)), now).catch((error) => {
       postFtueGardenRepairRef.current = null;
       console.warn('Could not repair the post-FTUE Mossprout Garden actions', error);
@@ -363,7 +366,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       setNarrativeHandoffActive(true);
       try {
         if (!run.mergeInstalled) {
-          await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run), { preserveHaven: true, basketParcel: true });
+          await installMossproutOnboardingMergeWorld(gameNow(), ftueWispForRun(run), { preserveHaven: true, basketParcel: true });
           updateFtueRun({ mergeInstalled: true });
         }
         const meetingResult = await advanceFtueActionDurably({ expectedStepId: 'companion.first_meeting', actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
@@ -400,7 +403,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
       if (ftueHandoffRef.current) return;
       ftueHandoffRef.current = true;
       try {
-        const now = Date.now();
+        const now = gameNow();
         const sourceId = `ftue:${run.runId}:first-rest`;
         relationshipProgressionRepository.update((current) => beginKatchimeraMeditation(
           current,
@@ -495,7 +498,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
           creatureId,
           kind: 'friendship_started',
           points,
-          occurredAt: Date.now(),
+          occurredAt: gameNow(),
         }, { queueCelebration: true });
         if (result.awarded) saveCompanionBondState(result.state);
       }
@@ -541,7 +544,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
           creatureId,
           kind: 'check_in_completed',
           points,
-          occurredAt: Date.now(),
+          occurredAt: gameNow(),
         }, { queueCelebration: true });
         if (result.awarded) saveCompanionBondState(result.state);
         recordMossproutOnboardingAnswer('companion.choose_support_style', supportStyle.id);
@@ -594,7 +597,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   const completeFtueJourneyDay = useCallback(() => {
     const run = loadFtueRun();
     if (run?.status !== 'active' || run.stepId !== 'companion.day_one_action') return;
-    const completedAt = Date.now();
+    const completedAt = gameNow();
     const nextRun = commitFtueAction({ actionId: 'companion.complete_day_one_action', evidenceRef: 'mossprout-journey-day-one-bond-action' });
     if (nextRun?.status !== 'complete') return;
     const completedDayId = localDayId(new Date(completedAt));
@@ -619,7 +622,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
     const run = loadFtueRun();
     try {
       if (!run?.mergeInstalled) {
-        await installMossproutOnboardingMergeWorld(Date.now(), ftueWispForRun(run), { preserveHaven: true, basketParcel: true });
+        await installMossproutOnboardingMergeWorld(gameNow(), ftueWispForRun(run), { preserveHaven: true, basketParcel: true });
         updateFtueRun({ mergeInstalled: true });
       }
       const result = await advanceFtueActionDurably({
@@ -685,7 +688,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
             'mossprout:journey',
             journey.dayId,
             MOSSPROUT_FTUE_FIRST_RESIDENT_ID,
-            Date.now(),
+            gameNow(),
           );
           const handoffRun = loadFtueRun();
           if (handoffRun?.status === 'active' && handoffRun.stepId === 'companion.resident_parcel_ready') {
@@ -756,7 +759,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, source, ftueRouteOr
   }
   return (
     <View style={styles.screen}>
-    <KingdomCompanionScreen
+    <KingdomCompanionScreen worldEventAction={worldEventAction}
       active={surfaceActive}
       forceMossproutAvailable={hostedInHaven}
       ftueConversationDefinitionId={activeFtueConversationDefinitionId}

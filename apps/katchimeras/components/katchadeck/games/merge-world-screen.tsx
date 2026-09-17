@@ -1,3 +1,5 @@
+import { gameNow } from '@/utils/game-clock';
+import { journeyGardenReturnNotes, JOURNEY_DELIVERY_NOTE_PREFIX } from '@/features/companion/journey-garden-orders';
 import { reconcileGardenLesson, reconcileHatchableLesson, submitHatchableAction, useActiveHatchable } from '@/features/onboarding/hatchable-runtime';
 import { HATCHABLE_LESSON_FINALE_NODE_IDS, hatchableDiscoveryScene } from '@/features/onboarding/hatchable-flows';
 import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
@@ -216,7 +218,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
   const [story, setStory] = useState(loadFeastleStory);
   const relationships = useRelationshipProgression();
-  const mossproutJourneyDayId = mossproutJourneyRuntimeDayId(relationships, localDayId(), isJourneyQuickModeEnabled());
+  const mossproutJourneyDayId = mossproutJourneyRuntimeDayId(relationships, localDayId(new Date(gameNow())), isJourneyQuickModeEnabled());
   const mossproutJourney = mossproutJourneyForDay(relationships, mossproutJourneyDayId);
   const mossproutJourneyExclusive = Boolean(mossproutJourney && mossproutJourney.status !== 'complete');
   const activityFamilyId = familyIdFromCompanionId(creatureId);
@@ -237,7 +239,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   useEffect(() => {
     if (!active || !state || !stepplingLesson.active || parcelFlight || serveFlight) return;
     let live = true;
-    const setup = send({ type: 'prepareGardenLesson', companion: activeLessonHatchable.companion, now: Date.now() });
+    const setup = send({ type: 'prepareGardenLesson', companion: activeLessonHatchable.companion, now: gameNow() });
     void flushMergeWorld().then(() => { if (live) return reconcileGardenLesson(activeLessonHatchable, setup?.state ?? state); }).catch(() => { if (live) setStepplingLessonError(true); });
     return () => { live = false; };
   }, [active, activeLessonHatchable, state, stepplingLesson.active, parcelFlight, serveFlight, send, flushMergeWorld]);
@@ -480,7 +482,9 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       announcement: 'Opening your Katchimera',
       target: 'companion',
       navigate: () => {
-        if (characterId === 'feastle') beginFeastleReturn();
+        if (noteId.startsWith(JOURNEY_DELIVERY_NOTE_PREFIX)) {
+          // Authored chapters own their progress; do not restart a legacy return.
+        } else if (characterId === 'feastle') beginFeastleReturn();
         else if (characterId === 'mossprout') {
           relationshipProgressionRepository.update((current) => beginMossproutJourneyReturn(current, mossproutJourneyDayId));
         }
@@ -751,6 +755,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
         characterId: 'mossprout' as const,
         bondPoints: 0,
       }] : []),
+      ...journeyGardenReturnNotes(relationships, state),
       ...(story.status === 'return_available' ? [{
         id: `chat-note:${story.id}:${story.targetLevel}`,
         kind: 'chat_note' as const,
@@ -800,7 +805,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     // Midpoint notes sit before the remaining requests so the story beat is
     // immediately visible without replacing or hiding any unserved order.
     return [...parcelEntries, ...returnEntries, ...orderEntries];
-  }, [stepplingLesson.active, activeLessonHatchable, glowLessonActive, active, activeResidentDiscovery?.id, activityFamilyId, requestCharacterId, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
+  }, [relationships, stepplingLesson.active, activeLessonHatchable, glowLessonActive, active, activeResidentDiscovery?.id, activityFamilyId, requestCharacterId, authoredStories, focusOrderId, ftueStep?.id, mossproutJourney?.activity, mossproutJourney?.beatId, mossproutJourney?.dayId, mossproutJourney?.status, mossproutJourneyExclusive, parcelFlight, parcelShakeNonce, pendingParcel, pendingParcels.length, readyOrderIds, returnCharacterId, serveFlight, state, story.id, story.pendingBondPoints, story.status, story.targetLevel]);
 
   const startServeAnimation = useCallback(async (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
     const state = stateRef.current;
@@ -889,11 +894,11 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     const activeOrder = activeServeOrderRef.current;
     if (!activeOrder) return;
     const servedOrder = state?.activeOrders.find((order) => order.id === activeOrder.orderId);
-    const result = dispatch({ type: 'serveOrder', orderId: activeOrder.orderId, now: Date.now() });
+    const result = dispatch({ type: 'serveOrder', orderId: activeOrder.orderId, now: gameNow() });
     if (result?.changed && activeOrder.orderId === 'mossprout:chapter-0:first-sprout') {
-      const dayId = localDayId();
+      const dayId = localDayId(new Date(gameNow()));
       relationshipProgressionRepository.update((current) => {
-        const started = startMossproutJourneyDay(current, dayId, Date.now(), stateRef.current?.mossproutBoardProgression.activeDayIds.length ?? 0);
+        const started = startMossproutJourneyDay(current, dayId, gameNow(), stateRef.current?.mossproutBoardProgression.activeDayIds.length ?? 0);
         return recordMossproutFirstGardenRestored(started.state, dayId, `merge-order:${activeOrder.orderId}`);
       });
     }
@@ -930,7 +935,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
     setFtueTargetRevision((revision) => revision + 1);
   }, []);
   const rerollOrder = useCallback((orderId: string) => {
-    dispatch({ type: 'rerollOrder', orderId, now: Date.now() });
+    dispatch({ type: 'rerollOrder', orderId, now: gameNow() });
   }, [dispatch]);
 
   const openParcel = useCallback(async (arrivalId: string) => {
@@ -948,7 +953,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       activeParcelRef.current = false;
       return;
     }
-    const result = dispatch({ type: 'claimArrival', arrivalId, now: Date.now() });
+    const result = dispatch({ type: 'claimArrival', arrivalId, now: gameNow() });
     if (!result?.changed || (!result.spawnedItems?.length && !result.spawnedGenerator)) {
       activeParcelRef.current = false;
       setParcelShakeNonce((value) => value + 1);
@@ -1010,7 +1015,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
   }, []);
   const openParcelFromRail = useCallback((arrivalId: string) => { void openParcel(arrivalId); }, [openParcel]);
   const rerollFromRail = useCallback((order: MergeOrder) => rerollOrder(order.id), [rerollOrder]);
-  const useGrovelight = useCallback((gateId: string) => { dispatch({ type: 'useGrovelightResonance', gateId, dayId: localDayId(), now: Date.now() }); }, [dispatch]);
+  const useGrovelight = useCallback((gateId: string) => { dispatch({ type: 'useGrovelightResonance', gateId, dayId: localDayId(new Date(gameNow())), now: gameNow() }); }, [dispatch]);
   const boardReady = useCallback(() => setBoardVisualReady(true), []);
 
   if (loading || !state || !stepplingLesson.ready) {
@@ -1124,7 +1129,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
           onPress={() => {
             if (pendingMemoryCard) {
               setRevealedMemoryCardId(pendingMemoryCard.cardId);
-              dispatch({ type: 'revealMemoryCard', cardId: pendingMemoryCard.cardId, now: Date.now() });
+              dispatch({ type: 'revealMemoryCard', cardId: pendingMemoryCard.cardId, now: gameNow() });
             } else setRevealedMemoryCardId(null);
           }}
         />
@@ -1157,7 +1162,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
           glow={discoveryFork.recommendedCharacterId === characterId}
           key={characterId}
           label={`${discoveryFork.candidateIds.length === 1 ? 'Follow ' : ''}${COMPANION_DISCOVERY_CATALOG.find((definition) => definition.characterId === characterId)?.pathName ?? 'Mysterious Path'}${discoveryFork.recommendedCharacterId === characterId ? ' · This feels familiar' : ''}`}
-          onPress={() => dispatch({ type: 'selectCompanionDiscoveryPath', characterId, now: Date.now() })}
+          onPress={() => dispatch({ type: 'selectCompanionDiscoveryPath', characterId, now: gameNow() })}
           variant={discoveryFork.recommendedCharacterId === characterId ? 'primary' : 'secondary'}
         />)}</View>
       </View> : null}
@@ -1166,7 +1171,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       <MergeServeRewardOverlay flight={serveFlight} onCoinArrive={handleCoinArrive} onEnergyArrive={handleEnergyArrive} onFinish={finishServeAnimation} onItemsArrive={handleServeItemsArrive} />
       <MergeParcelFlightOverlay flight={parcelFlight} onFinish={finishParcelFlight} onItemArrive={handleParcelItemArrive} />
       {active && !stepplingLesson.active && pendingResidentDialogue ? <KatchimeraFriendDiscoveryReveal
-        onContinue={() => dispatch({ type: 'ackResidentCardDialogue', discoveryId: pendingResidentDialogue.id, now: Date.now() })}
+        onContinue={() => dispatch({ type: 'ackResidentCardDialogue', discoveryId: pendingResidentDialogue.id, now: gameNow() })}
         residentId={pendingResidentDialogue.residentId}
       /> : null}
       <KatchimeraCardRevealModal
@@ -1190,7 +1195,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
               target: 'katchimeras',
               navigate: async () => {
                 if (!handoffCommitted) {
-                  const result = dispatch({ type: 'ackResidentCardReveal', discoveryId: discovery.id, now: Date.now() });
+                  const result = dispatch({ type: 'ackResidentCardReveal', discoveryId: discovery.id, now: gameNow() });
                   if (!result?.changed) throw new Error('Resident card reveal acknowledgement was not accepted');
                   setRevealedKatchimeraCardId(null);
                   finishResidentMergeSession();
@@ -1211,9 +1216,9 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       {active && !parcelFlight && mergeCelebrationRewards.length ? <RewardSplash
         items={mergeCelebrationRewards}
         onItemSeen={(receiptId) => receiptId.startsWith('companion-discovery:')
-          ? send({ type: 'ackCompanionDiscoveryReveal', characterId: receiptId.slice('companion-discovery:'.length) as MergeOrder['characterId'], now: Date.now() })
+          ? send({ type: 'ackCompanionDiscoveryReveal', characterId: receiptId.slice('companion-discovery:'.length) as MergeOrder['characterId'], now: gameNow() })
           // Bookkeeping, not play: it goes straight to the world so a lesson's exclusive step never blocks it (which would show the page again).
-          : send({ type: 'ackGeneratorUnlock', receiptId, now: Date.now() })}
+          : send({ type: 'ackGeneratorUnlock', receiptId, now: gameNow() })}
       /> : null}
     </View>
   );

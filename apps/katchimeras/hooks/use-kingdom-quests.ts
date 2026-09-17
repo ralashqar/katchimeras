@@ -1,7 +1,8 @@
+import { isWorldEventConversation } from '@/features/live-ops/world-event-identity';
 import { loadHatchProfile } from '@/features/onboarding/hatch-profile-storage';
 import { hatchableByCompanion } from '@/constants/hatchable-companions/registry';
 import { conversationTranscript, rememberConversationLine } from '@/utils/conversation-transcript';
-import { legacyMossproutPondConversation } from '@/constants/mossprout-campaign-conversations';
+import { legacyMossproutPondConversation , resolveMossproutCampaignConversation } from '@/constants/mossprout-campaign-conversations';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -29,9 +30,10 @@ import { completeAuthoredCohortConversation, isAuthoredCohortFamily } from '@/ut
 import { companionJourneyByFamilyId } from '@/constants/companion-journeys';
 import {
   companionConversationDefinitionById,
+  explicitCompanionConversation,
   companionConversationDefinitionsForFamily,
 } from '@/constants/companion-conversations-v2';
-import { resolveMossproutCampaignConversation } from '@/constants/mossprout-campaign-conversations';
+
 import { companionIdForFamily, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { isJourneyQuickModeEnabled } from '@/utils/dev-settings';
 import { companionQuickGoalTemplateById } from '@/constants/companion-quick-goals';
@@ -149,6 +151,7 @@ function settleActionConversationCompletion(
   definition: ConversationDefinition | null | undefined,
 ) {
   if (!definition
+    || isWorldEventConversation(definition.id)
     || (definition.tags?.includes('island-campaign') && !session.actionOrigin)
     || (session.dialoguePresentation && (!session.dialogueAcknowledgedAt || session.outcomePresentation))
     || (definition.familyId !== 'mossprout' && !session.actionOrigin)) return;
@@ -156,6 +159,7 @@ function settleActionConversationCompletion(
 }
 
 function conversationHasIndependentBond(definitionId: string, dayId?: string | null) {
+  if (isWorldEventConversation(definitionId)) return false;
   if (definitionId.startsWith('steppling:trail-chat:')) return false;
   // A journey episode pays its own Bond when it is recorded.
   if (journeyEpisodeForConversation(definitionId)) return false;
@@ -688,8 +692,10 @@ export function useKingdomQuests({ kingdom, residents, today }: Args) {
       const definitions = companionConversationDefinitionsForFamily(selectedFamilyId)
         .filter((definition) => definition.format !== 'profile_game'
           || (selectedFamilyId === 'mossprout' && input.definitionId === 'mossprout:game:form-finder'));
+      const hostedDefinition = input.definitionId ? explicitCompanionConversation(selectedFamilyId, input.definitionId) : null;
       const definition = input.definitionId
-        ? definitions.find((candidate) => candidate.id === input.definitionId) ?? null
+        ? definitions.find(candidate => candidate.id === input.definitionId)
+          ?? (hostedDefinition?.contextualOnly && hostedDefinition.format !== 'profile_game' ? hostedDefinition : null)
         : input.mode
           ? selectConversationForMode({
               familyId: selectedFamilyId,

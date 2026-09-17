@@ -1,3 +1,4 @@
+import { gameNow } from '@/utils/game-clock';
 import { packEntries } from '@/features/content-packs/active-pack';
 import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
 import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
@@ -74,7 +75,7 @@ export function bootstrapContentFlowCatalog() {
     ['glow.lesson.prepare', 'prepareGlowDiscoveryLesson'],
   ] as const) {
     registerContentFlowEffect(capability, async () => {
-      const result = await applyStoredGlowDiscovery({ type, now: Date.now() });
+      const result = await applyStoredGlowDiscovery({ type, now: gameNow() });
       if (!result.changed && result.message) throw new Error(result.message);
       return { targetId: GLOW_GATEWAY_ID, revision: result.state.revision };
     });
@@ -122,7 +123,7 @@ export function bootstrapContentFlowCatalog() {
   });
   registerContentFlowEffect('optional_action.publish', async ({ effectKey, payload }) => ({ effectKey, action: payload.action }));
   registerContentFlowEffect('relationship.complete_day_one_lesson', async ({ run, effectKey }) => {
-    const completedAt = Date.now();
+    const completedAt = gameNow();
     relationshipProgressionRepository.update((state) => completeDayOneLesson(state, { completedAt, flowRunId: run.runId }));
     const homeState = homeRepository.load();
     const resolveCompanionId = companionIdResolverForHomeState(homeState);
@@ -157,7 +158,7 @@ export function bootstrapContentFlowCatalog() {
         creatureId,
         kind: 'check_in_completed',
         points,
-        occurredAt: Date.now(),
+        occurredAt: gameNow(),
       }, { queueCelebration: true });
       if (result.awarded) saveCompanionBondState(result.state);
     }
@@ -167,7 +168,7 @@ export function bootstrapContentFlowCatalog() {
     const familyId = payload.familyId as KatchimeraFamilyId;
     const durationMs = Number(payload.durationMs);
     const sourceId = `ftue:${String(run.variables.ftueRunId ?? run.runId)}:first-rest`;
-    const startedAt = Date.now();
+    const startedAt = gameNow();
     relationshipProgressionRepository.update((state) => beginKatchimeraMeditation(
       state,
       familyId,

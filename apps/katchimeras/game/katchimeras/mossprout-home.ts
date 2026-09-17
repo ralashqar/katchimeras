@@ -295,7 +295,7 @@ export function resolveMossproutDayActions(input: {
   const mainRecord = journey?.actions.find((action) => action.kind === 'journey') ?? null;
   if (!journey && input.includeJourneyAction !== false) actions.push({
     id: 'mossprout:start-journey', kind: 'story_chat', title: input.journeyDayNumber && input.journeyDayNumber > 1
-      ? `Begin Journey Day ${input.journeyDayNumber}`
+      ? `Begin Chapter ${input.journeyDayNumber}`
       : 'Spend today with Mossprout',
     subtitle: input.journeyDayNumber && input.journeyDayNumber > 1
       ? 'A new day opens the next part of Mossprout\'s story.'

@@ -1,5 +1,5 @@
 export type MossproutWorldInteractionRequest = {
-  creatureId: 'companion:mossprout';
+  creatureId: string;
   ftueConversationDefinitionId?: string;
   journeyReturnConversationDefinitionId?: string;
   key: string;

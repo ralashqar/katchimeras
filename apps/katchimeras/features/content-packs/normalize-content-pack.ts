@@ -97,6 +97,13 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
   const conversations = list(raw.conversations, issues, 'conversations');
   const flows = list(raw.flows, issues, 'flows');
   const liveEvents = list(raw.liveEvents, issues, 'liveEvents');
+  const harmonyDefinitions = list(raw.harmonyDefinitions, issues, 'harmonyDefinitions');
+  if ((harmonyDefinitions.length || liveEvents.some(e => e.authority === 'local')) && Number(raw.contentSchemaVersion) < 3) issues.push('Local events and Harmony definitions require content schema 3');
+  if (harmonyDefinitions.length > 1) issues.push('A release may define Harmony only once');
+  for (const definition of harmonyDefinitions) {
+    if (!isText(definition.id) || !isInt(definition.version) || Number(definition.version) < 1 || !isInt(definition.incursionThreshold) || Number(definition.incursionThreshold) < 0 || !isRecord(definition.awards)) issues.push('Invalid Harmony definition');
+    else for (const [kind, award] of Object.entries(definition.awards)) if (!['friend_rescued', 'hex_restored', 'structure_upgraded', 'mist_cleared', 'journey_completed', 'wisp_discovered'].includes(kind) || !Number.isSafeInteger(award) || Number(award) < 0) issues.push(`Invalid Harmony award ${kind}`);
+  }
   if (liveEvents.length && Number(raw.contentSchemaVersion) < 2) issues.push('liveEvents require content schema 2');
   const companionIds = new Set<string>(['mossprout', ...HATCHABLE_COMPANIONS.map((definition) => definition.companion), ...hatchables.map((definition) => String(definition.companion))]);
   const skinIds = new Set<string>([...katchimeraSkinsBundled.map((skin) => skin.id), ...skins.map((skin) => String(skin.id))]);
@@ -270,8 +277,16 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     if (!companionIds.has(String(conversation.familyId))) issues.push(`conversation ${conversation.id}: ${conversation.familyId} is not a friend`);
   }
   if (conversations.length && !issues.length) issues.push(...validateConversationDefinitions(conversations as never));
+  const eventTargets = new Map<string, string>([['mossprout-garden', 'mossprout'], ...HATCHABLE_COMPANIONS_BUNDLED.map(h => [h.tile.id, h.companion] as [string, string])]);
+  for (const h of hatchables) if (isRecord(h.tile)) eventTargets.set(String(h.tile.id), String(h.companion));
+  for (const h of hatchables) if (isRecord(h.availability) && h.availability.kind === 'event_joined') {
+    if (Number(raw.contentSchemaVersion) < 4) issues.push('Event-introduced tiles require content schema 4');
+    const eventId = h.availability.eventId;
+    if (!liveEvents.some(e => e.id === eventId && e.authority === 'local')) issues.push(`hatchable ${h.companion}: event availability needs a local event in this release`);
+  }
   const seenFlows = new Set<string>();
   const eventIds = new Set<string>();
+  const eventSupplyChains = new Set([...MERGE_GENERATORS_BUNDLED.flatMap(generator => generator.chainIds), ...generators.flatMap(generator => Array.isArray(generator.chainIds) ? generator.chainIds.map(String) : [])]);
   for (const event of liveEvents) {
     if (!newId('live event', event.id, [], eventIds)) continue;
     const validated = validateLiveEvent(event);
@@ -280,7 +295,21 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
       for (const bundle of [tier.free, tier.premium]) for (const reward of bundle?.items ?? []) {
         if (reward.kind === 'item' && !candidateItems.has(reward.id)) issues.push(`${event.id}: unknown item reward ${reward.id}`);
         if (reward.kind === 'wisp' && !readyWispIds.has(reward.id)) issues.push(`${event.id}: Wisp reward ${reward.id} is not available`);
-        if (reward.kind === 'cosmetic' && !skinIds.has(reward.id)) issues.push(`${event.id}: unknown cosmetic reward ${reward.id}`);
+        if (reward.kind === 'cosmetic' && !skinIds.has(reward.id) && !validated.definition?.keepsakes?.some(k => k.id === reward.id)) issues.push(`${event.id}: unknown cosmetic reward ${reward.id}`);
+      }
+    }
+    for (const node of validated.definition?.encounters ?? []) {
+      if ((node.companionId || node.actionTitle || node.hexId !== 'mossprout-garden') && Number(raw.contentSchemaVersion) < 4) issues.push('World event presentation fields require content schema 4');
+      if (eventTargets.get(node.hexId) !== (node.companionId ?? 'mossprout')) issues.push(`${event.id}: encounter tile does not belong to its companion`);
+
+      const seed = candidateItems.get(node.seedItemId);
+      let availableMerges = 0;
+      let tier = seed;
+      for (let pieces = 8; pieces >= 2 && tier?.nextItemId; pieces /= 2) { availableMerges += pieces / 2; tier = candidateItems.get(tier.nextItemId); }
+      if (node.merges > availableMerges) issues.push(`${event.id}: encounter seed cannot reach its merge goal`);
+      for (const requirement of node.requirements) {
+        const item = candidateItems.get(requirement.definitionId);
+        if (!item || !eventSupplyChains.has(item.chainId)) issues.push(`${event.id}: requirement ${requirement.definitionId} needs an available generator chain`);
       }
     }
     for (const node of validated.definition?.incursion?.nodes ?? []) {
@@ -321,6 +350,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     ...(chapters.length ? { chapters: chapters as never } : {}),
     ...(conversations.length ? { conversations: conversations as never } : {}),
     ...(flows.length ? { flows: flows as never } : {}),
+    ...(harmonyDefinitions.length ? { harmonyDefinitions: harmonyDefinitions as never } : {}),
     ...(liveEvents.length ? { liveEvents: liveEvents as never } : {}),
     ...(dependencies.length ? { dependencies: dependencies as { id: string; version: number }[] } : {}),
     art,

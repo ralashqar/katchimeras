@@ -1,7 +1,9 @@
 import * as r0 from './rulesets/merge-v1-1fcfd9ee9e59e7949dd4163c79bbea97732481f371082068933f91a380663814.js';
 import * as r1 from './rulesets/merge-v1-22d414730357ed0cb8d4edbd9bf05332e713081d9d2de8d59f717758f002e6b0.js';
 import * as r2 from './rulesets/merge-v1-2cb07fa3ee72a2b67de9d620f5657ed7ead102882b18e5e2ce661a7efe92bd50.js';
-import * as r3 from './rulesets/merge-v1-bf312a3b31590a93314794a38fc9502c256e31ce050748ddd436f532f39b5afc.js';
-export const rulesetId = "merge-v1-bf312a3b31590a93314794a38fc9502c256e31ce050748ddd436f532f39b5afc";
-export const replayRulesets = [r0,r1,r2,r3];
+import * as r3 from './rulesets/merge-v1-727d12b4d70978733b40d258d67df882ffd47b6bde622156960e3fc069f0e476.js';
+import * as r4 from './rulesets/merge-v1-bf312a3b31590a93314794a38fc9502c256e31ce050748ddd436f532f39b5afc.js';
+import * as r5 from './rulesets/merge-v1-c8f9a4eddf8298cfeebbd1c29a73b2827ad831a51b6fdee44809f9fdfa866c99.js';
+export const rulesetId = "merge-v1-c8f9a4eddf8298cfeebbd1c29a73b2827ad831a51b6fdee44809f9fdfa866c99";
+export const replayRulesets = [r0,r1,r2,r3,r4,r5];
 export const resolveReplayRuleset = (id) => replayRulesets.find((runtime) => runtime.rulesetId === id);

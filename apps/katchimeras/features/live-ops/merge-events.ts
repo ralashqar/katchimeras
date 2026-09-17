@@ -1,18 +1,22 @@
+import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { GameplayEvent } from '@/types/gameplay-event';
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
 
 export function mergeCommandEvents(before: MergeWorldState, command: MergeWorldCommand, result: MergeWorldCommandResult, contentRevision: number): GameplayEvent[] {
   if (!result.changed) return [];
-  const base = { version: 1 as const, source: 'merge-world' as const, sourceRevision: result.state.revision, occurredAt: command.now, contentRevision, quantity: 1 };
+  const base = { version: 1 as const, source: 'merge-world' as const, sourceRevision: result.state.revision, occurredAt: Math.max(command.now, before.localLiveOps?.clock ?? 0), contentRevision, quantity: 1 };
   const id = `world:${before.createdAt}:${result.state.revision}:${'boardId' in command ? command.boardId ?? 'mossprout' : 'mossprout'}`;
   const events: GameplayEvent[] = [];
+  const boardId = 'boardId' in command ? command.boardId ?? 'mossprout' : 'mossprout';
+  const regionId = boardId === 'mossprout' ? 'mossprout-grove' : `${boardId}-home`;
   if (command.type === 'move' && result.mergedCell != null) {
-    const item = result.state.board[result.mergedCell]?.occupant;
-    if (item?.kind === 'item') events.push({ ...base, id: `${id}:merge`, kind: 'merge', context: { itemId: item.definitionId, itemTier: Number(item.definitionId.split(':').at(-1)) || undefined, regionId: 'mossprout-grove' } });
+    const board = boardId === 'mossprout' ? result.state.board : result.state.haven.residentMergeBoards[boardId]?.board;
+    const item = board?.[result.mergedCell]?.occupant;
+    if (item?.kind === 'item') events.push({ ...base, id: `${id}:merge`, kind: 'merge', context: { itemId: item.definitionId, itemTier: MERGE_ITEMS_BY_ID.get(item.definitionId)?.tier, companionId: boardId, regionId } });
   }
   if (command.type === 'serveOrder' && result.servedOrderId) {
     const order = before.activeOrders.find((entry) => entry.id === result.servedOrderId);
-    events.push({ ...base, id: `${id}:order:${result.servedOrderId}`, kind: 'order_completed', context: { targetId: result.servedOrderId, companionId: order?.characterId, regionId: 'mossprout-grove' } });
+    events.push({ ...base, id: `${id}:order:${result.servedOrderId}`, kind: 'order_completed', context: { targetId: result.servedOrderId, companionId: order?.characterId, regionId } });
   }
   return events;
 }

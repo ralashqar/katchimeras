@@ -1,3 +1,7 @@
+import { useGameClockOffset } from '@/hooks/use-game-clock-offset';
+import { gameNow } from '@/utils/game-clock';
+import { reconcileJourneyGardenOrders } from '@/features/companion/journey-garden-orders';
+import { journeyChapterFor } from '@/constants/companion-journey-chapters/registry';
 import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
 import { createContext, type PropsWithChildren, use, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
@@ -179,6 +183,7 @@ export function MergeWorldProvider({
     return Object.fromEntries(ids.map((id) => [id, companionFriendshipProgress(bond, companionIdForFamily(id)).level])) as Partial<Record<MergeCharacterId, number>>;
   }, []);
 
+  const gameClockOffset = useGameClockOffset();
   const refreshFriendshipLevels = useCallback(() => {
     const levels = currentFriendshipLevels();
     if (mountedRef.current) setFriendshipLevels(levels);
@@ -276,7 +281,9 @@ export function MergeWorldProvider({
     if (receipt.wispId) wisps.grant(receipt.wispId, receipt.id, 'game');
   }, [guardStoryReceiptMutation, wisps]);
 
-  const reconcileFeastleStory = useCallback((current: MergeWorldState, now = Date.now()) => {
+  const reconcileFeastleStory = useCallback((current: MergeWorldState, now = gameNow()) => {
+    const chapter = journeyChapterFor('feastle');
+    if (chapter && !chapter.orders) return reconcileJourneyGardenOrders(current, relationshipProgressionRepository.load(), now);
     const story = loadFeastleStory();
     const result = reduceMergeWorld(current, {
       type: 'reconcileStory', familyId: 'feastle', status: story.status,
@@ -291,7 +298,7 @@ export function MergeWorldProvider({
     return result.state;
   }, []);
 
-  const reconcileMossproutStory = useCallback((current: MergeWorldState, now = Date.now()) => {
+  const reconcileMossproutStory = useCallback((current: MergeWorldState, now = gameNow()) => {
     const relationships = relationshipProgressionRepository.load();
     const dayId = mossproutJourneyRuntimeDayId(relationships, localDayId(new Date(now)), isJourneyQuickModeEnabled());
     const journey = mossproutJourneyForDay(relationships, dayId);
@@ -329,7 +336,9 @@ export function MergeWorldProvider({
     }).state;
   }, []);
 
-  const reconcileAuthoredCohortStory = useCallback((current: MergeWorldState, familyId: AuthoredCohortFamilyId, now = Date.now()) => {
+  const reconcileAuthoredCohortStory = useCallback((current: MergeWorldState, familyId: AuthoredCohortFamilyId, now = gameNow()) => {
+    const chapter = journeyChapterFor(familyId);
+    if (chapter && !chapter.orders) return reconcileJourneyGardenOrders(current, relationshipProgressionRepository.load(), now);
     const story = loadAuthoredCohortStory(familyId);
     const result = reduceMergeWorld(current, {
       type: 'reconcileStory', familyId, status: story.status,
@@ -361,7 +370,7 @@ export function MergeWorldProvider({
     return current.unlockedCharacters[0] ?? null;
   }, [featuredCharacterId]);
 
-  const reconcileFeaturedStory = useCallback((current: MergeWorldState, characterId: MergeCharacterId, now = Date.now()) => {
+  const reconcileFeaturedStory = useCallback((current: MergeWorldState, characterId: MergeCharacterId, now = gameNow()) => {
     if (
       characterId === 'mossprout'
       && loadFirstSession()?.stage !== 'complete'
@@ -385,7 +394,7 @@ export function MergeWorldProvider({
     return reduceMergeWorld(current, command).state;
   }, [reconcileAuthoredCohortStory, reconcileFeastleStory, reconcileMossproutStory]);
 
-  const featureAndReconcile = useCallback((current: MergeWorldState, now = Date.now()) => {
+  const featureAndReconcile = useCallback((current: MergeWorldState, now = gameNow()) => {
     const firstSessionComplete = loadFirstSession()?.stage === 'complete';
     if (!firstSessionComplete && isMossproutChapterZeroActive(current)) {
       const featured = reduceMergeWorld(current, { type: 'featureCharacter', characterId: 'mossprout', now }).state;
@@ -563,7 +572,7 @@ export function MergeWorldProvider({
       const current = stateRef.current;
       if (!current) return;
       const levels = refreshFriendshipLevels();
-      const result = reduceMergeWorld(current, { type: 'reconcileFriendship', levels, now: Date.now() });
+      const result = reduceMergeWorld(current, { type: 'reconcileFriendship', levels, now: gameNow() });
       if (!result.changed) return;
       stateRef.current = result.state;
       if (mountedRef.current) setState(result.state);
@@ -653,7 +662,7 @@ export function MergeWorldProvider({
           applyReceiptSideEffect(receipt);
           const current = stateRef.current;
           if (!current) continue;
-          const result = reduceMergeWorld(current, { type: 'ackExternalReward', receiptId: receipt.id, now: Date.now() });
+          const result = reduceMergeWorld(current, { type: 'ackExternalReward', receiptId: receipt.id, now: gameNow() });
           if (!result.changed) continue;
           stateRef.current = result.state;
           if (mountedRef.current) setState(result.state);
@@ -665,7 +674,7 @@ export function MergeWorldProvider({
         const levels = refreshFriendshipLevels();
         const current = stateRef.current;
         if (current) {
-          const friendshipState = reduceMergeWorld(current, { type: 'reconcileFriendship', levels, now: Date.now() }).state;
+          const friendshipState = reduceMergeWorld(current, { type: 'reconcileFriendship', levels, now: gameNow() }).state;
           // Story storage notifications are guarded while receipt side effects
           // are applied. Reconcile explicitly after the whole batch so a
           // midpoint note and every unserved request appear atomically.
@@ -721,10 +730,10 @@ export function MergeWorldProvider({
         const loaded = await loadMergeWorldState();
         if (cancelled || !activeRef.current) return;
         baseRevisionRef.current = loaded.revision;
-        let next = reduceMergeWorld(loaded, { type: 'reconcileCharacters', characterIds, now: Date.now() }).state;
+        let next = reduceMergeWorld(loaded, { type: 'reconcileCharacters', characterIds, now: gameNow() }).state;
         next = featureAndReconcile(next);
         const rewards = [...mergeActivityRewards(days, new Date(), { state: next, quickGoals: loadCompanionQuickGoalState() }), ...mergeQuestActivityRewards(questState)];
-        const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now: Date.now() });
+        const activityResult = reduceMergeWorld(next, { type: 'grantActivityRewardsBatch', rewards, now: gameNow() });
         next = activityResult.state;
         await saveMergeWorldState(next, undefined, { baseRevision: loaded.revision });
         baseRevisionRef.current = next.revision;
@@ -732,12 +741,12 @@ export function MergeWorldProvider({
         const appliedIds: string[] = [];
         for (const receipt of next.externalRewardReceipts.filter((item) => item.appliedAt == null)) {
           applyReceiptSideEffect(receipt);
-          next = reduceMergeWorld(next, { type: 'ackExternalReward', receiptId: receipt.id, now: Date.now() }).state;
+          next = reduceMergeWorld(next, { type: 'ackExternalReward', receiptId: receipt.id, now: gameNow() }).state;
           appliedIds.push(receipt.id);
         }
         const levels = currentFriendshipLevels();
         const beforeFriendshipReconcile = next;
-        next = reduceMergeWorld(next, { type: 'reconcileFriendship', levels, now: Date.now() }).state;
+        next = reduceMergeWorld(next, { type: 'reconcileFriendship', levels, now: gameNow() }).state;
         // Applying a pending served-order receipt may have advanced Feastle to
         // a midpoint return. Repair the Merge projection before first paint.
         next = featureAndReconcile(next);
@@ -798,7 +807,7 @@ export function MergeWorldProvider({
     if (!active || loading) return;
     const current = stateRef.current;
     if (!current) return;
-    const now = Date.now();
+    const now = gameNow();
     let next = reduceMergeWorld(current, { type: 'reconcileCharacters', characterIds, now }).state;
     const levels = refreshFriendshipLevels();
     next = reduceMergeWorld(next, { type: 'reconcileFriendship', levels, now }).state;
@@ -852,7 +861,7 @@ export function MergeWorldProvider({
     if (discoveryGateResult?.changed) setLastResult(discoveryGateResult);
     else if (activityResult.changed) setLastResult(activityResult);
     enqueuePersistence(next);
-  }, [active, characterIds, days, enqueuePersistence, featureAndReconcile, journeyRevision, loading, questState, quickGoalRevision, refreshFriendshipLevels, wisps.state.inventory]);
+  }, [gameClockOffset, active, characterIds, days, enqueuePersistence, featureAndReconcile, journeyRevision, loading, questState, quickGoalRevision, refreshFriendshipLevels, wisps.state.inventory]);
 
   const dispatch = useCallback((command: MergeWorldCommand, options?: MergeWorldDispatchOptions): MergeWorldCommandResult | null => {
     if (!activeRef.current || !isAppForeground()) return null;
@@ -901,7 +910,7 @@ export function MergeWorldProvider({
       eventId: `resident-revealed:${reduced.residentCardRevealed.discoveryId}`,
       type: 'resident.revealed',
       payload: reduced.residentCardRevealed,
-      occurredAt: 'now' in command ? command.now : Date.now(),
+      occurredAt: 'now' in command ? command.now : gameNow(),
     });
     if (reduced.changed && command.type === 'ackResidentCardDialogue') {
       void acknowledgeActiveContentFlowPresentation('resident.dialogue');

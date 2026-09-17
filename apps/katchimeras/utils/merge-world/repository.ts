@@ -1,3 +1,8 @@
+import { gameNow } from '@/utils/game-clock';
+import { reconcileJourneyGardenOrders } from '@/features/companion/journey-garden-orders';
+import { availableLocalEvents, harmonyDefinition } from '@/features/live-ops/local-catalog';
+import { projectLocalEvents, reduceLocalEvent } from '@/features/live-ops/local-runtime';
+import type { LocalEventCommand } from '@/types/local-live-ops';
 import { recordHatchProfileAnswers } from '@/features/onboarding/hatch-profile-storage';
 import { GLOW } from '@/constants/glow';
 import type { GameplayEvent } from '@/types/gameplay-event';
@@ -5,7 +10,7 @@ import type { HarmonyState, LiveEventProgress } from '@/types/live-ops';
 import { contentRegistrySnapshot } from '@/features/content-packs/active-pack';
 import { appendGameplayEvents, GAMEPLAY_JOURNAL_SCHEMA } from '@/features/live-ops/journal';
 import { newWorldMilestones, worldMilestoneEvents } from '@/features/live-ops/merge-events';
-import { emptyHarmony } from '@/features/live-ops/rules';
+import { applyHarmonyEvent, emptyHarmony } from '@/features/live-ops/rules';
 import * as SQLite from 'expo-sqlite';
 import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import { WORLD_UPGRADE_STORIES } from '@/features/world-upgrades/world-upgrade-stories';
@@ -88,7 +93,7 @@ async function database() {
   return databasePromise;
 }
 
-export async function loadMergeWorldState(now = Date.now()): Promise<MergeWorldState> {
+export async function loadMergeWorldState(now = gameNow()): Promise<MergeWorldState> {
   // A mounted provider may still hold commands it has not written. Read what
   // the player sees, not what the database saw a moment ago.
   await flushMergeWorldWriters();
@@ -133,7 +138,7 @@ export async function saveMergeWorldState(
   if (resetInProgress) return;
   const generation = resetGeneration;
   const finishSerialization = measureMergeWork('save:serialize');
-  const serialized = JSON.stringify(state);
+  let serialized = JSON.stringify(state);
   finishSerialization();
   const selectedReceipts = receiptIds == null
     ? state.externalRewardReceipts
@@ -152,7 +157,7 @@ export async function saveMergeWorldState(
       );
       if (row && mergeWriteIsStale(row.revision, options.baseRevision)) {
         let current: MergeWorldState;
-        try { current = normalizeMergeWorldState(JSON.parse(row.state_json), Date.now()); }
+        try { current = normalizeMergeWorldState(JSON.parse(row.state_json), gameNow()); }
         catch { current = state; }
         throw new MergeWorldStaleWriteError(current);
       }
@@ -167,6 +172,9 @@ export async function saveMergeWorldState(
       catch { /* Loading already reported the damaged snapshot; recovered facts are historical. */ }
       const revision = contentRegistrySnapshot().revision;
       const backfill = !projection && priorState ? worldMilestoneEvents(priorState, revision, true) : [];
+      state = { ...state, localLiveOps: priorState?.localLiveOps ?? state.localLiveOps };
+      state = projectLocalEvents(state, [...newWorldMilestones(priorState, state, revision), ...(options.gameplayEvents ?? [])], state.updatedAt);
+      serialized = JSON.stringify(state);
       await appendGameplayEvents(db, [...backfill, ...newWorldMilestones(priorState, state, revision), ...(options.gameplayEvents ?? [])], contentRegistrySnapshot().packs.filter((record) => !record.retiredAt).flatMap((record) => record.pack.liveEvents ?? []));
       await db.runAsync(
         `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
@@ -195,8 +203,8 @@ export async function saveMergeWorldState(
 }
 
 async function reduceStoredMergeWorld(
-  reduce: (state: MergeWorldState) => MergeWorldCommandResult,
-  now = Date.now(),
+  reduce: (state: MergeWorldState) => (MergeWorldCommandResult & { localGameplayEvents?: GameplayEvent[] }) | Promise<MergeWorldCommandResult & { localGameplayEvents?: GameplayEvent[] }>,
+  now = gameNow(),
 ): Promise<MergeWorldCommandResult> {
   // Story effects and world screens reduce the database directly while a
   // provider may still be buffering the player's last taps. Drain those first
@@ -219,12 +227,13 @@ async function reduceStoredMergeWorld(
         }
       }
     }
-    const reduced = reduce(current);
+    const reduced = await reduce(current);
     if (!reduced.changed || generation !== resetGeneration || resetInProgress) return reduced;
     await db.withTransactionAsync(async () => {
     const projection = await db.getFirstAsync<{ projection_id: string }>('SELECT projection_id FROM gameplay_projections WHERE projection_id = ?', ['harmony:v1']);
     const revision = contentRegistrySnapshot().revision;
-    await appendGameplayEvents(db, [...(!projection ? worldMilestoneEvents(current, revision, true) : []), ...newWorldMilestones(current, reduced.state, revision)], contentRegistrySnapshot().packs.filter((record) => !record.retiredAt).flatMap((record) => record.pack.liveEvents ?? []));
+    reduced.state = projectLocalEvents(reduced.state, newWorldMilestones(current, reduced.state, revision), now);
+    await appendGameplayEvents(db, [...(!projection ? worldMilestoneEvents(current, revision, true) : []), ...newWorldMilestones(current, reduced.state, revision), ...(reduced.localGameplayEvents ?? [])], contentRegistrySnapshot().packs.filter((record) => !record.retiredAt).flatMap((record) => record.pack.liveEvents ?? []));
     await db.runAsync(
       `INSERT INTO merge_world_snapshot (profile_id, schema_version, revision, updated_at, state_json, backup_json)
        VALUES (?, ?, ?, ?, ?, ?)
@@ -248,7 +257,10 @@ export async function loadGameplayJournal(limit = 100): Promise<GameplayEvent[]>
 export async function loadHarmonyProgress(): Promise<HarmonyState> {
   const db = await database();
   const row = await db.getFirstAsync<{ payload_json: string }>('SELECT payload_json FROM gameplay_projections WHERE projection_id = ?', ['harmony:v1']);
-  return row ? JSON.parse(row.payload_json) as HarmonyState : emptyHarmony();
+  if (row) return JSON.parse(row.payload_json) as HarmonyState;
+  const snapshot = await db.getFirstAsync<{ state_json: string }>('SELECT state_json FROM merge_world_snapshot WHERE profile_id = ?', [LOCAL_PROFILE_ID]);
+  if (!snapshot) return emptyHarmony();
+  return worldMilestoneEvents(JSON.parse(snapshot.state_json), contentRegistrySnapshot().revision, true).reduce((progress, event) => applyHarmonyEvent(progress, event, harmonyDefinition()), emptyHarmony());
 }
 
 export async function loadLiveEventProgress(): Promise<LiveEventProgress[]> {
@@ -257,7 +269,7 @@ export async function loadLiveEventProgress(): Promise<LiveEventProgress[]> {
   return rows.map((row) => JSON.parse(row.payload_json) as LiveEventProgress);
 }
 
-export function saveUpgradeStoryRead(storyId: string, count: number, now = Date.now()) {
+export function saveUpgradeStoryRead(storyId: string, count: number, now = gameNow()) {
   return reduceStoredMergeWorld((state) => {
     const story = WORLD_UPGRADE_STORIES.find((item) => item.id === storyId);
     if (!story || !Number.isFinite(count)) return { state, changed: false, message: '' };
@@ -272,7 +284,7 @@ export function saveUpgradeStoryRead(storyId: string, count: number, now = Date.
 }
 
 /** Pays the authored journal reward through the normal daily journal receipt. */
-export function grantMossproutFtueJournalEnergy(dayId: string, now = Date.now()) {
+export function grantMossproutFtueJournalEnergy(dayId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'grantActivityRewardsBatch',
     rewards: [{
@@ -293,7 +305,7 @@ export function claimDailyStepEnergy(input: {
   observedAt: string;
   allowBootstrap: boolean;
   receiptId: string;
-}, now = Date.now()) {
+}, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'claimStepEnergy',
     ...input,
@@ -305,7 +317,7 @@ export function claimDailyStepEnergy(input: {
 export const claimMossproutFtueStepEnergy = claimDailyStepEnergy;
 
 /** Opens the fixed first board discovery after Mossprout's Chapter 0 return. */
-export function installStepplingFtueDiscovery(now = Date.now()) {
+export function installStepplingFtueDiscovery(now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'startStepplingDiscovery', now }), now);
 }
 
@@ -315,7 +327,7 @@ export function grantJournalCaptureEnergy(input: {
   dayId: string;
   journalEnergy: number;
   recordId: string;
-}, now = Date.now()) {
+}, now = gameNow()) {
   const rewards = [
     ...(input.journalEnergy > 0 ? [{
       receiptId: `activity:egg-journal:${input.dayId}:${input.recordId}`,
@@ -340,7 +352,7 @@ export function grantJournalCaptureEnergy(input: {
 }
 
 /** Atomically spends Merge Glow and advances one linear Haven environment. */
-export function upgradeStoredHavenTile(characterId: import('@/types/merge-world').MergeCharacterId, stage: HavenStage, now = Date.now()) {
+export function upgradeStoredHavenTile(characterId: import('@/types/merge-world').MergeCharacterId, stage: HavenStage, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId, stage, now }), now);
 }
 
@@ -348,7 +360,7 @@ export function upgradeStoredHavenTile(characterId: import('@/types/merge-world'
 export function upgradeStoredMossproutNatureIsland(
   islandId: import('@/types/merge-world').MossproutNatureIslandId,
   level: import('@/types/merge-world').MossproutNatureIslandLevel,
-  now = Date.now(),
+  now = gameNow(),
 ) {
   return reduceStoredMergeWorld(
     (state) => reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId, level, now }),
@@ -364,7 +376,7 @@ export function activateStoredIslandCampaignChapter(input: {
   level: import('@/types/merge-world').MossproutNatureIslandLevel;
   selectedOptionId?: string | null;
   orders: import('@/types/merge-world').MergeOrder[];
-}, now = Date.now()) {
+}, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'activateIslandCampaignChapter',
     ...input,
@@ -372,38 +384,38 @@ export function activateStoredIslandCampaignChapter(input: {
   }), now);
 }
 
-export function acknowledgeStoredIslandCampaignChapterReturn(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, now = Date.now()) {
+export function acknowledgeStoredIslandCampaignChapterReturn(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'ackIslandCampaignChapterReturn', campaignId, level, now,
   }), now);
 }
 
-export function requestStoredIslandCampaignDelivery(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, orders: import('@/types/merge-world').MergeOrder[], now = Date.now()) {
+export function requestStoredIslandCampaignDelivery(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, orders: import('@/types/merge-world').MergeOrder[], now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'requestIslandCampaignDelivery', campaignId, level, orders, now,
   }), now);
 }
 
-export function recordStoredIslandRestorationProgress(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, progress: { current: number; total: number }, now = Date.now()) {
+export function recordStoredIslandRestorationProgress(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, progress: { current: number; total: number }, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'recordIslandRestorationProgress', campaignId, level, current: progress.current, total: progress.total, now,
   }), now);
 }
 
-export function completeStoredIslandRestoration(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, now = Date.now()) {
+export function completeStoredIslandRestoration(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'completeIslandRestoration', campaignId, level, now,
   }), now);
 }
 
-export function completeStoredIslandCampaignChapter(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, now = Date.now()) {
+export function completeStoredIslandCampaignChapter(campaignId: string, level: import('@/types/merge-world').MossproutNatureIslandLevel, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'completeIslandCampaignChapter', campaignId, level, now,
   }), now);
 }
 
 /** Developer-only wallet grant for testing long island and Merge progression. */
-export function grantStoredDevMergeCurrency(input: { glow?: number; energy?: number }, now = Date.now()) {
+export function grantStoredDevMergeCurrency(input: { glow?: number; energy?: number }, now = gameNow()) {
   return reduceStoredMergeWorld((state) => {
     if (!DEV_TOOLS_ENABLED) return { state, changed: false, message: 'Developer tools are disabled.' };
     const glow = Math.max(0, Math.floor(Number(input.glow) || 0));
@@ -425,7 +437,7 @@ export function discoverStoredIslandCampaignResident(input: {
   campaignId: string;
   islandId: import('@/types/merge-world').MossproutNatureIslandId;
   residentSkinId: import('@/types/katchimera').KatchimeraSkinId;
-}, now = Date.now()) {
+}, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'discoverIslandCampaignResident',
     ...input,
@@ -433,7 +445,7 @@ export function discoverStoredIslandCampaignResident(input: {
   }), now);
 }
 
-export function acknowledgeStoredIslandCampaignResidentDiscovery(campaignId: string, now = Date.now()) {
+export function acknowledgeStoredIslandCampaignResidentDiscovery(campaignId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'ackIslandCampaignResidentDiscovery',
     campaignId,
@@ -441,7 +453,7 @@ export function acknowledgeStoredIslandCampaignResidentDiscovery(campaignId: str
   }), now);
 }
 
-export function acknowledgeStoredIslandCampaignResidentCardReveal(campaignId: string, now = Date.now()) {
+export function acknowledgeStoredIslandCampaignResidentCardReveal(campaignId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'ackIslandCampaignResidentCardReveal',
     campaignId,
@@ -450,21 +462,21 @@ export function acknowledgeStoredIslandCampaignResidentCardReveal(campaignId: st
 }
 
 /** Mossprout's wish has been told; the Kingdom tracker and its first map hint may appear. */
-export function introduceStoredKingdomGoal(now = Date.now()) {
+export function introduceStoredKingdomGoal(now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'introduceKingdomGoal', now }), now);
 }
 
-export function acknowledgeStoredKingdomGoalCoachmark(now = Date.now()) {
+export function acknowledgeStoredKingdomGoalCoachmark(now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'ackKingdomGoalCoachmark', now }), now);
 }
 
 /** A mist mission's ticket: the tile's price, paid once at its bubble; the reveal after the board then charges nothing. */
-export function payStoredHatchableMission(companion: import('@/types/merge-world').MergeCharacterId, receiptId: string, now = Date.now()) {
+export function payStoredHatchableMission(companion: import('@/types/merge-world').MergeCharacterId, receiptId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'payHatchableMission', companion, receiptId, now }), now);
 }
 
 /** Exactly-once story upgrade. Retrying an effect key returns its original receipt. */
-export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryWorldUpgradeEffectPayload, now = Date.now()) {
+export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryWorldUpgradeEffectPayload, now = gameNow()) {
   const target = payload.target;
   if (payload.transition === 'island_reveal') {
     const campaign = target.kind === 'haven_nature_island' ? islandCampaignForIsland(target.islandId) : null;
@@ -512,7 +524,7 @@ export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryW
       }), now);
 }
 
-export function revealStoredHaven(now = Date.now()) {
+export function revealStoredHaven(now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'revealHaven', now }), now);
 }
 
@@ -520,7 +532,7 @@ export function grantStoredPlantableMemory(
   definitionId: import('@/types/merge-world').MossproutMemoryPlantId,
   source: import('@/types/merge-world').PlantableMemorySource,
   receiptId: string,
-  now = Date.now(),
+  now = gameNow(),
 ) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'grantPlantableMemory', definitionId, source, receiptId, now,
@@ -531,7 +543,7 @@ export function placeStoredPlantableMemory(
   instanceId: string,
   slotId: import('@/types/merge-world').MossproutGardenPlantSlotId,
   receiptId: string,
-  now = Date.now(),
+  now = gameNow(),
 ) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'placePlantableMemory', instanceId, slotId, receiptId, now,
@@ -546,7 +558,7 @@ export function placeStoredPlantableMemory(
  * finishes the world mutation without requiring a screen to own Merge state.
  */
 export async function ensureStoredFirstFtueMemoryPlacement(sourceId: string | null, receiptId: string) {
-  const now = Date.now();
+  const now = gameNow();
   const result = await reduceStoredMergeWorld((state) => (
     reduceFirstFtueMemoryPlacement(state, sourceId, receiptId, now)
   ), now);
@@ -557,13 +569,13 @@ export async function ensureStoredFirstFtueMemoryPlacement(sourceId: string | nu
   };
 }
 
-export function growStoredPlantableMemory(instanceId: string, amount: number, receiptId: string, now = Date.now()) {
+export function growStoredPlantableMemory(instanceId: string, amount: number, receiptId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'growPlantableMemory', instanceId, amount, receiptId, now,
   }), now);
 }
 
-export function upgradeStoredHavenStructure(level: number, receiptId: string, now = Date.now()) {
+export function upgradeStoredHavenStructure(level: number, receiptId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'upgradeHavenStructure', structureId: 'mossprout-garden', level, receiptId, now,
   }), now);
@@ -573,14 +585,14 @@ export function upgradeStoredHavenFeature(
   featureId: import('@/types/merge-world').MossproutGardenFeatureId,
   level: number,
   receiptId: string,
-  now = Date.now(),
+  now = gameNow(),
 ) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'upgradeHavenFeature', structureId: 'mossprout-garden', featureId, level, receiptId, now,
   }), now);
 }
 
-export function revealStoredMovementEgg(receiptId: string, now = Date.now()) {
+export function revealStoredMovementEgg(receiptId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'revealMovementEgg', receiptId, now }), now);
 }
 
@@ -588,7 +600,7 @@ export function recordStoredMovementEggProgress(input: {
   observedSteps?: number;
   manualMovement?: boolean;
   receiptId: string;
-}, now = Date.now()) {
+}, now = gameNow()) {
   return reduceStoredMergeWorld((state) => {
     const progress = reduceMergeWorld(state, { type: 'recordMovementEggProgress', ...input, now });
     return progress;
@@ -596,7 +608,7 @@ export function recordStoredMovementEggProgress(input: {
 }
 
 export async function applyStoredHatchableEgg(definition: import('@/types/hatchable-companion').HatchableCompanionDefinition, action: import('@/features/onboarding/hatchable-egg-policy').HatchableEggAction) {
-  const now = Date.now();
+  const now = gameNow();
   const { companion } = definition;
   const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'hatchableEgg', companion, action, now }), now);
   // Reconcile advertised question rewards from saved answers, including retry
@@ -635,30 +647,30 @@ export async function applyStoredStepplingEgg(action: import('@/features/onboard
  * run (the receipt is the run's) by the flow after the lift, and repaired by the world screen at the
  * first restore. Reports whether this call was the one that granted it.
  */
-export async function ensureStoredOpeningGlow(receiptId: string, amount = GLOW.firstRestorationCost, now = Date.now()) {
+export async function ensureStoredOpeningGlow(receiptId: string, amount = GLOW.firstRestorationCost, now = gameNow()) {
   const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantOpeningGlow', receiptId, amount, now }), now);
   return { state: result.state, granted: result.changed, amount };
 }
 
 export function grantStoredGeneratorParcel(generatorId: string, rewardId: string, dayId: string) {
-  const now = Date.now();
+  const now = gameNow();
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantGeneratorParcel', generatorId, rewardId, dayId, now }), now);
 }
 
-export function reconcileStoredJourneyMeditation(cycle: import('@/types/companion-journey-cycle').CompanionJourneyCycle, availableAt: number, now = Date.now()) {
+export function reconcileStoredJourneyMeditation(cycle: import('@/types/companion-journey-cycle').CompanionJourneyCycle, availableAt: number, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'reconcileJourneyMeditation', cycle, availableAt, now }), now);
 }
 
-export function grantStoredJourneyReturn(cycle: import('@/types/companion-journey-cycle').CompanionJourneyCycle, dayId: string, now = Date.now()) {
+export function grantStoredJourneyReturn(cycle: import('@/types/companion-journey-cycle').CompanionJourneyCycle, dayId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantJourneyReturn', cycle, dayId, now }), now);
 }
 
-export function reconcileStoredHavenStory(characterId: import('@/types/merge-world').MergeCharacterId, storyLevel: number, now = Date.now()) {
+export function reconcileStoredHavenStory(characterId: import('@/types/merge-world').MergeCharacterId, storyLevel: number, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'reconcileHavenStory', characterId, storyLevel, now }), now);
 }
 
 /** Completes the Chapter Zero handoff by publishing today's normal Garden batch immediately. */
-export function seedStoredMossproutGardenAfterFtue(dayId: string, now = Date.now()) {
+export function seedStoredMossproutGardenAfterFtue(dayId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => {
     const completedChapterZero = completeMossproutChapterZeroSlice(state, now);
     return reduceMergeWorld(completedChapterZero, {
@@ -681,7 +693,7 @@ export function grantStoredKatchimeraCard(
   familyId: import('@/types/merge-world').MergeCharacterId,
   cardId: string,
   sourceReceiptId: string,
-  now = Date.now(),
+  now = gameNow(),
 ) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'grantKatchimeraCard', familyId, cardId, sourceReceiptId, now,
@@ -692,7 +704,7 @@ export function activateStoredResidentCardDiscovery(
   campaignId: string,
   journeyDayId: string,
   residentId: string,
-  now = Date.now(),
+  now = gameNow(),
 ) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'activateResidentCardDiscovery', campaignId, journeyDayId, residentId, now,
@@ -703,14 +715,14 @@ export function purchaseStoredKatchimeraCard(
   familyId: import('@/types/merge-world').MergeCharacterId,
   cardId: string,
   purchaseId: string,
-  now = Date.now(),
+  now = gameNow(),
 ) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'purchaseKatchimeraCard', familyId, cardId, cost: 150, purchaseId, now,
   }), now);
 }
 
-export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<void> {
+export async function resetMergeWorldStateForDebug(now = gameNow()): Promise<void> {
   resetGeneration += 1;
   resetInProgress = true;
   try {
@@ -732,7 +744,7 @@ export async function resetMergeWorldStateForDebug(now = Date.now()): Promise<vo
 }
 
 /** Atomically installs an authored/captured developer profile board. */
-export async function installMergeWorldStateForDebug(input: unknown, now = Date.now()): Promise<MergeWorldState> {
+export async function installMergeWorldStateForDebug(input: unknown, now = gameNow()): Promise<MergeWorldState> {
   const installed = normalizeMergeWorldState(input, now);
   await serializeWrite(async () => undefined);
   resetGeneration += 1;
@@ -778,7 +790,7 @@ export type MossproutInstallOptions = { opening?: boolean; /** The live first se
  * debug/reset callers retain the historical destructive behavior by default.
  */
 export async function installMossproutOnboardingMergeWorld(
-  now = Date.now(),
+  now = gameNow(),
   rewardWispId: import('@/types/wisp').WispId = 'sprout',
   options: { preserveHaven?: boolean } & MossproutInstallOptions = {},
 ): Promise<MergeWorldState> {
@@ -833,7 +845,7 @@ export type MossproutMergeFtueStepId =
   | 'merge.plant.sprout_pair'
   | 'merge.serve_plant';
 
-export async function prepareMossproutMergeFtueForDebug(step: MossproutMergeFtueStepId, now = Date.now()) {
+export async function prepareMossproutMergeFtueForDebug(step: MossproutMergeFtueStepId, now = gameNow()) {
   let prepared = await installMossproutOnboardingMergeWorld(now);
   if (step === 'merge.seed_drag') return prepared;
   prepared = mergeFirstPair(prepared, 'nature:garden:1', now + 1);
@@ -873,7 +885,7 @@ async function persistPreparedFtueState(state: MergeWorldState) {
 /** Makes one day eligible for real-life Merge Energy without resetting board progress. */
 export async function resetMergeWorldActivityForDayForDebug(
   dayId: string,
-  now = Date.now(),
+  now = gameNow(),
   stepEnergyDayId?: string,
 ): Promise<void> {
   // Preserve a board command that was queued immediately before Reset Today.
@@ -934,6 +946,30 @@ export function subscribeMergeWorldSnapshots(listener: (state: MergeWorldState, 
   return () => snapshotListeners.delete(listener);
 }
 
-export function ensureStoredCompanionDailyGarden(familyId: import('@/types/merge-world').MergeCharacterId, now = Date.now()) {
+export function ensureStoredJourneyGardenOrders(relationships: import('@/types/relationship-progression').RelationshipProgressState, now = gameNow()) {
+  return reduceStoredMergeWorld(state => {
+    const next = reconcileJourneyGardenOrders(state, relationships, now);
+    return { state: next, changed: next !== state };
+  }, now);
+}
+
+export function ensureStoredCompanionDailyGarden(familyId: import('@/types/merge-world').MergeCharacterId, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'ensureCompanionDailyGarden', familyId, now }), now);
+}
+
+/** Serialized with ordinary world writers; claims and inventory share the snapshot commit. */
+export async function applyStoredLocalEvent(command: LocalEventCommand, now = gameNow()) {
+  return reduceStoredMergeWorld(async state => {
+    const harmony = await loadHarmonyProgress();
+    const result = reduceLocalEvent(state, command, harmony, availableLocalEvents(), now);
+    return { state: result.world, changed: true, localGameplayEvents: result.events };
+  }, now);
+}
+
+export async function appendSourceGameplayEvents(events: GameplayEvent[]) {
+  return reduceStoredMergeWorld(state => ({
+    changed: true,
+    state: { ...projectLocalEvents(state, events, gameNow()), revision: state.revision + 1, updatedAt: gameNow() },
+    localGameplayEvents: events,
+  }));
 }

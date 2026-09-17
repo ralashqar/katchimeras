@@ -1,4 +1,6 @@
+import { gameNow } from '@/utils/game-clock';
 import { mergeOrderReady, mergeWorldStateForBoard } from '@/utils/merge-world/engine';
+import { companionGardenActionLabel } from '@/constants/companion-daily/registry';
 import { useOptionalMergeWorldState, useOptionalMergeWorldActions } from '@/features/merge-world/merge-world-provider';
 import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
@@ -25,6 +27,7 @@ function CompanionGardenActionContent({ familyId, onOpenMerge, storyRequests = [
   familyId: DailyGardenFamily; onOpenMerge: (id?: string) => void; storyRequests?: readonly CompanionMergeRequest[];
 }) {
   const navigation = useCompanionActionNavigation();
+  const actionLabel = companionGardenActionLabel(familyId);
   const dayId = useCompanionCalendarDay();
   const provided = useOptionalMergeWorldState();
   const actions = useOptionalMergeWorldActions();
@@ -37,7 +40,7 @@ function CompanionGardenActionContent({ familyId, onOpenMerge, storyRequests = [
   useEffect(() => {
     if (actions) {
       if (provided?.state) {
-        const result = actions.dispatch({ type: 'ensureCompanionDailyGarden', familyId, now: Date.now() });
+        const result = actions.dispatch({ type: 'ensureCompanionDailyGarden', familyId, now: gameNow() });
         setWorld(result?.state ?? provided.state);
       }
       return;
@@ -72,16 +75,16 @@ function CompanionGardenActionContent({ familyId, onOpenMerge, storyRequests = [
   const caughtUp = complete && requests.every((request) => request.served);
   const art = <Image source={katchimeraActionArt('today:quest')} contentFit="contain" style={{ width: 48, height: 48 }} />;
   const card = !world && !error ? null : caughtUp
-    ? dismissedDay === dayId ? null : <DayActionCompletedRow key={dayId} animateLayout artwork={art} title="Tend garden" start
+    ? dismissedDay === dayId ? null : <DayActionCompletedRow key={dayId} animateLayout artwork={art} title={actionLabel} start
         onFinished={() => {
           try { setStoredJson(`companion:garden-outro:${familyId}`, dayId); }
           catch { /* Keep completed work out of this mounted list if presentation storage is unavailable. */ }
           setDismissedDay(dayId);
         }} />
-    : <DayActionActiveRow label="Tend garden" animateLayout>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Tend garden. ${done} of ${total} requests complete`}
+    : <DayActionActiveRow label={actionLabel} animateLayout>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${actionLabel}. ${done} of ${total} requests complete`}
           onPress={() => error ? onOpenMerge() : setOpen(true)}>
-          <DayActionCardSurface artwork={art} title="Tend garden"
+          <DayActionCardSurface artwork={art} title={actionLabel}
             subtitle={today && !complete ? `${done}/${total} requests · +${DAILY_GARDEN_BONUS} Glow for both` : undefined} />
         </Pressable>
       </DayActionActiveRow>;
@@ -94,7 +97,7 @@ function CompanionGardenActionContent({ familyId, onOpenMerge, storyRequests = [
     </View>
     <CompanionSlidingSubmenu visible={open}>
       <MossproutJourneyRequestPanel
-        standalone fitContent animateEntrance={false} title={requests.length ? 'Tend garden' : 'The garden is caught up'}
+        standalone fitContent animateEntrance={false} title={requests.length ? actionLabel : 'All requests complete'}
         actionLabel="Back" onAction={() => setOpen(false)} onRequestPress={onOpenMerge}
         requests={requests.map(({ badge, ...request }) => ({
           ...request, description: [request.description, badge].filter(Boolean).join(' · '),

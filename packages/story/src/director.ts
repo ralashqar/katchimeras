@@ -39,12 +39,13 @@ async function startContentFlow(
   input: { runId?: string; parentRunId?: string | null; variables?: ContentFlowRun['variables']; now?: number } = {},
 ) {
   registerContentFlowDefinition(definition);
-  const run = createContentFlowRun(definition, { runId: input.runId ?? createClientId('flow'), parentRunId: input.parentRunId, variables: input.variables, now: input.now });
+  const run = createContentFlowRun(definition, { runId: input.runId ?? createClientId('flow'), parentRunId: input.parentRunId, variables: input.variables, now: input.now ?? clock() });
   await saveContentFlowTransition(run);
-  return runPendingEffects(definition, run, stabilizeContentFlow(definition, run, input.now).pendingWork);
+  return runPendingEffects(definition, run, stabilizeContentFlow(definition, run, input.now ?? run.updatedAt).pendingWork);
 }
 
 async function dispatchContentFlowCommand(runId: string, command: ContentFlowCommand): Promise<ContentFlowRun | null> {
+  command = { ...command, now: command.now ?? clock() };
   const run = await loadContentFlowRun(runId);
   if (!run) return null;
   let definition = contentFlowDefinition(run.definitionId, run.definitionVersion);
@@ -99,11 +100,11 @@ async function completeChildAndResumeParent(childRunId: string): Promise<Content
   const resumed = await reduceContentFlowRunAtomically({
     runId: parent.runId,
     reduce: (current) => current.status === 'active' && current.phase === 'suspended'
-      ? stabilizeContentFlow(definition, { ...current, phase: 'entering', updatedAt: clock() }).run
+      ? stabilizeContentFlow(definition, { ...current, phase: 'entering', updatedAt: clock() }, clock()).run
       : current,
   });
   if (!resumed.run) return null;
-  return runPendingEffects(definition, resumed.run, stabilizeContentFlow(definition, resumed.run).pendingWork);
+  return runPendingEffects(definition, resumed.run, stabilizeContentFlow(definition, resumed.run, clock()).pendingWork);
 }
 
 function contentFlowDomainEvent(input: Omit<ContentFlowEvent, 'eventId' | 'occurredAt'> & { eventId?: string; occurredAt?: number }): ContentFlowEvent {
@@ -203,10 +204,10 @@ async function resumeActiveContentFlows(isActive: () => boolean = () => true): P
     }
     const definition = contentFlowDefinition(run.definitionId, run.definitionVersion) ?? latestContentFlowDefinition(run.definitionId);
     if (!definition) continue;
-    const stabilized = await reduceContentFlowRunAtomically({ runId: run.runId, reduce: (current) => stabilizeContentFlow(definition, current).run });
+    const stabilized = await reduceContentFlowRunAtomically({ runId: run.runId, reduce: (current) => stabilizeContentFlow(definition, current, clock()).run });
     if (!stabilized.run) continue;
     if (!isActive()) break;
-    const resumed = await runPendingEffects(definition, stabilized.run, stabilizeContentFlow(definition, stabilized.run).pendingWork);
+    const resumed = await runPendingEffects(definition, stabilized.run, stabilizeContentFlow(definition, stabilized.run, clock()).pendingWork);
     results.push(resumed);
   }
   return results;

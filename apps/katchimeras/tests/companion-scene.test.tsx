@@ -68,7 +68,7 @@ test('both families preserve lane order, identity and day number through rest an
     for (const model of models) {
       assert.deepEqual(model.slots, ['tracker', 'garden', 'conversation']);
       assert.equal(model.journey.id, `${familyId}:episode-2:journey`);
-      assert.equal(model.journey.eyebrow, 'Our chapter · Journey Day 2');
+      assert.equal(model.journey.eyebrow, 'Our chapter · Chapter 2');
     }
     assert.deepEqual(models.map((model) => model.journey.command), ['continue', 'wait', 'return', 'history']);
     assert.doesNotMatch(models[3].journey.subtitle, /next|tomorrow|hours/i);
@@ -129,6 +129,8 @@ test('native scene keeps an inert rest card, accessible actions, and a scrollabl
   await act(async () => tree!.update(<Scene {...readyProps} />));
   assert.equal(tree!.root.findByType('Card' as React.ElementType), journeyCard);
   assert.equal(journeyLayer.props.style.opacity, 1);
+  await act(async () => tree!.update(<Scene {...readyProps} journeyUnavailable />));
+  assert.equal(tree!.root.findAllByType('Pressable' as React.ElementType).length, 0, 'unavailable content is hidden even inside the slide host');
   await act(async () => tree!.unmount());
 });
 

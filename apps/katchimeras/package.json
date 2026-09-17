@@ -21,6 +21,7 @@
     "test:character-progression": "tsx --test tests/relationship-progression.test.ts",
     "test:meta": "tsx --test tests/daily-journey.test.ts tests/wisp-collections.test.ts tests/season-engine.test.ts",
     "test:live-ops": "node --experimental-sqlite --import tsx --test tests/live-ops.test.ts tests/content-release.test.ts tests/content-packs.test.ts tests/mission-mechanics.test.ts tests/journey-continuations.test.ts tests/merge-world-writers.test.ts",
+    "test:local-events": "node --experimental-sqlite --import tsx --test tests/local-world-events.test.ts tests/live-ops-source-outbox.test.ts tests/local-event-repository.test.ts tests/local-world-events-ui.test.tsx tests/world-event-presentation.test.ts",
     "test:live-ops-client": "tsx --test tests/live-event-client.test.ts",
     "test:live-ops-sql": "node scripts/verify-live-ops-sql.mjs && node scripts/verify-live-event-claims.mjs",
     "build:verified-replay": "node scripts/build-verified-replay.mjs",

@@ -1,3 +1,4 @@
+import { harmonyDefinition } from './local-catalog';
 import type { GameplayEvent } from '@/types/gameplay-event';
 import type { HarmonyState, LiveEventDefinition, LiveEventProgress } from '@/types/live-ops';
 import { applyHarmonyEvent, emptyHarmony, emptyEventProgress, scoreGameplayEvent } from './rules';
@@ -27,9 +28,9 @@ export async function appendGameplayEvents(db: JournalDatabase, events: readonly
   for (const event of events) {
     const inserted = await db.runAsync('INSERT OR IGNORE INTO gameplay_events (event_id, payload_json, occurred_at) VALUES (?, ?, ?)', [event.id, JSON.stringify(event), event.occurredAt]);
     if (!inserted.changes) continue;
-    harmony = applyHarmonyEvent(harmony, event);
+    harmony = applyHarmonyEvent(harmony, event, harmonyDefinition());
     for (const definition of definitions) {
-      if (!definition.enabled || harmony.points < definition.minHarmony) continue;
+      if (definition.authority === 'local' || !definition.enabled || harmony.points < definition.minHarmony) continue;
       const key = `event:${definition.id}`;
       const stored = await db.getFirstAsync<{ payload_json: string }>('SELECT payload_json FROM gameplay_projections WHERE projection_id = ?', [key]);
       const progress: LiveEventProgress = stored ? JSON.parse(stored.payload_json) : emptyEventProgress(definition);

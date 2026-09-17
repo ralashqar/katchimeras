@@ -19,6 +19,11 @@ export function normalizeContentRelease(documents: readonly unknown[]): { packs:
     if (pack.contentSchemaVersion < 2 && ((Array.isArray(raw.liveEvents) && raw.liveEvents.length) || (Array.isArray(raw.chapters) && raw.chapters.some((chapter) => chapter?.afterChapterId)))) {
       issues.push(`${pack.id}: live events and Journey continuations require content schema 2`);
     }
+    if (pack.contentSchemaVersion < 3 && ((Array.isArray(raw.liveEvents) && raw.liveEvents.some(e => e?.authority === 'local')) || (Array.isArray(raw.harmonyDefinitions) && raw.harmonyDefinitions.length))) issues.push(`${pack.id}: local events and Harmony require content schema 3`);
+    if (pack.contentSchemaVersion < 4 && (
+      (Array.isArray(raw.liveEvents) && raw.liveEvents.some(e => e?.encounters?.some((n: Record<string, unknown>) => n.companionId || n.actionTitle || n.hexId !== 'mossprout-garden')))
+      || (Array.isArray(raw.hatchables) && raw.hatchables.some(h => h?.availability?.kind === 'event_joined'))
+    )) issues.push(`${pack.id}: world event presentation and event-introduced tiles require content schema 4`);
     for (const kind of CONTENT_KINDS) {
       if (raw[kind] !== undefined && !Array.isArray(raw[kind])) issues.push(`${raw.id}: ${kind} must be a list`);
       else if (raw[kind]) Object.assign(pack, { [kind]: raw[kind] });

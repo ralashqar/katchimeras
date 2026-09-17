@@ -1,3 +1,4 @@
+import { DevTimeSection } from '@/components/dev-time-section';
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -301,23 +302,23 @@ export default function ExploreScreen() {
 
   function handleResetCurrentJourney() {
     Alert.alert(
-      'Reset the latest Journey Day?',
-      'Reopens only Mossprout’s most recently started Journey Day. The Merge board and earlier Journey Days stay intact.',
+      'Reset the latest Chapter?',
+      'Reopens only Mossprout’s most recently started Chapter. The Merge board and earlier Chapters stay intact.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Reset Journey Day',
+          text: 'Reset Chapter',
           style: 'destructive',
           onPress: async () => {
             try {
               const result = await resetCurrentMossproutJourneyForDebug();
               if (!result.reset) {
-                Alert.alert('No Journey Day yet', 'Start Mossprout’s Journey once, then this control can rewind the latest day.');
+                Alert.alert('No Chapter yet', 'Start Mossprout’s Journey once, then this control can rewind the latest day.');
                 return;
               }
-              Alert.alert('Journey Day reset', result.episodeNumber ? `Journey Day ${result.episodeNumber} is ready to play again.` : 'The latest Journey Day is ready to play again.');
+              Alert.alert('Chapter reset', result.episodeNumber ? `Chapter ${result.episodeNumber} is ready to play again.` : 'The latest Chapter is ready to play again.');
             } catch (caught) {
-              Alert.alert('Journey reset did not finish', caught instanceof Error ? caught.message : 'The latest Journey Day could not be reset.');
+              Alert.alert('Journey reset did not finish', caught instanceof Error ? caught.message : 'The latest Chapter could not be reset.');
             }
           },
         },
@@ -661,6 +662,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Restart first-session onboarding · keep profile" onPress={handleRestartFirstSession} variant="primary" />
                 <KatchaButton label="Profile Snapshots" onPress={() => router.push('/dev-profile-snapshots' as Href)} variant="primary" />
                 <KatchaButton label="Content Flow Inspector" onPress={() => router.push('/dev-content-flow' as Href)} variant="secondary" />
+                <DevTimeSection />
                 <KatchaButton label="Content Packs (live ops)" onPress={() => router.push('/dev-content-packs' as Href)} variant="secondary" />
                 <KatchaButton label={currencyToolsOpen ? 'Hide currency tools' : 'Currency tools'} onPress={() => setCurrencyToolsOpen((open) => !open)} variant="primary" />
                 {currencyToolsOpen ? <View style={styles.journeyTools}>
@@ -681,11 +683,11 @@ export default function ExploreScreen() {
                     <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">Mossprout Journey</ThemedText>
                     <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">Replay one episode, remove daily waits, or return Journey and Merge to their starting state.</ThemedText>
                   </View>
-                  <KatchaButton label="Reset current Journey Day" onPress={handleResetCurrentJourney} variant="secondary" />
+                  <KatchaButton label="Reset current Chapter" onPress={handleResetCurrentJourney} variant="secondary" />
                   <View style={styles.devToggleRow}>
                     <View style={styles.devToggleCopy}>
                       <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">Journey quick mode</ThemedText>
-                      <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">Makes the next Journey Day available immediately after the previous one.</ThemedText>
+                      <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">Makes the next Chapter available immediately after the previous one.</ThemedText>
                     </View>
                     <Switch
                       accessibilityLabel="Enable Mossprout Journey quick mode"
@@ -762,7 +764,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Preview comic beats (LLM)" onPress={handlePreviewComicBeats} variant="secondary" />
                 <KatchaButton label="Preview random achievement splash" onPress={handlePreviewRandomAchievement} variant="secondary" />
                 <KatchaButton label="Preview random streak splash" onPress={handlePreviewRandomStreak} variant="secondary" />
-                <KatchaButton label="Preview Journey Day 1 splash" onPress={handlePreviewJourneySplash} variant="secondary" />
+                <KatchaButton label="Preview Chapter 1 splash" onPress={handlePreviewJourneySplash} variant="secondary" />
                 <KatchaButton label="Preview Hatch Your Past" onPress={() => router.push('/hatch-your-past')} variant="secondary" />
                 <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />
                 <KatchaButton label="Replay personality + zodiac" onPress={handleReplayWorldIdentity} variant="secondary" />

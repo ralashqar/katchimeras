@@ -354,6 +354,7 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
   },
   "daily": {
     "chapterTitle": "The Table We Remember",
+    "gardenActionLabel": "Prepare a feast",
     "restingLine": "Feastle is letting the dough rest. The Garden and our daily moments are still here.",
     "idleLine": "The hearth is warm. Show me a little of your day, or stay for a question.",
     "questionSubtitle": "A tiny story from around the table.",

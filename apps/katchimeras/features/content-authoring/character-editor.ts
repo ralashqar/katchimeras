@@ -30,7 +30,7 @@ const sources:Record<CharacterId,RecordData>={
   baristabbit:{hatchable:BARISTABBIT_HATCHABLE},
   feastle:{chapter:FEASTLE_CHAPTER,hatchable:FEASTLE_HATCHABLE,hatchProfile:FEASTLE_HATCH_PROFILE},
 };
-const textKeys=new Set('title name shortName purpose text prompt message label reply description reveal foreshadow complete helperText body eyebrow opening endMessage closing summary handoffLabel actionLabel actionTitle readingTitle chapterTitle restingLine idleLine questionSubtitle subtitle permissionTitle permissionBody analysingLine openingConclusion returnLine resolutionLine closingLine revealTitle thanks'.split(' '));
+const textKeys=new Set('title name shortName purpose text prompt message label reply description reveal foreshadow complete helperText body eyebrow opening endMessage closing summary handoffLabel actionLabel actionTitle readingTitle chapterTitle gardenActionLabel restingLine idleLine questionSubtitle subtitle permissionTitle permissionBody analysingLine openingConclusion returnLine resolutionLine closingLine revealTitle thanks'.split(' '));
 const copyContainers=new Set(['copy','lines','markerLines','guides','handoffs','callbackLine','actionLabels','stateLabels','speech','replies']);
 const protectedKeys=new Set(['id','kind','version','familyId','chapterId','conversationId','storageKey','runId','flowId','when','variantsWhen','fact','traits','wispAffinity','migrations','tags','styles','categoryIds','coord','camera','availability','mechanic','completes','style','insightKey','category','target','icon','lifeIcon','artKey','alphaBoundsKey','color','accentColor','presentation']);
 const numeric:Record<string,[number,number]>={reflectMs:[0,2592000000],ms:[0,2592000000],count:[0,10000],quantity:[1,100],coins:[0,10000],coinCost:[0,10000],price:[0,10000],bond:[0,1000],required:[1,100],merges:[1,100],perBond:[1,100000],mergeXp:[0,10000],friendshipXp:[0,10000],energy:[0,10000],cell:[0,48]};
@@ -60,6 +60,7 @@ export function characterFields(source:RecordData){
       else visit(v,[...parts,String(i)],copy);
     });return;}
     if(!isObject(value))return;
+    if(parts.at(-1)==='daily' && !Object.hasOwn(value,'gardenActionLabel'))fields.push({path:[...parts,'gardenActionLabel'].join('/'),label:'gardenActionLabel (blank: Tend garden)',value:'',max:4000});
     for(const [key,v] of Object.entries(value)){
       const path=[...parts,key];
       if(protectedKeys.has(key)&&!(key==='target'&&typeof v==='number'&&parts.at(-1)==='feed'))continue;
@@ -101,7 +102,7 @@ export function validateCharacterDraft(input:unknown):{draft:CharacterDraft|null
   for(const [path,value] of Object.entries(d.edits)){
     const f=allowed.get(path);
     if(!f){issues.push(`${path}: IDs, structure and mechanics are protected`);continue;}
-    if(typeof f.value==='number'? !Number.isSafeInteger(value)||Number(value)<f.min!||Number(value)>f.max : typeof value!=='string'||value.length>f.max|| (!!f.value.trim()&&!value.trim())){issues.push(`${path}: invalid ${typeof f.value==='number'?`number (${f.min}–${f.max})`:'text'}`);continue;}
+    if(typeof f.value==='number'? !Number.isSafeInteger(value)||Number(value)<f.min!||Number(value)>f.max : typeof value!=='string'||value.length>f.max|| (!path.endsWith('/gardenActionLabel')&&!!f.value.trim()&&!value.trim())){issues.push(`${path}: invalid ${typeof f.value==='number'?`number (${f.min}–${f.max})`:'text'}`);continue;}
     if(f.options&&!f.options.some(o=>o.id===value)){issues.push(`${path}: unknown merge item`);continue;}
     const parts=path.split('/');let cursor=model;for(const part of parts.slice(0,-1))cursor=cursor[part] as RecordData;cursor[parts.at(-1)!]=value;
   }

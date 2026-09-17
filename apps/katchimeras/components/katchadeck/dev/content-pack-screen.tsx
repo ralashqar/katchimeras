@@ -1,3 +1,4 @@
+import { createLocalEventPilot } from '@/features/live-ops/local-catalog';
 import { Link, Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -19,7 +20,7 @@ import type { ContentPack } from '@/types/content-pack';
  * it away. What the app is playing right now is shown at the top.
  */
 function counts(pack: ContentPack): string {
-  const kinds = ['characters', 'families', 'skins', 'mergeChains', 'mergeGenerators', 'islands', 'storyTiles', 'hatchables', 'missions', 'chapters', 'conversations', 'flows'] as const;
+  const kinds = ['characters', 'families', 'skins', 'mergeChains', 'mergeGenerators', 'islands', 'storyTiles', 'hatchables', 'missions', 'chapters', 'conversations', 'flows', 'liveEvents', 'harmonyDefinitions'] as const;
   const parts = kinds.flatMap((kind) => { const entries = pack[kind]; return entries?.length ? [`${entries.length} ${kind}`] : []; });
   parts.push(`${Object.keys(pack.art ?? {}).length} art`);
   return parts.join(' · ');
@@ -55,6 +56,16 @@ export function ContentPackScreen() {
     setDocument(JSON.stringify(fixturePack, null, 2));
     check(fixturePack);
   }, [check]);
+  const loadLocalPilot = useCallback(() => {
+    const stamp = Date.now();
+    const pack = createLocalEventPilot(new Date(stamp - 60000).toISOString());
+    pack.id = `local-events-dev-${stamp}`;
+    // Keep the installed world policy; this is an additive event test, not a policy replacement.
+    delete pack.harmonyDefinitions;
+    pack.liveEvents = pack.liveEvents!.map(event => ({ ...event, id: `${event.id}-${stamp}`, enabled: true }));
+    setDocument(JSON.stringify(pack, null, 2));
+    check(pack);
+  }, [check]);
   const activate = useCallback(async () => {
     if (!candidate) return;
     setBusy('downloading');
@@ -64,7 +75,7 @@ export function ContentPackScreen() {
     setStatus(contentPackStatus());
   }, [candidate, document]);
   const deactivate = useCallback(() => {
-    Alert.alert('Retire installed packs?', 'New event scoring stops after restart. Definitions and art stay installed so saved progress and earned content remain available.', [
+    Alert.alert('Retire installed packs?', 'New event enrollment stops after restart. Joined offline events keep their saved schedule; progress and earned content remain available.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Retire packs', onPress: () => { void deactivateContentPack(); } },
     ]);
@@ -91,6 +102,8 @@ export function ContentPackScreen() {
           <Pressable disabled={!url.trim() || busy != null} onPress={() => { void loadUrl(); }} style={[styles.button, (!url.trim() || busy != null) && styles.buttonDisabled]}><ThemedText style={styles.buttonText}>Fetch</ThemedText></Pressable>
           <Pressable onPress={loadFixture} style={styles.buttonMuted}><ThemedText style={styles.buttonText}>Bundled fixture</ThemedText></Pressable>
         </View>
+        <Pressable disabled={busy != null} onPress={loadLocalPilot} style={styles.buttonMuted}><ThemedText style={styles.buttonText}>Offline world event pilot</ThemedText></Pressable>
+        <ThemedText style={styles.detail}>Loads a fresh Moonlit Mist world adventure and Restoration Week. After activation and restart, visit Mossprout on the Kingdom map: tile dialogue, a lasting action card, normal Merge supplies and the docked mission board. Requires the first garden restoration and 100 Harmony.</ThemedText>
         <TextInput autoCapitalize="none" autoCorrect={false} multiline onChangeText={setDocument} placeholder="…or paste a pack document" placeholderTextColor="#9A8E78" style={[styles.input, styles.documentInput]} value={document} />
         <View style={styles.row}>
           <Pressable disabled={!document.trim()} onPress={checkDocument} style={[styles.button, !document.trim() && styles.buttonDisabled]}><ThemedText style={styles.buttonText}>Check</ThemedText></Pressable>
