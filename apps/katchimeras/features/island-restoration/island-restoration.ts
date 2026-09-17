@@ -5,7 +5,8 @@ import { createOpeningMissionState } from '@/features/onboarding/opening-mission
 import { closestOpeningPair, OPENING_BOARD_LAYOUT, OPENING_MERGE_WINDOW_CELLS } from '@/features/onboarding/opening-mist';
 import { wispsForClearing } from '@/features/onboarding/corruption-wisps';
 import type { MissionMechanicHost } from '@/features/mission-mechanics/mechanic';
-import type { IslandRestorationProgress, MergeBoardCell, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
+import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
+import type { IslandRestorationProgress, MergeBoardCell, MergeOrder, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 
 /**
  * A friend's restoration board: the same docked board the mist missions use.
@@ -140,6 +141,33 @@ export function restorationCheckpointReached(definition: RestorationBoardDefinit
   const cells = restorationWindowCells(definition.rows);
   if (cells.some((index) => state.board[index]?.occupant?.kind === 'generator')) return false;
   return restorationNextMove(state, cells) == null;
+}
+
+/**
+ * What a stuck board is missing: one twin for each of its highest loose
+ * pieces (distinct kinds, at most `max`), so each delivery merges with a piece
+ * already there. Nothing loose, nothing to ask for.
+ */
+export function restorationTwinRequest(definition: RestorationBoardDefinition, state: MergeWorldState, max = definition.request?.max ?? 2): { definitionId: string; quantity: number }[] {
+  const cells = restorationWindowCells(definition.rows);
+  const loose = new Map<string, number>();
+  for (const index of cells) {
+    const cell = state.board[index];
+    if (!cell || cell.locked || cell.mist || cell.occupant?.kind !== 'item') continue;
+    const item = MERGE_ITEMS_BY_ID.get(cell.occupant.definitionId);
+    if (!item?.nextItemId) continue;
+    loose.set(cell.occupant.definitionId, item.tier);
+  }
+  return [...loose.entries()].sort((a, b) => b[1] - a[1]).slice(0, Math.max(1, Math.floor(max))).map(([definitionId]) => ({ definitionId, quantity: 1 }));
+}
+
+/** The chapter's request with the board's own needs on it: the authored request when the board asks for nothing. */
+export function restorationRequestOrder(definition: RestorationBoardDefinition, state: MergeWorldState, authored: MergeOrder): MergeOrder {
+  if (!definition.request) return authored;
+  const requirements = restorationTwinRequest(definition, state);
+  if (!requirements.length) return authored;
+  const names = requirements.map((requirement) => MERGE_ITEMS_BY_ID.get(requirement.definitionId)?.name ?? requirement.definitionId);
+  return { ...authored, requirements, description: `Bring ${names.length === 1 ? `a ${names[0]}` : `a ${names.slice(0, -1).join(', a ')} and a ${names[names.length - 1]}`} for ${authored.title}.` };
 }
 
 /** Delivered items not yet placed on the board. */

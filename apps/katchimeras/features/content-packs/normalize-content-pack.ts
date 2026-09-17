@@ -230,6 +230,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     if (!islandIds.has(String(campaign.islandId))) issues.push(`island campaign ${id}: ${campaign.islandId} is not an island`);
     if (bundledCampaigns.some((item) => item.islandId === campaign.islandId)) issues.push(`island campaign ${id}: ${campaign.islandId} already has a story`);
     if (!skinIds.has(String(campaign.residentSkinId))) issues.push(`island campaign ${id}: form ${campaign.residentSkinId} does not exist`);
+    if (campaign.characterId !== undefined && !companionIds.has(String(campaign.characterId))) issues.push(`island campaign ${id}: ${campaign.characterId} is not a friend`);
     if (!isText(campaign.residentName) || !isText(campaign.chapterIdPrefix) || !isRecord(campaign.payoff) || !isRecord(campaign.copy)) issues.push(`island campaign ${id} needs a resident name, chapter id prefix, payoff and copy`);
     const wake = campaign.wake;
     if (wake !== undefined) {
@@ -264,6 +265,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
           else if (!candidateItems.has(String(entry.definitionId))) issues.push(`${where}: ${entry.definitionId} is not a known item`);
         }
         for (const cell of board.deliveryCells) if (!cells.has(Number(cell))) issues.push(`${where}: delivery cell ${cell} is outside the board`);
+        if (board.request !== undefined && (!isRecord(board.request) || board.request.kind !== 'twins' || (board.request.max !== undefined && (!isInt(board.request.max) || Number(board.request.max) < 1 || Number(board.request.max) > 3)))) issues.push(`${where}: request must be twins, with max from 1 to 3`);
         const mechanic = board.mechanic;
         if (isRecord(mechanic) && mechanic.kind === 'column-shot') {
           const wisps = isRecord(mechanic.wisps) && Array.isArray(mechanic.wisps.cells) ? mechanic.wisps.cells : [];

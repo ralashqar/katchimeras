@@ -70,6 +70,10 @@ const REVEAL_LINE_DELAY_MS = 1_100;
 /** A wisp on the sky grid, against a board cell; and the space between its rows. */
 const BOARD_WISP_SIZE = 0.9;
 const BOARD_ROW_PITCH = 0.9;
+/** A column shot's sky over the tile: the first row at this fraction of the tile's height, each row above it this much higher, each wisp this fraction of the tile's width. */
+const TILE_SKY_BASE = 0.4;
+const TILE_SKY_PITCH = 0.17;
+const TILE_SKY_WISP_SIZE = 0.18;
 
 type WispFrame = { x: number; y: number; width: number; height: number };
 /** Where every wisp is drawn, window-space, and where the line under them goes. */
@@ -104,13 +108,21 @@ export function wispLayout(target: CorruptionWispTarget, views: readonly Mission
     const rows = mechanic.kind === 'column-shot' ? Math.max(1, mechanic.wisps.rows) : 1;
     const pitch = (mechanic.kind === 'column-shot' ? mechanic.wisps.rowPitch ?? BOARD_ROW_PITCH : BOARD_ROW_PITCH) * geometry.cellSize;
     const top = metrics.y + first.top;
-    const frame = { x: metrics.x + first.left, y: top - rows * pitch, width: last.left + last.width - first.left, height: rows * pitch };
+    // The sky sits over the tile, as every other board's wisps do: each column's x is the board's, so a shot flies
+    // straight up its column, and the rows climb the tile from its middle. Until the tile is measured, the rows
+    // hang just above the board's top row.
+    const rowY = tileFrame
+      ? (row: number) => tileFrame.y + tileFrame.height * (TILE_SKY_BASE - row * TILE_SKY_PITCH)
+      : (row: number) => top - (row + 0.5) * pitch;
+    const size = (scale: number) => tileFrame ? Math.max(48, TILE_SKY_WISP_SIZE * tileFrame.width * scale) : geometry.cellSize * BOARD_WISP_SIZE * scale;
+    const frameTop = rowY(rows - 1) - size(1) / 2;
+    const frame = { x: metrics.x + first.left, y: frameTop, width: last.left + last.width - first.left, height: rowY(0) + size(1) / 2 - frameTop };
     const wisps = views.map((view) => {
-      if (view.placement.kind !== 'board') return { x: frame.x + frame.width / 2, y: frame.y, size: geometry.cellSize * BOARD_WISP_SIZE };
+      if (view.placement.kind !== 'board') return { x: frame.x + frame.width / 2, y: rowY(0), size: size(1) };
       const cell = columns[Math.max(0, Math.min(columns.length - 1, view.placement.column))]!;
-      return { x: metrics.x + mergeCellCenter(geometry, cell).x, y: top - (view.placement.row + 0.5) * pitch, size: geometry.cellSize * (view.placement.size ?? BOARD_WISP_SIZE) };
+      return { x: metrics.x + mergeCellCenter(geometry, cell).x, y: rowY(view.placement.row), size: size(view.placement.size ?? 1) };
     });
-    return { frame, wisps, captionTop: frame.y - 44 };
+    return { frame, wisps, captionTop: tileFrame ? tileFrame.y + tileFrame.height * 0.62 : frame.y - 44 };
   }
   if (!tileFrame) return null;
   const wisps = views.map((view) => view.placement.kind === 'tile'

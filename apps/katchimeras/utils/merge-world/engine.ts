@@ -35,7 +35,7 @@ import { advanceGlowRequests, glowTutorialDrop, normalizeGlowDiscoveryFields, re
 import { normalizeHatchableEgg, reduceHatchableEgg } from '@/features/onboarding/hatchable-egg-policy';
 import { sharedWorldPurchase } from '@/constants/shared-world';
 import { ISLAND_CAMPAIGNS, isIslandCampaignId, islandCampaignById, islandCampaignForIsland } from '@/constants/island-campaigns/registry';
-import { islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers';
+import { islandCampaignChapterOrder, islandCampaignChapter } from '@/constants/island-campaigns/helpers';
 import { islandWakeLockedReason, islandWakeState } from '@/constants/island-campaigns/wake-order';
 import { COMPANION_JOURNEY_PROFILES, JOURNEY_MEDITATION_ORDER_GLOW, JOURNEY_MEDITATION_ORDER_MINUTES } from '@/constants/companion-journey-profiles';
 import {
@@ -1491,7 +1491,15 @@ function requestIslandCampaignDelivery(
   // caller's orders are not trusted: a different one would strand the board.
   const definition = islandCampaignById.get(command.campaignId);
   const authored = definition ? islandCampaignChapterOrder(definition, command.level, found.chapter.selectedOptionId ?? null, command.now) : null;
-  const order = authored ?? command.orders.find((candidate) => candidate.storyArcId === command.campaignId && candidate.storyTargetLevel === command.level) ?? null;
+  const offered = command.orders.find((candidate) => candidate.storyArcId === command.campaignId && candidate.storyTargetLevel === command.level) ?? null;
+  // A board that asks for what it is missing: the caller read the request off the board, and only its pieces are taken
+  // (known items, a few of them), on the authored request's id, title and reward.
+  const board = definition ? islandCampaignChapter(definition, command.level)?.restoration : null;
+  const twins = board?.request && authored && offered && offered.requirements.length > 0 && offered.requirements.length <= Math.max(1, Math.floor(board.request.max ?? 2))
+    && offered.requirements.every((requirement) => MERGE_ITEMS_BY_ID.has(requirement.definitionId) && Number.isInteger(requirement.quantity) && requirement.quantity >= 1 && requirement.quantity <= 3)
+    ? { ...authored, requirements: offered.requirements.map((requirement) => ({ ...requirement })), ...(offered.description ? { description: offered.description } : {}) }
+    : null;
+  const order = twins ?? authored ?? offered;
   if (!order) return unchanged(state, 'That island chapter has no request.');
   const activeOrders = state.activeOrders.some((candidate) => candidate.id === order.id) ? state.activeOrders : [...state.activeOrders, order];
   return changed(touch(withIslandRestoration({ ...state, activeOrders }, command.campaignId, command.level, {
@@ -1685,6 +1693,12 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
     if (!mossproutNatureIslandReveals[campaign.islandId]
       && (mossproutNatureIslands[campaign.islandId] > 0 || Boolean(source.islandCampaigns?.[campaign.campaignId]))) {
       mossproutNatureIslandReveals[campaign.islandId] = { revealedAt: now, receiptId: `migration:${campaign.chapterIdPrefix}-revealed`, paid: 0 };
+    }
+    // An island a pack brought (one that wakes by its own condition) was once seeded at the save's baseline and revealed by
+    // this migration although nobody had cleared it: with no story begun, it goes back under the mist.
+    if (campaign.wake && !source.islandCampaigns?.[campaign.campaignId] && mossproutNatureIslandReveals[campaign.islandId]?.receiptId.startsWith('migration:')) {
+      delete mossproutNatureIslandReveals[campaign.islandId];
+      mossproutNatureIslands[campaign.islandId] = 0;
     }
   }
   const stepplingFallback = createStepplingHavenBoard(now)!;
@@ -3554,7 +3568,8 @@ function reconcileStory(
           .filter((order) => !servedIds.has(order.id))
           .slice(0, effectiveActPhase === 'regular_orders' ? 3 : undefined)
       : [];
-    const keep = next.activeOrders.filter((order) => order.characterId !== story.familyId || !order.storyArcId || order.storyArcId === DAILY_GARDEN_ARC || order.id.startsWith('journey-cycle:'));
+    // An island story's request made in this friend's name (their own island, a pack's) is not this story's to drop.
+    const keep = next.activeOrders.filter((order) => order.characterId !== story.familyId || !order.storyArcId || order.storyArcId === DAILY_GARDEN_ARC || order.id.startsWith('journey-cycle:') || islandCampaignById.has(order.storyArcId));
     // A saved Baristabbit order is a promise to the player. Preserve its old
     // requirements through this café retheme; other stories retain their
     // stricter authored-order reconciliation.
@@ -3576,7 +3591,7 @@ function reconcileStory(
     : [];
   // Ownership unlocks a character, but only an authored story beat may create
   // an order. Generic legacy orders are removed during story reconciliation.
-  const keepOrders = state.activeOrders.filter((order) => order.characterId !== 'feastle' || !order.storyArcId);
+  const keepOrders = state.activeOrders.filter((order) => order.characterId !== 'feastle' || !order.storyArcId || islandCampaignById.has(order.storyArcId));
   const activeOrders = [...keepOrders, ...wanted.map((order) => feastleOrders.find((existing) => existing.id === order.id) ?? order)];
   if (activeOrders.length !== state.activeOrders.length || activeOrders.some((order, index) => order.id !== state.activeOrders[index]?.id)) {
     next = { ...next, activeOrders };
@@ -4706,9 +4721,9 @@ function ensureOrderGlowReward(order: MergeOrder): MergeOrder {
 
 function normalizeOrder(value: MergeOrder): MergeOrder {
   value = ensureOrderGlowReward(value);
-  const recipientSkinId = value.characterId === 'mossprout'
-    && typeof value.recipientSkinId === 'string'
-    && mossproutResidentById.has(value.recipientSkinId)
+  // Whoever asked stays on the card: one of Mossprout's residents, or the resident of a friend's island whose story made the request.
+  const recipientSkinId = typeof value.recipientSkinId === 'string'
+    && (mossproutResidentById.has(value.recipientSkinId) || (value.characterId !== 'mossprout' && katchimeraSkinById.has(value.recipientSkinId)))
     ? value.recipientSkinId
     : value.characterId === 'mossprout' ? 'mossprout' : undefined;
   return {

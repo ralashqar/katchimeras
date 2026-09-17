@@ -36,7 +36,8 @@ export function islandCampaignChapterOrder(
   const selectedOrder = selected?.order ?? chapter.fallbackOrder;
   return {
     id: `${campaign.campaignId}:level-${level}:order${selected ? `:${selected.id}` : ''}`,
-    characterId: 'mossprout', recipientSkinId: campaign.residentSkinId,
+    // The request belongs to the friend whose place this is (Mossprout's for his garden islands), and the island's resident asks for it in person.
+    characterId: campaign.characterId ?? 'mossprout', recipientSkinId: campaign.residentSkinId,
     title: selectedOrder.title, description: selectedOrder.description,
     narrativeSignal: selectedOrder.narrativeSignal, difficulty: selectedOrder.difficulty,
     requirements: selectedOrder.requirements.map((requirement) => ({ ...requirement })),

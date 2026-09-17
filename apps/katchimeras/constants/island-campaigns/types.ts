@@ -1,7 +1,7 @@
 import type { ConversationInsightResultDefinition, ConversationOption } from '@/types/companion-conversation';
 import type { MissionMechanicDefinition } from '@/types/mission-mechanic';
 import type { KatchimeraSkinId } from '@/types/katchimera';
-import type { MergeOrder, MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
+import type { MergeCharacterId, MergeOrder, MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
 import type { CorruptionWispLines } from '@/features/onboarding/corruption-wisps';
 import type { ContentLine } from '@/types/content-predicate';
 
@@ -28,6 +28,12 @@ export type RestorationBoardDefinition = {
   deliveryCells: readonly number[];
   /** How merges strike the wisps over the island; absent, glow strikes carried by the item each merge makes. */
   mechanic?: MissionMechanicDefinition;
+  /**
+   * How the Main Board request is made once the beds are stuck: absent, the chapter's authored request; `twins`, a
+   * request read off the spent board itself, one twin for each of its highest pieces (at most `max`, default 2),
+   * so what arrives always has something to merge with.
+   */
+  request?: { kind: 'twins'; max?: number };
 };
 
 export type IslandCampaignChapterOrder = Pick<MergeOrder, 'title' | 'description' | 'difficulty' | 'requirements' | 'narrativeSignal'>;
@@ -118,6 +124,8 @@ export type IslandCampaignDefinition<S extends string = string> = {
   campaignId: string;
   islandId: MossproutNatureIslandId;
   residentSkinId: KatchimeraSkinId;
+  /** Whose place this is: the friend whose requests these are and whose chain leads them (content schema 6); Mossprout when absent. */
+  characterId?: MergeCharacterId;
   /** When the island wakes (content schema 6); absent, its place in the bundled wake order. */
   wake?: IslandWakeCondition;
   residentName: string;

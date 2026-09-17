@@ -159,10 +159,12 @@ export function mossproutNatureIslandLevelDefinition(
   return mossproutNatureIslandById.get(islandId)?.levels.find((candidate) => candidate.level === level) ?? null;
 }
 
+/** Every island at `level`; an island a pack brought always starts at 0, under its mist, whatever a save's baseline for Mossprout's six. */
 export function emptyMossproutNatureIslandLevels(
   level: MossproutNatureIslandLevel = 0,
 ): Record<MossproutNatureIslandId, MossproutNatureIslandLevel> {
-  return Object.fromEntries(MOSSPROUT_NATURE_ISLAND_IDS.map((id) => [id, level])) as Record<
+  const bundled = new Set(MOSSPROUT_NATURE_ISLANDS_BUNDLED.map((island) => island.id));
+  return Object.fromEntries(MOSSPROUT_NATURE_ISLAND_IDS.map((id) => [id, bundled.has(id) ? level : 0])) as Record<
     MossproutNatureIslandId,
     MossproutNatureIslandLevel
   >;

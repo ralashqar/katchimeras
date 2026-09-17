@@ -202,6 +202,8 @@ test('every request a board sends to the Main Board can be made there, and the e
       assert.deepEqual(openOrderChains(world, authored).requirements, authored.requirements, `${campaign.campaignId} level ${chapter.level} ${choice.id}: the repair would change the request`);
     }
     // What the request brings must be wanted: each delivered item merges with a twin on the spent board or frees a misted cell.
+    // A board that reads its request off its own pieces asks for exactly that.
+    if (chapter.restoration!.request) continue;
     const wanted = new Set(chapter.restoration!.echoes.map((echo) => echo.definitionId));
     for (const requirement of chapter.fallbackOrder.requirements) {
       const definition = MERGE_ITEMS_BY_ID.get(requirement.definitionId)!;

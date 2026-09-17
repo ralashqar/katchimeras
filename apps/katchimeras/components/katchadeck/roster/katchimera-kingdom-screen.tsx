@@ -110,7 +110,7 @@ import { HAVEN_ENVIRONMENTS, type HavenStage } from '@/constants/haven-catalog';
 import type { FtueCameraDirective, FtueCueDefinition } from '@/features/onboarding/ftue-types';
 import { IslandRestorationDock } from '@/components/katchadeck/world/island-restoration-dock';
 import { consumeIslandRestorationOpen, requestIslandRestorationOpen } from '@/features/island-restoration/restoration-intent';
-import { createRestorationState, deliveriesToPlace, restorationBoardStep, restorationCheckpointReached, restorationDeliveryCells, restorationMechanicHost, restorationRunId, restorationStorageKey, restoreRestorationEchoes } from '@/features/island-restoration/island-restoration';
+import { createRestorationState, deliveriesToPlace, restorationBoardStep, restorationCheckpointReached, restorationDeliveryCells, restorationMechanicHost, restorationRunId, restorationStorageKey, restoreRestorationEchoes, restorationRequestOrder } from '@/features/island-restoration/island-restoration';
 import { useKatchimeraCards } from '@/hooks/use-katchimera-cards';
 import { mossproutNatureIslandById, mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
 import { havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
@@ -1699,8 +1699,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (!islandRestoration || !restorationDefinition || !restorationStore.state) return;
     if (islandRestoration.progress.deliveryRequestedAt != null) return;
     if (!restorationCheckpointReached(restorationDefinition, restorationStore.state, restorationStore.merges, restorationDone)) return;
-    const order = islandCampaignChapterOrder(islandRestoration.campaign, islandRestoration.level, restorationChapterProgress?.selectedOptionId ?? null);
-    if (!order) return;
+    const authored = islandCampaignChapterOrder(islandRestoration.campaign, islandRestoration.level, restorationChapterProgress?.selectedOptionId ?? null);
+    if (!authored) return;
+    // A board that asks for what it is missing reads its request off its own pieces.
+    const order = restorationRequestOrder(restorationDefinition, restorationStore.state, authored);
     void requestStoredIslandCampaignDelivery(islandRestoration.campaign.campaignId, islandRestoration.level, [order]).catch((error) => console.warn('The request could not be sent', error));
   }, [islandRestoration, restorationChapterProgress?.selectedOptionId, restorationDefinition, restorationDone, restorationStore.merges, restorationStore.state]);
   // Finish: the last planting's bloom strikes the last wisp (or a board saved full finishes on arrival).

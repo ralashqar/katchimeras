@@ -32,6 +32,8 @@ test('glow strikes are the way every shipped board has always played: one hit pe
   assert.ok(hosts.length >= 4);
   for (const { name, host } of hosts) {
     const mechanic = resolveMechanic(host);
+    // A board authored with its own mechanic (a pack's column shot) is not a glow-strikes board.
+    if (host.mechanic && host.mechanic.kind !== 'glow-strikes') continue;
     assert.equal(mechanic.kind, 'glow-strikes', `${name} plays by glow strikes`);
     const plan = wispHitPlan(host.required, host.wisps.length);
     let state = createMechanicState(mechanic);
@@ -57,6 +59,7 @@ test('glow strikes are the way every shipped board has always played: one hit pe
     assert.deepEqual(normalizeMechanicState(mechanic, undefined, 3), { kind: 'glow-strikes', strikes: 3 });
   }
   for (const { definition } of SHIPPED_RESTORATIONS) {
+    if (definition.mechanic && definition.mechanic.kind !== 'glow-strikes') continue;
     const host = restorationMechanicHost(definition);
     assert.equal(host.mechanic?.kind === 'glow-strikes' ? host.mechanic.flight : null, 'item', 'a restoration board sends the item it made');
     assert.deepEqual(mechanicProgress(resolveMechanic(host), host, { kind: 'glow-strikes', strikes: 2 }), restorationProgress(definition, 2));

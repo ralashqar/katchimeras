@@ -51,11 +51,11 @@
       "campaignId": "island-campaign:wanderling-trail",
       "islandId": "wanderling-trail",
       "residentSkinId": "wanderling",
+      "characterId": "steppling",
       "wake": {
         "kind": "friend_hatched",
         "companion": "steppling"
       },
-      "residentName": "Wanderling",
       "chapterIdPrefix": "wanderling-trail",
       "tags": [
         "island-campaign",
@@ -136,12 +136,16 @@
                   }
                 ]
               }
+            },
+            "request": {
+              "kind": "twins",
+              "max": 2
             }
           },
           "prompt": "This was my trail. It never had a marker, and the Mistwisps liked that: nobody looked for it. Four of them sit over the first cairn now.\n\nWe put one stone back today. How do we start?",
           "fallbackOrder": {
             "title": "The First Cairn",
-            "description": "Make two Shoes to weigh the first cairn down.",
+            "description": "Bring what the first cairn is missing.",
             "difficulty": "small",
             "narrativeSignal": "curiosity",
             "requirements": [
@@ -162,7 +166,7 @@
               },
               "order": {
                 "title": "Wherever We Stop",
-                "description": "Make two Shoes for a cairn built wherever the walk ends.",
+                "description": "Bring what the first cairn is missing.",
                 "difficulty": "small",
                 "narrativeSignal": "ease",
                 "requirements": [
@@ -186,7 +190,7 @@
               },
               "order": {
                 "title": "The Stone That Was There",
-                "description": "Make two Shoes for the cairn the trail already chose.",
+                "description": "Bring what the first cairn is missing.",
                 "difficulty": "small",
                 "narrativeSignal": "curiosity",
                 "requirements": [
@@ -210,7 +214,7 @@
               },
               "order": {
                 "title": "Two Sets of Prints",
-                "description": "Make two Shoes for a cairn two of you walked to.",
+                "description": "Bring what the first cairn is missing.",
                 "difficulty": "small",
                 "narrativeSignal": "connection",
                 "requirements": [
@@ -238,16 +242,16 @@
           "prompt": "Past the cairn the trail bends away from the village routes. That bend is where they feed; nothing has walked it in years.\n\nWe take the bend back today. Which way round?",
           "fallbackOrder": {
             "title": "The Bend",
-            "description": "Bring a Flower and a Sprout for the bend in the trail.",
+            "description": "Bring a Hiking Gear and a Shoe for the bend in the trail.",
             "difficulty": "medium",
             "narrativeSignal": "curiosity",
             "requirements": [
               {
-                "definitionId": "nature:garden:4",
+                "definitionId": "adventure:trail:4",
                 "quantity": 1
               },
               {
-                "definitionId": "nature:garden:2",
+                "definitionId": "adventure:trail:2",
                 "quantity": 1
               }
             ]
@@ -263,16 +267,16 @@
               },
               "order": {
                 "title": "The Long Way Round",
-                "description": "Bring a Flower and a Sprout for the longer bend.",
+                "description": "Bring a Hiking Gear and a Shoe for the longer bend.",
                 "difficulty": "medium",
                 "narrativeSignal": "ease",
                 "requirements": [
                   {
-                    "definitionId": "nature:garden:4",
+                    "definitionId": "adventure:trail:4",
                     "quantity": 1
                   },
                   {
-                    "definitionId": "nature:garden:2",
+                    "definitionId": "adventure:trail:2",
                     "quantity": 1
                   }
                 ]
@@ -291,16 +295,16 @@
               },
               "order": {
                 "title": "The Quiet Bend",
-                "description": "Bring a Flower and a Sprout for the bend nobody hears.",
+                "description": "Bring a Hiking Gear and a Shoe for the bend nobody hears.",
                 "difficulty": "medium",
                 "narrativeSignal": "comfort",
                 "requirements": [
                   {
-                    "definitionId": "nature:garden:4",
+                    "definitionId": "adventure:trail:4",
                     "quantity": 1
                   },
                   {
-                    "definitionId": "nature:garden:2",
+                    "definitionId": "adventure:trail:2",
                     "quantity": 1
                   }
                 ]
@@ -319,16 +323,16 @@
               },
               "order": {
                 "title": "The Bend You Chose",
-                "description": "Bring a Flower and a Sprout for the bend you pointed at.",
+                "description": "Bring a Hiking Gear and a Shoe for the bend you pointed at.",
                 "difficulty": "medium",
                 "narrativeSignal": "connection",
                 "requirements": [
                   {
-                    "definitionId": "nature:garden:4",
+                    "definitionId": "adventure:trail:4",
                     "quantity": 1
                   },
                   {
-                    "definitionId": "nature:garden:2",
+                    "definitionId": "adventure:trail:2",
                     "quantity": 1
                   }
                 ]
@@ -344,31 +348,31 @@
             "items": [
               {
                 "cell": 16,
-                "definitionId": "nature:garden:1"
+                "definitionId": "adventure:trail:1"
               },
               {
                 "cell": 18,
-                "definitionId": "nature:garden:1"
+                "definitionId": "adventure:trail:1"
               },
               {
                 "cell": 22,
-                "definitionId": "nature:garden:1"
+                "definitionId": "adventure:trail:1"
               },
               {
                 "cell": 26,
-                "definitionId": "nature:garden:1"
+                "definitionId": "adventure:trail:1"
               }
             ],
             "echoes": [
               {
                 "id": "wanderling-2-plant",
                 "cell": 24,
-                "definitionId": "nature:garden:3"
+                "definitionId": "adventure:trail:3"
               },
               {
                 "id": "wanderling-2-sprout",
                 "cell": 31,
-                "definitionId": "nature:garden:2"
+                "definitionId": "adventure:trail:2"
               }
             ],
             "deliveryCells": [
@@ -546,7 +550,7 @@
           "prompt": "The last of them sit where the trail stops being a trail and is just open ground. That is the whole point of it, and they know.\n\nWe open the last of it today. What is a trail for?",
           "fallbackOrder": {
             "title": "Nowhere to Be",
-            "description": "Make a Boot and a Magical Plant for the open ground.",
+            "description": "Make a Boot and an Expedition Kit for the open ground.",
             "difficulty": "major",
             "narrativeSignal": "connection",
             "requirements": [
@@ -555,7 +559,7 @@
                 "quantity": 1
               },
               {
-                "definitionId": "nature:garden:6",
+                "definitionId": "adventure:trail:6",
                 "quantity": 1
               }
             ]
@@ -572,7 +576,7 @@
               },
               "order": {
                 "title": "For Going",
-                "description": "Make a Boot and a Magical Plant for a trail that only goes.",
+                "description": "Make a Boot and an Expedition Kit for a trail that only goes.",
                 "difficulty": "major",
                 "narrativeSignal": "ease",
                 "requirements": [
@@ -581,7 +585,7 @@
                     "quantity": 1
                   },
                   {
-                    "definitionId": "nature:garden:6",
+                    "definitionId": "adventure:trail:6",
                     "quantity": 1
                   }
                 ]
@@ -601,7 +605,7 @@
               },
               "order": {
                 "title": "For Seeing",
-                "description": "Make a Boot and a Magical Plant for a trail worth looking at.",
+                "description": "Make a Boot and an Expedition Kit for a trail worth looking at.",
                 "difficulty": "major",
                 "narrativeSignal": "curiosity",
                 "requirements": [
@@ -610,7 +614,7 @@
                     "quantity": 1
                   },
                   {
-                    "definitionId": "nature:garden:6",
+                    "definitionId": "adventure:trail:6",
                     "quantity": 1
                   }
                 ]
@@ -630,7 +634,7 @@
               },
               "order": {
                 "title": "For Company",
-                "description": "Make a Boot and a Magical Plant for a trail walked together.",
+                "description": "Make a Boot and an Expedition Kit for a trail walked together.",
                 "difficulty": "major",
                 "narrativeSignal": "connection",
                 "requirements": [
@@ -639,7 +643,7 @@
                     "quantity": 1
                   },
                   {
-                    "definitionId": "nature:garden:6",
+                    "definitionId": "adventure:trail:6",
                     "quantity": 1
                   }
                 ]
@@ -655,34 +659,34 @@
             "items": [
               {
                 "cell": 16,
-                "definitionId": "nature:garden:1"
+                "definitionId": "adventure:trail:1"
               },
               {
                 "cell": 18,
-                "definitionId": "nature:garden:1"
+                "definitionId": "adventure:trail:1"
               },
               {
                 "cell": 22,
-                "definitionId": "nature:garden:1"
+                "definitionId": "adventure:trail:1"
               },
               {
                 "cell": 26,
-                "definitionId": "nature:garden:1"
+                "definitionId": "adventure:trail:1"
               },
               {
                 "cell": 29,
-                "definitionId": "nature:garden:3"
+                "definitionId": "adventure:trail:3"
               },
               {
                 "cell": 36,
-                "definitionId": "nature:garden:4"
+                "definitionId": "adventure:trail:4"
               }
             ],
             "echoes": [
               {
                 "id": "wanderling-4-rare",
                 "cell": 24,
-                "definitionId": "nature:garden:5"
+                "definitionId": "adventure:trail:5"
               },
               {
                 "id": "wanderling-4-boot",
@@ -847,7 +851,8 @@
           ],
           "last": "The last one goes. Look at the trail."
         }
-      }
+      },
+      "residentName": "Wanderling"
     }
   ]
 }

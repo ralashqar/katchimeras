@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
-import { islandCampaignConversationDefinitions } from '@/constants/island-campaigns/helpers';
+import { islandCampaignChapterOrder, islandCampaignConversationDefinitions } from '@/constants/island-campaigns/helpers';
 import { ISLAND_CAMPAIGNS, islandCampaignForIsland } from '@/constants/island-campaigns/registry';
 import { islandWakeEntry, islandWakeLockedReason, islandWakeState, openIslands } from '@/constants/island-campaigns/wake-order';
 import { MOSSPROUT_NATURE_ISLANDS, mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
@@ -10,7 +10,8 @@ import { BUNDLED_CONTENT_PACKS } from '@/features/content-packs/bundled-packs';
 import { normalizeContentPack } from '@/features/content-packs/normalize-content-pack';
 import { normalizeContentRelease } from '@/features/content-packs/normalize-release';
 import { worldUpgradeOffers } from '@/features/world-upgrades/world-upgrade-offers';
-import { createInitialMergeWorldState } from '@/utils/merge-world/engine';
+import { createInitialMergeWorldState, normalizeMergeWorldState } from '@/utils/merge-world/engine';
+import { createRestorationState, restorationRequestOrder, restorationTwinRequest, restorationWindowCells } from '@/features/island-restoration/island-restoration';
 import { completeIslandCampaign, revealIsland } from './helpers/island-campaign';
 
 /**
@@ -44,6 +45,25 @@ test('the Wander Trail is an island with a story from the start: registered, voi
   assert.deepEqual(campaign.wake, { kind: 'friend_hatched', companion: 'steppling' });
   assert.deepEqual(campaign.chapters.map((chapter) => chapter.level), [1, 2, 3, 4]);
   assert.equal(campaign.chapters[0]!.restoration?.mechanic?.kind, 'column-shot', 'the first chapter is fought with shots up the columns');
+  assert.equal(campaign.characterId, 'steppling', 'the trail is Steppling’s place');
+  // The first board asks for what it is missing: with a lone Boot left, one Boot; with a Shoe and a Boot, one of each, the Boot first.
+  const board = campaign.chapters[0]!.restoration!;
+  assert.deepEqual(board.request, { kind: 'twins', max: 2 });
+  const spent = createRestorationState(board, NOW);
+  for (const cell of restorationWindowCells(board.rows)) spent.board[cell] = { ...spent.board[cell]!, mist: null, locked: false, occupant: null };
+  spent.board[17] = { ...spent.board[17]!, occupant: { kind: 'item', instanceId: 'boot', definitionId: 'adventure:trail:3' } };
+  assert.deepEqual(restorationTwinRequest(board, spent), [{ definitionId: 'adventure:trail:3', quantity: 1 }]);
+  spent.board[31] = { ...spent.board[31]!, occupant: { kind: 'item', instanceId: 'shoe', definitionId: 'adventure:trail:2' } };
+  assert.deepEqual(restorationTwinRequest(board, spent), [{ definitionId: 'adventure:trail:3', quantity: 1 }, { definitionId: 'adventure:trail:2', quantity: 1 }]);
+  const authored = islandCampaignChapterOrder(campaign, 1, null, NOW)!;
+  const asked = restorationRequestOrder(board, spent, authored);
+  assert.equal(asked.id, authored.id);
+  assert.equal(asked.description, 'Bring a Boot and a Shoe for The First Cairn.');
+  const request = islandCampaignChapterOrder(campaign, 1, null, NOW)!;
+  assert.equal(request.characterId, 'steppling', 'its requests are Steppling’s');
+  assert.equal(request.recipientSkinId, 'wanderling', 'and Wanderling asks for them in person');
+  assert.equal(normalizeMergeWorldState(JSON.parse(JSON.stringify({ ...createInitialMergeWorldState(NOW), activeOrders: [request] })), NOW).activeOrders.find((order) => order.id === request.id)?.recipientSkinId, 'wanderling', 'a saved request still says so');
+  assert.ok(campaign.chapters.every((chapter) => [chapter.fallbackOrder, ...chapter.choices.map((choice) => choice.order)].every((order) => order.requirements.some((requirement) => requirement.definitionId.startsWith('adventure:trail:')))), 'every request leads with Steppling’s chain');
   for (const definition of islandCampaignConversationDefinitions(campaign)) {
     assert.equal(companionConversationDefinitionById.get(definition.id)?.speakerSkinId, 'wanderling', `${definition.id} is spoken by Wanderling`);
   }
