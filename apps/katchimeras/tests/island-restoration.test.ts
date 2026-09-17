@@ -163,6 +163,8 @@ test('every authored restoration board needs its delivery on every path and fill
   for (const campaign of ISLAND_CAMPAIGNS) {
     for (const chapter of campaign.chapters) {
       if (!chapter.restoration) continue;
+      // A board that reads its request off its own pieces has no fixed delivery to prove; it asks again whenever it is stuck.
+      if (chapter.restoration.request) continue;
       // Every answer's request carries the same items, so the proof below holds whichever the player chose.
       const items = (requirements: readonly { definitionId: string; quantity: number }[]) => requirements.flatMap((requirement) => Array.from({ length: requirement.quantity }, () => requirement.definitionId)).sort().join(',');
       const expected = items(chapter.fallbackOrder.requirements);

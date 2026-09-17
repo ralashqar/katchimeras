@@ -1486,24 +1486,29 @@ function requestIslandCampaignDelivery(
   const found = islandRestorationChapter(state, command.campaignId, command.level);
   if (!found) return unchanged(state, 'That island chapter has not started.');
   if (found.restoration.completedAt != null) return unchanged(state, 'This part of the garden is already restored.');
-  if (found.restoration.deliveryRequestedAt != null) return unchanged(state);
+  const definition = islandCampaignById.get(command.campaignId);
+  const board = definition ? islandCampaignChapter(definition, command.level)?.restoration : null;
+  // A request goes out once. A board that asks for what it is missing may ask again, a round at a time, once
+  // everything it asked for before has been served: stuck again is asked again, and the chapter is never stranded.
+  const served = found.chapter.orderIds.every((id) => found.chapter.servedOrderIds.includes(id));
+  if (found.restoration.deliveryRequestedAt != null && !(board?.request && served)) return unchanged(state);
   // The request is the chapter's authored order for the saved answer. The
   // caller's orders are not trusted: a different one would strand the board.
-  const definition = islandCampaignById.get(command.campaignId);
   const authored = definition ? islandCampaignChapterOrder(definition, command.level, found.chapter.selectedOptionId ?? null, command.now) : null;
   const offered = command.orders.find((candidate) => candidate.storyArcId === command.campaignId && candidate.storyTargetLevel === command.level) ?? null;
   // A board that asks for what it is missing: the caller read the request off the board, and only its pieces are taken
-  // (known items, a few of them), on the authored request's id, title and reward.
-  const board = definition ? islandCampaignChapter(definition, command.level)?.restoration : null;
+  // (known items, a few of them), on the authored request's id, title and reward; a later round carries its number.
+  const round = found.restoration.deliveryRequestedAt != null ? found.chapter.orderIds.length + 1 : 1;
   const twins = board?.request && authored && offered && offered.requirements.length > 0 && offered.requirements.length <= Math.max(1, Math.floor(board.request.max ?? 2))
     && offered.requirements.every((requirement) => MERGE_ITEMS_BY_ID.has(requirement.definitionId) && Number.isInteger(requirement.quantity) && requirement.quantity >= 1 && requirement.quantity <= 3)
-    ? { ...authored, requirements: offered.requirements.map((requirement) => ({ ...requirement })), ...(offered.description ? { description: offered.description } : {}) }
+    ? { ...authored, ...(round > 1 ? { id: `${authored.id}:round-${round}` } : {}), requirements: offered.requirements.map((requirement) => ({ ...requirement })), ...(offered.description ? { description: offered.description } : {}) }
     : null;
+  if (round > 1 && !twins) return unchanged(state);
   const order = twins ?? authored ?? offered;
   if (!order) return unchanged(state, 'That island chapter has no request.');
   const activeOrders = state.activeOrders.some((candidate) => candidate.id === order.id) ? state.activeOrders : [...state.activeOrders, order];
   return changed(touch(withIslandRestoration({ ...state, activeOrders }, command.campaignId, command.level, {
-    orderIds: [order.id],
+    orderIds: round > 1 ? [...found.chapter.orderIds, order.id] : [order.id],
     restoration: { ...found.restoration, deliveryRequestedAt: command.now },
   }), command.now), `${order.title} is ready in the Garden.`);
 }

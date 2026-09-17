@@ -10,9 +10,9 @@ import { BUNDLED_CONTENT_PACKS } from '@/features/content-packs/bundled-packs';
 import { normalizeContentPack } from '@/features/content-packs/normalize-content-pack';
 import { normalizeContentRelease } from '@/features/content-packs/normalize-release';
 import { worldUpgradeOffers } from '@/features/world-upgrades/world-upgrade-offers';
-import { createInitialMergeWorldState, normalizeMergeWorldState } from '@/utils/merge-world/engine';
+import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { createRestorationState, restorationRequestOrder, restorationTwinRequest, restorationWindowCells } from '@/features/island-restoration/island-restoration';
-import { completeIslandCampaign, revealIsland } from './helpers/island-campaign';
+import { completeIslandCampaign, greetIslandFriend, revealIsland, startAndServeChapter } from './helpers/island-campaign';
 
 /**
  * Packs shipped inside the app: authored as content packs, played from the
@@ -45,6 +45,7 @@ test('the Wander Trail is an island with a story from the start: registered, voi
   assert.deepEqual(campaign.wake, { kind: 'friend_hatched', companion: 'steppling' });
   assert.deepEqual(campaign.chapters.map((chapter) => chapter.level), [1, 2, 3, 4]);
   assert.equal(campaign.chapters[0]!.restoration?.mechanic?.kind, 'column-shot', 'the first chapter is fought with shots up the columns');
+  assert.equal(campaign.chapters[0]!.restoration?.mechanic?.kind === 'column-shot' ? campaign.chapters[0]!.restoration.mechanic.emptyColumn : null, 'lost', 'and a shot up an empty column is lost');
   assert.equal(campaign.characterId, 'steppling', 'the trail is Steppling’s place');
   // The first board asks for what it is missing: with a lone Boot left, one Boot; with a Shoe and a Boot, one of each, the Boot first.
   const board = campaign.chapters[0]!.restoration!;
@@ -83,6 +84,16 @@ test('the Wander Trail is an island with a story from the start: registered, voi
   // Revealed, the story runs as Petalimp's does, and the card it earns is Wanderling's, of Steppling's family.
   const revealed = revealIsland({ ...awake, coins: 500 }, campaign, NOW);
   assert.equal(islandWakeState(revealed, 'wanderling-trail'), 'revealed');
+  // Stuck again after a lost shot, the first board asks again: a second round on its own id, once the first was served.
+  let rounds = greetIslandFriend(revealIsland({ ...awake, coins: 500 }, campaign, NOW), campaign, NOW + 1);
+  rounds = startAndServeChapter(rounds, campaign, 1, NOW + 10);
+  const boot = { ...islandCampaignChapterOrder(campaign, 1, rounds.islandCampaigns![campaign.campaignId]!.chapters['1']!.selectedOptionId, NOW + 20)!, requirements: [{ definitionId: 'adventure:trail:3', quantity: 1 }] };
+  const again = reduceMergeWorld(rounds, { type: 'requestIslandCampaignDelivery', campaignId: campaign.campaignId, level: 1, orders: [boot], now: NOW + 20 });
+  assert.equal(again.changed, true, 'asked again');
+  const chapterProgress = again.state.islandCampaigns![campaign.campaignId]!.chapters['1']!;
+  assert.equal(chapterProgress.orderIds.length, 2);
+  assert.deepEqual(again.state.activeOrders.find((order) => order.id === chapterProgress.orderIds[1])?.requirements, [{ definitionId: 'adventure:trail:3', quantity: 1 }]);
+  assert.equal(reduceMergeWorld(again.state, { type: 'requestIslandCampaignDelivery', campaignId: campaign.campaignId, level: 1, orders: [boot], now: NOW + 21 }).changed, false, 'not while a round is still out');
   const done = completeIslandCampaign({ ...awake, coins: 5000 }, campaign, NOW);
   const card = done.ownedKatchimeraCards.find((entry) => entry.cardId === 'wanderling');
   assert.ok(card, 'Wanderling comes home');

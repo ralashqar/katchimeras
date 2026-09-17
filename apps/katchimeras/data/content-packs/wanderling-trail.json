@@ -104,7 +104,7 @@
                 7
               ],
               "overflow": "lost",
-              "emptyColumn": "nearest",
+              "emptyColumn": "lost",
               "wisps": {
                 "rows": 2,
                 "rowPitch": 0.9,
@@ -550,7 +550,7 @@
           "prompt": "The last of them sit where the trail stops being a trail and is just open ground. That is the whole point of it, and they know.\n\nWe open the last of it today. What is a trail for?",
           "fallbackOrder": {
             "title": "Nowhere to Be",
-            "description": "Make a Boot and an Expedition Kit for the open ground.",
+            "description": "Make a Boot and a Magical Plant for the open ground.",
             "difficulty": "major",
             "narrativeSignal": "connection",
             "requirements": [
@@ -559,7 +559,7 @@
                 "quantity": 1
               },
               {
-                "definitionId": "adventure:trail:6",
+                "definitionId": "nature:garden:6",
                 "quantity": 1
               }
             ]
@@ -576,7 +576,7 @@
               },
               "order": {
                 "title": "For Going",
-                "description": "Make a Boot and an Expedition Kit for a trail that only goes.",
+                "description": "Make a Boot and a Magical Plant for a trail that only goes.",
                 "difficulty": "major",
                 "narrativeSignal": "ease",
                 "requirements": [
@@ -585,7 +585,7 @@
                     "quantity": 1
                   },
                   {
-                    "definitionId": "adventure:trail:6",
+                    "definitionId": "nature:garden:6",
                     "quantity": 1
                   }
                 ]
@@ -605,7 +605,7 @@
               },
               "order": {
                 "title": "For Seeing",
-                "description": "Make a Boot and an Expedition Kit for a trail worth looking at.",
+                "description": "Make a Boot and a Magical Plant for a trail worth looking at.",
                 "difficulty": "major",
                 "narrativeSignal": "curiosity",
                 "requirements": [
@@ -614,7 +614,7 @@
                     "quantity": 1
                   },
                   {
-                    "definitionId": "adventure:trail:6",
+                    "definitionId": "nature:garden:6",
                     "quantity": 1
                   }
                 ]
@@ -634,7 +634,7 @@
               },
               "order": {
                 "title": "For Company",
-                "description": "Make a Boot and an Expedition Kit for a trail walked together.",
+                "description": "Make a Boot and a Magical Plant for a trail walked together.",
                 "difficulty": "major",
                 "narrativeSignal": "connection",
                 "requirements": [
@@ -643,7 +643,7 @@
                     "quantity": 1
                   },
                   {
-                    "definitionId": "adventure:trail:6",
+                    "definitionId": "nature:garden:6",
                     "quantity": 1
                   }
                 ]
@@ -659,34 +659,34 @@
             "items": [
               {
                 "cell": 16,
-                "definitionId": "adventure:trail:1"
+                "definitionId": "nature:garden:1"
               },
               {
                 "cell": 18,
-                "definitionId": "adventure:trail:1"
+                "definitionId": "nature:garden:1"
               },
               {
                 "cell": 22,
-                "definitionId": "adventure:trail:1"
+                "definitionId": "nature:garden:1"
               },
               {
                 "cell": 26,
-                "definitionId": "adventure:trail:1"
+                "definitionId": "nature:garden:1"
               },
               {
                 "cell": 29,
-                "definitionId": "adventure:trail:3"
+                "definitionId": "nature:garden:3"
               },
               {
                 "cell": 36,
-                "definitionId": "adventure:trail:4"
+                "definitionId": "nature:garden:4"
               }
             ],
             "echoes": [
               {
                 "id": "wanderling-4-rare",
                 "cell": 24,
-                "definitionId": "adventure:trail:5"
+                "definitionId": "nature:garden:5"
               },
               {
                 "id": "wanderling-4-boot",

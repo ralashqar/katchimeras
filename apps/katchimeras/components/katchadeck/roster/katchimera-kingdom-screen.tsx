@@ -1528,8 +1528,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       requestResidentInteractionExit();
       return;
     }
-    if (!campaignProgress?.orderIds[0]) throw new Error(`${campaign.residentName}’s request could not be opened. Please try again.`);
-    const activeOrderId = campaignProgress.orderIds[0];
+    const activeOrderId = campaignProgress?.orderIds.at(-1);
+    if (!activeOrderId) throw new Error(`${campaign.residentName}’s request could not be opened. Please try again.`);
     openGarden(activeOrderId, 'mossprout');
   }, [measureGlowCurrencyOrigin, openGarden, openingGlow, pendingIslandCampaign, requestResidentInteractionExit]);
 
@@ -1636,7 +1636,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // The tray's request: the chapter's order once the board has asked for it, served or not.
   const restorationOrder = useMemo(() => {
     if (!islandRestoration || !restorationChapterProgress || islandRestoration.progress.deliveryRequestedAt == null) return null;
-    const orderId = restorationChapterProgress.orderIds[0];
+    const orderId = restorationChapterProgress.orderIds.at(-1);
     const saved = orderId ? mergeWorld.activeOrders.find((candidate) => candidate.id === orderId) : null;
     const authored = islandCampaignChapterOrder(islandRestoration.campaign, islandRestoration.level, restorationChapterProgress.selectedOptionId ?? null);
     return saved ?? (authored && orderId ? { ...authored, id: orderId } : authored);
@@ -1697,14 +1697,19 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // The checkpoint: the beds can go no further, so the chapter's order goes to the Main Board.
   useEffect(() => {
     if (!islandRestoration || !restorationDefinition || !restorationStore.state) return;
-    if (islandRestoration.progress.deliveryRequestedAt != null) return;
+    if (islandRestoration.progress.deliveryRequestedAt != null) {
+      // A board that asks for what it is missing asks again once the last round has been served and placed and the beds are stuck again.
+      if (!restorationDefinition.request || !restorationChapterProgress) return;
+      if (!restorationChapterProgress.orderIds.every((id) => restorationChapterProgress.servedOrderIds.includes(id))) return;
+      if (deliveriesToPlace(islandRestoration.progress, restorationStore.placedDeliveries).length) return;
+    }
     if (!restorationCheckpointReached(restorationDefinition, restorationStore.state, restorationStore.merges, restorationDone)) return;
     const authored = islandCampaignChapterOrder(islandRestoration.campaign, islandRestoration.level, restorationChapterProgress?.selectedOptionId ?? null);
     if (!authored) return;
     // A board that asks for what it is missing reads its request off its own pieces.
     const order = restorationRequestOrder(restorationDefinition, restorationStore.state, authored);
     void requestStoredIslandCampaignDelivery(islandRestoration.campaign.campaignId, islandRestoration.level, [order]).catch((error) => console.warn('The request could not be sent', error));
-  }, [islandRestoration, restorationChapterProgress?.selectedOptionId, restorationDefinition, restorationDone, restorationStore.merges, restorationStore.state]);
+  }, [islandRestoration, restorationChapterProgress, restorationDefinition, restorationDone, restorationStore.merges, restorationStore.placedDeliveries, restorationStore.state]);
   // Finish: the last planting's bloom strikes the last wisp (or a board saved full finishes on arrival).
   const restorationFinishedRef = useRef<string | null>(null);
   const finishIslandRestoration = useCallback(() => {
