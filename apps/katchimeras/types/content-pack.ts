@@ -1,4 +1,5 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
+import type { IslandCampaignDefinition } from '@/constants/island-campaigns/types';
 import type { KatchimeraFamilyDefinition, KatchimeraSkinDefinition } from '@/constants/katchimera-skins';
 import type { MossproutNatureIslandDefinition } from '@/constants/mossprout-nature-islands';
 import type { StoryTileDefinition } from '@/constants/story-tiles/registry';
@@ -16,7 +17,7 @@ import type { AlphaBounds } from '@/utils/hex-alpha-bounds';
  * the bundle. A pack only adds: an id the bundle already has is refused. The
  * schema version gates what an older app will load.
  */
-export const CONTENT_SCHEMA_VERSION = 4;
+export const CONTENT_SCHEMA_VERSION = 6;
 
 export type ContentPackArtEntry = {
   /** Where to fetch the file (https, or file:// for a pack on the device). */
@@ -66,6 +67,8 @@ export type ContentPackContent = {
   mergeChains?: readonly ContentPackMergeChain[];
   mergeGenerators?: readonly ContentPackGenerator[];
   islands?: readonly MossproutNatureIslandDefinition[];
+  /** A friend's island story (content schema 6): the resident, the four chapters with their boards and requests, the payoff, the copy, and when the island wakes. */
+  islandCampaigns?: readonly IslandCampaignDefinition[];
   storyTiles?: readonly StoryTileDefinition[];
   hatchables?: readonly HatchableCompanionDefinition[];
   missions?: readonly JourneyMissionDefinition[];

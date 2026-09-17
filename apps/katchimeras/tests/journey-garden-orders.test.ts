@@ -12,7 +12,7 @@ import { loadNativeModule } from './helpers/native-motion-harness';
 const now = Date.now();
 const relationships = { ...emptyRelationshipProgressState(), journeyEpisodes: Object.fromEntries(['day-1', 'day-2'].map(episodeId => [`feastle:${episodeId}`, { familyId: 'feastle', episodeId, completedAt: now - 3 * 3600000, answers: {}, facts: {} }])) };
 
-test('a saved Feastle day two restores two Snacks, serves through the real reducer and unlocks day three once', () => {
+test('a saved Feastle chapter restores two Snacks and serving opens its closing scene once', () => {
   let world = createInitialMergeWorldState(now);
   assert.equal(journeyGardenOrders(emptyRelationshipProgressState(), world).length, 0);
   world = reconcileJourneyGardenOrders(world, relationships, now);
@@ -34,11 +34,12 @@ test('a saved Feastle day two restores two Snacks, serves through the real reduc
   const notes = journeyGardenReturnNotes(relationships, world);
   assert.equal(notes.length, 1);
   assert.equal(notes[0].characterId, 'feastle');
+  assert.equal(notes[0].conversationId, 'feastle:journey:day-2-return');
   assert.deepEqual(journeyGardenReturnNotes(relationships, JSON.parse(JSON.stringify(world))), notes);
-  const continued = { ...relationships, journeyEpisodes: { ...relationships.journeyEpisodes, 'feastle:day-3': { familyId: 'feastle', episodeId: 'day-3', completedAt: now, answers: {}, facts: {} } } };
+  const continued = { ...relationships, journeyEpisodes: { ...relationships.journeyEpisodes, 'feastle:day-2-return': { familyId: 'feastle', episodeId: 'day-2-return', completedAt: now, answers: {}, facts: {} } } };
   assert.deepEqual(journeyGardenReturnNotes(continued, world), []);
   assert.ok(world.externalRewardReceipts.some(receipt => receipt.id === `merge-story-served:${order.id}`));
-  assert.equal(state().next?.episode.id, 'day-3');
+  assert.equal(state().next?.episode.id, 'day-2-return');
   assert.equal(state().next?.status, 'available');
   assert.equal(reconcileJourneyGardenOrders(world, relationships, now), world, 'served requests stay served after restart');
   assert.equal(reduceMergeWorld(world, { type: 'serveOrder', orderId: order.id, now }).changed, false);
@@ -84,5 +85,5 @@ test('chapter return opens the companion without invoking legacy reward progress
     beginFeastleReturn: () => assert.fail('must not replay legacy return'),
   }, 'openCharacterReturn');
   openCharacterReturn('feastle', 'chat-note:journey-delivery:feastle:day-2');
-  assert.deepEqual(JSON.parse(JSON.stringify(pushed)), [{ pathname: '/katchimera/[creatureId]', params: { creatureId: 'companion:feastle', source: 'merge-world', story: 'return' } }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(pushed)), [{ pathname: '/katchimera/[creatureId]', params: { creatureId: 'companion:feastle', source: 'merge-world', story: 'return', journeyDelivery: 'chat-note:journey-delivery:feastle:day-2' } }]);
 });

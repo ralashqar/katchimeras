@@ -32,6 +32,11 @@ def is_full_hex_tile(path: Path) -> bool:
     )
 
 
+def is_pack_full_tile(path: Path) -> bool:
+    """A content pack's full tile: tile-<id>-full.webp (its medium and thumb share the frame)."""
+    return path.suffix.lower() == ".webp" and path.stem.startswith("tile-") and path.stem.endswith("-full")
+
+
 def measure(path: Path) -> tuple[int, int, int, int]:
     with Image.open(path) as image:
         rgba = image.convert("RGBA")
@@ -70,7 +75,8 @@ def main() -> None:
     args = parser.parse_args()
 
     hex_dir = Path(args.dir) if args.dir else HEX_DIR
-    assets = sorted((path for path in hex_dir.glob("*.webp") if is_full_hex_tile(path)), key=lambda path: path.name)
+    accept = (lambda path: is_full_hex_tile(path) or is_pack_full_tile(path)) if args.dir else is_full_hex_tile
+    assets = sorted((path for path in hex_dir.glob("*.webp") if accept(path)), key=lambda path: path.name)
     if not assets:
         raise SystemExit("No full hex tile WebPs found.")
 

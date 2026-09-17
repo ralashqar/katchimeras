@@ -9,8 +9,9 @@ export function usesSharedResidentStage(familyId?: string) {
   return familyId === 'mossprout' || (familyId != null && hatchableByCompanion(familyId) != null);
 }
 
-/** Terrain identity stays stable across the mist reveal; a hatchable friend's slot is their cleared tile's structure. */
+/** Terrain identity stays stable across the mist reveal; a hatchable friend's slot is their cleared tile's structure. A tile that already names its structure (a story tile with a resident) is its own. */
 export function residentArtLayerId(tileId: string, familyId?: string) {
+  if (tileId.startsWith('structure:')) return tileId;
   const hatchable = familyId ? hatchableByCompanion(familyId) : null;
   return hatchable ? `structure:${hatchable.tile.id}` : tileId;
 }

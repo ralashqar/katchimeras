@@ -50,7 +50,7 @@ test('a story tile’s reveal is free and from the Mist whoever is home, once pe
   let world = createInitialMergeWorldState(NOW);
   world = { ...world, coins: 7, companionDiscovery: { ...world.companionDiscovery, records: [...world.companionDiscovery.records, { characterId: 'mossprout', gateId: 'ftue', pathId: 'ftue', discoveredAt: NOW } as never] } };
   assert.equal(storyTileRevealed(world, GROVE), false);
-  assert.deepEqual(storyTileStates(world), { [GROVE.id]: 'misted' });
+  assert.deepEqual(storyTileStates(world), Object.fromEntries(STORY_TILES.map((tile) => [tile.id, 'misted'])), 'every story tile, the bundled packs’ included, starts misted');
   const first = reduceMergeWorld(world, { type: 'unlockWorldTarget', targetId: GROVE.unlockId, receiptId: 'journey:mossprout:old-garden:consequence:reveal.commit', now: NOW });
   assert.equal(first.changed, true);
   assert.equal(first.state.coins, 7, 'nothing is charged');

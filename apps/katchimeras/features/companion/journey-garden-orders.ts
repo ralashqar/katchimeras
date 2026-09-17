@@ -1,3 +1,4 @@
+import { journeyEpisodeConversationId } from '@/constants/companion-journey-chapters/episode-conversation';
 import { gameNow } from '@/utils/game-clock';
 import { COMPANION_JOURNEY_CHAPTERS, journeyEpisodeRecordId } from '@/constants/companion-journey-chapters/registry';
 import type { CompanionJourneyChapterDefinition } from '@/types/companion-journey-chapter';
@@ -56,6 +57,7 @@ export function journeyGardenReturnNotes(
     if (!deliveries.length || deliveries.some(effect => !effect.orders.length || effect.orders.some(order => !served.has(order.id)))) return [];
     return [{
       id: `${JOURNEY_DELIVERY_NOTE_PREFIX}${chapter.familyId}:${episode.id}`,
+      conversationId: next.deliveryReturnFor === episode.id ? next.conversationId ?? journeyEpisodeConversationId(chapter.familyId, next.id) : undefined,
       kind: 'chat_note' as const,
       characterId: chapter.familyId,
       bondPoints: 0,

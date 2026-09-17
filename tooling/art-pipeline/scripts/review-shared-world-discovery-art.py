@@ -26,8 +26,16 @@ def validate() -> None:
         assert hashlib.sha256((folder / "source.png").read_bytes()).hexdigest() == record["sourceSha256"]
         for reference in record["references"]:
             assert hashlib.sha256((content_path(ROOT, reference["path"])).read_bytes()).hexdigest() == reference["sha256"]
+        pack = tile.get("pack")
+        staged = (ROOT.parent.parent / ".tmp-content-pack-art" / pack["id"] / str(pack["version"])) if pack else None
         for size, suffix in [(2048, None), (1024, ""), (512, "_512"), (256, "_256")]:
-            path = folder / "alpha.png" if suffix is None else ASSETS / f"{tile['assetKey']}{suffix}.webp"
+            if suffix is None:
+                path = folder / "alpha.png"
+            elif staged:
+                # A content-pack tile: its LODs are staged for the bucket, named by art key.
+                path = staged / f"tile-{pack['tileId']}-{ {'': 'full', '_512': 'medium', '_256': 'thumb'}[suffix] }.webp"
+            else:
+                path = ASSETS / f"{tile['assetKey']}{suffix}.webp"
             with Image.open(path) as image:
                 assert image.size == (size, size), path
                 assert image.mode == "RGBA", path
@@ -35,7 +43,7 @@ def validate() -> None:
                 bounds = alpha.getbbox()
                 assert bounds and all((bounds[0] > 0, bounds[1] > 0, bounds[2] < size, bounds[3] < size)), path
                 assert alpha.getextrema() == (0, 255), path
-                print(f"PASS {logical_path(ROOT, path)}: {size}px, padded true alpha")
+                print(f"PASS {path if staged and suffix is not None else logical_path(ROOT, path)}: {size}px, padded true alpha")
 
 
 def review_sheet(size: int, suffix: str, output: str) -> None:

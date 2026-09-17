@@ -61,7 +61,18 @@ def main() -> None:
         action="store_true",
         help="Defer the shared bounds rebuild until a multi-asset batch is complete.",
     )
+    parser.add_argument(
+        "--out-dir",
+        help="Pack mode: write the LODs into this folder instead of the bundled hex tree, and leave the bounds manifest alone.",
+    )
+    parser.add_argument(
+        "--pack-tile-id",
+        help="Pack mode: name the files after a content-pack tile (tile-<id>-full/-medium/-thumb.webp) instead of the asset key.",
+    )
     args = parser.parse_args()
+    pack_mode = bool(args.out_dir or args.pack_tile_id)
+    if pack_mode and not (args.out_dir and args.pack_tile_id):
+        raise SystemExit("Pack mode needs both --out-dir and --pack-tile-id.")
 
     source = Image.open(args.source).convert("RGBA")
     if source.getchannel("A").getbbox() is None:
@@ -72,13 +83,24 @@ def main() -> None:
     )):
         raise SystemExit("Transparent source must have transparent corners.")
 
-    OUT_ROOT.mkdir(parents=True, exist_ok=True)
-    outputs = [(args.size, OUT_ROOT / f"{args.key}.webp", args.quality)]
-    outputs.extend(
-        (lod_size, OUT_ROOT / f"{args.key}_{lod_size}.webp", 95 if lod_size >= 512 else 90)
-        for lod_size in args.lod_sizes
-        if 0 < lod_size < args.size
-    )
+    out_root = Path(args.out_dir) if pack_mode else OUT_ROOT
+    out_root.mkdir(parents=True, exist_ok=True)
+    if pack_mode:
+        # A content pack names its tile art by art key: tile:<id>:full|medium|thumb, ':' written as '-'.
+        lod_names = {512: "medium", 256: "thumb"}
+        outputs = [(args.size, out_root / f"tile-{args.pack_tile_id}-full.webp", args.quality)]
+        outputs.extend(
+            (lod_size, out_root / f"tile-{args.pack_tile_id}-{lod_names[lod_size]}.webp", 95 if lod_size >= 512 else 90)
+            for lod_size in args.lod_sizes
+            if 0 < lod_size < args.size and lod_size in lod_names
+        )
+    else:
+        outputs = [(args.size, OUT_ROOT / f"{args.key}.webp", args.quality)]
+        outputs.extend(
+            (lod_size, OUT_ROOT / f"{args.key}_{lod_size}.webp", 95 if lod_size >= 512 else 90)
+            for lod_size in args.lod_sizes
+            if 0 < lod_size < args.size
+        )
     for size, path, quality in outputs:
         # Derive every LOD directly from the authoritative BiRefNet RGBA instead
         # of cascading 2048 -> 1024 -> 512/256 resizes.
@@ -88,9 +110,9 @@ def main() -> None:
             else resize_rgba_premultiplied(source, (size, size))
         )
         save_webp_atomically(image, path, quality=min(args.quality, quality))
-        print(logical_path(ROOT, path), f"{path.stat().st_size // 1024} KB")
+        print(path if pack_mode else logical_path(ROOT, path), f"{path.stat().st_size // 1024} KB")
 
-    if not args.skip_bounds:
+    if not args.skip_bounds and not pack_mode:
         subprocess.run(
             [sys.executable, str(content_path(ROOT, "scripts") / "generate-hex-tile-bounds.py")],
             cwd=ROOT,

@@ -12,6 +12,7 @@ import { applyStrike, createMechanicState, mechanicComplete, mechanicMove, mecha
 import { COLUMN_SHOT_PREVIEW, resolveMissionForPlay, resolveRestorationForPlay } from '@/features/mission-mechanics/preview';
 import { wispHitPlan, wispStates, wispTargetIndex } from '@/features/onboarding/corruption-wisps';
 import { createMissionState, missionBoardStep, missionProgress } from '@/features/onboarding/steppling-mission';
+import { validateMissionDefinition } from '@/features/mission-mechanics/validate';
 import { missionWispTarget } from '@/features/mission-mechanics/wisp-target';
 import type { MissionMechanicDefinition, MissionMechanicState } from '@/types/mission-mechanic';
 import type { MergeWorldState } from '@/types/merge-world';
@@ -217,3 +218,35 @@ test('where the wisps hang: over the tile for glow strikes, on the sky grid abov
   const plain = { ...played, guides: { ...played.guides, aim: undefined } };
   assert.equal(missionBoardStep(plain, start, 1)?.id, `mission.${played.id.replace(/^mission:/, '')}.merge`);
 });
+
+/** A board where a shot up an empty column is lost: three wisps on the sky's first row, one above the middle, every one three hits. */
+const LOST: Extract<MissionMechanicDefinition, { kind: 'column-shot' }> = {
+  kind: 'column-shot', damageByTier: [1, 3, 7], overflow: 'lost', emptyColumn: 'lost',
+  wisps: { rows: 2, cells: [{ id: 'w0', column: 0, row: 0, hp: 3 }, { id: 'w2', column: 2, row: 0, hp: 3 }, { id: 'w4', column: 4, row: 0, hp: 3 }, { id: 'w2b', column: 2, row: 1, hp: 3 }] },
+};
+const guide = { eyebrow: 'Aim', title: 'x', body: 'x' };
+const lostMission = (cells: readonly number[], mechanic = LOST) => ({
+  id: 'mission:lost', storageKey: 'test.lost', required: columnShotTotalHp(mechanic), mechanic,
+  seed: { items: cells.map((cell) => ({ cell, definitionId: 'adventure:trail:1' })), echoes: [], veiled: [] },
+  guides: { firstMerge: guide, wake: guide, merge: guide, mergeFallbackTitle: 'x', free: guide, aim: guide }, wisps: [], lines: { firstStrike: 'x', fell: ['x'], last: 'x' },
+});
+
+test('a board where a miss is lost: the finger never points at a miss, and the board is sound when a hit is always at hand, sliding a piece under a wisp first', () => {
+  // Ten of the same on the bottom two rows: every column has a pair to merge, so a hit is always at hand.
+  const spread = lostMission([36, 37, 38, 39, 40, 29, 30, 31, 32, 33]);
+  assert.deepEqual(validateMissionDefinition(spread, NOW), []);
+  assert.deepEqual(validateMissionDefinition(lostMission(spread.seed.items.map((item) => item.cell), { ...LOST, emptyColumn: 'nearest' }), NOW), [], 'the same board played to the nearest wisp passes the plain walk');
+  // Twins only under empty sky (columns 1 and 3): every merge at hand would miss, but a slide first hits.
+  const aside = lostMission([37, 39, 30, 32, 23, 25, 16, 18]);
+  assert.deepEqual(validateMissionDefinition(aside, NOW), [], 'accepted, because a piece can be slid under a wisp');
+  const start = createMissionState(aside.seed, 'mossprout', NOW);
+  assert.equal(mechanicMove(LOST, start, createMechanicState(LOST), WINDOW), null, 'the finger rests rather than point at a miss');
+  assert.equal(missionBoardStep(aside, start, 0, createMechanicState(LOST))?.id, 'mission.lost.free', 'the free beat says to slide a piece under a wisp');
+  assert.ok(mechanicMove({ ...LOST, emptyColumn: 'nearest' }, start, createMechanicState(LOST), WINDOW), 'to the nearest wisp, any merge is worth pointing at');
+  // Too little to finish: refused.
+  assert.match(validateMissionDefinition(lostMission([36, 37, 38, 39]), NOW).join(' | '), /dead end with wisps standing|cannot be finished/);
+  // A merge into a live column is what the finger shows when there is one.
+  const move = mechanicMove(LOST, createMissionState(spread.seed, 'mossprout', NOW), createMechanicState(LOST), WINDOW);
+  assert.ok(move && [0, 2, 4].includes(WINDOW.cellIndices.indexOf(move.to) % 5), 'under a wisp');
+});
+

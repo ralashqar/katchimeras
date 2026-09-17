@@ -93,7 +93,7 @@ test('Feastle’s chapter card opens the authored Cold Hearth narrative after da
   await act(async () => { tree!.unmount(); });
 });
 
-test('Feastle day three lists the missing delivery in Tend garden and opens it from the blocked Journey card', async () => {
+test('Feastle keeps Chapter 2 active until delivery and opens its missing order', async () => {
   let state = withEpisodes(emptyRelationshipProgressState(), 'feastle', ['day-1', 'day-2'], Date.now() - 3 * HOUR);
   const opened: string[] = [];
   const module = loadStage(() => state, (value) => { state = value; }, {});
@@ -102,9 +102,11 @@ test('Feastle day three lists the missing delivery in Tend garden and opens it f
   await act(async () => { tree = create(<Stage familyId="feastle" onMore={() => {}} onJournal={() => {}} onGoal={() => {}} onOpenMerge={(id: string) => opened.push(id)} onOpenConversation={() => assert.fail('delivery must finish first')} />); });
   const scene = tree!.root.findByType('SceneCards' as React.ElementType);
   assert.equal(scene.props.model.phase, 'waiting');
-  assert.match(scene.props.model.journey.eyebrow, /Chapter 3/);
+  assert.match(scene.props.model.journey.eyebrow, /Chapter 2/);
   const daily = tree!.root.findByType('CompanionDailyActions' as React.ElementType);
   assert.equal(daily.props.requests[0].id, 'feastle:chapter-1:doorstep-snacks');
+  assert.equal(scene.props.deliveryRequest.id, 'feastle:chapter-1:doorstep-snacks');
+  assert.deepEqual(scene.props.deliveryRequest.definitionIds, daily.props.requests[0].definitionIds);
   assert.equal(daily.props.requests[0].definitionIds.join(','), 'food:table:2,food:table:2');
   await act(async () => scene.props.onJourney());
   assert.deepEqual(opened, ['feastle:chapter-1:doorstep-snacks']);

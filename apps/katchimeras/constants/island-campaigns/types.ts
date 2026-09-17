@@ -108,10 +108,18 @@ export type IslandCampaignCopy = {
   wispLines?: CorruptionWispLines;
 };
 
+/** When an island wakes: once a friend is hatched, once a friend is home, or at once. Absent, the bundled wake order decides. */
+export type IslandWakeCondition =
+  | { kind: 'friend_hatched'; companion: string }
+  | { kind: 'friend_home'; residentSkinId: KatchimeraSkinId }
+  | { kind: 'always' };
+
 export type IslandCampaignDefinition<S extends string = string> = {
   campaignId: string;
   islandId: MossproutNatureIslandId;
   residentSkinId: KatchimeraSkinId;
+  /** When the island wakes (content schema 6); absent, its place in the bundled wake order. */
+  wake?: IslandWakeCondition;
   residentName: string;
   /** Order chapter ids read `${chapterIdPrefix}-level-${n}`. */
   chapterIdPrefix: string;

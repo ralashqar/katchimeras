@@ -1,0 +1,853 @@
+{
+  "id": "wanderling-trail",
+  "version": 1,
+  "contentSchemaVersion": 6,
+  "title": "The Wander Trail",
+  "islands": [
+    {
+      "id": "wanderling-trail",
+      "accent": "#8FBF6A",
+      "coord": {
+        "q": -1,
+        "r": 0
+      },
+      "name": "Wander Trail",
+      "shortName": "Trail",
+      "theme": "Unplanned walks, cairns, meadow edges, and having nowhere to be.",
+      "levels": [
+        {
+          "level": 1,
+          "coinCost": 40,
+          "name": "The First Cairn",
+          "description": "One stone back on a path nobody marked.",
+          "storyGate": "chapter_zero_complete"
+        },
+        {
+          "level": 2,
+          "coinCost": 60,
+          "name": "The Bend",
+          "description": "The trail bends away from the village routes again.",
+          "storyGate": "story_level_2"
+        },
+        {
+          "level": 3,
+          "coinCost": 150,
+          "name": "The Meadow Edge",
+          "description": "Grass meets path, and the flowers are back along it.",
+          "storyGate": "story_level_3"
+        },
+        {
+          "level": 4,
+          "coinCost": 300,
+          "name": "Nowhere to Be",
+          "description": "The trail opens onto ground that goes nowhere in particular.",
+          "storyGate": "story_level_4"
+        }
+      ]
+    }
+  ],
+  "islandCampaigns": [
+    {
+      "campaignId": "island-campaign:wanderling-trail",
+      "islandId": "wanderling-trail",
+      "residentSkinId": "wanderling",
+      "wake": {
+        "kind": "friend_hatched",
+        "companion": "steppling"
+      },
+      "residentName": "Wanderling",
+      "chapterIdPrefix": "wanderling-trail",
+      "tags": [
+        "island-campaign",
+        "wanderling",
+        "wanderling-trail"
+      ],
+      "chapters": [
+        {
+          "level": 1,
+          "title": "The First Cairn",
+          "conversationId": "wanderling:island:first-cairn",
+          "restoration": {
+            "rows": 3,
+            "merges": 12,
+            "items": [
+              {
+                "cell": 16,
+                "definitionId": "adventure:trail:1"
+              },
+              {
+                "cell": 22,
+                "definitionId": "adventure:trail:1"
+              },
+              {
+                "cell": 26,
+                "definitionId": "adventure:trail:1"
+              }
+            ],
+            "echoes": [
+              {
+                "id": "wanderling-1-pebble",
+                "cell": 24,
+                "definitionId": "adventure:trail:1"
+              }
+            ],
+            "deliveryCells": [
+              17,
+              31,
+              19
+            ],
+            "mechanic": {
+              "kind": "column-shot",
+              "damageByTier": [
+                1,
+                3,
+                7
+              ],
+              "overflow": "lost",
+              "emptyColumn": "nearest",
+              "wisps": {
+                "rows": 2,
+                "rowPitch": 0.9,
+                "cells": [
+                  {
+                    "id": "sky-0-0",
+                    "column": 0,
+                    "row": 0,
+                    "hp": 3
+                  },
+                  {
+                    "id": "sky-2-0",
+                    "column": 2,
+                    "row": 0,
+                    "hp": 3
+                  },
+                  {
+                    "id": "sky-4-0",
+                    "column": 4,
+                    "row": 0,
+                    "hp": 3
+                  },
+                  {
+                    "id": "sky-2-1",
+                    "column": 2,
+                    "row": 1,
+                    "hp": 3,
+                    "size": 1.05
+                  }
+                ]
+              }
+            }
+          },
+          "prompt": "This was my trail. It never had a marker, and the Mistwisps liked that: nobody looked for it. Four of them sit over the first cairn now.\n\nWe put one stone back today. How do we start?",
+          "fallbackOrder": {
+            "title": "The First Cairn",
+            "description": "Make two Shoes to weigh the first cairn down.",
+            "difficulty": "small",
+            "narrativeSignal": "curiosity",
+            "requirements": [
+              {
+                "definitionId": "adventure:trail:2",
+                "quantity": 2
+              }
+            ]
+          },
+          "choices": [
+            {
+              "id": "start-unplanned",
+              "label": "Just walk",
+              "reply": "Just walk. The stone is wherever we stop.",
+              "style": "unplanned",
+              "wispAffinity": {
+                "breeze": 2
+              },
+              "order": {
+                "title": "Wherever We Stop",
+                "description": "Make two Shoes for a cairn built wherever the walk ends.",
+                "difficulty": "small",
+                "narrativeSignal": "ease",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 2
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the board. What you make flies straight up; bigger things hit harder.",
+              "returnLine": "Set them down. The first stone in years, right where we stopped.",
+              "resolutionLine": "It held. The first cairn is ours again."
+            },
+            {
+              "id": "start-looking",
+              "label": "Look first",
+              "reply": "Look first. The trail shows itself if you let it.",
+              "style": "looking",
+              "wispAffinity": {
+                "sprout": 2
+              },
+              "order": {
+                "title": "The Stone That Was There",
+                "description": "Make two Shoes for the cairn the trail already chose.",
+                "difficulty": "small",
+                "narrativeSignal": "curiosity",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 2
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the board. Look where it lands before you make the next.",
+              "returnLine": "Set them down. You saw where it wanted to be.",
+              "resolutionLine": "It held. The first cairn is ours again, and it was there all along."
+            },
+            {
+              "id": "start-together",
+              "label": "Side by side",
+              "reply": "Side by side, then. Two pairs of feet make a path faster.",
+              "style": "together",
+              "wispAffinity": {
+                "heartlet": 2
+              },
+              "order": {
+                "title": "Two Sets of Prints",
+                "description": "Make two Shoes for a cairn two of you walked to.",
+                "difficulty": "small",
+                "narrativeSignal": "connection",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 2
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the board, the two of us. Every merge pushes them back a little.",
+              "returnLine": "Set them down together. The first stone is ours.",
+              "resolutionLine": "We built it together, and it held. The first cairn is ours again."
+            }
+          ]
+        },
+        {
+          "level": 2,
+          "title": "Off the Marked Path",
+          "conversationId": "wanderling:island:off-the-path",
+          "callbackLine": {
+            "unplanned": "We stopped, and the stone held. So they moved to the bend.",
+            "looking": "You looked, and the stone held. So they moved to the bend.",
+            "together": "Our stone held. So they moved to the bend."
+          },
+          "prompt": "Past the cairn the trail bends away from the village routes. That bend is where they feed; nothing has walked it in years.\n\nWe take the bend back today. Which way round?",
+          "fallbackOrder": {
+            "title": "The Bend",
+            "description": "Bring a Flower and a Sprout for the bend in the trail.",
+            "difficulty": "medium",
+            "narrativeSignal": "curiosity",
+            "requirements": [
+              {
+                "definitionId": "nature:garden:4",
+                "quantity": 1
+              },
+              {
+                "definitionId": "nature:garden:2",
+                "quantity": 1
+              }
+            ]
+          },
+          "choices": [
+            {
+              "id": "bend-long",
+              "label": "The long way",
+              "reply": "The long way. More trail is more trail.",
+              "style": "unplanned",
+              "wispAffinity": {
+                "breeze": 2
+              },
+              "order": {
+                "title": "The Long Way Round",
+                "description": "Bring a Flower and a Sprout for the longer bend.",
+                "difficulty": "medium",
+                "narrativeSignal": "ease",
+                "requirements": [
+                  {
+                    "definitionId": "nature:garden:4",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "nature:garden:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the board. They give ground where the light lands.",
+              "returnLine": "Set them down at the bend. Watch them give ground.",
+              "resolutionLine": "The bend is walked again. More of the trail is ours."
+            },
+            {
+              "id": "bend-quiet",
+              "label": "The quiet way",
+              "reply": "The quiet way. You hear more.",
+              "style": "looking",
+              "wispAffinity": {
+                "sprout": 2
+              },
+              "order": {
+                "title": "The Quiet Bend",
+                "description": "Bring a Flower and a Sprout for the bend nobody hears.",
+                "difficulty": "medium",
+                "narrativeSignal": "comfort",
+                "requirements": [
+                  {
+                    "definitionId": "nature:garden:4",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "nature:garden:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the board. They give ground where the light lands.",
+              "returnLine": "Set them down quietly. Watch them give ground.",
+              "resolutionLine": "The bend is walked again, and it is quiet. More of the trail is ours."
+            },
+            {
+              "id": "bend-yours",
+              "label": "Your way",
+              "reply": "Your way. A guest picks the bend.",
+              "style": "together",
+              "wispAffinity": {
+                "heartlet": 2
+              },
+              "order": {
+                "title": "The Bend You Chose",
+                "description": "Bring a Flower and a Sprout for the bend you pointed at.",
+                "difficulty": "medium",
+                "narrativeSignal": "connection",
+                "requirements": [
+                  {
+                    "definitionId": "nature:garden:4",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "nature:garden:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the board. Your bend first.",
+              "returnLine": "Set them down where you pointed. Watch them give ground.",
+              "resolutionLine": "Your bend is walked again. More of the trail is ours."
+            }
+          ],
+          "restoration": {
+            "rows": 3,
+            "merges": 6,
+            "items": [
+              {
+                "cell": 16,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 18,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 22,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 26,
+                "definitionId": "nature:garden:1"
+              }
+            ],
+            "echoes": [
+              {
+                "id": "wanderling-2-plant",
+                "cell": 24,
+                "definitionId": "nature:garden:3"
+              },
+              {
+                "id": "wanderling-2-sprout",
+                "cell": 31,
+                "definitionId": "nature:garden:2"
+              }
+            ],
+            "deliveryCells": [
+              17,
+              30,
+              19
+            ]
+          }
+        },
+        {
+          "level": 3,
+          "title": "The Meadow Edge",
+          "conversationId": "wanderling:island:meadow-edge",
+          "callbackLine": {
+            "unplanned": "The long bend held. So they went to the meadow edge.",
+            "looking": "The quiet bend held. So they went to the meadow edge.",
+            "together": "Your bend held. So they went to the meadow edge."
+          },
+          "prompt": "The trail runs out into meadow. They sit along the edge where grass meets path, and the flowers went with them.\n\nWe bring the edge back today. What grows there?",
+          "fallbackOrder": {
+            "title": "The Meadow Edge",
+            "description": "Make a Rare Flower and a Shoe for the meadow edge.",
+            "difficulty": "medium",
+            "narrativeSignal": "ease",
+            "requirements": [
+              {
+                "definitionId": "nature:garden:5",
+                "quantity": 1
+              },
+              {
+                "definitionId": "adventure:trail:2",
+                "quantity": 1
+              }
+            ]
+          },
+          "choices": [
+            {
+              "id": "edge-whatever",
+              "label": "Whatever comes up",
+              "reply": "Whatever comes up. The meadow decides.",
+              "style": "unplanned",
+              "wispAffinity": {
+                "bloom": 2
+              },
+              "order": {
+                "title": "Whatever Comes Up",
+                "description": "Make a Rare Flower and a Shoe for an edge that grows how it likes.",
+                "difficulty": "medium",
+                "narrativeSignal": "ease",
+                "requirements": [
+                  {
+                    "definitionId": "nature:garden:5",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the board. They give it up one stretch at a time.",
+              "returnLine": "Set them down along the edge.",
+              "resolutionLine": "The edge grew back how it liked. More of the trail is ours."
+            },
+            {
+              "id": "edge-noticed",
+              "label": "The ones you notice",
+              "reply": "The ones you notice. Those are the ones that matter.",
+              "style": "looking",
+              "wispAffinity": {
+                "sprout": 2
+              },
+              "order": {
+                "title": "The Ones You Noticed",
+                "description": "Make a Rare Flower and a Shoe for the flowers you stopped for.",
+                "difficulty": "medium",
+                "narrativeSignal": "curiosity",
+                "requirements": [
+                  {
+                    "definitionId": "nature:garden:5",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the board. Look where the light lands.",
+              "returnLine": "Set them down where you stopped.",
+              "resolutionLine": "The flowers you noticed came back first. More of the trail is ours."
+            },
+            {
+              "id": "edge-shared",
+              "label": "Ones we both like",
+              "reply": "Ones we both like. There is room for two kinds.",
+              "style": "together",
+              "wispAffinity": {
+                "heartlet": 2
+              },
+              "order": {
+                "title": "Room for Two Kinds",
+                "description": "Make a Rare Flower and a Shoe for an edge with room for both of us.",
+                "difficulty": "medium",
+                "narrativeSignal": "connection",
+                "requirements": [
+                  {
+                    "definitionId": "nature:garden:5",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the board, the two of us.",
+              "returnLine": "Set them down, one each.",
+              "resolutionLine": "Two kinds grew. More of the trail is ours."
+            }
+          ],
+          "restoration": {
+            "rows": 4,
+            "merges": 7,
+            "items": [
+              {
+                "cell": 16,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 18,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 22,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 26,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 29,
+                "definitionId": "nature:garden:3"
+              }
+            ],
+            "echoes": [
+              {
+                "id": "wanderling-3-flower",
+                "cell": 24,
+                "definitionId": "nature:garden:4"
+              },
+              {
+                "id": "wanderling-3-shoe",
+                "cell": 38,
+                "definitionId": "adventure:trail:2"
+              }
+            ],
+            "deliveryCells": [
+              31,
+              37,
+              39
+            ]
+          }
+        },
+        {
+          "level": 4,
+          "title": "Nowhere to Be",
+          "conversationId": "wanderling:island:nowhere-to-be",
+          "callbackLine": {
+            "unplanned": "The edge came back. So they went to the end of the trail, where there is no end.",
+            "looking": "The edge came back. So they went to the end of the trail, where there is no end.",
+            "together": "The edge came back. So they went to the end of the trail, where there is no end."
+          },
+          "prompt": "The last of them sit where the trail stops being a trail and is just open ground. That is the whole point of it, and they know.\n\nWe open the last of it today. What is a trail for?",
+          "fallbackOrder": {
+            "title": "Nowhere to Be",
+            "description": "Make a Boot and a Magical Plant for the open ground.",
+            "difficulty": "major",
+            "narrativeSignal": "connection",
+            "requirements": [
+              {
+                "definitionId": "adventure:trail:3",
+                "quantity": 1
+              },
+              {
+                "definitionId": "nature:garden:6",
+                "quantity": 1
+              }
+            ]
+          },
+          "choices": [
+            {
+              "id": "end-going",
+              "label": "For going",
+              "reply": "For going. It does not need an end.",
+              "style": "unplanned",
+              "wispAffinity": {
+                "breeze": 2,
+                "bloom": 1
+              },
+              "order": {
+                "title": "For Going",
+                "description": "Make a Boot and a Magical Plant for a trail that only goes.",
+                "difficulty": "major",
+                "narrativeSignal": "ease",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:3",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "nature:garden:6",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the last patch. When they go this time, they go for good.",
+              "returnLine": "Set it down at the end that is not one.",
+              "resolutionLine": "They are gone. The whole trail is ours, and it goes nowhere in particular."
+            },
+            {
+              "id": "end-seeing",
+              "label": "For seeing",
+              "reply": "For seeing. Every bend is a new one.",
+              "style": "looking",
+              "wispAffinity": {
+                "sprout": 2,
+                "bloom": 1
+              },
+              "order": {
+                "title": "For Seeing",
+                "description": "Make a Boot and a Magical Plant for a trail worth looking at.",
+                "difficulty": "major",
+                "narrativeSignal": "curiosity",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:3",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "nature:garden:6",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the last patch. Look at it while you do.",
+              "returnLine": "Set it down. Look at what we walked.",
+              "resolutionLine": "They are gone. The whole trail is ours, and you saw all of it."
+            },
+            {
+              "id": "end-company",
+              "label": "For company",
+              "reply": "For company. A trail is better with someone on it.",
+              "style": "together",
+              "wispAffinity": {
+                "heartlet": 2,
+                "bloom": 1
+              },
+              "order": {
+                "title": "For Company",
+                "description": "Make a Boot and a Magical Plant for a trail walked together.",
+                "difficulty": "major",
+                "narrativeSignal": "connection",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:3",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "nature:garden:6",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Make light on the last patch, the two of us.",
+              "returnLine": "Set it down together. That is the last of them.",
+              "resolutionLine": "They are gone. The whole trail is ours, and we walked it together."
+            }
+          ],
+          "restoration": {
+            "rows": 4,
+            "merges": 8,
+            "items": [
+              {
+                "cell": 16,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 18,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 22,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 26,
+                "definitionId": "nature:garden:1"
+              },
+              {
+                "cell": 29,
+                "definitionId": "nature:garden:3"
+              },
+              {
+                "cell": 36,
+                "definitionId": "nature:garden:4"
+              }
+            ],
+            "echoes": [
+              {
+                "id": "wanderling-4-rare",
+                "cell": 24,
+                "definitionId": "nature:garden:5"
+              },
+              {
+                "id": "wanderling-4-boot",
+                "cell": 38,
+                "definitionId": "adventure:trail:3"
+              }
+            ],
+            "deliveryCells": [
+              31,
+              37,
+              39
+            ]
+          }
+        }
+      ],
+      "payoff": {
+        "styles": [
+          "unplanned",
+          "looking",
+          "together"
+        ],
+        "finalChapterWeight": 1.25,
+        "insightKey": "wanderling:walking-style",
+        "category": "Movement & rest",
+        "revealTitle": "How you walked it",
+        "closingLine": "Whatever comes next, it starts from here. Come by when you have nowhere to be.",
+        "insights": {
+          "unplanned": {
+            "id": "unplanned-walker",
+            "title": "The Going Way",
+            "emblemId": "wanderling-walk-unplanned",
+            "matchOptionIds": [],
+            "reflection": "No plan, every time, and the trail came back anyway.",
+            "summary": "Just going brought the trail back."
+          },
+          "looking": {
+            "id": "looking-walker",
+            "title": "The Noticing Way",
+            "emblemId": "wanderling-walk-looking",
+            "matchOptionIds": [],
+            "reflection": "You looked before every step. The trail showed itself.",
+            "summary": "Looking brought the trail back."
+          },
+          "together": {
+            "id": "company-walker",
+            "title": "The Together Way",
+            "emblemId": "wanderling-walk-together",
+            "matchOptionIds": [],
+            "reflection": "Two of us on it every time. The trail noticed.",
+            "summary": "Walking it together brought the trail back."
+          }
+        },
+        "insightChoices": {
+          "unplanned": {
+            "label": "We just went",
+            "reply": "We did. It never needed a plan."
+          },
+          "looking": {
+            "label": "We looked",
+            "reply": "We did. Every bend."
+          },
+          "together": {
+            "label": "We walked it together",
+            "reply": "We did. Every step."
+          }
+        }
+      },
+      "copy": {
+        "discoveryDialogue": "You looked this way, and the Mist let go of me. This was my trail; it never had a marker, and the Mistwisps have been sitting on it for years. Help me walk it back?",
+        "discoveryActionLabel": "Talk with Wanderling",
+        "revealReactionLine": "The Mist lifts from a path nobody marked. The cairns are still standing. Someone kept walking it.",
+        "mistNextName": "A path nobody marked",
+        "mistDescription": "Something in there keeps walking a trail that leads nowhere in particular, and something else is making sure nobody follows.",
+        "returnNoteTitle": "Meet me on the Wander Trail",
+        "returnNoteHint": "Return to Wanderling's trail for the next scene",
+        "actionLabels": {
+          "start_story": "Walk with Wanderling",
+          "open_merge": "Open Merge",
+          "continue_return": "Talk to Wanderling",
+          "continue_restoring": "Back to the Mist",
+          "continue_resolution": "See the trail"
+        },
+        "stateLabels": {
+          "available": "Choose how this stretch of trail comes back.",
+          "orders_active": "Requested in Merge",
+          "board_open": "Driving off the Mist",
+          "delivery_requested": "Requested in Merge",
+          "return_ready": "Request complete",
+          "restoration_ready": "Request complete · Ready to walk",
+          "resolution_ready": "Walked · Story waiting",
+          "complete": "Trail story complete"
+        },
+        "speech": {
+          "available": {
+            "text": "{{coins|raw}} of {{cost|raw}} Glow so far. The trail is not going anywhere.",
+            "variants": [
+              {
+                "when": {
+                  "fact": "cost",
+                  "lte": 0
+                },
+                "text": "I know where the first stone goes."
+              },
+              {
+                "when": {
+                  "fact": "affordable",
+                  "eq": true
+                },
+                "text": "I know where the first stone goes. Whenever you are ready."
+              }
+            ]
+          },
+          "delivery_requested": "This stretch is spent. What we need next is on your board.",
+          "restoration_ready": {
+            "text": "We are close now. A little more light and this stretch can be walked.",
+            "variants": [
+              {
+                "when": {
+                  "fact": "cost",
+                  "lte": 0
+                },
+                "text": "Everything is ready. This one is on me."
+              },
+              {
+                "when": {
+                  "fact": "affordable",
+                  "eq": true
+                },
+                "text": "We have what we need. Whenever you are ready."
+              },
+              {
+                "when": {
+                  "fact": "halfway",
+                  "eq": false
+                },
+                "text": "{{coins|raw}} of {{cost|raw}} Glow so far. The trail can wait."
+              }
+            ]
+          }
+        },
+        "fallbackReturn": "Everything for {{chapterTitle}} is here. Set it down and the Mist has to let go.",
+        "fallbackResolution": {
+          "text": "The trail remembered a little more, because we walked it.",
+          "variants": [
+            {
+              "when": {
+                "fact": "level",
+                "eq": 4
+              },
+              "text": "Every stretch is walked. The Mist has nothing left here to keep."
+            }
+          ]
+        },
+        "wakeHandoffLine": "I was walking a trail nobody could see. Then you looked. There are other places under the Mist, and someone resting in each of them.",
+        "sleepingHint": "The Mist is keeping someone on this trail. They will wake once Steppling is out of his Egg.",
+        "wispLines": {
+          "firstStrike": "It felt that.",
+          "fell": [
+            "One gone. It was sitting on my cairn.",
+            "Another gone. Look, the path.",
+            "One left, and it knows."
+          ],
+          "last": "The last one goes. Look at the trail."
+        }
+      }
+    }
+  ]
+}

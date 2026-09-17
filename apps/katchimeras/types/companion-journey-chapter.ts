@@ -121,6 +121,8 @@ export type JourneyConsequence =
   | { kind: 'wisp_reward'; rewardId: string; candidateWispIds: readonly WispId[]; fallbackWispId: WispId };
 
 export type JourneyEpisodeDefinition = {
+  /** Closing scene for an earlier delivery episode; shares its displayed chapter and reward identity. */
+  deliveryReturnFor?: string;
   /** Save data: the episode record and its conversation id derive from it. */
   id: string;
   title: string;
@@ -164,6 +166,8 @@ export type CompanionJourneyChapterDefinition = {
   chapterId: string;
   /** A continuation opens after every episode of this chapter is complete. */
   afterChapterId?: string;
+  /** The form of the friend's family who speaks this chapter's episodes (content schema 5); absent, the friend does. */
+  speakerSkinId?: string;
   title: string;
   purpose: string;
   /** Authored order is the arc's order; unlocks decide when each opens. */

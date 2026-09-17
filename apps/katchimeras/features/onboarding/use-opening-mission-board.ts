@@ -120,6 +120,15 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
   }, [runId, storageKey, revision]);
   /** Throws the saved board away and seeds a fresh one: the way out when a save cannot be read. */
   const reset = useCallback(() => { clearMission(storageKey); setRevision((value) => value + 1); }, [storageKey]);
+  /** Seeds the board again and keeps what the wisps have taken: the way on when every shot has been spent with wisps still standing. */
+  const reseed = useCallback(() => {
+    const activeRunId = runIdRef.current;
+    if (!activeRunId || !stateRef.current) return;
+    const next = createRef.current(Date.now());
+    stateRef.current = next;
+    saveMission(storageKey, activeRunId, next, mergesRef.current, placedRef.current, mechanicSaveState(mechanicStateRef.current));
+    setState(next);
+  }, [storageKey]);
   const send = useCallback((command: MergeWorldCommand): MissionCommandResult | null => {
     const current = stateRef.current;
     const activeRunId = runIdRef.current;
@@ -173,7 +182,7 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     setState(next);
     setPlacedDeliveries(placed);
   }, [storageKey]);
-  return { state, merges, mergesRef: mergesRef as RefObject<number>, placedDeliveries, mechanicState, mechanicStateRef: mechanicStateRef as RefObject<MissionMechanicState | null>, send, place, reset };
+  return { state, merges, mergesRef: mergesRef as RefObject<number>, placedDeliveries, mechanicState, mechanicStateRef: mechanicStateRef as RefObject<MissionMechanicState | null>, send, place, reset, reseed };
 }
 
 export function loadOpeningMission(runId: string, now = Date.now()): MergeWorldState | null {

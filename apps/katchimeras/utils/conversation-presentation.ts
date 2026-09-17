@@ -1,13 +1,9 @@
 import type { ConversationDefinition } from '@/types/companion-conversation';
 
-/** Keep a branching interaction in one overlay, including its results. */
+/** Narrative ownership is definition-wide, including replies and the final
+ * line. Only a standalone, non-narrative status message belongs overhead. */
 export function conversationUsesNarrativeOverlay(definition: ConversationDefinition): boolean {
-  if (definition.tags?.includes('required-narrative-overlay')) return true;
-  return definition.nodes.some((node) => {
-    if (node.kind === 'choice' || node.kind === 'poll') return node.options.length > 1;
-    if (node.kind === 'profile_game' || node.kind === 'insight_game') {
-      return node.questions.some((question) => question.options.length > 1);
-    }
-    return false;
-  });
+  if (definition.format === 'narrative' || definition.purpose === 'journey'
+    || definition.tags?.includes('required-narrative-overlay')) return true;
+  return definition.nodes.length > 1 || definition.nodes.some(node => node.kind !== 'end');
 }

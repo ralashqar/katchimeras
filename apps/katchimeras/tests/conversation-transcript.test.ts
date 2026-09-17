@@ -85,10 +85,10 @@ test('manual presentation traverses the authored packs without skipping replies 
   }
 });
 
-test('only multi-choice interactions use the narrative overlay, including their result nodes', () => {
+test('dialogue always uses the narrative overlay; only standalone status text stays overhead', () => {
   assert.equal(conversationUsesNarrativeOverlay({ ...definition, nodes: [{ id: 'end', kind: 'end', message: 'A few more steps.' }] }), false);
   assert.equal(conversationUsesNarrativeOverlay({ ...definition, tags: ['required-narrative-overlay'], nodes: [{ id: 'end', kind: 'end', message: 'The island is growing.' }] }), true);
-  assert.equal(conversationUsesNarrativeOverlay(definition), false, 'linear single-option dialogue stays overhead');
+  assert.equal(conversationUsesNarrativeOverlay(definition), true, 'linear dialogue stays in the narrative overlay');
   const choice = definition.nodes[0];
   assert.equal(choice.kind, 'choice');
   if (choice.kind !== 'choice') return;
@@ -126,3 +126,11 @@ for (const intent of ['calm', 'progress', 'unsure'] as const) {
     assert.equal(session.dialogueAcknowledgedAt, 4);
   });
 }
+
+test('every authored narrative, including Feastle delivery closings, requires the overlay', () => {
+  const narratives = companionConversationDefinitionsV2.filter(item => item.format === 'narrative');
+  assert.ok(narratives.some(item => item.id === 'feastle:journey:day-2-return'));
+  for (const narrative of narratives) assert.equal(conversationUsesNarrativeOverlay(narrative), true, narrative.id);
+  assert.equal(conversationUsesNarrativeOverlay({ ...definition, format: 'narrative', nodes: [{ id: 'end', kind: 'end', message: 'The hearth is warm again.' }] }), true, 'even a one-line authored narrative uses the overlay');
+  assert.equal(conversationUsesNarrativeOverlay({ ...definition, nodes: [definition.nodes[0]] }), true, 'a single interactive prompt is not a status bubble');
+});

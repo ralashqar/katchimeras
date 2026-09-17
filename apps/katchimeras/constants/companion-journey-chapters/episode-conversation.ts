@@ -58,6 +58,7 @@ export function journeyEpisodeConversation(chapter: CompanionJourneyChapterDefin
   const first = beats[0]!;
   const definition: ConversationDefinition = {
     id, version: 1, familyId: chapter.familyId, title: episode.title,
+    ...(chapter.speakerSkinId ? { speakerSkinId: chapter.speakerSkinId as ConversationDefinition['speakerSkinId'] } : {}),
     trigger: 'evergreen', minimumBondLevel: 1, cooldownDays: 3650, repeatPolicy: 'once_ever', contextualOnly: true,
     purpose: 'journey', format: 'narrative', tags: [JOURNEY_EPISODE_TAG, `flavour:${episode.flavour}`],
     entryNodeId: beatId(first),

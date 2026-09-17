@@ -5,7 +5,7 @@ import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feas
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import type { CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
 import type { useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
-import { missionWindow } from '@/features/mission-mechanics/board-window';
+import { missionPairs, missionWakes, missionWindow } from '@/features/mission-mechanics/board-window';
 import { mechanicComplete, resolveMechanic } from '@/features/mission-mechanics/mechanic';
 import { resolveMissionForPlay } from '@/features/mission-mechanics/preview';
 import { missionWispTarget } from '@/features/mission-mechanics/wisp-target';
@@ -65,6 +65,8 @@ export function useMistMission({ active, mission, owner, tileNode, boardMetrics,
     const timer = setTimeout(() => setStalled(true), STALLED_MS);
     return () => clearTimeout(timer);
   }, [active, store.state]);
+  // Every shot spent with wisps still standing (a board where a miss is lost): more pieces are offered, the damage dealt stays.
+  const stuck = useMemo(() => Boolean(active && store.state && store.mechanicState && !cleared && !missionPairs(store.state, window.cellIndices).length && !missionWakes(store.state, window.cellIndices).length), [active, cleared, store.mechanicState, store.state, window]);
   // A board's finale is its last item striking the last wisp. Nothing moves on until that landing,
   // and then only once the wisp has fallen: the mission is over when the player has seen it end.
   const finaleIdRef = useRef<number | null>(null);
@@ -116,6 +118,9 @@ export function useMistMission({ active, mission, owner, tileNode, boardMetrics,
     store, step, guidanceVisible, cleared, landed,
     /** Until the finale has landed: the map stays faded while the last item is still in the air. */
     busy: active && !landed,
-    stalled, wispTarget, revealNonce, bumpReveal, onStrike, onFinale,
+    stalled,
+    /** Nothing left to merge and wisps still standing: offer the seed again (`store.reseed`). */
+    stuck,
+    wispTarget, revealNonce, bumpReveal, onStrike, onFinale,
   };
 }

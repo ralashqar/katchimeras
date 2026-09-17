@@ -215,7 +215,11 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
       definitionIds: order.requirements.flatMap((item) => Array.from({ length: item.quantity }, () => item.definitionId)),
       badge: `+${order.reward.coins} Glow` })) : [];
   const requests = [...authoredRequests, ...legacyRequests.filter((request) => !authoredRequests.some((item) => item.id === request.id))];
-  const episodeNumber = next ? state!.chapter.episodes.indexOf(next.episode) + 1 : cycle?.number ?? 1;
+  const deliveryBlocker = next?.status === 'locked' ? next.blockedBy.find(condition => condition.kind === 'orders_served') : null;
+  const deliveryRequest = deliveryBlocker?.kind === 'orders_served'
+    ? requests.find(request => deliveryBlocker.orderIds.includes(request.id) && !request.served)
+    : undefined;
+  const episodeNumber = next ? state!.chapter.episodes.filter(episode => !episode.deliveryReturnFor).findIndex(episode => episode.id === (next.episode.deliveryReturnFor ?? next.episode.id)) + 1 : cycle?.number ?? 1;
   const model = companionSceneModel({
     familyId, episodeId: next ? next.episode.id : cycle?.episodeId ?? 'next', dayNumber: pending ? cycle.number : episodeNumber,
     chapterTitle: state?.chapter.title ?? daily?.chapterTitle ?? 'Our Garden',
@@ -226,15 +230,14 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   const onStory = pending && ready ? () => void perform(() => claimCompanionJourneyReturn(cycle.id))
     : next?.status === 'available' ? openEpisode
       : next?.status === 'locked' ? () => {
-        const blocker = next.blockedBy.find((condition) => condition.kind === 'orders_served');
-        const request = blocker?.kind === 'orders_served' ? requests.find((item) => blocker.orderIds.includes(item.id) && !item.served) : null;
-        if (request) onOpenMerge(request.id);
+        if (deliveryRequest) onOpenMerge(deliveryRequest.id);
         else setReaction(next.hint);
       } : onMore;
 
   return <View style={styles.stage}>
     {!onNarration && !submenuOpen ? <JourneyText style={styles.prompt}>{narration}</JourneyText> : null}
     {initialized && !error ? <CompanionSceneCards
+      deliveryRequest={deliveryRequest}
       hideJourney={submenuOpen || routineSubmenuOpen}
       journeyUnavailable={(hatchable != null && !chapter && !cycle) || !managed} model={model} onJourney={onStory} disabled={busy}
       timer={pending && !ready && rest ? <CompanionMeditationStage onPress={() => setReaction(journeyForeshadowLine(familyId))} title={model.journey.eyebrow} availableAt={rest.availableAt} startedAt={rest.startedAt} settledMs={rest.settledMs} now={now} companionName={hatchableByCompanion(familyId)?.displayName ?? 'Mossprout'} />

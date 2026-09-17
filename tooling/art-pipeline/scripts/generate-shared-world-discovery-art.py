@@ -26,6 +26,8 @@ def main() -> None:
     parser.add_argument("action", choices=["generate", "matte", "package"])
     parser.add_argument("--tile", required=True, help="A tile key from briefs.json.")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--out-dir", help="package: write pack-named LODs into this folder instead of the bundled hex tree (with --pack-tile-id).")
+    parser.add_argument("--pack-tile-id", help="package: the content-pack tile id the files are named after (tile-<id>-full/-medium/-thumb.webp).")
     args = parser.parse_args()
     brief = json.loads((DESIGN / "briefs.json").read_text(encoding="utf-8"))
     if args.tile not in brief["tiles"]:
@@ -74,9 +76,14 @@ def main() -> None:
         shutil.copy2(work / "final.png", folder / "alpha.png")
         print(f"Review alpha before packaging: {folder / 'alpha.png'}", flush=True)
     else:
+        # A brief may say the tile is a content pack's: then package stages it for the bucket unless told otherwise.
+        spec = tile.get("pack")
+        out_dir = args.out_dir or (str(ROOT.parent.parent / ".tmp-content-pack-art" / spec["id"] / str(spec["version"])) if spec else None)
+        pack_tile_id = args.pack_tile_id or (spec["tileId"] if spec else None)
+        pack = ["--out-dir", str(Path(out_dir).resolve()), "--pack-tile-id", pack_tile_id] if out_dir or pack_tile_id else []
         subprocess.run([
             sys.executable, "scripts/package-transparent-hex-tile.py",
-            "--source", str(folder / "alpha.png"), "--key", tile["assetKey"],
+            "--source", str(folder / "alpha.png"), "--key", tile["assetKey"], *pack,
         ], cwd=ROOT, check=True)
 
 

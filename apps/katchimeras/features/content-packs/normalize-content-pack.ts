@@ -11,12 +11,18 @@ import { validateLiveEvent } from '@/features/live-ops/validate';
 import { READY_WISPS } from '@/constants/wisps';
 import { MISSIONS_BUNDLED } from '@/constants/missions/registry';
 import { MOSSPROUT_NATURE_ISLANDS_BUNDLED } from '@/constants/mossprout-nature-islands';
+import { BUNDLED_NATURE_ISLAND_ART_IDS } from '@/constants/nature-island-art-ids';
+import { islandCampaignConversationDefinitions } from '@/constants/island-campaigns/helpers';
+import { ISLAND_CAMPAIGNS_BUNDLED } from '@/constants/island-campaigns/registry';
+import { missionWindow } from '@/features/mission-mechanics/board-window';
+import { columnShotTotalHp } from '@/features/mission-mechanics/column-shot';
 import { STORY_TILES_BUNDLED } from '@/constants/story-tiles/registry';
 import { hasStoryTileArt } from '@/constants/story-tiles/tile-art';
 import { validateContentFlowDefinition, candidateContentFlowCompiler } from '@/features/content-flow/content-flow-compiler';
 import { validateMissionDefinition } from '@/features/mission-mechanics/validate';
 import { createHatchableDiscoveryFlow, createHatchableDayOneFlow, createHatchableGardenLessonFlow } from '@/features/onboarding/hatchable-flows';
-import { CONTENT_SCHEMA_VERSION, type ContentPack, type ContentPackArtEntry } from '@/types/content-pack';
+import { CONTENT_SCHEMA_VERSION, type ContentPack, type ContentPackArtEntry, type ContentPackContent } from '@/types/content-pack';
+import { bundledPackEntries } from './bundled-packs';
 import { validateConversationDefinitions } from '@/utils/companion-conversation';
 import { isAlphaBounds } from '@/utils/hex-alpha-bounds';
 
@@ -52,6 +58,24 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
   const issues: string[] = [];
   if (!isRecord(value)) return { pack: null, issues: ['a pack is an object'] };
   const raw = value;
+  // Packs shipped inside the app are part of the bundle for every other pack; a shipped pack checked by itself is not its own collision.
+  const shipped = <K extends keyof ContentPackContent>(kind: K) => bundledPackEntries(kind, isText(raw.id) ? raw.id : undefined);
+  const bundledChainIds = [...MERGE_CHAIN_IDS_BUNDLED, ...shipped('mergeChains').map((chain) => chain.chainId)];
+  const bundledCharacterIds = [...MERGE_CHARACTER_IDS_BUNDLED, ...shipped('characters').map((character) => character.id)];
+  const bundledGenerators = [...MERGE_GENERATORS_BUNDLED, ...shipped('mergeGenerators')];
+  const bundledSkins = [...katchimeraSkinsBundled, ...shipped('skins')];
+  const bundledFamilies = [...katchimeraFamiliesBundled, ...shipped('families')];
+  const bundledIslands = [...MOSSPROUT_NATURE_ISLANDS_BUNDLED, ...shipped('islands')];
+  const bundledStoryTiles = [...STORY_TILES_BUNDLED, ...shipped('storyTiles')];
+  const bundledHatchables = [...HATCHABLE_COMPANIONS_BUNDLED, ...shipped('hatchables')];
+  const bundledMissions = [...MISSIONS_BUNDLED, ...shipped('missions')];
+  const bundledChapters = [...COMPANION_JOURNEY_CHAPTERS_BUNDLED, ...shipped('chapters')];
+  const bundledConversations = [...companionConversationDefinitionsBundled, ...shipped('conversations')];
+  const bundledCampaigns = [...ISLAND_CAMPAIGNS_BUNDLED, ...shipped('islandCampaigns')];
+  const seenConversationIds = new Set<string>();
+  // The conversations a shipped pack's own island stories compile to are in the bundled catalog; checked by itself, they are its own.
+  const ownCampaignConversationIds = new Set(bundledPackEntries('islandCampaigns').filter((campaign) => !bundledCampaigns.includes(campaign)).flatMap((campaign) => islandCampaignConversationDefinitions(campaign).map((definition) => definition.id)));
+  const bundledConversationIds = bundledConversations.filter((definition) => !ownCampaignConversationIds.has(definition.id)).map((definition) => definition.id);
   if (!isText(raw.id) || !ID.test(raw.id)) issues.push('a pack needs an id of letters, digits and dashes');
   if (!isInt(raw.version) || (raw.version as number) <= 0) issues.push('a pack needs a positive integer version');
   if (!isInt(raw.contentSchemaVersion)) issues.push('a pack needs a contentSchemaVersion');
@@ -84,12 +108,13 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
 
   // What the pack may reference: the bundle, plus what the pack itself brings.
   const chains = list(raw.mergeChains, issues, 'mergeChains');
-  const chainIds = new Set<string>([...MERGE_CHAIN_IDS_BUNDLED, ...chains.map((chain) => String(chain.chainId))]);
+  const chainIds = new Set<string>([...bundledChainIds, ...chains.map((chain) => String(chain.chainId))]);
   const characters = list(raw.characters, issues, 'characters');
   const skins = list(raw.skins, issues, 'skins');
   const families = list(raw.families, issues, 'families');
   const generators = list(raw.mergeGenerators, issues, 'mergeGenerators');
   const islands = list(raw.islands, issues, 'islands');
+  const islandCampaigns = list(raw.islandCampaigns, issues, 'islandCampaigns');
   const storyTiles = list(raw.storyTiles, issues, 'storyTiles');
   const hatchables = list(raw.hatchables, issues, 'hatchables');
   const missions = list(raw.missions, issues, 'missions');
@@ -106,15 +131,26 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
   }
   if (liveEvents.length && Number(raw.contentSchemaVersion) < 2) issues.push('liveEvents require content schema 2');
   const companionIds = new Set<string>(['mossprout', ...HATCHABLE_COMPANIONS.map((definition) => definition.companion), ...hatchables.map((definition) => String(definition.companion))]);
-  const skinIds = new Set<string>([...katchimeraSkinsBundled.map((skin) => skin.id), ...skins.map((skin) => String(skin.id))]);
+  const skinIds = new Set<string>([...bundledSkins.map((skin) => skin.id), ...skins.map((skin) => String(skin.id))]);
+  const skinFamilies = new Map<string, string>([...bundledSkins.map((skin) => [skin.id, skin.familyId] as const), ...skins.map((skin) => [String(skin.id), String(skin.familyId)] as const)]);
+  const schema = Number(raw.contentSchemaVersion);
+  /** A form named by a tile or a chapter: it must exist and, when a friend is named beside it, be one of that friend's family. */
+  const checkForm = (what: string, skinId: unknown, friend: unknown) => {
+    if (schema < 5) issues.push(`${what}: resident and speaker forms require content schema 5`);
+    if (!skinIds.has(String(skinId))) { issues.push(`${what}: form ${skinId} does not exist`); return; }
+    if (friend !== undefined && skinFamilies.get(String(skinId)) !== String(friend)) issues.push(`${what}: form ${skinId} is not one of ${friend}'s`);
+  };
   // Creature art the bundle has: every bundled skin's visual key (the cut-out tables `require()` their images, so they are not read here).
-  const bundledVisualKeys = new Set<string>(katchimeraSkinsBundled.flatMap((skin) => (skin.visualKey ? [skin.visualKey] : [])));
-  const storyTileIds = new Set<string>([...STORY_TILES_BUNDLED.map((tile) => tile.id), ...storyTiles.map((tile) => String(tile.id))]);
-  const missionIds = new Set<string>([...MISSIONS_BUNDLED.map((mission) => mission.id), ...missions.map((mission) => String(mission.id))]);
+  const bundledVisualKeys = new Set<string>(bundledSkins.flatMap((skin) => (skin.visualKey ? [skin.visualKey] : [])));
+  const storyTileIds = new Set<string>([...bundledStoryTiles.map((tile) => tile.id), ...storyTiles.map((tile) => String(tile.id))]);
+  const missionIds = new Set<string>([...bundledMissions.map((mission) => mission.id), ...missions.map((mission) => String(mission.id))]);
   const bundledCoords = new Set<string>([
     `${MOSSPROUT_LAYOUT.home.coord.q},${MOSSPROUT_LAYOUT.home.coord.r}`,
-    ...HATCHABLE_COMPANIONS_BUNDLED.map((definition) => `${definition.tile.coord.q},${definition.tile.coord.r}`),
-    ...STORY_TILES_BUNDLED.map((tile) => `${tile.coord.q},${tile.coord.r}`),
+    `${MOSSPROUT_LAYOUT.garden.coord.q},${MOSSPROUT_LAYOUT.garden.coord.r}`,
+    `${MOSSPROUT_LAYOUT.gate.coord.q},${MOSSPROUT_LAYOUT.gate.coord.r}`,
+    ...bundledHatchables.map((definition) => `${definition.tile.coord.q},${definition.tile.coord.r}`),
+    ...bundledStoryTiles.map((tile) => `${tile.coord.q},${tile.coord.r}`),
+    ...bundledIslands.flatMap((island) => (island.coord ? [`${island.coord.q},${island.coord.r}`] : [])),
   ]);
   const takenCoords = new Set(bundledCoords);
   const coordOf = (value: unknown): string | null => (isRecord(value) && isInt(value.q) && isInt(value.r) ? `${value.q},${value.r}` : null);
@@ -128,7 +164,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
 
   const seenChains = new Set<string>();
   for (const chain of chains) {
-    if (!newId('merge chain', chain.chainId, MERGE_CHAIN_IDS_BUNDLED, seenChains)) continue;
+    if (!newId('merge chain', chain.chainId, bundledChainIds, seenChains)) continue;
     if (!/^[a-z]+:[a-z-]+$/.test(chain.chainId as string)) issues.push(`merge chain ${chain.chainId} must be family:branch`);
     if (!ITEM_ICONS.has(String(chain.icon))) issues.push(`merge chain ${chain.chainId}: icon must be one of ${[...ITEM_ICONS].join(', ')}`);
     if (!isText(chain.color)) issues.push(`merge chain ${chain.chainId} needs a colour`);
@@ -136,7 +172,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
   }
   const seenCharacters = new Set<string>();
   for (const character of characters) {
-    if (!newId('character', character.id, MERGE_CHARACTER_IDS_BUNDLED, seenCharacters)) continue;
+    if (!newId('character', character.id, bundledCharacterIds, seenCharacters)) continue;
     if (!isText(character.name)) issues.push(`character ${character.id} needs a name`);
     if (!Array.isArray(character.coreChains) || character.coreChains.length !== 2) issues.push(`character ${character.id} needs two core chains`);
     for (const chainId of [...(Array.isArray(character.coreChains) ? character.coreChains : []), ...(Array.isArray(character.guestChains) ? character.guestChains : [])]) {
@@ -146,14 +182,14 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
   }
   const seenGenerators = new Set<string>();
   for (const generator of generators) {
-    if (!newId('generator', generator.id, MERGE_GENERATORS_BUNDLED.map((item) => item.id), seenGenerators)) continue;
+    if (!newId('generator', generator.id, bundledGenerators.map((item) => item.id), seenGenerators)) continue;
     if (!isText(generator.name) || !isText(generator.icon) || !isText(generator.color) || !isText(generator.unlockDescription)) issues.push(`generator ${generator.id} needs a name, icon, colour and description`);
     if (!isInt(generator.initialCell)) issues.push(`generator ${generator.id} needs an initial cell`);
     if (!Array.isArray(generator.chainIds) || generator.chainIds.length !== 2 || !generator.chainIds.every((chainId) => chainIds.has(String(chainId)))) issues.push(`generator ${generator.id} needs two known chains`);
   }
   const seenSkins = new Set<string>();
   for (const skin of skins) {
-    if (!newId('skin', skin.id, katchimeraSkinsBundled.map((item) => item.id), seenSkins)) continue;
+    if (!newId('skin', skin.id, bundledSkins.map((item) => item.id), seenSkins)) continue;
     if (!isText(skin.displayName) || !isText(skin.aspectId) || !isText(skin.familyId) || !isText(skin.status)) issues.push(`skin ${skin.id} needs a display name, aspect, family and status`);
     if (!Array.isArray(skin.focusLaneIds) || !Array.isArray(skin.hatchCues)) issues.push(`skin ${skin.id} needs focusLaneIds and hatchCues lists`);
     if (skin.visualKey != null && !isText(skin.visualKey)) issues.push(`skin ${skin.id}: visualKey must be text or null`);
@@ -161,7 +197,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
   }
   const seenFamilies = new Set<string>();
   for (const family of families) {
-    if (!newId('family', family.id, katchimeraFamiliesBundled.map((item) => item.id), seenFamilies)) continue;
+    if (!newId('family', family.id, bundledFamilies.map((item) => item.id), seenFamilies)) continue;
     if (!isText(family.displayName) || !isText(family.lifeAreaLabel) || !isText(family.description) || !isText(family.aspectId)) issues.push(`family ${family.id} needs a display name, life area, description and aspect`);
     if (!skinIds.has(String(family.anchorSkinId))) issues.push(`family ${family.id}: anchor skin ${family.anchorSkinId} does not exist`);
     if (!Array.isArray(family.skinIds) || !family.skinIds.every((id) => skinIds.has(String(id)))) issues.push(`family ${family.id}: every skin must exist`);
@@ -169,21 +205,81 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
   }
   const seenIslands = new Set<string>();
   for (const island of islands) {
-    if (!newId('island', island.id, MOSSPROUT_NATURE_ISLANDS_BUNDLED.map((item) => item.id), seenIslands)) continue;
+    if (!newId('island', island.id, bundledIslands.map((item) => item.id), seenIslands)) continue;
     if (!isText(island.name) || !isText(island.shortName) || !isText(island.theme) || !isText(island.accent)) issues.push(`island ${island.id} needs a name, short name, theme and accent`);
     const coord = coordOf(island.coord);
     if (!coord) issues.push(`island ${island.id} needs a coord`);
     else if (takenCoords.has(coord)) issues.push(`island ${island.id} sits on a tile that is taken`);
     else takenCoords.add(coord);
     if (!Array.isArray(island.levels) || island.levels.length !== 4 || !island.levels.every((level, index) => isRecord(level) && level.level === index + 1 && isInt(level.coinCost) && isText(level.name) && isText(level.description) && isText(level.storyGate))) issues.push(`island ${island.id} needs four levels with a cost, name, description and story gate`);
-    if (!hasArt(`island:${island.id}:full`)) issues.push(`island ${island.id}: no art for island:${island.id}:full`);
+    if (!hasArt(`island:${island.id}:full`) && !BUNDLED_NATURE_ISLAND_ART_IDS.includes(String(island.id))) issues.push(`island ${island.id}: no art for island:${island.id}:full`);
+  }
+  // A candidate is checked before activation, so its chains are not in the live registry.
+  const candidateItems = new Map([...MERGE_ITEMS_BY_ID].filter(([, item]) => bundledChainIds.includes(item.chainId)));
+  for (const chain of chains) {
+    if (isText(chain.chainId) && Array.isArray(chain.names) && chain.names.every(isText)) {
+      for (const item of compileMergeChain(chain as never)) candidateItems.set(item.id, item);
+    }
+  }
+  const islandIds = new Set<string>([...bundledIslands.map((island) => island.id), ...islands.map((island) => String(island.id))]);
+  const seenCampaigns = new Set<string>();
+  for (const campaign of islandCampaigns) {
+    if (schema < 6) issues.push('Island campaigns require content schema 6');
+    if (!newId('island campaign', campaign.campaignId, bundledCampaigns.map((item) => item.campaignId), seenCampaigns)) continue;
+    const id = campaign.campaignId as string;
+    if (!islandIds.has(String(campaign.islandId))) issues.push(`island campaign ${id}: ${campaign.islandId} is not an island`);
+    if (bundledCampaigns.some((item) => item.islandId === campaign.islandId)) issues.push(`island campaign ${id}: ${campaign.islandId} already has a story`);
+    if (!skinIds.has(String(campaign.residentSkinId))) issues.push(`island campaign ${id}: form ${campaign.residentSkinId} does not exist`);
+    if (!isText(campaign.residentName) || !isText(campaign.chapterIdPrefix) || !isRecord(campaign.payoff) || !isRecord(campaign.copy)) issues.push(`island campaign ${id} needs a resident name, chapter id prefix, payoff and copy`);
+    const wake = campaign.wake;
+    if (wake !== undefined) {
+      if (!isRecord(wake) || !['friend_hatched', 'friend_home', 'always'].includes(String(wake.kind))) issues.push(`island campaign ${id}: wake must be friend_hatched, friend_home or always`);
+      else if (wake.kind === 'friend_hatched' && !companionIds.has(String(wake.companion))) issues.push(`island campaign ${id}: wake names ${wake.companion}, who is not a friend`);
+      else if (wake.kind === 'friend_home' && !skinIds.has(String(wake.residentSkinId))) issues.push(`island campaign ${id}: wake names form ${wake.residentSkinId}, which does not exist`);
+    }
+    const chapters = list(campaign.chapters, issues, `island campaign ${id} chapters`);
+    if (chapters.length !== 4 || !chapters.every((chapter, index) => chapter.level === index + 1)) issues.push(`island campaign ${id} needs four chapters, levels 1 to 4`);
+    const styles = isRecord(campaign.payoff) && Array.isArray(campaign.payoff.styles) ? campaign.payoff.styles.map(String) : [];
+    for (const chapter of chapters) {
+      const where = `island campaign ${id} level ${chapter.level}`;
+      if (!isText(chapter.title) || !isText(chapter.prompt) || !String(chapter.prompt).includes('\n\n')) issues.push(`${where}: needs a title and a prompt of situation, blank line, question`);
+      if (!newId('conversation', chapter.conversationId, bundledConversationIds, seenConversationIds)) continue;
+      const choices = list(chapter.choices, issues, `${where} choices`);
+      if (choices.length !== 3) issues.push(`${where}: three answers`);
+      for (const choice of choices) {
+        if (!isText(choice.id) || !isText(choice.label) || !isText(choice.reply) || !isText(choice.openingConclusion) || !isText(choice.returnLine) || !isText(choice.resolutionLine)) issues.push(`${where}: answer ${choice.id} needs its lines`);
+        if (!styles.includes(String(choice.style))) issues.push(`${where}: answer ${choice.id} has a style the payoff does not know`);
+      }
+      for (const order of [chapter.fallbackOrder, ...choices.map((choice) => choice.order)]) {
+        if (!isRecord(order) || !Array.isArray(order.requirements) || !order.requirements.length) { issues.push(`${where}: every answer needs a request`); continue; }
+        for (const requirement of order.requirements) if (!isRecord(requirement) || !candidateItems.has(String(requirement.definitionId))) issues.push(`${where}: request asks for ${isRecord(requirement) ? requirement.definitionId : '?'}, which is not an item`);
+      }
+      const board = chapter.restoration;
+      if (board !== undefined) {
+        if (!isRecord(board) || (board.rows !== 3 && board.rows !== 4) || !isInt(board.merges) || !Array.isArray(board.items) || !Array.isArray(board.echoes) || !Array.isArray(board.deliveryCells)) { issues.push(`${where}: a restoration board needs rows, merges, items, echoes and delivery cells`); continue; }
+        const window = missionWindow(board.rows as 3 | 4);
+        const cells = new Set(window.cellIndices);
+        for (const entry of [...board.items, ...board.echoes]) {
+          if (!isRecord(entry) || !cells.has(Number(entry.cell))) issues.push(`${where}: cell ${isRecord(entry) ? entry.cell : '?'} is outside the board`);
+          else if (!candidateItems.has(String(entry.definitionId))) issues.push(`${where}: ${entry.definitionId} is not a known item`);
+        }
+        for (const cell of board.deliveryCells) if (!cells.has(Number(cell))) issues.push(`${where}: delivery cell ${cell} is outside the board`);
+        const mechanic = board.mechanic;
+        if (isRecord(mechanic) && mechanic.kind === 'column-shot') {
+          const wisps = isRecord(mechanic.wisps) && Array.isArray(mechanic.wisps.cells) ? mechanic.wisps.cells : [];
+          if (!wisps.length || !Array.isArray(mechanic.damageByTier)) issues.push(`${where}: a column-shot board needs wisps and damageByTier`);
+          else if (board.merges !== columnShotTotalHp(mechanic as never)) issues.push(`${where}: merges (${board.merges}) must equal the wisps' hit points (${columnShotTotalHp(mechanic as never)})`);
+        }
+      }
+    }
   }
   const seenTiles = new Set<string>();
   for (const tile of storyTiles) {
-    if (!newId('story tile', tile.id, [...STORY_TILES_BUNDLED.map((item) => item.id), ...HATCHABLE_COMPANIONS_BUNDLED.map((item) => item.tile.id)], seenTiles)) continue;
+    if (!newId('story tile', tile.id, [...bundledStoryTiles.map((item) => item.id), ...bundledHatchables.map((item) => item.tile.id)], seenTiles)) continue;
     if (!isText(tile.unlockId) || !isText(tile.name) || !isText(tile.alphaBoundsKey)) issues.push(`story tile ${tile.id} needs an unlock id, a name and an alphaBoundsKey`);
     if (tile.revealPreset !== 'mist-clear') issues.push(`story tile ${tile.id}: revealPreset must be mist-clear`);
     if (!companionIds.has(String(tile.companion))) issues.push(`story tile ${tile.id}: ${tile.companion} is not a friend`);
+    if (tile.residentSkinId !== undefined) checkForm(`story tile ${tile.id}`, tile.residentSkinId, tile.companion);
     if (!isRecord(tile.lines) || !isText(tile.lines.reveal)) issues.push(`story tile ${tile.id} needs a reveal line`);
     const coord = coordOf(tile.coord);
     if (!coord) issues.push(`story tile ${tile.id} needs a coord`);
@@ -192,28 +288,21 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     if (!hasStoryTileArt(String(tile.id)) && !hasArt(`tile:${tile.id}:full`)) issues.push(`story tile ${tile.id}: no art for tile:${tile.id}:full`);
   }
   const seenMissions = new Set<string>();
-  // A candidate is checked before activation, so its chains are not in the live registry.
-  const candidateItems = new Map([...MERGE_ITEMS_BY_ID].filter(([, item]) => MERGE_CHAIN_IDS_BUNDLED.includes(item.chainId)));
-  for (const chain of chains) {
-    if (isText(chain.chainId) && Array.isArray(chain.names) && chain.names.every(isText)) {
-      for (const item of compileMergeChain(chain as never)) candidateItems.set(item.id, item);
-    }
-  }
   for (const mission of missions) {
-    if (!newId('mission', mission.id, MISSIONS_BUNDLED.map((item) => item.id), seenMissions)) continue;
+    if (!newId('mission', mission.id, bundledMissions.map((item) => item.id), seenMissions)) continue;
     if (!isRecord(mission.guides) || !isRecord(mission.lines)) { issues.push(`mission ${mission.id} needs guides and lines`); continue; }
     issues.push(...validateMissionDefinition(mission as never, undefined, candidateItems));
   }
   const seenHatchables = new Set<string>();
   for (const definition of hatchables) {
-    if (!newId('hatchable', definition.companion, HATCHABLE_COMPANIONS_BUNDLED.map((item) => item.companion), seenHatchables)) continue;
+    if (!newId('hatchable', definition.companion, bundledHatchables.map((item) => item.companion), seenHatchables)) continue;
     const id = definition.companion as string;
     for (const field of ['displayName', 'tile', 'availability', 'discovery', 'mission', 'discoveryFlow', 'dayOne', 'lesson', 'egg', 'economy'] as const) {
       if (definition[field] === undefined) issues.push(`hatchable ${id} needs ${field}`);
     }
     const tile = isRecord(definition.tile) ? definition.tile : null;
     if (tile) {
-      if (!newId('tile', tile.id, [...STORY_TILES_BUNDLED.map((item) => item.id), ...HATCHABLE_COMPANIONS_BUNDLED.map((item) => item.tile.id)], seenTiles)) continue;
+      if (!newId('tile', tile.id, [...bundledStoryTiles.map((item) => item.id), ...bundledHatchables.map((item) => item.tile.id)], seenTiles)) continue;
       const coord = coordOf(tile.coord);
       if (!coord) issues.push(`hatchable ${id}: its tile needs a coord`);
       else if (takenCoords.has(coord)) issues.push(`hatchable ${id}: its tile sits on a tile that is taken`);
@@ -222,7 +311,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
       if (!hasArt(`cutout:${id}`)) issues.push(`hatchable ${id}: no art for cutout:${id}`);
     }
     if (isRecord(definition.mission)) {
-      if (!newId('mission', definition.mission.id, MISSIONS_BUNDLED.map((item) => item.id), seenMissions)) continue;
+      if (!newId('mission', definition.mission.id, bundledMissions.map((item) => item.id), seenMissions)) continue;
       issues.push(...validateMissionDefinition(definition.mission as never, undefined, candidateItems));
     }
     if (issues.length) continue;
@@ -234,16 +323,17 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
       issues.push(`hatchable ${id}: its flows cannot be built (${error instanceof Error ? error.message : String(error)})`);
     }
   }
+  const conversationIds = new Set<string>([...bundledConversationIds, ...conversations.map((conversation) => String(conversation.id))]);
   const seenChapters = new Set<string>();
-  const chapterRoots = new Set(COMPANION_JOURNEY_CHAPTERS_BUNDLED.filter((chapter) => !chapter.afterChapterId).map((chapter) => chapter.familyId));
-  const predecessorUses = new Set<string>();
-  const allChapterIds = new Map<string, string>([...COMPANION_JOURNEY_CHAPTERS_BUNDLED.map((chapter) => [chapter.chapterId, chapter.familyId] as const), ...chapters.map((chapter) => [String(chapter.chapterId), String(chapter.familyId)] as const)]);
-  const familyEpisodes = new Set(COMPANION_JOURNEY_CHAPTERS_BUNDLED.flatMap((chapter) => chapter.episodes.map((episode) => `${chapter.familyId}:${episode.id}`)));
+  const chapterRoots = new Set(bundledChapters.filter((chapter) => !chapter.afterChapterId).map((chapter) => chapter.familyId));
+  const predecessorUses = new Set<string>(bundledChapters.flatMap((chapter) => (chapter.afterChapterId ? [chapter.afterChapterId] : [])));
+  const allChapterIds = new Map<string, string>([...bundledChapters.map((chapter) => [chapter.chapterId, chapter.familyId] as const), ...chapters.map((chapter) => [String(chapter.chapterId), String(chapter.familyId)] as const)]);
+  const familyEpisodes = new Set(bundledChapters.flatMap((chapter) => chapter.episodes.map((episode) => `${chapter.familyId}:${episode.id}`)));
   for (const chapter of chapters) {
     if (!isText(chapter.familyId) || !companionIds.has(chapter.familyId)) { issues.push(`chapter ${chapter.chapterId ?? '?'}: ${chapter.familyId} is not a friend`); continue; }
     if (!chapter.afterChapterId && chapterRoots.has(chapter.familyId)) { issues.push(`chapter for ${chapter.familyId}: that friend already has a chapter; name afterChapterId for a continuation`); continue; }
     if (!chapter.afterChapterId) chapterRoots.add(chapter.familyId);
-    if (seenChapters.has(String(chapter.chapterId)) || COMPANION_JOURNEY_CHAPTERS_BUNDLED.some((item) => item.chapterId === chapter.chapterId)) issues.push(`chapter ${chapter.chapterId} appears twice`);
+    if (seenChapters.has(String(chapter.chapterId)) || bundledChapters.some((item) => item.chapterId === chapter.chapterId)) issues.push(`chapter ${chapter.chapterId} appears twice`);
     seenChapters.add(String(chapter.chapterId));
     if (chapter.afterChapterId !== undefined) {
       if (Number(raw.contentSchemaVersion) < 2) issues.push('chapter continuations require content schema 2');
@@ -252,6 +342,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
       else predecessorUses.add(chapter.afterChapterId);
     }
     if (!isText(chapter.chapterId) || !isText(chapter.title) || !isRecord(chapter.lines) || !isRecord(chapter.dayOne) || !isText(chapter.generatorId)) issues.push(`chapter ${chapter.chapterId}: needs an id, title, lines, dayOne and generator`);
+    if (chapter.speakerSkinId !== undefined) checkForm(`chapter ${chapter.chapterId}`, chapter.speakerSkinId, chapter.familyId);
     const episodes = list(chapter.episodes, issues, `chapter ${chapter.chapterId} episodes`);
     if (!episodes.length) issues.push(`chapter ${chapter.chapterId} needs episodes`);
     const episodeIds = new Set<string>();
@@ -263,6 +354,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
       familyEpisodes.add(familyEpisode);
       if (chapter.afterChapterId ? episode.dayOne : index === 0 ? episode.dayOne !== true : episode.dayOne) issues.push(`chapter ${chapter.chapterId}: only the first episode of the first chapter is the first meeting`);
       if (!Array.isArray(episode.unlock)) issues.push(`chapter ${chapter.chapterId}: episode ${episode.id} needs unlock conditions`);
+      if (episode.conversationId !== undefined && !conversationIds.has(String(episode.conversationId))) issues.push(`chapter ${chapter.chapterId}: conversation ${episode.conversationId} does not exist`);
       const consequences = [...(isRecord(episode.consequence) ? [episode.consequence] : []), ...(Array.isArray(episode.consequences) ? episode.consequences.filter(isRecord) : [])];
       for (const consequence of consequences) {
         if ((consequence.kind === 'reveal_story_tile' || consequence.kind === 'mist_mission') && !storyTileIds.has(String(consequence.tileId))) issues.push(`chapter ${chapter.chapterId}: ${consequence.tileId} is not a story tile`);
@@ -270,14 +362,14 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
       }
     });
   }
-  const seenConversations = new Set<string>();
-  const bundledConversationIds = companionConversationDefinitionsBundled.map((definition) => definition.id);
+  const seenConversations = seenConversationIds;
   for (const conversation of conversations) {
     if (!newId('conversation', conversation.id, bundledConversationIds, seenConversations)) continue;
     if (!companionIds.has(String(conversation.familyId))) issues.push(`conversation ${conversation.id}: ${conversation.familyId} is not a friend`);
+    if (conversation.speakerSkinId !== undefined && !skinIds.has(String(conversation.speakerSkinId))) issues.push(`conversation ${conversation.id}: form ${conversation.speakerSkinId} does not exist`);
   }
   if (conversations.length && !issues.length) issues.push(...validateConversationDefinitions(conversations as never));
-  const eventTargets = new Map<string, string>([['mossprout-garden', 'mossprout'], ...HATCHABLE_COMPANIONS_BUNDLED.map(h => [h.tile.id, h.companion] as [string, string])]);
+  const eventTargets = new Map<string, string>([['mossprout-garden', 'mossprout'], ...bundledHatchables.map(h => [h.tile.id, h.companion] as [string, string])]);
   for (const h of hatchables) if (isRecord(h.tile)) eventTargets.set(String(h.tile.id), String(h.companion));
   for (const h of hatchables) if (isRecord(h.availability) && h.availability.kind === 'event_joined') {
     if (Number(raw.contentSchemaVersion) < 4) issues.push('Event-introduced tiles require content schema 4');
@@ -286,7 +378,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
   }
   const seenFlows = new Set<string>();
   const eventIds = new Set<string>();
-  const eventSupplyChains = new Set([...MERGE_GENERATORS_BUNDLED.flatMap(generator => generator.chainIds), ...generators.flatMap(generator => Array.isArray(generator.chainIds) ? generator.chainIds.map(String) : [])]);
+  const eventSupplyChains = new Set([...bundledGenerators.flatMap(generator => generator.chainIds), ...generators.flatMap(generator => Array.isArray(generator.chainIds) ? generator.chainIds.map(String) : [])]);
   for (const event of liveEvents) {
     if (!newId('live event', event.id, [], eventIds)) continue;
     const validated = validateLiveEvent(event);
@@ -344,6 +436,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     ...(skins.length ? { skins: skins as never } : {}),
     ...(families.length ? { families: families as never } : {}),
     ...(islands.length ? { islands: islands as never } : {}),
+    ...(islandCampaigns.length ? { islandCampaigns: islandCampaigns as never } : {}),
     ...(storyTiles.length ? { storyTiles: storyTiles as never } : {}),
     ...(hatchables.length ? { hatchables: hatchables as never } : {}),
     ...(missions.length ? { missions: missions as never } : {}),

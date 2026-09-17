@@ -76,6 +76,7 @@ import { resetKatchimeraProgressForDebug } from '@/utils/reset-katchimera-progre
 import { setFeastleStoryStateForDebug } from '@/utils/companion-story-storage';
 import { triggerNativeCrashForDiagnostics } from '@/utils/crash-reporting';
 import { resetCurrentMossproutJourneyForDebug } from '@/features/mossprout/journey-dev-tools';
+import { completeJourneyChapterForDebug } from '@/features/companion/journey-chapter-dev-tools';
 
 const DEV_JOURNEY_DAY_ONE_RECEIPT = {
   id: 'dev-preview:journey-day-1',
@@ -326,6 +327,14 @@ export default function ExploreScreen() {
     );
   }
 
+  function handleFinishStepplingChapter() {
+    try {
+      const { recorded } = completeJourneyChapterForDebug('steppling', 'steppling-chapter-1');
+      Alert.alert('Steppling’s chapter 1 finished', recorded ? `${recorded} episode${recorded === 1 ? '' : 's'} recorded complete. A continuation from a content pack opens on Steppling’s page next.` : 'Every episode was already complete.');
+    } catch (caught) {
+      Alert.alert('Could not finish the chapter', caught instanceof Error ? caught.message : 'The chapter could not be recorded.');
+    }
+  }
   function handleResetJourneyAndBoard() {
     Alert.alert(
       'Reset Journey and Merge board?',
@@ -700,6 +709,11 @@ export default function ExploreScreen() {
                     />
                   </View>
                   <KatchaButton label="Reset all Journey + Merge progress" onPress={handleResetJourneyAndBoard} variant="destructive" />
+                  <View style={styles.devToggleCopy}>
+                    <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">Steppling continuation</ThemedText>
+                    <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">Records every episode of The Path Outside complete, so a content pack’s arc after it (the Wanderling Trail) opens without its waits and Bond.</ThemedText>
+                  </View>
+                  <KatchaButton label="Finish Steppling’s chapter 1" onPress={handleFinishStepplingChapter} variant="secondary" />
                   <View style={styles.devToggleRow}>
                     <View style={styles.devToggleCopy}>
                       <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">Mist board: column shot</ThemedText>

@@ -24,6 +24,10 @@ export function normalizeContentRelease(documents: readonly unknown[]): { packs:
       (Array.isArray(raw.liveEvents) && raw.liveEvents.some(e => e?.encounters?.some((n: Record<string, unknown>) => n.companionId || n.actionTitle || n.hexId !== 'mossprout-garden')))
       || (Array.isArray(raw.hatchables) && raw.hatchables.some(h => h?.availability?.kind === 'event_joined'))
     )) issues.push(`${pack.id}: world event presentation and event-introduced tiles require content schema 4`);
+    if (pack.contentSchemaVersion < 5 && (
+      (Array.isArray(raw.storyTiles) && raw.storyTiles.some((tile) => tile?.residentSkinId !== undefined))
+      || (Array.isArray(raw.chapters) && raw.chapters.some((chapter) => chapter?.speakerSkinId !== undefined))
+    )) issues.push(`${pack.id}: resident and speaker forms require content schema 5`);
     for (const kind of CONTENT_KINDS) {
       if (raw[kind] !== undefined && !Array.isArray(raw[kind])) issues.push(`${raw.id}: ${kind} must be a list`);
       else if (raw[kind]) Object.assign(pack, { [kind]: raw[kind] });

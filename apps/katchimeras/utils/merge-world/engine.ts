@@ -116,6 +116,7 @@ import { advanceMossproutChapterZero, enforceMossproutChapterZeroDropOverride, i
 import { havenStageDefinition, type HavenStage } from '@/constants/haven-catalog';
 import {
   MOSSPROUT_NATURE_ISLAND_IDS,
+  MOSSPROUT_NATURE_ISLANDS_BUNDLED,
   emptyMossproutNatureIslandLevels,
   mossproutNatureIslandById,
   mossproutNatureIslandLevelDefinition,
@@ -1235,7 +1236,8 @@ function upgradeMossproutNatureIsland(
     ...state.haven.mossproutNatureIslands,
     [islandId]: requestedLevel,
   };
-  const completedTier = MOSSPROUT_NATURE_ISLAND_IDS.every((id) => mossproutNatureIslands[id] >= requestedLevel);
+  // Mossprout's own six islands grow his Haven; an island a pack brings (another friend's) never holds it back.
+  const completedTier = MOSSPROUT_NATURE_ISLANDS_BUNDLED.every((island) => mossproutNatureIslands[island.id] >= requestedLevel);
   const existingStage = state.haven.tileStages.mossprout ?? 1;
   const aggregateStage = completedTier ? Math.max(existingStage, requestedLevel) as HavenStage : existingStage;
   const receipt: StoryWorldMutationReceipt | null = receiptId ? {
@@ -1574,7 +1576,8 @@ function completeIslandCampaignChapter(
   const hasCard = state.ownedKatchimeraCards.some((card) => card.cardId === cardId);
   const ownedKatchimeraCards = earnsCard && !hasCard ? [...state.ownedKatchimeraCards, {
     cardId,
-    familyId: 'mossprout' as const,
+    // The card is the resident's, of their own family: Mossprout's friends on the bundled islands, a form of another family on a pack's.
+    familyId: (katchimeraSkinById.get(cardId)?.familyId ?? 'mossprout') as MergeCharacterId,
     acquisition: 'island_campaign' as const,
     sourceReceiptId: `${campaignId}:friend`,
     acquiredAt: now,

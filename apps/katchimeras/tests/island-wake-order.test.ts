@@ -19,9 +19,11 @@ const NOW = Date.parse('2026-09-08T12:00:00Z');
 const fresh = () => ({ ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 5_000 });
 
 test('the wake order covers every island once and every authored campaign matches its resident', () => {
-  assert.deepEqual([...ISLAND_WAKE_ORDER.map((entry) => entry.islandId)].sort(), [...MOSSPROUT_NATURE_ISLAND_IDS].sort());
+  // An island whose campaign names its own wake condition (a pack's) stands outside the fixed order.
+  assert.deepEqual([...ISLAND_WAKE_ORDER.map((entry) => entry.islandId)].sort(), MOSSPROUT_NATURE_ISLAND_IDS.filter((id) => !islandCampaignForIsland(id)?.wake).sort());
   assert.equal(new Set(ISLAND_WAKE_ORDER.map((entry) => entry.residentSkinId)).size, ISLAND_WAKE_ORDER.length);
   for (const campaign of ISLAND_CAMPAIGNS) {
+    if (campaign.wake) continue;
     assert.equal(ISLAND_WAKE_ORDER.find((entry) => entry.islandId === campaign.islandId)?.residentSkinId, campaign.residentSkinId);
   }
 });

@@ -1,6 +1,6 @@
 import type { CompanionJourneyChapterDefinition } from '@/types/companion-journey-chapter';
 
-/** Seven episodes: warmth, belonging and a signal beyond the Mist. */
+/** Seven chapters, with delivery closing scenes: warmth, belonging and a signal beyond the Mist. */
 export const FEASTLE_CHAPTER: CompanionJourneyChapterDefinition = {
   "familyId": "feastle",
   "chapterId": "feastle-chapter-1",
@@ -99,6 +99,37 @@ export const FEASTLE_CHAPTER: CompanionJourneyChapterDefinition = {
             }
           ]
         }
+      ],
+      "bond": 0
+    },
+    {
+      "id": "day-2-return",
+      "deliveryReturnFor": "day-2",
+      "title": "The Cold Hearth",
+      "flavour": "companion",
+      "reflectMs": 0,
+      "unlock": [
+        {
+          "kind": "episode_complete",
+          "episodeId": "day-2"
+        },
+        {
+          "kind": "orders_served",
+          "orderIds": [
+            "feastle:chapter-1:doorstep-snacks"
+          ]
+        }
+      ],
+      "beats": [
+        {
+          "kind": "say",
+          "id": "delivery.thanks",
+          "text": "The hearth is warm again. Feastle sets one snack beside you and carries the other to the doorstep. “There. A place for us, and a welcome for whoever finds the light. Thank you for helping me begin again.”"
+        },
+        {
+          "kind": "end",
+          "text": "Another little piece of our home is back. I am glad we did this together."
+        }
       ]
     },
     {
@@ -109,7 +140,7 @@ export const FEASTLE_CHAPTER: CompanionJourneyChapterDefinition = {
       "unlock": [
         {
           "kind": "episode_complete",
-          "episodeId": "day-2"
+          "episodeId": "day-2-return"
         },
         {
           "kind": "orders_served",
@@ -218,6 +249,37 @@ export const FEASTLE_CHAPTER: CompanionJourneyChapterDefinition = {
             }
           ]
         }
+      ],
+      "bond": 0
+    },
+    {
+      "id": "day-4-return",
+      "deliveryReturnFor": "day-4",
+      "title": "Enough for One More",
+      "flavour": "companion",
+      "reflectMs": 0,
+      "unlock": [
+        {
+          "kind": "episode_complete",
+          "episodeId": "day-4"
+        },
+        {
+          "kind": "orders_served",
+          "orderIds": [
+            "feastle:chapter-1:welcome-table"
+          ]
+        }
+      ],
+      "beats": [
+        {
+          "kind": "say",
+          "id": "delivery.thanks",
+          "text": "Feastle places your gift on the table and straightens the empty chair. “It feels less empty now. Someone will find their way here. Until then, we will keep a place for them.”"
+        },
+        {
+          "kind": "end",
+          "text": "Another little piece of our home is back. I am glad we did this together."
+        }
       ]
     },
     {
@@ -228,7 +290,7 @@ export const FEASTLE_CHAPTER: CompanionJourneyChapterDefinition = {
       "unlock": [
         {
           "kind": "episode_complete",
-          "episodeId": "day-4"
+          "episodeId": "day-4-return"
         },
         {
           "kind": "orders_served",
@@ -333,6 +395,37 @@ export const FEASTLE_CHAPTER: CompanionJourneyChapterDefinition = {
             }
           ]
         }
+      ],
+      "bond": 0
+    },
+    {
+      "id": "day-6-return",
+      "deliveryReturnFor": "day-6",
+      "title": "The Lantern Supper",
+      "flavour": "companion",
+      "reflectMs": 0,
+      "unlock": [
+        {
+          "kind": "episode_complete",
+          "episodeId": "day-6"
+        },
+        {
+          "kind": "orders_served",
+          "orderIds": [
+            "feastle:chapter-1:lantern-supper"
+          ]
+        }
+      ],
+      "beats": [
+        {
+          "kind": "say",
+          "id": "delivery.thanks",
+          "text": "Feastle follows the warm scent to the edge of the Mist. “It reached further than I hoped. Somewhere out there, a friend might be remembering the way home.”"
+        },
+        {
+          "kind": "end",
+          "text": "Another little piece of our home is back. I am glad we did this together."
+        }
       ]
     },
     {
@@ -343,7 +436,7 @@ export const FEASTLE_CHAPTER: CompanionJourneyChapterDefinition = {
       "unlock": [
         {
           "kind": "episode_complete",
-          "episodeId": "day-6"
+          "episodeId": "day-6-return"
         },
         {
           "kind": "orders_served",

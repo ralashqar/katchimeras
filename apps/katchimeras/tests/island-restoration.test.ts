@@ -177,7 +177,7 @@ test('every request a board sends to the Main Board can be made there, and the e
   // The world right before each friend: the friends home by then decide which generator branches are open
   // (the Garden Basket's waterside waits for Shellio, the Journey Locker's travel branch for a later friend).
   const fixtures = buildPlayerProfileFixtures(NOW);
-  const worldBefore: Record<string, string> = { [petalimp.campaignId]: 'fixture:kingdom-before-petalimp', [FERNIP_WILDGROWTH_CAMPAIGN.campaignId]: 'fixture:kingdom-before-fernip' };
+  const worldBefore: Record<string, string> = { [petalimp.campaignId]: 'fixture:kingdom-before-petalimp', [FERNIP_WILDGROWTH_CAMPAIGN.campaignId]: 'fixture:kingdom-before-fernip', 'island-campaign:wanderling-trail': 'fixture:kingdom-before-petalimp' };
   for (const campaign of ISLAND_CAMPAIGNS) {
   if (!campaign.chapters.some((chapter) => chapter.restoration)) continue;
   const fixtureId = worldBefore[campaign.campaignId];

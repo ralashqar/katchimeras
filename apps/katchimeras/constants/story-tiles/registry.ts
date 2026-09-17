@@ -1,5 +1,6 @@
 import { markRegistryBuilt, packEntries } from '@/features/content-packs/active-pack';
 import type { HexCoord } from '@incubator/environments/hex';
+import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { MOSSPROUT_OLD_GROVE } from './mossprout-old-grove';
 
@@ -21,6 +22,8 @@ export type StoryTileDefinition = {
   name: string;
   /** Whose story keeps this place; also the unlock's destination in the catalog. */
   companion: MergeCharacterId;
+  /** A form of that friend's family who stands on the tile once it is revealed (content schema 5); absent, nobody does. */
+  residentSkinId?: KatchimeraSkinId;
   revealPreset: 'mist-clear';
   /** The key its revealed art's alpha bounds are generated under. */
   alphaBoundsKey: string;

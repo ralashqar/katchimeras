@@ -114,9 +114,9 @@ export function completeJourneyEpisode(familyId: string, episodeId: string, inpu
   }
   if (!episode.dayOne) {
     const bond = loadCompanionBondState();
-    const award = recordCompanionBondEvent(bond, { id: `journey:${recordId}`, kind: 'journey_day_completed', creatureId: companionIdForFamily(chapter.familyId as KatchimeraFamilyId),
-      points: episode.bond ?? COMPANION_BOND_REWARDS.journey_day_completed, occurredAt: now, dayId: localDayId(new Date(now)) }, { queueCelebration: false });
-    if (award.awarded) saveCompanionBondState(award.state);
+    const award = recordCompanionBondEvent(bond, { id: `journey:${episode.deliveryReturnFor ? journeyEpisodeRecordId(chapter.familyId, episode.deliveryReturnFor) : recordId}`, kind: 'journey_day_completed', creatureId: companionIdForFamily(chapter.familyId as KatchimeraFamilyId),
+      points: episode.bond ?? COMPANION_BOND_REWARDS.journey_day_completed, occurredAt: now, dayId: localDayId(new Date(now)) }, { queueCelebration: Boolean(episode.deliveryReturnFor) });
+    if (award.awarded && episode.bond !== 0) saveCompanionBondState(award.state);
     const journalFacts: Record<string, string> = {};
     for (const turn of input.session?.turns ?? []) {
       const node = compiled?.definition.nodes.find((item) => item.id === turn.nodeId);
@@ -201,6 +201,23 @@ export async function initializeJourney(familyId: string) {
   if (!chapter) return true;
   return serialize(`${chapter.familyId}-initialize`, async () => {
     registerCompanionJourneyFlows();
+    // Saves that already advanced beyond a newly authored closing scene must
+    // not be sent backwards or paid a second time.
+    repository.update(state => {
+      const records = { ...state.journeyEpisodes };
+      let changed = false;
+      chapter.episodes.forEach((episode, index) => {
+        if (!episode.deliveryReturnFor) return;
+        const id = journeyEpisodeRecordId(familyId, episode.id);
+        const later = chapter.episodes.slice(index + 1).find(candidate => !candidate.deliveryReturnFor && records[journeyEpisodeRecordId(familyId, candidate.id)]);
+        if (!records[id] && later) {
+          const completed = records[journeyEpisodeRecordId(familyId, later.id)];
+          records[id] = { familyId, episodeId: episode.id, completedAt: completed.completedAt, answers: {}, facts: {} };
+          changed = true;
+        }
+      });
+      return changed ? { ...state, journeyEpisodes: records } : state;
+    });
     const ready = chapter.afterChapterId ? true : await initializeJourneyOnce(chapter);
     if (ready) await ensureStoredJourneyGardenOrders(repository.load());
     return ready;

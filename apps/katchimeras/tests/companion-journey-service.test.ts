@@ -266,3 +266,23 @@ test('orders reach the signature once enough are served and the chapter complete
   assert.equal(app.story.actPhase, 'complete');
   assert.equal(currentJourneyCycle(app.state, 'steppling')!.finale, true);
 });
+
+test('Feastle delivery closes with one Bond reward and one queued celebration', () => {
+  const app = harness();
+  app.service.completeJourneyEpisode('feastle', 'day-2', { now: app.clock.now });
+  assert.equal(app.bond.events.filter(event => event.id === 'journey:feastle:day-2').length, 0, 'intro does not pay before delivery');
+  app.service.completeJourneyEpisode('feastle', 'day-2-return', { now: app.clock.now + 1000 });
+  assert.equal(app.bond.events.filter(event => event.id === 'journey:feastle:day-2').length, 1);
+  assert.equal(app.bond.pendingCelebrations?.filter(receipt => receipt.eventId === 'journey:feastle:day-2').length, 1);
+  assert.equal(app.service.completeJourneyEpisode('feastle', 'day-2-return'), false);
+  assert.equal(app.bond.pendingCelebrations?.filter(receipt => receipt.eventId === 'journey:feastle:day-2').length, 1);
+});
+
+test('existing Feastle progress beyond a delivery does not replay its new closing scene', async () => {
+  const app = harness();
+  app.setStory({ ...app.story, familyId: 'feastle', journeyManaged: true });
+  app.setRelationships({ ...app.state, journeyEpisodes: Object.fromEntries(['day-1', 'day-2', 'day-3'].map(episodeId => [`feastle:${episodeId}`, { familyId: 'feastle', episodeId, completedAt: app.clock.now, answers: {}, facts: {} }])) });
+  await app.service.initializeJourney('feastle');
+  assert.ok(app.state.journeyEpisodes?.['feastle:day-2-return']);
+  assert.equal(app.bond.events.length, 0);
+});

@@ -1,4 +1,5 @@
 import type { ActiveContentPack, ContentPack, ContentPackContent, ContentRegistrySnapshot } from '@/types/content-pack';
+import { bundledPackEntries } from './bundled-packs';
 
 /**
  * The pack the app is playing, primed once before any registry is built.
@@ -25,9 +26,9 @@ export function activeContentPack(): ActiveContentPack | null {
   return snapshot.packs.at(-1) ?? null;
 }
 
-/** The pack's entries of one kind, or none: what every registry spreads after its bundled entries. */
+/** Every pack's entries of one kind, the packs shipped inside the app first: what every registry spreads after its bundled entries. */
 export function packEntries<K extends keyof ContentPackContent>(kind: K): readonly NonNullable<ContentPackContent[K]>[number][] {
-  return snapshot.packs.flatMap((record) => (record.pack[kind] ?? []) as readonly NonNullable<ContentPackContent[K]>[number][]);
+  return [...bundledPackEntries(kind), ...snapshot.packs.flatMap((record) => (record.pack[kind] ?? []) as readonly NonNullable<ContentPackContent[K]>[number][])];
 }
 
 /**

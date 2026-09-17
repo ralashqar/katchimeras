@@ -691,31 +691,6 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
         "ending": "Another little story for the hearth."
       }
     ],
-    "moment": {
-      "title": "A moment at the table",
-      "prompt": "What would feel kind today?",
-      "artKey": "today:photo",
-      "options": [
-        {
-          "id": "simple",
-          "label": "Keep it simple"
-        },
-        {
-          "id": "company",
-          "label": "Make room for company"
-        },
-        {
-          "id": "quiet",
-          "label": "A quiet pause"
-        }
-      ],
-      "replies": {
-        "simple": "Then simple is the plan.",
-        "company": "I will move the bench along.",
-        "quiet": "No questions while the bowl is warm."
-      },
-      "thanks": "There is room for that here."
-    },
     "photo": {
       "category": "food",
       "title": "Show Feastle a little food",
@@ -743,38 +718,6 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
           "Noted in the little book beside the hearth."
         ]
       }
-    },
-    "notice": {
-      "title": "Notice one small thing",
-      "artKey": "today:photo",
-      "prompts": [
-        {
-          "id": "food-detail",
-          "prompt": "Think of something you ate, prepared or saw today. What stayed with you?",
-          "choices": [
-            {
-              "id": "smell",
-              "label": "A smell",
-              "reply": "Sometimes the memory arrives before the meal."
-            },
-            {
-              "id": "colour",
-              "label": "A colour",
-              "reply": "A small bright thing against the Mist."
-            },
-            {
-              "id": "care",
-              "label": "Someone’s care",
-              "reply": "That is an ingredient too."
-            },
-            {
-              "id": "nothing",
-              "label": "Nothing today",
-              "reply": "No need to search. Sitting here counts."
-            }
-          ]
-        }
-      ]
     }
   }
 };

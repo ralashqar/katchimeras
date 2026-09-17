@@ -2338,6 +2338,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         <KatchaButton label="Resume" onPress={() => { void resumeActiveHatchable(); }} />
       </View> : stepplingMissionStalled ? <View style={[styles.upgradeRecoveryCta, { bottom: Math.max(insets.bottom, 12) + 20 }]}>
         <KatchaButton label="Set the board up again" onPress={stepplingMission.reset} />
+      </View> : journeyMist.stalled ? <View style={[styles.upgradeRecoveryCta, { bottom: Math.max(insets.bottom, 12) + 20 }]}>
+        <KatchaButton label="Set the board up again" onPress={journeyMissionStore.reset} />
+      </View> : hatchableMist.stuck || journeyMist.stuck ? <View style={[styles.upgradeRecoveryCta, { bottom: Math.max(insets.bottom, 12) + 20 }]}>
+        <KatchaButton label="More pieces drift in" onPress={hatchableMist.stuck ? stepplingMission.reseed : journeyMissionStore.reseed} />
       </View> : null}
       {lockedHintVisible ? (
         <KatchaSheet

@@ -78,7 +78,7 @@ test('every chapter’s episodes compile to conversations that end, unlock on id
   for (const chapter of COMPANION_JOURNEY_CHAPTERS) {
     const ids = new Set(chapter.episodes.map((episode) => episode.id));
     assert.equal(ids.size, chapter.episodes.length, `${chapter.chapterId}: episode ids unique`);
-    assert.equal(chapter.episodes.filter((episode) => episode.dayOne).length, 1, `${chapter.chapterId}: exactly one day-one episode`);
+    assert.equal(chapter.episodes.filter((episode) => episode.dayOne).length, chapter.afterChapterId ? 0 : 1, `${chapter.chapterId}: exactly one day-one episode in a first chapter, none in a continuation`);
     for (const episode of chapter.episodes) {
       for (const condition of episode.unlock) if (condition.kind === 'episode_complete') assert.ok(ids.has(condition.episodeId), `${episode.id} unlocks on ${condition.episodeId}`);
       if (episode.dayOne) { assert.equal(episode.beats, undefined); continue; }
@@ -87,6 +87,6 @@ test('every chapter’s episodes compile to conversations that end, unlock on id
       assert.ok(definition.nodes.some((node) => node.kind === 'end'), `${episode.id} ends`);
       assert.equal(journeyEpisodeForConversation(definition.id)?.episode.id, episode.id);
     }
-    assert.ok(new Set(chapter.episodes.map((episode) => episode.flavour)).size >= 3, `${chapter.chapterId}: an arc mixes its flavours`);
+    assert.ok(new Set(chapter.episodes.map((episode) => episode.flavour)).size >= (chapter.afterChapterId ? 2 : 3), `${chapter.chapterId}: an arc mixes its flavours`);
   }
 });

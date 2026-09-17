@@ -13,6 +13,8 @@ import { hatchableTileArt } from '@/constants/hatchable-companions/tile-art';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { STEPPLING_TILE, SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { STORY_TILES, type StoryTileDefinition, type StoryTileState } from '@/constants/story-tiles/registry';
+import { katchimeraSkinById } from '@/constants/katchimera-skins';
+import { storyTileResidents, storyTileStructureId } from '@/utils/story-tile-residents';
 import { storyTileArt } from '@/constants/story-tiles/tile-art';
 import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants/mossprout-memory-plants';
 import type { MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel, PlantableMemoryInstance } from '@/types/merge-world';
@@ -146,6 +148,16 @@ export function natureIslandArt(islandId: MossproutNatureIslandId): NatureArtSpe
   };
 }
 export const MOSSPROUT_NATURE_ISLAND_ART: Record<string, NatureArtSpec> = {
+  // The Wander Trail: the bundled pack `data/content-packs/wanderling-trail.json`; one art for every level until bespoke stages exist.
+  'wanderling-trail': {
+    alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['shared_world_wanderling_trail_hex_tile_v1.webp'],
+    coord: { q: -1, r: 0 },
+    sources: {
+      full: require('@incubator/art-world/hex/shared_world_wanderling_trail_hex_tile_v1.webp'),
+      medium: require('@incubator/art-world/hex/shared_world_wanderling_trail_hex_tile_v1_512.webp'),
+      thumb: require('@incubator/art-world/hex/shared_world_wanderling_trail_hex_tile_v1_256.webp'),
+    },
+  },
   'seed-nursery': {
     alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_focused_v1_seed_nursery_hex_tile.webp'],
     coord: { q: -1, r: 1 },
@@ -383,12 +395,16 @@ export function buildMossproutHexNeighborhoodScene(
     return layer;
   };
   const hatchableLayers = HATCHABLE_COMPANIONS.map((definition) => ({ definition, locked: hatchableLayer(definition, true), revealed: hatchableLayer(definition, false) }));
-  // Every story tile, from its definition: full mist until its episode reveals it, its own art after. No marker, no resident.
-  const storyTileLayer = (tile: StoryTileDefinition, revealed: boolean) => layerFor(`structure:${tile.id}`, 'structure', {
-    coord: tile.coord,
-    alphaBounds: revealed ? hexAlphaBounds(tile.alphaBoundsKey) : DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS,
-    sources: revealed ? storyTileArt(tile.id) : DREAM_MIST_LOCKED_NATURE_SOURCES,
-  });
+  // Every story tile, from its definition: full mist until its episode reveals it, its own art after. No marker; a resident only where the tile names one.
+  const storyTileLayer = (tile: StoryTileDefinition, revealed: boolean) => {
+    const layer = layerFor(storyTileStructureId(tile.id), 'structure', {
+      coord: tile.coord,
+      alphaBounds: revealed ? hexAlphaBounds(tile.alphaBoundsKey) : DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS,
+      sources: revealed ? storyTileArt(tile.id) : DREAM_MIST_LOCKED_NATURE_SOURCES,
+    });
+    if (revealed && tile.residentSkinId) layer.residentAnchor = sharedResidentAnchor(layer.frame);
+    return layer;
+  };
   const storyTileLayers = STORY_TILES.map((tile) => ({ tile, misted: storyTileLayer(tile, false), revealed: storyTileLayer(tile, true) }));
   // Mist is opaque: while veiled, the home tile must paint over the Garden
   // structure that normally sits above it.
@@ -430,6 +446,8 @@ export function buildMossproutHexNeighborhoodScene(
   };
   const residentTiles: KingdomTileRender[] = Object.values(SHARED_WORLD_TILES).flatMap((entry) => {
     if (entry.companion === 'mossprout') return [];
+    // A story tile is a friend's place, not their home: nobody stands on it unless it names a resident form (drawn below).
+    if ('story' in entry && entry.story) return [];
     // Discovery-only tiles never inherit an owned/dev resident projection.
     const hatchable = hatchableByCompanion(entry.companion);
     if ('residentVisible' in entry && !entry.residentVisible && !(hatchable && hatchableTileState(hatchable) === 'open')) return [];
@@ -438,6 +456,11 @@ export function buildMossproutHexNeighborhoodScene(
     const point = mossproutHexPoint(entry.coord);
     return [{ companion: slot, coord: entry.coord, cx: point.x + dx, cy: point.y + dy, depth: hexDrawDepth(point), id: slot.id, kind: 'companion' as const }];
   });
+  // A story tile that names a resident form: once revealed, that form stands on it as its friend's owned slot.
+  for (const resident of storyTileResidents(STORY_TILES, gardenState.storyTiles ?? {}, companionSlots, katchimeraSkinById)) {
+    const point = mossproutHexPoint(resident.coord);
+    residentTiles.push({ companion: resident.companion, coord: resident.coord, cx: point.x + dx, cy: point.y + dy, depth: hexDrawDepth(point), id: resident.companion.id, kind: 'companion' });
+  }
   const tiles = [centerTile, ...residentTiles];
   return {
     centerTile,

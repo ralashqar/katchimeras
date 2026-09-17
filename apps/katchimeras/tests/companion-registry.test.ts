@@ -21,13 +21,16 @@ test('every chapter is a whole arc: unique ids, one first meeting, every flavour
   const orderIds = new Set<string>();
   const families = new Set<string>();
   for (const chapter of COMPANION_JOURNEY_CHAPTERS) {
-    assert.ok(!families.has(chapter.familyId), `${chapter.familyId} has one chapter`); families.add(chapter.familyId);
+    if (!chapter.afterChapterId) { assert.ok(!families.has(chapter.familyId), `${chapter.familyId} has one first chapter`); families.add(chapter.familyId); }
     assert.ok(chapter.familyId === 'mossprout' || hatchableByCompanion(chapter.familyId), `${chapter.familyId} has a page`);
     const ids = new Set(chapter.episodes.map((episode) => episode.id));
     assert.equal(ids.size, chapter.episodes.length, `${chapter.chapterId}: episode ids unique`);
-    assert.equal(chapter.episodes.filter((episode) => episode.dayOne).length, 1, `${chapter.chapterId}: exactly one first meeting`);
-    assert.equal(chapter.episodes[0]!.dayOne, true, `${chapter.chapterId}: the first meeting comes first`);
-    for (const flavour of FLAVOURS) assert.ok(chapter.episodes.some((episode) => episode.flavour === flavour), `${chapter.chapterId} has a ${flavour} episode`);
+    assert.equal(chapter.episodes.filter((episode) => episode.dayOne).length, chapter.afterChapterId ? 0 : 1, `${chapter.chapterId}: exactly one first meeting in a first chapter, none in a continuation`);
+    // A continuation (a bundled or live pack's arc) is shorter: no first meeting, and not every flavour.
+    if (!chapter.afterChapterId) {
+      assert.equal(chapter.episodes[0]!.dayOne, true, `${chapter.chapterId}: the first meeting comes first`);
+      for (const flavour of FLAVOURS) assert.ok(chapter.episodes.some((episode) => episode.flavour === flavour), `${chapter.chapterId} has a ${flavour} episode`);
+    }
     for (const level of chapter.bondRewards ?? []) {
       if (level.kind === 'episode') assert.ok(ids.has(level.id), `${chapter.chapterId}: Bond ${level.level} opens a real episode`);
       if (level.kind === 'place') assert.ok(storyTileById(level.id), `${chapter.chapterId}: Bond ${level.level} opens a real place`);

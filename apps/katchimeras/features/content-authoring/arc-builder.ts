@@ -1,5 +1,5 @@
 import { COMPANION_JOURNEY_CHAPTERS_BUNDLED } from '@/constants/companion-journey-chapters/registry';
-import { STORY_TILES_BUNDLED } from '@/constants/story-tiles/registry';
+import { STORY_TILES } from '@/constants/story-tiles/registry';
 import { HATCHABLE_COMPANIONS_BUNDLED } from '@/constants/hatchable-companions/registry';
 import { MOSSPROUT_LAYOUT } from '@incubator/environments/mossprout-layout';
 import { MERGE_ITEM_CATALOG } from '@/constants/merge-world-catalog';
@@ -16,7 +16,7 @@ export function arcCatalog() {
   return {
     predecessors: COMPANION_JOURNEY_CHAPTERS_BUNDLED.map((c) => ({ id: c.chapterId, familyId: c.familyId, title: c.title })),
     items: MERGE_ITEM_CATALOG.filter((i) => !i.progressionOnly).map((i) => ({ id: i.id, name: i.name })),
-    occupied: [{ id: 'home', ...MOSSPROUT_LAYOUT.home.coord }, ...STORY_TILES_BUNDLED.map((t) => ({ id: t.id, ...t.coord })), ...HATCHABLE_COMPANIONS_BUNDLED.map((c) => ({ id: c.tile.id, ...c.tile.coord }))],
+    occupied: [{ id: 'home', ...MOSSPROUT_LAYOUT.home.coord }, ...STORY_TILES.map((t) => ({ id: t.id, ...t.coord })), ...HATCHABLE_COMPANIONS_BUNDLED.map((c) => ({ id: c.tile.id, ...c.tile.coord }))],
   };
 }
 export function newArcDraft(): ArcDraft {

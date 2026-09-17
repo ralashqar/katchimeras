@@ -28,7 +28,7 @@ test('the fixture pack is accepted whole, and every way it could be wrong is ref
   assert.equal(normalizeContentPack(null).pack, null);
   refused((pack) => { delete pack.id; }, /needs an id/);
   refused((pack) => { pack.version = 0; }, /positive integer version/);
-  refused((pack) => { pack.contentSchemaVersion = 99; }, /schema 4; the pack is schema 99/);
+  refused((pack) => { pack.contentSchemaVersion = 99; }, /schema 5; the pack is schema 99/);
   refused((pack) => { pack.startsAt = 'yesterday-ish'; }, /startsAt must be a date/);
   refused((pack) => { (pack.art as Record<string, unknown>)['tile:harvest-grove:full'] = { url: 'ftp://nope' }; }, /https or file url/);
   refused((pack) => { (pack.art as Record<string, Record<string, unknown>>)['tile:harvest-grove:full']!.alphaBounds = { left: 1, top: 1, right: 0, bottom: 0 }; }, /alphaBounds must be a box/);

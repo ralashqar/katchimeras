@@ -8,6 +8,7 @@ import { LiveEventDiagnostics } from './live-event-diagnostics';
 import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 import fixturePack from '@/data/content-packs/event-column-shot.json';
 import { contentPackLabel, registriesBuiltBeforePriming } from '@/features/content-packs/active-pack';
+import { BUNDLED_CONTENT_PACKS } from '@/features/content-packs/bundled-packs';
 import { activateContentPackDocument, contentPackStatus, deactivateContentPack, fetchContentPackDocument } from '@/features/content-packs/content-pack-activation';
 import { normalizeContentPack } from '@/features/content-packs/normalize-content-pack';
 import { APP_VERSION } from '@/features/content-packs/prime';
@@ -20,7 +21,7 @@ import type { ContentPack } from '@/types/content-pack';
  * it away. What the app is playing right now is shown at the top.
  */
 function counts(pack: ContentPack): string {
-  const kinds = ['characters', 'families', 'skins', 'mergeChains', 'mergeGenerators', 'islands', 'storyTiles', 'hatchables', 'missions', 'chapters', 'conversations', 'flows', 'liveEvents', 'harmonyDefinitions'] as const;
+  const kinds = ['characters', 'families', 'skins', 'mergeChains', 'mergeGenerators', 'islands', 'islandCampaigns', 'storyTiles', 'hatchables', 'missions', 'chapters', 'conversations', 'flows', 'liveEvents', 'harmonyDefinitions'] as const;
   const parts = kinds.flatMap((kind) => { const entries = pack[kind]; return entries?.length ? [`${entries.length} ${kind}`] : []; });
   parts.push(`${Object.keys(pack.art ?? {}).length} art`);
   return parts.join(' · ');
@@ -90,6 +91,7 @@ export function ContentPackScreen() {
       <Link href="../dev-journey-preview">Journey draft preview</Link>
       <View style={styles.card}>
         <ThemedText selectable style={styles.title}>Playing now</ThemedText>
+        {BUNDLED_CONTENT_PACKS.map((pack) => <ThemedText key={pack.id} selectable style={styles.detail}>{contentPackLabel(pack)} · shipped with the app · {counts(pack)}</ThemedText>)}
         {status.playing.packs.length ? status.playing.packs.map((record) => <ThemedText key={record.pack.id} selectable style={styles.detail}>{contentPackLabel(record.pack)} · {record.retiredAt ? 'retained for saved progress' : 'active'} · {counts(record.pack)}</ThemedText>) : <ThemedText style={styles.detail}>Bundled content only.</ThemedText>}
         {status.installed.revision !== status.playing.revision ? <ThemedText selectable style={styles.detail}>Release revision {status.installed.revision} is stored for the next launch.</ThemedText> : null}
         <ThemedText selectable style={styles.detail}>App {APP_VERSION}{primedLate.length ? ` · primed late: ${primedLate.join(', ')}` : ''}</ThemedText>

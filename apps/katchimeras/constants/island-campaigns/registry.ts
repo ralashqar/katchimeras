@@ -1,3 +1,4 @@
+import { markRegistryBuilt, packEntries } from '@/features/content-packs/active-pack';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MossproutNatureIslandId } from '@/types/merge-world';
 import { AMBERLEAF_ORCHARD_CAMPAIGN } from './amberleaf-orchard';
@@ -12,7 +13,7 @@ import type { IslandCampaignDefinition } from './types';
  * Every narrative-led nature island, in wake order. Keep this module free of
  * engine or offer imports: the engine reads it while reducing commands.
  */
-export const ISLAND_CAMPAIGNS: readonly IslandCampaignDefinition[] = [
+export const ISLAND_CAMPAIGNS_BUNDLED: readonly IslandCampaignDefinition[] = [
   PETALIMP_BLOOM_CAMPAIGN,
   FERNIP_WILDGROWTH_CAMPAIGN,
   BLOSSLE_NURSERY_CAMPAIGN,
@@ -20,6 +21,8 @@ export const ISLAND_CAMPAIGNS: readonly IslandCampaignDefinition[] = [
   AMBERLEAF_ORCHARD_CAMPAIGN,
   MISTLE_ANCIENT_TREE_CAMPAIGN,
 ];
+export const ISLAND_CAMPAIGNS: readonly IslandCampaignDefinition[] = [...ISLAND_CAMPAIGNS_BUNDLED, ...packEntries('islandCampaigns')];
+markRegistryBuilt('islandCampaigns');
 
 export const islandCampaignById = new Map(ISLAND_CAMPAIGNS.map((campaign) => [campaign.campaignId, campaign]));
 

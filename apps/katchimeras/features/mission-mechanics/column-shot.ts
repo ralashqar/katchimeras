@@ -119,7 +119,8 @@ export function columnShotProgress(mechanic: ColumnShotDefinition, state: Column
 /**
  * The move the finger shows: of every waking and pair on the board, the one
  * whose shot lands in a column with a wisp standing, hits hardest, and is
- * closest at hand, in that order.
+ * closest at hand, in that order. On a board where a shot up an empty column
+ * is lost, no move is shown when every merge at hand would miss.
  */
 export function columnShotMove(mechanic: ColumnShotDefinition, board: MergeWorldState, state: ColumnShotState, window: MissionWindow): MissionMechanicMove | null {
   const wakes = missionWakes(board, window.cellIndices).map((move) => ({ move, distance: 0 }));
@@ -132,7 +133,11 @@ export function columnShotMove(mechanic: ColumnShotDefinition, board: MergeWorld
     return { move, standing, damage, distance };
   });
   scored.sort((a, b) => Number(b.standing) - Number(a.standing) || b.damage - a.damage || a.distance - b.distance);
-  return scored[0]?.move ?? null;
+  const best = scored[0];
+  if (!best) return null;
+  // Where a shot up an empty column is lost, the finger never shows a merge that would miss: it rests, and the free beat says to slide a piece under a wisp first.
+  if (mechanic.emptyColumn === 'lost' && !best.standing) return null;
+  return best.move;
 }
 
 /** A saved damage vector for this mechanic, or null when it cannot be read. */

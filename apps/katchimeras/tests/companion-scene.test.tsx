@@ -93,9 +93,10 @@ test('new greetings restore the intent follow-up while older saves retain their 
 
 test('native scene keeps an inert rest card, accessible actions, and a scrollable layout', async () => {
   const loaded = loadNativeModule('components/katchadeck/world/companion-scene-cards.tsx', {
+    '@/components/katchadeck/games/feastle-persistent-merge-board': { PersistentMergeItemArt: 'ItemArt' },
+    '@/components/themed-text': { ThemedText: 'Text' },
     'react-native': { ...nativeViews, Pressable: 'Pressable', ScrollView: 'ScrollView', useWindowDimensions: () => ({ width: 320, height: 568, fontScale: 2 }) },
     './companion-scene-overlay': loadCompanionOverlay(),
-    '@/components/themed-text': { ThemedText: 'Text' },
     '@/constants/katcha-ui': { KatchaUI: { companionScenePanel: { ink: '#352F23' } } },
     '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: 'Card', DayActionIcon: 'Icon' },
   });
@@ -117,6 +118,14 @@ test('native scene keeps an inert rest card, accessible actions, and a scrollabl
   assert.equal(journeyCard.props.title, model.journey.eyebrow, 'Journey heading uses the shared action-card typography');
   await act(async () => tree!.root.findAllByType('Pressable' as React.ElementType)[0].props.onPress());
   assert.equal(presses, 1);
+  await act(async () => tree!.update(<Scene {...props} deliveryRequest={{ id: 'snacks', title: 'A plate on the step', definitionIds: ['food:table:2', 'food:table:2'] }} />));
+  const deliveryCard = tree!.root.findByType('Card' as React.ElementType);
+  assert.equal(deliveryCard.props.title, 'A plate on the step');
+  assert.equal(deliveryCard.props.eyebrow, model.journey.eyebrow);
+  assert.match(deliveryCard.props.subtitle, /Prepare in Merge/);
+  assert.match(tree!.root.findByType('Pressable' as React.ElementType).props.accessibilityLabel, /×2/);
+  await act(async () => tree!.root.findByType('Pressable' as React.ElementType).props.onPress());
+  assert.equal(presses, 2);
   const readyProps = { ...props, model: { ...model, phase: 'ready', journey: { ...model.journey, command: 'return' } } };
   const journeyLayer = tree!.root.findByProps({ accessibilityLabel: 'Journey' });
   await act(async () => tree!.update(<Scene {...readyProps} hideJourney />));
@@ -203,6 +212,8 @@ for (const reducedMotion of [false, true]) {
       return React.createElement('ActionCards');
     }
     const loaded = loadNativeModule('components/katchadeck/world/companion-scene-cards.tsx', {
+    '@/components/katchadeck/games/feastle-persistent-merge-board': { PersistentMergeItemArt: 'ItemArt' },
+    '@/components/themed-text': { ThemedText: 'Text' },
       'react-native': { ...nativeViews, View: NativeView, Pressable: 'Pressable', ScrollView: 'ScrollView' },
       './companion-scene-overlay': overlay,
       '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: 'Card', DayActionIcon: 'Icon' },

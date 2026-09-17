@@ -492,7 +492,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
         else setReturnCharacterId((current) => current === characterId ? null : current);
         router.push({
           pathname: '/katchimera/[creatureId]',
-          params: { creatureId: `companion:${characterId}`, source: 'merge-world', story: 'return' },
+          params: { creatureId: `companion:${characterId}`, source: 'merge-world', story: 'return', ...(noteId.startsWith(JOURNEY_DELIVERY_NOTE_PREFIX) ? { journeyDelivery: noteId } : {}) },
         });
       },
     });
