@@ -128,6 +128,7 @@ export type KingdomTileUpgradeOffer = WorldTileActionPlacement & {
 type Props = {
   lanternPostAdornment?: React.ReactNode;
   hideWorldTiles?: boolean;
+  onMemoryPlantSettled?: (visualKey: string) => void;
   onHeartwoodPress?: () => void;
   onSelectHeartwoodBed?: (slotId: MossproutGardenPlantSlotId) => void;
   hearthAdornment?: React.ReactNode;
@@ -493,6 +494,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   gardenEventAdornment,
   lanternPostAdornment,
   hideWorldTiles = false,
+  onMemoryPlantSettled,
   onHeartwoodPress,
   onSelectHeartwoodBed,
   hearthAdornment,
@@ -1943,6 +1945,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           {/* Plants share the marker parent so badge zIndex can paint above every seed. */}
           <Animated.View pointerEvents={soloLayerId || hideWorldTiles ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle, hideWorldTiles && { opacity: 0 }]}>{memoryPlantProjections.map((plant) => (
             <ProjectedMemoryPlant
+              onSettled={onMemoryPlantSettled}
               animateReveal={!plant.preview && memoryPlantRevealKeys.has(plant.visualKey)}
               opacity={plant.preview ? 0.2 : 1}
               cameraScale={camera.scaleValue}
@@ -2905,6 +2908,7 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
  * results when a tiny world-space view is rasterized and then enlarged.
  */
 const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
+  onSettled,
   animateReveal,
   opacity = 1,
   cameraScale,
@@ -2917,6 +2921,7 @@ const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
   source,
   visualKey,
 }: {
+  onSettled?: (visualKey: string) => void;
   animateReveal: boolean;
   opacity?: number;
   cameraScale: SharedValue<number>;
@@ -2950,6 +2955,15 @@ const ProjectedMemoryPlant = memo(function ProjectedMemoryPlant({
   const outgoingStage = artLayers.outgoing;
   const blendReady = blendReadyKey === visualKey;
   const handleIncomingPainted = useCallback(() => setBlendReadyKey(visualKey), [visualKey]);
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
+  useEffect(() => {
+    if (!blendReady) return;
+    // Start after incoming art is painted. This outlasts both the crossfade
+    // and the rays/confetti sequence, including the reduced-motion version.
+    const timer = setTimeout(() => onSettledRef.current?.(visualKey), reduceMotion ? 520 : 1360);
+    return () => clearTimeout(timer);
+  }, [blendReady, reduceMotion, visualKey]);
   useEffect(() => {
     if (!outgoingStage || !blendReady) return;
     const timer = setTimeout(

@@ -562,13 +562,33 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       void applyStoredAdventure({ type: 'sync_heartwood' }).catch(() => { /* The Tree panel offers a retry. */ });
     }
   }, [treeStage, mergeWorld.sharedAdventure?.gardenSupply, mergeWorld.sharedAdventure?.gardenBedsVersion]);
+  // Replay only the presentation on a resumed growth checkpoint; saved growth
+  // remains authoritative. Paint the seed before releasing its sprout graphic.
+  const growthPresentationKey = `${activeFtueRunId ?? 'ftue'}:first-seed`;
+  const [releasedSeedGrowth, setReleasedSeedGrowth] = useState<string | null>(null);
+  const [settledSeedVisual, setSettledSeedVisual] = useState<string | null>(null);
+  useEffect(() => {
+    if (ftueStepId !== 'world.first_seed_grew') {
+      setReleasedSeedGrowth(null);
+      setSettledSeedVisual(null);
+      return;
+    }
+    if (!screenFocused || upgradePresentation || !ftueCameraSettled) return;
+    const timer = setTimeout(() => setReleasedSeedGrowth(growthPresentationKey), 150);
+    return () => clearTimeout(timer);
+  }, [ftueStepId, screenFocused, upgradePresentation, ftueCameraSettled, growthPresentationKey]);
+  const holdFirstSeedGraphic = ftueStepId === 'world.first_bloom_restore'
+    || (ftueStepId === 'world.first_seed_grew' && releasedSeedGrowth !== growthPresentationKey);
   const mossproutGardenScene = useMemo(() => ({
     heartwoodStage: treeStage,
     gateway: stepplingEncounter.open ? 'egg' as const : gatewayState,
     hatchableTiles,
     storyTiles,
     level: mergeWorld.haven.structures.mossproutGarden.level,
-    plantableMemories: mergeWorld.haven.plantableMemories,
+    plantableMemories: holdFirstSeedGraphic
+      ? mergeWorld.haven.plantableMemories.map(plant => plant.source.kind === 'ftue'
+        && (!activeFtueRunId || plant.source.sourceId === activeFtueRunId) ? { ...plant, growthPoints: 0 } : plant)
+      : mergeWorld.haven.plantableMemories,
     previewMemoryId: ftueStepId === 'world.garden_arrival'
       ? mergeWorld.haven.plantableMemories.find((plant) => plant.source.kind === 'ftue'
         && (!activeFtueRunId || plant.source.sourceId === activeFtueRunId) && plant.status !== 'planted')?.id
@@ -576,6 +596,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     featureLevels: mergeWorld.haven.structures.mossproutGarden.featureLevels,
   }), [
     treeStage,
+    holdFirstSeedGraphic,
     gatewayState,
     hatchableTiles,
     storyTiles,
@@ -597,6 +618,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   )) ?? null;
   const firstSeedPlanted = firstFtueMemory?.status === 'planted' && firstFtueMemory.slotId === MOSSPROUT_FIRST_MEMORY_SLOT_ID;
   const firstSeedGrown = firstSeedPlanted && firstFtueMemory.growthPoints >= 1;
+  const firstSeedVisualKey = firstFtueMemory ? `${firstFtueMemory.id}:${mossproutMemoryPlantStage(firstFtueMemory.growthPoints)}:planted` : null;
+  const handleMemoryPlantSettled = useCallback((visualKey: string) => {
+    if (visualKey === firstSeedVisualKey) setSettledSeedVisual(visualKey);
+  }, [firstSeedVisualKey]);
   const havenMergeBoardActive = visibleCompanionSlots.some((slot) => (
     slot.familyId === 'mossprout' && slot.kind === 'owned'
   ));
@@ -2131,6 +2156,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         mossproutNatureIslandLevels={mergeWorld.haven.mossproutNatureIslands}
         mossproutNatureIslandReveals={canvasNatureIslandReveals}
         mossproutGarden={mossproutGardenScene}
+        onMemoryPlantSettled={handleMemoryPlantSettled}
         onCameraSnapshotChange={onCameraSnapshotChange}
         onCameraMotionChange={handleCameraMotionChange}
         onInteractionExitFocusComplete={closeResidentInteraction}
@@ -2202,7 +2228,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           else openGarden(undefined, 'steppling');
         }} />
       </View> : null}
-      {ftueStepId === 'world.first_seed_grew' && firstSeedGrown && screenFocused && !ftueReturnFocusCreatureId ? <HeartwoodStoryScene scene="signal" onContinue={beginFirstSeedReturn} /> : null}
+      {ftueStepId === 'world.first_seed_grew' && firstSeedGrown && !holdFirstSeedGraphic && !upgradePresentation && ftueCameraSettled && settledSeedVisual === firstSeedVisualKey && screenFocused && !ftueReturnFocusCreatureId ? <HeartwoodStoryScene scene="signal" onContinue={beginFirstSeedReturn} /> : null}
       {worldEventsAllowed ? <LocalWorldEvents world={mergeWorld} onMerge={openGarden} onExplore={(id) => { const action = eventActions.find(a => a.event.id === id); if (action) void openWorldEvent(action); }} /> : null}
       {worldEventsAllowed && eventActions.length > 0 ? <View style={{ position: 'absolute', left: 16, right: 16, bottom: Math.max(insets.bottom, 12) + 82, zIndex: 32, gap: 6 }}>
         {eventActions.slice(0, 2).map(action => <WorldEventActionCard key={action.event.id} action={action} onPress={() => void openWorldEvent(action)} />)}
