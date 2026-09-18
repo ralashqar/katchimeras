@@ -1,3 +1,4 @@
+import { mossproutSupportCallback } from '@/features/onboarding/mossprout-bond-share';
 import { ConversationNarrativeOverlay } from './conversation-narrative-overlay';
 import type { ConversationTranscriptEntry } from '@/types/companion-conversation';
 import { useEffect, useRef, useState } from 'react';
@@ -20,11 +21,13 @@ const WAKE_ASK_ENTRY: ConversationTranscriptEntry = { id: 'first-rest:wake-ask',
  * Players who already decided (either way) go straight to rest; both answers
  * begin the same rest, and the reminder scheduler reads the OS decision.
  */
-export function MossproutFtueRestAction({ onNarration, onRest, history = [] }: {
+export function MossproutFtueRestAction({ onNarration, onRest, history = [], supportStyleId }: {
+  supportStyleId?: string | null;
   history?: readonly ConversationTranscriptEntry[];
   onNarration?: (text: string | null) => void; onRest?: () => void | Promise<void>;
 }) {
-  const dialogue = useFtueDialoguePages(COPY.farewell);
+  const farewell = [COPY.farewell, mossproutSupportCallback(supportStyleId)].filter(Boolean).join('\n\n');
+  const dialogue = useFtueDialoguePages(farewell);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -44,7 +47,7 @@ export function MossproutFtueRestAction({ onNarration, onRest, history = [] }: {
   };
 
   if (history.length) return <ConversationNarrativeOverlay title="Mossprout" required onClose={() => undefined}
-    entries={[...history, { id: 'first-rest:farewell', speaker: 'mossprout', text: COPY.farewell }, ...(asking ? [WAKE_ASK_ENTRY] : [])]} checkpoint="first-rest"
+    entries={[...history, { id: 'first-rest:farewell', speaker: 'mossprout', text: farewell }, ...(asking ? [WAKE_ASK_ENTRY] : [])]} checkpoint="first-rest"
     paced initiallyRevealedCount={history.length}>
     {(perform) => asking
       ? <View style={{ gap: 10 }}>

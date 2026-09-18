@@ -1,20 +1,20 @@
-/** Authored first-use copy; the noticing prompt stays fixed across days/relaunches. */
+/** First Bond scenario. Stable notice IDs preserve existing checkpoints and rewards. */
 export const MOSSPROUT_GARDEN_RETURN = {
-  prompt: 'Oh. I can see the ground again. I’d half forgotten it was there. That’s what the Mist does.',
+  prompt: 'Wait. Beyond the trees. Did that light move?',
   choices: [
-    { id: 'pleased', label: 'You look pleased.', reply: 'I am. I was trying to look mysterious, but pleased will do.' },
-    { id: 'together', label: 'We did that.', reply: 'We did. You brought one piece of your day, and the Mist had to make room for it.' },
-    { id: 'next', label: 'What happens now?', reply: 'We keep noticing little things. Every one is light, and there’s room for all of it here.' },
+    { id: 'pleased', label: 'Please tell me that was you.', reply: 'My impressive glowing days are mostly behind me. That came from farther away.' },
+    { id: 'together', label: 'It flashed when ours did.', reply: 'Just when the roots lit up? Then perhaps this Garden reaches farther than I remember.' },
+    { id: 'next', label: 'Could someone be out there?', reply: 'I used to know every light in these trees. I would very much like one of them to be a friend.' },
   ],
-  invitation: 'Your turn. Look up from this for a moment.',
+  invitation: 'If someone is out there, we’d better make this place worth finding.',
 };
 export const MOSSPROUT_FIRST_NOTICE = {
   id: 'first-notice',
-  prompt: 'Quick, before the Mist notices. What’s one thing near you it would love you to forget?',
+  prompt: 'A lost friend follows that light to our Garden. What’s the first thing you’d offer them?',
   choices: [
-    { id: 'light', label: 'A small good thing', reply: 'A small good thing, looked at. That is exactly what the Mist can’t take.' },
-    { id: 'sound', label: 'A sound I’d miss', reply: 'A sound you’d miss. Listening counts as looking.' },
-    { id: 'growing', label: 'Something alive', reply: 'Something alive. A neighbour of mine, perhaps. Things grow better noticed.' },
+    { id: 'light', label: '🏮 A trail of tiny lanterns', reply: 'So they never have to wonder which way is home. I like how you think.' },
+    { id: 'sound', label: '🍵 A warm drink and a seat', reply: 'A seat without thorns, ideally. I’m still learning what other people find comfortable.' },
+    { id: 'growing', label: '🌱 A garden patch of their own', reply: 'Their very own corner? Then they wouldn’t just be visiting. They’d belong here.' },
   ],
 };
 export const MOSSPROUT_FIRST_GROW_STEPS = ['companion.water_together', 'companion.first_grow', 'companion.first_notice'] as const;

@@ -157,7 +157,7 @@ export const FEASTLE_CHAPTER: CompanionJourneyChapterDefinition = {
         {
           "kind": "ask",
           "id": "day-3.table-question",
-          "prompt": "There is a bowl beneath the flour cloth. Two handles, one on either side. I cannot remember who held the other. What would you keep from a table you loved?",
+          "prompt": "I keep returning to the bowl beneath the flour cloth. Two handles, one on either side. I still cannot remember who held the other. What would you keep from a table you loved?",
           "options": [
             {
               "id": "taste",

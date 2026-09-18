@@ -18,6 +18,7 @@ const GUIDANCE_MOMENTS: Readonly<Record<string, GuidanceMoment>> = {
   'glow.lesson.single.parcel': { cue: 'tap', title: 'Open the parcel.' },
   'glow.lesson.single.spawn': { cue: 'tap', title: 'Tap the Basket for a Seed.' },
   'glow.lesson.single.grow': { cue: 'any', title: 'Grow a Plant. Two of the same make the next.' },
+  'glow.lesson.single.grow.echo': { cue: 'drag', title: 'Slide your Sprout onto the Sprout in the Mist.' },
   'glow.lesson.single.serve': { cue: 'tap', title: 'Give it here.' },
   'steppling.garden.grow': { cue: 'any', title: 'Make him a Shoe.' },
   'merge.return_note': { cue: 'tap', title: 'Tap Mossprout’s note.' },

@@ -196,7 +196,7 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, mode = 'garden',
 
   if (mode === 'water_response') return (
     <Animated.View style={styles.actionStage}>
-      <MossproutFtueRestAction history={ftueRun ? loadFtueNarrativeHistory(ftueRun.runId).entries : []} onNarration={onNarration} onRest={onContinue} />
+      <MossproutFtueRestAction supportStyleId={selectedSupportStyleId} history={ftueRun ? loadFtueNarrativeHistory(ftueRun.runId).entries : []} onNarration={onNarration} onRest={onContinue} />
     </Animated.View>
   );
 

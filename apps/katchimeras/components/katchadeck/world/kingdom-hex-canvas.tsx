@@ -126,6 +126,7 @@ export type KingdomTileUpgradeOffer = WorldTileActionPlacement & {
   }>;
 };
 type Props = {
+  lanternPostAdornment?: React.ReactNode;
   gardenEventAdornment?: React.ReactNode;
   background: TodayAtmosphereBackground;
   companionSlots: KingdomHexCompanionSlot[];
@@ -486,6 +487,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onCameraMotionChange,
   onOpenGarden,
   gardenEventAdornment,
+  lanternPostAdornment,
   upgradeOffers = [],
   selectedUpgradeOffer = null,
   upgradePanel,
@@ -828,6 +830,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     (layer) => layer.id === 'structure:mossprout-hex-garden',
   ) ?? null, [scene.tileArtLayers]);
   const gardenFrame = gardenLayer?.interactionFrame ?? null;
+  const lanternLayer = scene.tileArtLayers.find(layer => layer.id === 'structure:steppling-home');
+  const lanternFrame = lanternLayer?.interactionFrame ?? lanternLayer?.frame;
   const gardenFocusFrame = gardenLayer?.frame ?? null;
   const gardenPlotFrames = useMemo(() => gardenFocusFrame
     ? MOSSPROUT_GARDEN_PLANT_SLOT_IDS.map((slotId) => ({
@@ -1833,6 +1837,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 </Fragment>
               );
             })}
+            {focusedMossproutWorld && !upgradePresentation && lanternFrame && lanternPostAdornment ? <View style={{ position: 'absolute', left: lanternFrame.left + lanternFrame.width * 0.7, top: lanternFrame.top + lanternFrame.height * 0.25, zIndex: 35 }}>{lanternPostAdornment}</View> : null}
             {focusedMossproutWorld && interactionEnabled && !upgradePresentation && gardenFrame && gardenEventAdornment ? <View style={{ position: 'absolute', left: gardenFrame.left + gardenFrame.width * 0.72, top: gardenFrame.top + gardenFrame.height * 0.3, zIndex: 35 }}>{gardenEventAdornment}</View> : null}
             {focusedMossproutWorld && onGardenPlotTargetChange
               ? gardenPlotFrames.map(({ frame, slotId }) => (

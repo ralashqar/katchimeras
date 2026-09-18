@@ -4,7 +4,7 @@ import { commitCompanionLifeCompletion, companionLifeActivityId, loadCompanionLi
 import { recordMossproutOnboardingAnswer } from './mossprout-profile';
 import { MOSSPROUT_FIRST_NOTICE } from './mossprout-first-grow';
 
-/** Mossprout's first Grow is his daily noticing, completed once on the day it was first shown. */
+/** The first Bond scenario reuses the once-only notice completion and its durable reward receipt. */
 const COMPANION = 'mossprout';
 
 export function firstNoticeDay() {
@@ -19,7 +19,7 @@ export function loadFirstNoticeCompletion() {
 }
 export async function completeFirstNotice(optionId: string) {
   const choice = MOSSPROUT_FIRST_NOTICE.choices.find((item) => item.id === optionId);
-  if (!choice) throw new Error('Choose something you noticed.');
+  if (!choice) throw new Error('Choose a welcome for our visitor.');
   const pending = prepareCompanionLifeCompletion(COMPANION, { kind: 'notice', answer: choice.label, response: choice.reply }, new Date(`${firstNoticeDay()}T12:00:00`).getTime());
   return commitCompanionLifeCompletion(COMPANION, pending.id);
 }

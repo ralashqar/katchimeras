@@ -23,6 +23,10 @@ async function main() {
     next();
   });
   app.use(express.json({ limit: '3mb' }));
+  app.get('/api/shared-adventure-review', wrap(async (_, res) => {
+    const { sharedAdventureReview } = moduleAt('features/shared-adventure/review.ts');
+    res.json(sharedAdventureReview());
+  }));
   require('./journey-api.cjs')(app, { moduleAt, wrap, drafts });
   require('./new-companion-api.cjs')(app, { moduleAt, wrap, drafts });
   app.get('/api/drafts', wrap(async (_, res) => {

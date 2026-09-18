@@ -1104,7 +1104,7 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
         spotlight={mergeGuidanceVisible ? mergeGuidanceSpotlight : null}
         targetRevision={ftueTargetRevision}
         // A free beat with nothing spotlit (grow it your way): the finger is a nudge after a pause, not a lead.
-        visualTheme={ftueStep?.interaction?.mode === 'none' && !ftueStep.spotlight ? IDLE_FINGER_THEME : undefined}
+        visualTheme={ftueStep?.interaction?.mode === 'none' && !ftueStep.spotlight && !ftueStep.id.startsWith('glow.lesson.single.grow') ? IDLE_FINGER_THEME : undefined}
       />
       {active && glowScene?.view.kind === 'return' && !serveFlight ? <MergeGlowReadyGuide
         screenRef={screenRef} currencyRef={coinHudRef} currencyPillRef={coinHudPillRef} layoutNonce={screenLayoutNonce}

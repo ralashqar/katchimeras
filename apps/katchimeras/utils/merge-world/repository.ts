@@ -1,3 +1,4 @@
+import { reduceAdventure } from '@/features/shared-adventure/runtime';
 import { gameNow } from '@/utils/game-clock';
 import { reconcileJourneyGardenOrders } from '@/features/companion/journey-garden-orders';
 import { availableLocalEvents, harmonyDefinition } from '@/features/live-ops/local-catalog';
@@ -172,7 +173,7 @@ export async function saveMergeWorldState(
       catch { /* Loading already reported the damaged snapshot; recovered facts are historical. */ }
       const revision = contentRegistrySnapshot().revision;
       const backfill = !projection && priorState ? worldMilestoneEvents(priorState, revision, true) : [];
-      state = { ...state, localLiveOps: priorState?.localLiveOps ?? state.localLiveOps };
+      state = { ...state, localLiveOps: priorState?.localLiveOps ?? state.localLiveOps, sharedAdventure: priorState?.sharedAdventure ?? state.sharedAdventure };
       state = projectLocalEvents(state, [...newWorldMilestones(priorState, state, revision), ...(options.gameplayEvents ?? [])], state.updatedAt);
       serialized = JSON.stringify(state);
       await appendGameplayEvents(db, [...backfill, ...newWorldMilestones(priorState, state, revision), ...(options.gameplayEvents ?? [])], contentRegistrySnapshot().packs.filter((record) => !record.retiredAt).flatMap((record) => record.pack.liveEvents ?? []));
@@ -246,6 +247,10 @@ async function reduceStoredMergeWorld(
   });
   if (result.changed && generation === resetGeneration && !resetInProgress) publishSnapshot(result.state, 'store');
   return result;
+}
+
+export async function applyStoredAdventure(command: import('@/features/shared-adventure/types').AdventureCommand, now = gameNow()) {
+  return reduceStoredMergeWorld(state => reduceAdventure(state, command, now), now);
 }
 
 export async function loadGameplayJournal(limit = 100): Promise<GameplayEvent[]> {

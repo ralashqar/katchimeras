@@ -142,9 +142,9 @@ test('a board that ran ahead of the checkpoint is caught up from what it shows, 
   const secondPair = closestOpeningPair(afterFirst)!;
   const afterSecond = reduceMergeWorld(afterFirst, { type: 'move', from: secondPair.from, to: secondPair.to, now: NOW + 2 }).state;
   const third = openingMistBoardStep(authored, afterSecond, 2)!;
-  assert.equal(third.surface, 'haven', 'from the third merge the board is free');
+  assert.equal(third.surface, 'merge', 'the free board still renders its finger guide');
   assert.equal(mergeFtueBoardGate(third, afterSecond).kind, 'open');
-  assert.equal(third.cue, undefined);
+  assert.equal(third.cue?.kind, 'drag');
   assert.equal(mergeFtueBoardGate(authored, state).kind, 'open', 'a haven-surface step never gates the docked board');
   // The lost-write case: the board holds only the final piece, the checkpoint says one less.
   const finished = { ...state, board: state.board.map((cell, index) => cell.occupant?.kind === 'item' && index !== 16 ? { ...cell, occupant: null } : cell) };
@@ -154,8 +154,8 @@ test('a board that ran ahead of the checkpoint is caught up from what it shows, 
   assert.equal(stuck.cue, undefined);
   const guided: FtueStepDefinition = { ...authored, cue: { kind: 'drag', from: { kind: 'board_items', definitionId: SEED, occurrence: 0 }, to: { kind: 'board_items', definitionId: SEED, occurrence: 1 } }, spotlight: { targets: [] } };
   const free = openingMistBoardStep(guided, state, OPENING_GUIDED_MERGES)!;
-  assert.equal(free.id, guided.id);
-  assert.equal(free.cue, undefined, 'after the guided merges the authored guidance is stripped');
+  assert.equal(free.id, `${guided.id}.guided-3`);
+  assert.equal(free.cue?.kind, 'drag', 'the finger continues after exclusive input ends');
   assert.equal(free.spotlight, undefined);
   assert.equal(openingMistBoardStep(authored, null, 0), authored);
   assert.equal(openingMistBoardStep(null, state, 0), null);

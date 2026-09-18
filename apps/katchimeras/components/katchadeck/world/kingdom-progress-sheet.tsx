@@ -26,13 +26,14 @@ const PLACE_STATUS: Record<KingdomPlaceEntry['status'], string> = {
 };
 
 /** The Kingdom's long-term goal at a glance: who is home, what is restored, and the one next step. */
-export function KingdomProgressSheet({ progress, onClose, onNext, world, onMerge, onExplore }: {
+export function KingdomProgressSheet({ progress, onClose, onNext, world, onMerge, onExplore, onSharedAdventure }: {
   progress: KingdomProgress;
   onClose: () => void;
   onNext: (next: KingdomNext) => void;
   world: MergeWorldState;
   onMerge: () => void;
   onExplore: (eventId: string) => void;
+  onSharedAdventure?: () => void;
 }) {
   const [eventsOpen, setEventsOpen] = useState(false);
   const harmony = useHarmonyProgress();
@@ -45,6 +46,11 @@ export function KingdomProgressSheet({ progress, onClose, onNext, world, onMerge
     surface="parchment">
     {eventsOpen ? <LocalWorldEvents world={world} initiallyOpen embedded onMerge={onMerge} onExplore={onExplore} /> : <View style={styles.content}>
       <KingdomProgressSummary progress={progress} />
+      {onSharedAdventure ? <View style={styles.next}>
+        <ThemedText lightColor="#8E7130" darkColor="#8E7130" style={styles.sectionTitle}>THE PATH TO HEARTWOOD</ThemedText>
+        <ThemedText lightColor="#332918" darkColor="#332918">{world.sharedAdventure?.completedAt ? 'Someone answered. Keep the lantern paths open while we find the next light.' : 'Mossprout, Steppling and Feastle are making a signal together.'}</ThemedText>
+        <KatchaButton label={world.sharedAdventure?.completedAt ? 'Lantern Routes' : 'The First Answer'} onPress={onSharedAdventure} />
+      </View> : null}
       <View style={styles.next}>
         <ThemedText lightColor="#8E7130" darkColor="#8E7130" style={styles.sectionTitle}>HARMONY · {harmony.points}</ThemedText>
         <ThemedText lightColor="#332918" darkColor="#332918">Every rescued friend, restored place and discovered story brings the world back together.</ThemedText>

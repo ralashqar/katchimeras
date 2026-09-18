@@ -1,7 +1,7 @@
 import type { MergeWorldState, MergeOrder } from '@/types/merge-world';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import type { FtueStepDefinition, FtueTarget } from './ftue-types';
-import { closestPairOnBoard } from '@/features/content-flow/merge-lesson-recipe';
+import { nextLessonMerge } from '@/features/content-flow/merge-lesson-recipe';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/steppling';
 import { HATCHABLE_COMPANIONS, hatchableByCompanion } from '@/constants/hatchable-companions/registry';
 import { HATCHABLE_LESSON_FINALE_NODE_IDS, hatchableFlows } from './hatchable-flows';
@@ -98,7 +98,7 @@ export function lessonBoardStep(nodeId: string, state: MergeWorldState, definiti
   }
   if (nodeId === 'grow') {
     // Free: the Garden lesson just taught this shape. The finger only points after a pause, at the pair or the spawner.
-    const pair = closestPairOnBoard(state.board);
+    const pair = nextLessonMerge(state.board, lesson.growDefinitionId);
     const cue: FtueStepDefinition['cue'] = pair
       ? { kind: 'drag', from: { kind: 'board_cell', cell: pair.from }, to: { kind: 'board_cell', cell: pair.to } }
       : { kind: 'tap', target: { kind: 'board_generator', generatorId: lesson.generatorId } };

@@ -503,6 +503,7 @@ export type IslandCampaignProgress = {
 };
 
 export type MergeWorldState = {
+  sharedAdventure?: import('@/features/shared-adventure/types').SharedAdventureProgress;
   localLiveOps?: import('./local-live-ops').LocalLiveOpsState;
   /** Reading is independent of purchase flow runs; cursors count revealed lines. */
   upgradeStoryRead?: Record<string, number>;

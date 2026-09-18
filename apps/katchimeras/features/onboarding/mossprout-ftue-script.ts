@@ -1,3 +1,4 @@
+import { SHARED_ADVENTURE_ENABLED } from '@/features/shared-adventure/catalog';
 import { HATCH_PROFILES } from './hatch-profile';
 import { MOSSPROUT_GARDEN_RETURN, MOSSPROUT_FIRST_NOTICE } from './mossprout-first-grow';
 import { TODAY_GROWTH_REWARDS } from '@/utils/today-growth';
@@ -5,7 +6,7 @@ import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout'
 
 import type { FtueScriptDefinition } from './ftue-types';
 import { STEPPLING_DISCOVERY_ID } from '@/constants/companion-discovery-catalog';
-import { MOSSPROUT_BOND_SHARE_PROMPTS } from './mossprout-bond-share';
+import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_PROMPT, MOSSPROUT_SUPPORT_STYLE_OPTIONS } from './mossprout-bond-share';
 import { MOSSPROUT_FTUE_COPY as COPY } from './mossprout-ftue-copy';
 import { OPENING_CAMERA_ANCHOR_Y, OPENING_CAMERA_ENTRY_MS, OPENING_CAMERA_ZOOM, OPENING_MERGE_REQUIRED } from './opening-mist';
 
@@ -370,7 +371,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.first_seed_grew', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Your Memory', title: 'Look. Your day is growing here.', body: 'The Mist can’t hold a place someone is watching.' },
+      guide: { eyebrow: 'Your Memory', title: 'Look. Your day is growing here.', body: SHARED_ADVENTURE_ENABLED ? 'Did you see that glint beyond the trees? Just once, when our Garden woke. I wonder who saw us.' : 'The Mist can’t hold a place someone is watching.' },
       actions: [{ id: 'world.acknowledge_first_seed_growth', title: 'Continue', description: 'A moment with Mossprout.', icon: 'arrow.right', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'companion.water_together', backendEvent: true }],
       camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
       blockingBeat: 'chapter_complete',
@@ -554,19 +555,14 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       guide: { eyebrow: 'Mossprout understands', title: 'What are we growing?', body: 'Choose the shape that feels closest. It does not need to be a precise goal.' },
       actions: [
         {
-          id: 'companion.choose_growth_intent', title: 'One magical garden plot. What does it grow for you?', description: '', icon: 'heart.fill',
+          id: 'companion.choose_growth_intent', title: MOSSPROUT_BOND_SHARE_PROMPTS[0].prompt, description: '', icon: 'heart.fill',
           presentation: 'inline_choice', handlerId: 'player_profile', nextStepId: 'companion.day_one_action',
           options: MOSSPROUT_BOND_SHARE_PROMPTS[0].options.map((option) => ({ id: `${MOSSPROUT_BOND_SHARE_PROMPTS[0].id}:${option.id}`, label: option.label, icon: option.icon })),
         },
         {
-          id: 'companion.choose_support_style', title: 'Halfway up a hill and stuck. What do you want from me?', description: '', icon: 'heart.fill',
+          id: 'companion.choose_support_style', title: MOSSPROUT_SUPPORT_PROMPT, description: '', icon: 'heart.fill',
           presentation: 'inline_choice', handlerId: 'player_profile', nextStepId: 'companion.day_one_action',
-          options: [
-            { id: 'tiny_step', label: 'Point at the next step', icon: 'leaf.fill' },
-            { id: 'reflect', label: 'Talk it through with me', icon: 'bubble.left.fill' },
-            { id: 'push', label: 'A push', icon: 'bolt.fill' },
-            { id: 'company', label: 'Just walk with me', icon: 'heart.fill' },
-          ],
+          options: MOSSPROUT_SUPPORT_STYLE_OPTIONS.map(({ id, label, icon }) => ({ id, label, icon })),
         },
         { id: 'companion.complete_day_one_action', title: 'Grow it bit by bit', description: 'Mossprout understands you a little better.', icon: 'heart.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.bond_spotlight', backendEvent: true },
       ],
@@ -584,7 +580,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'companion.first_grow', surface: 'companion', navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
       guide: { eyebrow: 'Your turn', title: MOSSPROUT_GARDEN_RETURN.invitation, body: '' },
-      actions: [{ id: 'companion.open_first_grow', title: 'Notice one small thing', description: 'Look up from this for a moment.', icon: 'leaf.fill',
+      actions: [{ id: 'companion.open_first_grow', title: 'Make room for a friend', description: 'Imagine who might find our Garden.', icon: 'leaf.fill',
         presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'companion.first_notice' }],
     },
     {
@@ -592,7 +588,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       camera: mossproutWorldDialogueCamera,
       guide: { eyebrow: 'Your turn', title: MOSSPROUT_FIRST_NOTICE.prompt, body: '' },
       actions: [
-        { id: 'companion.complete_first_notice', title: 'Notice one small thing', description: '', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'player_profile', nextStepId: 'companion.notice_bond_spotlight' },
+        { id: 'companion.complete_first_notice', title: 'Make room for a friend', description: '', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'player_profile', nextStepId: 'companion.notice_bond_spotlight' },
+        // Legacy saved transitions only; the Bond lesson no longer offers a skip.
         { id: 'companion.skip_first_notice', title: 'Not now', description: '', icon: 'arrow.right', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'companion.first_rest' },
       ],
     },

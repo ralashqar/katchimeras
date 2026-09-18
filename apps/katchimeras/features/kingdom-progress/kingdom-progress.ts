@@ -1,4 +1,6 @@
 import { activeIslandCampaign, islandCampaignProgress, pendingIslandCampaignDiscovery } from '@/constants/island-campaigns/helpers';
+import { SHARED_ADVENTURE_ENABLED } from '@/features/shared-adventure/catalog';
+import { adventureNext } from '@/features/shared-adventure/runtime';
 import { islandCampaignForIsland } from '@/constants/island-campaigns/registry';
 import { ISLAND_WAKE_ORDER, islandFriendHome, islandWakeState, nextOpenIsland } from '@/constants/island-campaigns/wake-order';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
@@ -35,7 +37,7 @@ export type KingdomPlaceEntry = {
 };
 
 export type KingdomNext = {
-  kind: 'clear_mist' | 'talk' | 'merge' | 'restore' | 'story' | 'journey' | 'complete';
+  kind: 'clear_mist' | 'talk' | 'merge' | 'restore' | 'story' | 'journey' | 'complete' | 'shared_adventure';
   label: string;
   islandId?: MossproutNatureIslandId;
   residentSkinId?: KatchimeraSkinId;
@@ -101,6 +103,8 @@ function nextStep(world: MergeWorldState, friends: KingdomFriendEntry[]): Kingdo
       default: break;
     }
   }
+  const shared = SHARED_ADVENTURE_ENABLED ? adventureNext(world) : null;
+  if (shared && shared.kind !== 'routes') return { kind: 'shared_adventure', label: shared.title };
   const open = nextOpenIsland(world);
   if (open) {
     const wake = ISLAND_WAKE_ORDER.find((entry) => entry.islandId === open);

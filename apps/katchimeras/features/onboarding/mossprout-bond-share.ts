@@ -26,23 +26,23 @@ export type MossproutBondSharePrompt = {
 export const MOSSPROUT_BOND_SHARE_PROMPTS = [
   {
     id: 'desired-help',
-    cardLabel: 'What would help',
+    cardLabel: 'Our first seed',
     icon: 'leaf.fill',
-    prompt: 'One magical garden plot. What does it grow for you?',
-    reply: 'Good. We do not have to grow a whole forest today.',
+    prompt: 'One seed survived under my roots. I’ve been saving it. Though I seem to have forgotten what for.',
+    reply: 'We can start with this one. Forests are rather a lot of paperwork.',
     options: [
-      { id: 'progress', icon: 'leaf.fill', label: 'Something that gets me moving', reply: 'Then we will begin with one small, living thing.' },
-      { id: 'calm', icon: 'wind', label: 'Somewhere quiet to sit', reply: 'Then let us make a little room for quiet.' },
-      { id: 'feel_like_myself', icon: 'sun.max.fill', label: 'Something that feels like me again', reply: 'Then let us grow a little more light for whatever today needs.' },
+      { id: 'progress', icon: 'leaf.fill', label: 'Then let’s find out.', reply: 'An excellent plan. Very little planning involved.' },
+      { id: 'calm', icon: 'wind', label: 'Somewhere we can breathe.', reply: 'A quiet corner, then. Even brave roots need one.' },
+      { id: 'feel_like_myself', icon: 'sun.max.fill', label: 'Something that feels like ours.', reply: 'Ours. Yes. I’d like to remember that word.' },
     ],
   },
 ] as const satisfies readonly MossproutBondSharePrompt[];
 
 export const MOSSPROUT_SUPPORT_STYLE_OPTIONS = [
-  { id: 'tiny_step', icon: 'leaf.fill', label: 'Point at the next step', reply: 'Small is good. Tiny roots still count.' },
-  { id: 'reflect', icon: 'bubble.left.fill', label: 'Talk it through with me', reply: 'Oh, good. I like thinking. Possibly too much.' },
-  { id: 'push', icon: 'bolt.fill', label: 'A push', reply: 'All right. I can be surprisingly stern for something this leafy.' },
-  { id: 'company', icon: 'heart.fill', label: 'Just walk with me', reply: 'I can do that. We do not always need to turn everything into a project.' },
+  { id: 'tiny_step', icon: 'leaf.fill', label: 'Find one small step.', reply: 'One root in front of the other. I can manage that.' },
+  { id: 'reflect', icon: 'bubble.left.fill', label: 'Let’s work it out together.', reply: 'Good. You think, I’ll rustle thoughtfully. Then we’ll swap.' },
+  { id: 'push', icon: 'bolt.fill', label: 'Remind me we can do this.', reply: 'We can do this. I’m practising saying it before we need it.' },
+  { id: 'company', icon: 'heart.fill', label: 'Just stay beside me.', reply: 'That I can promise. Even when neither of us knows the way.' },
 ] as const;
 
 export const MOSSPROUT_WATER_TOGETHER_OPTIONS = MOSSPROUT_WATER_OPTIONS;
@@ -82,4 +82,16 @@ export function mossproutBondShareSelection(optionId: string | null | undefined)
       : null)
     ?? null;
   return prompt && answer ? { answer, id: optionId, prompt } : null;
+}
+
+/** Shared by the graph and overlay; answer IDs retain their saved preference meanings. */
+export const MOSSPROUT_SUPPORT_PROMPT = 'If we get lost out there—and I have an excellent history of getting lost—what should I do?';
+export function mossproutSupportCallback(id: string | null | undefined): string {
+  switch (id) {
+    case 'tiny_step': return 'One small step, you said. That trail marker looks like a good place to start.';
+    case 'reflect': return 'We’ll work it out together. I’ll think about those marks while my roots rest.';
+    case 'push': return 'We can do this. See? I remembered. Even with my eyes half shut.';
+    case 'company': return 'Beside you, remember? When my roots are rested, that’s where I’ll be.';
+    default: return '';
+  }
 }

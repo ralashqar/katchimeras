@@ -21,7 +21,7 @@ export const OPENING_MERGE_REQUIRED = 7;
 /**
  * The first merges are guided the way the original full-board lesson was:
  * an exclusive drag of one pair, nothing else allowed. The first shows the
- * spotlight and the finger, the second only the finger, then the board is free.
+ * spotlight and the finger, then the finger remains through every merge. Input is free after the second.
  */
 export const OPENING_GUIDED_MERGES = 2;
 /**
@@ -142,13 +142,9 @@ export function openingMergesOnBoard(state: MergeWorldState): number {
 }
 
 /**
- * The beat the docked board projects. For the first guided merges it is a
- * merge-surface step that allows exactly one drag (the closest pair), with the
- * spotlight and finger on the first and only the finger on the second, the
- * same constraints the original full-board lesson used; then the authored
- * haven step with its guidance removed, so the board is free. A board that
- * ran ahead of the checkpoint is caught up by `openingMergesOnBoard`, not by
- * a refill, so nothing else ever needs to be on the board.
+ * The first two moves are exclusive; only the first is spotlit. After that,
+ * the board is free but a finger always points at a current pair until the
+ * finale. Guidance follows board state after reload or an alternate merge.
  */
 export function openingMistBoardStep(
   authored: FtueStepDefinition | null,
@@ -157,13 +153,13 @@ export function openingMistBoardStep(
 ): FtueStepDefinition | null {
   if (!authored || !state) return authored;
   const pair = count < OPENING_MERGE_REQUIRED ? closestOpeningPair(state) : null;
-  if (pair && count < OPENING_GUIDED_MERGES) {
+  if (pair) {
     const from: FtueTarget = { kind: 'board_cell', cell: pair.from };
     const to: FtueTarget = { kind: 'board_cell', cell: pair.to };
     const first = count === 0;
     return {
       ...authored, id: `${authored.id}.guided-${count + 1}`, surface: 'merge',
-      interaction: { mode: 'exclusive', allowed: { kind: 'board_drag', from, to } },
+      interaction: count < OPENING_GUIDED_MERGES ? { mode: 'exclusive', allowed: { kind: 'board_drag', from, to } } : { mode: 'none' },
       cue: { kind: 'drag', from, to },
       spotlight: first ? { targets: [from, to], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.64 } : undefined,
     };

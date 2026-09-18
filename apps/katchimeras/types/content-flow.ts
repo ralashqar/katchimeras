@@ -2,7 +2,7 @@ export * from '@incubator/story/types';
 import type { MossproutGardenPlantSlotId } from '@/types/merge-world';
 declare module '@incubator/story/types' {
   interface StoryTypeRegistry {
-    surface: 'today' | 'hatch' | 'companion' | 'merge' | 'haven' | 'collection' | 'none';
+    surface: 'today' | 'hatch' | 'companion' | 'merge' | 'haven' | 'collection' | 'adventure' | 'none';
     route: 'today' | 'companion' | 'merge' | 'haven' | 'collection';
   }
 }

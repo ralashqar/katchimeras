@@ -402,7 +402,7 @@ test('first Grow shares the daily noticing receipt, survives interruption, and r
   assert.equal(runtime.loadFirstNoticeCompletion(), undefined);
 });
 
-for (const outcome of ['later', 'light']) test(`FTUE chains noticing without a gateway and safely finishes ${outcome}`, async () => {
+for (const outcome of ['light', 'sound', 'growing']) test(`FTUE Bond scenario safely rewards ${outcome}`, async () => {
   const copy = await import('../features/onboarding/mossprout-first-grow');
   let run = { runId: 'first-grow', stepId: 'companion.water_together', answers: {} as Record<string, { optionId: string }> };
   const listeners = new Set<() => void>();
@@ -433,7 +433,6 @@ for (const outcome of ['later', 'light']) test(`FTUE chains noticing without a g
     '@/utils/companion-bond': { COMPANION_BOND_REWARDS },
     '@/features/onboarding/mossprout-first-grow': copy,
     '@/features/onboarding/mossprout-first-grow-runtime': { loadFirstNoticeCompletion: () => completion, completeFirstNotice: async () => {
-      assert.notEqual(outcome, 'later', 'skip must not reward');
       if (rejectCompletion) { rejectCompletion = false; throw new Error('disk unavailable'); }
       if (!completion) { rewards++; completion = { id: 'notice', status: 'complete', answer: 'Some light', response: 'Well noticed.' }; }
       return completion;
@@ -458,7 +457,7 @@ for (const outcome of ['later', 'light']) test(`FTUE chains noticing without a g
   assert.equal(narration, null, 'overlay owns the FTUE prompt');
   assert.equal(tree!.root.findByType('Overlay' as React.ElementType).props.entries[0].text, copy.MOSSPROUT_GARDEN_RETURN.prompt);
   await act(async () => tree!.root.findByType('Choices' as React.ElementType).props.onSelect('pleased'));
-  assert.match(tree!.root.findByType('Overlay' as React.ElementType).props.entries[2].text, /trying to look mysterious/);
+  assert.match(tree!.root.findByType('Overlay' as React.ElementType).props.entries[2].text, /impressive glowing days/);
   assert.equal(actions.length, 0, 'reply stays visible before final exit');
   assert.equal(tree!.root.findAllByProps({ label: 'Continue' }).length, 0, 'noticing choices follow the Garden reply without another Continue');
   assert.equal(tree!.root.findAllByType('Active' as React.ElementType).length, 0, 'no action-card gateway before noticing');
@@ -466,10 +465,13 @@ for (const outcome of ['later', 'light']) test(`FTUE chains noticing without a g
   await act(async () => tree!.unmount());
   await act(async () => { tree = create(<Stage onNarration={onNarration} />); });
   assert.ok(tree!.root.findByType('Choices' as React.ElementType).props.options.some((choice: { id: string }) => choice.id === 'light'), 'relaunch resumes the noticing question');
+  const options = tree!.root.findByType('Choices' as React.ElementType).props.options;
+  assert.deepEqual(options.map((choice: { id: string }) => choice.id), ['light', 'sound', 'growing']);
+  assert.ok(options.every((choice: { label: string }) => /^(🏮|🍵|🌱) /.test(choice.label)));
   await act(async () => tree!.root.findByType('Choices' as React.ElementType).props.onSelect(outcome));
   assert.equal(run.stepId, 'companion.water_together', 'FTUE advances only after the final overlay exit');
   await act(async () => tree!.root.findByProps({ label: 'Continue' }).props.onPress());
-  if (outcome === 'light') {
+  {
     assert.equal(run.stepId, 'companion.first_notice');
     assert.equal(tree!.root.findAllByType('Overlay' as React.ElementType).length, 0, 'reward/error lives back in the world');
     await act(async () => tree!.root.findByProps({ label: 'Try again' }).props.onPress());
@@ -487,18 +489,7 @@ for (const outcome of ['later', 'light']) test(`FTUE chains noticing without a g
     await act(async () => tree!.unmount());
     return;
   }
-  assert.equal(run.stepId, 'companion.first_rest');
-  assert.deepEqual(actions, ['companion.choose_garden_return', 'companion.open_first_grow', 'companion.skip_first_notice']);
-  assert.equal(tree!.root.findAllByType('Completed' as React.ElementType).length, 0);
-  await act(async () => tree!.unmount());
-  run = { ...run, stepId: 'companion.first_notice' };
-  await act(async () => { tree = create(<Stage onNarration={onNarration} />); });
-  assert.equal(tree!.root.findAllByProps({ title: 'Grow with Mossprout' }).length, 0);
-  assert.equal(tree!.root.findAllByType('Overlay' as React.ElementType).length, 1, 'resume opens the saved noticing conversation directly');
-  assert.equal(narration, null);
-  assert.ok(tree!.root.findByType('Overlay' as React.ElementType).props.entries.some((entry: { text: string }) => entry.text === copy.MOSSPROUT_FIRST_NOTICE.prompt));
-  assert.equal(tree!.root.findByType('Overlay' as React.ElementType).props.entries[0].text, copy.MOSSPROUT_GARDEN_RETURN.prompt, 'history survives the action-card interlude');
-  await act(async () => tree!.unmount());
+
 });
 
 

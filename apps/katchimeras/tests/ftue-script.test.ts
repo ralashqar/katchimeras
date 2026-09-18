@@ -268,8 +268,8 @@ test('the first Bond action turns a soft intention into a Seed direction', () =>
   assert.equal(MOSSPROUT_BOND_SHARE_PROMPTS.every((prompt) => prompt.options.length === 3), true);
   assert.equal(MOSSPROUT_SUPPORT_STYLE_OPTIONS.length, 4);
   const selection = mossproutBondShareSelection('desired-help:progress');
-  assert.equal(selection?.prompt.prompt, 'One magical garden plot. What does it grow for you?');
-  assert.equal(selection?.answer.label, 'Something that gets me moving');
+  assert.match(selection!.prompt.prompt, /One seed survived under my roots/);
+  assert.equal(selection?.answer.label, 'Then let’s find out.');
   assert.equal(mossproutBondShareSelection('desired-help:energy')?.answer.label, 'Getting some energy back');
   assert.equal(mossproutBondShareSelection('desired-help:good_day')?.answer.label, 'Just having a good day');
   assert.equal(mossproutBondShareSelection('desired-help:not-an-answer'), null);
@@ -571,9 +571,9 @@ test('Mossprout remembers the day, reflects it back, then offers one narrative G
   assert.doesNotMatch(mossproutStage, /eyebrow="MEMORY SEED"|accessibilityLabel="Your memory seed"/);
   assert.doesNotMatch(mossproutStage, /seedName:|seedDescription:|seedEyebrow:/);
   assert.match(mossproutStage, /onContinue=\{\(id\) => onContinue\?\.\(id\)\}/);
-  assert.match(bondShare, /One magical garden plot\. What does it grow for you\?/);
-  assert.match(bondShare, /Something that gets me moving[\s\S]*?Somewhere quiet to sit[\s\S]*?Something that feels like me again/);
-  assert.match(bondShare, /Point at the next step[\s\S]*?Talk it through with me[\s\S]*?A push[\s\S]*?Just walk with me/);
+  assert.match(bondShare, /One seed survived under my roots/);
+  assert.match(bondShare, /Then let’s find out[\s\S]*?Somewhere we can breathe[\s\S]*?Something that feels like ours/);
+  assert.match(bondShare, /Find one small step[\s\S]*?Let’s work it out together[\s\S]*?Remind me we can do this[\s\S]*?Just stay beside me/);
   assert.match(mossproutStage, /ref=\{actionStackTargetRef\}[\s\S]*?style=\{styles\.bondChoiceStack\}/);
   assert.match(companionRoute, /stepId === 'companion\.bond_spotlight' \|\| ftueRun\.stepId === 'companion\.day_one_action'[\s\S]*?\? 'bond_choice'/);
   assert.match(interaction, /activeBondQuestionId=\{ftueBondQuestionId\}[\s\S]*?onBondQuestionChange=\{setFtueBondQuestionId\}/);

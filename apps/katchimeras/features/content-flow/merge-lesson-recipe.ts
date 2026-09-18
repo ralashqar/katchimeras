@@ -2,6 +2,7 @@ import type { FtueGuide, FtueStepDefinition, FtueTarget } from '@/features/onboa
 import type { ContentFlowNode } from '@/types/content-flow';
 import type { MergeWorldState } from '@/types/merge-world';
 import { story } from './story-manifest';
+import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 
 export type MergeLessonBeat = { id: string; guide: FtueGuide } & (
   /** A parcel on the tray to open: the Basket arrives this way, and its reward page greets it. */
@@ -48,6 +49,28 @@ export function mergeLessonRecipe(beats: readonly MergeLessonBeat[], next: strin
   }));
 }
 
+/** Prefer a visible sleeping match, then a loose pair, on the requested item's chain only. */
+export function nextLessonMerge(board: MergeWorldState['board'], targetId: string): { from: number; to: number; echo: boolean } | null {
+  const leadsToTarget = (id: string): boolean => {
+    const visited = new Set<string>();
+    while (id && !visited.has(id)) {
+      if (id === targetId) return visited.size > 0;
+      visited.add(id);
+      id = MERGE_ITEMS_BY_ID.get(id)?.nextItemId ?? '';
+    }
+    return false;
+  };
+  const useful = board.map(cell => cell.occupant?.kind === 'item' && !leadsToTarget(cell.occupant.definitionId) ? { ...cell, occupant: null } : cell);
+  for (const [to, cell] of board.entries()) {
+    if (cell.occupant || cell.mist?.kind !== 'echo' || !leadsToTarget(cell.mist.definitionId)) continue;
+    const definitionId = cell.mist.definitionId;
+    const from = useful.findIndex(source => !source.locked && !source.mist && !source.blocker && source.occupant?.kind === 'item' && source.occupant.definitionId === definitionId);
+    if (from >= 0) return { from, to, echo: true };
+  }
+  const pair = closestPairOnBoard(useful);
+  return pair ? { ...pair, echo: false } : null;
+}
+
 /** The same authored beat drives instruction, finger, spotlight, and allowed input. */
 export function mergeLessonBoardStep(beat: MergeLessonBeat | undefined, idPrefix = 'merge.lesson', recovery?: {
   board: MergeWorldState['board']; generatorId: string; requiredDefinitionId: string;
@@ -59,11 +82,14 @@ export function mergeLessonBoardStep(beat: MergeLessonBeat | undefined, idPrefix
     return { ...base, cue: { kind: 'tap', target }, spotlight: { targets: [target], padding: 7, radius: 14 }, interaction: { mode: 'exclusive', allowed: { kind: 'parcel_tap', target } } };
   }
   if (beat.kind === 'grow') {
-    const pair = recovery ? closestPairOnBoard(recovery.board) : null;
+    const pair = recovery ? nextLessonMerge(recovery.board, beat.definitionId) : null;
     const cue: FtueStepDefinition['cue'] = pair
       ? { kind: 'drag', from: { kind: 'board_cell', cell: pair.from }, to: { kind: 'board_cell', cell: pair.to } }
       : { kind: 'tap', target: { kind: 'board_generator', generatorId: beat.generatorId } };
-    return { ...base, cue, interaction: { mode: 'none' } };
+    if (!pair && recovery && !recovery.board.some(cell => !cell.locked && !cell.mist && !cell.blocker && !cell.occupant)) return {
+      ...base, guide: { eyebrow: 'A little room', title: 'Make space in the Garden.', body: 'Store an item or merge a pair, then we can keep growing.' }, interaction: { mode: 'none' },
+    };
+    return { ...base, ...(pair?.echo ? { id: `${base.id}.echo`, guide: { eyebrow: 'A match in the Mist', title: 'Wake the matching piece.', body: 'Drag your piece onto its sleeping twin. They grow together.' } } : {}), cue, interaction: { mode: 'none' } };
   }
   const missingSource = recovery && recovery.board.filter((cell) => !cell.locked && cell.occupant?.kind === 'item' && cell.occupant.definitionId === recovery.requiredDefinitionId).length < (beat.kind === 'pair' ? 2 : 1);
   if (recovery && (beat.kind === 'spawn' || missingSource) && beat.kind !== 'practice') {

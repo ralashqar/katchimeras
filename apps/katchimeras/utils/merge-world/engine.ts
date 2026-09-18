@@ -1,3 +1,4 @@
+import { normalizeAdventure } from '@/features/shared-adventure/normalize';
 import { createOrderQueries } from '@incubator/merge/orders';
 import { reconcileUpgradeProgress } from '@/features/world-upgrades/world-upgrade-progress';
 const { mergeOrderReady, mergeOrderRequirementReadiness, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds, boardItemCounts } = createOrderQueries();
@@ -951,6 +952,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
       ? source.characterProgress
       : fallback.characterProgress,
     localLiveOps: source.localLiveOps,
+    sharedAdventure: normalizeAdventure(source.sharedAdventure),
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
     storyWorldMutationReceipts: normalizeStoryWorldMutationReceipts(source.storyWorldMutationReceipts),
     companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, source.activeOrders, rawVersion, now),

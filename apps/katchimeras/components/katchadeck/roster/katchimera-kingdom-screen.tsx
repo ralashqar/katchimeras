@@ -157,6 +157,9 @@ import type { IslandCampaignDefinition, IslandCampaignPhase } from '@/constants/
 import { nextOpenIsland } from '@/constants/island-campaigns/wake-order';
 import { KingdomGoalScene } from '@/components/katchadeck/onboarding/kingdom-goal-scene';
 import { KingdomProgressPill } from '@/components/katchadeck/world/kingdom-progress-pill';
+import { SharedAdventurePanel } from '@/components/katchadeck/world/shared-adventure-panel';
+import { LanternPost } from '@/components/katchadeck/world/lantern-post';
+import { SHARED_ADVENTURE_ENABLED } from '@/features/shared-adventure/catalog';
 import { IslandWakeHandoffSheet, KingdomProgressSheet } from '@/components/katchadeck/world/kingdom-progress-sheet';
 import { kingdomProgress, type KingdomNext } from '@/features/kingdom-progress/kingdom-progress';
 import { stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
@@ -361,6 +364,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const focusReasonRef = useRef<'goal' | 'tracker' | null>(null);
   const [goalCoachmarkArmed, setGoalCoachmarkArmed] = useState(false);
   const [progressSheetOpen, setProgressSheetOpen] = useState(false);
+  const [adventureOpen, setAdventureOpen] = useState(false);
   const eventHarmony = useHarmonyProgress();
   const [eventSelection, setEventSelection] = useState<WorldEventSelection | null>(null);
   const [eventError, setEventError] = useState('');
@@ -1844,7 +1848,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const goalIslandOffer = goalIslandId
     ? upgradeOffers.find((offer) => offer.id === `nature:${goalIslandId}` && offer.eligible) ?? null
     : null;
-  const kingdomGoalGuideActive = Boolean(screenFocused && kingdomGoal?.introducedAt && kingdomGoal.coachmarkSeenAt == null && goalIslandOffer
+  const kingdomGoalGuideActive = Boolean(!SHARED_ADVENTURE_ENABLED && screenFocused && kingdomGoal?.introducedAt && kingdomGoal.coachmarkSeenAt == null && goalIslandOffer
     && !interactionCreatureId && !activeInteractionResidentId && !stepplingEggOpen && !upgradePresentation && !requiredUpgradeStory && !ordinaryUpgradeRun);
   const goalFocusStartedRef = useRef(false);
   useEffect(() => {
@@ -1876,6 +1880,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     setFocusIslandId(islandId);
   }, []);
   const followKingdomNext = useCallback((next: KingdomNext) => {
+    if (next.kind === 'shared_adventure') { setProgressSheetOpen(false); setAdventureOpen(true); return; }
     if (next.kind === 'merge') { setProgressSheetOpen(false); openGarden(undefined, 'mossprout'); return; }
     if (next.islandId) showIslandFromTracker(next.islandId);
     else setProgressSheetOpen(false);
@@ -2036,7 +2041,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     [mergeWorld.haven.mossproutNatureIslandReveals],
   );
 
-  const worldEventsAllowed = !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !havenMergeBoardActive && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId;
+  const sharedAdventureAllowed = !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId;
+  const worldEventsAllowed = sharedAdventureAllowed && !havenMergeBoardActive;
 
   // Ordinary story/FTUE always wins. Only a new occurrence auto-introduces;
   // later chapters stay available as cards, and interrupted stories resume by tap.
@@ -2064,6 +2070,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   return (
     <View collapsable={false} onLayout={onContentReady} ref={screenRef} style={styles.screen}>
       <KingdomHexCanvas
+        lanternPostAdornment={SHARED_ADVENTURE_ENABLED && kingdomGoal?.introducedAt ? <LanternPost progress={mergeWorld.sharedAdventure} onPress={sharedAdventureAllowed ? () => setAdventureOpen(true) : undefined} /> : null}
         gardenEventAdornment={worldEventsAllowed ? <GardenEventAdornment world={mergeWorld} onExplore={eventActions.length ? () => { void openWorldEvent(eventActions[0]); } : undefined} /> : null}
         background={background}
         cameraLocked={eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(requiredUpgradeStory) || restorationBoardVisible}
@@ -2162,6 +2169,15 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       {worldEventsAllowed && eventActions.length > 0 ? <View style={{ position: 'absolute', left: 16, right: 16, bottom: Math.max(insets.bottom, 12) + 82, zIndex: 32, gap: 6 }}>
         {eventActions.slice(0, 2).map(action => <WorldEventActionCard key={action.event.id} action={action} onPress={() => void openWorldEvent(action)} />)}
       </View> : null}
+      {SHARED_ADVENTURE_ENABLED && adventureOpen && screenFocused ? <SharedAdventurePanel world={mergeWorld}
+        onClose={() => setAdventureOpen(false)}
+        onGarden={() => { setAdventureOpen(false); openGarden(undefined, 'mossprout'); }}
+        onFeastle={() => {
+          setAdventureOpen(false);
+          const offer = upgradeOffers.find(item => item.id === 'mist:feastle-home');
+          if (offer && !mergeWorld.worldUnlocks?.['feastle:arrival']?.hatchedAt) void openUpgradeOffer(offer);
+          else openGarden(undefined, 'feastle');
+        }} /> : null}
       {eventBoardActive && selectedEventAction ? <LocalEventMissionDock action={selectedEventAction} width={window.width} bottomInset={insets.bottom} onClose={() => setEventSelection(null)} /> : null}
       {screenFocused && eventError ? <View style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 160, zIndex: 120 }}><KatchaButton label={eventError} onPress={() => setEventError('')} /></View> : null}
       {screenFocused && mistExitError ? <View style={{ position: 'absolute', bottom: insets.bottom + 20, left: 24, right: 24, zIndex: 120 }}>
@@ -2322,6 +2338,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         progress={progressSummary}
         onClose={() => setProgressSheetOpen(false)}
         onNext={followKingdomNext}
+        onSharedAdventure={SHARED_ADVENTURE_ENABLED && kingdomGoal?.introducedAt ? () => { setProgressSheetOpen(false); setAdventureOpen(true); } : undefined}
         world={mergeWorld}
         onMerge={() => { setProgressSheetOpen(false); openGarden(); }}
         onExplore={(id) => { setProgressSheetOpen(false); const action = eventActions.find(a => a.event.id === id); if (action) void openWorldEvent(action); }}

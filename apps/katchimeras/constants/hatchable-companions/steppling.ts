@@ -75,13 +75,13 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
        * The Garden board's proper introduction: one lesson, nothing taught twice. Merging was taught by
        * the opening, waking sleepers by Steppling's board; what is new here is a parcel on the tray, a
        * spawner, and a request served. The board starts bare: open the parcel (the Basket's own reward
-       * page greets it), two Seeds, then grow the Plant the request asks for the player's own way (the
-       * finger only points after a pause), and serve it for the light the trail needs.
+       * page greets it), two Seeds, then grow the Plant using the Sprout already sleeping in the Mist (or
+       * a loose pair on an older board), with a persistent finger, and serve it for the light the trail needs.
        */
       beats: [
         { id: 'lesson.single.parcel', kind: 'parcel', arrivalId: MOSSPROUT_BASKET_ARRIVAL_ID, guide: { eyebrow: 'A parcel from Mossprout', title: 'The Garden Basket. Open it.', body: 'Everything that grows here starts in there.' } },
         { id: 'lesson.single.spawn', kind: 'spawn', generatorId: 'wild-garden', guide: { eyebrow: 'A request', title: 'Mossprout is asking for a Plant.', body: 'That’s a request, on the right. Start with two Seeds.' } },
-        { id: 'lesson.single.grow', kind: 'grow', definitionId: 'nature:garden:3', generatorId: 'wild-garden', guide: { eyebrow: 'Making light', title: 'Two Seeds make a Sprout. Two Sprouts make a Plant.', body: 'Tap the Basket whenever you run short.' } },
+        { id: 'lesson.single.grow', kind: 'grow', definitionId: 'nature:garden:3', generatorId: 'wild-garden', guide: { eyebrow: 'Making light', title: 'Two Seeds make a Sprout. Two Sprouts make a Plant.', body: 'The Mist is holding a Sprout. Make its twin from two Seeds, then slide them together.' } },
         { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: 'A request, served', title: 'Give it here.', body: 'Serving a request is what turns a grown thing into light.' } },
       ],
       lessonPrefix: 'glow',

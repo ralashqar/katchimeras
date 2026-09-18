@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ConversationNarrativeOverlay } from './conversation-narrative-overlay';
 import { CompanionChoiceList } from './companion-choice-list';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
-import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_STYLE_OPTIONS, mossproutBondShareSelection } from '@/features/onboarding/mossprout-bond-share';
+import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_PROMPT, MOSSPROUT_SUPPORT_STYLE_OPTIONS, mossproutBondShareSelection } from '@/features/onboarding/mossprout-bond-share';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import type { ConversationTranscriptEntry } from '@/types/companion-conversation';
 
@@ -15,7 +15,7 @@ export function FtueBondNarrative({ runId, selectedGrowthId, onContinue }: {
 }) {
   const key = `katchimeras.ftue-bond-dialogue:${runId}`;
   const prompt = MOSSPROUT_BOND_SHARE_PROMPTS[0];
-  const supportPrompt = 'And how would you like me to help?';
+  const supportPrompt = MOSSPROUT_SUPPORT_PROMPT;
   const [state, setState] = useState<Checkpoint>(() => {
     const saved = getStoredJson<Checkpoint | null>(key, null);
     if (saved) return saved;

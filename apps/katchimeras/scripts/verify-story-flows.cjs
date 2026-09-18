@@ -4,6 +4,8 @@ const result = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', [
   'tsx',
   '--test',
   'tests/content-flow.test.ts',
+  'tests/ftue-narrative-guidance.test.ts',
+  'tests/opening-mist-dock.test.ts',
   'tests/conversation-transcript.test.ts',
   'tests/conversation-narrative-overlay.test.tsx',
   'tests/ftue-bond-narrative.test.tsx',

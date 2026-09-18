@@ -73,11 +73,10 @@ export function MossproutFirstGrowStage({ onNarration, onBondRewardRequest }: {
       if (loadFtueRun()?.stepId === 'companion.first_grow') {
         await advanceFtueActionDurably({ expectedStepId: 'companion.first_grow', actionId: 'companion.open_first_grow' });
       }
-      if (id === 'later') await advance('companion.skip_first_notice', 'skipped');
-      else await present(await completeFirstNotice(id));
+      await present(await completeFirstNotice(id));
     });
   };
-  const noticeChoices = [...MOSSPROUT_FIRST_NOTICE.choices, { id: 'later', label: 'Not now', reply: 'Of course. We can notice something together another time.' }];
+  const noticeChoices = MOSSPROUT_FIRST_NOTICE.choices;
   if (finishing && !flight) return <View collapsable={false}>{retryCard}</View>;
   if (returning) return <FtueGrowDialogue key="garden-return" runId={run!.runId} id="garden-return"
     prompt={MOSSPROUT_GARDEN_RETURN.prompt} choices={MOSSPROUT_GARDEN_RETURN.choices} invitation={MOSSPROUT_GARDEN_RETURN.invitation}
@@ -89,7 +88,7 @@ export function MossproutFirstGrowStage({ onNarration, onBondRewardRequest }: {
   // need a retained root, measured footprint, or submenu navigation animation.
   return <View collapsable={false} style={{ gap: 8 }}>
     {open && !returning ? <View style={{ gap: 8 }}>
-      {flight ? <DayActionCompletedRow animateLayout={false} enteringEnabled={false} artwork={artwork} title="Notice one small thing" reward={reward}
+      {flight ? <DayActionCompletedRow animateLayout={false} enteringEnabled={false} artwork={artwork} title="Make room for a friend" reward={reward}
         onRewardRequest={flight.receipt && onBondRewardRequest ? (source, arrive) => onBondRewardRequest(source, arrive, flight.receipt!) : undefined}
         onFinished={() => void perform(async () => {
           acknowledgeCompanionLifeCompletion('mossprout', flight.id);
@@ -97,11 +96,11 @@ export function MossproutFirstGrowStage({ onNarration, onBondRewardRequest }: {
         })} /> : null}
       {retryCard}
     </View> : <View style={{ gap: 8 }}>
-      <DayActionActiveRow animateLayout={false} enteringEnabled={false} label="Notice one small thing">
+      <DayActionActiveRow animateLayout={false} enteringEnabled={false} label="Make room for a friend">
         <Pressable accessibilityRole="button" disabled={busy} onPress={() => void perform(async () => {
           if (run?.stepId === 'companion.first_grow') await advanceFtueActionDurably({ expectedStepId: 'companion.first_grow', actionId: 'companion.open_first_grow' });
           if (alive.current) setOpen(true);
-        })}><DayActionCardSurface artwork={artwork} title="Notice one small thing" reward={reward} /></Pressable>
+        })}><DayActionCardSurface artwork={artwork} title="Make room for a friend" reward={reward} /></Pressable>
       </DayActionActiveRow>{!open ? retryCard : null}
     </View>}
   </View>;

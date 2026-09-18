@@ -29,6 +29,7 @@ export function worldMilestoneEvents(world: MergeWorldState, contentRevision: nu
     sourceRevision: world.revision, occurredAt: world.updatedAt, contentRevision, quantity: 1,
     context: { targetId, level, companionId, regionId: 'mossprout-grove' }, historical,
   });
+  if (world.sharedAdventure?.postBuiltAt) add('structure_upgraded', 'lantern-post', 1);
   for (const [id, unlock] of Object.entries(world.worldUnlocks ?? {})) {
     if (unlock.hatchedAt != null) add('friend_rescued', unlock.destination, undefined, unlock.destination);
     if (unlock.unlockedAt) add('mist_cleared', id);

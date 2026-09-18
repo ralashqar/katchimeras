@@ -1,4 +1,5 @@
 import { gameNow } from '@/utils/game-clock';
+import { registerAdventureFlows } from '@/features/shared-adventure/flows';
 import { packEntries } from '@/features/content-packs/active-pack';
 import { HATCHABLE_COMPANIONS } from '@/constants/hatchable-companions/registry';
 import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
@@ -44,6 +45,7 @@ let bootstrapped = false;
 
 export function bootstrapContentFlowCatalog() {
   if (bootstrapped) return;
+  registerAdventureFlows();
   registerCompanionJourneyFlows();
   [...LEGACY_WORLD_UPGRADE_FLOWS, ...WORLD_UPGRADE_FLOWS].forEach(registerContentFlowDefinition);
   registerStoryVariantSet(MOSSPROUT_FTUE_VARIANTS);

@@ -1,3 +1,4 @@
+import { SHARED_ADVENTURE_ENABLED } from '@/features/shared-adventure/catalog';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -15,9 +16,9 @@ import type { MergeWorldState } from '@/types/merge-world';
 import { introduceStoredKingdomGoal, loadMergeWorldState, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
 
 /** Mossprout's wish: the Kingdom's long-term purpose, told once Steppling's garden lesson is over. */
-export const KINGDOM_GOAL_LINE = 'Look how much of it is still grey. Every place we bring back brings a friend home. Let’s start with the one closest.';
+export const KINGDOM_GOAL_LINE = SHARED_ADVENTURE_ENABLED ? 'We saw a glint when the Garden woke. Perhaps someone is still out there. These homes once met at Heartwood. Let us make a signal together, so the friends still out there can find their way back.' : 'Look how much of it is still grey. Every place we bring back brings a friend home. Let’s start with the one closest.';
 export const KINGDOM_GOAL_PREMISE = 'They’re all still out there, held where they were the day the looking stopped. The Mist didn’t take them. It just settled, and stayed, and something in it learned to keep.';
-export const KINGDOM_GOAL_ACTION = 'Find the first one';
+export const KINGDOM_GOAL_ACTION = SHARED_ADVENTURE_ENABLED ? 'Follow the light' : 'Find the first one';
 
 function useMergeWorldSnapshot() {
   const [world, setWorld] = useState<MergeWorldState | null>(null);
