@@ -44,13 +44,16 @@ function completeBloomCampaignRequest(state: MergeWorldState, level: MossproutNa
   } } };
 }
 
-test('first memory targets the measured central soil bed and its button stays below the rim', () => {
+test('first memory targets the measured front-center circular bed and its button stays below the rim', () => {
   const source = { left: 0, top: 0, width: 1024, height: 1024 };
   const patch = mossproutGardenPlantSlotFrame(source, MOSSPROUT_FIRST_MEMORY_SLOT_ID);
-  assert.deepEqual(patch, { left: 442, top: 270, width: 220, height: 154 });
-  const centre = GARDEN_PLANT_SLOT_POSITIONS[MOSSPROUT_FIRST_MEMORY_SLOT_ID];
-  assert.equal(centre.x * 1024, 550);
-  assert.equal(centre.y * 1024, 350);
+  assert.ok(Math.abs(patch.left - 440.32) < 1e-8);
+  assert.ok(Math.abs(patch.top - 560.128) < 1e-8);
+  assert.equal(patch.width, 143.36);
+  assert.equal(patch.height, 92.16);
+  const centre = GARDEN_PLANT_SLOT_POSITIONS[MOSSPROUT_FIRST_MEMORY_SLOT_ID]!;
+  assert.equal(centre.x, 0.5);
+  assert.equal(centre.y, 0.592);
   for (const scale of [0.35, 1, 1.28, 2.7]) {
     const garden = { left: -173, top: 211, width: 1024 * scale, height: 1024 * scale };
     const projectedPatch = mossproutGardenPlantSlotFrame(garden, MOSSPROUT_FIRST_MEMORY_SLOT_ID);
@@ -441,7 +444,7 @@ test('FTUE upgrade is explicit and meditation Back exits without reopening Merge
   assert.match(canvas, /camera\.isMoving \? null : tileUpgradeOfferNodeRef\.current/);
   assert.match(canvas, /const committedScene = useMemo[\s\S]*?const upgradeFromScene = useMemo[\s\S]*?upgradePresentation\.fromStage[\s\S]*?complete rendered world on the receipt's from-state[\s\S]*?storySceneGuard\?\.scene \?\? committedScene/);
   assert.match(canvas, /payload\.operation === 'preserve'[\s\S]*?payload\.holdWorldState[\s\S]*?setStorySceneGuard[\s\S]*?requestAnimationFrame/);
-  assert.match(readFileSync('components/katchadeck/world/mossprout-hex-neighborhood-scene.ts', 'utf8'), /GARDEN_LAYOUT_BOUNDS = Object\.values\(GARDEN_LEVELS\)\.reduce[\s\S]*?GARDEN_LEVELS\[gardenArtLevel\],[\s\S]*?GARDEN_LAYOUT_BOUNDS/);
+  assert.match(readFileSync('components/katchadeck/world/mossprout-hex-neighborhood-scene.ts', 'utf8'), /HEARTWOOD_ART\[gardenState\.heartwoodStage[\s\S]*?Object\.values\(HEARTWOOD_BOUNDS\)\.reduce/);
   assert.match(readFileSync('components/katchadeck/world/mossprout-hex-neighborhood-scene.ts', 'utf8'), /MEMORY_PLANT_ART_CONTACT_Y = 366 \/ 384[\s\S]*?baseY - size \* MEMORY_PLANT_ART_CONTACT_Y/);
   assert.match(canvas, /const ProjectedMemoryPlant[\s\S]*?allowDownscaling=\{false\}/);
   assert.match(canvas, /MEMORY_PLANT_NATIVE_SURFACE_SCALE[\s\S]*?revealScale\.value[\s\S]*?withSequence\([\s\S]*?withTiming\(1\.14[\s\S]*?withTiming\(1,/);

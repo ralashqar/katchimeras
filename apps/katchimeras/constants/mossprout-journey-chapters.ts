@@ -68,7 +68,7 @@ export const MOSSPROUT_EXTENDED_JOURNEY_BEATS: readonly MossproutExtendedJourney
     minimumActiveDays: 28, title: 'Heartwood', objectiveId: 'mossprout:objective:heartwood',
     mergeOrderId: 'merge-story:mossprout:heartwood:heartwood',
     requirements: [{ definitionId: 'hybrid:heartwood-sanctuary', quantity: 1 }],
-    description: 'Complete the Heartwood Sanctuary.', optionalAction: null,
+    description: 'Restore the Sanctuary beneath Heartwood, where the paths meet.', optionalAction: null,
   },
 ] as const;
 

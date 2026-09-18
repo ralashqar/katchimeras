@@ -77,12 +77,13 @@ export function isMossproutOpeningStep(stepId: string | null | undefined): boole
 }
 
 /**
- * Mossprout's tile stands alone until the Egg has hatched: the mist beats, the
- * Egg intro and the Egg's questions. The sleeping islands are met afterwards.
+ * Mossprout's tile stands alone through the hatch and first conversation.
+ * Heartwood and the sleeping islands appear when the Garden reveal begins.
  */
 export function homeSoloForStep(stepId: string | null | undefined): boolean {
   if (!stepId) return false;
-  return isMossproutOpeningStep(stepId) || stepId === 'world.egg_intro' || stepId.startsWith('egg.');
+  return isMossproutOpeningStep(stepId) || stepId === 'world.egg_intro' || stepId.startsWith('egg.')
+    || stepId === 'companion.first_meeting' || stepId === 'companion.garden_intro';
 }
 
 /** Merges counted so far toward the bar, clamped to the requirement. */

@@ -41,6 +41,8 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   const hatchableAsleep = hatchable?.state === 'sleeping';
   const paintedWidth = markerPortrait || sleepingPortrait || hatchable ? 78 : MARKER_SIZE;
   const campaignPending = Boolean(markerSkin && !offer.eligible);
+  const isHeartwood = offer.visualTarget?.kind === 'haven_structure' && offer.visualTarget.structureId === 'mossprout-hex-garden';
+  const anchorY = isHeartwood ? 0.4 : 0.62;
   useEffect(() => {
     visibility.value = hidden ? withTiming(0, { duration: reduced ? 80 : 140 })
       : reduced ? withTiming(1, { duration: 100 }) : withSpring(1, { damping: 12, stiffness: 220, mass: 0.7 });
@@ -60,12 +62,13 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
     pulse.value = offer.eligible && offer.affordable && !reduced && !inert ? withRepeat(withSequence(withTiming(1.045, { duration: 850 }), withTiming(1, { duration: 850 })), -1) : 1;
     return () => cancelAnimation(pulse);
   }, [inert, offer.affordable, offer.eligible, pulse, reduced]);
-  // Center the bubble just above the stairs in the lower part of the tile.
+  // Heartwood floats above the centre, clear of its foreground planting beds.
+  // Other islands keep their badge just above the stairs.
   // Artwork scales with the world; the screen-space hit target remains usable
   // when zoomed out. Tutorial measurement separately covers the painted badge.
   const projection = useAnimatedStyle(() => ({ transform: [
     { translateX: sceneWidth / 2 + cameraX.value + (frame.left + frame.width / 2 - sceneWidth / 2) * cameraScale.value - MARKER_SIZE / 2 },
-    { translateY: sceneHeight / 2 + cameraY.value + (frame.top + frame.height * 0.62 - sceneHeight / 2) * cameraScale.value - MARKER_SIZE / 2 },
+    { translateY: sceneHeight / 2 + cameraY.value + (frame.top + frame.height * anchorY - sceneHeight / 2) * cameraScale.value - MARKER_SIZE / 2 },
   ] }));
   // The painted bubble follows the world's zoom. The press target must follow
   // it too: a fixed 68pt square under a bubble drawn at two or three times
@@ -91,7 +94,7 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
       left: MARKER_SIZE / 2 - (paintedWidth / 2 + 4) * scale,
       top: MARKER_SIZE / 2 - (bubbleHeight / 2 + 12) * scale };
   });
-  return <Animated.View pointerEvents={hidden ? 'none' : 'box-none'} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} style={[styles.position, projection]}>
+  return <Animated.View pointerEvents={hidden ? 'none' : 'box-none'} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} style={[styles.position, isHeartwood && styles.heartwoodPosition, projection]}>
       <Animated.View ref={target} collapsable={false} pointerEvents="none" accessible={false}
         onLayout={() => { onTargetChange?.(offer.id, null); if (!moving && !hidden) onTargetChange?.(offer.id, node.current); }} style={[styles.spotlightTarget, spotlightBounds]} />
       <AnimatedPressable ref={button} collapsable={false} hitSlop={6} accessibilityRole="button" accessibilityLabel={hatchableAsleep ? `${offer.name}, still under the Mist` : hatchable?.state === 'board' ? `${offer.name}, the mist board is open` : hatchable ? `${offer.name}, an Egg under the Mist, ${offer.cost} Glow to clear` : sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
@@ -158,6 +161,7 @@ function HatchableEggFace({ state, glowProgress, glowTotal, cost, missingGlow }:
 const styles = StyleSheet.create({
   spotlightTarget: { position: 'absolute' },
   position: { position: 'absolute', left: 0, top: 0, width: 68, height: 68, zIndex: 18 },
+  heartwoodPosition: { zIndex: 24 },
   hitTarget: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center' },
   bubble: { width: 68, minHeight: 68, alignItems: 'center', justifyContent: 'center', padding: 2, borderRadius: 18,
     backgroundColor: '#FFF3D0', borderWidth: 2, borderColor: '#D6AF62', boxShadow: '0 3px 5px rgba(67,43,18,0.24), inset 0 2px 0 #FFFBEF' },

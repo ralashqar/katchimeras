@@ -94,9 +94,10 @@ test('every island level uses the shared purchase flow in wake order, survives r
   assert.equal(state.haven.tileStages.mossprout, MOSSPROUT_NATURE_ISLANDS.every((island) => state.haven.mossproutNatureIslands[island.id] === 4) ? 4 : 1);
 });
 
-test('mist islands are targetable and every reveal keeps other tiles and camera bounds stable', () => {
+for (const compiler of ['typescript', 'babel'] as const) test(`mist islands are targetable and every reveal keeps other tiles and camera bounds stable (${compiler})`, () => {
   const file = 'components/katchadeck/world/mossprout-hex-neighborhood-scene.ts';
   const mocks: Record<string, unknown> = {
+    '@/constants/heartwood-art': { HEARTWOOD_ART: Object.fromEntries(['dormant', 'stirring', 'rooted', 'blooming', 'awakened'].map(stage => [stage, { full: stage, medium: stage, thumb: stage }])) },
     './shared-resident-presentation': { sharedResidentAnchor },
     '@/constants/mossprout-memory-plants': { mossproutMemoryPlantById: new Map() },
     '@/constants/hatchable-companions/tile-art': { hatchableTileArt: (tileId: string) => ({ full: `${tileId}:full`, medium: `${tileId}:512`, thumb: `${tileId}:256` }) },
@@ -106,10 +107,16 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
     },
   };
   for (const match of readFileSync(file, 'utf8').matchAll(/require\('([^']+)'\)/g)) mocks[match[1]] = match[1];
-  const module = loadNativeModule(file, mocks);
+  const module = loadNativeModule(file, mocks, {}, undefined, compiler);
   const levels = { ...restored().haven.mossproutNatureIslands };
   const build = () => module.buildMossproutHexNeighborhoodScene([], levels) as KingdomHexScene;
   const baseline = build();
+  assert.ok(Number.isFinite(baseline.width) && baseline.width > 0, 'scene width must be finite and positive');
+  assert.ok(Number.isFinite(baseline.height) && baseline.height > 0, 'scene height must be finite and positive');
+  for (const layer of baseline.tileArtLayers) {
+    assert.ok(Object.values(layer.frame).every(Number.isFinite), `${layer.id} must have finite coordinates`);
+    assert.ok(layer.frame.width > 0 && layer.frame.height > 0, `${layer.id} must have visible dimensions`);
+  }
   // The opening veil: same frame, footprint, anchor and envelope; only art and draw order change.
   const veiled = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeVeiled: true }) as KingdomHexScene;
   const home = (scene: KingdomHexScene) => scene.tileArtLayers.find((layer) => layer.id === scene.centerTile.id)!;
@@ -118,14 +125,25 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
   assert.deepEqual(home(veiled).frame, home(baseline).frame);
   assert.deepEqual(home(veiled).residentAnchor, home(baseline).residentAnchor);
   assert.notEqual(home(veiled).source, home(baseline).source, 'the veiled home tile paints mist');
-  assert.equal(veiled.tileArtLayers.find((layer) => layer.id === 'structure:mossprout-hex-garden'), undefined, 'the Garden is part of what the Mist hides');
+  assert.deepEqual(garden(veiled).frame, garden(baseline).frame, 'the combined Tree remains behind the opening Mist');
   assert.equal(home(veiled).residentSource, undefined, 'nobody stands on the veiled tile');
   assert.ok(home(baseline).residentSource, 'unveiled, Mossprout stands on the tile as before');
-  assert.ok(home(baseline).depth < garden(baseline).depth, 'unveiled, the Garden sits above the tile as before');
+  assert.ok(home(baseline).depth > garden(baseline).depth, 'the home is in front of the central Tree');
   const solo = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeSolo: true }) as KingdomHexScene;
-  assert.equal(solo.tileArtLayers.map((layer) => layer.id).join(','), home(baseline).id, 'until the hatch Mossprout’s tile stands alone: no Garden, no neighbours, even unveiled');
+  assert.deepEqual(Array.from(solo.tileArtLayers.map((layer) => layer.id)), [home(baseline).id], 'only Mossprout’s supporting tile remains: no Tree or neighbours');
+  assert.equal(solo.tiles.length, 1, 'no residents float over hidden neighbour tiles');
+  const veiledSolo = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeSolo: true, homeVeiled: true }) as KingdomHexScene;
+  assert.equal(veiledSolo.tileArtLayers.length, 1, 'the Tree is absent before the Mist lifts too');
+  assert.deepEqual(home(veiledSolo).frame, home(solo).frame, 'the supporting island never moves during the hatch');
   assert.equal(solo.width, baseline.width); assert.equal(solo.height, baseline.height);
   assert.deepEqual(home(solo).frame, home(baseline).frame, 'alone, the tile still sits where the world will grow around it');
+  for (const stage of ['stirring', 'rooted', 'blooming', 'awakened']) {
+    const changed = module.buildMossproutHexNeighborhoodScene([], levels, { level: 0, plantableMemories: [], heartwoodStage: stage }) as KingdomHexScene;
+    assert.equal(changed.width, baseline.width);
+    assert.equal(changed.height, baseline.height);
+    for (const layer of baseline.tileArtLayers) assert.deepEqual(changed.tileArtLayers.find(candidate => candidate.id === layer.id)?.frame, layer.frame, 'Tree growth preserves every frame');
+    assert.equal(garden(changed).source, stage);
+  }
   for (const island of MOSSPROUT_NATURE_ISLANDS) {
     const id = `nature:mossprout:${island.id}`;
     const locked = baseline.tileArtLayers.find((layer) => layer.id === id)!;
@@ -149,8 +167,19 @@ test('mist islands are targetable and every reveal keeps other tiles and camera 
     }
   }
   // No two layers share a hex: a story tile has its own place beside the islands and the friends' tiles.
-  const hexes = baseline.tileArtLayers.filter((layer) => !layer.id.endsWith(':growth') && layer.id !== 'structure:mossprout-hex-garden').map((layer) => `${layer.coord.q},${layer.coord.r}`);
+  const hexes = baseline.tileArtLayers.filter((layer) => !layer.id.endsWith(':growth')).map((layer) => `${layer.coord.q},${layer.coord.r}`);
   assert.equal(new Set(hexes).size, hexes.length, `every layer on its own hex: ${hexes.join(' ')}`);
+  const radius = ({ q, r }: { q: number; r: number }) => Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
+  const occupied = new Set(hexes);
+  const outerRadius = Math.max(...baseline.tileArtLayers.map(layer => radius(layer.coord)));
+  for (let q = -outerRadius; q <= outerRadius; q++) {
+    for (let r = -outerRadius; r <= outerRadius; r++) {
+      if (radius({ q, r }) < outerRadius) assert.ok(occupied.has(`${q},${r}`), `no gaps inside the outer ring: ${q},${r}`);
+    }
+  }
+  assert.equal(radius(garden(baseline).coord), 0, 'Heartwood occupies the centre');
+  assert.equal(radius(home(baseline).coord), 1, 'Mossprout stays adjacent to Heartwood');
+  assert.deepEqual(baseline.centerTile.coord, home(baseline).coord, 'camera target and tile use the same ring position');
   // A story tile: mist until its episode reveals it; revealing it moves nothing else and keeps the envelope.
   for (const tile of STORY_TILES) {
     const id = `structure:${tile.id}`;

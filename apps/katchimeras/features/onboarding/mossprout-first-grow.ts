@@ -1,12 +1,12 @@
 /** First Bond scenario. Stable notice IDs preserve existing checkpoints and rewards. */
 export const MOSSPROUT_GARDEN_RETURN = {
-  prompt: 'Wait. Beyond the trees. Did that light move?',
+  prompt: 'Our light reached the broken marker. The old roots still know the way!',
   choices: [
-    { id: 'pleased', label: 'Please tell me that was you.', reply: 'My impressive glowing days are mostly behind me. That came from farther away.' },
-    { id: 'together', label: 'It flashed when ours did.', reply: 'Just when the roots lit up? Then perhaps this Garden reaches farther than I remember.' },
-    { id: 'next', label: 'Could someone be out there?', reply: 'I used to know every light in these trees. I would very much like one of them to be a friend.' },
+    { id: 'pleased', label: '🏮 Did we just do that?', reply: 'We did. One Garden awake, one root carrying light. My impressive glowing days may not be behind me after all.' },
+    { id: 'together', label: '🌳 Why did it stop there?', reply: 'The trail is broken. Steppling used to mend these paths. Three notches—that is his mark.' },
+    { id: 'next', label: '🥾 Let’s follow it.', reply: 'Yes! Steppling’s trail first. Heartwood needs more than my Garden. Steppling can help its roots find our other friends.' },
   ],
-  invitation: 'If someone is out there, we’d better make this place worth finding.',
+  invitation: 'The light can show someone the way. We can give them a reason to stay.',
 };
 export const MOSSPROUT_FIRST_NOTICE = {
   id: 'first-notice',

@@ -22,7 +22,7 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
     unlockId: 'mossprout:overgrown-trail', price: GLOW.mistUnlockCost,
     name: 'Misty clearing', revealPreset: 'mist-clear',
     alphaBoundsKey: 'shared_world_steppling_trailhead_hex_tile_v1.webp',
-    markerLines: { sleeping: 'The Mist still holds this one.' },
+    markerLines: { sleeping: 'Three notches on a broken marker. Steppling’s trail starts here.' },
   },
   availability: { kind: 'after_ftue' },
   discovery: { gateId: 'gate-2-steppling', pathId: 'overgrown-trail' },
@@ -57,9 +57,9 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
       ],
     },
     guides: {
-      firstMerge: { eyebrow: 'Left on the trail', title: 'Two Socks. Together.', body: 'Every merge strikes a wisp.' },
+      firstMerge: { eyebrow: 'Left on the trail', title: 'Two Socks. Clear the way to Steppling.', body: 'Every merge clears another stretch of the old lantern path.' },
       wake: { eyebrow: 'Asleep under the Mist', title: 'Something under there wants {a} {name}.', body: 'Give it its match. What it was hiding comes with it.' },
-      merge: { eyebrow: 'Two of a kind', title: 'Two of the same make {a} {name}.', body: 'Drag one onto the other. Every merge strikes a wisp.' },
+      merge: { eyebrow: 'Two of a kind', title: 'Two of the same make {a} {name}.', body: 'Drag one onto the other. Every merge clears another stretch of the old lantern path.' },
       mergeFallbackTitle: 'Two of the same make the next one up.',
       free: { eyebrow: 'Keep striking', title: 'Keep merging.', body: 'Two of the same, together.' },
     },
@@ -69,7 +69,7 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
   discoveryFlow: {
     id: 'glow-steppling-discovery', version: 12, runId: 'story:glow-steppling-v1',
     gardenLesson: {
-      open: { guide: { eyebrow: 'Someone’s in there', title: 'Light is made on the Garden board.', body: 'Mossprout has a request waiting there. Serve it and the light reaches the trail.' }, actionLabel: 'Open Garden' },
+      open: { guide: { eyebrow: 'The next root connection', title: 'Light is made on the Garden board.', body: 'Grow Mossprout’s Plant. Its light will reach the broken trail and help us find Steppling.' }, actionLabel: 'Open Garden' },
       prepareCapability: 'glow.lesson.prepare',
       /**
        * The Garden board's proper introduction: one lesson, nothing taught twice. Merging was taught by
@@ -85,9 +85,9 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
         { id: 'lesson.single.serve', kind: 'serve', orderId: GLOW_ORDER_IDS[1], guide: { eyebrow: 'A request, served', title: 'Give it here.', body: 'Serving a request is what turns a grown thing into light.' } },
       ],
       lessonPrefix: 'glow',
-      ready: { guide: { eyebrow: 'Enough light', title: 'That should reach.', body: 'Come and see who the trail was hiding.' }, actionLabel: 'Back to world' },
+      ready: { guide: { eyebrow: 'Enough light', title: 'That should reach.', body: 'The broken marker is lit. Come and find the friend who knows this path.' }, actionLabel: 'Back to world' },
     },
-    egg: { guide: { eyebrow: 'An Egg', title: 'So the trail was keeping someone.', body: 'You noticed something out in your world today. This is what that did. Go on. That’s you.' }, actionLabel: 'Meet the Egg' },
+    egg: { guide: { eyebrow: 'An Egg', title: 'Steppling kept the trail’s last light.', body: 'You reached the old lantern footing. The Egg beside it belongs to the friend who tended this path.' }, actionLabel: 'Meet the Egg' },
     migrations: {
       // The bubble pays first now: a save waiting at the old offer or return goes to the pay step.
       'gateway.return': 'gateway.pay', 'gateway.offer': 'gateway.pay',
@@ -147,22 +147,22 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
     },
     taskCapability: 'steppling.garden.task',
     eventPrefix: 'steppling.garden',
-    closing: 'A Shoe, some light, and the first stretch of trail the Mist doesn’t own. We can keep going, at your pace.',
-    summary: 'Your world grows where you look',
+    closing: 'That Shoe gets us to the old lantern footing. Mossprout can hold its roots. I know the way. Now we need a hearth worth leading someone to.',
+    summary: 'A trail to reconnect our homes',
     generatorId: 'journey-locker',
     parcelArrivalId: 'journey:steppling:day-1:journey-locker',
     growDefinitionId: 'adventure:trail:2',
     dropDefinitionId: 'adventure:trail:1',
     order: {
-      id: 'steppling:discovery:first-trail', characterId: 'steppling', title: 'Steppling’s first Shoe',
-      description: 'Merge two Socks into a Shoe for Steppling.', difficulty: 'small', requirements: [{ definitionId: 'adventure:trail:2', quantity: 1 }],
+      id: 'steppling:discovery:first-trail', characterId: 'steppling', title: 'A Shoe for the lantern path',
+      description: 'Equip Steppling to reach the old lantern footing. Merge two Socks into a Shoe.', difficulty: 'small', requirements: [{ definitionId: 'adventure:trail:2', quantity: 1 }],
       reward: { coins: 20, mergeXp: 18, friendshipXp: 12, energy: 2 }, signature: false, purpose: 'normal', storyArcId: 'steppling:discovery',
     },
     copy: {
       parcel: { eyebrow: '', title: 'A parcel from Steppling!', body: 'He kept it through the whole Mist. Tap to open it.' },
       room: { eyebrow: '', title: 'A little room', body: 'Merge or store an item, then we’ll continue.' },
       grow: { eyebrow: '', title: 'Yours now. Make him a Shoe.', body: 'Two Socks from the Locker, together.' },
-      serve: { eyebrow: '', title: 'Steppling needs a Shoe.', body: 'Serve it, and the light is yours to spend.' },
+      serve: { eyebrow: '', title: 'Steppling needs a Shoe.', body: 'Equip Steppling for the first lantern connection.' },
       finale: { eyebrow: '', title: 'Back to Steppling.', body: '' },
       finaleAction: 'Our adventure',
     },

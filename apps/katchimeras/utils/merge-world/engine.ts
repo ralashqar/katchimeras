@@ -1765,7 +1765,7 @@ function normalizePlantableMemories(value: unknown): MergeWorldState['haven']['p
     if (!candidate || typeof candidate !== 'object') return [];
     const raw = candidate as Partial<PlantableMemoryInstance>;
     if (typeof raw.id !== 'string' || ids.has(raw.id)) return [];
-    if (!['momentum', 'stillness', 'renewal', 'warmth', 'curiosity'].includes(raw.definitionId ?? '')) return [];
+    if (!['momentum', 'stillness', 'renewal', 'warmth', 'curiosity', 'connection'].includes(raw.definitionId ?? '')) return [];
     const requestedSlot = raw.slotId && MOSSPROUT_GARDEN_PLANT_SLOTS.includes(raw.slotId) ? raw.slotId : null;
     const slotId = requestedSlot && !slots.has(requestedSlot) ? requestedSlot : null;
     ids.add(raw.id);

@@ -7,6 +7,7 @@ import { createInitialMergeWorldState } from '@/utils/merge-world/engine';
 import { ADVENTURE_FLOWS } from '@/features/shared-adventure/definitions';
 import { createContentFlowRun, reduceContentFlow } from '@/features/content-flow/content-flow-interpreter';
 import type { ContentFlowCommand, ContentFlowDefinition, ContentFlowRun } from '@/types/content-flow';
+import { HEARTWOOD_BEDS, HEARTWOOD_CATEGORIES } from '@/features/shared-adventure/heartwood-garden';
 import { emptyAdventure, routeRewardDay } from '@/features/shared-adventure/runtime';
 import { sharedAdventureReview } from '@/features/shared-adventure/review';
 import { validateContentFlowDefinition } from '@/features/content-flow/content-flow-compiler';
@@ -30,6 +31,7 @@ test('scene resumes its saved line; routes clearly distinguish practice and toda
   const module = loadNativeModule('components/katchadeck/world/shared-adventure-panel.tsx', {
     'react-native': { ...nativeViews, Modal: 'Modal', Text: 'Text', ScrollView: 'ScrollView' },
     'expo-image': { Image: 'Image' },
+    './heartwood-vista': { HeartwoodVista: 'HeartwoodVista' },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
     '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
     './kingdom-opening-merge-dock': { MistMissionDock: 'Mission' },
@@ -45,12 +47,18 @@ test('scene resumes its saved line; routes clearly distinguish practice and toda
   const mount = async () => { await act(async () => { renderer = create(React.createElement(module.SharedAdventurePanel as React.ComponentType<any>, { world, onClose: () => closed++, onGarden: () => {}, onFeastle: () => {} })); }); };
   await mount();
   await act(async () => renderer.root.findByProps({ label: 'Continue' }).props.onPress());
-  assert.equal((saved as ContentFlowRun | null)?.nodeId, 'line:1');
+  assert.equal((saved as ContentFlowRun | null)?.nodeId, 'road-ahead');
   await act(async () => renderer.unmount());
   await mount();
-  assert.ok(JSON.stringify(renderer!.toJSON()).includes('These homes used to meet at Heartwood'));
+  assert.ok(JSON.stringify(renderer!.toJSON()).includes('Heartwood has one living root.'));
   await act(async () => renderer.root.findByProps({ label: 'Back to the Kingdom' }).props.onPress());
   assert.equal(closed, 1);
+  await act(async () => renderer.unmount());
+  // An installed v1 save must render its migrated scene before any input.
+  saved = { ...saved!, definitionVersion: 1, nodeId: 'line:1' };
+  await mount();
+  assert.ok(JSON.stringify(renderer!.toJSON()).includes('Heartwood has one living root.'));
+  assert.ok(renderer!.root.findByProps({ label: 'Continue' }));
   await act(async () => renderer.unmount());
   world = { ...world, sharedAdventure: { ...emptyAdventure(), acknowledged: { wish: now, trail: now, hearth: now, welcome: now, post: now, answer: now }, postBuiltAt: now, completedAt: now } };
   // Completed state is authoritative even when an old main-board receipt was compacted.
@@ -61,4 +69,30 @@ test('scene resumes its saved line; routes clearly distinguish practice and toda
   await mount();
   assert.ok(JSON.stringify(renderer!.toJSON()).includes('Practice · no Glow'));
   await act(async () => renderer.unmount());
+});
+
+
+test('five-bed UI offers a collected bloom as a free swap with the exact current occupant', async () => {
+  const world = createInitialMergeWorldState(Date.now());
+  world.haven.plantableMemories = HEARTWOOD_CATEGORIES.map((definitionId, index) => ({
+    id: `plant:${index}`, definitionId, status: index < 5 ? 'planted' : 'earned', slotId: HEARTWOOD_BEDS[index] ?? null,
+    growthPoints: 3, source: { kind: 'tending', sourceId: 'test' }, earnedAt: 1, plantedAt: 1,
+  }));
+  const commands: unknown[] = [];
+  const module = loadNativeModule('components/katchadeck/world/heartwood-plant-beds.tsx', {
+    'react-native': { ...nativeViews, Image: 'Image', Text: 'Text' },
+    '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'KatchaButton' },
+    '@/constants/mossprout-memory-plants': {
+      mossproutMemoryPlantStage: (growth: number) => growth >= 3 ? 'bloom' : growth >= 1 ? 'sprout' : 'seed',
+      mossproutMemoryPlantById: new Map(HEARTWOOD_CATEGORIES.map(id => [id, { name: `Seed of ${id}`, art: { seed: 1, sprout: 2, bloom: 3 } }])),
+    },
+    '@/utils/merge-world/repository': { applyStoredAdventure: async (command: unknown) => { commands.push(structuredClone(command)); } },
+  });
+  let renderer: ReactTestRenderer;
+  await act(async () => { renderer = create(React.createElement(module.HeartwoodPlantBeds as React.ComponentType<any>, { world, selectedBed: 'back-centre' })); });
+  assert.match(renderer!.root.findAll(node => String(node.type) === 'Text').map(node => node.children.join('')).join(' '), /5\/5 beds planted/);
+  const button = renderer!.root.findByProps({ label: 'Replace momentum · free' });
+  await act(async () => button.props.onPress());
+  assert.deepEqual(commands, [{ type: 'place_heartwood', category: 'connection', slotId: 'back-centre', expectedOccupantId: 'plant:0' }]);
+  await act(async () => renderer!.unmount());
 });

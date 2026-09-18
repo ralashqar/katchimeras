@@ -17,7 +17,7 @@
     "verify:story-flows": "node ./scripts/verify-story-flows.cjs",
     "test:kingdom": "tsx --test tests/kingdom-rendering.test.ts tests/katchimera-roster.test.ts tests/steppling-encounter.test.ts tests/steppling-panel-transition.test.ts tests/feastle-hatch-handoff.test.tsx tests/native-transition-regressions.test.tsx",
     "test:game-hub": "tsx --test tests/game-hub.test.ts",
-    "test:shared-adventure": "node --experimental-sqlite --import tsx --test tests/shared-adventure.test.ts tests/shared-adventure-repository.test.ts tests/shared-adventure-ui.test.tsx",
+    "test:shared-adventure": "node --experimental-sqlite --import tsx --test tests/shared-adventure.test.ts tests/shared-adventure-repository.test.ts tests/shared-adventure-ui.test.tsx tests/heartwood-opening.test.ts tests/heartwood-story-scene.test.tsx tests/heartwood-progression.test.ts tests/heartwood-garden.test.ts",
     "test:merge-world": "tsx --test tests/merge-world.test.ts tests/merge-order-requirements.test.ts tests/merge-order-queue.test.ts tests/merge-performance.test.ts tests/merge-order-window.test.ts tests/merge-order-performance.test.ts tests/mossprout-board-progression.test.ts tests/merge-ftue-interaction-coordinator.test.ts tests/player-profile-snapshots.test.ts tests/haven-progression.test.ts tests/haven-upgrade-presentation.test.ts tests/haven-tile-presentation.test.ts tests/haven-square-world.test.ts tests/petalimp-island-campaign.test.ts tests/merge-ftue-chapter-zero.test.ts tests/merge-world-writers.test.ts",
     "test:character-progression": "tsx --test tests/relationship-progression.test.ts",
     "test:meta": "tsx --test tests/daily-journey.test.ts tests/wisp-collections.test.ts tests/season-engine.test.ts",

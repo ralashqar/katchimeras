@@ -1,0 +1,32 @@
+{
+  "dormant": {
+    "left": 40,
+    "top": 51,
+    "right": 981,
+    "bottom": 954
+  },
+  "stirring": {
+    "left": 40,
+    "top": 50,
+    "right": 981,
+    "bottom": 954
+  },
+  "rooted": {
+    "left": 40,
+    "top": 24,
+    "right": 983,
+    "bottom": 954
+  },
+  "blooming": {
+    "left": 40,
+    "top": 22,
+    "right": 982,
+    "bottom": 954
+  },
+  "awakened": {
+    "left": 40,
+    "top": 20,
+    "right": 981,
+    "bottom": 954
+  }
+}

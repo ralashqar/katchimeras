@@ -407,7 +407,8 @@ export type MossproutMemoryPlantId =
   | 'stillness'
   | 'renewal'
   | 'warmth'
-  | 'curiosity';
+  | 'curiosity'
+  | 'connection';
 
 export type PlantableMemorySource = {
   kind: 'ftue' | 'journey' | 'tending' | 'moment';

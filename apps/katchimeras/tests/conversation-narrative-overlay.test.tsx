@@ -252,29 +252,19 @@ test('Seed reveal uses the selected intention and keeps its celebration behind t
 });
 
 
-test('Garden handoff stays empty, advances automatically, and exposes retry only on failure', async () => {
+test('Garden handoff presents Heartwood and waits for the player before planting', async () => {
   const loaded = loadNativeModule('components/katchadeck/world/garden-planting-handoff.tsx', {
-    '@/components/katchadeck/ui/katcha-button': { KatchaButton: host('Button') },
+    './heartwood-story-scene': { HeartwoodStoryScene: host('HeartwoodScene') },
   });
   const Handoff = loaded.GardenPlantingHandoff as React.ComponentType<any>;
   let calls = 0;
-  let fail = false;
-  const advance = async () => { calls++; return !fail; };
   let tree!: ReactTestRenderer;
-  await act(async () => { tree = create(<Handoff onContinue={advance} />); });
+  await act(async () => { tree = create(<Handoff onContinue={() => { calls++; }} />); });
+  assert.equal(calls, 0, 'no automatic skip past the destination');
+  const scene = tree.root.findByType(host('HeartwoodScene'));
+  assert.equal(scene.props.scene, 'introduction');
+  await act(async () => scene.props.onContinue());
   assert.equal(calls, 1);
-  assert.equal(tree.toJSON(), null, 'normal handoff has no CTA or entrance content');
-  await act(async () => tree.update(<Handoff onContinue={advance} />));
-  assert.equal(calls, 1, 'rerender does not repeat navigation');
-  await act(async () => tree.unmount());
-  fail = true;
-  await act(async () => { tree = create(<Handoff onContinue={advance} />); });
-  const retry = tree.root.findByType(host('Button'));
-  assert.equal(retry.props.label, 'Try opening the Garden again');
-  fail = false;
-  await act(async () => retry.props.onPress());
-  assert.equal(calls, 3);
-  assert.equal(tree.toJSON(), null);
   await act(async () => tree.unmount());
 });
 

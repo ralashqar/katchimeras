@@ -1,4 +1,6 @@
 import { createMissionState } from '@/features/onboarding/steppling-mission';
+import { unlockGardenSupply, collectGardenSupply } from './heartwood-progression';
+import { placeHeartwood, reconcileHeartwoodPlants, tendHeartwood } from './heartwood-garden';
 import { missionWindow } from '@/features/mission-mechanics/board-window';
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import type { MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
@@ -42,6 +44,34 @@ export function reduceAdventure(source: MergeWorldState, command: AdventureComma
   const progress = world.sharedAdventure ??= emptyAdventure();
   const now = Math.max(time, progress.clock);
   const unchanged = (): MergeWorldCommandResult => ({ state: source, changed: false });
+  if (command.type === 'sync_heartwood' || command.type === 'collect_garden_supply' || command.type === 'tend_heartwood' || command.type === 'place_heartwood') {
+    const reconciled = reconcileHeartwoodPlants(world);
+    const unlocked = unlockGardenSupply(world, now);
+    const migrated = !!progress.gardenSupply && progress.gardenBedsVersion !== 2;
+    if (migrated) progress.gardenBedsVersion = 2;
+    if ((command.type === 'tend_heartwood' || command.type === 'place_heartwood') && !progress.gardenSupply) throw new Error('Grow Mossprout’s first Seed before tending the other roots.');
+    const tended = command.type === 'place_heartwood' ? placeHeartwood(world, command.category, command.slotId, command.expectedOccupantId, now)
+      : command.type === 'tend_heartwood' && tendHeartwood(world, command.category, command.expectedGrowth, now, command.slotId);
+    const collected = command.type === 'collect_garden_supply' && collectGardenSupply(world, now);
+    if (!unlocked && !collected && !reconciled && !tended && !migrated) return unchanged();
+    if (tended) progress.activity = [...progress.activity, { at: now, kind: 'plant_tended', target: command.type === 'tend_heartwood' || command.type === 'place_heartwood' ? command.category : '' }].slice(-200);
+    if (collected) progress.activity = [...progress.activity, { at: now, kind: 'supply_collected', target: 'mossprout-garden' }].slice(-200);
+    progress.clock = now;
+    world.revision = source.revision + 1;
+    world.updatedAt = now;
+    return { state: world, changed: true };
+  }
+  // Presentation receipts are available before the chapter's gameplay gate.
+  // They never award currency, complete orders, or advance a personal Journey.
+  if (command.type === 'presented') {
+    if (!['introduction', 'signal', 'recap'].includes(command.scene)) throw new Error('Unknown Heartwood scene');
+    if (progress.presentations?.[command.scene] != null) return unchanged();
+    progress.presentations = { ...progress.presentations, [command.scene]: now };
+    progress.clock = now;
+    world.revision = source.revision + 1;
+    world.updatedAt = now;
+    return { state: world, changed: true };
+  }
   const next = adventureNext(world);
   if (!next) throw new Error('Finish the first introductions before following the light.');
   let target = ADVENTURE_ID;

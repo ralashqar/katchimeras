@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
@@ -11,6 +12,28 @@ import { loadNativeModule, nativeViews } from './helpers/native-motion-harness';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const NOW = Date.parse('2026-09-08T12:00:00Z');
+
+test('the post-FTUE friend guide works with shared adventure enabled and resumes after reload', () => {
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  const expression = screen.match(/const kingdomGoalGuideActive = (Boolean\([\s\S]*?\));/)![1];
+  const context = {
+    SHARED_ADVENTURE_ENABLED: true, screenFocused: true,
+    kingdomGoal: { introducedAt: NOW, coachmarkSeenAt: null }, goalIslandOffer: { id: 'nature:bloom-garden', eligible: true },
+    ftueStepId: null, adventureOpen: false, progressSheetOpen: false, wakeHandoffCampaign: null, selectedUpgrade: null,
+    eventBoardActive: false, openingBoardActive: false, stepplingMissionActive: false, journeyMissionActive: false, restorationBoardVisible: false, upgradeHandoffPending: false,
+    interactionCreatureId: null, activeInteractionResidentId: null, stepplingEggOpen: false,
+    upgradePresentation: null, requiredUpgradeStory: null, ordinaryUpgradeRun: null,
+  };
+  assert.equal(runInNewContext(expression, context), true, 'the durable introduction must guide to Petalimp, even with shared adventure enabled');
+  assert.equal(runInNewContext(expression, { ...context, goalIslandOffer: null }), false, 'never lock the world without a tappable marker');
+  assert.equal(runInNewContext(expression, { ...context, kingdomGoal: { introducedAt: NOW, coachmarkSeenAt: NOW + 1 } }), false, 'tapping the marker ends the guide');
+  assert.equal(runInNewContext(expression, { ...context, adventureOpen: true }), false, 'a modal owns input until dismissed');
+  assert.equal(runInNewContext(expression, { ...context, restorationBoardVisible: true }), false, 'a board hides the markers and must not be locked behind the guide');
+  const handoff = screen.slice(screen.indexOf('const finishKingdomGoalScene'), screen.indexOf('const completeIslandFocus'));
+  assert.doesNotMatch(handoff, /setAdventureOpen\(true\)/, 'the closing goal modal must hand over to the map, not another native modal');
+  assert.match(screen, /focusNatureIslandId=\{focusIslandId\}/);
+  assert.match(screen, /kingdomGoalGuideActive && goalCoachmarkArmed && goalIslandId/);
+});
 
 test('Mossprout plants the wish at his farewell and the resting card keeps the garden open', () => {
   const pages = MOSSPROUT_FTUE_COPY.farewell.split('\n\n');
@@ -83,6 +106,7 @@ test('the goal scene tells the wish once and hands over exactly once per tap bur
     '@/components/katchadeck/ui/katcha-sheet': { KatchaSheet: ({ children, overlay }: { children: React.ReactNode; overlay: React.ReactNode }) => <>{children}{overlay}</> },
     '@/components/katchadeck/ui/katcha-button': { KatchaButton: 'Button' },
     '@/components/katchadeck/world/kingdom-progress-summary': { KingdomProgressSummary: 'Summary' },
+    '@/components/katchadeck/world/heartwood-vista': { HeartwoodVista: 'HeartwoodVista' },
     '@/constants/katchimera-skins': { katchimeraSkinById: new Map([['mossprout', { visualKey: 'mossprout' }]]) },
     '@/constants/theme': { AppFontFamilies: { manrope: 'manrope' } },
     '@/features/kingdom-progress/kingdom-progress': { kingdomProgress: () => ({ friends: { home: 1, met: 1, total: 9, entries: [] }, places: { restored: 1, total: 7, entries: [] }, next: { kind: 'clear_mist', label: 'Clear the mist at Bloom Garden' } }) },
@@ -94,11 +118,11 @@ test('the goal scene tells the wish once and hands over exactly once per tap bur
     },
   });
   const Scene = module.KingdomGoalScene as React.ComponentType<{ onDone: () => void }>;
-  assert.match(module.KINGDOM_GOAL_LINE as unknown as string, /friend home/);
-  assert.match(module.KINGDOM_GOAL_PREMISE as unknown as string, /held where they were/);
+  assert.match(module.KINGDOM_GOAL_LINE as unknown as string, /lantern footing/);
+  assert.match(module.KINGDOM_GOAL_PREMISE as unknown as string, /Heartwood/);
   let tree: ReactTestRenderer;
   await act(async () => { tree = create(<Scene onDone={() => { done += 1; }} />); });
-  const button = tree!.root.findByProps({ label: 'Find the first one' });
+  const button = tree!.root.findByProps({ label: 'Find our next friend' });
   assert.match(JSON.stringify(tree!.toJSON()), /Clear the mist at Bloom Garden/, 'the next step is shown');
   await act(async () => { button.props.onPress(); button.props.onPress(); });
   assert.equal(introduced, 1, 'the wish is recorded once');

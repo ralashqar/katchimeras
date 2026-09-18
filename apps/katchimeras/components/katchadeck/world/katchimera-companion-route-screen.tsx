@@ -360,9 +360,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, worldEventAction, s
       return;
     }
     if (run?.stepId === 'companion.first_meeting') {
-      // The Seed invitation has already been read in the narrative. Prepare the
-      // Garden before advancing. Commit the silent checkpoint in the same handoff
-      // so there is no intermediate companion render before the world pans to it.
+      // Prepare the Garden, then reveal Heartwood at the planting checkpoint.
       setNarrativeHandoffActive(true);
       try {
         if (!run.mergeInstalled) {
@@ -371,8 +369,8 @@ export function KatchimeraCompanionRouteScreen({ creatureId, worldEventAction, s
         }
         const meetingResult = await advanceFtueActionDurably({ expectedStepId: 'companion.first_meeting', actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
         if (meetingResult.run?.stepId !== 'companion.garden_intro') throw new Error('Mossprout did not accept the Seed handoff');
-        const gardenResult = await advanceFtueActionDurably({ expectedStepId: 'companion.garden_intro', actionId: 'companion.continue_to_planting', evidenceRef: 'first-meeting:seed-invitation' });
-        if (gardenResult.run?.stepId !== 'world.garden_arrival') throw new Error('Mossprout world did not accept the planting handoff');
+        // Leave the durable introduction checkpoint on screen: Heartwood is shown before planting.
+        setNarrativeHandoffActive(false);
         await flushFtuePersistence();
       } catch (error) {
         setNarrativeHandoffActive(false);
@@ -590,9 +588,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, worldEventAction, s
       return;
     }
     if (run.stepId === 'companion.meditating') return continueToMist();
-    if (run.stepId === 'companion.garden_intro') {
-      commitFtueAction({ actionId: 'companion.acknowledge_garden_intro', evidenceRef: 'garden-intro:seen' });
-    }
+    if (run.stepId === 'companion.garden_intro') return completeFtueConversation();
   }, [completeFtueConversation, completeResidentResultExit, continueToMist]);
   const completeFtueJourneyDay = useCallback(() => {
     const run = loadFtueRun();

@@ -33,7 +33,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
         echoes: [{ id: 'petalimp-1-plant', cell: 24, definitionId: 'nature:garden:3' }],
         deliveryCells: [17, 31, 19],
       },
-      prompt: 'This was my garden. The Mistwisps have been feeding on it for years, and there is less of it every season. Three of them are on it now.\n\nOne flower is all we can manage today. How do we start?',
+      prompt: 'You’ve woken Heartwood’s roots? Its branches need flowers next. Travellers used to stop at my garden. Three Mistwisps are feeding on its last flowers.\n\nOne flower is all we can manage today. How do we start?',
       fallbackOrder: order('The First Bloom', 'Make one Flower for the garden’s first small beginning.', 'small', 'curiosity', [{ definitionId: 'nature:garden:4', quantity: 1 }]),
       choices: [
         {
@@ -42,7 +42,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
           order: order('One Brave Bloom', 'Make one Flower so the empty garden has somewhere gentle to begin.', 'small', 'ease', [{ definitionId: 'nature:garden:4', quantity: 1 }]),
           openingConclusion: 'Make light on the board. Every merge pushes them back a little.',
           returnLine: 'Set it down. The first thing to grow here in years. This first patch is my gift.',
-          resolutionLine: 'It took. The first patch is ours again.',
+          resolutionLine: 'It took. Our first patch is back—a living patch to help Heartwood bloom.',
         },
         {
           id: 'begin-playful', label: 'Start fast', reply: 'Fast. They won’t know what to do with it.',
@@ -50,7 +50,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
           order: order('A Curious Flower', 'Make one Flower for Petalimp’s first cheerful garden experiment.', 'small', 'curiosity', [{ definitionId: 'nature:garden:4', quantity: 1 }]),
           openingConclusion: 'Make light on the board. Every merge pushes them back a little. Quickly, if you can.',
           returnLine: 'Set it down. It’ll be up before they’ve turned round. This first patch is my gift.',
-          resolutionLine: 'It came up fast, and they moved off it. The first patch is ours again.',
+          resolutionLine: 'It came up fast! A bright first patch beside Heartwood’s waiting roots. Travellers will spot this.',
         },
         {
           id: 'begin-together', label: 'Start together', reply: 'Together, then. It’s easier to keep looking when there are two of us.',
@@ -58,7 +58,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
           order: order('Our First Flower', 'Make one Flower for the place you and Petalimp are beginning together.', 'small', 'connection', [{ definitionId: 'nature:garden:4', quantity: 1 }]),
           openingConclusion: 'Make light on the board, the two of us. Every merge pushes them back a little.',
           returnLine: 'Set it down, and I’ll tend it. This first patch is my gift to you.',
-          resolutionLine: 'We planted it together, and it took. The first patch is ours again.',
+          resolutionLine: 'We planted it together. When the paths reconnect, we’ll have flowers to welcome our next visitor.',
         },
       ],
     },

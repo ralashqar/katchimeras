@@ -42,12 +42,16 @@ test('both tutorial marker spotlight targets enclose the full badge at every zoo
   for (const id of ['haven:mossprout', 'mist:steppling-home']) {
     const cameraScale = { value: 1 }; const proxyNode = { name: 'visual envelope' }; const buttonNode = { name: 'button' };
     const registrations: unknown[] = [];
-    const props = { offer: { id, action: id.startsWith('mist') ? 'Clear mist' : 'Restore', cost: 40, missingGlow: 0, affordable: true },
+    const props = { offer: { id, visualTarget: { kind: 'haven_structure', structureId: id === 'haven:mossprout' ? 'mossprout-hex-garden' : 'steppling-home' }, action: id.startsWith('mist') ? 'Clear mist' : 'Restore', cost: 40, missingGlow: 0, affordable: true },
       frame: { left: 100, top: 100, width: 600, height: 500 }, cameraScale, cameraX: { value: 0 }, cameraY: { value: 0 },
       sceneWidth: 1000, sceneHeight: 1000, moving: false, onPress() {}, onTargetChange: (_id: string, node: unknown) => registrations.push(node) };
     let tree: ReactTestRenderer;
     await act(async () => { tree = create(<Marker {...props} />, { createNodeMock: (element) => element.type === 'Pressable' ? buttonNode : proxyNode }); });
     const animated = tree!.root.findAllByType(host('AnimatedView'));
+    const position = animated.find(node => node.props.style?.[0]?.zIndex === 18)!;
+    const anchorRatio = id === 'haven:mossprout' ? 0.4 : 0.62;
+    assert.equal(position.props.style.at(-1).read().transform[1].translateY, 100 + 500 * anchorRatio - 34, 'Heartwood floats above its beds; other markers stay at the stairs');
+    assert.equal(position.props.style[1]?.zIndex ?? 18, id === 'haven:mossprout' ? 24 : 18);
     const proxy = animated.find((node) => node.props.collapsable === false)!;
     const bubble = animated.find((node) => node.props.style[0].backgroundColor)!;
     await act(async () => bubble.props.onLayout({ nativeEvent: { layout: { height: 88 } } }));

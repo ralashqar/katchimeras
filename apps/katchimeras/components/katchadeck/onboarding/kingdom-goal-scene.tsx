@@ -1,4 +1,4 @@
-import { SHARED_ADVENTURE_ENABLED } from '@/features/shared-adventure/catalog';
+import { HeartwoodVista } from '@/components/katchadeck/world/heartwood-vista';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -16,9 +16,9 @@ import type { MergeWorldState } from '@/types/merge-world';
 import { introduceStoredKingdomGoal, loadMergeWorldState, subscribeMergeWorldSnapshots } from '@/utils/merge-world/repository';
 
 /** Mossprout's wish: the Kingdom's long-term purpose, told once Steppling's garden lesson is over. */
-export const KINGDOM_GOAL_LINE = SHARED_ADVENTURE_ENABLED ? 'We saw a glint when the Garden woke. Perhaps someone is still out there. These homes once met at Heartwood. Let us make a signal together, so the friends still out there can find their way back.' : 'Look how much of it is still grey. Every place we bring back brings a friend home. Let’s start with the one closest.';
-export const KINGDOM_GOAL_PREMISE = 'They’re all still out there, held where they were the day the looking stopped. The Mist didn’t take them. It just settled, and stayed, and something in it learned to keep.';
-export const KINGDOM_GOAL_ACTION = SHARED_ADVENTURE_ENABLED ? 'Follow the light' : 'Find the first one';
+export const KINGDOM_GOAL_LINE = 'Our Garden carries light again. Steppling has found the old lantern footing. Now we need a hearth at the other end—a place worth finding.';
+export const KINGDOM_GOAL_PREMISE = 'Heartwood’s first root is awake. Now reconnect our homes: restore the Lantern Post, welcome a traveller, and help the Tree take root again.';
+export const KINGDOM_GOAL_ACTION = 'Find our next friend';
 
 function useMergeWorldSnapshot() {
   const [world, setWorld] = useState<MergeWorldState | null>(null);
@@ -67,8 +67,9 @@ export function KingdomGoalScene({ onDone }: { onDone: () => void }) {
         <KatchaButton fullWidth glow label={KINGDOM_GOAL_ACTION} loading={busy} disabled={busy} onPress={() => void advance()} />
       </View>}>
       <View style={[styles.body, { paddingTop: insets.top + 28 }]}>
+        <HeartwoodVista signal compact />
         {portrait ? <Image accessibilityIgnoresInvertColors contentFit="contain" source={portrait} style={styles.portrait} transition={0} /> : null}
-        <ThemedText style={styles.eyebrow} lightColor="#8E7130" darkColor="#8E7130">MOSSPROUT’S WISH</ThemedText>
+        <ThemedText style={styles.eyebrow} lightColor="#8E7130" darkColor="#8E7130">OUR FIRST SHARED CHAPTER</ThemedText>
         <ThemedText selectable style={styles.quote} lightColor="#332918" darkColor="#332918">{`“${KINGDOM_GOAL_LINE}”`}</ThemedText>
         <ThemedText selectable style={styles.premise} lightColor="#5C513B" darkColor="#5C513B">{KINGDOM_GOAL_PREMISE}</ThemedText>
         <View style={styles.tracker}>

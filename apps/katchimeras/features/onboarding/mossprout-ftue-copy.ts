@@ -2,32 +2,32 @@ import type { FtueChoiceOption } from './ftue-types';
 
 /** Shared by the authored graph and its native presentations. IDs are save data. */
 export const MOSSPROUT_FTUE_COPY = {
-  opening: 'Nobody has looked at this place in years. The Mist came in and stayed. Then you looked.',
-  openingNoticed: 'Nobody has looked at this place in years.',
-  openingArrived: 'The Mist came in and stayed. Then you looked.',
+  opening: 'Once, every path led home. Then the lights went out. A flicker beneath the Mist is still holding on.',
+  openingNoticed: 'Once, every path led home. Then the lights went out.',
+  openingArrived: 'A flicker beneath the Mist. Someone is still in there.',
   lookCloser: 'Look closer',
-  mistClearTitle: 'Three Mistwisps have this garden. Make light and they’ll flinch.',
+  mistClearTitle: 'Someone is trapped beneath these wisps. Merge to reach them.',
   mistClearBody: 'Two of the same, together: that’s light. Drag one Seed onto the other.',
   mistThins: 'The Mist has cleared.',
   eggHeardYou: 'The Mist has cleared.',
   dayQuestion: 'If today were weather over this garden, what was it?',
   helpQuestion: 'And the first thing we grow. What should it be for?',
-  seedOrigin: 'Your answers made light, and the last wisps let go. It’s the first light I’ve felt in years. Let’s give it soil.',
-  bond: 'You stayed to talk. After all that quiet, I think my leaves have forgotten how to stop rustling.',
-  planted: 'There. Our first seed. I shall try not to check on it every three seconds.',
-  mergePurpose: 'Come. I’ll show you how we make more of it.',
-  growth: 'Look. Your day is growing here. Wait—was that a glint beyond the trees?',
+  seedOrigin: 'Five empty beds around Heartwood… and I kept one seed safe. Let’s plant it beside the Tree. Perhaps its roots will remember how to grow.',
+  bond: 'You found me. Now we can find the others. And perhaps stop my leaves rustling with excitement.',
+  planted: 'There. Our first seed, right beside Heartwood. Four beds still waiting. We’ll bring this whole circle back to life.',
+  mergePurpose: 'The trail needs light. Let’s grow what our friends need and send it farther.',
+  growth: 'Look! Heartwood’s first root is glowing. A bud! And the same light is reaching that broken trail marker.',
   waterQuestion: 'Your turn. Look up from this for a moment.',
-  farewell: 'I need to rest, and think today over. Roots do, after they grow.\n\nIn the Mist, there are more of us. Three notches mark a trail. Steppling might know who made that glint.',
+  farewell: 'Three notches. Steppling’s trail! Find him beyond that marker. He knows how the old roots connect our homes.\n\nI’ll rest and keep our roots bright. You needn’t wait for me. We’ve a path to bring back.',
   restAction: 'Rest, Mossprout',
   wakeAsk: 'May I wake you when I’m back? I’d like to show you what grew.',
   wakeAllow: 'Wake me',
   wakeDecline: 'Not now',
   meditation: 'Mossprout is resting',
   meditationAvailable: 'Mossprout is awake. Let’s see what’s nearby.',
-  meditationHelp: 'The garden stays open. Past it, the Mist is still holding someone.',
+  meditationHelp: 'Find Steppling at the broken trail. Our living Heartwood starts there.',
   keepGrowing: 'Keep growing',
-  nextRequest: 'Every request makes light. Light pushes the Mist back. Behind the Mist there are more of us.',
+  nextRequest: 'Grow supplies, serve a friend, restore the path. Every connection helps Heartwood grow.',
   freePlayHint: 'Make another Sprout, then merge the pair.',
 } as const;
 
@@ -46,9 +46,9 @@ export const MOSSPROUT_HELP_OPTIONS = [
 ] as const satisfies readonly FtueChoiceOption[];
 
 export const MOSSPROUT_GREETING_OPTIONS = [
-  { id: 'hello', label: 'Hi, Mossprout.', reply: 'Hi. I’m glad you’re here.' },
-  { id: 'garden', label: 'What is this place?', reply: 'My garden. The Mist had it for years. It’s ours again now, mostly.' },
-  { id: 'tiny', label: 'You’re tiny.', reply: 'The Garden is enormous. Both things can be true.' },
+  { id: 'hello', label: '🌳 What happened to it?', reply: 'The Mist cut Heartwood off from our homes. Its roots are hungry for life. This Garden can feed the first one.' },
+  { id: 'garden', label: '🏮 Can we light it again?', reply: 'Together, I think we can. Heartwood needs all our friends, each tending something different. We start here, with a living Garden.' },
+  { id: 'tiny', label: '🥾 Then where do we start?', reply: 'This Garden. A seed, some light, then Heartwood’s first living root. Fortunately, I packed a seed. Less fortunately, I ate the map.' },
 ] as const;
 
 export const MOSSPROUT_WATER_OPTIONS = [

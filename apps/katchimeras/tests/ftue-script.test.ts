@@ -541,7 +541,7 @@ test('FTUE Energy recovery uses one general reflection with no journal hierarchy
 
 test('Mossprout remembers the day, reflects it back, then offers one narrative Garden objective', () => {
   const firstMeetings = mossproutFtueConversationDefinitions.filter((definition) => definition.id.startsWith('mossprout:ftue:first-meeting:'));
-  assert.ok(firstMeetings.every((definition) => definition.version === 10));
+  assert.ok(firstMeetings.every((definition) => definition.version === 11));
   for (const definition of firstMeetings) {
     const hello = definition.nodes.find((node) => node.id === 'hello');
     assert.equal(hello?.kind, 'choice');
@@ -754,7 +754,7 @@ test('route-changing FTUE actions persist before navigation and owned companion 
   assert.match(kingdomCompanion, /!ftueConversationDefinitionId && !forceMossproutAvailable/);
   assert.match(companion, /openFtueGarden = useCallback\(async \(\) => \{[\s\S]*?installMossproutOnboardingMergeWorld[\s\S]*?advanceFtueActionDurably[\s\S]*?result\.run\?\.stepId !== 'world\.garden_arrival'[\s\S]*?flushFtuePersistence/);
   assert.doesNotMatch(companion, /Could not prepare Mossprout Garden handoff'[\s\S]{0,120}?throw error/);
-  assert.match(companion, /run\?\.stepId === 'companion\.first_meeting'[\s\S]*?setNarrativeHandoffActive\(true\)[\s\S]*?actionId: 'companion\.complete_first_meeting'[\s\S]*?actionId: 'companion\.continue_to_planting'[\s\S]*?world\.garden_arrival/);
+  assert.match(companion, /run\?\.stepId === 'companion\.first_meeting'[\s\S]*?setNarrativeHandoffActive\(true\)[\s\S]*?actionId: 'companion\.complete_first_meeting'[\s\S]*?companion\.garden_intro[\s\S]*?setNarrativeHandoffActive\(false\)/);
   assert.match(companion, /completeStepplingNarrative = useCallback[\s\S]*?setNarrativeHandoffActive\(true\)[\s\S]*?completeStepplingDayOne/);
   assert.match(companion, /if \(narrativeHandoffActive \|\| stepplingDayOne\.gardenHandoffPending\) return/);
   assert.match(companion, /if \(mistHandoffActive \|\| pendingMistExit\) return/);

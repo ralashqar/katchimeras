@@ -1,5 +1,8 @@
 import { mossproutHexPoint, mossproutLayerGeometry, mossproutSceneEnvelope } from '@incubator/environments/mossprout-layout';
 import { MOSSPROUT_PRESET } from '@incubator/environments/mossprout-preset';
+import { HEARTWOOD_ART } from '@/constants/heartwood-art';
+import { dormant, stirring, rooted, blooming, awakened } from '@/constants/heartwood-garden-bounds.gen.json';
+import type { HeartwoodStage } from '@/features/shared-adventure/heartwood-progression';
 import type { ImageSourcePropType } from 'react-native';
 import { sharedResidentAnchor } from './shared-resident-presentation';
 
@@ -11,7 +14,7 @@ import { artSourceSet } from '@/utils/art-source';
 import { HATCHABLE_COMPANIONS, hatchableByCompanion } from '@/constants/hatchable-companions/registry';
 import { hatchableTileArt } from '@/constants/hatchable-companions/tile-art';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
-import { STEPPLING_TILE, SHARED_WORLD_TILES } from '@/constants/shared-world';
+import { SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { STORY_TILES, type StoryTileDefinition, type StoryTileState } from '@/constants/story-tiles/registry';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { storyTileResidents, storyTileStructureId } from '@/utils/story-tile-residents';
@@ -19,12 +22,15 @@ import { storyTileArt } from '@/constants/story-tiles/tile-art';
 import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants/mossprout-memory-plants';
 import type { MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel, PlantableMemoryInstance } from '@/types/merge-world';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
-import { hexDrawDepth, type HexCoord } from '@/utils/world-hex';
+import { hexDrawDepth, hexSpiral, type HexCoord } from '@/utils/world-hex';
 import { GARDEN_PLANT_SLOT_POSITIONS, MOSSPROUT_FIRST_MEMORY_SLOT_ID, mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
 
 export { mossproutGardenPlantSlotFrame } from '@/utils/mossprout-garden-layout';
 
 const SOURCE_SIZE = { height: 1024, width: 1024 } as const;
+// Enumerate only rectangles. Babel wraps JSON namespace imports with a
+// `default` object; including that in the union makes the whole scene NaN.
+const HEARTWOOD_BOUNDS = { dormant, stirring, rooted, blooming, awakened };
 const MAIN_RESIDENT_SOURCE = require('@incubator/art-world/square/mossprout-standing-resident-512.webp');
 
 type TileSources = {
@@ -49,50 +55,8 @@ const MAIN: ArtSpec = {
   },
 };
 
-const GARDEN_LEVELS: Record<0 | 1 | 2, ArtSpec> = {
-  0: {
-  alphaBounds: { left: 25, top: 59, right: 995, bottom: 961 },
-  coord: { q: 0, r: 2 },
-  sources: {
-    full: require('@incubator/art-world/hex/mossprout_memory_garden_level_0.webp'),
-    medium: MOSSPROUT_PRESET.garden.levels[0],
-    thumb: require('@incubator/art-world/hex/mossprout_memory_garden_level_0_256.webp'),
-  },
-  },
-  1: {
-    alphaBounds: { left: 11, top: 48, right: 1000, bottom: 992 },
-    coord: { q: 0, r: 2 },
-    sources: {
-      full: require('@incubator/art-world/hex/mossprout_memory_garden_level_1.webp'),
-      medium: MOSSPROUT_PRESET.garden.levels[1],
-      thumb: require('@incubator/art-world/hex/mossprout_memory_garden_level_1_256.webp'),
-    },
-  },
-  2: {
-    alphaBounds: { left: 11, top: 48, right: 1000, bottom: 992 },
-    coord: { q: 0, r: 2 },
-    sources: {
-      full: require('@incubator/art-world/hex/mossprout_memory_garden_level_2.webp'),
-      medium: MOSSPROUT_PRESET.garden.levels[2],
-      thumb: require('@incubator/art-world/hex/mossprout_memory_garden_level_2_256.webp'),
-    },
-  },
-};
-
-// Every Garden level is authored on the same 1024px canvas. Use one union
-// silhouette for layout so tiny alpha-edge differences between exports can
-// never move or resize the world object when its source changes.
-const GARDEN_LAYOUT_BOUNDS = Object.values(GARDEN_LEVELS).reduce<ArtSpec['alphaBounds']>(
-  (bounds, level) => ({
-    bottom: Math.max(bounds.bottom, level.alphaBounds.bottom),
-    left: Math.min(bounds.left, level.alphaBounds.left),
-    right: Math.max(bounds.right, level.alphaBounds.right),
-    top: Math.min(bounds.top, level.alphaBounds.top),
-  }),
-  { bottom: 0, left: SOURCE_SIZE.width, right: 0, top: SOURCE_SIZE.height },
-);
-
 export type MossproutGardenSceneState = {
+  heartwoodStage?: HeartwoodStage;
   /** Steppling's tile, kept for callers from before `hatchableTiles`; the map wins when both are given. */
   gateway?: 'locked' | 'egg' | 'open';
   /** Every hatchable companion's tile by tile id: misted, an Egg on it, or open with the friend home. */
@@ -256,17 +220,39 @@ export const MOSSPROUT_NATURE_ISLAND_ART: Record<string, NatureArtSpec> = {
   },
 };
 
+// Fill complete inner rings before starting an outer ring. Source coordinates
+// remain content/save identities; only their presentation positions change.
+// First ring: Nursery, Mossprout, Bloom/Petalimp, Baristabbit, Steppling, Feastle.
+const coordKey = (coord: HexCoord) => `${coord.q},${coord.r}`;
+const ringSources = [
+  MOSSPROUT_NATURE_ISLAND_ART['seed-nursery'].coord,
+  MAIN.coord,
+  MOSSPROUT_NATURE_ISLAND_ART['bloom-garden'].coord,
+  ...['baristabbit', 'steppling', 'feastle'].flatMap(id => {
+    const definition = hatchableByCompanion(id);
+    return definition ? [definition.tile.coord] : [];
+  }),
+  ...MOSSPROUT_NATURE_ISLANDS.map(island => natureIslandArt(island.id).coord),
+  ...HATCHABLE_COMPANIONS.map(definition => definition.tile.coord),
+  ...STORY_TILES.map(tile => tile.coord),
+];
+const uniqueRingSources = [...new Map(ringSources.map(coord => [coordKey(coord), coord])).values()];
+const ringPositions = hexSpiral(uniqueRingSources.length);
+const heartwoodPositions = new Map(uniqueRingSources.map((coord, index) => [coordKey(coord), ringPositions[index]]));
+
 function layerFor(
   id: string,
   kind: KingdomTileArtLayer['kind'],
   spec: ArtSpec,
   layoutBounds = spec.alphaBounds,
 ): KingdomTileArtLayer {
-  const point = mossproutHexPoint(spec.coord);
-  const { frame, interactionFrame } = mossproutLayerGeometry(spec.coord, layoutBounds);
+  // Heartwood owns the centre; all other tiles occupy contiguous outer rings.
+  const coord = id === 'structure:mossprout-hex-garden' ? spec.coord : heartwoodWorldCoord(spec.coord);
+  const point = mossproutHexPoint(coord);
+  const { frame, interactionFrame } = mossproutLayerGeometry(coord, layoutBounds);
   return {
     alphaBounds: spec.alphaBounds,
-    coord: spec.coord,
+    coord,
     custom: true,
     depth: hexDrawDepth(point),
     fallbackSource: null,
@@ -278,6 +264,10 @@ function layerFor(
     sources: spec.sources,
     sourceSize: SOURCE_SIZE,
   };
+}
+
+export function heartwoodWorldCoord(coord: HexCoord): HexCoord {
+  return heartwoodPositions.get(coordKey(coord)) ?? coord;
 }
 
 function natureLayerFor(
@@ -328,7 +318,7 @@ export type MossproutSceneOptions = {
    * every camera stay put; only its art and draw order change.
    */
   homeVeiled?: boolean;
-  /** Until the hatch: Mossprout's tile alone, no Garden, no neighbours. The envelope is unchanged. */
+  /** Opening and first conversation: only Mossprout's tile. The envelope is unchanged. */
   homeSolo?: boolean;
 };
 
@@ -348,15 +338,15 @@ export function buildMossproutHexNeighborhoodScene(
   // Under the veil nobody stands on the tile; the sleeping marker says who is there.
   if (!options.homeVeiled) mainLayer.residentSource = MAIN_RESIDENT_SOURCE;
   mainLayer.residentAnchor = sharedResidentAnchor(mainLayer.frame);
-  const gardenArtLevel: 0 | 1 | 2 = gardenState.level <= 0
-    ? 0
-    : (gardenState.featureLevels?.spring ?? 0) > 0 && (gardenState.featureLevels?.path ?? 0) > 0 ? 2 : 1;
-  const gardenLayer = layerFor(
-    'structure:mossprout-hex-garden',
-    'structure',
-    GARDEN_LEVELS[gardenArtLevel],
-    GARDEN_LAYOUT_BOUNDS,
-  );
+  // The old Garden ID remains the save/tutorial target, now hosted by Heartwood.
+  const gardenLayer = layerFor('structure:mossprout-hex-garden', 'structure', {
+    coord: { q: 0, r: 0 },
+    alphaBounds: HEARTWOOD_BOUNDS[gardenState.heartwoodStage ?? 'dormant'],
+    sources: HEARTWOOD_ART[gardenState.heartwoodStage ?? 'dormant'],
+  }, Object.values(HEARTWOOD_BOUNDS).reduce((union, bounds) => ({
+    left: Math.min(union.left, bounds.left), top: Math.min(union.top, bounds.top),
+    right: Math.max(union.right, bounds.right), bottom: Math.max(union.bottom, bounds.bottom),
+  }), { left: 1024, top: 1024, right: 0, bottom: 0 }));
   const plantLayers = gardenState.plantableMemories.flatMap((plant): KingdomTileArtLayer[] => {
     const preview = gardenState.previewMemoryId === plant.id && plant.status !== 'planted';
     const slotId = preview ? MOSSPROUT_FIRST_MEMORY_SLOT_ID : plant.slotId;
@@ -364,12 +354,12 @@ export function buildMossproutHexNeighborhoodScene(
     const definition = mossproutMemoryPlantById.get(plant.definitionId);
     const position = GARDEN_PLANT_SLOT_POSITIONS[slotId];
     if (!definition || !position) return [];
-    const size = gardenLayer.frame.width * 0.18;
+    const size = gardenLayer.frame.width * 0.145;
     const baseX = gardenLayer.frame.left + gardenLayer.frame.width * position.x;
     const baseY = gardenLayer.frame.top + gardenLayer.frame.height * position.y;
     return [{
       alphaBounds: { left: 0, top: 0, right: 384, bottom: 384 },
-      coord: GARDEN_LEVELS[0].coord,
+      coord: gardenLayer.coord,
       custom: true,
       depth: gardenLayer.depth + 1 + position.y,
       fallbackSource: null,
@@ -406,10 +396,9 @@ export function buildMossproutHexNeighborhoodScene(
     return layer;
   };
   const storyTileLayers = STORY_TILES.map((tile) => ({ tile, misted: storyTileLayer(tile, false), revealed: storyTileLayer(tile, true) }));
-  // Mist is opaque: while veiled, the home tile must paint over the Garden
-  // structure that normally sits above it.
-  if (options.homeVeiled) mainLayer.depth = gardenLayer.depth + 2;
-  // The Garden is part of what the Mist hides: it is not drawn until the veil lifts.
+  // Keep the home Mist in front during non-solo reveal transitions too.
+  if (options.homeVeiled) mainLayer.depth = Math.max(mainLayer.depth, gardenLayer.depth + 2);
+  // The opening excludes neighbours without changing their reserved bounds.
   const neighbourLayers = options.homeSolo ? [] : [
     ...hatchableLayers.map(({ definition, locked, revealed }) => (hatchableTileState(definition) === 'locked' ? locked : revealed)),
     ...storyTileLayers.map(({ tile, misted, revealed }) => ((gardenState.storyTiles?.[tile.id] ?? 'misted') === 'revealed' ? revealed : misted)),
@@ -419,9 +408,9 @@ export function buildMossproutHexNeighborhoodScene(
       Boolean(natureIslandReveals[island.id]),
     )),
   ];
-  // The Garden is part of what the Mist hides, and it waits with the neighbours until the hatch.
+  // Heartwood follows the same solo rule as every other neighbouring tile.
   const rawLayers = [
-    mainLayer, ...(options.homeVeiled || options.homeSolo ? [] : [gardenLayer, ...plantLayers]),
+    ...(options.homeSolo ? [] : [gardenLayer]), mainLayer, ...(options.homeVeiled || options.homeSolo ? [] : plantLayers),
     ...neighbourLayers,
   ];
   // Reserve both art envelopes so changing mist to terrain never shifts the world.
@@ -434,10 +423,11 @@ export function buildMossproutHexNeighborhoodScene(
   boundsLayers.push(unveiledMain, gardenLayer);
   const { dx, dy, width, height } = mossproutSceneEnvelope(boundsLayers.map(layer => layer.frame));
   const layers = rawLayers.map((layer) => shiftLayer(layer, dx, dy)).sort((a, b) => a.depth - b.depth);
-  const mainPoint = mossproutHexPoint(MAIN.coord);
+  const mainCoord = heartwoodWorldCoord(MAIN.coord);
+  const mainPoint = mossproutHexPoint(mainCoord);
   const centerTile: KingdomTileRender = {
     companion: mossprout,
-    coord: MAIN.coord,
+    coord: mainCoord,
     cx: mainPoint.x + dx,
     cy: mainPoint.y + dy,
     depth: hexDrawDepth(mainPoint),
@@ -453,15 +443,15 @@ export function buildMossproutHexNeighborhoodScene(
     if ('residentVisible' in entry && !entry.residentVisible && !(hatchable && hatchableTileState(hatchable) === 'open')) return [];
     const slot = companionSlots.find((candidate) => candidate.familyId === entry.companion && candidate.kind === 'owned');
     if (!slot) return [];
-    const point = mossproutHexPoint(entry.coord);
-    return [{ companion: slot, coord: entry.coord, cx: point.x + dx, cy: point.y + dy, depth: hexDrawDepth(point), id: slot.id, kind: 'companion' as const }];
+    const point = mossproutHexPoint(heartwoodWorldCoord(entry.coord));
+    return [{ companion: slot, coord: heartwoodWorldCoord(entry.coord), cx: point.x + dx, cy: point.y + dy, depth: hexDrawDepth(point), id: slot.id, kind: 'companion' as const }];
   });
   // A story tile that names a resident form: once revealed, that form stands on it as its friend's owned slot.
   for (const resident of storyTileResidents(STORY_TILES, gardenState.storyTiles ?? {}, companionSlots, katchimeraSkinById)) {
-    const point = mossproutHexPoint(resident.coord);
-    residentTiles.push({ companion: resident.companion, coord: resident.coord, cx: point.x + dx, cy: point.y + dy, depth: hexDrawDepth(point), id: resident.companion.id, kind: 'companion' });
+    const point = mossproutHexPoint(heartwoodWorldCoord(resident.coord));
+    residentTiles.push({ companion: resident.companion, coord: heartwoodWorldCoord(resident.coord), cx: point.x + dx, cy: point.y + dy, depth: hexDrawDepth(point), id: resident.companion.id, kind: 'companion' });
   }
-  const tiles = [centerTile, ...residentTiles];
+  const tiles = [centerTile, ...(options.homeSolo ? [] : residentTiles)];
   return {
     centerTile,
     height,

@@ -127,6 +127,10 @@ export type KingdomTileUpgradeOffer = WorldTileActionPlacement & {
 };
 type Props = {
   lanternPostAdornment?: React.ReactNode;
+  hideWorldTiles?: boolean;
+  onHeartwoodPress?: () => void;
+  onSelectHeartwoodBed?: (slotId: MossproutGardenPlantSlotId) => void;
+  hearthAdornment?: React.ReactNode;
   gardenEventAdornment?: React.ReactNode;
   background: TodayAtmosphereBackground;
   companionSlots: KingdomHexCompanionSlot[];
@@ -488,6 +492,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onOpenGarden,
   gardenEventAdornment,
   lanternPostAdornment,
+  hideWorldTiles = false,
+  onHeartwoodPress,
+  onSelectHeartwoodBed,
+  hearthAdornment,
   upgradeOffers = [],
   selectedUpgradeOffer = null,
   upgradePanel,
@@ -830,6 +838,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     (layer) => layer.id === 'structure:mossprout-hex-garden',
   ) ?? null, [scene.tileArtLayers]);
   const gardenFrame = gardenLayer?.interactionFrame ?? null;
+  const heartwoodFrame = scene.tileArtLayers.find(layer => layer.id === 'structure:mossprout-hex-garden')?.interactionFrame;
+  const hearthFrame = scene.tileArtLayers.find(layer => layer.id === 'structure:feastle-home')?.interactionFrame;
   const lanternLayer = scene.tileArtLayers.find(layer => layer.id === 'structure:steppling-home');
   const lanternFrame = lanternLayer?.interactionFrame ?? lanternLayer?.frame;
   const gardenFocusFrame = gardenLayer?.frame ?? null;
@@ -1721,7 +1731,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           handler leaves the otherwise-visible Kingdom canvas unresponsive. */}
       <GestureDetector key={`kingdom-camera-${assetRevision}`} gesture={camera.gesture}>
         <View style={StyleSheet.absoluteFill}>
-          <Animated.View style={[styles.scene, { width: scene.width, height: scene.height }, camera.worldStyle]}>
+          <Animated.View pointerEvents={hideWorldTiles ? 'none' : 'box-none'} accessibilityElementsHidden={hideWorldTiles} importantForAccessibility={hideWorldTiles ? 'no-hide-descendants' : 'auto'} style={[styles.scene, { width: scene.width, height: scene.height }, camera.worldStyle, hideWorldTiles && { opacity: 0 }]}>
             {scene.tileArtLayers.map((layer) => {
               // Memory plants are drawn on oversized, screen-projected native
               // surfaces below. A second camera-scaled copy here would soften
@@ -1837,7 +1847,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 </Fragment>
               );
             })}
+            {focusedMossproutWorld && onHeartwoodPress && heartwoodFrame && !upgradePresentation ? <Pressable accessibilityRole="button" accessibilityLabel="Heartwood. View world recovery and Garden supplies" onPress={onHeartwoodPress} style={{ position: 'absolute', left: heartwoodFrame.left + heartwoodFrame.width * 0.42, top: heartwoodFrame.top, width: heartwoodFrame.width * 0.16, height: heartwoodFrame.height * 0.24, zIndex: 34 }} /> : null}
             {focusedMossproutWorld && !upgradePresentation && lanternFrame && lanternPostAdornment ? <View style={{ position: 'absolute', left: lanternFrame.left + lanternFrame.width * 0.7, top: lanternFrame.top + lanternFrame.height * 0.25, zIndex: 35 }}>{lanternPostAdornment}</View> : null}
+            {focusedMossproutWorld && !upgradePresentation && hearthFrame && hearthAdornment ? <View style={{ position: 'absolute', left: hearthFrame.left + hearthFrame.width * 0.65, top: hearthFrame.top + hearthFrame.height * 0.3, zIndex: 35 }}>{hearthAdornment}</View> : null}
             {focusedMossproutWorld && interactionEnabled && !upgradePresentation && gardenFrame && gardenEventAdornment ? <View style={{ position: 'absolute', left: gardenFrame.left + gardenFrame.width * 0.72, top: gardenFrame.top + gardenFrame.height * 0.3, zIndex: 35 }}>{gardenEventAdornment}</View> : null}
             {focusedMossproutWorld && onGardenPlotTargetChange
               ? gardenPlotFrames.map(({ frame, slotId }) => (
@@ -1849,6 +1861,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                   />
                 ))
               : null}
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onSelectHeartwoodBed ? gardenPlotFrames.filter(({ slotId }) => !mossproutGarden?.plantableMemories.some(plant => plant.status === 'planted' && plant.slotId === slotId)).map(({ frame, slotId }) => <Pressable key={`empty-heartwood:${slotId}`} accessibilityRole="button" accessibilityLabel="Empty Heartwood bed. Choose a seed" onPress={() => onSelectHeartwoodBed(slotId)} style={{ position: 'absolute', ...frame, zIndex: 36 }} />) : null}
             {interactionEnabled
               && !camera.isMoving
               && !upgradePresentation
@@ -1927,6 +1940,23 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             })() : null}
             <Animated.View pointerEvents={soloLayerId ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle]}>{creatureNodes}</Animated.View>
           </Animated.View>
+          {/* Plants share the marker parent so badge zIndex can paint above every seed. */}
+          <Animated.View pointerEvents={soloLayerId || hideWorldTiles ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle, hideWorldTiles && { opacity: 0 }]}>{memoryPlantProjections.map((plant) => (
+            <ProjectedMemoryPlant
+              animateReveal={!plant.preview && memoryPlantRevealKeys.has(plant.visualKey)}
+              opacity={plant.preview ? 0.2 : 1}
+              cameraScale={camera.scaleValue}
+              cameraTranslateX={camera.translationXValue}
+              cameraTranslateY={camera.translationYValue}
+              color={plant.color}
+              frame={plant.frame}
+              key={plant.instanceId}
+              sceneHeight={scene.height}
+              sceneWidth={scene.width}
+              source={plant.source}
+              visualKey={plant.visualKey}
+            />
+          ))}</Animated.View>
           {/* Rendered inside the camera's own GestureDetector, not after it,
               so a drag starting on a marker still pans/pinches the world —
               a plain Pressable outside this subtree never saw those touches
@@ -1934,7 +1964,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               Pressable only cancels once the touch travels past its
               press-move threshold, same as every other world hit target
               here (nature islands, the gateway, memory plants). */}
-          {!upgradePresentation && interactionEnabled && onUpgradeOfferPress ? upgradeOffers.map((offer) => {
+          {!hideWorldTiles && !upgradePresentation && interactionEnabled && onUpgradeOfferPress ? upgradeOffers.map((offer) => {
             // Anchor to the painted stairs, not the island's larger touch target.
             const target = offer.visualTarget;
             const frame = target.kind === 'haven_nature_island'
@@ -1996,23 +2026,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           sceneHeight={scene.height} sceneWidth={scene.width} x={anchor.x} y={anchor.y - SHARED_RESIDENT_BASELINE_LIFT}
           onPress={interactionEnabled && !upgradePresentation && !storySceneGuard ? onSelectGateway : undefined} />;
       })() : null}
-      {/* Planted memories fade with the rest of the map while a docked board is up. */}
-      <Animated.View pointerEvents={soloLayerId ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle]}>{memoryPlantProjections.map((plant) => (
-        <ProjectedMemoryPlant
-          animateReveal={!plant.preview && memoryPlantRevealKeys.has(plant.visualKey)}
-          opacity={plant.preview ? 0.2 : 1}
-          cameraScale={camera.scaleValue}
-          cameraTranslateX={camera.translationXValue}
-          cameraTranslateY={camera.translationYValue}
-          color={plant.color}
-          frame={plant.frame}
-          key={plant.instanceId}
-          sceneHeight={scene.height}
-          sceneWidth={scene.width}
-          source={plant.source}
-          visualKey={plant.visualKey}
-        />
-      ))}</Animated.View>
       {selectedUpgradeOffer && upgradePanel && !upgradePresentation ? <>
         <Pressable style={[StyleSheet.absoluteFill, { zIndex: 31 }]} accessibilityRole="button" accessibilityLabel="Close upgrade" onPress={onDismissUpgrade} />
         {(() => {

@@ -1,0 +1,3443 @@
+[
+  {
+    "centerTile": {
+      "companion": {
+        "id": "family:mossprout",
+        "familyId": "mossprout",
+        "kind": "locked",
+        "coord": {
+          "q": 0,
+          "r": 1
+        }
+      },
+      "coord": {
+        "q": 0,
+        "r": 1
+      },
+      "cx": 775.8216595517611,
+      "cy": 1364.821257378342,
+      "depth": 3332.864125448261,
+      "id": "family:mossprout",
+      "kind": "companion"
+    },
+    "height": 2394,
+    "tileArtLayers": [
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": -2
+        },
+        "custom": true,
+        "depth": -6665.728250896522,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 107.84418356456786,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 216.43866299483238,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:feastle-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": -2
+        },
+        "custom": true,
+        "depth": -4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 274.48738983698104,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 383.08186926724534,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "structure:baristabbit-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 274.48738983698104,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 383.08186926724534,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:wanderling-trail",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -3332.864125448261,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 441.130596109394,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 549.7250755396585,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:steppling-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -1666.4320627241304,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 607.7738023818072,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 716.3682818120715,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:bloom-garden",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 40,
+          "top": 51,
+          "right": 981,
+          "bottom": 954
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 0,
+        "fallbackSource": null,
+        "frame": {
+          "height": 532.0890774125133,
+          "left": 510.0369299653347,
+          "top": 764.7012080179528,
+          "width": 532.0890774125133
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 883.0114880844845,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:mossprout-hex-garden",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/heartwood_garden_dormant.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/heartwood_garden_dormant.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.592,
+        "fallbackSource": null,
+        "frame": {
+          "left": 737.5050105591841,
+          "top": 1006.1615685693844,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 738.8352332527154,
+          "top": 1055.7539333625975,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:momentum",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/momentum_seed.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 1666.4320627241304,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 941.0602149266332,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1049.6546943568976,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:seed-nursery",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 43,
+          "top": 35,
+          "right": 980,
+          "bottom": 952
+        },
+        "coord": {
+          "q": 0,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 3332.864125448261,
+        "fallbackSource": null,
+        "frame": {
+          "height": 535.4962646744931,
+          "left": 508.3350000000001,
+          "top": 1095.8592376344784,
+          "width": 535.4962646744931
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 1216.2979006293106,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "family:mossprout",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\mossprout_focused_v1_main_hex_tile_512.webp",
+          "thumb": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        },
+        "residentSource": "@incubator/art-world/square/mossprout-standing-resident-512.webp",
+        "residentAnchor": {
+          "x": 776.0831323372466,
+          "y": 1358.2524073249801
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 2
+        },
+        "custom": true,
+        "depth": 4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 1274.3466274714592,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1382.9411069017237,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:pond-sanctuary",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 1274.3466274714592,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 1382.9411069017237,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:orchard-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 3
+        },
+        "custom": true,
+        "depth": 8332.160313620652,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 1607.6330400162853,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1716.2275194465496,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:ancient-tree-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": 2
+        },
+        "custom": true,
+        "depth": 8332.160313620652,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 1607.6330400162853,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 1716.2275194465496,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:wildgrowth-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": 3
+        },
+        "custom": true,
+        "depth": 9998.592376344783,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 1774.2762462886985,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 1882.8707257189628,
+          "width": 490,
+          "height": 344.82171349806254
+        },
+        "id": "structure:mossprout-old-grove",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      }
+    ],
+    "tileById": {},
+    "tiles": [
+      {
+        "companion": {
+          "id": "family:mossprout",
+          "familyId": "mossprout",
+          "kind": "locked",
+          "coord": {
+            "q": 0,
+            "r": 1
+          }
+        },
+        "coord": {
+          "q": 0,
+          "r": 1
+        },
+        "cx": 775.8216595517611,
+        "cy": 1364.821257378342,
+        "depth": 3332.864125448261,
+        "id": "family:mossprout",
+        "kind": "companion"
+      }
+    ],
+    "width": 1553
+  },
+  {
+    "centerTile": {
+      "companion": {
+        "id": "family:mossprout",
+        "familyId": "mossprout",
+        "kind": "locked",
+        "coord": {
+          "q": 0,
+          "r": 1
+        }
+      },
+      "coord": {
+        "q": 0,
+        "r": 1
+      },
+      "cx": 775.8216595517611,
+      "cy": 1364.821257378342,
+      "depth": 3332.864125448261,
+      "id": "family:mossprout",
+      "kind": "companion"
+    },
+    "height": 2394,
+    "tileArtLayers": [
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": -2
+        },
+        "custom": true,
+        "depth": -6665.728250896522,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 107.84418356456786,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 216.43866299483238,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:feastle-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": -2
+        },
+        "custom": true,
+        "depth": -4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 274.48738983698104,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 383.08186926724534,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "structure:baristabbit-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 274.48738983698104,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 383.08186926724534,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:wanderling-trail",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -3332.864125448261,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 441.130596109394,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 549.7250755396585,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:steppling-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -1666.4320627241304,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 607.7738023818072,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 716.3682818120715,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:bloom-garden",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 40,
+          "top": 50,
+          "right": 981,
+          "bottom": 954
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 0,
+        "fallbackSource": null,
+        "frame": {
+          "height": 532.0890774125133,
+          "left": 510.0369299653347,
+          "top": 764.7012080179528,
+          "width": 532.0890774125133
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 883.0114880844845,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:mossprout-hex-garden",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/heartwood_garden_stirring.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/heartwood_garden_stirring.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.548,
+        "fallbackSource": null,
+        "frame": {
+          "left": 639.0685312378691,
+          "top": 982.7496491632339,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 640.3987539314005,
+          "top": 1032.342013956447,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:stillness",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/stillness_seed.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.548,
+        "fallbackSource": null,
+        "frame": {
+          "left": 835.9414898804991,
+          "top": 982.7496491632339,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 837.2717125740304,
+          "top": 1032.342013956447,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:renewal",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/renewal_seed.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.592,
+        "fallbackSource": null,
+        "frame": {
+          "left": 737.5050105591841,
+          "top": 1006.1615685693844,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 738.8352332527154,
+          "top": 1055.7539333625975,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:momentum",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/momentum_sprout.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 1666.4320627241304,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 941.0602149266332,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1049.6546943568976,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:seed-nursery",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 43,
+          "top": 35,
+          "right": 980,
+          "bottom": 952
+        },
+        "coord": {
+          "q": 0,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 3332.864125448261,
+        "fallbackSource": null,
+        "frame": {
+          "height": 535.4962646744931,
+          "left": 508.3350000000001,
+          "top": 1095.8592376344784,
+          "width": 535.4962646744931
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 1216.2979006293106,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "family:mossprout",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\mossprout_focused_v1_main_hex_tile_512.webp",
+          "thumb": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        },
+        "residentSource": "@incubator/art-world/square/mossprout-standing-resident-512.webp",
+        "residentAnchor": {
+          "x": 776.0831323372466,
+          "y": 1358.2524073249801
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 2
+        },
+        "custom": true,
+        "depth": 4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 1274.3466274714592,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1382.9411069017237,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:pond-sanctuary",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 1274.3466274714592,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 1382.9411069017237,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:orchard-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 3
+        },
+        "custom": true,
+        "depth": 8332.160313620652,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 1607.6330400162853,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1716.2275194465496,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:ancient-tree-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": 2
+        },
+        "custom": true,
+        "depth": 8332.160313620652,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 1607.6330400162853,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 1716.2275194465496,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:wildgrowth-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": 3
+        },
+        "custom": true,
+        "depth": 9998.592376344783,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 1774.2762462886985,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 1882.8707257189628,
+          "width": 490,
+          "height": 344.82171349806254
+        },
+        "id": "structure:mossprout-old-grove",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      }
+    ],
+    "tileById": {},
+    "tiles": [
+      {
+        "companion": {
+          "id": "family:mossprout",
+          "familyId": "mossprout",
+          "kind": "locked",
+          "coord": {
+            "q": 0,
+            "r": 1
+          }
+        },
+        "coord": {
+          "q": 0,
+          "r": 1
+        },
+        "cx": 775.8216595517611,
+        "cy": 1364.821257378342,
+        "depth": 3332.864125448261,
+        "id": "family:mossprout",
+        "kind": "companion"
+      }
+    ],
+    "width": 1553
+  },
+  {
+    "centerTile": {
+      "companion": {
+        "id": "family:mossprout",
+        "familyId": "mossprout",
+        "kind": "locked",
+        "coord": {
+          "q": 0,
+          "r": 1
+        }
+      },
+      "coord": {
+        "q": 0,
+        "r": 1
+      },
+      "cx": 775.8216595517611,
+      "cy": 1364.821257378342,
+      "depth": 3332.864125448261,
+      "id": "family:mossprout",
+      "kind": "companion"
+    },
+    "height": 2394,
+    "tileArtLayers": [
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": -2
+        },
+        "custom": true,
+        "depth": -6665.728250896522,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 107.84418356456786,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 216.43866299483238,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:feastle-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": -2
+        },
+        "custom": true,
+        "depth": -4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 274.48738983698104,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 383.08186926724534,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "structure:baristabbit-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 274.48738983698104,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 383.08186926724534,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:wanderling-trail",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -3332.864125448261,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 441.130596109394,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 549.7250755396585,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:steppling-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -1666.4320627241304,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 607.7738023818072,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 716.3682818120715,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:bloom-garden",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 40,
+          "top": 24,
+          "right": 983,
+          "bottom": 954
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 0,
+        "fallbackSource": null,
+        "frame": {
+          "height": 532.0890774125133,
+          "left": 510.0369299653347,
+          "top": 764.7012080179528,
+          "width": 532.0890774125133
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 883.0114880844845,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:mossprout-hex-garden",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/heartwood_garden_rooted.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/heartwood_garden_rooted.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.414,
+        "fallbackSource": null,
+        "frame": {
+          "left": 584.2633562643803,
+          "top": 911.4497127899571,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 585.5935789579116,
+          "top": 961.0420775831702,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:warmth",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/warmth_sprout.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.414,
+        "fallbackSource": null,
+        "frame": {
+          "left": 890.746664853988,
+          "top": 911.4497127899571,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 892.0768875475193,
+          "top": 961.0420775831702,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:curiosity",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/curiosity_sprout.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.548,
+        "fallbackSource": null,
+        "frame": {
+          "left": 639.0685312378691,
+          "top": 982.7496491632339,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 640.3987539314005,
+          "top": 1032.342013956447,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:stillness",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/stillness_sprout.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.548,
+        "fallbackSource": null,
+        "frame": {
+          "left": 835.9414898804991,
+          "top": 982.7496491632339,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 837.2717125740304,
+          "top": 1032.342013956447,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:renewal",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/renewal_sprout.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.592,
+        "fallbackSource": null,
+        "frame": {
+          "left": 737.5050105591841,
+          "top": 1006.1615685693844,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 738.8352332527154,
+          "top": 1055.7539333625975,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:momentum",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/momentum_sprout.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 1666.4320627241304,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 941.0602149266332,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1049.6546943568976,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:seed-nursery",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 43,
+          "top": 35,
+          "right": 980,
+          "bottom": 952
+        },
+        "coord": {
+          "q": 0,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 3332.864125448261,
+        "fallbackSource": null,
+        "frame": {
+          "height": 535.4962646744931,
+          "left": 508.3350000000001,
+          "top": 1095.8592376344784,
+          "width": 535.4962646744931
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 1216.2979006293106,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "family:mossprout",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\mossprout_focused_v1_main_hex_tile_512.webp",
+          "thumb": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        },
+        "residentSource": "@incubator/art-world/square/mossprout-standing-resident-512.webp",
+        "residentAnchor": {
+          "x": 776.0831323372466,
+          "y": 1358.2524073249801
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 2
+        },
+        "custom": true,
+        "depth": 4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 1274.3466274714592,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1382.9411069017237,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:pond-sanctuary",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 1274.3466274714592,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 1382.9411069017237,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:orchard-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 3
+        },
+        "custom": true,
+        "depth": 8332.160313620652,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 1607.6330400162853,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1716.2275194465496,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:ancient-tree-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": 2
+        },
+        "custom": true,
+        "depth": 8332.160313620652,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 1607.6330400162853,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 1716.2275194465496,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:wildgrowth-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": 3
+        },
+        "custom": true,
+        "depth": 9998.592376344783,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 1774.2762462886985,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 1882.8707257189628,
+          "width": 490,
+          "height": 344.82171349806254
+        },
+        "id": "structure:mossprout-old-grove",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      }
+    ],
+    "tileById": {},
+    "tiles": [
+      {
+        "companion": {
+          "id": "family:mossprout",
+          "familyId": "mossprout",
+          "kind": "locked",
+          "coord": {
+            "q": 0,
+            "r": 1
+          }
+        },
+        "coord": {
+          "q": 0,
+          "r": 1
+        },
+        "cx": 775.8216595517611,
+        "cy": 1364.821257378342,
+        "depth": 3332.864125448261,
+        "id": "family:mossprout",
+        "kind": "companion"
+      }
+    ],
+    "width": 1553
+  },
+  {
+    "centerTile": {
+      "companion": {
+        "id": "family:mossprout",
+        "familyId": "mossprout",
+        "kind": "locked",
+        "coord": {
+          "q": 0,
+          "r": 1
+        }
+      },
+      "coord": {
+        "q": 0,
+        "r": 1
+      },
+      "cx": 775.8216595517611,
+      "cy": 1364.821257378342,
+      "depth": 3332.864125448261,
+      "id": "family:mossprout",
+      "kind": "companion"
+    },
+    "height": 2394,
+    "tileArtLayers": [
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": -2
+        },
+        "custom": true,
+        "depth": -6665.728250896522,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 107.84418356456786,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 216.43866299483238,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:feastle-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": -2
+        },
+        "custom": true,
+        "depth": -4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 274.48738983698104,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 383.08186926724534,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "structure:baristabbit-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 274.48738983698104,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 383.08186926724534,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:wanderling-trail",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -3332.864125448261,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 441.130596109394,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 549.7250755396585,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:steppling-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -1666.4320627241304,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 607.7738023818072,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 716.3682818120715,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:bloom-garden",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 40,
+          "top": 22,
+          "right": 982,
+          "bottom": 954
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 0,
+        "fallbackSource": null,
+        "frame": {
+          "height": 532.0890774125133,
+          "left": 510.0369299653347,
+          "top": 764.7012080179528,
+          "width": 532.0890774125133
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 883.0114880844845,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:mossprout-hex-garden",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/heartwood_garden_blooming.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/heartwood_garden_blooming.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.414,
+        "fallbackSource": null,
+        "frame": {
+          "left": 584.2633562643803,
+          "top": 911.4497127899571,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 585.5935789579116,
+          "top": 961.0420775831702,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:warmth",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/warmth_sprout.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.414,
+        "fallbackSource": null,
+        "frame": {
+          "left": 890.746664853988,
+          "top": 911.4497127899571,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 892.0768875475193,
+          "top": 961.0420775831702,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:curiosity",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/curiosity_sprout.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.548,
+        "fallbackSource": null,
+        "frame": {
+          "left": 639.0685312378691,
+          "top": 982.7496491632339,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 640.3987539314005,
+          "top": 1032.342013956447,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:stillness",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/stillness_bloom.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.548,
+        "fallbackSource": null,
+        "frame": {
+          "left": 835.9414898804991,
+          "top": 982.7496491632339,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 837.2717125740304,
+          "top": 1032.342013956447,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:renewal",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/renewal_bloom.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.592,
+        "fallbackSource": null,
+        "frame": {
+          "left": 737.5050105591841,
+          "top": 1006.1615685693844,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 738.8352332527154,
+          "top": 1055.7539333625975,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:momentum",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/momentum_bloom.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 1666.4320627241304,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 941.0602149266332,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1049.6546943568976,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:seed-nursery",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 43,
+          "top": 35,
+          "right": 980,
+          "bottom": 952
+        },
+        "coord": {
+          "q": 0,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 3332.864125448261,
+        "fallbackSource": null,
+        "frame": {
+          "height": 535.4962646744931,
+          "left": 508.3350000000001,
+          "top": 1095.8592376344784,
+          "width": 535.4962646744931
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 1216.2979006293106,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "family:mossprout",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\mossprout_focused_v1_main_hex_tile_512.webp",
+          "thumb": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        },
+        "residentSource": "@incubator/art-world/square/mossprout-standing-resident-512.webp",
+        "residentAnchor": {
+          "x": 776.0831323372466,
+          "y": 1358.2524073249801
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 2
+        },
+        "custom": true,
+        "depth": 4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 1274.3466274714592,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1382.9411069017237,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:pond-sanctuary",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 1274.3466274714592,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 1382.9411069017237,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:orchard-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 3
+        },
+        "custom": true,
+        "depth": 8332.160313620652,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 1607.6330400162853,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1716.2275194465496,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:ancient-tree-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": 2
+        },
+        "custom": true,
+        "depth": 8332.160313620652,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 1607.6330400162853,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 1716.2275194465496,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:wildgrowth-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": 3
+        },
+        "custom": true,
+        "depth": 9998.592376344783,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 1774.2762462886985,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 1882.8707257189628,
+          "width": 490,
+          "height": 344.82171349806254
+        },
+        "id": "structure:mossprout-old-grove",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      }
+    ],
+    "tileById": {},
+    "tiles": [
+      {
+        "companion": {
+          "id": "family:mossprout",
+          "familyId": "mossprout",
+          "kind": "locked",
+          "coord": {
+            "q": 0,
+            "r": 1
+          }
+        },
+        "coord": {
+          "q": 0,
+          "r": 1
+        },
+        "cx": 775.8216595517611,
+        "cy": 1364.821257378342,
+        "depth": 3332.864125448261,
+        "id": "family:mossprout",
+        "kind": "companion"
+      }
+    ],
+    "width": 1553
+  },
+  {
+    "centerTile": {
+      "companion": {
+        "id": "family:mossprout",
+        "familyId": "mossprout",
+        "kind": "locked",
+        "coord": {
+          "q": 0,
+          "r": 1
+        }
+      },
+      "coord": {
+        "q": 0,
+        "r": 1
+      },
+      "cx": 775.8216595517611,
+      "cy": 1364.821257378342,
+      "depth": 3332.864125448261,
+      "id": "family:mossprout",
+      "kind": "companion"
+    },
+    "height": 2394,
+    "tileArtLayers": [
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": -2
+        },
+        "custom": true,
+        "depth": -6665.728250896522,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 107.84418356456786,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 216.43866299483238,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:feastle-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": -2
+        },
+        "custom": true,
+        "depth": -4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 274.48738983698104,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 383.08186926724534,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "structure:baristabbit-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 274.48738983698104,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 383.08186926724534,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:wanderling-trail",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -3332.864125448261,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 441.130596109394,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 549.7250755396585,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:steppling-home",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": -1
+        },
+        "custom": true,
+        "depth": -1666.4320627241304,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 607.7738023818072,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 716.3682818120715,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:bloom-garden",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 40,
+          "top": 20,
+          "right": 981,
+          "bottom": 954
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 0,
+        "fallbackSource": null,
+        "frame": {
+          "height": 532.0890774125133,
+          "left": 510.0369299653347,
+          "top": 764.7012080179528,
+          "width": 532.0890774125133
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 883.0114880844845,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "structure:mossprout-hex-garden",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/heartwood_garden_awakened.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/heartwood_garden_awakened.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.414,
+        "fallbackSource": null,
+        "frame": {
+          "left": 584.2633562643803,
+          "top": 911.4497127899571,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 585.5935789579116,
+          "top": 961.0420775831702,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:warmth",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/warmth_bloom.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.414,
+        "fallbackSource": null,
+        "frame": {
+          "left": 890.746664853988,
+          "top": 911.4497127899571,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 892.0768875475193,
+          "top": 961.0420775831702,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:curiosity",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/curiosity_bloom.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.548,
+        "fallbackSource": null,
+        "frame": {
+          "left": 639.0685312378691,
+          "top": 982.7496491632339,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 640.3987539314005,
+          "top": 1032.342013956447,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:stillness",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/stillness_bloom.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.548,
+        "fallbackSource": null,
+        "frame": {
+          "left": 835.9414898804991,
+          "top": 982.7496491632339,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 837.2717125740304,
+          "top": 1032.342013956447,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:renewal",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/renewal_bloom.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 0,
+          "top": 0,
+          "right": 384,
+          "bottom": 384
+        },
+        "coord": {
+          "q": 0,
+          "r": 0
+        },
+        "custom": true,
+        "depth": 1.592,
+        "fallbackSource": null,
+        "frame": {
+          "left": 737.5050105591841,
+          "top": 1006.1615685693844,
+          "width": 77.15291622481443,
+          "height": 77.15291622481443
+        },
+        "interactionFrame": {
+          "left": 738.8352332527154,
+          "top": 1055.7539333625975,
+          "width": 74.49247083775188,
+          "height": 47.8880169671262
+        },
+        "id": "plant:momentum",
+        "kind": "structure",
+        "source": "@incubator/art-world/memory-plants/momentum_bloom.webp",
+        "sourceSize": {
+          "width": 384,
+          "height": 384
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 1666.4320627241304,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 941.0602149266332,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1049.6546943568976,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:seed-nursery",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 43,
+          "top": 35,
+          "right": 980,
+          "bottom": 952
+        },
+        "coord": {
+          "q": 0,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 3332.864125448261,
+        "fallbackSource": null,
+        "frame": {
+          "height": 535.4962646744931,
+          "left": 508.3350000000001,
+          "top": 1095.8592376344784,
+          "width": 535.4962646744931
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 1216.2979006293106,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "family:mossprout",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\mossprout_focused_v1_main_hex_tile_512.webp",
+          "thumb": "@incubator/art-world/hex/mossprout_focused_v1_main_hex_tile_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        },
+        "residentSource": "@incubator/art-world/square/mossprout-standing-resident-512.webp",
+        "residentAnchor": {
+          "x": 776.0831323372466,
+          "y": 1358.2524073249801
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 2
+        },
+        "custom": true,
+        "depth": 4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 1274.3466274714592,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1382.9411069017237,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:pond-sanctuary",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": 1
+        },
+        "custom": true,
+        "depth": 4999.296188172391,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 1274.3466274714592,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 1382.9411069017237,
+          "width": 490,
+          "height": 344.8217134980625
+        },
+        "id": "nature:mossprout:orchard-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": -1,
+          "r": 3
+        },
+        "custom": true,
+        "depth": 8332.160313620652,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 107.48665955176102,
+          "top": 1607.6330400162853,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 118.48665955176102,
+          "top": 1716.2275194465496,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:ancient-tree-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 1,
+          "r": 2
+        },
+        "custom": true,
+        "depth": 8332.160313620652,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 932.1566595517611,
+          "top": 1607.6330400162853,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 943.1566595517611,
+          "top": 1716.2275194465496,
+          "width": 490,
+          "height": 344.8217134980624
+        },
+        "id": "nature:mossprout:wildgrowth-grove",
+        "kind": "tile",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      },
+      {
+        "alphaBounds": {
+          "left": 22,
+          "top": 114,
+          "right": 1002,
+          "bottom": 972
+        },
+        "coord": {
+          "q": 0,
+          "r": 3
+        },
+        "custom": true,
+        "depth": 9998.592376344783,
+        "fallbackSource": null,
+        "frame": {
+          "height": 512,
+          "left": 519.8216595517611,
+          "top": 1774.2762462886985,
+          "width": 512
+        },
+        "interactionFrame": {
+          "left": 530.8216595517611,
+          "top": 1882.8707257189628,
+          "width": 490,
+          "height": 344.82171349806254
+        },
+        "id": "structure:mossprout-old-grove",
+        "kind": "structure",
+        "source": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+        "sources": {
+          "full": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4.webp",
+          "medium": "C:\\Users\\daruk\\Projects\\Katchimeras\\katchimeras\\art\\assets\\images\\katchimeras\\world\\hex\\dream_mist_locked_hex_tile_v4_512.webp",
+          "thumb": "@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp"
+        },
+        "sourceSize": {
+          "height": 1024,
+          "width": 1024
+        }
+      }
+    ],
+    "tileById": {},
+    "tiles": [
+      {
+        "companion": {
+          "id": "family:mossprout",
+          "familyId": "mossprout",
+          "kind": "locked",
+          "coord": {
+            "q": 0,
+            "r": 1
+          }
+        },
+        "coord": {
+          "q": 0,
+          "r": 1
+        },
+        "cx": 775.8216595517611,
+        "cy": 1364.821257378342,
+        "depth": 3332.864125448261,
+        "id": "family:mossprout",
+        "kind": "companion"
+      }
+    ],
+    "width": 1553
+  }
+]

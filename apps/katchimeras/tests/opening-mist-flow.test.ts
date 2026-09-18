@@ -50,6 +50,8 @@ function loadRuntime(stored?: unknown) {
 const merge = (revision: number) => ({ type: 'merge_completed', fromInstanceId: `a${revision}`, targetInstanceId: `b${revision}`, resultDefinitionId: 'nature:garden:2', resultCell: 16 + revision, revision });
 
 test('the opening is three haven beats before the Egg: look closer, clear the Mist, the veil lifts', () => {
+  const kingdomScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  assert.doesNotMatch(kingdomScreen, /hideWorldTiles=/, 'dialogue must not hide the island supporting Mossprout');
   assert.deepEqual(validateMossproutFtueScript(), []);
   assert.equal(MOSSPROUT_FTUE_SCRIPT.entryStepId, 'world.mist_open');
   assert.equal(MOSSPROUT_FTUE_FLOW.entryNodeId, MOSSPROUT_FTUE_SCRIPT.entryStepId);
@@ -58,8 +60,8 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
   assert.equal(open.camera?.kind === 'focus_target' ? open.camera.durationMs : null, OPENING_CAMERA_ENTRY_MS, 'the glide runs for the length of the captions');
   assert.equal(open.actions[0]?.id, 'world.look_closer');
   assert.equal(open.actions[0]?.nextStepId, 'world.mist_clear');
-  assert.equal(open.guide.title, 'Nobody has looked at this place in years.');
-  assert.equal(open.guide.body, 'The Mist came in and stayed. Then you looked.');
+  assert.equal(open.guide.title, 'Once, every path led home. Then the lights went out.');
+  assert.equal(open.guide.body, 'A flicker beneath the Mist. Someone is still in there.');
   const clear = mossproutFtueStep('world.mist_clear')!;
   assert.equal(clear.surface, 'haven', 'a haven step keeps the docked board ungated and resumes to the Kingdom');
   assert.equal(clear.interaction?.mode, 'none');

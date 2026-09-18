@@ -14,7 +14,7 @@ export type MossproutMemoryPlantDefinition = {
 };
 
 export const MOSSPROUT_GARDEN_PLANT_SLOTS: readonly MossproutGardenPlantSlotId[] = [
-  'back-left', 'back-centre', 'back-right', 'front-left', 'front-centre', 'front-right',
+  'back-left', 'back-centre', 'back-right', 'front-left', 'front-right',
 ];
 
 export const MOSSPROUT_MEMORY_PLANTS: readonly MossproutMemoryPlantDefinition[] = [
@@ -66,6 +66,16 @@ export const MOSSPROUT_MEMORY_PLANTS: readonly MossproutMemoryPlantDefinition[] 
       seed: require('@incubator/art-world/memory-plants/curiosity_seed.webp'),
       sprout: require('@incubator/art-world/memory-plants/curiosity_sprout.webp'),
       bloom: require('@incubator/art-world/memory-plants/curiosity_bloom.webp'),
+    },
+  },
+  {
+    id: 'connection', name: 'Seed of Connection', color: '#AC83D7',
+    description: 'For the small things that bring us closer.',
+    reflection: 'A little kindness can put down roots in two places at once.',
+    art: {
+      seed: require('@incubator/art-world/memory-plants/connection_seed.webp'),
+      sprout: require('@incubator/art-world/memory-plants/connection_sprout.webp'),
+      bloom: require('@incubator/art-world/memory-plants/connection_bloom.webp'),
     },
   },
 ] as const;

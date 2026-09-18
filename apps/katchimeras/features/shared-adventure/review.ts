@@ -3,6 +3,9 @@ import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { createMissionState } from '@/features/onboarding/steppling-mission';
 import { missionPairs, missionWakes, missionWindow } from '@/features/mission-mechanics/board-window';
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
+import { HEARTWOOD_STORY } from './heartwood-opening';
+import { MOSSPROUT_GREETING_OPTIONS, MOSSPROUT_FTUE_COPY } from '@/features/onboarding/mossprout-ftue-copy';
+import { MOSSPROUT_FIRST_NOTICE } from '@/features/onboarding/mossprout-first-grow';
 
 /** The same bundled definitions the app uses, reviewed in the existing Live Ops Studio. */
 export function sharedAdventureReview() {
@@ -29,7 +32,9 @@ export function sharedAdventureReview() {
     if (!MERGE_ITEMS_BY_ID.has(item.definitionId)) issues.push(`${order.id}: unknown item ${item.definitionId}`);
   }
   return { adventure: FIRST_ANSWER, orders: [PREPARATION_ORDER, DOORSTEP_ORDER], routes, issues,
-    rollout: 'Development builds only; native acceptance required before enabling production.',
+    opening: { scenes: HEARTWOOD_STORY, copy: MOSSPROUT_FTUE_COPY, greetings: MOSSPROUT_GREETING_OPTIONS, bond: MOSSPROUT_FIRST_NOTICE,
+      art: { dormant: '/api/heartwood-art/dormant', stirring: '/api/heartwood-art/stirring', rooted: '/api/heartwood-art/rooted' } },
+    rollout: 'Bundled opening and shared adventure enabled in development and release.',
     economy: '20 Glow per route per local day; 60 total. Practice runs give no currency, Bond or Harmony.',
   };
 }

@@ -12,7 +12,7 @@ const openingLines: Record<string, string> = {
   radiant: 'I felt a burst of sunshine through the shell. The Mist hates that. I’m glad we get to share it.',
   light: 'There was a gentle warmth around my shell, right through the Mist. I think that was you.',
   meh: 'A quiet sort of day? We don’t have to make it into anything bigger.',
-  heavy: 'A heavy day. The Mist is made of those. We can take our time here. I’m glad you came.',
+  heavy: 'A heavy day. You can set a little of it down here. I’m glad you came.',
   stormy: 'Sounds like there’s a lot moving around inside. Even that is light to me. We can start with one small thing.',
   pretty_good: 'So that little patch of sunshine was you.',
   mostly_drifting: 'Oh! I felt the breeze carrying us along. Drifting can still bring you somewhere new.',
@@ -36,10 +36,28 @@ const openingLines: Record<string, string> = {
   default: 'Your answers found me in the Mist. That’s how I knew where to hatch.',
 };
 
+/** Opening-only wording; IDs still select the same optional personal activities. */
+function openingFollowup(intent: string | null | undefined) {
+  const original = mossproutFollowup(intent);
+  const words: Record<string, [string, string]> = {
+    demands: ['🍃 A corner where nothing needs me', 'Then this Garden will have a quiet corner. No requests from the ferns. I’ll have a word with them.'],
+    busy_thoughts: ['🌿 Something simple to look after', 'One leaf, one small beginning. Heartwood can wait while we find our footing.'],
+    pause: ['☁️ Somewhere to catch my breath', 'We’ll leave room for that. A home should welcome tired travellers too.'],
+    easy_start: ['🌱 One small thing I can start', 'Our seed is excellent at being small. We’ll wake the Garden one thing at a time.'],
+    self_care: ['🍵 A place to look after myself', 'Then this is your stop along the road as well as mine. Adventures need somewhere to come back to.'],
+    care: ['🌼 Something I can help grow', 'You and me, then. I know the roots. You can tell me when I’m fussing over them.'],
+    peaceful: ['🍃 A quiet place between adventures', 'A quiet Garden beside a long road. That sounds like somewhere I’d come home to.'],
+    curious: ['🔎 A new discovery every visit', 'I can offer one mysterious root immediately. I have been trying to identify it for years.'],
+    company: ['💛 A friend to share it with', 'Well. Here I am. Slightly mossy, but very pleased to meet you.'],
+  };
+  return { prompt: 'As we help Heartwood wake, this Garden will be our home. What would make it feel like yours?',
+    options: original.options.map(option => ({ ...option, label: words[option.id][0], reply: words[option.id][1] })) };
+}
+
 function definition(key: string, opening: string): ConversationDefinition {
   return {
     id: `${MOSSPROUT_FTUE_CONVERSATION_PREFIX}:${key}`,
-    version: 10,
+    version: 11,
     familyId: 'mossprout',
     title: 'Meet Mossprout',
     trigger: 'evergreen',
@@ -56,10 +74,10 @@ function definition(key: string, opening: string): ConversationDefinition {
     entryNodeId: 'hello',
     nodes: [
       {
-        id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout. I was the last one the Mist took, so I was the first one out.`,
+        id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout. See that great tree? Heartwood. Every path used to meet beneath it.`,
         options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'followup' })),
       },
-      { id: 'followup', kind: 'choice', prompt: mossproutFollowup('progress').prompt, options: mossproutFollowup('progress').options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) },
+      { id: 'followup', kind: 'choice', prompt: openingFollowup('progress').prompt, options: openingFollowup('progress').options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) },
       { id: 'end', kind: 'end', message: MOSSPROUT_FTUE_COPY.seedOrigin },
     ],
   };
@@ -67,14 +85,14 @@ function definition(key: string, opening: string): ConversationDefinition {
 
 export function resolveMossproutFtueConversation(definition: ConversationDefinition, intent: string | null | undefined, savedVersion: number, hatchInsight?: string) {
   if (!definition.id.startsWith(MOSSPROUT_FTUE_CONVERSATION_PREFIX)) return definition;
-  const followup = mossproutFollowup(intent);
+  const followup = savedVersion >= 11 ? openingFollowup(intent) : mossproutFollowup(intent);
   // New meetings connect the player’s intention to the Seed before planting.
   // Keep older sessions on their saved route, including the v8 follow-up.
   const hasFollowup = savedVersion === 8 || savedVersion >= 10;
   return { ...definition, nodes: [...definition.nodes.filter((node) => node.id !== 'followup'), ...(hasFollowup ? [{ id: 'followup', kind: 'choice' as const, prompt: followup.prompt, options: [] }] : [])].map((node) => {
-    if (node.id === 'hello' && node.kind === 'choice') return { ...node, ...(hatchInsight ? { prompt: `${hatchInsight}\n\nI’m Mossprout. I’m glad you found me.` } : {}), options: node.options.map((option) => ({ ...option, nextNodeId: hasFollowup ? 'followup' : 'end' })) };
+    if (node.id === 'hello' && node.kind === 'choice') return { ...node, ...(hatchInsight ? { prompt: `${hatchInsight}\n\nI’m Mossprout. That great tree is Heartwood. Every path used to meet beneath it.` } : {}), options: node.options.map((option) => ({ ...option, nextNodeId: hasFollowup ? 'followup' : 'end' })) };
     if (node.id !== 'followup') return node;
-    return { id: 'followup', kind: 'choice' as const, prompt: `${hatchInsight && !intent ? 'We can grow a small beginning together.' : intent?.replace('desired-help:', '') === 'calm' ? 'You said a little calm would feel good.' : intent?.replace('desired-help:', '') === 'unsure' ? 'You said you weren’t sure what would feel good yet. That’s all right.' : 'You said a little progress would feel good.'}\n\n${followup.prompt}`, options: followup.options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) };
+    return { id: 'followup', kind: 'choice' as const, prompt: savedVersion >= 11 ? followup.prompt : `${hatchInsight && !intent ? 'We can grow a small beginning together.' : intent?.replace('desired-help:', '') === 'calm' ? 'You said a little calm would feel good.' : intent?.replace('desired-help:', '') === 'unsure' ? 'You said you weren’t sure what would feel good yet. That’s all right.' : 'You said a little progress would feel good.'}\n\n${followup.prompt}`, options: followup.options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) };
   }) };
 }
 

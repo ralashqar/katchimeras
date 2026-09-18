@@ -89,7 +89,7 @@ export function nativeMotionHarness() {
 }
 
 const requireFromTest = createRequire(import.meta.url);
-export function loadNativeModule(path: string, mocks: Record<string, unknown>, globals: Record<string, unknown> = {}, declaration?: string) {
+export function loadNativeModule(path: string, mocks: Record<string, unknown>, globals: Record<string, unknown> = {}, declaration?: string, compiler: 'typescript' | 'babel' = 'typescript') {
   let source = readFileSync(path, 'utf8');
   if (declaration) {
     const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -102,7 +102,14 @@ export function loadNativeModule(path: string, mocks: Record<string, unknown>, g
     if (!statement) throw new Error(`Missing ${declaration}`);
     source = `${statement.getText(file)}\nexports.${declaration} = ${declaration};`;
   }
-  const code = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  // Opt in for pure scene modules: Babel's JSON namespace interop matches the
+  // native bundle and includes `default`, unlike the legacy TS test transform.
+  const code = compiler === 'babel'
+    ? requireFromTest('@babel/core').transformSync(source, {
+      filename: resolve(path), configFile: false, babelrc: false,
+      plugins: [requireFromTest.resolve('@babel/plugin-transform-typescript'), requireFromTest.resolve('@babel/plugin-transform-modules-commonjs')],
+    }).code
+    : ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const module = { exports: {} as Record<string, Function> };
   runInNewContext(code, {
     // The sandbox stands in for a React Native runtime, which always has timers.
@@ -116,7 +123,7 @@ export function loadNativeModule(path: string, mocks: Record<string, unknown>, g
         const resolved = localRequire.resolve(id);
         // Metro treats artwork as an asset reference, never JavaScript source.
         if (/\.(webp|png|jpe?g|gif)$/.test(resolved)) return resolved;
-        return loadNativeModule(resolved, mocks, globals);
+        return loadNativeModule(resolved, mocks, globals, undefined, compiler);
       }
       return requireFromTest(id);
     },

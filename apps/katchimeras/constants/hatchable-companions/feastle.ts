@@ -16,7 +16,7 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
     "revealPreset": "mist-clear",
     "alphaBoundsKey": "feastle_hearth_v1_hex_tile.webp",
     "markerLines": {
-      "sleeping": "Somewhere beyond the Mist, a spoon taps against a bowl."
+      "sleeping": "The old lantern path leads to a warm table. A spoon taps against a bowl."
     }
   },
   "availability": {
@@ -171,7 +171,7 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
       "title": "A Seat Kept Warm"
     },
     "conversationId": "feastle:journey:day-one",
-    "opening": "Oh. You found the table. I kept setting two places, even when I could only see one. I am Feastle. What shall our first meal feel like?",
+    "opening": "A lantern path? It used to bring friends from all around Heartwood to this table. I am Feastle. I kept setting two places. What shall we share first?",
     "choices": [
       {
         "id": "simple",
@@ -207,8 +207,8 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
     },
     "taskCapability": "feastle.garden.task",
     "eventPrefix": "feastle.garden",
-    "closing": "A Snack. Two places. That is enough for a beginning. The Mist has less room here now.",
-    "summary": "Warmth begins with what we have",
+    "closing": "A Snack, a warm hearth, and a place for whoever finds our signal. Mossprout has the roots. Steppling has the path. I’ll keep the welcome ready.",
+    "summary": "A welcoming hearth beneath Heartwood",
     "generatorId": "hearth-pantry",
     "parcelArrivalId": "journey:feastle:day-1:hearth-pantry",
     "growDefinitionId": "food:table:2",
@@ -254,14 +254,14 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
       "serve": {
         "eyebrow": "A seat for you",
         "title": "Serve our first Snack.",
-        "body": "It does not need to be a feast to be worth sharing."
+        "body": "Our lantern should lead to a welcome. Begin with one Snack for this hearth."
       },
       "finale": {
         "eyebrow": "Together",
         "title": "Back to Feastle.",
         "body": ""
       },
-      "finaleAction": "A place at the table"
+      "finaleAction": "Prepare our first signal"
     }
   },
   "egg": {

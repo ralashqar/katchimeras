@@ -112,7 +112,8 @@ test('the bar reads objective progress and the veil follows the opening steps', 
   for (const stepId of ['world.mist_open', 'world.mist_clear', 'world.mist_lift', 'world.egg_intro', 'egg.opening', 'egg.context', 'egg.ready']) {
     assert.equal(homeSoloForStep(stepId), true, `${stepId}: the tile stands alone until the hatch`);
   }
-  assert.equal(homeSoloForStep('companion.first_meeting'), false, 'the islands are met after the hatch');
+  assert.equal(homeSoloForStep('companion.first_meeting'), true, 'the post-hatch conversation keeps Mossprout on its own island');
+  assert.equal(homeSoloForStep('companion.garden_intro'), true, 'the Tree waits until the Garden reveal');
   assert.equal(homeSoloForStep('world.garden_arrival'), false);
   assert.equal(homeSoloForStep(null), false);
 });

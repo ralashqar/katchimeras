@@ -139,7 +139,7 @@ export const MISTLE_ANCIENT_TREE_CAMPAIGN: IslandCampaignDefinition<MistleMistSt
         trusting: 'You were the voice through the mist. I still listen for it.',
       },
       prompt: 'So many small things helped this tree grow. A pot. A path. Someone keeping a space beside it. I can see them all now, and I still cannot see where the fog ends. I think I have stopped needing to.\n\nWhat would you want to remember about not knowing, from here on?',
-      fallbackOrder: order('The Heartwood', 'Make a Heartwood Sanctuary and an Ancient Tree to give the grove a heart full of light.', 'major', 'comfort', [{ definitionId: 'hybrid:heartwood-sanctuary', quantity: 1 }, { definitionId: 'nature:garden:7', quantity: 1 }]),
+      fallbackOrder: order('The Heartwood', 'Make a Heartwood Sanctuary and an Ancient Tree to restore the Sanctuary at Heartwood, where the lantern paths meet.', 'major', 'comfort', [{ definitionId: 'hybrid:heartwood-sanctuary', quantity: 1 }, { definitionId: 'nature:garden:7', quantity: 1 }]),
       choices: [
         {
           id: 'remember-step', label: 'I only need the next step', reply: 'The next step. The fog only ever asked for that much.',

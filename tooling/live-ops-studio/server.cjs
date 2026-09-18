@@ -23,6 +23,10 @@ async function main() {
     next();
   });
   app.use(express.json({ limit: '3mb' }));
+  app.get('/api/heartwood-art/:stage', (req, res) => {
+    if (!['dormant', 'stirring', 'rooted'].includes(req.params.stage)) return res.sendStatus(404);
+    res.sendFile(path.resolve(__dirname, '../../art/assets/images/katchimeras/world/hex', `heartwood_${req.params.stage}_512.webp`));
+  });
   app.get('/api/shared-adventure-review', wrap(async (_, res) => {
     const { sharedAdventureReview } = moduleAt('features/shared-adventure/review.ts');
     res.json(sharedAdventureReview());

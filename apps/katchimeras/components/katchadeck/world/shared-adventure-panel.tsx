@@ -1,3 +1,4 @@
+import { heartwoodStage } from '@/features/shared-adventure/heartwood-progression';
 import { useEffect, useRef, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
@@ -17,11 +18,12 @@ import { OPENING_BOARD_LAYOUT } from '@/features/onboarding/opening-mist';
 import { missionWindow } from '@/features/mission-mechanics/board-window';
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import { gameNow } from '@/utils/game-clock';
+import { HeartwoodVista } from './heartwood-vista';
 
 const LAYOUT = { ...OPENING_BOARD_LAYOUT, rows: 4, cellIndices: missionWindow(4).cellIndices, accessibilityLabel: 'Lantern route merge board, five columns by four rows' };
 const EMPTY = new Set<string>();
-export function SharedAdventurePanel({ world, onClose, onGarden, onFeastle }: {
-  world: MergeWorldState; onClose: () => void; onGarden: () => void; onFeastle: () => void;
+export function SharedAdventurePanel({ world, onClose, onGarden, onFeastle, routeCompanion }: {
+  world: MergeWorldState; onClose: () => void; onGarden: () => void; onFeastle: () => void; routeCompanion?: string;
 }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -59,19 +61,21 @@ export function SharedAdventurePanel({ world, onClose, onGarden, onFeastle }: {
   const send = (command: AdventureCommand) => work(() => applyStoredAdventure(command));
   const run = world.sharedAdventure?.run;
   const route = run && !run.completedAt ? routeById(run.routeId) : undefined;
-  const scene = definition?.nodes.find(n => n.id === flow?.nodeId);
+  const nodeId = flow ? definition?.migrations?.[flow.nodeId] ?? flow.nodeId : undefined;
+  const scene = definition?.nodes.find(n => n.id === nodeId);
   const line = scene?.kind === 'scene' ? scene : null;
   const button = (label: string, action: () => void, key = label) => <KatchaButton key={key} label={label} disabled={pending} onPress={action} />;
   return <Modal transparent visible animationType="fade" onRequestClose={onClose}>
     <View style={[styles.scrim, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 20 }]}>
       <ScrollView contentContainerStyle={styles.card} style={route ? { maxHeight: '36%' } : { maxHeight: '85%' }}>
-        <Image source={require('@incubator/art-world/props/prop_lantern.png')} style={styles.lantern} contentFit="contain" />
+        {!route ? <HeartwoodVista stage={heartwoodStage(world) === 'awakened' || heartwoodStage(world) === 'blooming' ? heartwoodStage(world) : undefined} compact signal send={beatId === 'answer' && nodeId === 'send-signal'} answer={Boolean(world.sharedAdventure?.completedAt) || (beatId === 'answer' && ['receive-answer', 'road-ahead'].includes(nodeId ?? ''))} />
+          : <Image source={require('@incubator/art-world/props/prop_lantern.png')} style={styles.lantern} contentFit="contain" />}
         <Text style={styles.eyebrow}>{FIRST_ANSWER.destination}</Text>
         <Text accessibilityRole="header" style={styles.title}>{route?.title ?? next?.title ?? FIRST_ANSWER.title}</Text>
         {line ? <>
           <Text style={styles.speaker}>{String(line.payload?.speaker)}</Text>
           <Text style={styles.body}>{String(line.payload?.text)}</Text>
-          {beatId === 'answer' && flow?.nodeId === 'line:3' ? <Text style={styles.body}>{({ welcome: 'You are welcome here. That is the promise our light carries.', rest: 'A place to rest. That is the promise our light carries.', company: 'You are not alone. That is the promise our light carries.' })[world.sharedAdventure?.promise ?? 'welcome']}</Text> : null}
+          {beatId === 'answer' && nodeId === 'road-ahead' ? <Text style={styles.body}>{({ welcome: 'You are welcome here. That is the promise our light carries.', rest: 'A place to rest. That is the promise our light carries.', company: 'You are not alone. That is the promise our light carries.' })[world.sharedAdventure?.promise ?? 'welcome']}</Text> : null}
           {line.actions.map(action => button(action.id === 'continue' ? 'Continue' : ({ welcome: 'You are welcome here', rest: 'A place to rest', company: 'You are not alone' }[action.id] ?? action.id), () => {
             void work(async () => { setFlow(await dispatchContentFlowCommand(flow!.runId, { type: 'submit_scene', actionId: action.id })); });
           }, action.id))}
@@ -82,10 +86,10 @@ export function SharedAdventurePanel({ world, onClose, onGarden, onFeastle }: {
         {next?.kind === 'mission' && !route ? button('Clear the signal site', () => { void send({ type: 'start_route', routeId: 'signal-site' }); }) : null}
         {route && run ? <><Text style={styles.body}>Match pairs and wake matching pieces in the Mist. Your route saves after every move.</Text>{run.merges >= route.required ? button(route.id === 'signal-site' ? 'Raise the Lantern Post' : 'Bring the light home', () => { void send({ type: 'finish_route', runId: run.id }); }) : null}</> : null}
         {next?.kind === 'routes' && !route ? <>
-          <Text style={styles.body}>Someone beyond the trees answered. Follow the lantern paths while we prepare the way to Heartwood.</Text>
+          <Text style={styles.body}>Someone beyond the trees answered. Heartwood is Rooted again. Follow the lantern paths while we discover which home needs our light next.</Text>
           {world.sharedAdventure?.pathfinderAt ? <Text style={styles.speaker}>First Pathfinder · all three paths explored</Text> : null}
           {run?.completedAt ? <Text style={styles.body}>{run.reward ? `You brought home ${run.reward} Glow.` : 'A little more light along the path.'}</Text> : null}
-          {LANTERN_ROUTES.map(r => button(`${r.title} · ${routeRewardAvailable(world.sharedAdventure!, r.id, clock) ? '20 Glow today' : 'Practice · no Glow'}`, () => { void send({ type: 'start_route', routeId: r.id }); }, r.id))}
+          {LANTERN_ROUTES.filter(r => !routeCompanion || r.companion === routeCompanion).map(r => button(`${r.title} · ${routeRewardAvailable(world.sharedAdventure!, r.id, clock) ? '20 Glow today' : 'Practice · no Glow'}`, () => { void send({ type: 'start_route', routeId: r.id }); }, r.id))}
           <Text style={styles.body}>Each path gives Glow once per local day. Come back whenever you like.</Text>
         </> : null}
         {error ? <Text accessibilityRole="alert" style={styles.body}>{error}</Text> : null}

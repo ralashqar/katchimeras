@@ -1,4 +1,3 @@
-import { SHARED_ADVENTURE_ENABLED } from '@/features/shared-adventure/catalog';
 import { HATCH_PROFILES } from './hatch-profile';
 import { MOSSPROUT_GARDEN_RETURN, MOSSPROUT_FIRST_NOTICE } from './mossprout-first-grow';
 import { TODAY_GROWTH_REWARDS } from '@/utils/today-growth';
@@ -128,7 +127,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 51,
+  version: 52,
   entryStepId: 'world.mist_open',
   terminalStepId: 'complete',
   steps: [
@@ -197,7 +196,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.garden_intro', surface: 'companion', navigation: mossproutHavenHostedCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'Your Memory', title: COPY.seedOrigin, body: COPY.bond },
+      guide: { eyebrow: 'Wake Heartwood', title: 'Wake the Garden. Reconnect the paths.', body: COPY.seedOrigin },
       actions: [
         { id: 'companion.continue_to_planting', title: 'Plant it', description: 'Find it a place in the garden.', icon: 'arrow.right', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.garden_arrival', backendEvent: true },
         // Receipt lookup for older saves; never shown as a second control.
@@ -371,7 +370,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.first_seed_grew', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Your Memory', title: 'Look. Your day is growing here.', body: SHARED_ADVENTURE_ENABLED ? 'Did you see that glint beyond the trees? Just once, when our Garden woke. I wonder who saw us.' : 'The Mist can’t hold a place someone is watching.' },
+      guide: { eyebrow: 'The roots remember', title: COPY.growth, body: 'Our first connection is awake. Find Steppling at the broken trail.' },
       actions: [{ id: 'world.acknowledge_first_seed_growth', title: 'Continue', description: 'A moment with Mossprout.', icon: 'arrow.right', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'companion.water_together', backendEvent: true }],
       camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
       blockingBeat: 'chapter_complete',
@@ -596,7 +595,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.notice_bond_spotlight', surface: 'companion', navigation: mossproutCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'Closer', title: 'You noticed something. That’s the whole trick.', body: 'It’s how the Mist loses.' },
+      guide: { eyebrow: 'Closer', title: 'A welcome worth sharing.', body: 'Your Bond grew. We’re making a home together.' },
       actions: [{ id: 'companion.acknowledge_notice_bond', title: 'Continue', description: '', icon: 'arrow.right',
         presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'companion.first_rest' }],
     },
@@ -630,7 +629,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'companion.meditating', surface: 'companion', navigation: { ...mossproutCompanionResume, lock: false },
       camera: mossproutMeditationCamera,
       guide: { eyebrow: 'Resting', title: COPY.meditation, body: COPY.meditationHelp },
-      actions: [{ id: 'companion.tend_garden', title: 'Look at the Mist', description: 'Someone’s still in there.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete', backendEvent: true }],
+      actions: [{ id: 'companion.tend_garden', title: 'Find Steppling', description: 'Follow the root-light to the broken trail.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete', backendEvent: true }],
       blockingBeat: 'chapter_complete',
     },
     {
