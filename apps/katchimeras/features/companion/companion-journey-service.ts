@@ -283,6 +283,11 @@ async function initializeJourneyOnce(chapter: CompanionJourneyChapterDefinition)
 
 /** When Mossprout's first session ended: the farewell began his first rest; an older save may only have its first Garden day. */
 function mossproutDayOneAt(state: RelationshipProgressState): number | null {
+  // The first meeting remains complete even if its transient rest or older
+  // campaign history is replaced/pruned while other friends progress.
+  const firstEpisode = journeyChapterFor('mossprout')?.episodes.find(episode => episode.dayOne);
+  const completed = firstEpisode ? state.journeyEpisodes?.[journeyEpisodeRecordId('mossprout', firstEpisode.id)] : undefined;
+  if (completed && Number.isFinite(completed.completedAt)) return completed.completedAt;
   const rest = [...(state.meditations ?? [])].filter((record) => record.familyId === 'mossprout').sort((a, b) => a.startedAt - b.startedAt)[0] ?? katchimeraMeditationRecord(state, 'mossprout');
   const firstDay = state.journeyDays.find((day) => day.familyId === 'mossprout' && day.status === 'complete');
   const cycle = state.journeyCycles?.find((item) => item.familyId === 'mossprout');

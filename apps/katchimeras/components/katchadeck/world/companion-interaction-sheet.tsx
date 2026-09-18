@@ -1092,6 +1092,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   familyId={props.familyId}
                   onNarration={setJourneyNarration}
                   onVisitSeed={props.onClose}
+                  fallback={props.familyId === 'mossprout' ? mossproutStage({}) : undefined}
                   routineActions={mossproutStage({ meditationMode: true, visibleActionCount: meditation ? 2 : 3 })}
                   onOpenMerge={(orderId) => props.onOpenMerge?.(orderId, props.familyId)}
                   onMore={() => selectDestination('achievements')}

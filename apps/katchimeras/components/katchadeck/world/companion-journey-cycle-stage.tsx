@@ -62,6 +62,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
   const relationships = useRelationshipProgression();
   const cycle = currentJourneyCycle(relationships, familyId);
   const chapter = journeyChapterFor(familyId, relationships.journeyEpisodes, cycle && cycle.returnedAt == null ? cycle.chapterId : undefined);
+  const recordedDayOne = chapter?.episodes.some(episode => episode.dayOne && relationships.journeyEpisodes?.[`${chapter.familyId}:${episode.id}`]) ?? false;
   const daily = companionDailyConfig(familyId);
   const [initialized, setInitialized] = useState(false);
   const [managed, setManaged] = useState(true);
@@ -104,7 +105,11 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
     const app = AppState.addEventListener('change', (state) => { if (state === 'active') void refresh(); });
     const stepsTimer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 60000);
     return () => { live = false; mounted.current = false; clearInterval(stepsTimer); unsubscribeWorld(); unsubscribeStory(); unsubscribeHome(); unsubscribeBond(); app.remove(); };
-  }, [chapter, familyId]);
+  }, [chapter, familyId, recordedDayOne]);
+
+  // A retained companion screen must refresh when revisited, not wait for
+  // the next minute tick or a new Merge snapshot.
+  useEffect(() => { if (cardsActive) void refreshRef.current(); }, [cardsActive]);
 
   const rest = relationships.meditations?.find((item) => (item.cycleId ?? item.sourceId) === cycle?.id);
   const pending = cycle && cycle.returnedAt == null;
@@ -156,7 +161,7 @@ function CompanionJourneyCycleStageContent({ onOpenConversation, familyId, onOpe
 
   // A hatchable friend keeps their daily cards even before their journey chapter can be managed (day one not
   // yet finished); the journey card alone waits. Mossprout's unmanaged stage falls back to his own.
-  if (!managed && familyId === 'mossprout') return <>{fallback}</>;
+  if (!managed && familyId === 'mossprout') return <>{fallback ?? routineActions}</>;
   type Action = { id: string; title: string; subtitle?: string; icon: IconSymbolName; onPress: () => void };
   let actions: Action[] = [];
   const journal: Action = { id: 'journal', title: 'Check in', icon: 'book.closed.fill', onPress: onJournal };

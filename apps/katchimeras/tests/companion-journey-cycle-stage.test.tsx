@@ -218,3 +218,32 @@ test('original request tray preserves its styling and routes to the selected ord
   assert.deepEqual(opened, ['one']);
   await act(async () => { tree!.unmount(); });
 });
+
+test('Mossprout never loses his daily cards when Journey initialization is not ready', async () => {
+  let state = emptyRelationshipProgressState();
+  const module = loadStage(() => state, value => { state = value; }, { initializeJourney: async () => false });
+  const Stage = module.CompanionJourneyCycleStage as React.ComponentType<Record<string, unknown>>;
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Stage familyId="mossprout" routineActions={<ViewForTest />} onMore={() => {}} onJournal={() => {}} onGoal={() => {}} onOpenMerge={() => {}} />); });
+  assert.equal(tree!.root.findAllByType('OriginalActionSystem' as React.ElementType).length, 1);
+  await act(async () => { tree!.update(<Stage familyId="mossprout" fallback={<React.Fragment>Full Mossprout dashboard</React.Fragment>} routineActions={<ViewForTest />} onMore={() => {}} onJournal={() => {}} onGoal={() => {}} onOpenMerge={() => {}} />); });
+  assert.match(JSON.stringify(tree!.toJSON()), /Full Mossprout dashboard/);
+  await act(async () => tree!.unmount());
+});
+
+test('revisiting a retained Mossprout screen retries readiness immediately', async () => {
+  let state = emptyRelationshipProgressState();
+  let ready = false;
+  const module = loadStage(() => state, value => { state = value; }, { initializeJourney: async () => ready });
+  const Stage = module.CompanionJourneyCycleStage as React.ComponentType<Record<string, unknown>>;
+  const props = { familyId: 'mossprout', routineActions: <ViewForTest />, onMore() {}, onJournal() {}, onGoal() {}, onOpenMerge() {} };
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<Stage {...props} cardsActive />); });
+  assert.equal(tree!.root.findAllByType('OriginalActionSystem' as React.ElementType).length, 1);
+  await act(async () => tree!.update(<Stage {...props} cardsActive={false} />));
+  ready = true;
+  await act(async () => tree!.update(<Stage {...props} cardsActive />));
+  assert.equal(tree!.root.findAllByType('SceneCards' as React.ElementType).length, 1);
+  assert.equal(tree!.root.findAllByType('OriginalActionSystem' as React.ElementType).length, 1);
+  await act(async () => tree!.unmount());
+});

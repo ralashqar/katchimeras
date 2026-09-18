@@ -286,3 +286,16 @@ test('existing Feastle progress beyond a delivery does not replay its new closin
   assert.ok(app.state.journeyEpisodes?.['feastle:day-2-return']);
   assert.equal(app.bond.events.length, 0);
 });
+
+test('Mossprout stays managed after old rest/history is replaced: the saved first episode is authoritative', async () => {
+  const app = harness();
+  const { journeyChapterFor } = await import('@/constants/companion-journey-chapters/registry');
+  const first = journeyChapterFor('mossprout')!.episodes.find(episode => episode.dayOne)!;
+  app.setRelationships({ ...app.state, meditations: [], journeyCycles: [], journeyDays: [], journeyEpisodes: {
+    [`mossprout:${first.id}`]: { familyId: 'mossprout', episodeId: first.id, completedAt: app.clock.now - 8 * HOUR, answers: {}, facts: {} },
+  } });
+  assert.equal(await app.service.initializeJourney('mossprout'), true);
+  assert.equal(await app.service.journeyDayOneComplete('mossprout'), true);
+  assert.equal(await app.service.initializeJourney('mossprout'), true, 'reentry is stable');
+  assert.equal(app.bond.events.length, 0, 'recognizing saved progress cannot replay rewards');
+});
