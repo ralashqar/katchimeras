@@ -1415,13 +1415,14 @@ function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onF
   );
 }
 
-function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent, enterFromBottom = false, ftueQuestionLayout = false, fullRowIllustratedChoices = false, illustratedChoices = false, interactionLocked, metric, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
+function InlineCheckInPanel({ hideChoiceIcons = false, action, allowSkip = true, choices, completionEvent, enterFromBottom = false, ftueQuestionLayout = false, fullRowIllustratedChoices = false, illustratedChoices = false, interactionLocked, metric, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, textChoices = false, wide = false }: {
   action: RankedTodayCareAction;
   allowSkip?: boolean;
   choices: InlineChoice[];
   completionEvent: TodayCareCompletionEvent | null;
   enterFromBottom?: boolean;
   ftueQuestionLayout?: boolean;
+  hideChoiceIcons?: boolean;
   fullRowIllustratedChoices?: boolean;
   illustratedChoices?: boolean;
   interactionLocked: boolean;
@@ -1496,7 +1497,7 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
             } : undefined}
             style={illustratedChoices
               ? [styles.illustratedChoiceGrid, fullRowIllustratedChoices && styles.fullRowIllustratedChoiceGrid]
-              : textChoices ? styles.textChoiceGrid : wide ? styles.sleepGrid : styles.moodGrid}>
+              : textChoices ? [styles.textChoiceGrid, hideChoiceIcons && styles.fullRowIllustratedChoiceGrid] : wide ? styles.sleepGrid : styles.moodGrid}>
             {choices.map((choice) => illustratedChoices ? (
               <MeasuredIllustratedChoice
                 accent={choice.accent}
@@ -1532,10 +1533,11 @@ function InlineCheckInPanel({ action, allowSkip = true, choices, completionEvent
               />
             ) : textChoices ? (
               <MeasuredTextChoice
+                fullRow={hideChoiceIcons}
                 accent={choice.accent}
                 disabled={interactionLocked}
                 dimmed={ownedSelection != null && ownedSelection.id !== choice.id}
-                icon={choice.icon ?? 'sparkles'}
+                icon={hideChoiceIcons ? null : choice.icon ?? 'sparkles'}
                 key={choice.id}
                 label={choice.label}
                 onPress={(from) => {
@@ -1742,11 +1744,12 @@ function MeasuredIllustratedChoice({ accent, disabled, dimmed, fullRow, icon, im
   );
 }
 
-function MeasuredTextChoice({ accent, disabled, dimmed, icon, label, onPress, selected }: {
+function MeasuredTextChoice({ accent, disabled, dimmed, icon, label, onPress, selected, fullRow = false }: {
+  fullRow?: boolean;
   accent: string;
   disabled: boolean;
   dimmed: boolean;
-  icon: IconSymbolName;
+  icon: IconSymbolName | null;
   label: string;
   onPress: (from: FeedSourceRect) => void;
   selected: boolean;
@@ -1763,13 +1766,14 @@ function MeasuredTextChoice({ accent, disabled, dimmed, icon, label, onPress, se
       ref={chipRef}
       style={({ pressed }) => [
         styles.textChoice,
+        fullRow && styles.emojiAnswerRow,
         { borderColor: selected ? accent : `${accent}66` },
         selected && { backgroundColor: `${accent}2E`, borderWidth: 1.5 },
         dimmed && styles.choiceDimmed,
         pressed && styles.choicePressed,
       ]}>
-      <IconSymbol color={Meadow.ink} name={icon} size={16} />
-      <ThemedText numberOfLines={1} style={styles.textChoiceLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{label}</ThemedText>
+      {icon ? <IconSymbol color={Meadow.ink} name={icon} size={16} /> : null}
+      <ThemedText numberOfLines={2} style={[styles.textChoiceLabel, fullRow && styles.emojiAnswerLabel]} lightColor={Meadow.ink} darkColor={Meadow.ink}>{label}</ThemedText>
     </Pressable>
   );
 }
@@ -2054,6 +2058,7 @@ export function EggQuestionPanel({ action, completionEvent, enterFromBottom = fa
   // shares the durable action ID but uses the ordinary illustrated rows.
   const moodQuestion = action.id === 'egg.day_texture' && options.every((option) => Boolean(option.domainChoiceId));
   const visibleOptions = options.slice(0, moodQuestion ? 5 : 4);
+  const textOnly = !moodQuestion && visibleOptions.every(option => option.textOnly);
   return (
     <View collapsable={false} ref={sourceRef}>
       <InlineCheckInPanel
@@ -2074,7 +2079,9 @@ export function EggQuestionPanel({ action, completionEvent, enterFromBottom = fa
         enterFromBottom={enterFromBottom}
         ftueQuestionLayout
         fullRowIllustratedChoices={action.id.startsWith('egg.') && !moodQuestion}
-        illustratedChoices
+        illustratedChoices={!textOnly}
+        textChoices={textOnly}
+        hideChoiceIcons={textOnly}
         interactionLocked={interactionLocked}
         metric={metric}
         onChoose={(choice, from, currencyFrom) => {
@@ -2305,6 +2312,8 @@ const styles = StyleSheet.create({
   textChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   textChoice: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.48)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 34, paddingHorizontal: 12, paddingVertical: 5 },
   textChoiceLabel: KatchaDeckUI.typography.ftueChipLabel,
+  emojiAnswerRow: { alignSelf: 'stretch', minHeight: 56, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#FFF7E8' },
+  emojiAnswerLabel: { flex: 1, fontSize: 17, lineHeight: 23 },
   illustratedChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center' },
   fullRowIllustratedChoiceGrid: { flexDirection: 'column', flexWrap: 'nowrap', gap: 6 },
   illustratedChoice: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1.25, boxShadow: '0 3px 8px rgba(86,66,34,0.13), inset 0 1px 0 rgba(255,255,255,0.82)', gap: 0, justifyContent: 'flex-end', minHeight: 70, overflow: 'hidden', paddingBottom: 4, paddingHorizontal: 4, paddingTop: 2, position: 'relative' },

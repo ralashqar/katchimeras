@@ -40,6 +40,8 @@ export type FtueHandlerId =
   | 'acknowledgement';
 
 export type FtueChoiceOption = {
+  /** Emoji-prefixed label only; illustrated answers remain available when unset. */
+  textOnly?: boolean;
   id: string;
   label: string;
   icon: IconSymbolName;

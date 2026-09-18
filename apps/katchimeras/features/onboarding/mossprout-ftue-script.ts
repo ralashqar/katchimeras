@@ -163,7 +163,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'world.egg_intro', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: 'Two wisps remain', title: COPY.eggHeardYou, body: '' },
-      actions: [{ id: 'world.inspect_mossprout_egg', title: 'Come closer', description: 'See how the Egg responds to you.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'egg.opening' }],
+      actions: [{ id: 'world.inspect_mossprout_egg', title: 'Continue', description: 'Continue automatically when the egg camera settles.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'egg.opening' }],
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM, anchorY: 0.5, durationMs: 1400 },
     },
     ...openingQuestionSteps,

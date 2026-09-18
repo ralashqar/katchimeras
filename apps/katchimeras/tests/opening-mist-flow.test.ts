@@ -52,6 +52,13 @@ const merge = (revision: number) => ({ type: 'merge_completed', fromInstanceId: 
 test('the opening is three haven beats before the Egg: look closer, clear the Mist, the veil lifts', () => {
   const kingdomScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   assert.doesNotMatch(kingdomScreen, /hideWorldTiles=/, 'dialogue must not hide the island supporting Mossprout');
+  assert.match(kingdomScreen, /OPENING_EGG_APPROACH_DELAY_MS = REVEAL_CAPTION_DELAY_MS \+ 1000/, 'one second for the bottom caption before zooming');
+  assert.match(kingdomScreen, /egg-camera-settled/, 'questions open automatically after the camera settles');
+  const reward = kingdomScreen.slice(kingdomScreen.indexOf('// Keep the earned Glow'), kingdomScreen.indexOf('// The repair:'));
+  assert.match(reward, /ensureStoredOpeningGlow/);
+  assert.doesNotMatch(reward, /openingGlow.launch|setGlowSpend/, 'grant the earned reward without a distracting flight');
+  assert.doesNotMatch(kingdomScreen, /Help the egg/);
+  assert.match(kingdomScreen, /!\['egg.opening', 'world.mist_lift', 'world.egg_intro'/, 'no CTA during the reveal or approach');
   assert.deepEqual(validateMossproutFtueScript(), []);
   assert.equal(MOSSPROUT_FTUE_SCRIPT.entryStepId, 'world.mist_open');
   assert.equal(MOSSPROUT_FTUE_FLOW.entryNodeId, MOSSPROUT_FTUE_SCRIPT.entryStepId);
@@ -189,10 +196,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   // Phase two: once the run is at the lift and the board is fading, the camera and the Egg's subject
   // presentation wait a further beat. The presentation's arrival changes the canvas's tutorial camera key
   // and would otherwise re-apply the clear step's camera against the revealed-Egg tile mid-fall.
-  assert.match(screen, /const OPENING_LIFT_CAMERA_DELAY_MS = 800;/);
   assert.match(screen, /const OPENING_CLEAR_CAMERA = mossproutFtueStep\(OPENING_MIST_CLEAR_STEP_ID\)\?\.camera \?\? null;/, 'one stable directive, so its key never changes while held');
-  assert.match(screen, /const openingLiftCameraHeld = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID\s*&& \(openingFinaleHeld \|\| \(openingGlow\.finaleLanded && !openingLiftCameraReleased\)\);/);
-  assert.match(screen, /if \(routeFtueStepId !== OPENING_MIST_LIFT_STEP_ID \|\| openingFinaleHeld \|\| !openingGlow\.finaleLanded\) \{ setOpeningLiftCameraReleased\(false\); return; \}\s*const timer = setTimeout\(\(\) => setOpeningLiftCameraReleased\(true\), OPENING_LIFT_CAMERA_DELAY_MS\);/, 'a cold resume at the lift (no finale landed) is not held');
   assert.match(screen, /worldSubjectPresentation=\{openingLiftCameraHeld \? null : worldSubjectPresentation\}/, 'the Egg presentation reaches the canvas only once the board is gone');
   // The run store advances a frame before the route's step id: the board must not unmount (and replay its entrance) in between.
   assert.match(screen, /\(ftueRun\.stepId === routeFtueStepId \|\| \(ftueRun\.stepId === OPENING_MIST_LIFT_STEP_ID && routeFtueStepId === OPENING_MIST_CLEAR_STEP_ID\)\)/, 'the opening run survives the frame between the store and the route');
@@ -219,12 +223,11 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   // The caption uses the cleared dock space during the reveal; the camera
   // still waits until the crossblend and reading beat finish.
   assert.match(screen, /if \(presentation\.veilLift\) \{[\s\S]*?setOpeningRevealComplete\(true\)/);
-  assert.match(screen, /!openingRevealComplete \|\| !screenFocused/);
+  assert.match(screen, /!openingRevealComplete \|\| openingLiftCameraHeld \|\| !ftueCameraSettled \|\| !screenFocused/);
   assert.match(screen, /setLiftCaptionVisible\(true\), REVEAL_CAPTION_DELAY_MS/);
   assert.match(screen, /ftueStepId !== OPENING_MIST_LIFT_STEP_ID \|\| liftCaptionVisible/);
-  assert.match(screen, /ftueStepId === OPENING_MIST_LIFT_STEP_ID \? OPENING_REVEAL_CAMERA/);
 
-  assert.match(screen, /const LIFT_CAPTION_MIN_MS = 1400;/);
+  assert.match(screen, /const LIFT_CAPTION_MIN_MS = 200;/);
   assert.match(screen, /if \(homeVeil !== 'lifting'\) return;[\s\S]*?veilLiftKeyRef\.current = key;[\s\S]*?veilLift: true/, 'the crossblend starts when the veil enters lifting, not when the step changes');
   // The mist clears on the frame the final item strikes the tile; the camera, caption and dock still wait for the burst to settle.
   assert.match(screen, /const homeVeil = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld && !openingGlow\.finaleLanded \? 'veiled' : homeVeilForStep\(routeFtueStepId\);/);

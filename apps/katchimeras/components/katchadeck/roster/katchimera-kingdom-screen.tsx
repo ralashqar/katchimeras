@@ -226,22 +226,13 @@ const RESTORATION_HINT_FINGER_DROP = 40;
 
 /** The clear step's camera, held past the run's own step change while the board fades. */
 const OPENING_CLEAR_CAMERA = mossproutFtueStep(OPENING_MIST_CLEAR_STEP_ID)?.camera ?? null;
-// Keep the current framing throughout the reveal, even as the egg mounts.
-const OPENING_REVEAL_CAMERA = OPENING_CLEAR_CAMERA?.kind === 'focus_target'
-  ? { ...OPENING_CLEAR_CAMERA, projectionOnly: true } : OPENING_CLEAR_CAMERA;
 /** The opening's mist as a board mechanic sees it: its bar and its three wisps, struck by Glow. */
 const OPENING_MIST_HOST: MissionMechanicHost = { required: OPENING_MERGE_REQUIRED, wisps: OPENING_WISPS };
 /** How long the opening's lift caption is on screen before the run moves on to the Egg. */
-const LIFT_CAPTION_MIN_MS = 1400;
+const LIFT_CAPTION_MIN_MS = 200;
 // The merge dock fades out in 260ms; its space is then free for the caption.
 const REVEAL_CAPTION_DELAY_MS = 300;
-/** After the lift caption appears: when the first light is seen flying into the counter. */
-const OPENING_GLOW_ARRIVAL_DELAY_MS = 600;
-/**
- * After the finale has settled and the run reaches the lift: how long the camera and the Egg
- * wait, so the board (a 260ms fade) is gone before anything in the world moves.
- */
-const OPENING_LIFT_CAMERA_DELAY_MS = 800;
+const OPENING_EGG_APPROACH_DELAY_MS = REVEAL_CAPTION_DELAY_MS + 1000;
 /** The longest the screen is held still between a board's finale and its resolution story. */
 const RESTORATION_HANDOFF_MAX_MS = 12_000;
 
@@ -309,19 +300,19 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // store's own render pass arrives before the state does, and must not see the lift step unheld.
   const openingFinaleHeld = openingGlow.finaleActive || openingGlow.finaleHoldRef.current;
   const ftueStepId = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld ? OPENING_MIST_CLEAR_STEP_ID : routeFtueStepId;
-  // Phase two of the hold, for the camera and the Egg only. The moment the run reaches the lift, the
-  // Egg surface mounts and publishes a subject presentation; that changes the canvas's tutorial camera
-  // key, which re-applies the clear step's directive against the tile that is now a revealed Egg (a
-  // different anchor) and nudges the camera while the last wisp is still falling. So until the board
-  // has faded, the canvas keeps the clear step's camera and sees no presentation at all.
-  const [openingLiftCameraReleased, setOpeningLiftCameraReleased] = useState(false);
+  const screenFocused = useIsFocused();
+  // Read the bottom caption for one second, then approach automatically.
+  const [openingEggApproachReady, setOpeningEggApproachReady] = useState(false);
   useEffect(() => {
-    if (routeFtueStepId !== OPENING_MIST_LIFT_STEP_ID || openingFinaleHeld || !openingGlow.finaleLanded) { setOpeningLiftCameraReleased(false); return; }
-    const timer = setTimeout(() => setOpeningLiftCameraReleased(true), OPENING_LIFT_CAMERA_DELAY_MS);
+    if (routeFtueStepId !== OPENING_MIST_LIFT_STEP_ID || openingFinaleHeld || !screenFocused) {
+      setOpeningEggApproachReady(false);
+      return;
+    }
+    const timer = setTimeout(() => setOpeningEggApproachReady(true), OPENING_EGG_APPROACH_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [openingFinaleHeld, openingGlow.finaleLanded, routeFtueStepId]);
+  }, [routeFtueStepId, openingFinaleHeld, screenFocused]);
   const openingLiftCameraHeld = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID
-    && (openingFinaleHeld || (openingGlow.finaleLanded && !openingLiftCameraReleased));
+    && (openingFinaleHeld || !openingEggApproachReady);
   // The mist itself starts clearing the frame the item strikes the tile; only
   // the camera, the caption and the dock wait for the burst to settle.
   const homeVeil = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld && !openingGlow.finaleLanded ? 'veiled' : homeVeilForStep(routeFtueStepId);
@@ -347,7 +338,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     });
     return () => subscription.remove();
   }, [stepplingSurfaceOpen, stepplingEggOpen, closeStepplingEgg]);
-  const screenFocused = useIsFocused();
   const [glowPanelOpen, setGlowPanelOpen] = useState(true);
   useEffect(() => { setGlowPanelOpen(glowRun?.status !== 'completed'); }, [glowRun?.status, glowRun?.nodeId]);
   const glowGatewayActive = Boolean(glowRun);
@@ -657,7 +647,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   } : null, [restorationIslandId, restorationOpen, screenFocused]);
   const eventCompanionId = selectedEventAction?.encounter.companionId ?? 'mossprout';
   const eventCamera = useMemo((): FtueCameraDirective | null => eventBoardActive ? { kind: 'focus_target', target: { kind: 'haven_resident', characterId: eventCompanionId }, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700 } : null, [eventBoardActive, eventCompanionId]);
-  const baseTutorialCamera = eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (ftueStepId === OPENING_MIST_LIFT_STEP_ID ? OPENING_REVEAL_CAMERA : openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
+  const baseTutorialCamera = eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
   const tutorialCamera = useMemo(() => {
     if (!ftueStepId?.startsWith('egg.') || baseTutorialCamera?.kind !== 'focus_target') return baseTutorialCamera;
     return { ...baseTutorialCamera, zoom: sharedEggZoom(worldSubjectPresentation?.wispsCleared
@@ -699,15 +689,15 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }, delay);
     return () => clearTimeout(timer);
   }, [activeFtueRunId, firstSeedPlanted, ftueStep?.autoAdvanceMs, ftueStepId]);
-  // The reveal and approach share one caption. Only expose answers after the
-  // canvas has actually settled, including when resuming directly at the egg.
+  // This checkpoint is automatic, including a cold resume. The questions
+  // become available only once the egg camera has settled, like other eggs.
   useEffect(() => {
     if (ftueStepId !== 'world.egg_intro' || !ftueCameraSettled || !screenFocused) return;
     const revision = cameraSettleRevisionRef.current;
     const timer = setTimeout(() => {
       if (revision !== cameraSettleRevisionRef.current) return;
       commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-camera-settled' });
-    }, 300);
+    }, 200);
     return () => clearTimeout(timer);
   }, [ftueStepId, ftueCameraSettled, screenFocused]);
   useEffect(() => {
@@ -1081,8 +1071,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (revealedUpgradeRef.current === presentation.nonce) return;
     revealedUpgradeRef.current = presentation.nonce;
     if (presentation.veilLift) {
-      // Completion includes the mist crossblend. Keep the bottom caption and
-      // wide framing for a reading beat before approaching the egg.
+      // Completion includes the mist crossblend; the egg approach runs alongside it.
       setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
       setOpeningRevealComplete(true);
       return;
@@ -1121,55 +1110,23 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const timer = setTimeout(() => setLiftCaptionVisible(true), REVEAL_CAPTION_DELAY_MS);
     return () => clearTimeout(timer);
   }, [ftueStepId, screenFocused]);
-  // Let the caption be read at the wide framing before starting the approach.
+  // Keep the same caption through the approach and its settled reading beat.
   useEffect(() => {
-    if (ftueStepId !== OPENING_MIST_LIFT_STEP_ID || !liftCaptionVisible || !openingRevealComplete || !screenFocused) return;
+    if (ftueStepId !== OPENING_MIST_LIFT_STEP_ID || !liftCaptionVisible || !openingRevealComplete || openingLiftCameraHeld || !ftueCameraSettled || !screenFocused) return;
     const timer = setTimeout(() => {
       commitFtueAction({ actionId: OPENING_LIFTED_ACTION_ID, evidenceRef: 'mossprout-world:veil-lifted' });
     }, LIFT_CAPTION_MIN_MS);
     return () => clearTimeout(timer);
-  }, [ftueStepId, liftCaptionVisible, openingRevealComplete, screenFocused]);
-  // The first light. The Glow that drove the wisps off stays with you: granted by the flow right
-  // after the lift (`haven.opening_glow`), and here as well under the same receipt in case that effect
-  // was interrupted. Seen arriving once: tokens fly from the tile into the counter, which counts them in.
-  const openingGlowShownRef = useRef<string | null>(null);
+  }, [ftueStepId, liftCaptionVisible, openingRevealComplete, openingLiftCameraHeld, ftueCameraSettled, screenFocused]);
+  // Keep the earned Glow, but no reward flight competes with the egg reveal.
   useEffect(() => {
     if (ftueStepId !== OPENING_MIST_LIFT_STEP_ID) return;
-    const key = `${activeFtueRunId ?? 'current'}:opening-glow`;
-    if (openingGlowShownRef.current === key) return;
-    openingGlowShownRef.current = key;
     let cancelled = false;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    // After the caption's first beat, so the light does not fight the crossblend.
-    timers.push(setTimeout(() => {
-      void ensureStoredOpeningGlow(`${activeFtueRunId ?? 'current'}:opening-glow`).then((result) => {
-        if (cancelled || !result.state.openingGlow) return;
-        const { amount } = result.state.openingGlow;
-        const total = result.state.coins;
-        // Hold the counter below the grant while the tokens are in the air, then count them in.
-        setGlowSpend({ amount, counting: false });
-        setDisplayedGlow(Math.max(0, total - amount));
-        const fly = (from: { x: number; y: number }) => {
-          openingGlow.launch(from, glowCurrencyArtRef.current);
-          timers.push(setTimeout(() => {
-            if (cancelled) return;
-            setGlowSpend({ amount, counting: true });
-            setDisplayedGlow(total);
-            timers.push(setTimeout(() => { if (!cancelled) setGlowSpend(null); }, 900));
-          }, OPENING_GLOW_FLIGHT_MS));
-        };
-        const node = homeTileNode;
-        if (!node) { fly({ x: window.width / 2, y: window.height * 0.5 }); return; }
-        node.measureInWindow((x, y, width, height) => fly({ x: x + width / 2, y: y + height * 0.5 }));
-      }).catch(() => undefined);
-    }, OPENING_GLOW_ARRIVAL_DELAY_MS));
-    return () => {
-      cancelled = true;
-      for (const timer of timers) clearTimeout(timer);
-      // Whatever was mid-flight: the counter follows the wallet again.
-      setGlowSpend(null);
-    };
-  }, [activeFtueRunId, ftueStepId, homeTileNode, openingGlow, window.height, window.width]);
+    void ensureStoredOpeningGlow(`${activeFtueRunId ?? 'current'}:opening-glow`).then(result => {
+      if (!cancelled) setDisplayedGlow(result.state.coins);
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [activeFtueRunId, ftueStepId]);
   // The repair: a profile that reaches the first restore short of its light (the lift happened before
   // the light was kept, or the effect was interrupted) is granted it here under the same receipt.
   const firstLightRepairRef = useRef<string | null>(null);

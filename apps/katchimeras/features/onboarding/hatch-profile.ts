@@ -15,7 +15,7 @@ export type HatchQuestion = {
   id: string;
   title: string;
   dimension: HatchAnswer['dimension'];
-  options: readonly { id: string; label: string; reply: string }[];
+  options: readonly { id: string; label: string; reply: string; textOnly?: boolean }[];
 };
 export type HatchProfileDefinition = { katchimeraId: string; domain: string; version: number; questions: readonly HatchQuestion[] };
 export const HATCH_ANSWER_BOND = 15;
@@ -92,23 +92,23 @@ export const HATCH_PROFILES: Readonly<Record<string, HatchProfileDefinition>> = 
   FEASTLE_HATCH_PROFILE,
   profile('mossprout', 'growth',
     question('friction', 'What makes it hard to get going?', 'primaryFriction', [
-      ['starting', 'Not sure where to start', 'The beginning gets tangled sometimes.'],
-      ['overloaded', 'Too much on my plate', 'A crowded patch leaves little room for a new shoot.'],
-      ['follow_through', 'Losing momentum', 'Keeping a little thing growing takes care, too.'],
+      ['starting', '🧭 Not sure where to start', 'The beginning gets tangled sometimes.'],
+      ['overloaded', '🍽️ Too much on my plate', 'A crowded patch leaves little room for a new shoot.'],
+      ['follow_through', '🍂 Losing momentum', 'Keeping a little thing growing takes care, too.'],
     ]), question('support', 'What would help you get started?', 'supportPreference', [
-      ['small_action', 'One tiny step', 'Good thing I’m rather fond of tiny beginnings.'],
-      ['steady_guidance', 'A little guidance', 'We can find the next patch of light together.'],
-      ['breathing_room', 'A little breathing room', 'Then we’ll leave room around the roots. No tugging.'],
+      ['small_action', '🌱 One tiny step', 'Good thing I’m rather fond of tiny beginnings.'],
+      ['steady_guidance', '🏮 A little guidance', 'We can find the next patch of light together.'],
+      ['breathing_room', '🌿 A little breathing room', 'Then we’ll leave room around the roots. No tugging.'],
     ])),
   profile('steppling', 'movement',
     question('friction', 'What gets in the way of going out?', 'primaryFriction', [
-      ['energy', 'Too low on energy', 'Some days there isn’t much fuel for an expedition.'],
-      ['pulled_away', 'Getting distracted', 'A busy day can carry you everywhere except outside.'],
-      ['appeal', 'Not keen on going out', 'Then perhaps we need an outing worth looking forward to.'],
+      ['energy', '🔋 Too low on energy', 'Some days there isn’t much fuel for an expedition.'],
+      ['pulled_away', '🦋 Getting distracted', 'A busy day can carry you everywhere except outside.'],
+      ['appeal', '🏠 Not keen on going out', 'Then perhaps we need an outing worth looking forward to.'],
     ]), question('support', 'What makes going out more appealing?', 'supportPreference', [
-      ['destination', 'Somewhere nice to explore', 'Good. I was hoping we could find somewhere worth going.'],
-      ['company', 'Someone coming with me', 'A companion for the road? I’m already here.'],
-      ['own_pace', 'Going at my own pace', 'No marching orders, then. We can follow your feet.'],
+      ['destination', '🗺️ Somewhere nice to explore', 'Good. I was hoping we could find somewhere worth going.'],
+      ['company', '🤝 Someone coming with me', 'A companion for the road? I’m already here.'],
+      ['own_pace', '🐾 Going at my own pace', 'No marching orders, then. We can follow your feet.'],
     ])),
   profile('baristabbit', 'routine',
     question('friction', 'What throws off your routine?', 'primaryFriction', [
@@ -160,7 +160,16 @@ export const HATCH_PROFILES: Readonly<Record<string, HatchProfileDefinition>> = 
       ['soften', 'A little calm', 'Then we’ll begin with something gentle.'],
       ['feel_understood', 'Something that fits my mood', 'A song that meets you where you are. I like that.'],
     ])),
-].map((definition) => [definition.katchimeraId, { ...definition, version: 2 }]));
+].map((definition) => [definition.katchimeraId, {
+  ...definition,
+  version: 2,
+  questions: definition.questions.map(question => ({
+    ...question,
+    options: question.options.map(option =>
+      ['mossprout', 'steppling'].includes(definition.katchimeraId)
+        ? { ...option, textOnly: true } : option),
+  })),
+}]));
 
 function hatchDefinition(companion: string, version: number) {
   return version === 1 ? LEGACY_HATCH_PROFILES[companion] : version === 2 ? HATCH_PROFILES[companion] : undefined;
