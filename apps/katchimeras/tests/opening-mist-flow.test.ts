@@ -234,7 +234,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(dock, /if \(finale\) \{\s*setFinaleLanded\(true\);\s*setFinaleLandedId\(id\);/, 'the landing flag is raised at impact, by id too');
   assert.match(screen, /Boolean\(upgradePresentation && !upgradePresentation\.veilLift\)/, 'the HUD stays hidden while the veil lifts');
   assert.match(screen, /homeVeil=\{homeVeil\}\s*homeSolo=\{homeSoloForStep\(ftueStepId\)\}/);
-  assert.match(canvas, /return buildMossproutHexNeighborhoodScene\(fromSlots, fromNatureLevels, fromGarden, fromReveals, \{ homeVeiled: homeVeil === 'veiled' \|\| homeVeil === 'lifting', homeSolo \}\);/, 'the lift’s from-scene stays veiled and solo, so the world never flashes in during the crossblend');
+  assert.match(canvas, /return buildMossproutHexNeighborhoodScene\(fromSlots, fromNatureLevels, fromGarden, fromReveals, \{ homeVeiled: homeVeil === 'veiled' \|\| homeVeil === 'lifting', homeSolo, revealWorldWithHome \}\);/, 'the lift’s from-scene stays veiled and solo, so the world never flashes in during the crossblend');
   assert.match(canvas, /const joinedLater = layerJoinedLater\(layer\.id\);[\s\S]*?<Animated\.View entering=\{joinedLater \? FadeIn\.duration\(reduceMotion \? 120 : 720\) : undefined\}[\s\S]*?<KingdomTileArt/, 'tiles that join after mount fade in rather than snap');
   assert.match(screen, /: ftueStepId === OPENING_MIST_OPEN_STEP_ID\s*\? OPENING_CAMERA_ENTRY_ZOOM/, 'the first beat mounts further out and glides in');
   assert.match(canvas, /const revealingVeiledHome = Boolean\(upgradePresentation\?\.veilLift\);\s*const homeVeilProgress = useSharedValue\(0\);/, 'the lift owns one reveal clock, like the Steppling reveal');

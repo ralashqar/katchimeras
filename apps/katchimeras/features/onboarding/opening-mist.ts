@@ -77,8 +77,8 @@ export function isMossproutOpeningStep(stepId: string | null | undefined): boole
 }
 
 /**
- * Mossprout's tile stands alone through the hatch and first conversation.
- * Heartwood and the sleeping islands appear when the Garden reveal begins.
+ * Keep neighbours hidden until the hatch finishes. The establishing-shot
+ * presentation releases this solo mask for the whole world together.
  */
 export function homeSoloForStep(stepId: string | null | undefined): boolean {
   if (!stepId) return false;

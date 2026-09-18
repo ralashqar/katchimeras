@@ -647,7 +647,20 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   } : null, [restorationIslandId, restorationOpen, screenFocused]);
   const eventCompanionId = selectedEventAction?.encounter.companionId ?? 'mossprout';
   const eventCamera = useMemo((): FtueCameraDirective | null => eventBoardActive ? { kind: 'focus_target', target: { kind: 'haven_resident', characterId: eventCompanionId }, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700 } : null, [eventBoardActive, eventCompanionId]);
-  const baseTutorialCamera = eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
+  const heartwoodIntroActive = (ftueStepId === 'companion.first_meeting' && Boolean(worldSubjectPresentation?.introRevealReady))
+    || ftueStepId === 'companion.garden_intro';
+  const heartwoodIntroCamera = useMemo((): FtueCameraDirective | null => heartwoodIntroActive ? {
+    kind: 'focus_target', target: { kind: 'haven_heartwood_pair' }, zoom: 0.92, anchorY: 0.46, durationMs: 1200,
+  } : null, [heartwoodIntroActive]);
+  useEffect(() => {
+    if (!heartwoodIntroActive || !ftueCameraSettled || !screenFocused) return;
+    const revision = cameraSettleRevisionRef.current;
+    const timer = setTimeout(() => {
+      if (cameraSettleRevisionRef.current === revision) worldSubjectPresentation?.onIntroFramingReady?.();
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [heartwoodIntroActive, ftueCameraSettled, screenFocused, worldSubjectPresentation?.onIntroFramingReady]);
+  const baseTutorialCamera = heartwoodIntroCamera ?? eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
   const tutorialCamera = useMemo(() => {
     if (!ftueStepId?.startsWith('egg.') || baseTutorialCamera?.kind !== 'focus_target') return baseTutorialCamera;
     return { ...baseTutorialCamera, zoom: sharedEggZoom(worldSubjectPresentation?.wispsCleared
@@ -2122,6 +2135,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onHomeTileTargetChange={setHomeTileNode}
         homeVeil={homeVeil}
         homeSolo={homeSoloForStep(ftueStepId)}
+        revealWorldWithHome={heartwoodIntroActive}
         openingWeather={homeVeil !== 'none'}
         openingWeatherActive={homeVeil === 'veiled' && !missionBoardDocked}
         sleepingMarkersInert={Boolean(ftueStepId)}

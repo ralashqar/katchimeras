@@ -132,6 +132,10 @@ for (const compiler of ['typescript', 'babel'] as const) test(`mist islands are 
   const solo = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeSolo: true }) as KingdomHexScene;
   assert.deepEqual(Array.from(solo.tileArtLayers.map((layer) => layer.id)), [home(baseline).id], 'only Mossprout’s supporting tile remains: no Tree or neighbours');
   assert.equal(solo.tiles.length, 1, 'no residents float over hidden neighbour tiles');
+  const intro = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeSolo: true, revealWorldWithHome: true }) as KingdomHexScene;
+  assert.deepEqual(Array.from(intro.tileArtLayers.map(layer => layer.id)).sort(), Array.from(baseline.tileArtLayers.map(layer => layer.id)).sort(), 'Heartwood and every surrounding tile reveal together at the first meeting');
+  assert.deepEqual(home(intro).frame, home(solo).frame, 'revealing Heartwood never moves Mossprout');
+  assert.equal(intro.width, solo.width); assert.equal(intro.height, solo.height);
   const veiledSolo = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeSolo: true, homeVeiled: true }) as KingdomHexScene;
   assert.equal(veiledSolo.tileArtLayers.length, 1, 'the Tree is absent before the Mist lifts too');
   assert.deepEqual(home(veiledSolo).frame, home(solo).frame, 'the supporting island never moves during the hatch');

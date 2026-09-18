@@ -1207,9 +1207,9 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomCanvas, /WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE = 2\.7/);
   assert.match(kingdomCanvas, /function GardenOrderShortcut[\s\S]*?gardenOrderRequestBubble[\s\S]*?<PersistentMergeItemArt/);
   assert.doesNotMatch(kingdomCanvas, /We’ll build this order/);
-  assert.match(kingdomCanvas, /tile\.companion\.creature\.creatureId === interactionResidentId\) continue/);
+  assert.match(kingdomCanvas, /tile\.companion\.creature\.creatureId === interactionResidentProjection\?\.creature\.creatureId\) continue/);
   assert.match(kingdomCanvas, /if \(onSelectResident\) \{[\s\S]*?onSelectResident\(creature\.creatureId, creature\.name\);[\s\S]*?return;[\s\S]*?onFocus\(x, y, \{ id: tile\.id \}\)/);
-  assert.match(kingdomCanvas, /<ProjectedResidentCreature[\s\S]*?cameraScale=\{camera\.scaleValue\}[\s\S]*?rewardPulseKey=\{interactionRewardPulseKey\}/);
+  assert.match(kingdomCanvas, /<ProjectedResidentCreature[\s\S]*?cameraScale=\{camera\.scaleValue\}[\s\S]*?rewardPulseKey=\{interactionResidentId \? interactionRewardPulseKey : worldSubjectPresentation\?\.rewardPulseKey \?\? 0\}/);
   assert.match(kingdomCanvas, /<ProjectedResidentCreature[\s\S]*?cameraMoving=\{camera\.isMoving\}/);
   assert.match(kingdomCanvas, /ProjectedResidentCreature[\s\S]*?runRewardArrivalMotion\(rewardPulse, rewardShake, reduceMotion\)[\s\S]*?rewardShake\.value \* 5\.5[\s\S]*?rewardPulse\.value \* 0\.055/);
   assert.match(kingdomCanvas, /renderToHardwareTextureAndroid=\{false\}[\s\S]*?shouldRasterizeIOS=\{false\}[\s\S]*?worldInteractionCreatureNativeSurface/);

@@ -21,8 +21,10 @@ function cameraSnapshotsEqual(left: KatchimeraWorldSession['cameraSnapshot'], ri
     && Math.abs(left.scale - right.scale) < 0.0001;
 }
 
-function MossproutOpeningSurface({ companionActive, conversationDefinitionId, onWorldSubjectPresentationChange, worldEggTargetRef }: {
+function MossproutOpeningSurface({ companionActive, introFramingReady, onRevealReady, conversationDefinitionId, onWorldSubjectPresentationChange, worldEggTargetRef }: {
   companionActive: boolean;
+  introFramingReady: boolean;
+  onRevealReady: (ready: boolean) => void;
   conversationDefinitionId?: string;
   onWorldSubjectPresentationChange: (presentation: WorldFtueSubjectPresentation | null) => void;
   worldEggTargetRef: RefObject<ViewType | null>;
@@ -32,6 +34,7 @@ function MossproutOpeningSurface({ companionActive, conversationDefinitionId, on
   useEffect(() => {
     if (!companionActive) setCompanionVisualReady(false);
   }, [companionActive]);
+  useEffect(() => { onRevealReady(companionVisualReady); }, [companionVisualReady, onRevealReady]);
   const handleCompanionVisualReady = useCallback(() => setCompanionVisualReady(true), []);
   const handleCreatureRewardPulse = useCallback(() => setRewardPulseKey((key) => key + 1), []);
 
@@ -45,7 +48,7 @@ function MossproutOpeningSurface({ companionActive, conversationDefinitionId, on
         worldEggTargetRef={worldEggTargetRef}
         worldHosted
       />
-      {companionActive && companionVisualReady ? (
+      {companionActive && companionVisualReady && introFramingReady ? (
         <View style={styles.companionOverlay}>
           <KatchimeraCompanionRouteScreen
             creatureId="companion:mossprout"
@@ -86,6 +89,15 @@ export default function KatchimerasScreen() {
   });
   const worldEggTargetRef = useRef<ViewType | null>(null);
   const [worldSubjectPresentation, setWorldSubjectPresentation] = useState<WorldFtueSubjectPresentation | null>(null);
+  const [introRevealReady, setIntroRevealReady] = useState(false);
+  const [introFramingReady, setIntroFramingReady] = useState(false);
+  const handleIntroFramingReady = useCallback(() => setIntroFramingReady(true), []);
+  useEffect(() => {
+    if (!introRevealReady) setIntroFramingReady(false);
+  }, [introRevealReady]);
+  const presentedWorldSubject = useMemo(() => worldSubjectPresentation ? {
+    ...worldSubjectPresentation, introRevealReady, onIntroFramingReady: handleIntroFramingReady,
+  } : null, [worldSubjectPresentation, introRevealReady, handleIntroFramingReady]);
   const handleWorldSessionChange = useCallback((next: KatchimeraWorldSession) => {
     setWorldSession((current) => (
       current.activeWorldFamilyId === next.activeWorldFamilyId
@@ -155,12 +167,14 @@ export default function KatchimerasScreen() {
         onWorldSessionChange={handleWorldSessionChange}
         worldEggTargetRef={worldEggTargetRef}
         worldSession={worldSession}
-        worldSubjectPresentation={worldSubjectPresentation}
+        worldSubjectPresentation={presentedWorldSubject}
       />
       {worldInteractionActive ? (
         <View style={styles.worldInteractionLayer}>
           <MossproutOpeningSurface
             companionActive={havenHostedCompanionActive}
+            introFramingReady={ftueStep?.id !== 'companion.first_meeting' || introFramingReady}
+            onRevealReady={setIntroRevealReady}
             conversationDefinitionId={ftueStep?.id === 'companion.first_meeting'
               ? mossproutFtueConversationDefinitionId(ftueRun?.answers['egg.day_texture']?.optionId ?? 'default')
               : ftueStep?.id === 'companion.chapter_zero_return'

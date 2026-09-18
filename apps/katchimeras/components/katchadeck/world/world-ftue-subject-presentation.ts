@@ -4,6 +4,8 @@ import type { MergeCharacterId } from '@/types/merge-world';
 export type WorldFtueSubjectPresentation = {
   /** Load the resident behind the Egg without starting hatch expressions. */
   preloadHatch?: boolean;
+  introRevealReady?: boolean;
+  onIntroFramingReady?: () => void;
   wispsCleared?: number;
   hatchFamilyId?: MergeCharacterId;
   companionVisible: boolean;

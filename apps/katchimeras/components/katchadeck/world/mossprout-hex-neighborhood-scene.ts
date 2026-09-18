@@ -320,6 +320,7 @@ export type MossproutSceneOptions = {
   homeVeiled?: boolean;
   /** Opening and first conversation: only Mossprout's tile. The envelope is unchanged. */
   homeSolo?: boolean;
+  revealWorldWithHome?: boolean;
 };
 
 export function buildMossproutHexNeighborhoodScene(
@@ -399,7 +400,8 @@ export function buildMossproutHexNeighborhoodScene(
   // Keep the home Mist in front during non-solo reveal transitions too.
   if (options.homeVeiled) mainLayer.depth = Math.max(mainLayer.depth, gardenLayer.depth + 2);
   // The opening excludes neighbours without changing their reserved bounds.
-  const neighbourLayers = options.homeSolo ? [] : [
+  const solo = options.homeSolo && !options.revealWorldWithHome;
+  const neighbourLayers = solo ? [] : [
     ...hatchableLayers.map(({ definition, locked, revealed }) => (hatchableTileState(definition) === 'locked' ? locked : revealed)),
     ...storyTileLayers.map(({ tile, misted, revealed }) => ((gardenState.storyTiles?.[tile.id] ?? 'misted') === 'revealed' ? revealed : misted)),
     ...MOSSPROUT_NATURE_ISLANDS.map((island) => natureLayerFor(
@@ -408,9 +410,9 @@ export function buildMossproutHexNeighborhoodScene(
       Boolean(natureIslandReveals[island.id]),
     )),
   ];
-  // Heartwood follows the same solo rule as every other neighbouring tile.
+  // Reveal Heartwood and every neighbour in the same render, sharing the tile fade.
   const rawLayers = [
-    ...(options.homeSolo ? [] : [gardenLayer]), mainLayer, ...(options.homeVeiled || options.homeSolo ? [] : plantLayers),
+    ...(solo ? [] : [gardenLayer]), mainLayer, ...(options.homeVeiled || solo ? [] : plantLayers),
     ...neighbourLayers,
   ];
   // Reserve both art envelopes so changing mist to terrain never shifts the world.
@@ -451,7 +453,7 @@ export function buildMossproutHexNeighborhoodScene(
     const point = mossproutHexPoint(heartwoodWorldCoord(resident.coord));
     residentTiles.push({ companion: resident.companion, coord: heartwoodWorldCoord(resident.coord), cx: point.x + dx, cy: point.y + dy, depth: hexDrawDepth(point), id: resident.companion.id, kind: 'companion' });
   }
-  const tiles = [centerTile, ...(options.homeSolo ? [] : residentTiles)];
+  const tiles = [centerTile, ...(solo ? [] : residentTiles)];
   return {
     centerTile,
     height,

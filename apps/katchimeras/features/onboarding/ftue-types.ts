@@ -94,6 +94,7 @@ export type FtueTarget =
   | { kind: 'haven_upgrade_button'; characterId: string }
   | { kind: 'haven_nature_island'; islandId: MossproutNatureIslandId }
   | { kind: 'haven_garden_tile'; characterId: 'mossprout' }
+  | { kind: 'haven_heartwood_pair' }
   | { kind: 'haven_garden_button'; characterId: 'mossprout' }
   | { kind: 'haven_garden_cluster'; characterId: 'mossprout' }
   | { kind: 'haven_garden_plant_button'; characterId: 'mossprout' }
