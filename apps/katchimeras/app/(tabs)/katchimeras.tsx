@@ -74,12 +74,16 @@ export default function KatchimerasScreen() {
     interactionSource,
     interactionStory,
     mossproutInteraction,
+    interactionCreature,
+    interactionConversation,
   } = useLocalSearchParams<{
     interactionFtue?: string;
     interactionResidentResume?: string;
     interactionSource?: string;
     interactionStory?: string;
     mossproutInteraction?: string;
+    interactionCreature?: string;
+    interactionConversation?: string;
   }>();
   const ftueRun = useFtueRun();
   const ftueStep = ftueRun?.status === 'active' ? mossproutFtueStep(ftueRun.stepId) : null;
@@ -108,7 +112,7 @@ export default function KatchimerasScreen() {
   }, []);
   const requestedWorldInteraction = useMemo<MossproutWorldInteractionRequest | null>(() => {
     const meditationFtue = ftueRun?.status === 'active' && ftueRun.stepId === 'companion.meditating';
-    if (mossproutInteraction !== '1' && !meditationFtue) return null;
+    if (!interactionCreature && mossproutInteraction !== '1' && !meditationFtue) return null;
     const firstMeeting = ftueRun?.status === 'active' && ftueRun.stepId === 'companion.first_meeting';
     const chapterZeroReturn = ftueRun?.status === 'active' && ftueRun.stepId === 'companion.chapter_zero_return';
     const ftueConversationDefinitionId = interactionFtue === '1' && firstMeeting
@@ -122,14 +126,14 @@ export default function KatchimerasScreen() {
         ))?.returnConversationId ?? undefined
       : undefined;
     return {
-      creatureId: 'companion:mossprout',
+      creatureId: interactionCreature ?? 'companion:mossprout',
       ftueConversationDefinitionId,
-      journeyReturnConversationDefinitionId,
-      key: [interactionFtue, interactionResidentResume, interactionSource, interactionStory, meditationFtue ? 'meditation' : ftueRun?.stepId].join(':'),
+      journeyReturnConversationDefinitionId: interactionConversation ?? journeyReturnConversationDefinitionId,
+      key: [interactionCreature, interactionConversation, interactionFtue, interactionResidentResume, interactionSource, interactionStory, meditationFtue ? 'meditation' : ftueRun?.stepId].join(':'),
       residentStoryResumeRequested: interactionResidentResume === '1',
       source: interactionSource === 'merge-world' ? 'merge-world' : undefined,
     };
-  }, [ftueRun?.status, ftueRun?.stepId, interactionFtue, interactionResidentResume, interactionSource, interactionStory, mossproutInteraction]);
+  }, [ftueRun?.status, ftueRun?.stepId, interactionFtue, interactionResidentResume, interactionSource, interactionStory, mossproutInteraction, interactionCreature, interactionConversation]);
   const consumeWorldInteractionRequest = useCallback(() => {
     router.setParams({
       interactionFtue: undefined,
@@ -137,6 +141,8 @@ export default function KatchimerasScreen() {
       interactionSource: undefined,
       interactionStory: undefined,
       mossproutInteraction: undefined,
+      interactionCreature: undefined,
+      interactionConversation: undefined,
     });
   }, [router]);
 

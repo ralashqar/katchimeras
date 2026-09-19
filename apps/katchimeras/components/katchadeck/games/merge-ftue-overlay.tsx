@@ -733,7 +733,7 @@ export function MergeFtueEggGuide({ anchor, guide, screen, children, hideAvatar 
 
   const calloutWidth = inlineWidth ?? Math.min(326, screen.width - 28);
   const [measuredHeight, setMeasuredHeight] = useState(0);
-  const estimatedHeight = measuredHeight || (children ? 170 : 96);
+  const estimatedHeight = measuredHeight || (children ? 146 : 72);
   const calloutLeft = clamp(
     anchor.x + anchor.width / 2 - calloutWidth / 2,
     14,
@@ -771,9 +771,9 @@ export function MergeFtueEggGuide({ anchor, guide, screen, children, hideAvatar 
         accessibilityLabel="Your Egg is showing you around"
         pointerEvents="none"
         style={[styles.eggGuideAvatar, avatarMotionStyle]}>
-        <EggAvatar faceId={guideFaceId} presentation="button" size={76} skinId={equippedSkinId} />
+        <EggAvatar faceId={guideFaceId} presentation="button" size={52} skinId={equippedSkinId} />
       </Animated.View> : null}
-      <ThemedText style={[styles.eggGuideMessage, styles.eggGuideMessageLayout, { width: hideAvatar ? calloutWidth - 24 : calloutWidth - 24 - 76 - 9 }]} lightColor="#35422F" darkColor="#35422F">
+      <ThemedText style={[styles.eggGuideMessage, styles.eggGuideMessageLayout, { width: hideAvatar ? calloutWidth - 24 : calloutWidth - 24 - 52 - 9 }]} lightColor="#35422F" darkColor="#35422F">
         <ThemedText style={[styles.eggGuideMessage, styles.eggGuideEmphasis]} lightColor="#668A49" darkColor="#668A49">
           {normalizeSpeechText(guide.title)}
         </ThemedText>
@@ -907,13 +907,13 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     bottom: -10,
   },
-  eggGuideAvatar: { flexShrink: 0, height: 76, width: 76, zIndex: 1 },
-  eggGuideContentRow: { alignItems: 'flex-start', flexDirection: 'row', flexShrink: 0, gap: 9, width: '100%' },
+  eggGuideAvatar: { flexShrink: 0, height: 52, width: 52, zIndex: 1 },
+  eggGuideContentRow: { alignItems: 'center', flexDirection: 'row', flexShrink: 0, gap: 9, width: '100%' },
   eggGuideActionRow: { alignItems: 'flex-end', flexShrink: 0, width: '100%' },
   eggGuideMessage: {
     ...KatchaDeckUI.typography.ftueHeroTitle,
-    fontSize: 16.5,
-    lineHeight: 21,
+    fontSize: 18,
+    lineHeight: 23,
   },
   eggGuideMessageLayout: {
     flexShrink: 0,

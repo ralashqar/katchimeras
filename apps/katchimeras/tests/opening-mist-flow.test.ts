@@ -85,7 +85,7 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
   assert.deepEqual(lift.guide, mossproutFtueStep('world.egg_intro')?.guide, 'the reveal caption stays unchanged during the approach');
   assert.deepEqual(lift.camera, mossproutFtueStep('world.egg_intro')?.camera, 'the intro must not restart the approach with a different camera directive');
   const firstQuestion = mossproutFtueStep('egg.opening')!;
-  assert.equal(firstQuestion.guide.title, 'Your answers can clear the wisps.');
+  assert.equal(firstQuestion.guide.title, 'Share a little of your light. Help it wake.');
   assert.equal(firstQuestion.actions[0].options?.length, 3);
 
   for (const stepId of MOSSPROUT_OPENING_STEP_IDS) {

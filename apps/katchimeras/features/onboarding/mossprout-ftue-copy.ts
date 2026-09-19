@@ -7,7 +7,7 @@ export const MOSSPROUT_FTUE_COPY = {
   openingArrived: 'A flicker beneath the Mist. Someone is still in there.',
   lookCloser: 'Look closer',
   mistClearTitle: 'Someone is trapped beneath these wisps. Merge to reach them.',
-  mistClearBody: 'Two of the same, together: that’s light. Drag one Seed onto the other.',
+  mistClearBody: '',
   mistThins: 'The Mist has cleared.',
   eggHeardYou: 'The Mist has cleared.',
   dayQuestion: 'If today were weather over this garden, what was it?',

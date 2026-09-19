@@ -2452,6 +2452,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         && (ftueStepId !== OPENING_MIST_LIFT_STEP_ID || liftCaptionVisible)
         && (ftueStepId !== 'world.seed_planted' || firstSeedPlacementFailed) ? (
         <View
+          // The bottom Mist caption must not carry its exiting title into the
+          // question header when this container moves to the top of the screen.
+          key={ftueStepId === 'egg.opening' ? 'egg-question-header' : 'world-discovery-caption'}
           pointerEvents="box-none"
           style={[
             styles.discoveryCalloutLayer,

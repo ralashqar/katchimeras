@@ -2,7 +2,7 @@ import { Image, type ImageRef } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useSharedActionPanelLifecycle } from '@/features/today/use-shared-action-panel-lifecycle';
 import { memo, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { InteractionManager, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ImageSourcePropType, type LayoutChangeEvent, type View as ViewType } from 'react-native';
+import { InteractionManager, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type ImageSourcePropType, type LayoutChangeEvent, type View as ViewType } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -1500,6 +1500,7 @@ function InlineCheckInPanel({ hideChoiceIcons = false, action, allowSkip = true,
               : textChoices ? [styles.textChoiceGrid, hideChoiceIcons && styles.fullRowIllustratedChoiceGrid] : wide ? styles.sleepGrid : styles.moodGrid}>
             {choices.map((choice) => illustratedChoices ? (
               <MeasuredIllustratedChoice
+                hideIcon={hideChoiceIcons}
                 accent={choice.accent}
                 disabled={interactionLocked}
                 dimmed={ownedSelection != null && ownedSelection.id !== choice.id}
@@ -1676,11 +1677,12 @@ function FtueEnergyBadge({ amount, wide }: { amount: number; wide: boolean }) {
   );
 }
 
-function MeasuredIllustratedChoice({ accent, disabled, dimmed, fullRow, icon, image, label, onPress, reduceMotion, selected, showGlint, surface, threeColumn, width }: {
+function MeasuredIllustratedChoice({ hideIcon = false, accent, disabled, dimmed, fullRow, icon, image, label, onPress, reduceMotion, selected, showGlint, surface, threeColumn, width }: {
   accent: string;
   disabled: boolean;
   dimmed: boolean;
   fullRow: boolean;
+  hideIcon?: boolean;
   icon: IconSymbolName;
   image?: ImageSourcePropType | ImageRef;
   label: string;
@@ -1692,6 +1694,8 @@ function MeasuredIllustratedChoice({ accent, disabled, dimmed, fullRow, icon, im
   threeColumn: boolean;
   width: number;
 }) {
+  // Native emoji metrics exceed Fredoka's compact label line box on iOS.
+  const emojiLabel = hideIcon ? label.match(/^(\S+)\s+(.+)$/u) : null;
   const tileRef = useRef<ViewType | null>(null);
   const artScale = useSharedValue(1);
   useEffect(() => {
@@ -1723,7 +1727,7 @@ function MeasuredIllustratedChoice({ accent, disabled, dimmed, fullRow, icon, im
         pressed && styles.illustratedChoicePressed,
       ]}>
       <View pointerEvents="none" style={[styles.illustratedChoiceHighlight, fullRow && styles.fullRowIllustratedChoiceHighlight, threeColumn && styles.illustratedChoiceHighlightThreeColumn]} />
-      <Animated.View style={[styles.illustratedChoiceArtFrame, fullRow && styles.fullRowIllustratedChoiceArtFrame, threeColumn && styles.illustratedChoiceArtFrameThreeColumn, artStyle]}>
+      {!hideIcon ? <Animated.View style={[styles.illustratedChoiceArtFrame, fullRow && styles.fullRowIllustratedChoiceArtFrame, threeColumn && styles.illustratedChoiceArtFrameThreeColumn, artStyle]}>
         {image ? (
           // Preserve source pixels: the FTUE camera enlarges this small layout
           // after decoding, and selection adds another scale pulse.
@@ -1731,9 +1735,10 @@ function MeasuredIllustratedChoice({ accent, disabled, dimmed, fullRow, icon, im
         ) : (
           <IconSymbol color={accent} name={icon} size={threeColumn ? 30 : 32} />
         )}
-      </Animated.View>
+      </Animated.View> : null}
+      {emojiLabel ? <Text accessible={false} style={styles.illustratedChoiceEmoji}>{emojiLabel[1]}</Text> : null}
       <ThemedText numberOfLines={2} style={[styles.illustratedChoiceLabel, fullRow && styles.fullRowIllustratedChoiceLabel, threeColumn && styles.illustratedChoiceLabelThreeColumn]} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-        {label}
+        {emojiLabel?.[2] ?? label}
       </ThemedText>
       {showGlint ? (
         <View style={[styles.illustratedChoiceGlint, { backgroundColor: accent }]}>
@@ -2079,8 +2084,7 @@ export function EggQuestionPanel({ action, completionEvent, enterFromBottom = fa
         enterFromBottom={enterFromBottom}
         ftueQuestionLayout
         fullRowIllustratedChoices={action.id.startsWith('egg.') && !moodQuestion}
-        illustratedChoices={!textOnly}
-        textChoices={textOnly}
+        illustratedChoices
         hideChoiceIcons={textOnly}
         interactionLocked={interactionLocked}
         metric={metric}
@@ -2330,6 +2334,7 @@ const styles = StyleSheet.create({
   illustratedChoiceArt: { height: 40, width: 46 },
   fullRowIllustratedChoiceArt: { height: 44, width: 50 },
   illustratedChoiceArtThreeColumn: { height: 37, width: 43 },
+  illustratedChoiceEmoji: { fontSize: 18, lineHeight: 28, paddingVertical: 2, flexShrink: 0, textAlign: 'center', includeFontPadding: true },
   illustratedChoiceLabel: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 10.5, letterSpacing: -0.15, lineHeight: 11.5, minHeight: 20, textAlign: 'center', textAlignVertical: 'center', width: '100%' },
   fullRowIllustratedChoiceLabel: { flex: 1, fontSize: 15, letterSpacing: -0.2, lineHeight: 18, minHeight: 0, textAlign: 'left', width: 'auto' },
   illustratedChoiceLabelThreeColumn: { fontSize: 9.5, lineHeight: 10.5, minHeight: 19 },

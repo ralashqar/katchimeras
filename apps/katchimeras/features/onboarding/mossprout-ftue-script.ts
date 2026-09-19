@@ -58,7 +58,7 @@ export const MOSSPROUT_FTUE_RETURN_NOTE_ID = 'mossprout:chapter-0:return-note';
 const openingQuestionSteps: FtueScriptDefinition['steps'] = [
   {
     id: 'egg.opening', surface: 'haven',
-    guide: { eyebrow: 'Two wisps remain', title: 'Your answers can clear the wisps.', body: '' },
+    guide: { eyebrow: 'Two wisps remain', title: 'Share a little of your light. Help it wake.', body: '' },
     camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.opening'), anchorY: 0.5, durationMs: 520 },
     actions: [{
       id: 'egg.day_texture', title: HATCH_PROFILES.mossprout.questions[0].title, description: '', icon: 'leaf.fill',
