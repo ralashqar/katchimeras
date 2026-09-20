@@ -2,6 +2,9 @@ import { saveWithGameplayOutbox } from '@/features/live-ops/source-outbox';
 import type { WispCollectionState, WispGrantSource, WispId } from '@/types/wisp';
 import { getStoredJson, getStoredRaw } from '@/utils/app-storage';
 import { applyWispGrant, EMPTY_WISP_STATE, normalizeWispState } from '@/utils/wisp-state';
+import { reduceWispLantern } from '@/utils/wisp-lantern-state';
+import type { WispLanternCommand, WispPackAuthority } from '@/types/wisp-lantern';
+import { gameNow } from '@/utils/game-clock';
 
 export const WISP_STORAGE_KEY = 'katchimera.wisps.v2';
 const LEGACY_WISP_STORAGE_KEY = 'katchimera.wisps.v1';
@@ -23,6 +26,20 @@ export function subscribeWispState(listener: (state: WispCollectionState) => voi
   listeners.add(listener);
   return () => { listeners.delete(listener); };
 }
+
+/** Synchronous SQLite write: no await or React snapshot between read and commit. */
+export function updateStoredWispState(reduce: (state: WispCollectionState) => WispCollectionState) {
+  const current = loadWispState();
+  const next = reduce(current);
+  return next === current ? current : saveWispState(next);
+}
+export function commandWispLantern(command: WispLanternCommand, now = gameNow(), externallyOwned: readonly WispId[] = []) {
+  return updateStoredWispState(current => reduceWispLantern(current, command, now, Math.floor(Math.random() * 4294967296), externallyOwned));
+}
+export const localWispPackAuthority = {
+  scope: 'local-lantern-v1' as const,
+  async openPack(packId: string, externallyOwned: readonly WispId[] = []) { return commandWispLantern({ type: 'open_pack', packId }, undefined, externallyOwned).lantern!.packs[packId]; },
+} satisfies WispPackAuthority;
 
 export function grantStoredWisp(
   id: WispId,

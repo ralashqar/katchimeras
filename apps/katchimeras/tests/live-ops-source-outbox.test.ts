@@ -14,6 +14,18 @@ function harness() {
   return { storage, module };
 }
 
+test('visitor ownership grants no Harmony facts while personal discoveries still do', async () => {
+  const { module } = harness();
+  module.saveWithGameplayOutbox('katchimera.wisps.v2', { unlocked: {}, inventory: {} });
+  module.saveWithGameplayOutbox('katchimera.wisps.v2', {
+    unlocked: { dewdrop: { unlockedAt: 10 }, sprout: { unlockedAt: 11 } },
+    inventory: { dewdrop: { sources: ['visitor'] }, sprout: { sources: ['journey'] } },
+  });
+  const delivered: GameplayEvent[] = [];
+  await module.drainGameplaySourceOutboxes(async (events: GameplayEvent[]) => { delivered.push(...events); });
+  assert.deepEqual(delivered.map(event => event.context.targetId), ['sprout']);
+});
+
 test('source facts baseline historically, retain new actions on failed delivery, and deduplicate acknowledgement', async () => {
   const { storage, module } = harness();
   const key = 'katchadeck.companion-bond-v1';

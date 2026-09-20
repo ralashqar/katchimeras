@@ -1,18 +1,12 @@
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, FadeIn, FadeInUp, interpolate, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 
-import {
-  DeckCardHitTarget,
-  deckSlotStyles,
-  DeckVisualSlot,
-} from '@/components/katchadeck/home/today-deck/deck-slot';
-import { resolveDeckStride } from '@/components/katchadeck/home/today-deck/deck-navigation';
-import { useDeckController } from '@/components/katchadeck/home/today-deck/use-deck-controller';
+import { CollectibleCardDeck } from './collectible-card-deck';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -20,7 +14,6 @@ import { getCreatureVisual } from '@/game/days';
 import type { KatchimeraCardOption } from '@/hooks/use-katchimera-cards';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { DailyCardSize } from '@/utils/daily-card-layout';
-import { resolveCollectionDeckWindow } from '@/utils/collection-deck';
 import { VEILED_MEMORY_CARD_ART } from '@/constants/memory-card-art';
 
 type KatchimeraCardDeckCarouselProps = {
@@ -29,8 +22,6 @@ type KatchimeraCardDeckCarouselProps = {
   maxCardHeight?: number;
 };
 
-const WINDOW_RADIUS = 3;
-const CARD_RATIO = 0.7;
 
 const BOTANICAL_LINES: Partial<Record<KatchimeraSkinId, string>> = {
   mossprout: 'Keeper of the shared patch',
@@ -45,75 +36,15 @@ const BOTANICAL_LINES: Partial<Record<KatchimeraSkinId, string>> = {
 };
 
 export function KatchimeraCardDeckCarousel({ cards, initialCardId, maxCardHeight = 430 }: KatchimeraCardDeckCarouselProps) {
-  const { width: windowWidth } = useWindowDimensions();
-  const [requestedCardId, setRequestedCardId] = useState<KatchimeraSkinId | ''>(() => (
-    cards.some((card) => card.id === initialCardId) ? initialCardId! : cards.find((card) => card.owned)?.id ?? cards[0]?.id ?? ''
-  ));
-  const selectedCardId = cards.some((card) => card.id === requestedCardId)
-    ? requestedCardId
-    : cards[0]?.id ?? '';
-  const selectedIndex = Math.max(0, cards.findIndex((card) => card.id === selectedCardId));
-  const selectedCard = cards[selectedIndex];
-  const cardSize = useMemo<DailyCardSize>(() => {
-    const width = Math.min(286, Math.max(210, windowWidth - 92), maxCardHeight * CARD_RATIO);
-    return { width, height: width / CARD_RATIO, scale: width / 941 };
-  }, [maxCardHeight, windowWidth]);
-  const stride = resolveDeckStride(windowWidth);
-  const { focusedIndex, navigateToIndex, swipeGesture } = useDeckController({
-    days: cards,
-    disabled: cards.length < 2,
-    maxNavigableIndex: Math.max(0, cards.length - 1),
-    onSelect: (id) => setRequestedCardId(id as KatchimeraSkinId),
-    selectedId: selectedCardId,
-    stride,
-  });
-  const deckIndices = useMemo(
-    () => resolveCollectionDeckWindow(cards.length, selectedIndex, WINDOW_RADIUS),
-    [cards.length, selectedIndex],
-  );
-
-  if (!selectedCard) return null;
-
-  return (
-    <View style={styles.carousel}>
-      <GestureDetector gesture={swipeGesture}>
-        <View style={[styles.stage, { height: cardSize.height + 16, width: windowWidth }]}>
-          {deckIndices.map((cardIndex) => {
-            const card = cards[cardIndex];
-            if (!card) return null;
-            const active = card.id === selectedCardId;
-            return (
-              <DeckVisualSlot active={active} cardIndex={cardIndex} cardSize={cardSize} focusedIndex={focusedIndex} key={card.id} stride={stride}>
-                <KatchimeraCollectionCard card={card} cardNumber={cardIndex + 1} cardSize={cardSize} />
-              </DeckVisualSlot>
-            );
-          })}
-          <View pointerEvents="box-none" style={deckSlotStyles.hitLayer}>
-            {deckIndices.map((cardIndex) => {
-              const card = cards[cardIndex];
-              if (!card || card.id === selectedCardId) return null;
-              return (
-                <DeckCardHitTarget
-                  accessibilityLabel={`Center card ${cardIndex + 1}`}
-                  cardIndex={cardIndex}
-                  cardSize={cardSize}
-                  focusedIndex={focusedIndex}
-                  key={`hit-${card.id}`}
-                  onPress={() => navigateToIndex(cardIndex)}
-                  stride={stride}
-                />
-              );
-            })}
-          </View>
-        </View>
-      </GestureDetector>
-      <View style={styles.caption}>
-        <ThemedText style={styles.counter} lightColor="#D0A43B" darkColor="#F0CF77">{selectedIndex + 1} / {cards.length}</ThemedText>
-        <ThemedText style={styles.captionTitle} lightColor="#2F3A25" darkColor="#FFF5D8">{selectedCard.owned ? selectedCard.displayName : 'Undiscovered resident'}</ThemedText>
-        <ThemedText style={styles.hint} lightColor="#6E725F" darkColor="rgba(255,245,216,0.68)">Swipe through the Mossprout set</ThemedText>
-      </View>
-    </View>
-  );
+  const [requestedCardId, setRequestedCardId] = useState<KatchimeraSkinId | ''>(() =>
+    cards.some(card => card.id === initialCardId) ? initialCardId! : cards.find(card => card.owned)?.id ?? '');
+  const selectedId = cards.some(card => card.id === requestedCardId) ? requestedCardId : cards[0]?.id ?? '';
+  return <CollectibleCardDeck cards={cards} selectedId={selectedId} onSelect={card => setRequestedCardId(card.id)} maxCardHeight={maxCardHeight} navigationLabel="Mossprout set"
+    renderCard={(card, index, size) => <KatchimeraCollectionCard card={card} cardNumber={index + 1} cardSize={size} />}
+    renderCaption={card => <View style={styles.caption}>
+      <ThemedText style={styles.captionTitle} lightColor="#2F3A25" darkColor="#FFF5D8">{card.owned ? card.displayName : 'Undiscovered resident'}</ThemedText>
+      <ThemedText style={styles.hint} lightColor="#6E725F" darkColor="rgba(255,245,216,0.68)">Swipe through the Mossprout set</ThemedText>
+    </View>} />;
 }
 
 function KatchimeraCollectionCard({ card, cardNumber, cardSize }: {
@@ -186,7 +117,7 @@ export function KatchimeraCardRevealModal({ cardId, cards, onDone }: {
     : card);
   return (
     <Modal animationType="none" navigationBarTranslucent onRequestClose={onDone} presentationStyle="fullScreen" statusBarTranslucent transparent visible>
-      <StatusBar style="light" />
+      <GestureHandlerRootView style={{ flex: 1 }}><StatusBar style="light" />
       <Animated.View accessibilityViewIsModal entering={FadeIn.duration(reduceMotion ? 80 : 260)} style={styles.revealScreen}>
         <View style={styles.revealGlow} />
         <View style={[styles.revealLayout, { paddingBottom: Math.max(insets.bottom + 12, 22), paddingTop: Math.max(insets.top + 12, 24) }]}>
@@ -201,7 +132,7 @@ export function KatchimeraCardRevealModal({ cardId, cards, onDone }: {
           </View>
           <View style={styles.revealAction}><KatchaButton fullWidth glow label="Done" onPress={onDone} /></View>
         </View>
-      </Animated.View>
+      </Animated.View></GestureHandlerRootView>
     </Modal>
   );
 }

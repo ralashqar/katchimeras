@@ -1,0 +1,74 @@
+[
+  {
+    "id": "dewdrop",
+    "prompt": "Use case: stylized-concept. Asset: dewdrop, one freestanding tiny magical Wisp sprite for Katchimeras cozy 3D toy diorama mobile game. A clear aqua droplet with two tiny leaflike fins. One simple friendly graphic face with two dark dot eyes and tiny smile. Matte resin/soft ceramic toy, broad simple forms, contained gentle glow, warm soft studio light. Centered full body square canvas, generous transparent padding, readable at 40px. True transparent background. Exactly one creature. No floor, no shadow, no text, no border, no environment, no props, no photoreal eyes, no other creatures.",
+    "source": "dewdrop.png",
+    "tool": "built-in image_gen",
+    "sha256": "aac063c95195f6ed91f38e8ef8509725740d1a0d94cecb1227f0e96a7c42b3c5",
+    "alpha": "native generated alpha; preserved",
+    "size": [
+      1254,
+      1254
+    ]
+  },
+  {
+    "id": "bubble",
+    "prompt": "Use case: stylized-concept. Asset: bubble, one freestanding tiny magical Wisp sprite for Katchimeras cozy 3D toy diorama mobile game. An iridescent soap bubble orb with tiny cheeks and two little rounded fins. One simple friendly graphic face with two dark dot eyes and tiny smile. Matte resin/soft ceramic toy, broad simple forms, contained gentle glow, warm soft studio light. Centered full body square canvas, generous transparent padding, readable at 40px. True transparent background. Exactly one creature. No floor, no shadow, no text, no border, no environment, no props, no photoreal eyes, no other creatures.",
+    "source": "bubble.png",
+    "tool": "built-in image_gen",
+    "sha256": "f6d3347dbf17da373c8e86c3dcca02dbc701aa85925f809c20f04630e89ac391",
+    "alpha": "native generated alpha; preserved",
+    "size": [
+      1254,
+      1254
+    ]
+  },
+  {
+    "id": "nimbus",
+    "prompt": "Use case: stylized-concept. Asset: nimbus, one freestanding tiny magical Wisp sprite for Katchimeras cozy 3D toy diorama mobile game. A small white cloud orb with tiny blue feet. One simple friendly graphic face with two dark dot eyes and tiny smile. Matte resin/soft ceramic toy, broad simple forms, contained gentle glow, warm soft studio light. Centered full body square canvas, generous transparent padding, readable at 40px. True transparent background. Exactly one creature. No floor, no shadow, no text, no border, no environment, no props, no photoreal eyes, no other creatures.",
+    "source": "nimbus.png",
+    "tool": "built-in image_gen",
+    "sha256": "c6e5ac70b3db02bd7902d8a34f4a5f2afac6a1b08ead503698f974928ffb934f",
+    "alpha": "native generated alpha; preserved",
+    "size": [
+      1254,
+      1254
+    ]
+  },
+  {
+    "id": "clover",
+    "prompt": "Use case: stylized-concept. Asset: clover, one freestanding tiny magical Wisp sprite for Katchimeras cozy 3D toy diorama mobile game. A four-leaf green orb with gold freckles. One simple friendly graphic face with two dark dot eyes and tiny smile. Matte resin/soft ceramic toy, broad simple forms, contained gentle glow, warm soft studio light. Centered full body square canvas, generous transparent padding, readable at 40px. True transparent background. Exactly one creature. No floor, no shadow, no text, no border, no environment, no props, no photoreal eyes, no other creatures.",
+    "source": "clover.png",
+    "tool": "built-in image_gen",
+    "sha256": "87e0c6f583762975eea0dc513e44b38fa1e75137848c4fde757a52624219d10f",
+    "alpha": "native generated alpha; preserved",
+    "size": [
+      1254,
+      1254
+    ]
+  },
+  {
+    "id": "pebble",
+    "prompt": "Use case: stylized-concept. Asset: pebble, one freestanding tiny magical Wisp sprite for Katchimeras cozy 3D toy diorama mobile game. A smooth warm-grey pebble orb with miniature fins. One simple friendly graphic face with two dark dot eyes and tiny smile. Matte resin/soft ceramic toy, broad simple forms, contained gentle glow, warm soft studio light. Centered full body square canvas, generous transparent padding, readable at 40px. True transparent background. Exactly one creature. No floor, no shadow, no text, no border, no environment, no props, no photoreal eyes, no other creatures.",
+    "source": "pebble.png",
+    "tool": "built-in image_gen",
+    "sha256": "fb53841a1d234979542ad3327cc7ec09a104f3b61f29be115cce509069ad3d41",
+    "alpha": "native generated alpha; preserved",
+    "size": [
+      1254,
+      1254
+    ]
+  },
+  {
+    "id": "crystal",
+    "prompt": "Use case: stylized-concept. Asset: crystal, one freestanding tiny magical Wisp sprite for Katchimeras cozy 3D toy diorama mobile game. A softly faceted pale violet crystal sprite, friendly rounded faceting. One simple friendly graphic face with two dark dot eyes and tiny smile. Matte resin/soft ceramic toy, broad simple forms, contained gentle glow, warm soft studio light. Centered full body square canvas, generous transparent padding, readable at 40px. True transparent background. Exactly one creature. No floor, no shadow, no text, no border, no environment, no props, no photoreal eyes, no other creatures.",
+    "source": "crystal.png",
+    "tool": "built-in image_gen",
+    "sha256": "6b54aebd976b62578faf65b577706cb66d1ebdebe1135e81100935aa7ce9db17",
+    "alpha": "native generated alpha; preserved",
+    "size": [
+      1254,
+      1254
+    ]
+  }
+]

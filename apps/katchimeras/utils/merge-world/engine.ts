@@ -628,6 +628,7 @@ function placePlantableMemory(
   command: Extract<MergeWorldCommand, { type: 'placePlantableMemory' }>,
 ): MergeWorldCommandResult {
   if (hasHavenMutationReceipt(state, command.receiptId)) return unchanged(state, 'This planting was already saved.');
+  if (state.wispLanternPlacement?.slotId === command.slotId) return unchanged(state, 'The Wisp Lantern lives in this patch.');
   if (!MOSSPROUT_GARDEN_PLANT_SLOTS.includes(command.slotId)) return unchanged(state, 'That Garden plot does not exist.');
   const selected = state.haven.plantableMemories.find((plant) => plant.id === command.instanceId);
   if (!selected) return unchanged(state, 'That memory Seed is not available.');
@@ -953,6 +954,9 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
       : fallback.characterProgress,
     localLiveOps: source.localLiveOps,
     sharedAdventure: normalizeAdventure(source.sharedAdventure),
+    wispLanternPlacement: source.wispLanternPlacement?.slotId === 'front-right' && Number.isFinite(source.wispLanternPlacement.plantedAt)
+      ? source.wispLanternPlacement : undefined,
+    wispLanternProgress: source.wispLanternProgress,
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
     storyWorldMutationReceipts: normalizeStoryWorldMutationReceipts(source.storyWorldMutationReceipts),
     companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, source.activeOrders, rawVersion, now),
@@ -2545,6 +2549,9 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
   if (!order || !mergeOrderReady(state, order)) return unchanged(state, 'The requested items are not ready yet.');
   if (order.storyArcId === DAILY_GARDEN_ARC && order.storyBeatId !== localDayId(now)) return unchanged(state, 'New garden requests are ready for today. Your items are yours to keep.');
   const board = boardAfterServingOrder(state, order);
+  if (order.storyArcId === 'wisp-lantern') return { ...changed(touch({
+    ...state, board, activeOrders: state.activeOrders.filter(item => item.id !== orderId),
+  }, now), 'A Lantern Pouch is waiting at the Wisp Lantern.'), servedOrderId: order.id };
   if (order.storyArcId === DAILY_GARDEN_ARC) {
     const next = completeDailyGardenOrder({ ...state, board, coins: state.coins + order.reward.coins, completedOrderCount: state.completedOrderCount + 1, activeOrders: state.activeOrders.filter((item) => item.id !== orderId) }, order, now);
     const bonus = next.coins - state.coins > order.reward.coins;
@@ -4722,6 +4729,7 @@ export function mergeOrderEnergyRefund(order: MergeOrder): number {
 }
 
 function ensureOrderGlowReward(order: MergeOrder): MergeOrder {
+  if (order.storyArcId === 'wisp-lantern') return order;
   if (Number.isFinite(order.reward.coins) && order.reward.coins > 0) return order;
   return { ...order, reward: { ...order.reward, coins: JOURNEY_MEDITATION_ORDER_GLOW } };
 }

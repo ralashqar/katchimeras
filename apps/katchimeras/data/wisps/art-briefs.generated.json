@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "items": [
     {
       "id": "crema",
@@ -431,114 +431,6 @@
         "jubilee.png",
         "jubilee.webp",
         "thumbnails/jubilee.webp"
-      ]
-    },
-    {
-      "id": "dewdrop",
-      "name": "Dewdrop",
-      "rarity": "common",
-      "seriesId": "garden-visitors",
-      "primaryFamilyId": null,
-      "visualSummary": "Clear aqua droplet with leaflike fins.",
-      "palette": [
-        "aqua",
-        "mint"
-      ],
-      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
-      "requiredOutputs": [
-        "dewdrop.png",
-        "dewdrop.webp",
-        "thumbnails/dewdrop.webp"
-      ]
-    },
-    {
-      "id": "bubble",
-      "name": "Bubble",
-      "rarity": "common",
-      "seriesId": "soft-visitors",
-      "primaryFamilyId": null,
-      "visualSummary": "Iridescent soap bubble with tiny cheeks.",
-      "palette": [
-        "pearl",
-        "sky"
-      ],
-      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
-      "requiredOutputs": [
-        "bubble.png",
-        "bubble.webp",
-        "thumbnails/bubble.webp"
-      ]
-    },
-    {
-      "id": "nimbus",
-      "name": "Nimbus",
-      "rarity": "common",
-      "seriesId": "soft-visitors",
-      "primaryFamilyId": null,
-      "visualSummary": "Small white cloud orb with blue feet.",
-      "palette": [
-        "cloud",
-        "sky"
-      ],
-      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
-      "requiredOutputs": [
-        "nimbus.png",
-        "nimbus.webp",
-        "thumbnails/nimbus.webp"
-      ]
-    },
-    {
-      "id": "clover",
-      "name": "Clover",
-      "rarity": "common",
-      "seriesId": "garden-visitors",
-      "primaryFamilyId": null,
-      "visualSummary": "Four-leaf orb with gold freckles.",
-      "palette": [
-        "clover green",
-        "gold"
-      ],
-      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
-      "requiredOutputs": [
-        "clover.png",
-        "clover.webp",
-        "thumbnails/clover.webp"
-      ]
-    },
-    {
-      "id": "pebble",
-      "name": "Pebble",
-      "rarity": "common",
-      "seriesId": "garden-visitors",
-      "primaryFamilyId": null,
-      "visualSummary": "Smooth warm-grey stone with miniature fins.",
-      "palette": [
-        "warm grey",
-        "cream"
-      ],
-      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
-      "requiredOutputs": [
-        "pebble.png",
-        "pebble.webp",
-        "thumbnails/pebble.webp"
-      ]
-    },
-    {
-      "id": "crystal",
-      "name": "Crystal",
-      "rarity": "rare",
-      "seriesId": "treasure-visitors",
-      "primaryFamilyId": null,
-      "visualSummary": "Faceted crystal sprite.",
-      "palette": [
-        "ice blue",
-        "violet"
-      ],
-      "direction": "Tiny floating creature, simple silhouette, one dominant concept, readable face, minimal limbs, transparent background; 20–30% of Egg Avatar height; do not resemble a full Katchimera.",
-      "requiredOutputs": [
-        "crystal.png",
-        "crystal.webp",
-        "thumbnails/crystal.webp"
       ]
     },
     {

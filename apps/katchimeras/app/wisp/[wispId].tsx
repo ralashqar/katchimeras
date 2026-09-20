@@ -46,19 +46,23 @@ export default function WispDetailScreen() {
         <ThemedText style={styles.title} lightColor={Meadow.ink} darkColor={Meadow.ink}>{owned || !definition.hidden ? definition.name : '???'}</ThemedText>
         <ThemedText style={styles.subtitle} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{owned ? definition.subtitle : definition.hidden ? 'Its story is still hidden.' : definition.description}</ThemedText>
 
-        <View style={styles.progressCard}>
+        {definition.packEligible ? <View style={styles.progressCard}>
+          <ThemedText style={styles.cardLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>LANTERN VISITOR</ThemedText>
+          <ThemedText style={styles.rule} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{owned ? 'At home in your collection. Repeat visitors leave Echoes at the Wisp Lantern.' : 'Find this visitor in Lantern pouches, or invite it for 15 Echoes. The Wisp Lantern appears beside Heartwood after sharing Feastle’s first Snack and meeting Heartwood.'}</ThemedText>
+          {unlock ? <ThemedText style={styles.firstLine} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>First welcomed {new Date(unlock.unlockedAt).toLocaleDateString()}</ThemedText> : null}
+        </View> : <View style={styles.progressCard}>
           <View style={styles.progressHeading}>
             <ThemedText style={styles.cardLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>{owned ? 'RESONANCE' : 'DISCOVERY PROGRESS'}</ThemedText>
             <ThemedText style={styles.progressNumber} lightColor={Meadow.ink} darkColor={Meadow.ink}>{owned ? `${resonance} ${resonance === 1 ? 'day' : 'days'}` : `${progress.current} / ${progress.target}`}</ThemedText>
           </View>
           <View style={styles.track}><View style={[styles.fill, { width: `${Math.min(100, progress.current / progress.target * 100)}%` }]} /></View>
           <ThemedText style={styles.rule} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{owned ? 'Each day this Wisp returns, its Resonance grows.' : `Keep going: ${progress.unit}.`}</ThemedText>
-        </View>
+        </View>}
 
         {owned ? <Pressable accessibilityRole="button" onPress={() => wisps.equip(equipped ? null : definition.id)} style={({ pressed }) => [styles.equip, pressed && styles.pressed]}>
           <ThemedText style={styles.equipText} lightColor="#FFF8E7" darkColor="#FFF8E7">{equipped ? 'Let it rest' : 'Equip Wisp'}</ThemedText>
         </Pressable> : null}
-        {!owned && shopOffer && economy.config.flags.wispShop ? <Pressable accessibilityRole="button" disabled={buying || economy.snapshot.essenceBalance < shopOffer.price} onPress={async () => {
+        {!definition.packEligible && !owned && shopOffer && economy.config.flags.wispShop ? <Pressable accessibilityRole="button" disabled={buying || economy.snapshot.essenceBalance < shopOffer.price} onPress={async () => {
           setBuying(true);
           await economy.purchaseWithEssence(shopOffer.id);
           setBuying(false);
@@ -66,14 +70,14 @@ export default function WispDetailScreen() {
           <ThemedText style={styles.equipText} lightColor="#FFF8E7" darkColor="#FFF8E7">{buying ? 'Inviting…' : `${shopOffer.price} Essence`}</ThemedText>
         </Pressable> : null}
 
-        <View style={styles.history}>
+        {!definition.packEligible ? <View style={styles.history}>
           <ThemedText style={styles.sectionTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Your history</ThemedText>
           <ThemedText style={styles.historyNumber} lightColor={Meadow.ink} darkColor={Meadow.ink}>{visibleMatchingDays.length}</ThemedText>
           <ThemedText style={styles.historyLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{economy.snapshot.activePlus ? 'days together' : 'days in your latest 14 days'}</ThemedText>
           {!economy.snapshot.activePlus && visibleMatchingDays.length < matchingDays.length ? <Pressable accessibilityRole="button" onPress={() => router.push('/modal')} style={styles.longMemory}><ThemedText style={styles.longMemoryText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>See your full history with Plus</ThemedText></Pressable> : null}
           {unlock ? <ThemedText style={styles.firstLine} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>First discovered {new Date(unlock.unlockedAt).toLocaleDateString()}</ThemedText> : null}
           {matchingDays[0] ? <ThemedText style={styles.firstLine} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>First memory: {matchingDays[0].dayName ?? matchingDays[0].dateLabel}</ThemedText> : null}
-        </View>
+        </View> : null}
       </ScrollView>
     </SafeAreaView>
   );

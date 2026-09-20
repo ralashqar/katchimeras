@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "items": [
     {
       "id": "sunbeam",
@@ -3292,7 +3292,7 @@
       "subtitle": "Morning jewel",
       "description": "A bright bead of impossible fresh air.",
       "category": "experience",
-      "acquisition": "shop",
+      "acquisition": "game",
       "rarity": "common",
       "hidden": false,
       "featureFamily": "fantasy",
@@ -3303,22 +3303,23 @@
         "mint"
       ],
       "dayRule": null,
-      "unlockRule": {
-        "id": "shop",
-        "target": 150,
-        "unit": "Essence"
-      },
-      "availability": "planned",
+      "unlockRule": null,
+      "availability": "ready",
       "sortOrder": 76,
-      "version": 1,
+      "version": 2,
       "semanticClass": "cosmetic",
-      "seriesId": "garden-visitors",
-      "giftPolicy": "duplicate_only",
-      "duplicatePolicy": "convert_or_gift",
-      "primaryAcquisition": "shop",
+      "seriesId": "little-lantern-visitors",
+      "giftPolicy": "not_giftable",
+      "duplicatePolicy": "convert",
+      "packEligible": true,
+      "primaryAcquisition": "game",
       "primaryFamilyId": null,
       "affinityFamilyIds": [],
-      "assetRefs": null
+      "assetRefs": {
+        "art": "assets/images/katchimeras/wisps/dewdrop.png",
+        "runtime": "assets/images/katchimeras/wisps/dewdrop.webp",
+        "thumbnail": "assets/images/katchimeras/wisps/thumbnails/dewdrop.webp"
+      }
     },
     {
       "id": "bubble",
@@ -3326,7 +3327,7 @@
       "subtitle": "Upward drifter",
       "description": "Finds delight in taking the long way upward.",
       "category": "experience",
-      "acquisition": "shop",
+      "acquisition": "game",
       "rarity": "common",
       "hidden": false,
       "featureFamily": "fantasy",
@@ -3337,22 +3338,23 @@
         "sky"
       ],
       "dayRule": null,
-      "unlockRule": {
-        "id": "shop",
-        "target": 150,
-        "unit": "Essence"
-      },
-      "availability": "planned",
+      "unlockRule": null,
+      "availability": "ready",
       "sortOrder": 77,
-      "version": 1,
+      "version": 2,
       "semanticClass": "cosmetic",
-      "seriesId": "soft-visitors",
-      "giftPolicy": "duplicate_only",
-      "duplicatePolicy": "convert_or_gift",
-      "primaryAcquisition": "shop",
+      "seriesId": "little-lantern-visitors",
+      "giftPolicy": "not_giftable",
+      "duplicatePolicy": "convert",
+      "packEligible": true,
+      "primaryAcquisition": "game",
       "primaryFamilyId": null,
       "affinityFamilyIds": [],
-      "assetRefs": null
+      "assetRefs": {
+        "art": "assets/images/katchimeras/wisps/bubble.png",
+        "runtime": "assets/images/katchimeras/wisps/bubble.webp",
+        "thumbnail": "assets/images/katchimeras/wisps/thumbnails/bubble.webp"
+      }
     },
     {
       "id": "nimbus",
@@ -3360,7 +3362,7 @@
       "subtitle": "Pocket weather",
       "description": "A soft cloud with highly local opinions about rain.",
       "category": "experience",
-      "acquisition": "shop",
+      "acquisition": "game",
       "rarity": "common",
       "hidden": false,
       "featureFamily": "fantasy",
@@ -3371,22 +3373,23 @@
         "sky"
       ],
       "dayRule": null,
-      "unlockRule": {
-        "id": "shop",
-        "target": 150,
-        "unit": "Essence"
-      },
-      "availability": "planned",
+      "unlockRule": null,
+      "availability": "ready",
       "sortOrder": 78,
-      "version": 1,
+      "version": 2,
       "semanticClass": "cosmetic",
-      "seriesId": "soft-visitors",
-      "giftPolicy": "duplicate_only",
-      "duplicatePolicy": "convert_or_gift",
-      "primaryAcquisition": "shop",
+      "seriesId": "little-lantern-visitors",
+      "giftPolicy": "not_giftable",
+      "duplicatePolicy": "convert",
+      "packEligible": true,
+      "primaryAcquisition": "game",
       "primaryFamilyId": null,
       "affinityFamilyIds": [],
-      "assetRefs": null
+      "assetRefs": {
+        "art": "assets/images/katchimeras/wisps/nimbus.png",
+        "runtime": "assets/images/katchimeras/wisps/nimbus.webp",
+        "thumbnail": "assets/images/katchimeras/wisps/thumbnails/nimbus.webp"
+      }
     },
     {
       "id": "clover",
@@ -3394,7 +3397,7 @@
       "subtitle": "Lucky leaf",
       "description": "Insists luck is mostly noticing good little things.",
       "category": "experience",
-      "acquisition": "shop",
+      "acquisition": "game",
       "rarity": "common",
       "hidden": false,
       "featureFamily": "fantasy",
@@ -3405,22 +3408,23 @@
         "gold"
       ],
       "dayRule": null,
-      "unlockRule": {
-        "id": "shop",
-        "target": 150,
-        "unit": "Essence"
-      },
-      "availability": "planned",
+      "unlockRule": null,
+      "availability": "ready",
       "sortOrder": 79,
-      "version": 1,
+      "version": 2,
       "semanticClass": "cosmetic",
-      "seriesId": "garden-visitors",
-      "giftPolicy": "duplicate_only",
-      "duplicatePolicy": "convert_or_gift",
-      "primaryAcquisition": "shop",
+      "seriesId": "little-lantern-visitors",
+      "giftPolicy": "not_giftable",
+      "duplicatePolicy": "convert",
+      "packEligible": true,
+      "primaryAcquisition": "game",
       "primaryFamilyId": null,
       "affinityFamilyIds": [],
-      "assetRefs": null
+      "assetRefs": {
+        "art": "assets/images/katchimeras/wisps/clover.png",
+        "runtime": "assets/images/katchimeras/wisps/clover.webp",
+        "thumbnail": "assets/images/katchimeras/wisps/thumbnails/clover.webp"
+      }
     },
     {
       "id": "pebble",
@@ -3428,7 +3432,7 @@
       "subtitle": "Tiny constant",
       "description": "Small, steady, and very difficult to hurry.",
       "category": "experience",
-      "acquisition": "shop",
+      "acquisition": "game",
       "rarity": "common",
       "hidden": false,
       "featureFamily": "fantasy",
@@ -3439,22 +3443,23 @@
         "cream"
       ],
       "dayRule": null,
-      "unlockRule": {
-        "id": "shop",
-        "target": 150,
-        "unit": "Essence"
-      },
-      "availability": "planned",
+      "unlockRule": null,
+      "availability": "ready",
       "sortOrder": 80,
-      "version": 1,
+      "version": 2,
       "semanticClass": "cosmetic",
-      "seriesId": "garden-visitors",
-      "giftPolicy": "duplicate_only",
-      "duplicatePolicy": "convert_or_gift",
-      "primaryAcquisition": "shop",
+      "seriesId": "little-lantern-visitors",
+      "giftPolicy": "not_giftable",
+      "duplicatePolicy": "convert",
+      "packEligible": true,
+      "primaryAcquisition": "game",
       "primaryFamilyId": null,
       "affinityFamilyIds": [],
-      "assetRefs": null
+      "assetRefs": {
+        "art": "assets/images/katchimeras/wisps/pebble.png",
+        "runtime": "assets/images/katchimeras/wisps/pebble.webp",
+        "thumbnail": "assets/images/katchimeras/wisps/thumbnails/pebble.webp"
+      }
     },
     {
       "id": "crystal",
@@ -3462,7 +3467,7 @@
       "subtitle": "Clear thought",
       "description": "Splits every passing glow into its favourite colours.",
       "category": "experience",
-      "acquisition": "shop",
+      "acquisition": "game",
       "rarity": "rare",
       "hidden": false,
       "featureFamily": "fantasy",
@@ -3473,22 +3478,23 @@
         "violet"
       ],
       "dayRule": null,
-      "unlockRule": {
-        "id": "shop",
-        "target": 250,
-        "unit": "Essence"
-      },
-      "availability": "planned",
+      "unlockRule": null,
+      "availability": "ready",
       "sortOrder": 81,
-      "version": 1,
+      "version": 2,
       "semanticClass": "cosmetic",
-      "seriesId": "treasure-visitors",
-      "giftPolicy": "duplicate_only",
-      "duplicatePolicy": "convert_or_gift",
-      "primaryAcquisition": "shop",
+      "seriesId": "little-lantern-visitors",
+      "giftPolicy": "not_giftable",
+      "duplicatePolicy": "convert",
+      "packEligible": true,
+      "primaryAcquisition": "game",
       "primaryFamilyId": null,
       "affinityFamilyIds": [],
-      "assetRefs": null
+      "assetRefs": {
+        "art": "assets/images/katchimeras/wisps/crystal.png",
+        "runtime": "assets/images/katchimeras/wisps/crystal.webp",
+        "thumbnail": "assets/images/katchimeras/wisps/thumbnails/crystal.webp"
+      }
     },
     {
       "id": "marble",

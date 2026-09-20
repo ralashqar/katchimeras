@@ -1,6 +1,8 @@
 import type { WispCollectionDefinition } from '@/types/wisp-collections';
+import { LANTERN_COLLECTION } from './wisp-lantern';
 
 export const WISP_COLLECTIONS: readonly WispCollectionDefinition[] = [
+  LANTERN_COLLECTION,
   {
     id: 'little-adventures',
     name: 'Little Adventures',

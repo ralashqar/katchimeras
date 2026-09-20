@@ -1,4 +1,5 @@
 import { WISP_CATALOG_VERSION, WISPS_BY_ID } from '@/constants/wisps';
+import { normalizeWispLantern } from './wisp-lantern-state';
 import type { WispCollectionState, WispGrantSource, WispId } from '@/types/wisp';
 
 export type WispGrantResult = {
@@ -55,10 +56,11 @@ export function normalizeWispState(value: unknown): WispCollectionState {
     if (!record || inventory[id as WispId]) continue;
     inventory[id as WispId] = { wispId: id as WispId, quantity: 1, sources: ['migration'], firstGrantedAt: record.unlockedAt, giftableQuantity: 0 };
   }
-  const equipped = candidate.equippedWispId && unlocked[candidate.equippedWispId] && WISPS_BY_ID.has(candidate.equippedWispId)
+  const equipped = candidate.equippedWispId && WISPS_BY_ID.has(candidate.equippedWispId)
     ? candidate.equippedWispId : null;
   return {
-    version: 2,
+    version: 3,
+    lantern: candidate.lantern ? normalizeWispLantern(candidate.lantern) : undefined,
     equippedWispId: equipped,
     unlocked,
     inventory,

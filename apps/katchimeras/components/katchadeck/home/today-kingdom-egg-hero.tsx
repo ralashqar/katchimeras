@@ -32,6 +32,7 @@ import Animated, {
 import { ThemedText } from '@/components/themed-text';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
 import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
+import { eggHatchRattle, eggHatchPulse } from '@/components/katchadeck/ui/egg-hatch-motion';
 import { KatchaDeckUI } from '@/constants/theme';
 import { HOME_FTUE_CAMERA_SCALE } from '@/constants/home-loop-layout';
 import todayScene from '@/data/today-scene.json';
@@ -285,20 +286,9 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
     }
     if (discoveryPhase === 'preparing' || discoveryPhase === 'shaking' || discoveryPhase === 'cracking') {
       cancelAnimation(discoveryShake);
-      discoveryShake.value = quick ? 0 : withRepeat(
-        withSequence(
-          withTiming(1, { duration: 62, easing: Easing.linear }),
-          withTiming(-1, { duration: 62, easing: Easing.linear }),
-        ),
-        -1,
-        true,
-      );
+      discoveryShake.value = quick ? 0 : eggHatchRattle();
       cancelAnimation(discoveryPulse);
-      discoveryPulse.value = withRepeat(
-        withTiming(1, { duration: quick ? 240 : 720, easing: Easing.out(Easing.cubic) }),
-        -1,
-        false,
-      );
+      discoveryPulse.value = eggHatchPulse(quick);
     }
     discoveryCrackOne.value = withTiming(discoveryPhaseAtLeast(discoveryPhase, 'cracking') ? 1 : 0, { duration: quick ? 80 : 260 });
     discoveryCrackTwo.value = discoveryPhaseAtLeast(discoveryPhase, 'cracking')

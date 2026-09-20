@@ -1,4 +1,5 @@
 import { reduceAdventure } from '@/features/shared-adventure/runtime';
+import { placeLanternWorld, projectLanternWorld, startLanternWorld } from '@/features/wisps/lantern-world';
 import { gameNow } from '@/utils/game-clock';
 import { reconcileJourneyGardenOrders } from '@/features/companion/journey-garden-orders';
 import { availableLocalEvents, harmonyDefinition } from '@/features/live-ops/local-catalog';
@@ -173,7 +174,8 @@ export async function saveMergeWorldState(
       catch { /* Loading already reported the damaged snapshot; recovered facts are historical. */ }
       const revision = contentRegistrySnapshot().revision;
       const backfill = !projection && priorState ? worldMilestoneEvents(priorState, revision, true) : [];
-      state = { ...state, localLiveOps: priorState?.localLiveOps ?? state.localLiveOps, sharedAdventure: priorState?.sharedAdventure ?? state.sharedAdventure };
+      state = { ...state, wispLanternPlacement: priorState?.wispLanternPlacement ?? state.wispLanternPlacement, wispLanternProgress: priorState?.wispLanternProgress ?? state.wispLanternProgress, localLiveOps: priorState?.localLiveOps ?? state.localLiveOps, sharedAdventure: priorState?.sharedAdventure ?? state.sharedAdventure };
+      state = projectLanternWorld(state, options.gameplayEvents ?? []);
       state = projectLocalEvents(state, [...newWorldMilestones(priorState, state, revision), ...(options.gameplayEvents ?? [])], state.updatedAt);
       serialized = JSON.stringify(state);
       await appendGameplayEvents(db, [...backfill, ...newWorldMilestones(priorState, state, revision), ...(options.gameplayEvents ?? [])], contentRegistrySnapshot().packs.filter((record) => !record.retiredAt).flatMap((record) => record.pack.liveEvents ?? []));
@@ -233,6 +235,7 @@ async function reduceStoredMergeWorld(
     await db.withTransactionAsync(async () => {
     const projection = await db.getFirstAsync<{ projection_id: string }>('SELECT projection_id FROM gameplay_projections WHERE projection_id = ?', ['harmony:v1']);
     const revision = contentRegistrySnapshot().revision;
+    reduced.state = projectLanternWorld(reduced.state, reduced.localGameplayEvents ?? []);
     reduced.state = projectLocalEvents(reduced.state, newWorldMilestones(current, reduced.state, revision), now);
     await appendGameplayEvents(db, [...(!projection ? worldMilestoneEvents(current, revision, true) : []), ...newWorldMilestones(current, reduced.state, revision), ...(reduced.localGameplayEvents ?? [])], contentRegistrySnapshot().packs.filter((record) => !record.retiredAt).flatMap((record) => record.pack.liveEvents ?? []));
     await db.runAsync(
@@ -251,6 +254,20 @@ async function reduceStoredMergeWorld(
 
 export async function applyStoredAdventure(command: import('@/features/shared-adventure/types').AdventureCommand, now = gameNow()) {
   return reduceStoredMergeWorld(state => reduceAdventure(state, command, now), now);
+}
+
+export async function plantStoredWispLantern(now = gameNow()) {
+  return reduceStoredMergeWorld(state => {
+    const next = placeLanternWorld(state, now);
+    return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
+  }, now);
+}
+
+export async function activateStoredWispLantern(now = gameNow()) {
+  return reduceStoredMergeWorld(state => {
+    const next = startLanternWorld(state, now);
+    return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
+  }, now);
 }
 
 export async function loadGameplayJournal(limit = 100): Promise<GameplayEvent[]> {

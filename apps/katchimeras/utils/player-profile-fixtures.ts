@@ -15,6 +15,10 @@ import { STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID, STEPPLING_PARCEL_REWA
 import { advanceGlowRequests, GLOW_GATEWAY_ID, GLOW_ORDER_IDS, GLOW_SINGLE_ECHO_IDS, MOSSPROUT_BASKET_ARRIVAL_ID } from '@/utils/merge-world/glow-discovery-policy';
 import { islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers';
 import { PETALIMP_BLOOM_CAMPAIGN, PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_ID } from '@/constants/island-campaigns/petalimp-bloom';
+import { FEASTLE_HATCHABLE } from '@/constants/hatchable-companions/feastle';
+import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
+import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
+import { reduceAdventure } from '@/features/shared-adventure/runtime';
 
 const DAY = 86_400_000;
 const COMPLETE_PROFILE: OnboardingProfile = {
@@ -53,6 +57,7 @@ type FixtureDefinition = {
   /** Durable story runs the snapshot restores alongside the world (the Glow story, Steppling's lesson). */
   contentFlowRuns?: (now: number) => ContentFlowRun[];
   meaningfulDays?: number;
+  prepareKeyValues?: (values: Record<string, string>) => Record<string, string>;
 };
 
 function fixtureSummary(state: MergeWorldState, ftueStep: string | null) {
@@ -283,11 +288,62 @@ function storyRunAt(definition: ContentFlowDefinition, runId: string, nodeId: st
   return stabilizeContentFlow(definition, { ...createContentFlowRun(definition, { runId, now }), nodeId }, now).run;
 }
 
+/** Earliest Lantern invitation: established Garden/Trail, first planted memory,
+ * Heartwood introduced, and Feastle's actual hatch, parcel and Snack completed. */
+function beforeWispLantern(now: number): MergeWorldState {
+  let state = stepplingHome(now);
+  const plantedAt = now - 5 * DAY;
+  const seedReceipt = 'fixture:first-memory:momentum';
+  state = step(state, { type: 'grantPlantableMemory', definitionId: 'momentum', source: { kind: 'ftue', sourceId: 'fixture-ftue-complete' }, receiptId: seedReceipt, now: plantedAt }, 'earn the first Seed');
+  state = step(state, { type: 'placePlantableMemory', instanceId: `memory-plant:${seedReceipt}`, slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID, receiptId: `${seedReceipt}:placed`, now: plantedAt + 1 }, 'plant the first tree patch');
+  state = step(state, { type: 'growPlantableMemory', instanceId: `memory-plant:${seedReceipt}`, amount: 1, receiptId: `${seedReceipt}:grown`, now: plantedAt + 2 }, 'grow the first sprout');
+  const at = now - DAY;
+  state = step(state, { type: 'introduceKingdomGoal', now: at }, 'introduce Heartwood');
+  state = step(state, { type: 'ackKingdomGoalCoachmark', now: at + 1 }, 'finish the Heartwood guide');
+  state = reduceAdventure(state, { type: 'presented', scene: 'introduction' }, at + 2).state;
+  state = reduceAdventure(state, { type: 'sync_heartwood' }, at + 3).state;
+  state = step(state, { type: 'claimArrival', arrivalId: 'heartwood:garden:intro', now: at + 4 }, 'unpack the first Garden supply');
+  const definition = FEASTLE_HATCHABLE;
+  state = step(state, { type: 'unlockWorldTarget', targetId: definition.tile.unlockId, receiptId: 'fixture:feastle:mist', now: at + 5 }, 'clear Feastle’s mist');
+  state = step(state, { type: 'transferDiscoveryEgg', targetId: definition.tile.unlockId, now: at + 6 }, 'carry Feastle’s Egg home');
+  state = step(state, { type: 'hatchWorldEgg', targetId: definition.tile.unlockId, now: at + 7 }, 'hatch Feastle');
+  state = step(state, { type: 'grantGeneratorParcel', generatorId: definition.dayOne.parcel.generatorId, rewardId: definition.dayOne.parcel.rewardId, dayId: new Date(at).toISOString().slice(0, 10), now: at + 8 }, 'receive the Hearth Pantry');
+  state = step(state, { type: 'prepareGardenLesson', companion: 'feastle', now: at + 9 }, 'prepare Feastle’s lesson');
+  state = step(state, { type: 'claimArrival', arrivalId: definition.lesson.parcelArrivalId, now: at + 10 }, 'unpack the Hearth Pantry');
+  state = step(state, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: at + 11, seed: 'fixture:ingredient:1', spendEnergy: false }, 'make an Ingredient');
+  state = step(state, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: at + 12, seed: 'fixture:ingredient:2', spendEnergy: false }, 'make another Ingredient');
+  const ingredients = state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' && cell.occupant.definitionId === 'food:table:1' ? [index] : []);
+  if (ingredients.length < 2) throw new Error('Fixture needs two Ingredients for Feastle’s first Snack.');
+  state = step(state, { type: 'move', from: ingredients[0], to: ingredients[1], now: at + 13 }, 'merge the first Snack');
+  state = step(state, { type: 'serveOrder', orderId: definition.lesson.order.id, now: at + 14 }, 'share Feastle’s first Snack');
+  for (const receipt of state.generatorUnlockReceipts.filter(receipt => receipt.seenAt == null)) {
+    state = step(state, { type: 'ackGeneratorUnlock', receiptId: receipt.id, now: at + 15 }, 'finish the spawner reward page');
+  }
+  // Everything earned before this checkpoint was already presented. Keep the
+  // Lantern entirely untouched so its invitation, story and pouch can be tested.
+  return { ...state, externalRewardReceipts: state.externalRewardReceipts.map(receipt => ({ ...receipt, appliedAt: receipt.appliedAt ?? at + 15 })) };
+}
+
 /**
- * Three snapshots, one per friend, each right before the next friend's mist:
- * before Steppling's reveal, before Petalimp, before Fernip.
+ * Friend-discovery checkpoints plus the first Wisp Lantern invitation.
  */
 const FIXTURE_DEFINITIONS: readonly FixtureDefinition[] = [
+  { id: 'kingdom-before-wisp-lantern', name: 'Kingdom · Before Wisp Lantern', description: 'Feastle hatched, Pantry unpacked and first Snack shared. Steppling is home, Heartwood is introduced, and the Seed of Momentum sprouts in the first tree patch. The Lantern invitation appears in Haven: plant it in the front-right patch and open a card pack containing one random Common Wisp.', tags: ['Kingdom', 'Wisps', 'Lantern', 'Feastle', 'Heartwood'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: beforeWispLantern,
+    prepareKeyValues: (values) => {
+      const profile = JSON.parse(values['katchadeck.onboarding-profile']) as OnboardingProfile;
+      return { ...values, 'katchadeck.onboarding-profile': JSON.stringify({ ...profile, mossproutAnswers: { ...profile.mossproutAnswers, firstSeedId: 'momentum' } }) };
+    },
+    contentFlowRuns: (now) => {
+      const feastle = hatchableFlows(FEASTLE_HATCHABLE);
+      return [
+        storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'complete', now - 4 * DAY + 5),
+        storyRunAt(STEPPLING_DAY_ONE_FLOW, STEPPLING_DAY_ONE_RUN_ID, 'complete', now - 4 * DAY + 6),
+        storyRunAt(STEPPLING_GARDEN_FLOW, STEPPLING_GARDEN_RUN_ID, 'complete', now - 4 * DAY + 10),
+        storyRunAt(feastle.discovery, FEASTLE_HATCHABLE.discoveryFlow.runId, 'complete', now - DAY + 7),
+        storyRunAt(feastle.dayOne, FEASTLE_HATCHABLE.dayOne.flow.runId, 'complete', now - DAY + 8),
+        storyRunAt(feastle.gardenLesson, FEASTLE_HATCHABLE.lesson.flow.runId, 'complete', now - DAY + 15),
+      ];
+    } },
   { id: 'steppling-mist-ready', name: 'Kingdom · Before Steppling', description: 'The Garden lesson done and the Glow earned; the misted clearing’s bubble waits to be tapped, paid, and its mission board opened.', tags: ['Kingdom', 'Steppling', 'Mist'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: glowLessonServed,
     contentFlowRuns: (now) => [storyRunAt(GLOW_DISCOVERY_FLOW, GLOW_DISCOVERY_RUN_ID, 'gateway.pay', now - 5 * DAY + 3)] },
   { id: 'kingdom-before-petalimp', name: 'Kingdom · Before Petalimp', description: 'The first session over: Steppling home and his first Shoe served. Mossprout’s wish and Bloom Garden come next.', tags: ['Kingdom', 'Petalimp'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: stepplingHome,
@@ -307,6 +363,7 @@ const FIXTURE_DEFINITIONS: readonly FixtureDefinition[] = [
 export function buildPlayerProfileFixtures(now = Date.now()): PlayerProfileSnapshot[] {
   return FIXTURE_DEFINITIONS.map((fixture) => {
     const state = fixture.buildWorld(now);
+    const keyValues = fixtureKeyValues(now, fixture.ftueStep, fixture.meaningfulDays ?? 4);
     return {
       schemaVersion: 1,
       id: `fixture:${fixture.id}`,
@@ -319,7 +376,7 @@ export function buildPlayerProfileFixtures(now = Date.now()): PlayerProfileSnaps
       launchRoute: fixture.launchRoute ?? (fixture.ftueStep == null ? '/(tabs)/today' : '/(tabs)/games'),
       summary: fixtureSummary(state, fixture.ftueStep),
       domains: {
-        keyValue: { schemaVersion: 1, values: fixtureKeyValues(now, fixture.ftueStep, fixture.meaningfulDays ?? 4) },
+        keyValue: { schemaVersion: 1, values: fixture.prepareKeyValues?.(keyValues) ?? keyValues },
         mergeWorld: { schemaVersion: 1, state },
         ...(fixture.contentFlowRuns ? { contentFlow: { schemaVersion: 1 as const, runs: fixture.contentFlowRuns(now) } } : {}),
       },

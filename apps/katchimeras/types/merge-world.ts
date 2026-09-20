@@ -504,6 +504,8 @@ export type IslandCampaignProgress = {
 };
 
 export type MergeWorldState = {
+  wispLanternPlacement?: { slotId: 'front-right'; plantedAt: number };
+  wispLanternProgress?: import('@/features/wisps/lantern-world').LanternWorldProgress;
   sharedAdventure?: import('@/features/shared-adventure/types').SharedAdventureProgress;
   localLiveOps?: import('./local-live-ops').LocalLiveOpsState;
   /** Reading is independent of purchase flow runs; cursors count revealed lines. */

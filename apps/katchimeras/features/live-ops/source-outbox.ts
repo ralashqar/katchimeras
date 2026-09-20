@@ -14,7 +14,12 @@ export function sourceGameplayFacts(key: string, value: Record<string, unknown>)
     result.push({ version: 1, id: `${kind}:${id}`, kind, source: kind === 'wisp_discovered' ? 'collection' : 'relationship', sourceRevision: 1, contentRevision: 0, occurredAt: at, quantity, context: { targetId: id, companionId } });
   };
   if (key === SOURCES[0]) for (const e of (value.events ?? []) as { id: string; occurredAt: number; points: number; creatureId: string }[]) add('bond_gained', e.id, e.occurredAt, e.points, e.creatureId.replace(/^companion[-:]/, ''));
-  if (key === SOURCES[1]) for (const [id, w] of Object.entries((value.unlocked ?? {}) as Record<string, { unlockedAt: number }>)) add('wisp_discovered', id, w.unlockedAt, 1);
+  if (key === SOURCES[1]) for (const [id, w] of Object.entries((value.unlocked ?? {}) as Record<string, { unlockedAt: number }>)) {
+    const record = (value.inventory as Record<string, { sources?: string[] }> | undefined)?.[id];
+    // Visitor/paid ownership is not an accomplishment or a source of more rewards.
+    if (record?.sources?.length && record.sources.every(source => ['visitor', 'purchase', 'plus_claim', 'essence_shop', 'season'].includes(source))) continue;
+    add('wisp_discovered', id, w.unlockedAt, 1);
+  }
   if (key === SOURCES[2]) for (const [id, j] of Object.entries((value.journeyEpisodes ?? {}) as Record<string, { completedAt: number; familyId: string; migrated?: boolean }>)) {
     add('journey_completed', id, j.completedAt, 1, j.familyId);
     if (j.migrated && result.at(-1)) result.at(-1)!.historical = true;

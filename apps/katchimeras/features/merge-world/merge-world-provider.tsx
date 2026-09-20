@@ -470,6 +470,14 @@ export function MergeWorldProvider({
       // store write (story effect, world screen) always supersedes us: it was
       // reduced from the flushed database, so our optimistic state descends
       // from an older snapshot than the one it produced.
+      // Transactional Lantern projections add the next request/reward after
+      // the optimistic command. Adopt those fields only for this exact revision.
+      if (origin === 'provider' && stateRef.current && freshState.revision === stateRef.current.revision && freshState.wispLanternProgress
+        && JSON.stringify(freshState.wispLanternProgress) !== JSON.stringify(stateRef.current.wispLanternProgress)) {
+        const projected = { ...stateRef.current, wispLanternProgress: freshState.wispLanternProgress, activeOrders: freshState.activeOrders };
+        stateRef.current = projected;
+        setState(projected);
+      }
       if (origin === 'provider' && freshState.revision <= (stateRef.current?.revision ?? -1)) return;
       if (origin === 'store' && freshState.revision <= (baseRevisionRef.current ?? -1)) return;
       if (pendingPersistenceRef.current) {
@@ -944,7 +952,7 @@ export function MergeWorldProvider({
     }
     if (reduced.changed && command.type === 'serveOrder' && servedCharacterId === 'mossprout') {
       relationshipProgressionRepository.update((relationships) => {
-        if (isIslandCampaignId(servedOrder?.storyArcId)) return relationships;
+        if (isIslandCampaignId(servedOrder?.storyArcId) || servedOrder?.storyArcId === 'wisp-lantern') return relationships;
         const withJourney = recordMossproutJourneyOrderServed(relationships, command.orderId, command.now);
         if (servedOrder?.storyArcId !== 'mossprout:casual-garden') return withJourney;
         const dayId = servedOrder.storyBeatId ?? localDayId(new Date(command.now));
@@ -970,7 +978,7 @@ export function MergeWorldProvider({
     // An island campaign owns its return scene and next request. Its orders
     // share Mossprout's board inventory, but must never wake or rebuild the
     // legacy Mossprout journey after serving.
-    const nextState = reduced.changed && servedCharacterId && !isIslandCampaignId(servedOrder?.storyArcId)
+    const nextState = reduced.changed && servedCharacterId && !isIslandCampaignId(servedOrder?.storyArcId) && servedOrder?.storyArcId !== 'wisp-lantern'
       ? reconcileFeaturedStory(reduced.state, servedCharacterId, command.now)
       : reduced.state;
     const result = nextState === reduced.state ? reduced : { ...reduced, state: nextState };

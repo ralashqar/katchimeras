@@ -1,5 +1,8 @@
+import { loadWispState } from '@/utils/wisp-storage';
 import { heartwoodStage, gardenSupplyStatus } from '@/features/shared-adventure/heartwood-progression';
 import { HeartwoodRoad } from '@/components/katchadeck/world/heartwood-road';
+import { WispLanternPanel, WispLanternWorld } from '@/components/katchadeck/wisps/wisp-lantern';
+import { lanternEligible } from '@/features/wisps/lantern-world';
 import { HeartwoodStoryScene } from '@/components/katchadeck/world/heartwood-story-scene';
 import { needsHeartwoodRecap } from '@/features/shared-adventure/heartwood-opening';
 import { loadCompanionContentState } from '@/utils/companion-content-storage';
@@ -8,7 +11,7 @@ import { worldEventActions, worldEventConversation, type WorldEventAction, type 
 import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
-import { applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, ensureStoredFirstFtueMemoryPlacement, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission } from '@/utils/merge-world/repository';
+import { plantStoredWispLantern, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, ensureStoredFirstFtueMemoryPlacement, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission } from '@/utils/merge-world/repository';
 import { LocalEventMissionDock } from '@/components/katchadeck/world/local-event-mission-dock';
 import { WorldEventActionCard } from '@/components/katchadeck/world/world-event-action-card';
 import { GardenEventAdornment } from '@/components/katchadeck/world/garden-event-adornment';
@@ -192,6 +195,11 @@ type Props = {
 const GARDEN_BUTTON_ART = require('@incubator/art-world/square/mossprout-garden-button-v1-256.webp');
 /** One shared empty list, so the canvas is not handed a fresh prop on every opening render. */
 const NO_UPGRADE_OFFERS: WorldUpgradeOffer[] = [];
+const LANTERN_PLANT_OFFER = {
+  accessibilityHint: 'Plants the Wisp Lantern in the highlighted Heartwood patch',
+  placement: 'below', gap: 12, icon: 'sparkles', label: 'Plant Lantern',
+  target: { kind: 'haven_garden_plot', slotId: 'front-right' },
+} as const satisfies KingdomTileUpgradeOffer;
 const FIRST_SEED_GARDEN_PLANT_OFFER = {
   accessibilityHint: 'Plants your first Memory Seed in the highlighted Garden patch',
   placement: 'below',
@@ -359,6 +367,17 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [goalCoachmarkArmed, setGoalCoachmarkArmed] = useState(false);
   const [progressSheetOpen, setProgressSheetOpen] = useState(false);
   const [adventureOpen, setAdventureOpen] = useState(false);
+  const [wispLanternOpen, setWispLanternOpen] = useState(false);
+  const [wispPlanting, setWispPlanting] = useState(false);
+  const [wispPlantError, setWispPlantError] = useState('');
+  const wispPlantBusy = useRef(false);
+  const wispAutoPresented = useRef(false);
+  const plantWispLantern = useCallback(() => {
+    if (wispPlantBusy.current) return;
+    wispPlantBusy.current = true; setWispPlantError('');
+    void plantStoredWispLantern().catch(() => setWispPlantError('Couldn’t plant the Lantern. Tap Plant Lantern to try again.'))
+      .finally(() => { wispPlantBusy.current = false; });
+  }, []);
   const [routeCompanion, setRouteCompanion] = useState<string | undefined>();
   const eventHarmony = useHarmonyProgress();
   const [eventSelection, setEventSelection] = useState<WorldEventSelection | null>(null);
@@ -660,7 +679,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }, 1000);
     return () => clearTimeout(timer);
   }, [heartwoodIntroActive, ftueCameraSettled, screenFocused, worldSubjectPresentation?.onIntroFramingReady]);
-  const baseTutorialCamera = heartwoodIntroCamera ?? eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
+  const lanternCamera = useMemo((): FtueCameraDirective | null => wispLanternOpen ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.15, anchorY: 0.42, durationMs: 850 } : null, [wispLanternOpen]);
+  const baseTutorialCamera = lanternCamera ?? heartwoodIntroCamera ?? eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
   const tutorialCamera = useMemo(() => {
     if (!ftueStepId?.startsWith('egg.') || baseTutorialCamera?.kind !== 'focus_target') return baseTutorialCamera;
     return { ...baseTutorialCamera, zoom: sharedEggZoom(worldSubjectPresentation?.wispsCleared
@@ -815,9 +835,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     registerFtueTarget(`garden-plot:mossprout:${slotId}`, node);
   }, [registerFtueTarget]);
   const setGardenWorldOfferNode = useCallback((node: View | null) => {
-    registerFtueTarget('garden-plant-button:mossprout', ftueStepId === 'world.garden_arrival' ? node : null);
+    registerFtueTarget('garden-plant-button:mossprout', ftueStepId === 'world.garden_arrival' || wispPlanting ? node : null);
 
-  }, [ftueStepId, registerFtueTarget]);
+  }, [ftueStepId, registerFtueTarget, wispPlanting]);
   const setHavenGuideNode = useCallback((node: View | null) => {
     registerFtueTarget('haven-guide', node);
   }, [registerFtueTarget]);
@@ -1859,7 +1879,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     ? visibleWorldUpgradeOffers(upgradeOffers, ftueStepId, glowRun, activeHatchable.tile.id).find((offer) => offer.id === `nature:${goalIslandId}` && offer.eligible) ?? null
     : null;
   const kingdomGoalGuideActive = Boolean(screenFocused && kingdomGoal?.introducedAt && kingdomGoal.coachmarkSeenAt == null && goalIslandOffer
-    && !ftueStepId && !adventureOpen && !progressSheetOpen && !wakeHandoffCampaign && !selectedUpgrade
+    && !ftueStepId && !adventureOpen && !wispLanternOpen && !progressSheetOpen && !wakeHandoffCampaign && !selectedUpgrade
     && !eventBoardActive && !openingBoardActive && !stepplingMissionActive && !journeyMissionActive && !restorationBoardVisible && !upgradeHandoffPending
     && !interactionCreatureId && !activeInteractionResidentId && !stepplingEggOpen && !upgradePresentation && !requiredUpgradeStory && !ordinaryUpgradeRun);
   const goalFocusStartedRef = useRef(false);
@@ -2057,9 +2077,23 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     [mergeWorld.haven.mossproutNatureIslandReveals],
   );
 
-  const sharedAdventureAllowed = !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId;
+  const sharedAdventureAllowed = !wispLanternOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId;
   const heartwoodRecap = sharedAdventureAllowed && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed') && !havenMergeBoardActive && (mergeWorld.haven.tileStages.mossprout ?? 0) >= 1 && needsHeartwoodRecap(mergeWorld);
   const worldEventsAllowed = sharedAdventureAllowed && !havenMergeBoardActive && !heartwoodRecap;
+  // havenMergeBoardActive means an owned Mossprout can open the Garden, not
+  // that a board is on screen. Owning the Garden must not disable this tap.
+  const wispLanternAllowed = sharedAdventureAllowed && !heartwoodRecap
+    && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed');
+  const wispLanternAdornment = lanternEligible(mergeWorld) ? <WispLanternWorld
+    planted={Boolean(mergeWorld.wispLanternPlacement)} rewards={mergeWorld.wispLanternProgress?.rewards}
+    onPress={wispLanternAllowed ? () => setWispLanternOpen(true) : undefined} /> : null;
+
+  useEffect(() => {
+    if (!wispLanternAllowed || !lanternEligible(mergeWorld) || wispAutoPresented.current || eventSelection || wakeHandoffCampaign || revealedFriendCardId || heartwoodOpenToken > 0) return;
+    if (mergeWorld.wispLanternPlacement && loadWispState().lantern?.introducedAt != null) return;
+    wispAutoPresented.current = true;
+    setWispLanternOpen(true);
+  }, [wispLanternAllowed, mergeWorld, eventSelection, wakeHandoffCampaign, revealedFriendCardId, heartwoodOpenToken]);
 
   // Ordinary story/FTUE always wins. Only a new occurrence auto-introduces;
   // later chapters stay available as cards, and interrupted stories resume by tap.
@@ -2088,6 +2122,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     <View collapsable={false} onLayout={onContentReady} ref={screenRef} style={styles.screen}>
       <KingdomHexCanvas
         onHeartwoodPress={sharedAdventureAllowed ? () => { setSelectedHeartwoodBed(undefined); setHeartwoodOpenToken(value => value + 1); } : undefined}
+        wispLanternAdornment={wispLanternAdornment}
+        wispLanternPlanted={Boolean(mergeWorld.wispLanternPlacement)}
+        onPlantWispLantern={wispPlanting ? plantWispLantern : undefined}
         onSelectHeartwoodBed={sharedAdventureAllowed ? (slotId) => { setSelectedHeartwoodBed(slotId); setHeartwoodOpenToken(value => value + 1); } : undefined}
         lanternPostAdornment={SHARED_ADVENTURE_ENABLED && kingdomGoal?.introducedAt ? <LanternPost progress={mergeWorld.sharedAdventure} onPress={sharedAdventureAllowed ? () => setAdventureOpen(true) : undefined} /> : null}
         hearthAdornment={sharedAdventureAllowed && mergeWorld.sharedAdventure?.completedAt ? <KatchaButton label="🍲 Warm delivery" onPress={() => { setRouteCompanion('feastle'); setAdventureOpen(true); }} /> : null}
@@ -2096,7 +2133,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           <GardenEventAdornment world={mergeWorld} onExplore={eventActions.length ? () => { void openWorldEvent(eventActions[0]); } : undefined} />
         </View> : null}
         background={background}
-        cameraLocked={eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(requiredUpgradeStory) || restorationBoardVisible}
+        cameraLocked={wispLanternOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(requiredUpgradeStory) || restorationBoardVisible}
         discoveredEggInteraction={stepplingEncounter.open}
         gatewayTileId={activeHatchable.tile.id}
         discoveredEggPresentation={stepplingEncounter.presentation}
@@ -2112,7 +2149,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         identity={identity}
         discoveryRevealFamilyId={null}
         highlightedLockedFamilyId={null}
-        interactionEnabled={!activeInteractionResidentId && !stepplingEncounter.open && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
+        interactionEnabled={!wispLanternOpen && !activeInteractionResidentId && !stepplingEncounter.open && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
         interactionExitNonce={interactionExitNonce}
         interactionNatureIslandId={pendingIslandCampaign?.campaign.islandId ?? null}
         preserveInteractionCameraOnExit={Boolean(pendingIslandCampaign || eventSelection)}
@@ -2139,7 +2176,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         openingWeather={homeVeil !== 'none'}
         openingWeatherActive={homeVeil === 'veiled' && !missionBoardDocked}
         sleepingMarkersInert={Boolean(ftueStepId)}
-        onTileUpgradeOfferPress={beginFirstSeedPlanting}
+        onTileUpgradeOfferPress={wispPlanting ? plantWispLantern : beginFirstSeedPlanting}
         upgradeOffers={screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingEggOpen && !ordinaryUpgradeRun && !upgradeHandoffPending
           ? kingdomGoalGuideActive ? visibleUpgradeOffers.filter((offer) => offer.id === `nature:${goalIslandId}`) : visibleUpgradeOffers
           : NO_UPGRADE_OFFERS}
@@ -2178,7 +2215,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onUpgradePresentationComplete={completeUpgradePresentation}
         recenterBottom={Math.max(insets.bottom, 12) + 150}
         residentStatusGlyphs={residentStatusGlyphs}
-        tileUpgradeOffer={ftueStepId === 'world.garden_arrival'
+        tileUpgradeOffer={wispPlanting ? LANTERN_PLANT_OFFER : ftueStepId === 'world.garden_arrival'
           ? FIRST_SEED_GARDEN_PLANT_OFFER
           : null}
         tutorialCamera={tutorialCamera}
@@ -2204,6 +2241,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       {worldEventsAllowed && eventActions.length > 0 ? <View style={{ position: 'absolute', left: 16, right: 16, bottom: Math.max(insets.bottom, 12) + 82, zIndex: 32, gap: 6 }}>
         {eventActions.slice(0, 2).map(action => <WorldEventActionCard key={action.event.id} action={action} onPress={() => void openWorldEvent(action)} />)}
       </View> : null}
+      {wispPlanting && screenFocused ? <HavenFtueOverlay
+        cue={{ kind: 'tap', target: { kind: 'haven_garden_plant_button', characterId: 'mossprout' } }}
+        spotlight={{ targets: [{ kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, { kind: 'haven_garden_plant_button', characterId: 'mossprout' }], grouping: 'bounding_rect', padding: 8, radius: 22, dimOpacity: 0.62 }}
+        fingerPlacement="below" screenRef={screenRef} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision} /> : null}
+      {wispPlantError && wispPlanting ? <View style={{ position: 'absolute', bottom: insets.bottom + 24, left: 20, right: 20, zIndex: 160 }}><ThemedText accessibilityRole="alert">{wispPlantError}</ThemedText></View> : null}
+      {wispLanternOpen && screenFocused ? <WispLanternPanel onPlantingChange={setWispPlanting} world={mergeWorld} onClose={() => setWispLanternOpen(false)} onGarden={() => { setWispLanternOpen(false); openGarden(undefined, 'mossprout'); }} /> : null}
       {SHARED_ADVENTURE_ENABLED && adventureOpen && screenFocused ? <SharedAdventurePanel world={mergeWorld} routeCompanion={routeCompanion}
         onClose={() => { setAdventureOpen(false); setRouteCompanion(undefined); }}
         onGarden={() => { setAdventureOpen(false); openGarden(undefined, 'mossprout'); }}

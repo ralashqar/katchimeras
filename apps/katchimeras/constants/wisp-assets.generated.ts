@@ -55,4 +55,10 @@ export const WISP_ASSETS = {
   "confetti": { full: require('@incubator/art-wisps/confetti.webp'), thumbnail: require('@incubator/art-wisps/thumbnails/confetti.webp') },
   "recall": { full: require('@incubator/art-wisps/recall.webp'), thumbnail: require('@incubator/art-wisps/thumbnails/recall.webp') },
   "grovelight": { full: require('@incubator/art-wisps/grovelight.webp'), thumbnail: require('@incubator/art-wisps/thumbnails/grovelight.webp') },
+  "dewdrop": { full: require('@incubator/art-wisps/dewdrop.webp'), thumbnail: require('@incubator/art-wisps/thumbnails/dewdrop.webp') },
+  "bubble": { full: require('@incubator/art-wisps/bubble.webp'), thumbnail: require('@incubator/art-wisps/thumbnails/bubble.webp') },
+  "nimbus": { full: require('@incubator/art-wisps/nimbus.webp'), thumbnail: require('@incubator/art-wisps/thumbnails/nimbus.webp') },
+  "clover": { full: require('@incubator/art-wisps/clover.webp'), thumbnail: require('@incubator/art-wisps/thumbnails/clover.webp') },
+  "pebble": { full: require('@incubator/art-wisps/pebble.webp'), thumbnail: require('@incubator/art-wisps/thumbnails/pebble.webp') },
+  "crystal": { full: require('@incubator/art-wisps/crystal.webp'), thumbnail: require('@incubator/art-wisps/thumbnails/crystal.webp') },
 } as const satisfies Partial<Record<WispId, WispAsset>>;

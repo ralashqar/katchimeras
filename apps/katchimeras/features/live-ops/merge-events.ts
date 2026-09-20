@@ -16,7 +16,9 @@ export function mergeCommandEvents(before: MergeWorldState, command: MergeWorldC
   }
   if (command.type === 'serveOrder' && result.servedOrderId) {
     const order = before.activeOrders.find((entry) => entry.id === result.servedOrderId);
-    events.push({ ...base, id: `${id}:order:${result.servedOrderId}`, kind: 'order_completed', context: { targetId: result.servedOrderId, companionId: order?.characterId, regionId } });
+    events.push({ ...base, id: `${id}:order:${result.servedOrderId}`, kind: 'order_completed', context: { targetId: result.servedOrderId, companionId: order?.characterId, regionId,
+      tags: order && boardId === 'mossprout' && (!order.storyArcId || order.storyArcId === 'mossprout:casual-garden') && order.purpose === 'normal' && !order.id.includes('tutorial') && !order.id.includes('chapter-0') ? ['lantern-daily-order'] : [],
+    } });
   }
   return events;
 }

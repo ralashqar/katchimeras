@@ -7,6 +7,10 @@ export const HEARTWOOD_BED_LABELS: Partial<Record<MossproutGardenPlantSlotId, st
   'back-centre': 'Front center', 'front-left': 'Front left', 'front-right': 'Front right', 'back-left': 'Left side', 'back-right': 'Right side',
 };
 
+export function availableHeartwoodBeds(world: MergeWorldState) {
+  return HEARTWOOD_BEDS.filter(bed => bed !== world.wispLanternPlacement?.slotId);
+}
+
 export function heartwoodPlants(world: MergeWorldState) {
   return HEARTWOOD_CATEGORIES.map(category => {
     const memories = world.haven.plantableMemories.filter(plant => plant.definitionId === category).sort((a, b) => b.growthPoints - a.growthPoints);
@@ -32,7 +36,7 @@ export function reconcileHeartwoodPlants(world: MergeWorldState) {
   const firstMigration = world.sharedAdventure?.gardenBedsVersion !== 2;
   const planted = world.haven.plantableMemories.filter(plant => plant.status === 'planted')
     .sort((a, b) => Number(b.source.kind === 'ftue') - Number(a.source.kind === 'ftue'));
-  const used = new Set<MossproutGardenPlantSlotId>();
+  const used = new Set<MossproutGardenPlantSlotId>(world.wispLanternPlacement ? [world.wispLanternPlacement.slotId] : []);
   for (const plant of planted) {
     const preferred = firstMigration && plant.source.kind === 'ftue' ? 'back-centre' : plant.slotId;
     const slot = preferred && HEARTWOOD_BEDS.includes(preferred) && !used.has(preferred) ? preferred : HEARTWOOD_BEDS.find(bed => !used.has(bed));
@@ -55,7 +59,7 @@ function consumePlants(world: MergeWorldState, amount: number) {
 
 /** Expected occupant makes replacements safe against stale taps and retries. */
 export function placeHeartwood(world: MergeWorldState, category: MossproutMemoryPlantId, slotId: MossproutGardenPlantSlotId, expectedOccupantId: string | null, now: number) {
-  if (!HEARTWOOD_CATEGORIES.includes(category) || !HEARTWOOD_BEDS.includes(slotId)) throw new Error('Choose an available Heartwood category and bed.');
+  if (!HEARTWOOD_CATEGORIES.includes(category) || !availableHeartwoodBeds(world).includes(slotId)) throw new Error('Choose an available Heartwood category and bed.');
   const occupant = world.haven.plantableMemories.find(plant => plant.status === 'planted' && plant.slotId === slotId);
   if ((occupant?.id ?? null) !== expectedOccupantId) return false;
   const target = heartwoodPlants(world).find(entry => entry.category === category)!;
@@ -76,8 +80,8 @@ export function tendHeartwood(world: MergeWorldState, category: MossproutMemoryP
   const target = heartwoodPlants(world).find(entry => entry.category === category)!;
   if (target.growth !== expectedGrowth) return false;
   if (!target.plant) {
-    const slot = requestedSlot ?? HEARTWOOD_BEDS.find(bed => !world.haven.plantableMemories.some(plant => plant.status === 'planted' && plant.slotId === bed));
-    if (!slot || world.haven.plantableMemories.some(plant => plant.status === 'planted' && plant.slotId === slot)) throw new Error('All five Heartwood beds are occupied. Choose a bed to swap.');
+    const slot = requestedSlot ?? availableHeartwoodBeds(world).find(bed => !world.haven.plantableMemories.some(plant => plant.status === 'planted' && plant.slotId === bed));
+    if (!slot || world.haven.plantableMemories.some(plant => plant.status === 'planted' && plant.slotId === slot)) throw new Error('All plant beds are occupied. Choose a bed to swap.');
     return placeHeartwood(world, category, slot, null, now);
   }
   if (target.growth >= 3) return false;

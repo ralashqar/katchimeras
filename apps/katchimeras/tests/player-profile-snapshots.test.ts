@@ -7,15 +7,20 @@ import { islandWakeState } from '@/constants/island-campaigns/wake-order';
 
 import { buildPlayerProfileFixtures, PLAYER_PROFILE_FIXTURE_COUNT } from '@/utils/player-profile-fixtures';
 import { stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
+import { lanternEligible } from '@/features/wisps/lantern-world';
+import { needsHeartwoodRecap } from '@/features/shared-adventure/heartwood-opening';
+import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
+import { normalizeMergeWorldState } from '@/utils/merge-world/engine';
 
 const NOW = Date.parse('2026-08-17T12:00:00Z');
 const root = resolve(__dirname, '..');
 const read = (relative: string) => readFileSync(resolve(root, relative), 'utf8');
 
-test('the profile fixture catalog is three Kingdom snapshots, one right before each friend', () => {
+test('the profile fixture catalog offers the Lantern checkpoint and the three friend checkpoints', () => {
   const fixtures = buildPlayerProfileFixtures(NOW);
-  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 3);
+  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 4);
   assert.deepEqual(fixtures.map((fixture) => [fixture.id, fixture.name]), [
+    ['fixture:kingdom-before-wisp-lantern', 'Kingdom · Before Wisp Lantern'],
     ['fixture:steppling-mist-ready', 'Kingdom · Before Steppling'],
     ['fixture:kingdom-before-petalimp', 'Kingdom · Before Petalimp'],
     ['fixture:kingdom-before-fernip', 'Kingdom · Before Fernip'],
@@ -24,6 +29,40 @@ test('the profile fixture catalog is three Kingdom snapshots, one right before e
     assert.equal(fixture.launchRoute, '/(tabs)/katchimeras', `${fixture.id} opens on the Kingdom`);
     assert.equal(fixture.summary.ftueStep, 'complete', `${fixture.id} is past the FTUE`);
   }
+});
+
+test('Before-Wisp-Lantern restores a played-through Feastle and planted first memory without starting the Lantern', () => {
+  const fixture = buildPlayerProfileFixtures(NOW).find(candidate => candidate.id === 'fixture:kingdom-before-wisp-lantern')!;
+  assert.equal(fixture.domains.mergeWorld.state.wispLanternPlacement, undefined);
+  const world = normalizeMergeWorldState(JSON.parse(JSON.stringify(fixture.domains.mergeWorld.state)), NOW);
+  assert.ok(world.unlockedCharacters.includes('feastle'));
+  assert.ok(world.unlockedCharacters.includes('steppling'));
+  assert.ok(world.worldUnlocks?.['feastle:arrival']?.hatchedAt);
+  assert.ok(world.companionDiscovery.records.some(record => record.characterId === 'feastle' && record.firstOrderCompletedAt));
+  assert.ok(world.generators['hearth-pantry']);
+  assert.ok(world.board.some(cell => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'hearth-pantry'));
+  assert.ok(world.gardenLessons?.feastle?.servedAt);
+  assert.ok(world.externalRewardReceipts.every(receipt => receipt.appliedAt != null), 'prior rewards must not replay on loading');
+  assert.equal(world.activeOrders.some(order => order.id === 'feastle:discovery:first-snack'), false);
+  const plant = world.haven.plantableMemories.find(plant => plant.slotId === MOSSPROUT_FIRST_MEMORY_SLOT_ID)!;
+  assert.ok(plant);
+  assert.equal(plant.definitionId, 'momentum');
+  assert.equal(plant.status, 'planted');
+  assert.ok(plant.growthPoints >= 1);
+  assert.equal(plant.source.kind, 'ftue');
+  assert.equal(world.haven.plantableMemories.filter(plant => plant.status === 'planted').length, 1);
+  assert.equal(JSON.parse(fixture.domains.keyValue.values['katchadeck.onboarding-profile']).mossproutAnswers.firstSeedId, 'momentum');
+  assert.equal(lanternEligible(world), true);
+  assert.equal(needsHeartwoodRecap(world), false, 'the Heartwood recap must not block the Lantern invitation');
+  assert.ok(world.kingdomGoal?.coachmarkSeenAt);
+  assert.equal(world.wispLanternProgress, undefined);
+  assert.equal(world.activeOrders.some(order => order.storyArcId === 'wisp-lantern'), false);
+  assert.equal(fixture.domains.keyValue.values['katchimera.wisps.v2'], undefined, 'no visitors or pouches pre-granted');
+  assert.equal(world.arrivals.some(arrival => arrival.claimedAt == null), false);
+  assert.ok(world.generatorUnlockReceipts.every(receipt => receipt.seenAt != null), 'spawner reward pages must not interrupt the Lantern test');
+  assert.ok(fixture.domains.contentFlow?.runs.every(run => run.status === 'completed'));
+  assert.ok(fixture.domains.contentFlow?.runs.some(run => run.runId === 'ftue:feastle-garden:1'));
+  assert.ok(fixture.domains.contentFlow?.runs.every(run => !run.definitionId.includes('wisp-lantern')));
 });
 
 test('the Before-Steppling and Before-Petalimp fixtures land right before each reveal', () => {

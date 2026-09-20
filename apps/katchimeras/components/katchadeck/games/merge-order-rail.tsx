@@ -579,6 +579,7 @@ function OrderRewardPopup({ order, reduceMotion }: {
   reduceMotion: boolean;
 }) {
   const rows = [
+    ...(order.storyArcId === 'wisp-lantern' ? [{ amount: 1, art: require('@incubator/art-wisps/lantern/lantern-lit.webp'), id: 'pouch', label: 'Lantern Pouch' }] : []),
     { amount: order.reward.friendshipXp, art: ORDER_REWARD_ART.bond, id: 'bond', label: 'Bond' },
     { amount: order.reward.coins, art: ORDER_REWARD_ART.coins, id: 'coins', label: 'Glow' },
     { amount: order.reward.energy, art: ORDER_REWARD_ART.energy, id: 'energy', label: 'Energy' },

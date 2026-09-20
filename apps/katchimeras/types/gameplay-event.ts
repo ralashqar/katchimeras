@@ -24,6 +24,7 @@ export type GameplayEvent = {
 };
 
 export type RewardItem =
+  | { kind: 'wisp_pack'; packId: string; scope: 'local-lantern-v1' | 'verified' }
   | { kind: 'glow'; amount: number }
   | { kind: 'gems'; amount: number }
   | { kind: 'wisp'; id: string }

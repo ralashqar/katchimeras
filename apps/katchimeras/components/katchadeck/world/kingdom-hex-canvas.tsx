@@ -1,4 +1,5 @@
 import { EGG_FEED_TARGET_Y_RATIO } from '@/features/today/egg-feed-target';
+import { eggHatchRattle, eggHatchPulse } from '@/components/katchadeck/ui/egg-hatch-motion';
 import { HatchWispLayer } from './hatch-wisp-layer';
 import { playUpgradeSequence } from '@incubator/environments/upgrade-sequence';
 import {createHexTileRenderer} from '@incubator/environments/hex-tile';
@@ -127,6 +128,9 @@ export type KingdomTileUpgradeOffer = WorldTileActionPlacement & {
 };
 type Props = {
   lanternPostAdornment?: React.ReactNode;
+  wispLanternAdornment?: React.ReactNode;
+  wispLanternPlanted?: boolean;
+  onPlantWispLantern?: () => void;
   hideWorldTiles?: boolean;
   onMemoryPlantSettled?: (visualKey: string) => void;
   onHeartwoodPress?: () => void;
@@ -494,6 +498,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onOpenGarden,
   gardenEventAdornment,
   lanternPostAdornment,
+  wispLanternAdornment,
+  wispLanternPlanted,
+  onPlantWispLantern,
   hideWorldTiles = false,
   onMemoryPlantSettled,
   onHeartwoodPress,
@@ -853,6 +860,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         slotId,
       }))
     : [], [gardenFocusFrame]);
+  const wispPatchFrame = gardenPlotFrames.find(plot => plot.slotId === 'front-right')?.frame;
   // One stable ref callback per island: an inline arrow would be a new ref on every
   // render, which React re-invokes with null then the node, and each call would set
   // the Kingdom's state and render this canvas again, without end.
@@ -1107,6 +1115,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       return;
     }
     const target = tutorialCamera.target;
+    if (target.kind === 'haven_garden_plot' && gardenFocusFrame) {
+      const frame = mossproutGardenPlantSlotFrame(gardenFocusFrame, target.slotId);
+      appliedTutorialCameraRef.current = applicationKey;
+      focusTutorialResident(frame.left + frame.width / 2, frame.top + frame.height / 2, {
+        anchorY: tutorialCamera.anchorY, durationMs, zoom: tutorialCamera.zoom, unbounded: true,
+      });
+      return;
+    }
     const targetCharacterId = target.kind === 'haven_tile' || target.kind === 'haven_resident'
       ? target.characterId
       : null;
@@ -1176,7 +1192,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       zoom: tutorialCamera.zoom,
       unbounded: true,
     });
-  }, [fitTutorialWorld, focusTutorialResident, gardenFrame, gatewayTileId, scene.tileArtLayers, scene.tiles, sceneHomeTile, tutorialCamera, tutorialCameraKey, tutorialCameraReady, worldSubjectPresentation?.growthProgress]);
+  }, [fitTutorialWorld, focusTutorialResident, gardenFocusFrame, gardenFrame, gatewayTileId, scene.tileArtLayers, scene.tiles, sceneHomeTile, tutorialCamera, tutorialCameraKey, tutorialCameraReady, worldSubjectPresentation?.growthProgress]);
   const storyCameraSnapshotsRef = useRef(new Map<string, KingdomCameraSnapshot>());
   const storyTargetFrame = useCallback((target: StoryTarget) => {
     if (target.kind === 'haven_world') return { left: 0, top: 0, width: scene.width, height: scene.height };
@@ -1868,6 +1884,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               );
             })}
             {focusedMossproutWorld && onHeartwoodPress && heartwoodFrame && !upgradePresentation ? <Pressable accessibilityRole="button" accessibilityLabel="Heartwood. View world recovery and Garden supplies" onPress={onHeartwoodPress} style={{ position: 'absolute', left: heartwoodFrame.left + heartwoodFrame.width * 0.42, top: heartwoodFrame.top, width: heartwoodFrame.width * 0.16, height: heartwoodFrame.height * 0.24, zIndex: 34 }} /> : null}
+            {focusedMossproutWorld && !upgradePresentation && wispPatchFrame && wispLanternAdornment && !onPlantWispLantern ? <View style={{ position: 'absolute', left: wispPatchFrame.left + wispPatchFrame.width / 2 - 52, top: wispPatchFrame.top + wispPatchFrame.height / 2 - 90, zIndex: 37 }}>{wispLanternAdornment}</View> : null}
+            {focusedMossproutWorld && onPlantWispLantern && wispPatchFrame ? <Pressable accessibilityRole="button" accessibilityLabel="Plant Lantern in front-right patch" onPress={onPlantWispLantern} style={{ position: 'absolute', ...wispPatchFrame, zIndex: 38 }} /> : null}
             {focusedMossproutWorld && !upgradePresentation && lanternFrame && lanternPostAdornment ? <View style={{ position: 'absolute', left: lanternFrame.left + lanternFrame.width * 0.7, top: lanternFrame.top + lanternFrame.height * 0.25, zIndex: 35 }}>{lanternPostAdornment}</View> : null}
             {focusedMossproutWorld && !upgradePresentation && hearthFrame && hearthAdornment ? <View style={{ position: 'absolute', left: hearthFrame.left + hearthFrame.width * 0.65, top: hearthFrame.top + hearthFrame.height * 0.3, zIndex: 35 }}>{hearthAdornment}</View> : null}
             {focusedMossproutWorld && interactionEnabled && !upgradePresentation && gardenFrame && gardenEventAdornment ? <View style={{ position: 'absolute', left: gardenFrame.left + gardenFrame.width * 0.72, top: gardenFrame.top + gardenFrame.height * 0.3, zIndex: 35 }}>{gardenEventAdornment}</View> : null}
@@ -1881,8 +1899,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                   />
                 ))
               : null}
-            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onSelectHeartwoodBed ? gardenPlotFrames.filter(({ slotId }) => !mossproutGarden?.plantableMemories.some(plant => plant.status === 'planted' && plant.slotId === slotId)).map(({ frame, slotId }) => <Pressable key={`empty-heartwood:${slotId}`} accessibilityRole="button" accessibilityLabel="Empty Heartwood bed. Choose a seed" onPress={() => onSelectHeartwoodBed(slotId)} style={{ position: 'absolute', ...frame, zIndex: 36 }} />) : null}
-            {interactionEnabled
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onSelectHeartwoodBed ? gardenPlotFrames.filter(({ slotId }) => !(wispLanternPlanted && slotId === 'front-right') && !mossproutGarden?.plantableMemories.some(plant => plant.status === 'planted' && plant.slotId === slotId)).map(({ frame, slotId }) => <Pressable key={`empty-heartwood:${slotId}`} accessibilityRole="button" accessibilityLabel="Empty Heartwood bed. Choose a seed" onPress={() => onSelectHeartwoodBed(slotId)} style={{ position: 'absolute', ...frame, zIndex: 36 }} />) : null}
+            {(interactionEnabled || Boolean(onPlantWispLantern))
               && !camera.isMoving
               && !upgradePresentation
               && tileUpgradeOffer
@@ -2268,15 +2286,8 @@ const RevealedCompanionEgg = memo(function RevealedCompanionEgg({
     }
     const shaking = (hatchPhase === 'preparing' || worldFtueHatchPhaseAtLeast(hatchPhase, 'shaking'))
       && !worldFtueHatchPhaseAtLeast(hatchPhase, 'crossfading_subject');
-    hatchShake.value = shaking && !reduceMotion ? withRepeat(withSequence(
-      withTiming(1, { duration: 62, easing: Easing.linear }),
-      withTiming(-1, { duration: 62, easing: Easing.linear }),
-    ), -1, true) : withTiming(0, { duration: 80 });
-    hatchPulse.value = shaking ? withRepeat(
-      withTiming(1, { duration: reduceMotion ? 240 : 720, easing: Easing.out(Easing.cubic) }),
-      -1,
-      false,
-    ) : 0;
+    hatchShake.value = shaking && !reduceMotion ? eggHatchRattle() : withTiming(0, { duration: 80 });
+    hatchPulse.value = shaking ? eggHatchPulse(reduceMotion) : 0;
     const cracking = worldFtueHatchPhaseAtLeast(hatchPhase, 'cracking');
     crackOne.value = withTiming(cracking ? 1 : 0, { duration: reduceMotion ? 80 : 260 });
     crackTwo.value = cracking

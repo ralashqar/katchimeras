@@ -224,7 +224,7 @@ export default function CollectionScreen() {
                     <Pressable key={id} accessibilityRole="button" onPress={() => router.push({ pathname: '/wisp/[wispId]', params: { wispId: id } })} style={({ pressed }) => [styles.wispCell, pressed && styles.wispCellPressed]}>
                       <WispArtwork id={id} silhouette={!quantity} size={48} thumbnail />
                       <ThemedText numberOfLines={1} style={styles.wispName} lightColor={quantity ? Lantern.moon50 : Lantern.moon500} darkColor={quantity ? Lantern.moon50 : Lantern.moon500}>{quantity ? definition.name : '???'}</ThemedText>
-                      <ThemedText style={styles.wispTier} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{quantity ? `Resonance ${wispEvolutionTier(Math.max(1, wisps.resonance(id)))} · ${wisps.resonance(id)} days` : 'Not found'}</ThemedText>
+                      <ThemedText style={styles.wispTier} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{definition.packEligible ? quantity ? 'Lantern visitor · at home' : 'Find at the Wisp Lantern' : quantity ? `Resonance ${wispEvolutionTier(Math.max(1, wisps.resonance(id)))} · ${wisps.resonance(id)} days` : 'Not found'}</ThemedText>
                     </Pressable>
                   );
                 })}

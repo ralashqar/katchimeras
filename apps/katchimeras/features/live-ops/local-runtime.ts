@@ -86,9 +86,13 @@ export function reduceLocalEvent(source: MergeWorldState, command: LocalEventCom
         if (!tier) throw new Error('Unknown reward.');
         if (run.claims[tier.id] === undefined) {
           if (!['active', 'claim'].includes(phase) || run.progress.points < tier.points) throw new Error('This reward is not available.');
-          for (const item of tier.free.items) {
+          for (const [itemIndex, item] of tier.free.items.entries()) {
             if (item.kind === 'glow') world.coins += item.amount;
             else if (item.kind === 'cosmetic') grantKeepsake(world, run, item.id, now);
+            else if (item.kind === 'wisp_pack' && item.scope === 'local-lantern-v1') {
+              if (!world.wispLanternProgress) throw new Error('Welcome the Wisps at the Lantern before collecting this pouch.');
+              world.wispLanternProgress.rewards[`lantern:event:${run.definition.id}:${tier.id}:${itemIndex}`] = { ...item, scope: 'local-lantern-v1', grantedAt: now };
+            }
             else throw new Error('This reward requires a different claim service.');
           }
           run.claims[tier.id] = now;

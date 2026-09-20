@@ -19,6 +19,7 @@ export type WispRuleDefinition = {
 };
 
 export type WispCatalogItem = {
+  packEligible?: boolean;
   id: WispId;
   name: string;
   subtitle: string;
@@ -84,7 +85,8 @@ export type JourneyWispRewardReceipt = {
 };
 
 export type WispCollectionState = {
-  version: 2;
+  version: 2 | 3;
+  lantern?: import('./wisp-lantern').WispLanternState;
   equippedWispId: WispId | null;
   unlocked: Partial<Record<WispId, WispUnlockRecord>>;
   inventory: Partial<Record<WispId, WispInventoryRecord>>;

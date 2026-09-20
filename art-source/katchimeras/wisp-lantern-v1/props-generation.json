@@ -1,0 +1,41 @@
+[
+  {
+    "id": "lantern-dormant",
+    "prompt": "Use case: stylized-concept. Asset: lantern-dormant transparent cutout for Katchimeras mobile cozy 3D toy diorama. A squat hollow carved wooden lantern with a leaf roof and amber window, unlit, awaiting small magical visitors. No face. Three-quarter elevated camera, soft hand-painted matte resin, rounded simple silhouettes, restrained cozy warm light, organic green and honey wood palette. Centered full object square canvas, generous clear margin. True transparent background, no ground plane, no text, no UI, no border, no background, no cast shadow. A single game prop, readable small.",
+    "source": "lantern-dormant.png",
+    "originalGeneration": "exec-2c88fec7-e284-418e-9626-84e8072be801.png",
+    "tool": "built-in image_gen",
+    "sha256": "05b385182c2df7cf84de5e98a01866a27d67b156a71bf31f0f44698024dac565",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": "native transparency"
+  },
+  {
+    "id": "lantern-lit",
+    "prompt": "Use case: stylized-concept. Asset: lantern-lit transparent cutout for Katchimeras mobile cozy 3D toy diorama. A squat hollow carved wooden lantern with a leaf roof and a glowing warm amber window, welcoming small magical visitors. No face. Three-quarter elevated camera, soft hand-painted matte resin, rounded simple silhouettes, restrained cozy warm light, organic green and honey wood palette. Centered full object square canvas, generous clear margin. True transparent background, no ground plane, no text, no UI, no border, no background, no cast shadow. A single game prop, readable small.",
+    "source": "lantern-lit.png",
+    "originalGeneration": "exec-5a56ed16-6ec6-417b-907a-6cdbf2f8a6f1.png",
+    "tool": "built-in image_gen",
+    "sha256": "8f7dae24d5466b599b633259e7acf416f07982d731e668e9c770bff75954b343",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": "native transparency"
+  },
+  {
+    "id": "first-gathering",
+    "prompt": "Use case: stylized-concept. Asset: first-gathering transparent cutout for Katchimeras mobile cozy 3D toy diorama. A tiny horseshoe arrangement of three leaf cushions, soft moss, small smooth pebbles and two miniature amber lanterns, open space in the middle for a separate main lantern. No creatures. Three-quarter elevated camera, soft hand-painted matte resin, rounded simple silhouettes, restrained cozy warm light, organic green and honey wood palette. Centered full object square canvas, generous clear margin. True transparent background, no ground plane, no text, no UI, no border, no background, no cast shadow. A single game prop, readable small.",
+    "source": "first-gathering.png",
+    "originalGeneration": "exec-0633f948-347d-4276-a23e-084b2f6d4406.png",
+    "tool": "built-in image_gen",
+    "sha256": "8cbd88e6f8a83e348034bc84ec279e1a2ce9d56b8e82f817697fb6f96a0fc0f9",
+    "size": [
+      1254,
+      1254
+    ],
+    "alpha": "native transparency"
+  }
+]

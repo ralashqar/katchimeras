@@ -265,6 +265,42 @@
       "id": "recall",
       "motif": "Violet memory-tile spirit.",
       "source": "exec-619b6cf1-7726-458d-9665-3c8e6d2deada.png"
+    },
+    {
+      "id": "dewdrop",
+      "motif": "Clear aqua droplet with leaflike fins.",
+      "source": "art-source/katchimeras/wisp-lantern-v1/dewdrop.png",
+      "pipeline": "Built-in image_gen native transparency; Pillow resize/WebP export"
+    },
+    {
+      "id": "bubble",
+      "motif": "Iridescent soap bubble with tiny cheeks.",
+      "source": "art-source/katchimeras/wisp-lantern-v1/bubble.png",
+      "pipeline": "Built-in image_gen native transparency; Pillow resize/WebP export"
+    },
+    {
+      "id": "nimbus",
+      "motif": "Small white cloud orb with blue feet.",
+      "source": "art-source/katchimeras/wisp-lantern-v1/nimbus.png",
+      "pipeline": "Built-in image_gen native transparency; Pillow resize/WebP export"
+    },
+    {
+      "id": "clover",
+      "motif": "Four-leaf orb with gold freckles.",
+      "source": "art-source/katchimeras/wisp-lantern-v1/clover.png",
+      "pipeline": "Built-in image_gen native transparency; Pillow resize/WebP export"
+    },
+    {
+      "id": "pebble",
+      "motif": "Smooth warm-grey stone with miniature fins.",
+      "source": "art-source/katchimeras/wisp-lantern-v1/pebble.png",
+      "pipeline": "Built-in image_gen native transparency; Pillow resize/WebP export"
+    },
+    {
+      "id": "crystal",
+      "motif": "Faceted crystal sprite.",
+      "source": "art-source/katchimeras/wisp-lantern-v1/crystal.png",
+      "pipeline": "Built-in image_gen native transparency; Pillow resize/WebP export"
     }
   ]
 }
