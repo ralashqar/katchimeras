@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from './helpers/content-fs';
 
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
 import {
   activeIslandCampaign,
+  activeIslandCampaigns,
   activeIslandCampaignReturn,
   islandCampaignChapterOrder,
   islandCampaignConversationDefinitions,
@@ -118,4 +120,26 @@ test('a complete campaign earns the friend card once and reports through the gen
   assert.equal(pendingIslandCampaignCardReveal(state)?.campaign, campaign);
   assert.equal(activeIslandCampaign(state), null);
   assert.equal(islandCampaignPanelPresentation(state, campaign), null);
+});
+
+test('two friends’ stories in progress: both are seen, so a finished board continues on its own whoever’s it is', () => {
+  // A pack's island (the Wander Trail) wakes on its own condition, so its story can run alongside the friend the wake
+  // order has open. The screen's automatic continuations once looked only at the first story in campaign order, so
+  // the other friend's finished board waited for the player to tap the island and press a free Restore.
+  const [first, second] = ISLAND_CAMPAIGNS;
+  assert.ok(first && second);
+  let state = { ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 1000 };
+  state = greetIslandFriend(revealIsland(state, first, NOW), first, NOW + 1);
+  // The wake order will not reveal two ordered friends at once, so the second story is written in by hand, the way a
+  // pack island's own wake condition puts one there: the same greeted record, under the other friend's ids.
+  const greeted = JSON.parse(JSON.stringify(state.islandCampaigns![first.campaignId])
+    .replaceAll(first.campaignId, second.campaignId).replaceAll(first.islandId, second.islandId).replaceAll(first.residentSkinId, second.residentSkinId));
+  state = { ...state, islandCampaigns: { ...state.islandCampaigns, [second.campaignId]: greeted },
+    haven: { ...state.haven, mossproutNatureIslandReveals: { ...state.haven.mossproutNatureIslandReveals, [second.islandId]: state.haven.mossproutNatureIslandReveals[first.islandId] } } };
+  assert.deepEqual(activeIslandCampaigns(state).map((story) => story.campaign.campaignId), [first.campaignId, second.campaignId], 'every story in progress, in campaign order');
+  assert.equal(activeIslandCampaign(state)?.campaign, first, 'the single lookup is only ever the first of them');
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  assert.match(screen, /const stories = activeIslandCampaigns\(mergeWorld\);[\s\S]*?for \(const story of ordered\) if \(advance\(story\)\) return;/, 'the screen continues whichever story is waiting');
+  assert.match(screen, /const campaignAutoTransitionRef = useRef\(new Set<string>\(\)\);/, 'and remembers what has fired per friend, chapter and status, so two stories cannot replay each other’s scenes');
+  assert.doesNotMatch(screen, /activeIslandCampaign\(mergeWorld\)/);
 });

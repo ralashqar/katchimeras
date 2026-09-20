@@ -283,15 +283,25 @@ export type ActiveIslandCampaign = {
   status: IslandCampaignChapterStatus;
 };
 
-/** The first discovered island whose story is still in progress. */
-export function activeIslandCampaign(world: MergeWorldState): ActiveIslandCampaign | null {
+/**
+ * Every discovered island whose story is still in progress, in campaign order. The wake order brings friends home
+ * one at a time, but a pack's island wakes on its own condition (the Wander Trail on Steppling's hatch), so two
+ * stories can be in progress at once: anything that continues a story on its own has to look at all of them.
+ */
+export function activeIslandCampaigns(world: MergeWorldState): ActiveIslandCampaign[] {
+  const active: ActiveIslandCampaign[] = [];
   for (const campaign of ISLAND_CAMPAIGNS) {
     const progress = islandCampaignProgress(world, campaign);
     if (!progress?.discoveryRevealSeenAt) continue;
     const chapter = campaign.chapters.find((candidate) => islandCampaignChapterStatus(world, campaign, candidate.level) !== 'complete');
-    if (chapter) return { campaign, progress, chapter, status: islandCampaignChapterStatus(world, campaign, chapter.level) };
+    if (chapter) active.push({ campaign, progress, chapter, status: islandCampaignChapterStatus(world, campaign, chapter.level) });
   }
-  return null;
+  return active;
+}
+
+/** The first discovered island whose story is still in progress. */
+export function activeIslandCampaign(world: MergeWorldState): ActiveIslandCampaign | null {
+  return activeIslandCampaigns(world)[0] ?? null;
 }
 
 /** Progress records whose friend has appeared but not yet been greeted, in wake order. */

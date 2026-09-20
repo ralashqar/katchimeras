@@ -241,7 +241,10 @@ test('the campaign auto-transition guard never keys on mergeWorld.revision', () 
   assert.doesNotMatch(screen, /campaignAutoTransitionRef[\s\S]{0,400}mergeWorld\.revision/,
     'no campaign auto-transition key may depend on the global revision counter');
   assert.match(screen, /const key = `return:\$\{campaign\.campaignId\}:\$\{chapter\.level\}:\$\{status\}`/);
-  assert.match(screen, /const key = `restore:\$\{campaign\.campaignId\}:\$\{status\}`/);
+  // The chapter is in the key: fired keys are kept in a set (two friends' stories can run at once), so a key without
+  // its level would stop the same friend's next stage from ever continuing on its own.
+  assert.match(screen, /const key = `restore:\$\{campaign\.campaignId\}:\$\{chapter\.level\}:\$\{status\}`/);
+  assert.match(screen, /const key = `restore-board:\$\{campaign\.campaignId\}:\$\{chapter\.level\}:\$\{status\}`/);
   assert.match(screen, /const key = `resolution:\$\{campaign\.campaignId\}:\$\{chapter\.level\}:\$\{status\}`/);
 });
 

@@ -148,7 +148,8 @@ import {
 } from '@/features/content-flow/story-world-operations';
 import { useStoryPresentationOperation } from '@/features/content-flow/use-story-presentation-operation';
 import {
-  activeIslandCampaign,
+  activeIslandCampaigns,
+  type ActiveIslandCampaign,
   islandCampaignChapter,
   islandCampaignChapterOrder,
   islandCampaignOpeningConversationId,
@@ -519,7 +520,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   } | null>(null);
   const islandNarrativeAfterUpgradeRef = useRef<((campaign: IslandCampaignDefinition, level: MossproutNatureIslandLevel, phase: IslandCampaignPhase) => void) | null>(null);
   const islandDiscoveryContinueBusy = useRef(false);
-  const campaignAutoTransitionRef = useRef<string | null>(null);
+  // Every automatic continuation that has already fired, by friend, chapter and status: more than one friend's story
+  // can be in progress, so one slot would let them knock each other's guard out and replay a scene.
+  const campaignAutoTransitionRef = useRef(new Set<string>());
   /** A served request whose friend should greet the player on the island panel, not in an overlay. */
   const returnPanelRef = useRef<string | null>(null);
   const openUpgradeOfferRef = useRef<((offer: WorldUpgradeOffer) => Promise<void>) | null>(null);
@@ -1816,9 +1819,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   useEffect(() => {
     if (!screenFocused || pendingIslandDiscovery
       || interactionCreatureId || selectedUpgrade || upgradePresentation || requiredUpgradeStory || ordinaryUpgradeRun) return;
-    const active = activeIslandCampaign(mergeWorld);
-    if (!active) return;
-    const { campaign, chapter, status } = active;
     // Not `mergeWorld.revision`: that bumps on every command in the game,
     // including ones that have nothing to do with this campaign (an energy
     // tick, an unrelated merge). Keying on it meant the guard reset itself
@@ -1827,57 +1827,69 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // reached its own completion callback, and its chapter never actually
     // persisted as complete. `status` only changes when this chapter's own
     // progress does, which is the only thing that should ever re-arm this.
-    if (status === 'return_ready') {
-      const key = `return:${campaign.campaignId}:${chapter.level}:${status}`;
-      if (campaignAutoTransitionRef.current === key) return;
-      campaignAutoTransitionRef.current = key;
-      if (chapter.level === 1) {
-        // The first return is the gift beat: a full scene, then the free restoration.
-        openIslandCampaignNarrative(campaign, chapter.level, 'return');
-        return;
+    const fired = campaignAutoTransitionRef.current;
+    /** Continues one friend's story if it is waiting on the game; true when it did (one continuation per pass). */
+    const advance = ({ campaign, chapter, status }: ActiveIslandCampaign): boolean => {
+      if (status === 'return_ready') {
+        const key = `return:${campaign.campaignId}:${chapter.level}:${status}`;
+        if (fired.has(key)) return false;
+        fired.add(key);
+        if (chapter.level === 1) {
+          // The first return is the gift beat: a full scene, then the free restoration.
+          openIslandCampaignNarrative(campaign, chapter.level, 'return');
+          return true;
+        }
+        // Later returns land where the Glow is spent: the friend speaks on the island panel.
+        returnPanelRef.current = `${campaign.campaignId}:${chapter.level}`;
+        void acknowledgeStoredIslandCampaignChapterReturn(campaign.campaignId, chapter.level).catch(() => { returnPanelRef.current = null; });
+        return true;
       }
-      // Later returns land where the Glow is spent: the friend speaks on the island panel.
-      returnPanelRef.current = `${campaign.campaignId}:${chapter.level}`;
-      void acknowledgeStoredIslandCampaignChapterReturn(campaign.campaignId, chapter.level).catch(() => { returnPanelRef.current = null; });
-      return;
-    }
-    if (status === 'restoration_ready' && chapter.restoration) {
-      // The beds are full and the stage was paid when they opened: the island grows on its own.
-      const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${campaign.islandId}` && candidate.nextLevel === chapter.level && candidate.eligible);
-      const key = `restore-board:${campaign.campaignId}:${status}`;
-      if (!offer || campaignAutoTransitionRef.current === key) return;
-      campaignAutoTransitionRef.current = key;
-      void purchaseWorldUpgrade(offer, { beforeValidation: flushMergeWorld }).catch((error) => {
-        campaignAutoTransitionRef.current = null;
-        setUpgradeError(error instanceof Error ? error.message : 'The garden restoration paused.');
-      });
-      return;
-    }
-    if (status === 'restoration_ready' && returnPanelRef.current === `${campaign.campaignId}:${chapter.level}`) {
-      returnPanelRef.current = null;
-      const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${campaign.islandId}` && candidate.nextLevel === chapter.level);
-      if (offer) void openUpgradeOfferRef.current?.(offer);
-      return;
-    }
-    if (chapter.level === 1 && status === 'restoration_ready') {
-      const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${campaign.islandId}` && candidate.nextLevel === 1 && candidate.eligible);
-      const key = `restore:${campaign.campaignId}:${status}`;
-      if (!offer || campaignAutoTransitionRef.current === key) return;
-      campaignAutoTransitionRef.current = key;
-      void purchaseWorldUpgrade(offer, { beforeValidation: flushMergeWorld }).catch((error) => {
-        campaignAutoTransitionRef.current = null;
-        setUpgradeError(error instanceof Error ? error.message : 'The garden restoration paused.');
-      });
-      return;
-    }
-    if (status === 'resolution_ready') {
-      const key = `resolution:${campaign.campaignId}:${chapter.level}:${status}`;
-      if (campaignAutoTransitionRef.current === key) return;
-      campaignAutoTransitionRef.current = key;
-      openIslandCampaignNarrative(campaign, chapter.level, 'resolution');
-    }
+      if (status === 'restoration_ready' && chapter.restoration) {
+        // The beds are full and the stage was paid when they opened: the island grows on its own.
+        const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${campaign.islandId}` && candidate.nextLevel === chapter.level && candidate.eligible);
+        const key = `restore-board:${campaign.campaignId}:${chapter.level}:${status}`;
+        if (!offer || fired.has(key)) return false;
+        fired.add(key);
+        void purchaseWorldUpgrade(offer, { beforeValidation: flushMergeWorld }).catch((error) => {
+          fired.delete(key);
+          setUpgradeError(error instanceof Error ? error.message : 'The garden restoration paused.');
+        });
+        return true;
+      }
+      if (status === 'restoration_ready' && returnPanelRef.current === `${campaign.campaignId}:${chapter.level}`) {
+        returnPanelRef.current = null;
+        const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${campaign.islandId}` && candidate.nextLevel === chapter.level);
+        if (offer) void openUpgradeOfferRef.current?.(offer);
+        return true;
+      }
+      if (chapter.level === 1 && status === 'restoration_ready') {
+        const offer = upgradeOffers.find((candidate) => candidate.id === `nature:${campaign.islandId}` && candidate.nextLevel === 1 && candidate.eligible);
+        const key = `restore:${campaign.campaignId}:${chapter.level}:${status}`;
+        if (!offer || fired.has(key)) return false;
+        fired.add(key);
+        void purchaseWorldUpgrade(offer, { beforeValidation: flushMergeWorld }).catch((error) => {
+          fired.delete(key);
+          setUpgradeError(error instanceof Error ? error.message : 'The garden restoration paused.');
+        });
+        return true;
+      }
+      if (status === 'resolution_ready') {
+        const key = `resolution:${campaign.campaignId}:${chapter.level}:${status}`;
+        if (fired.has(key)) return false;
+        fired.add(key);
+        openIslandCampaignNarrative(campaign, chapter.level, 'resolution');
+        return true;
+      }
+      return false;
+    };
+    // Every friend whose story is in progress, the one being dealt with first. This once looked only at the first in
+    // campaign order (Petalimp, once Bloom Garden is revealed), so Wanderling's finished board never continued on its
+    // own: the player had to tap the island and press a free Restore to move the story on.
+    const stories = activeIslandCampaigns(mergeWorld);
+    const ordered = [...stories.filter((story) => story.campaign.campaignId === restorationFocusCampaignId), ...stories.filter((story) => story.campaign.campaignId !== restorationFocusCampaignId)];
+    for (const story of ordered) if (advance(story)) return;
   }, [flushMergeWorld, interactionCreatureId, mergeWorld, openIslandCampaignNarrative, ordinaryUpgradeRun,
-    pendingIslandDiscovery, requiredUpgradeStory, screenFocused, selectedUpgrade, upgradeOffers, upgradePresentation]);
+    pendingIslandDiscovery, requiredUpgradeStory, restorationFocusCampaignId, screenFocused, selectedUpgrade, upgradeOffers, upgradePresentation]);
 
   // Mossprout's wish plays once Steppling's garden lesson is over: a blocking
   // full-screen scene, then a guided walk to the first mist. Both phases are
