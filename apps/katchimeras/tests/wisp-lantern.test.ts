@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EMPTY_WISP_STATE, normalizeWispState, applyWispGrant } from '@/utils/wisp-state';
 import { reduceWispLantern, pendingLanternPack } from '@/utils/wisp-lantern-state';
-import { LANTERN_VISITORS, ORDINARY_PACK, validateLanternPacks } from '@/constants/wisp-lantern';
+import { LANTERN_VISITORS, ORDINARY_PACK, ORDINARY_PROTECTION, validateLanternPacks } from '@/constants/wisp-lantern';
 import { WISP_CATALOG } from '@/constants/wisps';
 import { wispOwnershipState } from '@/utils/wisp-ownership';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
@@ -65,6 +65,7 @@ test('duplicates give echoes; third dry pack guarantees missing; purchases never
   for (const id of LANTERN_VISITORS.slice(0, 5)) state = applyWispGrant(state, id, `legacy:${id}`, 'experience', { now: NOW }).state;
   const history = structuredClone(state.resonanceCounts);
   state.lantern!.dryPacks = 2;
+  state.lantern!.dryPacksByGroup[ORDINARY_PROTECTION] = 2;
   state = pouch(state, 'pity', 1);
   assert.ok(state.lantern!.packs.pity.outcomes!.some(o => o.id === 'crystal' && o.discovered));
   assert.equal(state.lantern!.dryPacks, 0);

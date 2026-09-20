@@ -11,6 +11,7 @@ import { lanternEligible } from '@/features/wisps/lantern-world';
 import { needsHeartwoodRecap } from '@/features/shared-adventure/heartwood-opening';
 import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
 import { normalizeMergeWorldState } from '@/utils/merge-world/engine';
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 
 const NOW = Date.parse('2026-08-17T12:00:00Z');
 const root = resolve(__dirname, '..');
@@ -18,12 +19,15 @@ const read = (relative: string) => readFileSync(resolve(root, relative), 'utf8')
 
 test('the profile fixture catalog offers the Lantern checkpoint and the three friend checkpoints', () => {
   const fixtures = buildPlayerProfileFixtures(NOW);
-  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, 4);
+  assert.equal(PLAYER_PROFILE_FIXTURE_COUNT, DEV_TOOLS_ENABLED ? 7 : 6);
   assert.deepEqual(fixtures.map((fixture) => [fixture.id, fixture.name]), [
     ['fixture:kingdom-before-wisp-lantern', 'Kingdom · Before Wisp Lantern'],
     ['fixture:steppling-mist-ready', 'Kingdom · Before Steppling'],
     ['fixture:kingdom-before-petalimp', 'Kingdom · Before Petalimp'],
     ['fixture:kingdom-before-fernip', 'Kingdom · Before Fernip'],
+    ['fixture:lantern-level-2-ready', 'Lantern · Level 2 Ready'],
+    ['fixture:lantern-level-3-ready', 'Lantern · Level 3 Ready'],
+    ...(DEV_TOOLS_ENABLED ? [['fixture:lantern-season-preview', 'Lantern · Seasonal Preview']] : []),
   ]);
   for (const fixture of fixtures) {
     assert.equal(fixture.launchRoute, '/(tabs)/katchimeras', `${fixture.id} opens on the Kingdom`);

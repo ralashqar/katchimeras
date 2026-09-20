@@ -1,4 +1,5 @@
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
+import { lanternPackDefinition } from '@/constants/wisp-lantern';
 import { createMissionState } from '@/features/onboarding/steppling-mission';
 import { missionWindow } from '@/features/mission-mechanics/board-window';
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
@@ -91,7 +92,7 @@ export function reduceLocalEvent(source: MergeWorldState, command: LocalEventCom
             else if (item.kind === 'cosmetic') grantKeepsake(world, run, item.id, now);
             else if (item.kind === 'wisp_pack' && item.scope === 'local-lantern-v1') {
               if (!world.wispLanternProgress) throw new Error('Welcome the Wisps at the Lantern before collecting this pouch.');
-              world.wispLanternProgress.rewards[`lantern:event:${run.definition.id}:${tier.id}:${itemIndex}`] = { ...item, scope: 'local-lantern-v1', grantedAt: now };
+              world.wispLanternProgress.rewards[`lantern:event:${run.definition.id}:${tier.id}:${itemIndex}`] = { ...item, definitionVersion: lanternPackDefinition(item.packId).version, scope: 'local-lantern-v1', grantedAt: now };
             }
             else throw new Error('This reward requires a different claim service.');
           }

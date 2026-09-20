@@ -5,7 +5,6 @@ import { playUpgradeSequence } from '@incubator/environments/upgrade-sequence';
 import {createHexTileRenderer} from '@incubator/environments/hex-tile';
 import { WorldUpgradeMarker } from './world-upgrade-marker';
 import type { HomeVeilState } from '@/features/onboarding/opening-mist';
-import { WorldUpgradeAnchor } from './world-upgrade-anchor';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import { useFocusEffect } from '@react-navigation/native';
@@ -168,7 +167,14 @@ type Props = {
   onOpenGarden?: (orderId?: string | null) => void;
   upgradeOffers?: readonly WorldUpgradeOffer[];
   selectedUpgradeOffer?: WorldUpgradeOffer | null;
-  upgradePanel?: ReactNode;
+  /** The docked upgrade panel is up (the screen mounts it): taps on the stage above it dismiss. */
+  upgradePanelOpen?: boolean;
+  /** The band above the docked panel the selected tile is framed in. */
+  upgradeStage?: { centerY: number; height: number } | null;
+  /** Something other than an upgrade offer on the stage (a Haven's details, a hidden friend): framed the same way. */
+  upgradeStageSubject?: { id: string; target: StoryTarget } | null;
+  /** The picture the world is drawing right now for the tile on the stage, so the panel shows that very tile and not a stand-in. */
+  onUpgradeStageArt?: (art: ImageSourcePropType | null) => void;
   onDismissUpgrade?: () => void;
   preserveUpgradeCamera?: boolean;
   upgradeSelectionCommitted?: boolean;
@@ -508,7 +514,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   hearthAdornment,
   upgradeOffers = [],
   selectedUpgradeOffer = null,
-  upgradePanel,
+  upgradePanelOpen = false,
+  upgradeStage = null,
+  upgradeStageSubject = null,
+  onUpgradeStageArt,
   onDismissUpgrade,
   preserveUpgradeCamera = false,
   upgradeSelectionCommitted = false,
@@ -1023,7 +1032,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         }
       : undefined,
     minimumScale: focusedMossproutWorld ? 0.28 : undefined,
-    maximumScale: selectedUpgradeOffer && !preserveUpgradeCamera || upgradePresentation
+    maximumScale: (selectedUpgradeOffer || upgradeStageSubject) && !preserveUpgradeCamera || upgradePresentation
       ? Math.max(cameraMaximumScale ?? KINGDOM_RENDERING.havenMaxScale, 3)
       : cameraMaximumScale,
     onSnapshotChange: onCameraSnapshotChange,
@@ -1219,29 +1228,68 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const upgradeOrigin = useRef<KingdomCameraSnapshot | null>(null);
   const upgradeFocusId = useRef<string | null>(null);
   const upgradeCameraCommitted = useRef(false);
+  // FTUE's own close-up, lifted clear of the docked panel: where to put the tile back.
+  const upgradeLift = useRef<{ x: number; y: number; anchorY: number; zoom: number } | null>(null);
   useEffect(() => {
-    if (upgradeSelectionCommitted || upgradePresentation) upgradeCameraCommitted.current = true;
-    if (selectedUpgradeOffer) {
-      // FTUE already owns the planting or mist close-up; opening its upgrade sheet
-      // must not fit the tile again or save a competing return-camera snapshot.
-      if (preserveUpgradeCamera) return;
-      if (!tutorialCameraReady || upgradeFocusId.current === selectedUpgradeOffer.id) return;
-      upgradeOrigin.current ??= readLiveCameraSnapshot();
+    const durationMs = reduceMotion ? 80 : 440;
+    const lower = () => {
+      const lift = upgradeLift.current;
+      upgradeLift.current = null;
+      if (lift) focusTutorialResident(lift.x, lift.y, { anchorY: lift.anchorY, durationMs, zoom: lift.zoom, unbounded: true });
+    };
+    if (upgradeSelectionCommitted || upgradePresentation) {
+      upgradeCameraCommitted.current = true;
+      // The purchase plays where FTUE framed the tile, not where the panel lifted it.
+      lower();
+    }
+    const subject = selectedUpgradeOffer ? { id: selectedUpgradeOffer.id, target: selectedUpgradeOffer.visualTarget as StoryTarget } : upgradeStageSubject;
+    if (subject) {
+      if (!tutorialCameraReady || !viewport.height || upgradeFocusId.current === subject.id) return;
+      const frame = storyTargetFrame(subject.target);
+      const stageCenterY = upgradeStage?.centerY ?? viewport.height * 0.3;
       upgradeCameraCommitted.current = false;
-      upgradeFocusId.current = selectedUpgradeOffer.id;
-      const frame = storyTargetFrame(selectedUpgradeOffer.visualTarget);
-      if (frame) focusInteractionTile(frame, {
-        durationMs: reduceMotion ? 80 : 440,
-        horizontalPadding: 16,
-        verticalPadding: 96,
-        screenCenterY: viewport.height * 0.60,
+      upgradeFocusId.current = subject.id;
+      if (!frame) return;
+      if (preserveUpgradeCamera) {
+        // FTUE already owns the planting or mist close-up: keep its zoom and save no
+        // competing return snapshot. Only lift the tile into the stage above the panel.
+        const live = readLiveCameraSnapshot();
+        const x = frame.left + frame.width / 2;
+        const y = frame.top + frame.height / 2;
+        const screenY = scene.height / 2 + live.ty + (y - scene.height / 2) * live.scale;
+        upgradeLift.current = { x, y, anchorY: screenY / viewport.height, zoom: live.scale };
+        focusTutorialResident(x, y, { anchorY: stageCenterY / viewport.height, durationMs, zoom: live.scale, unbounded: true });
+        return;
+      }
+      upgradeOrigin.current ??= readLiveCameraSnapshot();
+      focusInteractionTile(frame, {
+        durationMs,
+        fitHeight: upgradeStage?.height,
+        horizontalPadding: 24,
+        verticalPadding: 12,
+        screenCenterY: stageCenterY,
+        unbounded: true,
       });
     } else if (upgradeFocusId.current) {
       const origin = upgradeOrigin.current;
-      if (origin && !upgradeCameraCommitted.current && !preserveUpgradeCamera) animateToCameraSnapshot(origin, reduceMotion ? 80 : 440);
-      upgradeOrigin.current = null; upgradeFocusId.current = null; upgradeCameraCommitted.current = false;
+      if (!upgradeCameraCommitted.current && upgradeLift.current) lower();
+      else if (origin && !upgradeCameraCommitted.current && !preserveUpgradeCamera) animateToCameraSnapshot(origin, durationMs);
+      upgradeOrigin.current = null; upgradeFocusId.current = null; upgradeCameraCommitted.current = false; upgradeLift.current = null;
     }
-  }, [animateToCameraSnapshot, focusInteractionTile, preserveUpgradeCamera, readLiveCameraSnapshot, reduceMotion, selectedUpgradeOffer, storyTargetFrame, tutorialCameraReady, upgradePresentation, upgradeSelectionCommitted, viewport.height]);
+  }, [animateToCameraSnapshot, focusInteractionTile, focusTutorialResident, preserveUpgradeCamera, readLiveCameraSnapshot, reduceMotion, scene.height, selectedUpgradeOffer, storyTargetFrame, tutorialCameraReady, upgradePresentation, upgradeSelectionCommitted, upgradeStage?.centerY, upgradeStage?.height, upgradeStageSubject, viewport.height]);
+  // The tile on the upgrade stage, as the scene draws it this frame (mist, a stage of growth, a pack's own art).
+  const upgradeStageTarget = selectedUpgradeOffer ? selectedUpgradeOffer.visualTarget as StoryTarget : upgradeStageSubject?.target ?? null;
+  const upgradeStageArt = useMemo(() => {
+    const target = upgradeStageTarget;
+    if (!target) return null;
+    const layer = target.kind === 'haven_nature_island' ? scene.tileArtLayers.find((candidate) => candidate.id === `nature:mossprout:${target.islandId}`)
+      : target.kind === 'haven_structure' ? scene.tileArtLayers.find((candidate) => candidate.id === target.structureId || candidate.id === `structure:${target.structureId}`)
+        : target.kind === 'haven_tile' ? scene.tileArtLayers.find((candidate) => candidate.id === scene.tiles.find((tile) => tile.kind === 'companion' && tile.companion?.familyId === target.familyId)?.id)
+          : target.kind === 'haven_home' && sceneHomeTile ? scene.tileArtLayers.find((candidate) => candidate.id === sceneHomeTile.id)
+            : undefined;
+    return layer ? layer.sources?.medium ?? layer.sources?.full ?? layer.source : null;
+  }, [scene.tileArtLayers, scene.tiles, sceneHomeTile, upgradeStageTarget]);
+  useEffect(() => { onUpgradeStageArt?.(upgradeStageArt); }, [onUpgradeStageArt, upgradeStageArt]);
   const havenTargetRegistry = useMemo(() => storyTargetRegistry('haven'), []);
   const registeredStoryTargets = useMemo<StoryTarget[]>(() => [
     { kind: 'haven_world' },
@@ -2010,7 +2058,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               ? scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame
               : storyTargetFrame(target);
             return frame ? <WorldUpgradeMarker key={offer.id} offer={offer} frame={frame}
-              hidden={Boolean(selectedUpgradeOffer) || Boolean(soloLayerId && offer.id !== soloOfferId)}
+              hidden={Boolean(selectedUpgradeOffer || upgradeStageSubject) || Boolean(soloLayerId && offer.id !== soloOfferId)}
               selected={selectedUpgradeOffer?.id === offer.id}
               cameraScale={camera.scaleValue} cameraX={camera.translationXValue} cameraY={camera.translationYValue}
               sceneWidth={scene.width} sceneHeight={scene.height} moving={camera.isMoving}
@@ -2065,18 +2113,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           sceneHeight={scene.height} sceneWidth={scene.width} x={anchor.x} y={anchor.y - SHARED_RESIDENT_BASELINE_LIFT}
           onPress={interactionEnabled && !upgradePresentation && !storySceneGuard ? onSelectGateway : undefined} />;
       })() : null}
-      {selectedUpgradeOffer && upgradePanel && !upgradePresentation ? <>
-        <Pressable style={[StyleSheet.absoluteFill, { zIndex: 31 }]} accessibilityRole="button" accessibilityLabel="Close upgrade" onPress={onDismissUpgrade} />
-        {(() => {
-          const target = selectedUpgradeOffer.visualTarget;
-          const frame = target.kind === 'haven_nature_island' ? scene.tileArtLayers.find((layer) => layer.id === `nature:mossprout:${target.islandId}`)?.frame : storyTargetFrame(target);
-          return frame ? <WorldUpgradeAnchor key={`${selectedUpgradeOffer.id}:${selectedUpgradeOffer.nextLevel}`} frame={frame}
-            cameraScale={camera.scaleValue} cameraX={camera.translationXValue} cameraY={camera.translationYValue}
-            sceneWidth={scene.width} sceneHeight={scene.height} viewportWidth={viewport.width} viewportHeight={viewport.height} moving={camera.isMoving}>
-            {upgradePanel}
-          </WorldUpgradeAnchor> : null;
-        })()}
-      </> : null}
+      {(selectedUpgradeOffer || upgradeStageSubject) && upgradePanelOpen && !upgradePresentation
+        ? <Pressable style={[StyleSheet.absoluteFill, { zIndex: 31 }]} accessibilityRole="button" accessibilityLabel="Close upgrade" onPress={onDismissUpgrade} />
+        : null}
       {!upgradePresentation && interactionEnabled && !cameraLocked && !storyCameraInputLocked ? (
         <Pressable
           accessibilityRole="button"

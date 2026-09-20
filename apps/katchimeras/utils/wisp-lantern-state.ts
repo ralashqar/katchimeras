@@ -1,27 +1,31 @@
 import { WISP_RARITY } from '@/constants/wisp-rarity';
 import { wispDefinition } from '@/constants/wisps';
-import { LANTERN_COLLECTION, LANTERN_VISITORS, ORDINARY_PACK, WELCOME_PACK, WELCOME_RECEIPT, lanternPackDefinition } from '@/constants/wisp-lantern';
+import { LANTERN_COLLECTION, LANTERN_VISITORS, ORDINARY_PROTECTION, WELCOME_PACK, WELCOME_RECEIPT } from '@/constants/wisp-lantern';
+import { albumPhase, albumWisps, packDefinition, wispAlbum } from '@/constants/wisp-albums';
 import type { WispCollectionState, WispId } from '@/types/wisp';
 import type { WispLanternCommand, WispLanternState, WispPackInstance } from '@/types/wisp-lantern';
 export function emptyWispLantern(): WispLanternState {
-  return { version: 1, scope: 'local-lantern-v1', unlockedAt: null, introducedAt: null, packs: {}, echoes: 0,
+  return { version: 2, scope: 'local-lantern-v1', unlockedAt: null, introducedAt: null, packs: {}, echoes: 0, dryPacksByGroup: {},
     dryPacks: 0, receipts: [], residents: [], cosmetics: [], claims: [], duplicateExplained: false };
 }
 export function normalizeWispLantern(raw: unknown): WispLanternState {
   if (!raw || typeof raw !== 'object') return emptyWispLantern();
   const value = raw as Partial<WispLanternState>;
-  if (value.scope !== 'local-lantern-v1' || value.version !== 1) throw new Error('Unsupported Wisp Lantern save');
+  if (value.scope !== 'local-lantern-v1' || ![1, 2].includes(Number(value.version))) throw new Error('Unsupported Wisp Lantern save');
   if (!Number.isSafeInteger(value.echoes) || value.echoes! < 0 || !value.packs || !Array.isArray(value.receipts)) throw new Error('Invalid Wisp Lantern save');
-  if (!Number.isSafeInteger(value.dryPacks) || value.dryPacks! < 0 || !Array.isArray(value.residents) || value.residents.length > 3
+  if (!Number.isSafeInteger(value.dryPacks) || value.dryPacks! < 0 || !Array.isArray(value.residents) || value.residents.length > 5
     || !Array.isArray(value.cosmetics) || !Array.isArray(value.claims)
     || [value.unlockedAt, value.introducedAt].some(at => at !== null && !Number.isFinite(at))) throw new Error('Invalid Wisp Lantern progress');
   for (const [id, pack] of Object.entries(value.packs)) {
+    const definition = packDefinition(pack.definitionId, pack.definitionVersion, value.previewSeasonStartedAt);
     if (!pack || pack.id !== id || pack.scope !== value.scope || !Number.isSafeInteger(pack.seed) || !Number.isInteger(pack.revealed) || pack.revealed < 0
       || !Number.isFinite(pack.grantedAt) || (pack.openedAt != null && (!Number.isFinite(pack.openedAt) || !Array.isArray(pack.outcomes)))
       || (pack.focusedCardIndex != null && (!pack.outcomes || !Number.isInteger(pack.focusedCardIndex) || pack.focusedCardIndex < 0 || pack.focusedCardIndex >= pack.outcomes.length))
-      || (pack.outcomes && (pack.revealed > pack.outcomes.length || pack.outcomes.some(outcome => !(LANTERN_VISITORS as readonly string[]).includes(outcome.id) || !Number.isSafeInteger(outcome.echoes) || outcome.echoes < 0)))) throw new Error('Invalid saved Wisp pouch');
+      || (pack.outcomes && (pack.revealed > pack.outcomes.length || pack.outcomes.some(outcome => !definition.pool.some(entry => entry.id === outcome.id) || !Number.isSafeInteger(outcome.echoes) || outcome.echoes < 0)))) throw new Error('Invalid saved Wisp pouch');
   }
-  return { ...emptyWispLantern(), ...value } as WispLanternState;
+  const dryPacksByGroup = Number(value.version) === 1 ? { [ORDINARY_PROTECTION]: value.dryPacks! } : value.dryPacksByGroup ?? {};
+  if (Object.values(dryPacksByGroup).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('Invalid pack protection');
+  return { ...emptyWispLantern(), ...value, version: 2, dryPacksByGroup } as WispLanternState;
 }
 export function wispRandom(seed: number) {
   let value = seed >>> 0;
@@ -32,13 +36,15 @@ function own(state: WispCollectionState, id: WispId, receiptId: string, now: num
   state.unlocked[id] = { wispId: id, unlockedAt: now, sourceDayId: null, seenReveal: true };
   state.appliedGrantReceiptIds = [...(state.appliedGrantReceiptIds ?? []), receiptId];
 }
-function grant(lantern: WispLanternState, id: string, definitionId: string, seed: number, now: number) {
+function grant(lantern: WispLanternState, id: string, definitionId: string, seed: number, now: number, version?: number) {
   if (!id || Object.hasOwn(Object.prototype, id) || !Number.isSafeInteger(seed)) throw new Error('Invalid pouch receipt.');
   if (lantern.packs[id]) return;
-  const definition = lanternPackDefinition(definitionId);
+  const definition = packDefinition(definitionId, version, lantern.previewSeasonStartedAt);
+  const album = wispAlbum(definition.collectionId, lantern.previewSeasonStartedAt);
+  if (album.seasonal && albumPhase(album, now) !== 'active') throw new Error('This season is not awarding packs.');
   lantern.packs[id] = { id, definitionId, definitionVersion: definition.version, scope: 'local-lantern-v1', seed, grantedAt: now, revealed: 0 };
 }
-export function reduceWispLantern(input: WispCollectionState, command: WispLanternCommand, now: number, seed = 1, externallyOwned: readonly WispId[] = []): WispCollectionState {
+export function reduceWispLantern(input: WispCollectionState, command: WispLanternCommand, now: number, seed = 1, externallyOwned: readonly WispId[] = [], residentCapacity = 3): WispCollectionState {
   if (!Number.isFinite(now)) throw new Error('Invalid Wisp command time');
   const state = structuredClone(input);
   const lantern = state.lantern = normalizeWispLantern(state.lantern);
@@ -57,21 +63,25 @@ export function reduceWispLantern(input: WispCollectionState, command: WispLante
     }
     case 'grant_pack':
       if (!command.receiptId) throw new Error('A pack needs its reward receipt.');
-      grant(lantern, command.receiptId, command.definitionId, command.seed, now); break;
+      grant(lantern, command.receiptId, command.definitionId, command.seed, now, command.definitionVersion); break;
     case 'open_pack': {
       const pack = lantern.packs[command.packId];
       if (!pack || pack.scope !== 'local-lantern-v1') throw new Error('Pouch unavailable.');
       if (pack.openedAt != null) return input;
-      const definition = lanternPackDefinition(pack.definitionId, pack.definitionVersion);
+      const definition = packDefinition(pack.definitionId, pack.definitionVersion, lantern.previewSeasonStartedAt);
       const random = wispRandom(pack.seed);
       const selected = new Set<WispId>();
       let discovered = false;
+      const protection = definition.protectionGroup;
+      const dryPacks = protection ? lantern.dryPacksByGroup[protection] ?? 0 : 0;
       pack.outcomes = [];
       for (let slot = 0; slot < definition.slots; slot++) {
-        const missing = definition.pool.filter(entry => !owned(entry.id));
+        const eligible = definition.pool.filter(entry => (!definition.distinct || !selected.has(entry.id)) &&
+          (definition.guaranteedRarity?.slot !== slot || WISP_RARITY[wispDefinition(entry.id).rarity].rank >= WISP_RARITY[definition.guaranteedRarity.minimum].rank));
+        const missing = eligible.filter(entry => !owned(entry.id));
         const guarantee: boolean = slot === definition.slots - 1 && !discovered && missing.length > 0
-          && definition.guaranteeAfterDryPacks != null && lantern.dryPacks >= definition.guaranteeAfterDryPacks;
-        const pool: { id: WispId; weight: number }[] = guarantee ? missing.map(entry => ({ ...entry, weight: 1 })) : definition.pool.filter(entry => !definition.distinct || !selected.has(entry.id));
+          && definition.guaranteeAfterDryPacks != null && dryPacks >= definition.guaranteeAfterDryPacks;
+        const pool: { id: WispId; weight: number }[] = guarantee ? missing.map(entry => ({ ...entry, weight: 1 })) : eligible;
         let roll = random() * pool.reduce((sum, entry) => sum + entry.weight, 0);
         const chosen = pool.find(entry => (roll -= entry.weight) < 0) ?? pool[pool.length - 1];
         if (!chosen) throw new Error('This pouch has no eligible visitors.');
@@ -84,7 +94,8 @@ export function reduceWispLantern(input: WispCollectionState, command: WispLante
         pack.outcomes.push({ id: chosen.id, discovered: isNew, echoes });
       }
       pack.openedAt = now;
-      if (pack.definitionId === ORDINARY_PACK) lantern.dryPacks = discovered || LANTERN_VISITORS.every(owned) ? 0 : lantern.dryPacks + 1;
+      if (protection) lantern.dryPacksByGroup[protection] = discovered || definition.pool.every(entry => owned(entry.id)) ? 0 : dryPacks + 1;
+      lantern.dryPacks = lantern.dryPacksByGroup[ORDINARY_PROTECTION] ?? 0;
       if (!lantern.residents.length) lantern.residents = [...selected].slice(0, 3);
       break;
     }
@@ -114,12 +125,21 @@ export function reduceWispLantern(input: WispCollectionState, command: WispLante
       }
       lantern.echoes -= cost; lantern.receipts.push(command.receiptId); break;
     }
-    case 'claim_collection':
-      if (lantern.claims.includes(LANTERN_COLLECTION.id)) return input;
-      if (!LANTERN_VISITORS.every(owned)) throw new Error('Meet all six visitors first.');
-      lantern.claims.push(LANTERN_COLLECTION.id); lantern.cosmetics.push('first-gathering'); break;
+    case 'claim_collection': {
+      const album = wispAlbum(command.collectionId ?? LANTERN_COLLECTION.id, lantern.previewSeasonStartedAt);
+      const set = command.setId ? album.sets.find(s => s.id === command.setId) : undefined;
+      if (command.setId && !set) throw new Error('Unknown Wisp set.');
+      const claimId = set ? `${album.id}:set:${set.id}` : album.id;
+      if (lantern.claims.includes(claimId)) return input;
+      if (!['permanent', 'active', 'claim'].includes(albumPhase(album, now))) throw new Error('The album reward claim period has ended.');
+      if (!(set?.wispIds ?? albumWisps(album)).every(owned)) throw new Error('Complete this collection first.');
+      lantern.claims.push(claimId);
+      const reward = (set?.reward ?? album.reward).id;
+      if (!lantern.cosmetics.includes(reward)) lantern.cosmetics.push(reward);
+      break;
+    }
     case 'residents':
-      if (command.ids.length > 3 || new Set(command.ids).size !== command.ids.length || command.ids.some(id => !owned(id))) throw new Error('Choose up to three owned Wisps.');
+      if (command.ids.length > residentCapacity || new Set(command.ids).size !== command.ids.length || command.ids.some(id => !owned(id))) throw new Error(`Choose up to ${residentCapacity} owned Wisps.`);
       lantern.residents = [...command.ids]; break;
     case 'explain_duplicate': lantern.duplicateExplained = true; break;
   }

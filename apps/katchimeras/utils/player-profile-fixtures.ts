@@ -19,6 +19,11 @@ import { FEASTLE_HATCHABLE } from '@/constants/hatchable-companions/feastle';
 import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
 import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
 import { reduceAdventure } from '@/features/shared-adventure/runtime';
+import { placeLanternWorld, startLanternWorld, WELCOME_ORDER_IDS } from '@/features/wisps/lantern-world';
+import { reduceWispLantern } from '@/utils/wisp-lantern-state';
+import { EMPTY_WISP_STATE } from '@/utils/wisp-state';
+import { ORDINARY_PACK, RARE_PACK, WELCOME_RECEIPT } from '@/constants/wisp-lantern';
+import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 
 const DAY = 86_400_000;
 const COMPLETE_PROFILE: OnboardingProfile = {
@@ -57,7 +62,7 @@ type FixtureDefinition = {
   /** Durable story runs the snapshot restores alongside the world (the Glow story, Steppling's lesson). */
   contentFlowRuns?: (now: number) => ContentFlowRun[];
   meaningfulDays?: number;
-  prepareKeyValues?: (values: Record<string, string>) => Record<string, string>;
+  prepareKeyValues?: (values: Record<string, string>, now: number) => Record<string, string>;
 };
 
 function fixtureSummary(state: MergeWorldState, ftueStep: string | null) {
@@ -360,8 +365,36 @@ const FIXTURE_DEFINITIONS: readonly FixtureDefinition[] = [
     ] },
 ];
 
+function lanternUpgradeFixture(target: 2 | 3, preview = false): FixtureDefinition {
+  const base = FIXTURE_DEFINITIONS[0];
+  return {
+    ...base, id: preview ? 'lantern-season-preview' : `lantern-level-${target}-ready`,
+    name: preview ? 'Lantern · Seasonal Preview' : `Lantern · Level ${target} Ready`,
+    description: preview ? 'Developer-only seasonal album preview using existing Wisp art, with seasonal and permanent packs ready to open.' : `Lantern placed and introduced. Both welcome requests and the Level ${target} milestones are complete; tap Upgrade to claim it.`,
+    tags: ['Kingdom', 'Wisps', 'Lantern', 'Upgrades', ...(preview ? ['Seasonal', 'Preview'] : [])],
+    buildWorld: now => {
+      const world = startLanternWorld(placeLanternWorld(beforeWispLantern(now), now - DAY), now - DAY);
+      Object.assign(world.wispLanternProgress!, { level: target - 1, upgradeClaims: target === 3 ? [2] : [], lifetimeOrders: target === 2 ? 10 : 40, welcomeServed: [...WELCOME_ORDER_IDS], recurringOrders: target === 3 ? 19 : 0 });
+      world.activeOrders = world.activeOrders.filter(o => o.storyArcId !== 'wisp-lantern');
+      return world;
+    },
+    prepareKeyValues: (values, now) => {
+      let state = reduceWispLantern(EMPTY_WISP_STATE, { type: 'unlock' }, now - DAY, 42);
+      state = reduceWispLantern(state, { type: 'open_pack', packId: WELCOME_RECEIPT }, now - DAY);
+      state = reduceWispLantern(state, { type: 'acknowledge_reveal', packId: WELCOME_RECEIPT, revealed: 1 }, now - DAY);
+      state = reduceWispLantern(state, { type: 'complete_intro' }, now - DAY);
+      for (let i = 0; i < 3; i++) state = reduceWispLantern(state, { type: 'grant_pack', receiptId: `fixture:pack:${i}`, definitionId: i === 2 ? RARE_PACK : ORDINARY_PACK, seed: 50 + i }, now);
+      if (preview && DEV_TOOLS_ENABLED) {
+        state.lantern!.previewSeasonStartedAt = now - DAY;
+        state = reduceWispLantern(state, { type: 'grant_pack', receiptId: 'fixture:season', definitionId: 'dev-moonlit-pack', seed: 80 }, now);
+      }
+      return { ...(base.prepareKeyValues?.(values, now) ?? values), 'katchimera.wisps.v2': JSON.stringify(state) };
+    },
+  };
+}
+const LANTERN_FIXTURES = [lanternUpgradeFixture(2), lanternUpgradeFixture(3), ...(DEV_TOOLS_ENABLED ? [lanternUpgradeFixture(3, true)] : [])];
 export function buildPlayerProfileFixtures(now = Date.now()): PlayerProfileSnapshot[] {
-  return FIXTURE_DEFINITIONS.map((fixture) => {
+  return [...FIXTURE_DEFINITIONS, ...LANTERN_FIXTURES].map((fixture) => {
     const state = fixture.buildWorld(now);
     const keyValues = fixtureKeyValues(now, fixture.ftueStep, fixture.meaningfulDays ?? 4);
     return {
@@ -376,7 +409,7 @@ export function buildPlayerProfileFixtures(now = Date.now()): PlayerProfileSnaps
       launchRoute: fixture.launchRoute ?? (fixture.ftueStep == null ? '/(tabs)/today' : '/(tabs)/games'),
       summary: fixtureSummary(state, fixture.ftueStep),
       domains: {
-        keyValue: { schemaVersion: 1, values: fixture.prepareKeyValues?.(keyValues) ?? keyValues },
+        keyValue: { schemaVersion: 1, values: fixture.prepareKeyValues?.(keyValues, now) ?? keyValues },
         mergeWorld: { schemaVersion: 1, state },
         ...(fixture.contentFlowRuns ? { contentFlow: { schemaVersion: 1 as const, runs: fixture.contentFlowRuns(now) } } : {}),
       },
@@ -384,4 +417,4 @@ export function buildPlayerProfileFixtures(now = Date.now()): PlayerProfileSnaps
   });
 }
 
-export const PLAYER_PROFILE_FIXTURE_COUNT = FIXTURE_DEFINITIONS.length;
+export const PLAYER_PROFILE_FIXTURE_COUNT = FIXTURE_DEFINITIONS.length + LANTERN_FIXTURES.length;

@@ -1,5 +1,7 @@
 import { reduceAdventure } from '@/features/shared-adventure/runtime';
-import { placeLanternWorld, projectLanternWorld, startLanternWorld } from '@/features/wisps/lantern-world';
+import { placeLanternWorld, projectLanternWorld, startLanternWorld, upgradeLanternWorld } from '@/features/wisps/lantern-world';
+import { lanternResidentCapacity, type LanternLevel } from '@/constants/wisp-lantern-levels';
+import { reduceWispLantern } from '@/utils/wisp-lantern-state';
 import { gameNow } from '@/utils/game-clock';
 import { reconcileJourneyGardenOrders } from '@/features/companion/journey-garden-orders';
 import { availableLocalEvents, harmonyDefinition } from '@/features/live-ops/local-catalog';
@@ -260,6 +262,22 @@ export async function plantStoredWispLantern(now = gameNow()) {
   return reduceStoredMergeWorld(state => {
     const next = placeLanternWorld(state, now);
     return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
+  }, now);
+}
+
+export async function upgradeStoredWispLantern(targetLevel: LanternLevel, now = gameNow()) {
+  return reduceStoredMergeWorld(state => {
+    const next = upgradeLanternWorld(state, targetLevel);
+    return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
+  }, now);
+}
+
+/** Read capacity from the flushed authoritative world, never a caller-supplied level. */
+export async function assignStoredLanternResidents(ids: import('@/types/wisp').WispId[], now = gameNow()) {
+  const { updateStoredWispState } = await import('@/utils/wisp-storage');
+  return reduceStoredMergeWorld(state => {
+    updateStoredWispState(current => reduceWispLantern(current, { type: 'residents', ids }, now, 1, [], lanternResidentCapacity(state.wispLanternProgress?.level)));
+    return { state, changed: false };
   }, now);
 }
 

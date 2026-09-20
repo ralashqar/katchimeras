@@ -1,5 +1,5 @@
 import type { LiveEventDefinition } from '@/types/live-ops';
-import { ORDINARY_PACK } from '@/constants/wisp-lantern';
+import { LANTERN_PACKS } from '@/constants/wisp-lantern';
 
 const KINDS = new Set(['merge', 'order_completed', 'mist_cleared', 'hex_restored', 'structure_upgraded', 'friend_rescued', 'bond_gained', 'wisp_discovered', 'journey_completed', 'expedition_completed', 'incursion_completed']);
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -44,7 +44,7 @@ export function validateLiveEvent(value: unknown): { definition: LiveEventDefini
       if (!safeId(t.id)) issues.push('Local reward IDs must be safe content IDs');
       if (t.premium !== undefined) issues.push('Local events cannot grant premium rewards');
       if (record(t.free) && Array.isArray(t.free.items)) for (const item of t.free.items) {
-        if (!record(item) || (item.kind !== 'glow' && !(item.kind === 'cosmetic' && ids.has(String(item.id))) && !(item.kind === 'wisp_pack' && item.scope === 'local-lantern-v1' && item.packId === ORDINARY_PACK))) issues.push('Local rewards must be Glow, this event’s keepsakes, or a local Lantern Pouch');
+        if (!record(item) || (item.kind !== 'glow' && !(item.kind === 'cosmetic' && ids.has(String(item.id))) && !(item.kind === 'wisp_pack' && item.scope === 'local-lantern-v1' && LANTERN_PACKS.some(p => p.id === item.packId && p.protectionGroup)))) issues.push('Local rewards must be Glow, this event’s keepsakes, or a registered local Lantern pack');
       }
     }
   }
@@ -86,7 +86,7 @@ export function validateLiveEvent(value: unknown): { definition: LiveEventDefini
         if (item.kind === 'glow' || item.kind === 'gems') {
           if (!integer(item.amount, 1)) issues.push(`${tier.id}: invalid currency amount`);
         } else if (item.kind === 'wisp_pack') {
-          if (value.authority !== 'local' || item.scope !== 'local-lantern-v1' || item.packId !== ORDINARY_PACK) issues.push(`${tier.id}: unsupported pack authority or definition`);
+          if (value.authority !== 'local' || item.scope !== 'local-lantern-v1' || !LANTERN_PACKS.some(p => p.id === item.packId && p.protectionGroup)) issues.push(`${tier.id}: unsupported pack authority or definition`);
         } else if (item.kind === 'wisp' || item.kind === 'cosmetic') {
           if (!text(item.id)) issues.push(`${tier.id}: reward needs a collectible ID`);
         } else if (item.kind === 'item') {

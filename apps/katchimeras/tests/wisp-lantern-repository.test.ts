@@ -64,5 +64,22 @@ test('SQLite commits item consumption and pouch receipt together, survives retry
   assert.equal(restored.activeOrders.filter(order => order.id === WELCOME_ORDER_IDS[1]).length, 1);
   assert.ok(!restored.activeOrders.some(order => order.id === WELCOME_ORDER_IDS[0]));
   assert.equal(restored.wispLanternPlacement?.slotId, 'front-right');
+  const milestoneEvents = Array.from({ length: 11 }, (_, index) => ({
+    version: 1 as const, id: `milestone:${index}`, kind: 'order_completed' as const, source: 'merge-world' as const,
+    sourceRevision: 1, contentRevision: 1, occurredAt: now + index + 1, quantity: 1,
+    context: { targetId: index === 0 ? WELCOME_ORDER_IDS[1] : `everyday:${index}`, tags: index === 0 ? [] : ['lantern-daily-order'] },
+  }));
+  await repository.saveMergeWorldState({ ...restored, revision: restored.revision + 1 }, undefined, { baseRevision: restored.revision, gameplayEvents: milestoneEvents });
+  restored = await repository.loadMergeWorldState();
+  assert.equal(restored.wispLanternProgress?.lifetimeOrders, 10);
+  fail = true;
+  await assert.rejects(repository.upgradeStoredWispLantern(2, now + 20), /disk failure/);
+  assert.equal((await repository.loadMergeWorldState()).wispLanternProgress.level, 1);
+  await Promise.all([repository.upgradeStoredWispLantern(2, now + 21), repository.upgradeStoredWispLantern(2, now + 21)]);
+  const upgraded: MergeWorldState = await repository.loadMergeWorldState();
+  assert.equal(upgraded.wispLanternProgress?.level, 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(upgraded.wispLanternProgress?.upgradeClaims)), [2]);
+  await repository.saveMergeWorldState({ ...restored, revision: upgraded.revision + 1 }, undefined, { baseRevision: upgraded.revision });
+  assert.equal((await repository.loadMergeWorldState()).wispLanternProgress.level, 2, 'a stale provider cannot downgrade the Lantern');
   db.close();
 });

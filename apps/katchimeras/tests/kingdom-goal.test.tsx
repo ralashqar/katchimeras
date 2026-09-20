@@ -19,7 +19,7 @@ test('the post-FTUE friend guide works with shared adventure enabled and resumes
   const context = {
     SHARED_ADVENTURE_ENABLED: true, screenFocused: true,
     kingdomGoal: { introducedAt: NOW, coachmarkSeenAt: null }, goalIslandOffer: { id: 'nature:bloom-garden', eligible: true },
-    ftueStepId: null, adventureOpen: false, progressSheetOpen: false, wakeHandoffCampaign: null, selectedUpgrade: null,
+    ftueStepId: null, adventureOpen: false, lanternSurfaceOpen: false, progressSheetOpen: false, wakeHandoffCampaign: null, selectedUpgrade: null,
     eventBoardActive: false, openingBoardActive: false, stepplingMissionActive: false, journeyMissionActive: false, restorationBoardVisible: false, upgradeHandoffPending: false,
     interactionCreatureId: null, activeInteractionResidentId: null, stepplingEggOpen: false,
     upgradePresentation: null, requiredUpgradeStory: null, ordinaryUpgradeRun: null,
@@ -81,7 +81,7 @@ test('the wish waits for Steppling to leave, and the guide never locks the world
   // markers and the panel must not flash back in over that handoff.
   assert.match(screen, /const upgradeHandoffPending = upgradePresentationOperation\.model\.pendingWork\.kind === 'presentation'\s*\n\s*&& upgradePresentationOperation\.model\.pendingWork\.presentationType === STORY_WORLD_UPGRADE_PRESENTATION/);
   assert.match(screen, /upgradeOffers=\{[^\n]*?&& !upgradeHandoffPending/);
-  assert.match(screen, /upgradePanel=\{[^\n]*?&& !upgradeHandoffPending/);
+  assert.match(screen, /const upgradePanelOpen = Boolean\([^\n]*?&& !upgradeHandoffPending/);
 });
 
 test('the Journal and Merge shortcuts hide behind an open upgrade panel', () => {

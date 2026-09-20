@@ -2,6 +2,7 @@ import { loadWispState } from '@/utils/wisp-storage';
 import { heartwoodStage, gardenSupplyStatus } from '@/features/shared-adventure/heartwood-progression';
 import { HeartwoodRoad } from '@/components/katchadeck/world/heartwood-road';
 import { WispLanternPanel, WispLanternWorld } from '@/components/katchadeck/wisps/wisp-lantern';
+import { WispLanternUpgradePanel } from '@/components/katchadeck/wisps/wisp-lantern-upgrade-panel';
 import { lanternEligible } from '@/features/wisps/lantern-world';
 import { HeartwoodStoryScene } from '@/components/katchadeck/world/heartwood-story-scene';
 import { needsHeartwoodRecap } from '@/features/shared-adventure/heartwood-opening';
@@ -11,7 +12,7 @@ import { worldEventActions, worldEventConversation, type WorldEventAction, type 
 import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
-import { plantStoredWispLantern, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, ensureStoredFirstFtueMemoryPlacement, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission } from '@/utils/merge-world/repository';
+import { plantStoredWispLantern, upgradeStoredWispLantern, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, ensureStoredFirstFtueMemoryPlacement, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission } from '@/utils/merge-world/repository';
 import { LocalEventMissionDock } from '@/components/katchadeck/world/local-event-mission-dock';
 import { WorldEventActionCard } from '@/components/katchadeck/world/world-event-action-card';
 import { GardenEventAdornment } from '@/components/katchadeck/world/garden-event-adornment';
@@ -57,7 +58,7 @@ import { worldUpgradeStory, upgradeUsesTutorialNarrative } from '@/features/worl
 import { useGlowEggHandoff } from '@/features/onboarding/use-glow-egg-handoff';
 import { CompanionJournalButton } from '@/components/katchadeck/world/companion-life-actions';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View, useWindowDimensions, type View as ViewType } from 'react-native';
+import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View, useWindowDimensions, type ImageSourcePropType, type View as ViewType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useIsFocused } from '@react-navigation/native';
@@ -116,11 +117,14 @@ import { HAVEN_ENVIRONMENTS, type HavenStage } from '@/constants/haven-catalog';
 
 import type { FtueCameraDirective, FtueCueDefinition } from '@/features/onboarding/ftue-types';
 import { IslandRestorationDock } from '@/components/katchadeck/world/island-restoration-dock';
-import { consumeIslandRestorationOpen, requestIslandRestorationOpen } from '@/features/island-restoration/restoration-intent';
+import { HavenDetailPanel, UndiscoveredHavenPanel } from '@/components/katchadeck/world/haven-detail-panel';
+import { upgradeStageLayout } from '@/features/upgrade-stage/upgrade-stage-layout';
+import { tileLevelArt } from '@/features/upgrade-stage/upgrade-level-art';
+import { KINGDOM_DREAM_MIST_LOCKED_HEX_TILE_V1 } from '@/utils/world-visuals';
+import { consumeIslandRestorationOpen, peekIslandRestorationOpen, requestIslandRestorationOpen } from '@/features/island-restoration/restoration-intent';
 import { createRestorationState, deliveriesToPlace, restorationBoardStep, restorationCheckpointReached, restorationDeliveryCells, restorationMechanicHost, restorationRunId, restorationStorageKey, restoreRestorationEchoes, restorationRequestOrder } from '@/features/island-restoration/island-restoration';
 import { useKatchimeraCards } from '@/hooks/use-katchimera-cards';
 import { mossproutNatureIslandById, mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
-import { havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
 import type { HavenTileUpgradePresentation } from '@/utils/haven-upgrade-presentation';
 import { deriveHavenTilePresentation } from '@/utils/haven-tile-presentation';
 import { advanceFtueActionDurably, commitFtueAction, dispatchFtueEvent, loadFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
@@ -290,7 +294,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [homeTileNode, setHomeTileNodeState] = useState<View | null>(null);
   const [gatewayTileNode, setGatewayTileNodeState] = useState<View | null>(null);
   // A friend's restoration board: the chapter whose beds are open, on its own store under the island.
-  const islandRestoration = useMemo(() => activeIslandRestoration(mergeWorld), [mergeWorld]);
+  // Whose board the player is dealing with. Two friends can be mid-restoration at once (a pack's island wakes on
+  // its own condition), so the board follows the friend whose story, marker or request opened it.
+  const [restorationFocusCampaignId, setRestorationFocusCampaignId] = useState<string | null>(() => peekIslandRestorationOpen());
+  const islandRestoration = useMemo(() => activeIslandRestoration(mergeWorld, restorationFocusCampaignId), [mergeWorld, restorationFocusCampaignId]);
   const [islandTileNodes, setIslandTileNodes] = useState<Partial<Record<MossproutNatureIslandId, View | null>>>({});
   const islandTileNodesRef = useRef(islandTileNodes);
   islandTileNodesRef.current = islandTileNodes;
@@ -353,8 +360,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const glowScene = glowRun ? hatchableDiscoveryScene(activeHatchable, glowRun.nodeId) : null;
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
+  // The shared upgrade stage: the docked panel's size, and the band above it the canvas frames the tile in.
+  const upgradeStage = useMemo(() => upgradeStageLayout(window, insets), [insets, window]);
+  const upgradeStageBand = useMemo(() => ({ centerY: upgradeStage.stageCenterY, height: upgradeStage.stageHeight }), [upgradeStage]);
   const reduceMotion = useReducedMotion();
-  const [lockedHintVisible, setLockedHintVisible] = useState(false);
+  // A hidden friend's tile on the upgrade stage: which one, so the camera can frame it.
+  const [lockedHintFamilyId, setLockedHintFamilyId] = useState<string | null>(null);
+  // What the world is drawing for the tile on the upgrade stage: the panel's "current" picture is that very tile.
+  const [upgradeStageArt, setUpgradeStageArt] = useState<ImageSourcePropType | null>(null);
   // Mossprout's wish: once told, the next open island is framed and pointed at exactly once.
   const kingdomGoal = mergeWorld.kingdomGoal ?? null;
   const goalIslandId = nextOpenIsland(mergeWorld);
@@ -368,6 +381,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [progressSheetOpen, setProgressSheetOpen] = useState(false);
   const [adventureOpen, setAdventureOpen] = useState(false);
   const [wispLanternOpen, setWispLanternOpen] = useState(false);
+  // Growing the Lantern: the hub hands over to the shared upgrade stage and takes the player back after.
+  const [lanternUpgradeOpen, setLanternUpgradeOpen] = useState(false);
+  const lanternSurfaceOpen = wispLanternOpen || lanternUpgradeOpen;
   const [wispPlanting, setWispPlanting] = useState(false);
   const [wispPlantError, setWispPlantError] = useState('');
   const wispPlantBusy = useRef(false);
@@ -656,8 +672,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   useEffect(() => { if (!restorationIslandId) setRestorationOpen(false); }, [restorationIslandId]);
   const restorationCampaignId = islandRestoration?.campaign.campaignId ?? null;
   useEffect(() => {
-    // "Meet me at Bloom Garden" from the Merge page: straight onto the board.
-    if (screenFocused && restorationCampaignId && consumeIslandRestorationOpen(restorationCampaignId)) setRestorationOpen(true);
+    // "Meet me at Bloom Garden" from the Merge page: straight onto that friend's board, whoever's was up before.
+    if (!screenFocused) return;
+    const requested = peekIslandRestorationOpen();
+    if (requested && requested !== restorationCampaignId) { setRestorationFocusCampaignId(requested); return; }
+    if (restorationCampaignId && consumeIslandRestorationOpen(restorationCampaignId)) setRestorationOpen(true);
   }, [restorationCampaignId, screenFocused]);
   const closeRestoration = useCallback(() => setRestorationOpen(false), []);
   const restorationCamera = useMemo((): FtueCameraDirective | null => restorationIslandId && restorationOpen && screenFocused ? {
@@ -679,7 +698,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }, 1000);
     return () => clearTimeout(timer);
   }, [heartwoodIntroActive, ftueCameraSettled, screenFocused, worldSubjectPresentation?.onIntroFramingReady]);
-  const lanternCamera = useMemo((): FtueCameraDirective | null => wispLanternOpen ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.15, anchorY: 0.42, durationMs: 850 } : null, [wispLanternOpen]);
+  const lanternCamera = useMemo((): FtueCameraDirective | null => lanternUpgradeOpen
+    // The Lantern stands above its plot: frame the plot a little under the band's centre so the Lantern fills it.
+    ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.7, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.2) / Math.max(1, window.height), durationMs: 520 }
+    : wispLanternOpen ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.15, anchorY: 0.42, durationMs: 850 } : null, [lanternUpgradeOpen, upgradeStage, window.height, wispLanternOpen]);
   const baseTutorialCamera = lanternCamera ?? heartwoodIntroCamera ?? eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
   const tutorialCamera = useMemo(() => {
     if (!ftueStepId?.startsWith('egg.') || baseTutorialCamera?.kind !== 'focus_target') return baseTutorialCamera;
@@ -1478,7 +1500,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       return;
     }
     if (progress.action === 'continue_restoring') {
-      // Bring the board back under the island.
+      // Bring this friend's board back under their island.
+      setRestorationFocusCampaignId(campaign.campaignId);
       setRestorationOpen(true);
       setSelectedUpgrade(null);
       return;
@@ -1558,6 +1581,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           aim(0);
         });
       }
+      // The board that docks is the one this answer just opened, not another friend's left unfinished.
+      setRestorationFocusCampaignId(campaign.campaignId);
       setRestorationOpen(true);
       requestResidentInteractionExit();
       return;
@@ -1879,7 +1904,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     ? visibleWorldUpgradeOffers(upgradeOffers, ftueStepId, glowRun, activeHatchable.tile.id).find((offer) => offer.id === `nature:${goalIslandId}` && offer.eligible) ?? null
     : null;
   const kingdomGoalGuideActive = Boolean(screenFocused && kingdomGoal?.introducedAt && kingdomGoal.coachmarkSeenAt == null && goalIslandOffer
-    && !ftueStepId && !adventureOpen && !wispLanternOpen && !progressSheetOpen && !wakeHandoffCampaign && !selectedUpgrade
+    && !ftueStepId && !adventureOpen && !lanternSurfaceOpen && !progressSheetOpen && !wakeHandoffCampaign && !selectedUpgrade
     && !eventBoardActive && !openingBoardActive && !stepplingMissionActive && !journeyMissionActive && !restorationBoardVisible && !upgradeHandoffPending
     && !interactionCreatureId && !activeInteractionResidentId && !stepplingEggOpen && !upgradePresentation && !requiredUpgradeStory && !ordinaryUpgradeRun);
   const goalFocusStartedRef = useRef(false);
@@ -1937,8 +1962,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (upgradePressBusy.current || upgradePurchasing || upgradePresentation) return;
     // Resting friends are on the map from the first frame, but not yet the player's business.
     if (offer.sleepingSkinId && ftueStepId) return;
-    // A friend mid-restoration: the marker is the board, not a panel about the board.
-    if (restorationCampaignId && islandCampaignForOffer(offer.id)?.campaignId === restorationCampaignId) {
+    // A friend mid-restoration: the marker is the board, not a panel about the board. Their own board, even while
+    // another friend's is also unfinished.
+    const offerCampaignId = islandCampaignForOffer(offer.id)?.campaignId;
+    if (offerCampaignId && activeIslandRestoration(mergeWorldRef.current, offerCampaignId)?.campaign.campaignId === offerCampaignId) {
+      setRestorationFocusCampaignId(offerCampaignId);
       setRestorationOpen(true);
       return;
     }
@@ -1965,7 +1993,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       setSelectedUpgrade(offer);
     } catch (error) { setSelectedUpgrade(offer); setUpgradeError(error instanceof Error ? error.message : 'Could not open the upgrade. Please try again.'); }
     finally { upgradePressBusy.current = false; }
-  }, [ftueStepId, hatchableRuns, restorationCampaignId, upgradePresentation, upgradePurchasing]);
+  }, [ftueStepId, hatchableRuns, upgradePresentation, upgradePurchasing]);
   openUpgradeOfferRef.current = openUpgradeOffer;
   openGardenRef.current = openGarden;
   const handleUpgradeOfferPress = useCallback((offer: WorldUpgradeOffer) => {
@@ -2037,9 +2065,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
 
   // The canvas is memoised, and it holds only if none of its props change identity on an ordinary
   // screen render: these handlers read live state through a ref instead of being re-created.
-  const selectLockedFamily = useStableCallback((_familyId: string) => {
+  const selectLockedFamily = useStableCallback((familyId: string) => {
     if (kingdomGoalGuideActive) return;
-    if (!ftueStep || ftueStep.surface !== 'haven') setLockedHintVisible(true);
+    if (!ftueStep || ftueStep.surface !== 'haven') setLockedHintFamilyId(familyId);
   });
   const selectNatureIsland = useStableCallback((islandId: MossproutNatureIslandId) => {
     if (ftueStep?.surface === 'haven') return;
@@ -2077,7 +2105,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     [mergeWorld.haven.mossproutNatureIslandReveals],
   );
 
-  const sharedAdventureAllowed = !wispLanternOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId;
+  const sharedAdventureAllowed = !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId;
   const heartwoodRecap = sharedAdventureAllowed && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed') && !havenMergeBoardActive && (mergeWorld.haven.tileStages.mossprout ?? 0) >= 1 && needsHeartwoodRecap(mergeWorld);
   const worldEventsAllowed = sharedAdventureAllowed && !havenMergeBoardActive && !heartwoodRecap;
   // havenMergeBoardActive means an owned Mossprout can open the Garden, not
@@ -2085,6 +2113,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const wispLanternAllowed = sharedAdventureAllowed && !heartwoodRecap
     && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed');
   const wispLanternAdornment = lanternEligible(mergeWorld) ? <WispLanternWorld
+    level={mergeWorld.wispLanternProgress?.level}
     planted={Boolean(mergeWorld.wispLanternPlacement)} rewards={mergeWorld.wispLanternProgress?.rewards}
     onPress={wispLanternAllowed ? () => setWispLanternOpen(true) : undefined} /> : null;
 
@@ -2116,7 +2145,16 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [eventSelection, selectedEventAction, openWorldEvent, requestResidentInteractionExit]);
 
   // Mount the camera with its saved framing, rather than initializing the overview first.
+  // A Haven's details and a hidden friend's tile share the upgrade stage with the offers: the canvas frames them the same way.
+  const detailFamilyId = detailCreatureId ? visibleCompanionSlots.find((slot) => slot.kind === 'owned' && slot.creature.creatureId === detailCreatureId)?.familyId ?? null : null;
+  const upgradeStageSubject = useMemo(() => lockedHintFamilyId
+    ? { id: `hidden:${lockedHintFamilyId}`, target: { kind: 'haven_tile' as const, familyId: lockedHintFamilyId } }
+    : detailFamilyId ? { id: `haven:${detailFamilyId}`, target: { kind: 'haven_tile' as const, familyId: detailFamilyId } } : null,
+  [detailFamilyId, lockedHintFamilyId]);
+
   if (!glowReady || !stepplingLesson.ready) return null;
+
+  const upgradePanelOpen = Boolean(screenFocused && sharedUpgrade && !upgradePresentation && !upgradeHandoffPending && !activeInteractionResidentId);
 
   return (
     <View collapsable={false} onLayout={onContentReady} ref={screenRef} style={styles.screen}>
@@ -2133,7 +2171,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           <GardenEventAdornment world={mergeWorld} onExplore={eventActions.length ? () => { void openWorldEvent(eventActions[0]); } : undefined} />
         </View> : null}
         background={background}
-        cameraLocked={wispLanternOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(requiredUpgradeStory) || restorationBoardVisible}
+        cameraLocked={lanternSurfaceOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(upgradeStageSubject) || Boolean(requiredUpgradeStory) || restorationBoardVisible}
         discoveredEggInteraction={stepplingEncounter.open}
         gatewayTileId={activeHatchable.tile.id}
         discoveredEggPresentation={stepplingEncounter.presentation}
@@ -2149,7 +2187,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         identity={identity}
         discoveryRevealFamilyId={null}
         highlightedLockedFamilyId={null}
-        interactionEnabled={!wispLanternOpen && !activeInteractionResidentId && !stepplingEncounter.open && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
+        interactionEnabled={!lanternSurfaceOpen && !activeInteractionResidentId && !stepplingEncounter.open && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
         interactionExitNonce={interactionExitNonce}
         interactionNatureIslandId={pendingIslandCampaign?.campaign.islandId ?? null}
         preserveInteractionCameraOnExit={Boolean(pendingIslandCampaign || eventSelection)}
@@ -2182,14 +2220,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           : NO_UPGRADE_OFFERS}
         selectedUpgradeOffer={selectedUpgrade}
         onDismissUpgrade={() => upgradeDismiss.current?.()}
-        upgradePanel={screenFocused && sharedUpgrade && !upgradePresentation && !upgradeHandoffPending && !activeInteractionResidentId ? <WorldUpgradePanel
-          offer={sharedUpgrade} world={mergeWorld} busy={upgradePurchasing || (upgradeCommitted && !upgradeError)}
-          campaignState={islandCampaignPanelState}
-          saveRead={saveUpgradeStoryRead}
-          onCoachmarkChange={setUpgradeCoachmark} error={upgradeError} coached={coachedUpgrade} actionRef={upgradeActionRef} registerDismiss={registerUpgradeDismiss}
-          onCampaignAction={islandCampaignPanelState?.actionLabel ? handleIslandCampaignPanelAction : undefined}
-          onClose={() => { pendingUpgradeReward.current = null; setSelectedUpgrade(null); setUpgradeError(null); }} onConfirm={() => { void confirmWorldUpgrade(); }}
-          onGarden={() => { openGarden(); }} /> : null}
+        upgradePanelOpen={upgradePanelOpen || Boolean(upgradeStageSubject)}
+        upgradeStageSubject={sharedUpgrade ? null : upgradeStageSubject}
+        onUpgradeStageArt={setUpgradeStageArt}
+        upgradeStage={upgradeStageBand}
         preserveUpgradeCamera={ftueGardenUpgradeActive || Boolean(pendingIslandCampaign)
           || (selectedUpgrade?.id === `mist:${activeHatchable.tile.id}` && Boolean(glowRun && glowRun.status !== 'completed'))}
         upgradeSelectionCommitted={upgradeCommitted}
@@ -2246,7 +2280,21 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         spotlight={{ targets: [{ kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, { kind: 'haven_garden_plant_button', characterId: 'mossprout' }], grouping: 'bounding_rect', padding: 8, radius: 22, dimOpacity: 0.62 }}
         fingerPlacement="below" screenRef={screenRef} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision} /> : null}
       {wispPlantError && wispPlanting ? <View style={{ position: 'absolute', bottom: insets.bottom + 24, left: 20, right: 20, zIndex: 160 }}><ThemedText accessibilityRole="alert">{wispPlantError}</ThemedText></View> : null}
-      {wispLanternOpen && screenFocused ? <WispLanternPanel onPlantingChange={setWispPlanting} world={mergeWorld} onClose={() => setWispLanternOpen(false)} onGarden={() => { setWispLanternOpen(false); openGarden(undefined, 'mossprout'); }} /> : null}
+      {upgradePanelOpen && sharedUpgrade ? <WorldUpgradePanel key={`${sharedUpgrade.id}:${sharedUpgrade.nextLevel}`}
+        offer={sharedUpgrade} world={mergeWorld} busy={upgradePurchasing || (upgradeCommitted && !upgradeError)}
+        layout={upgradeStage} bottomInset={insets.bottom} currentArt={upgradeStageArt}
+        campaignState={islandCampaignPanelState}
+        saveRead={saveUpgradeStoryRead}
+        onCoachmarkChange={setUpgradeCoachmark} error={upgradeError} coached={coachedUpgrade} actionRef={upgradeActionRef} registerDismiss={registerUpgradeDismiss}
+        onCampaignAction={islandCampaignPanelState?.actionLabel ? handleIslandCampaignPanelAction : undefined}
+        onClose={() => { pendingUpgradeReward.current = null; setSelectedUpgrade(null); setUpgradeError(null); }} onConfirm={() => { void confirmWorldUpgrade(); }}
+        onGarden={() => { openGarden(); }} /> : null}
+      {wispLanternOpen && screenFocused ? <WispLanternPanel onPlantingChange={setWispPlanting} world={mergeWorld} onClose={() => setWispLanternOpen(false)} onGarden={() => { setWispLanternOpen(false); openGarden(undefined, 'mossprout'); }}
+        onUpgrade={() => { setWispLanternOpen(false); setLanternUpgradeOpen(true); }} /> : null}
+      {lanternUpgradeOpen && screenFocused ? <WispLanternUpgradePanel world={mergeWorld} layout={upgradeStage} bottomInset={insets.bottom}
+        onUpgrade={upgradeStoredWispLantern}
+        onClose={() => { setLanternUpgradeOpen(false); setWispLanternOpen(true); }}
+        onGarden={() => { setLanternUpgradeOpen(false); openGarden(undefined, 'mossprout'); }} /> : null}
       {SHARED_ADVENTURE_ENABLED && adventureOpen && screenFocused ? <SharedAdventurePanel world={mergeWorld} routeCompanion={routeCompanion}
         onClose={() => { setAdventureOpen(false); setRouteCompanion(undefined); }}
         onGarden={() => { setAdventureOpen(false); openGarden(undefined, 'mossprout'); }}
@@ -2445,22 +2493,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       </View> : hatchableMist.stuck || journeyMist.stuck ? <View style={[styles.upgradeRecoveryCta, { bottom: Math.max(insets.bottom, 12) + 20 }]}>
         <KatchaButton label="More pieces drift in" onPress={hatchableMist.stuck ? stepplingMission.reseed : journeyMissionStore.reseed} />
       </View> : null}
-      {lockedHintVisible ? (
-        <KatchaSheet
-          header={{
-            eyebrow: 'UNDISCOVERED KATCHIMERA',
-            title: 'Hidden in the Dream Mist',
-            subtitle: 'A new companion is waiting somewhere beyond the clouds.',
-          }}
-          onRequestClose={() => setLockedHintVisible(false)}
-          surface="night">
-          <View style={styles.discoveryHint}>
-            <ThemedText selectable style={styles.discoveryHintText} lightColor="#E9E3F5" darkColor="#E9E3F5">
-              Keep living days and growing your relationships to discover who is waiting here.
-            </ThemedText>
-          </View>
-        </KatchaSheet>
-      ) : null}
+      {lockedHintFamilyId && !sharedUpgrade ? <UndiscoveredHavenPanel key={lockedHintFamilyId} art={upgradeStageArt ?? KINGDOM_DREAM_MIST_LOCKED_HEX_TILE_V1} layout={upgradeStage} bottomInset={insets.bottom}
+        registerDismiss={registerUpgradeDismiss} onClose={() => setLockedHintFamilyId(null)} /> : null}
       {selectedMemoryPlant && selectedMemoryPlantDefinition && !upgradePresentation ? (
         <KatchaSheet
           header={{
@@ -2595,62 +2629,38 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         const characterId = slot.familyId as MergeCharacterId;
         const environment = HAVEN_ENVIRONMENTS[characterId];
         const currentStage = mergeWorld.haven.tileStages[characterId] ?? 0;
-        const current = environment?.stages[currentStage];
         const next = characterId === 'mossprout' && currentStage >= 1
           ? undefined
           : environment?.stages[currentStage + 1];
-        const currentArt = havenHexTileSpec(characterId, currentStage);
-        const nextArt = next ? havenHexTileSpec(characterId, next.stage) : null;
-        return <KatchaSheet
-          footer={<View style={styles.actions}>
-            {next ? <View ref={characterId === 'mossprout' ? setRestoreButtonNode : undefined} style={styles.restoreButtonAnchor}>
-              <KatchaButton
-                disabled={mergeWorld.coins < next.coinCost || upgrading}
-                fullWidth
-                icon="sparkles"
-                label="Restore"
-                cost={{ currency: 'coins', amount: next.coinCost }}
-                onPress={() => { const offer = upgradeOffers.find((candidate) => candidate.id === `haven:${characterId}`); if (offer) { setDetailCreatureId(null); void openUpgradeOffer(offer); } }}
-              />
-            </View> : null}
-            {ftueStepId !== 'haven.mossprout.restore' ? <KatchaButton fullWidth label={`Visit ${slot.creature.name}`} onPress={() => selectResident(slot.creature.creatureId)} variant="secondary" /> : null}
-            {characterId === 'mossprout' && currentStage >= 1 && !ftueStepId ? <KatchaButton fullWidth label="Garden story & history" variant="secondary" onPress={() => {
-              const archive = worldUpgradeArchiveOffer(mergeWorld, 'haven:mossprout');
-              if (archive) { setDetailCreatureId(null); setSelectedUpgrade({ ...archive, currentLevel: currentStage }); }
-            }} /> : null}
-            {hatchableByCompanion(characterId) && mergeWorld.worldUnlocks?.[hatchableByCompanion(characterId)!.tile.unlockId] && !ftueStepId ? <KatchaButton fullWidth label="Clearing story & history" variant="secondary" onPress={() => {
-              const archive = worldUpgradeArchiveOffer(mergeWorld, `mist:${hatchableByCompanion(characterId)!.tile.id}`);
-              if (archive) { setDetailCreatureId(null); setSelectedUpgrade(archive); }
-            }} /> : null}
-          </View>}
-          header={{ eyebrow: `${slot.creature.name.toUpperCase()} · HAVEN LV${currentStage}`, title: current?.name ?? `${slot.creature.name}’s Haven`, subtitle: current?.narrative ?? 'A home with room to grow.' }}
-          onRequestClose={() => { if (ftueStepId !== 'haven.mossprout.restore') setDetailCreatureId(null); }}
-          portal={ftueStepId !== 'haven.mossprout.restore'}
-          scroll
-          showClose={ftueStepId !== 'haven.mossprout.restore'}
-          surface="night">
-          <View style={styles.progressCard}>
-            <ThemedText style={styles.progressEyebrow} lightColor="#B7D98B" darkColor="#B7D98B">ENVIRONMENT · {currentStage} / 4</ThemedText>
-            <View style={styles.previewRow}>
-              {currentArt ? <View style={styles.previewCell}>
-                <Image contentFit="contain" source={kingdomHexTileSourceForLod(currentArt, 'medium')} style={styles.previewImage} />
-                <ThemedText style={styles.previewLabel} lightColor="#D7E2D1" darkColor="#D7E2D1">CURRENT</ThemedText>
-              </View> : null}
-              {nextArt ? <View style={styles.previewCell}>
-                <Image contentFit="contain" source={kingdomHexTileSourceForLod(nextArt, 'medium')} style={styles.previewImage} />
-                <ThemedText style={styles.previewLabel} lightColor="#D7E2D1" darkColor="#D7E2D1">NEXT</ThemedText>
-              </View> : null}
-            </View>
-            {next ? <>
-              <ThemedText style={styles.nextTitle} lightColor="#F8FCFF" darkColor="#F8FCFF">Next: {next.name}</ThemedText>
-              <ThemedText style={styles.discoveryHintText} lightColor="#D7E2D1" darkColor="#D7E2D1">{next.narrative}</ThemedText>
-              <View style={styles.requirementRow}>
-                <ThemedText style={styles.requirement} lightColor="#FFE19A" darkColor="#FFE19A">{next.coinCost.toLocaleString()} Glow</ThemedText>
-              </View>
-            </> : <ThemedText style={styles.nextTitle} lightColor="#FFE19A" darkColor="#FFE19A">Signature Haven complete</ThemedText>}
-            {upgradeError ? <ThemedText selectable style={styles.upgradeError} lightColor="#FFD2C8" darkColor="#FFD2C8">{upgradeError}</ThemedText> : null}
-          </View>
-        </KatchaSheet>;
+        const guided = ftueStepId === 'haven.mossprout.restore';
+        const hatchable = hatchableByCompanion(characterId);
+        const links = ftueStepId ? [] : [
+          ...(characterId === 'mossprout' && currentStage >= 1 ? [{ label: 'Garden story & history', onPress: () => {
+            const archive = worldUpgradeArchiveOffer(mergeWorld, 'haven:mossprout');
+            setDetailCreatureId(null);
+            if (archive) setSelectedUpgrade({ ...archive, currentLevel: currentStage });
+          } }] : []),
+          ...(hatchable && mergeWorld.worldUnlocks?.[hatchable.tile.unlockId] ? [{ label: 'Clearing story & history', onPress: () => {
+            const archive = worldUpgradeArchiveOffer(mergeWorld, `mist:${hatchable.tile.id}`);
+            setDetailCreatureId(null);
+            if (archive) setSelectedUpgrade(archive);
+          } }] : []),
+        ];
+        const havenLevels = (environment?.stages ?? []).filter((stage) => stage.stage >= 1).map((stage) => ({
+          level: stage.stage as number, name: stage.name, description: stage.narrative,
+          state: stage.stage <= currentStage ? 'done' as const : stage.stage === next?.stage ? 'next' as const : 'ahead' as const,
+        }));
+        return <HavenDetailPanel key={detailCreatureId}
+          residentName={slot.creature.name} level={currentStage} maxLevel={Math.max(currentStage, (environment?.stages.length ?? 1) - 1)}
+          levels={havenLevels} nextCost={next?.coinCost}
+          artFor={(level) => tileLevelArt(`haven:${characterId}`, level)} currentArt={upgradeStageArt}
+          glow={mergeWorld.coins} upgrading={upgrading} error={upgradeError} guided={guided}
+          restoreRef={characterId === 'mossprout' ? setRestoreButtonNode : undefined} links={links}
+          layout={upgradeStage} bottomInset={insets.bottom} registerDismiss={registerUpgradeDismiss}
+          onClose={() => setDetailCreatureId(null)}
+          onRestore={() => { const offer = upgradeOffers.find((candidate) => candidate.id === `haven:${characterId}`); setDetailCreatureId(null); if (offer) void openUpgradeOffer(offer); }}
+          onVisit={companionHasPage(characterId) ? () => selectResident(slot.creature.creatureId) : undefined}
+          onGarden={() => { setDetailCreatureId(null); openGarden(); }} />;
       })() : null}
       {ftueCameraSettled && !sharedUpgrade && !upgradePresentation && !interactionCreatureId && (ftueStepId === 'haven.mossprout.focus' || ftueStepId === 'haven.mossprout.restore' || ftueStepId === 'world.garden_arrival' || (ftueStepId === 'world.seed_planted' && firstSeedPlacementFailed && !firstSeedPlacementBusy) || ftueStepId === 'world.garden_handoff' || ftueStepId === 'world.first_bloom_offer' || ftueStepId === 'world.first_bloom_restore') ? (
         <HavenFtueOverlay
@@ -2724,20 +2734,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   gardenButtonPressed: { opacity: 0.9, transform: [{ scale: 0.96 }] },
-  discoveryHint: {
-    backgroundColor: 'rgba(214,203,242,0.09)',
-    borderColor: 'rgba(214,203,242,0.2)',
-    borderCurve: 'continuous',
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 16,
-  },
-  discoveryHintText: {
-    fontFamily: AppFontFamilies.manrope,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 21,
-  },
   discoveryCalloutLayer: {
     gap: 10,
     left: 16,
@@ -2752,18 +2748,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   discoveryCalloutButton: { alignSelf: 'center', maxWidth: 430, width: '100%' },
-  actions: { gap: 10 },
-  restoreButtonAnchor: { width: '100%' },
-  progressCard: { backgroundColor: 'rgba(214,233,197,0.08)', borderColor: 'rgba(203,235,165,0.2)', borderRadius: 20, borderWidth: 1, gap: 9, padding: 17 },
-  progressEyebrow: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
-  nextTitle: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 22, lineHeight: 27 },
-  requirementRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 5 },
-  requirement: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '800' },
-  upgradeError: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '800', lineHeight: 18 },
-  previewRow: { flexDirection: 'row', gap: 10 },
-  previewCell: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.18)', borderRadius: 16, flex: 1, overflow: 'hidden', padding: 6 },
-  previewImage: { aspectRatio: 1, width: '100%' },
-  previewLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
   memoryPlantDetail: { alignItems: 'center', gap: 12, paddingBottom: 8 },
   memoryPlantArt: { height: 210, width: 210 },
   memoryPlantReflection: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 21, lineHeight: 27, maxWidth: 330, textAlign: 'center' },

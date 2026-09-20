@@ -76,6 +76,15 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
   const [mechanicState, setMechanicState] = useState<MissionMechanicState | null>(null);
   // Bumped by `reset`: the saved board is cleared and the store loads again (a fresh seed).
   const [revision, setRevision] = useState(0);
+  // Which board the values above belong to. The load below runs after the render that changed the key, so for that
+  // render (and every effect in its commit) the state is still the PREVIOUS board's. One screen hosts every friend's
+  // restoration through this hook: without an owner, a friend's board opened while another's was mid-way read the
+  // other's progress (3 / 5, its checkpoint reached) and asked for its delivery before a single merge.
+  const boardKey = runId ? `${storageKey}\u0000${runId}` : null;
+  const [owner, setOwner] = useState<string | null>(null);
+  const ownerRef = useRef<string | null>(null);
+  const boardKeyRef = useRef(boardKey);
+  boardKeyRef.current = boardKey;
   const stateRef = useRef<MergeWorldState | null>(null);
   const mergesRef = useRef(0);
   const placedRef = useRef(0);
@@ -94,6 +103,8 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
       mergesRef.current = 0;
       placedRef.current = 0;
       mechanicStateRef.current = null;
+      ownerRef.current = null;
+      setOwner(null);
       setState(null);
       setMerges(0);
       setPlacedDeliveries(0);
@@ -111,6 +122,8 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     mergesRef.current = loaded.merges;
     placedRef.current = loaded.placedDeliveries;
     mechanicStateRef.current = loaded.mechanicState;
+    ownerRef.current = `${storageKey}\u0000${runId}`;
+    setOwner(ownerRef.current);
     setState(loaded.state);
     setMerges(loaded.merges);
     setPlacedDeliveries(loaded.placedDeliveries);
@@ -123,7 +136,7 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
   /** Seeds the board again and keeps what the wisps have taken: the way on when every shot has been spent with wisps still standing. */
   const reseed = useCallback(() => {
     const activeRunId = runIdRef.current;
-    if (!activeRunId || !stateRef.current) return;
+    if (!activeRunId || !stateRef.current || ownerRef.current !== boardKeyRef.current) return;
     const next = createRef.current(Date.now());
     stateRef.current = next;
     saveMission(storageKey, activeRunId, next, mergesRef.current, placedRef.current, mechanicSaveState(mechanicStateRef.current));
@@ -132,7 +145,8 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
   const send = useCallback((command: MergeWorldCommand): MissionCommandResult | null => {
     const current = stateRef.current;
     const activeRunId = runIdRef.current;
-    if (!current || !activeRunId) return null;
+    // Never play (or save) one board's state under another board's key.
+    if (!current || !activeRunId || ownerRef.current !== boardKeyRef.current) return null;
     const result = reduceMergeWorld(current, command);
     if (result.changed) {
       const merged = command.type === 'move' && result.mergedCell != null;
@@ -161,7 +175,7 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
   const place = useCallback((entries: readonly { cell: number; definitionId: string }[]) => {
     const current = stateRef.current;
     const activeRunId = runIdRef.current;
-    if (!current || !activeRunId || !entries.length) return;
+    if (!current || !activeRunId || !entries.length || ownerRef.current !== boardKeyRef.current) return;
     const board = [...current.board];
     let nextInstance = current.nextInstance;
     let landed = 0;
@@ -182,7 +196,9 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     setState(next);
     setPlacedDeliveries(placed);
   }, [storageKey]);
-  return { state, merges, mergesRef: mergesRef as RefObject<number>, placedDeliveries, mechanicState, mechanicStateRef: mechanicStateRef as RefObject<MissionMechanicState | null>, send, place, reset, reseed };
+  // Until this board's own save has loaded, there is no board: never the last one's.
+  const mine = owner != null && owner === boardKey;
+  return { state: mine ? state : null, merges: mine ? merges : 0, mergesRef: mergesRef as RefObject<number>, placedDeliveries: mine ? placedDeliveries : 0, mechanicState: mine ? mechanicState : null, mechanicStateRef: mechanicStateRef as RefObject<MissionMechanicState | null>, send, place, reset, reseed };
 }
 
 export function loadOpeningMission(runId: string, now = Date.now()): MergeWorldState | null {

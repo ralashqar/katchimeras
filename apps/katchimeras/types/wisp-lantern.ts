@@ -1,9 +1,11 @@
-import type { WispId } from './wisp';
+import type { WispId, WispRarity } from './wisp';
 export type WispEconomyScope = 'local-lantern-v1' | 'verified';
 export type WispPackDefinition = {
   id: string; version: number; collectionId: string; scope: WispEconomyScope;
   slots: number; pool: readonly { id: WispId; weight: number }[];
   distinct: boolean; guaranteeAfterDryPacks: number | null;
+  name?: string; artKey?: 'pack'; protectionGroup?: string;
+  guaranteedRarity?: { slot: number; minimum: WispRarity };
 };
 export type WispPackOutcome = { id: WispId; discovered: boolean; echoes: number };
 export type WispPackInstance = {
@@ -11,18 +13,20 @@ export type WispPackInstance = {
   seed: number; grantedAt: number; openedAt?: number; outcomes?: WispPackOutcome[]; revealed: number; focusedCardIndex?: number;
 };
 export type WispLanternState = {
-  version: 1; scope: 'local-lantern-v1'; unlockedAt: number | null; introducedAt: number | null;
+  version: 2; scope: 'local-lantern-v1'; unlockedAt: number | null; introducedAt: number | null;
   packs: Record<string, WispPackInstance>; echoes: number; dryPacks: number;
   receipts: string[]; residents: WispId[]; cosmetics: string[]; claims: string[];
   duplicateExplained: boolean;
+  dryPacksByGroup: Record<string, number>;
+  previewSeasonStartedAt?: number;
 };
 export type WispLanternCommand =
   | { type: 'unlock' } | { type: 'complete_intro' }
-  | { type: 'grant_pack'; receiptId: string; definitionId: string; seed: number }
+  | { type: 'grant_pack'; receiptId: string; definitionId: string; definitionVersion?: number; seed: number }
   | { type: 'open_pack'; packId: string }
   | { type: 'focus_pack_card'; packId: string; index: number }
   | { type: 'acknowledge_reveal'; packId: string; revealed: number }
   | { type: 'exchange'; receiptId: string; wispId?: WispId; cosmeticId?: 'lantern-trail' }
-  | { type: 'claim_collection' } | { type: 'residents'; ids: WispId[] } | { type: 'explain_duplicate' };
+  | { type: 'claim_collection'; collectionId?: string; setId?: string } | { type: 'residents'; ids: WispId[] } | { type: 'explain_duplicate' };
 /** Verified implementations resolve remotely; editable pilot saves are never purchase authority. */
 export interface WispPackAuthority { scope: WispEconomyScope; openPack(packId: string): Promise<WispPackInstance> }

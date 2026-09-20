@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
-import { islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers';
+import { activeIslandRestoration, islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers';
 import { FERNIP_WILDGROWTH_CAMPAIGN } from '@/constants/island-campaigns/fernip-wildgrowth';
 import { PETALIMP_BLOOM_CAMPAIGN } from '@/constants/island-campaigns/petalimp-bloom';
 import type { IslandCampaignDefinition, RestorationBoardDefinition } from '@/constants/island-campaigns/types';
@@ -308,7 +308,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   const store = readFileSync('features/onboarding/use-opening-mission-board.ts', 'utf8');
   const engine = readFileSync('utils/merge-world/engine.ts', 'utf8');
   const boardFile = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
-  assert.match(screen, /const islandRestoration = useMemo\(\(\) => activeIslandRestoration\(mergeWorld\), \[mergeWorld\]\);/);
+  assert.match(screen, /const islandRestoration = useMemo\(\(\) => activeIslandRestoration\(mergeWorld, restorationFocusCampaignId\), \[mergeWorld, restorationFocusCampaignId\]\);/, 'the board follows the friend the player is dealing with');
   assert.match(screen, /const restorationBoardRunId = islandRestoration && restorationDefinition \? restorationRunId\(islandRestoration\.campaign\.campaignId, islandRestoration\.level, islandRestoration\.progress\.startedAt, restorationDefinition\) : null;/, 'a restarted or re-authored stage never inherits a saved board');
   assert.match(screen, /useMissionBoard\(islandRestoration \? previewMissionStorageKey\(restorationStorageKey\(islandRestoration\.campaign\.campaignId, islandRestoration\.level\), mechanicPreview\) : 'katchimeras\.mist-mission\.none\.v1', restorationBoardRunId, createRestorationBoard, repairRestorationBoard, restorationBinding\)/, 'its own store per chapter, repaired on load, played by the board\u2019s mechanic');
   assert.match(screen, /target: \{ kind: 'haven_nature_island' as const, islandId: restorationIslandId \},\s*zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y/, 'the board framing on the island');
@@ -427,4 +427,24 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(store, /const place = useCallback\(\(entries: readonly \{ cell: number; definitionId: string \}\[\]\) => \{[\s\S]*?saveMission\(storageKey, activeRunId, next, mergesRef\.current, placed, mechanicSaveState\(mechanicStateRef\.current\)\);/, 'placed deliveries are saved with the board');
   assert.doesNotMatch(engine, /'rooted'/, 'no bed mechanic remains in the engine');
   assert.doesNotMatch(boardFile, /rooted|bedRing/, 'nor in the board renderer');
+});
+
+test('two friends mid-restoration: the board is the one the player is dealing with, never simply the first in campaign order', () => {
+  // The wake order allows one restoration at a time, but a pack's island wakes on its own condition (the Wander
+  // Trail on Steppling's hatch). Clearing its mist once docked Petalimp's unfinished board instead of its own.
+  const restoration = (startedAt: number) => ({ startedAt, paidCoins: 0, progress: { current: 0, total: 5 }, deliveryRequestedAt: null, delivered: [], completedAt: null });
+  const chapter = (level: number, startedAt: number) => ({ [String(level)]: { level, completedAt: null, orderIds: [], restoration: restoration(startedAt) } });
+  const [first, second] = ISLAND_CAMPAIGNS.filter((campaign) => campaign.chapters.some((entry) => entry.level === 1 && entry.restoration));
+  assert.ok(first && second, 'at least two friends restore on a board');
+  const world = { ...createInitialMergeWorldState(NOW, ['mossprout']), islandCampaigns: {
+    [first.campaignId]: { chapters: chapter(1, NOW) },
+    [second.campaignId]: { chapters: chapter(1, NOW + 500) },
+  } } as unknown as MergeWorldState;
+  assert.equal(activeIslandRestoration(world)?.campaign.campaignId, second.campaignId, 'with no one in particular, the board started most recently');
+  assert.equal(activeIslandRestoration(world, first.campaignId)?.campaign.campaignId, first.campaignId, 'the friend being dealt with wins');
+  assert.equal(activeIslandRestoration(world, second.campaignId)?.campaign.campaignId, second.campaignId);
+  assert.equal(activeIslandRestoration(world, 'no-such-campaign')?.campaign.campaignId, second.campaignId, 'a friend with no board falls back, never to nothing');
+  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  assert.match(screen, /setRestorationFocusCampaignId\(campaign\.campaignId\);\s*setRestorationOpen\(true\);\s*requestResidentInteractionExit\(\);/, 'the answer that opens a board docks that board');
+  assert.match(screen, /activeIslandRestoration\(mergeWorldRef\.current, offerCampaignId\)\?\.campaign\.campaignId === offerCampaignId\) \{\s*setRestorationFocusCampaignId\(offerCampaignId\);/, 'a friend’s marker opens their own board');
 });

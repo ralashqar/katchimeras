@@ -83,18 +83,28 @@ export function islandCampaignStateLabel(campaign: IslandCampaignDefinition, sta
   return campaign.copy.stateLabels[status] ?? (status === 'board_open' || status === 'delivery_requested' ? RESTORATION_STATE_LABELS[status] : status);
 }
 
-/** The chapter whose restoration board is open right now (paid, not yet complete), if any. */
-export function activeIslandRestoration(world: MergeWorldState): { campaign: IslandCampaignDefinition; level: MossproutNatureIslandLevel; chapter: IslandCampaignChapter; progress: IslandRestorationProgress } | null {
+/**
+ * The chapter whose restoration board is open right now (paid, not yet complete), if any.
+ *
+ * The wake order lets only one friend be mid-restoration, but a pack's island wakes on its own condition (the
+ * Wander Trail on Steppling's hatch), so two can be unfinished at once. The friend the player is dealing with
+ * (`preferredCampaignId`) wins; otherwise the one started most recently, never simply the first in campaign order.
+ */
+export function activeIslandRestoration(world: MergeWorldState, preferredCampaignId?: string | null): { campaign: IslandCampaignDefinition; level: MossproutNatureIslandLevel; chapter: IslandCampaignChapter; progress: IslandRestorationProgress } | null {
+  let latest: { campaign: IslandCampaignDefinition; level: MossproutNatureIslandLevel; chapter: IslandCampaignChapter; progress: IslandRestorationProgress } | null = null;
   for (const campaign of ISLAND_CAMPAIGNS) {
     const record = islandCampaignProgress(world, campaign);
     if (!record) continue;
     for (const entry of Object.values(record.chapters)) {
       if (!entry.restoration || entry.restoration.completedAt != null || entry.completedAt != null) continue;
       const chapter = islandCampaignChapter(campaign, entry.level);
-      if (chapter?.restoration) return { campaign, level: entry.level, chapter, progress: entry.restoration };
+      if (!chapter?.restoration) continue;
+      const found = { campaign, level: entry.level, chapter, progress: entry.restoration };
+      if (campaign.campaignId === preferredCampaignId) return found;
+      if (!latest || found.progress.startedAt > latest.progress.startedAt) latest = found;
     }
   }
-  return null;
+  return latest;
 }
 
 export type IslandCampaignPanelRequest = {

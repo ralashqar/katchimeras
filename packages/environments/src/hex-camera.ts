@@ -603,13 +603,17 @@ export function useKingdomHexCamera({
     onComplete?: () => void;
     screenCenterY?: number;
     verticalPadding?: number;
+    fitHeight?: number;
+    unbounded?: boolean;
   }) => {
     if (!viewport.width || !viewport.height || frame.width <= 0 || frame.height <= 0) return;
     const target = kingdomCameraSnapshotForFrame(viewport, scene, frame, {
+      fitHeight: options?.fitHeight,
       horizontalPadding: options?.horizontalPadding,
       maximumScale: maxScale,
       minimumScale: minScale,
       screenCenterY: options?.screenCenterY,
+      unbounded: options?.unbounded,
       verticalPadding: options?.verticalPadding,
     });
     const key = [target.tx, target.ty, target.scale].map((value) => value.toFixed(3)).join(':');
@@ -638,6 +642,7 @@ export function useKingdomHexCamera({
         if (frameFocusKeyRef.current === key) frameFocusKeyRef.current = null;
         options?.onComplete?.();
       },
+      options?.unbounded,
     );
   }, [animateTo, commitSnapshot, maxScale, minScale, scale, scene, tx, ty, viewport]);
 

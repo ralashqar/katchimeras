@@ -1,22 +1,18 @@
 # Hex upgrades v2
 
-The canvas projects `WorldUpgradeAnchor` from the selected tile's painted frame.
-Its panel stays readable at different camera scales, respects safe areas, and
-waits for camera settling before its entrance. The anchor reserves 80 points below the top safe-area inset for
-navigation/currency chrome and exposes all remaining space below its stable top.
-The card measures its header and natural scroll content at a fixed width (up to
-336 points), then fits their combined height plus its border. It grows downward,
-with scrolling enabled only when the content exceeds the remaining screen space.
-The initial viewport must match that measured size before the entrance bounce
-starts; its transform origin is top-center so the top stays fixed. This avoids first-open clipping at the entrance scale. Markers remain mounted through
-selection so their exit and return can animate. Purchase confirmation waits for
-the panel's 140ms exit before invoking the existing purchase or tutorial handler.
-The transparent outside target consumes the tap; it never passes it to a tile.
+The panel is the shared upgrade stage (`docs/upgrade-stage.md`): the canvas
+frames the selected tile in the band above a docked, full-width panel whose
+height `upgradeStageLayout` decides before it mounts. The title bar and the
+hero row (with the purchase action) are pinned and only the rows under them scroll. Markers
+remain mounted through selection so their exit and return can animate. Purchase
+confirmation waits for the panel's 140ms exit before invoking the existing
+purchase or tutorial handler. The transparent target over the band consumes the
+tap; it never passes it to a tile.
 
 The upgrade tutorial coachmark is owned by the screen overlay, outside the
-card's transform and clipping. The card publishes readiness and layout/scroll
-revisions, hides the guide during history or purchase, and scrolls the tutorial
-action into view on short screens. Coachmarks convert target window coordinates
+panel's transform and clipping. The panel publishes readiness once it has
+settled and hides the guide during history or purchase; the pinned action is
+always on screen, so nothing scrolls it into view. Coachmarks convert target window coordinates
 to their overlay's coordinates and measure the speech bubble before positioning
 it above/below the target; the upgrade action remains tappable.
 
@@ -28,8 +24,8 @@ Each step has three before-build lines and one reaction. Speaker portraits come
 from the skin catalog. Steppling has an authored Mossprout alternative until
 the persisted egg hatch is complete. Future steps are not displayed.
 
-The tile panel contains only title/current-max level, required Glow, unlock details
-and the purchase action. Its top-left speech button opens `WorldUpgradeNarrative`.
+The tile panel's Upgrade tab contains only the hero row (the level, its copy and
+the purchase action), the level slots and the Glow requirement. Its Story tab opens `WorldUpgradeNarrative`.
 No dialogue is displayed or marked read by opening the base card.
 
 The story is a native full-screen transparent Modal above navigation and the

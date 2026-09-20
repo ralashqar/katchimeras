@@ -170,12 +170,16 @@ export function kingdomCameraSnapshotForFrame(
     minimumScale: number;
     screenCenterY?: number;
     verticalPadding?: number;
+    /** Fit the frame into a band this tall (a stage above a docked panel) instead of the whole viewport. */
+    fitHeight?: number;
+    /** Frame the target exactly where asked, even past the scene's edge. */
+    unbounded?: boolean;
   },
 ): KingdomCameraSnapshot {
   const horizontalPadding = Math.max(0, options.horizontalPadding ?? 0);
   const verticalPadding = Math.max(0, options.verticalPadding ?? horizontalPadding);
   const availableWidth = Math.max(1, viewport.width - horizontalPadding * 2);
-  const availableHeight = Math.max(1, viewport.height - verticalPadding * 2);
+  const availableHeight = Math.max(1, (options.fitHeight ?? viewport.height) - verticalPadding * 2);
   const widthScale = frame.width > 0 ? availableWidth / frame.width : options.maximumScale;
   const heightScale = frame.height > 0 ? availableHeight / frame.height : options.maximumScale;
   const scale = Math.min(
@@ -195,5 +199,6 @@ export function kingdomCameraSnapshotForFrame(
       x: viewport.width / 2,
       y: options.screenCenterY ?? viewport.height / 2,
     },
+    options.unbounded,
   );
 }
