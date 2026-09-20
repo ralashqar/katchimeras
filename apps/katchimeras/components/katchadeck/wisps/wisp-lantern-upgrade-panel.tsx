@@ -25,7 +25,7 @@ export function WispLanternUpgradePanel({ world, layout, bottomInset, registerDi
   const [error, setError] = useState<string | null>(null);
   const motion = useUpgradeDockMotion({ busy, onClose, registerDismiss });
   const model = lanternUpgradeModel(world.wispLanternProgress);
-  const pick = useUpgradeLevelPick(model.levels, model.level.current, lanternLevelArt);
+  const pick = useUpgradeLevelPick(model.levels, lanternLevelArt);
   const { onFocus } = pick;
   const resetPick = pick.reset;
   const upgrade = useCallback(async () => {
@@ -38,14 +38,14 @@ export function WispLanternUpgradePanel({ world, layout, bottomInset, registerDi
 
   return <UpgradeDock motion={motion} title={model.title} levelLabel={`Lv. ${model.level.current}`} progressLabel={model.progressLabel} progressFraction={model.progressFraction}
     height={layout.panelHeight} width={layout.panelWidth} bottomInset={bottomInset} closeLabel="Close Lantern upgrade"
-    hero={<UpgradeHero art={pick.art} ribbon={pick.ribbon} name={pick.name ?? model.title} description={pick.description}
+    hero={<UpgradeHero name={pick.name ?? model.title} description={pick.description}
       action={onFocus && model.primary ? <KatchaButton fullWidth size="compact" loading={busy} disabled={busy || motion.closing || model.primary.disabled}
         accessibilityLabel={`Upgrade to Level ${model.level.next}, free`} label={error ? 'Try again' : model.primary.label} onPress={() => { void upgrade(); }} /> : null}
       caption={error ?? pick.caption ?? (model.complete ? 'Fully grown' : 'Free')}
       captionTone={error ? 'danger' : undefined} />}>
     {model.benefits.map((benefit) => <UpgradeBenefitRow key={benefit.id} benefit={benefit} />)}
     <UpgradeSection label="Stages" aside="Each one is a surprise">
-      <UpgradeLevelSlots levels={model.levels} selected={pick.shown?.level ?? null} onSelect={pick.pick} artFor={pick.slotArt} disabled={busy || motion.closing} />
+      <UpgradeLevelSlots levels={model.levels} selected={pick.shown?.level ?? null} current={pick.current} onSelect={pick.pick} artFor={pick.slotArt} disabled={busy || motion.closing} />
     </UpgradeSection>
     {model.requirements.length ? <UpgradeSection label="Requires">
       {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement} disabled={busy || motion.closing} onAction={() => motion.leave(onGarden)} />)}

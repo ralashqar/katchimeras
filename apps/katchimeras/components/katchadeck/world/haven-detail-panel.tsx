@@ -15,7 +15,7 @@ import type { UpgradeStageLayout } from '@/features/upgrade-stage/upgrade-stage-
  */
 export function HavenDetailPanel({ residentName, level, maxLevel, levels, nextCost, glow, upgrading, error, guided, restoreRef, links, artFor, currentArt, layout, bottomInset, registerDismiss, onClose, onRestore, onVisit, onGarden }: {
   residentName: string; level: number; maxLevel: number;
-  /** Every authored stage past the bare tile; the one after `level` is what Restore buys. */
+  /** Every authored stage, the bare tile (0) included; the one after `level` is what Restore buys. */
   levels: readonly UpgradeLevelEntry[];
   nextCost?: number; glow: number; upgrading: boolean; error?: string | null;
   /** The guided first restore: the panel stays, and only Restore is offered. */
@@ -32,16 +32,17 @@ export function HavenDetailPanel({ residentName, level, maxLevel, levels, nextCo
 }) {
   const motion = useUpgradeDockMotion({ busy: upgrading, onClose, locked: guided, registerDismiss });
   const next = levels.find((entry) => entry.state === 'next');
-  const pick = useUpgradeLevelPick(levels, level, artFor, currentArt);
+  // A Haven counts from 0 in the save and from 1 on screen, like every tile.
+  const pick = useUpgradeLevelPick(levels, artFor, currentArt, 1);
   const { shown, onFocus } = pick;
   const cost = next ? nextCost ?? 0 : 0;
   const affordable = glow >= cost;
   const fraction = next ? (cost <= 0 ? 1 : Math.min(1, glow / cost)) : level / Math.max(1, maxLevel);
   const go = (action: () => void) => motion.leave(action);
-  return <UpgradeDock motion={motion} title={`${residentName}’s Haven`} levelLabel={`Lv. ${level}`}
-    progressLabel={next ? `${Math.floor(fraction * 100)}%` : level >= maxLevel ? 'MAX' : `${level} / ${maxLevel}`} progressFraction={fraction}
+  return <UpgradeDock motion={motion} title={`${residentName}’s Haven`} levelLabel={`Lv. ${level + 1}`}
+    progressLabel={next ? `${Math.floor(fraction * 100)}%` : level >= maxLevel ? 'MAX' : `${level + 1} / ${maxLevel + 1}`} progressFraction={fraction}
     height={layout.panelHeight} width={layout.panelWidth} bottomInset={bottomInset} closeLabel="Close Haven details"
-    hero={<UpgradeHero art={pick.art} ribbon={pick.ribbon}
+    hero={<UpgradeHero
       name={pick.name ?? `${residentName}’s Haven`} description={shown ? pick.description : 'A home with room to grow.'}
       action={onFocus && next ? <View ref={restoreRef} collapsable={false}>
         <KatchaButton fullWidth size="compact" label="Restore" cost={{ currency: 'coins', amount: cost }}
@@ -50,7 +51,7 @@ export function HavenDetailPanel({ residentName, level, maxLevel, levels, nextCo
       caption={error ?? pick.caption ?? (!next ? 'Signature Haven complete' : null)}
       captionTone={error ? 'danger' : undefined} />}>
     {levels.length > 1 ? <UpgradeSection label="Stages" aside="Each one is a surprise">
-      <UpgradeLevelSlots levels={levels} selected={shown?.level ?? null} onSelect={pick.pick} artFor={pick.slotArt} disabled={guided || upgrading || motion.closing} />
+      <UpgradeLevelSlots levels={levels} selected={shown?.level ?? null} current={pick.current} levelOffset={1} onSelect={pick.pick} artFor={pick.slotArt} disabled={guided || upgrading || motion.closing} />
     </UpgradeSection> : null}
     {next && cost > 0 ? <UpgradeSection label="Requires">
       <UpgradeRequirementRow disabled={upgrading || motion.closing || guided} onAction={() => go(onGarden)}
@@ -71,7 +72,7 @@ export function UndiscoveredHavenPanel({ art, layout, bottomInset, registerDismi
 }) {
   const motion = useUpgradeDockMotion({ busy: false, onClose, registerDismiss });
   return <UpgradeDock motion={motion} title="Undiscovered" progressLabel="? ? ?" height={Math.min(layout.panelHeight, 300)} width={layout.panelWidth} bottomInset={bottomInset} closeLabel="Close"
-    hero={<UpgradeHero art={art} dim name="Hidden in the Dream Mist" description="A new companion is waiting somewhere beyond the clouds." />}>
+    hero={<UpgradeHero picture={{ art }} name="Hidden in the Dream Mist" description="A new companion is waiting somewhere beyond the clouds." />}>
     <Text selectable style={styles.narrative}>Keep living days and growing your relationships to discover who is waiting here.</Text>
   </UpgradeDock>;
 }

@@ -11,8 +11,8 @@ a way to go and meet them, and one pinned action below.
 
 `features/upgrade-stage/upgrade-stage-layout.ts` decides the split before
 anything mounts: `upgradeStageLayout(viewport, insets)` returns the panel's
-height (about 58% of the screen, 62% on phones shorter than 700 points, clamped
-to 380–640) and width (edge to edge, a 600-point column on tablets), and the
+height (about 54% of the screen, 60% on phones shorter than 700 points, clamped
+to 360–600) and width (edge to edge, a 600-point column on tablets), and the
 band left above it under the HUD (`stageTop`, `stageHeight`, `stageCenterY`).
 Because the height is known up front, the camera is sent to its final target
 while the panel is still sliding in. Nothing measures itself and nothing waits
@@ -38,6 +38,12 @@ use `{ kind: 'haven_tile', familyId }`. The Haven subject shares its id with the
 tile's offer (`haven:<family>`), so Restore hands over to the upgrade panel
 without the camera moving.
 
+When a purchase is confirmed the panel leaves and the whole screen is the tile's
+again. The reveal that follows (mist lifting, an island growing) assumes a
+close-up (`cameraAlreadyFocused`), so the canvas zooms the framed tile to the
+full screen at that moment, before the mist clears; the band above the panel had
+framed it far smaller. A tutorial-owned close-up is lowered back instead.
+
 The Lantern is an adornment on the `front-right` garden plot, so the screen
 frames it with a camera directive whose `anchorY` comes from the same layout.
 
@@ -53,18 +59,26 @@ own palette. From top to bottom, in `components/katchadeck/upgrade/`:
    close. It is the swipe handle. A tile still under the mist shows no level.
 2. **Body card**: cream, rounded all the way round and set into the frame, so
    the wood shows on every side.
-3. **Hero row** (`UpgradeHero`, pinned at the top of the card): a large picture
-   in a pale mount under an open sky, with a `Current stage` ribbon, and beside
-   it the level's name, a leaf rule, its description, the action (the shared
-   compact Glow CTA) and a short status pill (`Free`, `Reached`, an error). The
-   action never scrolls, so the tutorial coachmark needs no scrolling either.
+3. **Hero row** (`UpgradeHero`, pinned at the top of the card): the level's
+   name, a leaf rule, its description, and the action at full width (the shared
+   compact Glow CTA) with a short status pill under it (`Free`, `Reached`, an
+   error). It carries no picture of the subject: the tile is framed right above
+   the panel, and the height goes to the tile instead. Only something held or
+   hidden gets a small picture (the friend resting there, the lock, the mist).
+   A friend's chapter starts from a button that reads `Restore` with its Glow
+   cost (or `Free`), not the friend's own sentence for it. The action never
+   scrolls, so the tutorial coachmark needs no scrolling either.
 4. **Strips** (`UpgradeBenefitRow`): one line per gain, a chip naming it and the
    stat as `3 +1`, or what is unlocked.
 5. **Stages** (`UpgradeLevelSlots` in an `UpgradeSection` card): the subject's
    whole road as a chain of slots joined by dots, each with its level on a tag
-   at its foot. Picking a slot shows that level in the hero row (it glows gold);
-   only the next level carries the action. A level gained while the panel is up
-   pops its tag with a success haptic.
+   at its foot. The road starts at the stage the subject already stands on, so
+   the current stage always has a slot: it is pictured there as the world is
+   drawing it right now and wears a `Now` tag. Picking a slot shows that level
+   in the hero row (it glows gold); only the next level carries the action.
+   More than four stages scroll sideways, opened on the stage in play so the
+   one before it and the one after it are always on screen. A level gained
+   while the panel is up pops its tag with a success haptic.
 6. **Requires** (`UpgradeRequirementRow` in a card): an icon well, the name and
    one plain line about it, and have / need in a pill (green with a tick when
    met, red while short). While short it grows a foot with the glossy bar and a
@@ -73,13 +87,20 @@ own palette. From top to bottom, in `components/katchadeck/upgrade/`:
    one view: a sunk pill with the selected tab riding in it, each with an icon.
    A tile with dialogue or a friend's chapters gets `Upgrade` and `Story`.
 
+### Levels on screen
+
+A tile counts from 0 in the save (an unrestored tile is 0), but nobody reads a
+place as "level 0". The model carries `levelOffset` (1 for tiles and Havens, 0
+for the Lantern, which already counts from 1) and every level shown adds it:
+the title's `Lv.`, the slot tags, `Reach Level N first`, the `2 / 5` pill.
+
 ### No spoilers
 
 What a level will look like is for the world to reveal, not the panel.
 `useUpgradeLevelPick` applies one rule everywhere: a reached level shows its own
-picture; the level being bought shows the subject as it stands now (`Current
-stage`); anything further on is a question mark, in its slot and in the hero
-picture, and its name reads `? ? ?`. `artFor` is never asked for a level that
+picture in its slot (the current one as the world draws it now); the level being
+bought and anything further on is a question mark, and a level further on reads
+`? ? ?` in the hero row. `artFor` is never asked for a level that
 has not been reached. A tile still under the mist is pictured as mist.
 
 `useUpgradeDockMotion` owns the behaviour. The dock sits at `zIndex` 60 (not a

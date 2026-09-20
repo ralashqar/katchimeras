@@ -49,6 +49,12 @@ export const upgradeFocusLevel = (levels: readonly UpgradeLevelEntry[]) => level
 
 export type UpgradePanelModel = {
   title: string;
+  /**
+   * Added to every level before it is shown. A tile's levels count from 0 in the save (an unrestored tile is 0), but
+   * nobody reads a place as "level 0": on screen it is level 1 and its first upgrade makes it level 2. The Lantern
+   * already counts from 1.
+   */
+  levelOffset: 0 | 1;
   /** One quiet line under the title: what this place is about. */
   tagline?: string;
   level: { current: number; next: number | null; max: number };
@@ -71,12 +77,16 @@ const levelState = (level: number, current: number, next: number | null): Upgrad
 /** Every authored level of a tile, from the same catalogues its offers are generated from. */
 function tileLevels(offer: WorldUpgradeOffer, next: number | null, complete: boolean): UpgradeLevelEntry[] {
   const [kind, id] = [offer.id.slice(0, offer.id.indexOf(':')), offer.id.slice(offer.id.indexOf(':') + 1)];
+  // The road starts at the stage the tile already stands on (0 in the save), so the current stage always has a slot.
+  const island = kind === 'nature' ? mossproutNatureIslandById.get(id) : undefined;
   const authored = kind === 'haven'
-    ? (HAVEN_ENVIRONMENTS[id as keyof typeof HAVEN_ENVIRONMENTS]?.stages ?? []).filter((stage) => stage.stage >= 1).map((stage) => ({ level: stage.stage as number, name: stage.name, description: stage.narrative }))
-    : kind === 'nature'
-      ? (mossproutNatureIslandById.get(id)?.levels ?? []).map((level) => ({ level: level.level as number, name: level.name, description: level.description }))
+    ? (HAVEN_ENVIRONMENTS[id as keyof typeof HAVEN_ENVIRONMENTS]?.stages ?? []).map((stage) => ({ level: stage.stage as number, name: stage.name, description: stage.narrative }))
+    : island
+      ? [{ level: 0, name: island.name, description: island.theme }, ...island.levels.map((level) => ({ level: level.level as number, name: level.name, description: level.description }))]
       : [];
-  if (authored.some((entry) => entry.level === offer.nextLevel) || (next == null && authored.length)) {
+  // Still under the mist there is no road to show yet: only the step that lifts it.
+  const misted = offer.transition === 'island_reveal' || kind === 'mist';
+  if (!misted && authored.length && (next == null || authored.some((entry) => entry.level === next))) {
     return authored.filter((entry) => entry.level <= offer.maxLevel).map((entry) => ({ ...entry, state: levelState(entry.level, offer.currentLevel, next) }));
   }
   // A mist tile, a reveal step (current and next level are both 0), or a level the catalogue does not list: the offer
@@ -97,10 +107,11 @@ export function tileUpgradeModel(offer: WorldUpgradeOffer, glow: number, options
   }];
   return {
     title: offer.name,
+    levelOffset: 1,
     tagline: offer.id.startsWith('nature:') && offer.transition !== 'island_reveal' ? mossproutNatureIslandById.get(offer.id.slice('nature:'.length))?.theme : undefined,
     level: { current: offer.currentLevel, next, max: offer.maxLevel },
     progressLabel: complete ? 'MAX' : offer.restorationProgress ? `${offer.restorationProgress.current} / ${offer.restorationProgress.total}`
-      : purchasable ? `${percent(glow, offer.cost)}%` : `${offer.currentLevel} / ${offer.maxLevel}`,
+      : purchasable ? `${percent(glow, offer.cost)}%` : `${offer.currentLevel + 1} / ${offer.maxLevel + 1}`,
     progressFraction: complete ? 1 : offer.restorationProgress ? offer.restorationProgress.current / Math.max(1, offer.restorationProgress.total)
       : purchasable ? percent(glow, offer.cost) / 100 : offer.currentLevel / Math.max(1, offer.maxLevel),
     levels: tileLevels(offer, next, complete),
@@ -120,6 +131,7 @@ export function lanternUpgradeModel(progress: LanternWorldProgress | undefined):
   const needed = WELCOME_ORDER_IDS.length + (next?.orders ?? 0);
   return {
     title: 'Wisp Lantern',
+    levelOffset: 0,
     level: { current, next: next?.level ?? null, max: LANTERN_LEVELS.length },
     progressLabel: next ? `${percent(Math.min(welcome, WELCOME_ORDER_IDS.length) + Math.min(orders, next.orders), needed)}%` : 'MAX',
     progressFraction: next ? percent(Math.min(welcome, WELCOME_ORDER_IDS.length) + Math.min(orders, next.orders), needed) / 100 : 1,

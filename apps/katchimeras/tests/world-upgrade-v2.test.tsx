@@ -148,16 +148,23 @@ test('docked panel pins its action, keeps shortage explicit, waits for its exit,
   assert.ok(flat().includes('0%'), 'the title bar reads how close the next level is');
   assert.equal(buy.props.size, 'compact', 'a short action sits beside the hero copy');
   const slots = () => tree!.root.findAllByType(host('Pressable')).filter((node) => node.props.accessibilityRole === 'radio');
-  assert.deepEqual(slots().map((node) => node.props.accessibilityState.selected), [true, false, false, false], 'the road opens on the level being bought');
+  assert.deepEqual(slots().map((node) => node.props.accessibilityState.selected), [false, true, false, false, false], 'the road opens on the level being bought, after the stage the tile stands on');
+  assert.deepEqual(slots().map((node) => node.props.accessibilityLabel.split(',')[0].split('.')[0]), ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'], 'levels read from 1, never 0');
+  assert.ok(flat().includes('Lv. 1'), 'an unrestored tile is level 1 on screen');
+  assert.equal(inScroll(slots()[0] as unknown as Node), true);
+  assert.equal(tree!.root.findAllByType(host('ScrollView')).filter((node) => node.props.horizontal).length, 1, 'more than four stages scroll sideways');
   const pictures = () => tree!.root.findAllByType(host('Image')).map((node) => node.props.source).filter((source) => typeof source === 'number' && source >= 700);
-  assert.deepEqual(pictures(), [700], 'the hero shows the tile as it stands now; no level ahead is pictured anywhere');
-  assert.ok(flat().includes('Current stage'));
+  assert.deepEqual(pictures(), [700], 'only the stage the tile stands on is pictured, in its own slot; the hero row carries no picture');
+  assert.ok(flat().includes('Now'), 'and that slot is marked');
   assert.equal(flat().filter((text) => text === '?').length, 4, 'every level not yet reached is a question mark');
   await act(async () => slots()[2].props.onPress());
-  assert.ok(flat().includes('Reach Level 2 first'), 'a level further on explains itself');
-  assert.ok(flat().includes('? ? ?') && pictures().length === 0, 'and keeps its name and its look to itself');
+  assert.ok(flat().includes('Reach Level 2 first'), 'a level further on explains itself, in the numbers the player sees');
+  assert.ok(flat().includes('? ? ?'), 'and keeps its name to itself');
+  assert.deepEqual(pictures(), [700]);
   assert.equal(tree!.root.findAllByType(host('Button')).some((node) => node.props.label === 'Restore'), false, 'and cannot be bought from there');
   await act(async () => slots()[0].props.onPress());
+  assert.ok(flat().includes('Current stage'), 'the stage it stands on can be looked at');
+  await act(async () => slots()[1].props.onPress());
   assert.ok(tree!.root.findAllByType(host('Button')).some((node) => node.props.label === 'Restore'));
   const coachStates: { visible: boolean; revision: number }[] = [];
   const onCoachmarkChange = (state: { visible: boolean; revision: number }) => coachStates.push(state);
@@ -224,7 +231,7 @@ test('docked panel pins its action, keeps shortage explicit, waits for its exit,
   assert.equal(inScroll(clear as unknown as Node), false);
   assert.equal(flat().some((text) => /Reach Level/.test(text)), false, 'it is never mistaken for a level further ahead');
   assert.equal(flat().some((text) => /Lv\./.test(text)), false, 'a misted tile has no level to show yet');
-  assert.ok(tree!.root.findAllByType(host('Image')).some((node) => node.props.source === 'mist-art'), 'the mist is pictured, not what is under it');
+  assert.equal(tree!.root.findAllByType(host('Image')).filter((node) => node.props.source !== 42).length, 0, 'nothing under the mist is pictured');
   assert.ok(tree!.root.findAllByType(host('LinearGradient')).some((node) => [node.props.style].flat().some((style) => style?.width === '100%')), 'the gauge is full at 100%');
   await act(async () => { clear.props.onPress(); motion.advance(140); });
   assert.equal(purchases, 2, 'and it buys');
@@ -263,6 +270,18 @@ test('docked panel pins its action, keeps shortage explicit, waits for its exit,
   assert.ok(tree!.root.findAllByType(host('Button')).some((node) => node.props.label === 'Open Merge'));
   await act(async () => { requestTray.props.onRequestPress(campaignOrder.id); motion.advance(140); });
   assert.equal(campaignActions, 1, 'the campaign panel owns the explicit Merge handoff');
+  await act(async () => tree!.unmount());
+
+  // Starting a friend's chapter: their own phrase for it is long and says nothing of the price, so the button reads
+  // as every other upgrade does, the verb and the Glow it spends (or that it is free).
+  await act(async () => { tree = create(<Panel {...props} world={{ ...world, coins: 100 }} offer={campaignOffer} campaignState={{ ...campaignState, action: 'start_story', actionLabel: 'Plan with Petalimp', actionCost: 60, order: null }} onCampaignAction={() => campaignActions++} />); });
+  const start = tree!.root.findAllByType(host('Button')).find((node) => node.props.label === 'Restore')!;
+  assert.ok(start, 'a short verb, not the friend’s sentence'); assert.equal(start.props.cost.amount, 60, 'with its cost on the button');
+  assert.equal(tree!.root.findAllByType(host('Button')).some((node) => node.props.label === 'Plan with Petalimp'), false);
+  await act(async () => tree!.unmount());
+  await act(async () => { tree = create(<Panel {...props} offer={campaignOffer} campaignState={{ ...campaignState, action: 'start_story', actionLabel: 'Plan with Petalimp', order: null }} onCampaignAction={() => campaignActions++} />); });
+  assert.equal(tree!.root.findAllByType(host('Button')).find((node) => node.props.label === 'Restore')!.props.cost, undefined);
+  assert.ok(tree!.root.findAllByType(host('Text')).some((node) => node.props.children === 'Free'), 'the first stage is a gift, and says so');
   await act(async () => tree!.unmount());
 
   await act(async () => { tree = create(<Panel {...props} offer={campaignOffer} campaignState={{ ...campaignState, actionLabel: 'Talk to Petalimp', order: { ...campaignOrder, served: true }, stateLabel: 'Request complete' }} onCampaignAction={() => campaignActions++} />); });

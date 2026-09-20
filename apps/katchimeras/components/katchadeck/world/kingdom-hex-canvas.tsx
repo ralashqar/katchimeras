@@ -1230,6 +1230,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const upgradeCameraCommitted = useRef(false);
   // FTUE's own close-up, lifted clear of the docked panel: where to put the tile back.
   const upgradeLift = useRef<{ x: number; y: number; anchorY: number; zoom: number } | null>(null);
+  // The tile the panel framed, kept for the zoom that follows a confirmed purchase.
+  const upgradeStageFrame = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
+  const upgradeCommitZoomed = useRef(false);
   useEffect(() => {
     const durationMs = reduceMotion ? 80 : 440;
     const lower = () => {
@@ -1240,7 +1243,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (upgradeSelectionCommitted || upgradePresentation) {
       upgradeCameraCommitted.current = true;
       // The purchase plays where FTUE framed the tile, not where the panel lifted it.
-      lower();
+      if (upgradeLift.current) lower();
+      else if (upgradeStageFrame.current && !upgradeCommitZoomed.current && !preserveUpgradeCamera) {
+        // The panel has left and the whole screen is the tile's again. Its reveal (mist lifting, the island growing)
+        // assumes a close-up (`cameraAlreadyFocused`), so zoom in now, before the mist clears: the band above the
+        // panel framed the tile far smaller than that, and the zoom used to arrive only with the board.
+        upgradeCommitZoomed.current = true;
+        focusInteractionTile(upgradeStageFrame.current, { durationMs, horizontalPadding: 16, verticalPadding: 96, screenCenterY: viewport.height * 0.48, unbounded: true });
+      }
     }
     const subject = selectedUpgradeOffer ? { id: selectedUpgradeOffer.id, target: selectedUpgradeOffer.visualTarget as StoryTarget } : upgradeStageSubject;
     if (subject) {
@@ -1248,7 +1258,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const frame = storyTargetFrame(subject.target);
       const stageCenterY = upgradeStage?.centerY ?? viewport.height * 0.3;
       upgradeCameraCommitted.current = false;
+      upgradeCommitZoomed.current = false;
       upgradeFocusId.current = subject.id;
+      upgradeStageFrame.current = frame;
       if (!frame) return;
       if (preserveUpgradeCamera) {
         // FTUE already owns the planting or mist close-up: keep its zoom and save no
@@ -1275,6 +1287,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       if (!upgradeCameraCommitted.current && upgradeLift.current) lower();
       else if (origin && !upgradeCameraCommitted.current && !preserveUpgradeCamera) animateToCameraSnapshot(origin, durationMs);
       upgradeOrigin.current = null; upgradeFocusId.current = null; upgradeCameraCommitted.current = false; upgradeLift.current = null;
+      upgradeStageFrame.current = null; upgradeCommitZoomed.current = false;
     }
   }, [animateToCameraSnapshot, focusInteractionTile, focusTutorialResident, preserveUpgradeCamera, readLiveCameraSnapshot, reduceMotion, scene.height, selectedUpgradeOffer, storyTargetFrame, tutorialCameraReady, upgradePresentation, upgradeSelectionCommitted, upgradeStage?.centerY, upgradeStage?.height, upgradeStageSubject, viewport.height]);
   // The tile on the upgrade stage, as the scene draws it this frame (mist, a stage of growth, a pack's own art).

@@ -90,7 +90,7 @@ test('the Lantern grows on the shared upgrade stage: free milestones, a pinned a
   const texts = () => renderer!.root.findAllByType('Text' as any).map((node) => [node.props.children].flat().filter((child) => typeof child === 'string' || typeof child === 'number').join(''));
   assert.ok(texts().includes('Gathering') && texts().includes('100%'), 'the hero row shows the level being reached, the title bar how close it is');
   const pictures = () => renderer!.root.findAllByType('Image' as any).map((node) => node.props.source).filter((source) => typeof source === 'number' && source > 900);
-  assert.deepEqual(pictures(), [901, 901], 'the hero and the reached slot show the Lantern as it is; the next one is not pictured');
+  assert.deepEqual(pictures(), [901], 'only the reached slot is pictured; the next Lantern stays a surprise');
   assert.ok(texts().includes('Resident Wisps') && texts().includes('3') && texts().includes('+1'), 'a stat reads its value and what the level adds');
   assert.ok(texts().includes('2 / 2') && texts().includes('10 / 10'), 'both milestones read complete');
   assert.equal(buttons().some((b) => b.props.label === 'Go'), false, 'nothing left to go and do');
@@ -101,7 +101,7 @@ test('the Lantern grows on the shared upgrade stage: free milestones, a pinned a
   assert.equal(upgraded, 2); assert.equal(closes, 0, 'the panel stays up across the upgrade');
   await act(async () => renderer!.update(<Panel {...props} world={upgradeLanternWorld(props.world, 2)} />));
   assert.ok(texts().includes('Brighter Light'), 'the hero row moves on to the next level');
-  assert.deepEqual(pictures(), [902, 901, 902], 'and the Lantern it shows is the one just gained');
+  assert.deepEqual(pictures(), [901, 902], 'and the slot just gained fills in');
   assert.equal(renderer!.root.findAllByType('AnimatedView' as any).length, 2, 'the gained slot pops once, beside the panel itself');
   assert.equal(buttons().find((b) => b.props.accessibilityLabel === 'Upgrade to Level 3, free')!.props.disabled, true);
   const slots = () => renderer!.root.findAllByProps({ accessibilityRole: 'radio' }).filter((node) => typeof node.type === 'string');

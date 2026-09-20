@@ -27,6 +27,8 @@ import {
 export type UpgradeCoachmarkState = { visible: boolean; revision: number };
 
 export type WorldUpgradeCampaignState = {
+  /** What the action does. Starting a chapter is worded by the panel: short, with its cost on the button. */
+  action?: 'start_story' | 'open_merge' | 'continue_return' | 'continue_restoring' | 'continue_resolution' | null;
   actionLabel?: string;
   /** Glow the action spends (a restoration stage opening); the button waits until the player has it. */
   actionCost?: number;
@@ -79,7 +81,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   // The slot that is picked drives the hero row; it opens on the level being bought.
   // Still under the mist: its picture is the mist, and it has no level to speak of yet.
   const misted = offer.transition === 'island_reveal' || offer.id.startsWith('mist:');
-  const pick = useUpgradeLevelPick(model.levels, model.level.current, (level) => tileLevelArt(offer.id, level, misted), currentArt);
+  const pick = useUpgradeLevelPick(model.levels, (level) => tileLevelArt(offer.id, level, misted), currentArt, model.levelOffset);
   const { shown, onFocus } = pick;
   const campaignSkin = campaignState ? katchimeraSkinById.get(campaignState.residentSkinId) : null;
   const campaignPortrait = campaignSkin?.visualKey ? getCreatureVisual(campaignSkin.visualKey, 'grown').source : null;
@@ -99,7 +101,11 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   const go = (action: () => void) => { setHistory(false); leave(action); };
 
   const purchaseLabel = model.primary ? (error && affordable ? 'Try again' : model.primary.label) : '';
-  const campaignAction = !model.primary && !locked && campaignState?.actionLabel && onCampaignAction ? campaignState.actionLabel : null;
+  // A friend's chapter starts from here. The friend's own phrase for it ("Plan with Petalimp") is long and says
+  // nothing of the price, so the button reads as every other upgrade does: the verb, and the Glow it spends.
+  const campaignAction = !model.primary && !locked && campaignState?.actionLabel && onCampaignAction
+    ? campaignState.action === 'start_story' ? 'Restore' : campaignState.actionLabel : null;
+  const campaignFree = campaignState?.action === 'start_story' && !campaignState.actionCost;
   const action = !onFocus ? null
     // A held tile says why in the hero row; a disabled button would only repeat its label.
     : model.locked ? null
@@ -111,15 +117,14 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
           cost={campaignState?.actionCost ? { currency: 'coins', amount: campaignState.actionCost } : undefined}
           onPress={() => go(onCampaignAction!)} />
           : null;
-  const caption = error ? error : pick.caption ?? (model.complete ? 'Fully grown' : null);
+  const caption = error ? error : pick.caption ?? (model.complete ? 'Fully grown' : campaignAction && campaignFree ? 'Free' : null);
 
   return <>
-    <UpgradeDock motion={motion} title={model.title} levelLabel={misted ? undefined : `Lv. ${model.level.current}`} tagline={model.tagline} progressLabel={model.progressLabel} progressFraction={model.progressFraction}
+    <UpgradeDock motion={motion} title={model.title} levelLabel={misted ? undefined : `Lv. ${model.level.current + model.levelOffset}`} tagline={model.tagline} progressLabel={model.progressLabel} progressFraction={model.progressFraction}
       height={layout.panelHeight} width={layout.panelWidth} bottomInset={bottomInset}
       tabs={hasStoryTab ? { items: [{ id: 'upgrade', label: offer.action === 'Restore' ? 'Restore' : 'Upgrade', icon: 'leaf.fill' }, { id: 'story', label: 'Story', icon: 'book.fill' }], value: tab, onChange: setTab } : undefined}
       hero={<UpgradeHero
-        art={model.locked ? sleepingPortrait ?? LOCK_ART : pick.art} silhouette={Boolean(model.locked && sleepingPortrait)} dim={locked || misted}
-        ribbon={model.locked || misted ? undefined : pick.ribbon}
+        picture={model.locked ? { art: sleepingPortrait ?? LOCK_ART, silhouette: Boolean(sleepingPortrait) } : null}
         name={model.locked ? model.locked.label : pick.name ?? offer.nextName}
         description={model.locked ? model.locked.reason : shown ? pick.description : offer.description}
         action={action} caption={caption} captionTone={error ? 'danger' : undefined} />}>
@@ -127,7 +132,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
         {sleepingHint ? <Text style={styles.note}>{sleepingHint}</Text> : null}
         {model.benefits.map((benefit) => <UpgradeBenefitRow key={benefit.id} benefit={benefit} />)}
         {!locked && model.levels.length > 1 ? <UpgradeSection label="Stages" aside="Each one is a surprise">
-          <UpgradeLevelSlots levels={model.levels} selected={shown?.level ?? null} onSelect={pick.pick} artFor={pick.slotArt} disabled={busy || closing} />
+          <UpgradeLevelSlots levels={model.levels} selected={shown?.level ?? null} current={pick.current} levelOffset={model.levelOffset} onSelect={pick.pick} artFor={pick.slotArt} disabled={busy || closing} />
         </UpgradeSection> : null}
         {model.requirements.length ? <UpgradeSection label="Requires">
           {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement} disabled={busy || closing} onAction={() => go(onGarden)} />)}

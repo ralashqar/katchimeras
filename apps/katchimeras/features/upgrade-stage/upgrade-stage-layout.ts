@@ -17,8 +17,8 @@ export type UpgradeStageLayout = {
 /** The HUD bar (Back, progress, Glow) under the top safe-area inset. */
 export const UPGRADE_STAGE_TOP_CHROME = 60;
 export const UPGRADE_PANEL_MAX_WIDTH = 600;
-const PANEL_MIN_HEIGHT = 380;
-const PANEL_MAX_HEIGHT = 640;
+const PANEL_MIN_HEIGHT = 360;
+const PANEL_MAX_HEIGHT = 600;
 const STAGE_MIN_HEIGHT = 100;
 const SHORT_SCREEN_HEIGHT = 700;
 
@@ -28,7 +28,7 @@ export function upgradeStageLayout(
 ): UpgradeStageLayout {
   const stageTop = insets.top + UPGRADE_STAGE_TOP_CHROME;
   // Short phones give the panel a little more so its content rarely scrolls.
-  const fraction = viewport.height < SHORT_SCREEN_HEIGHT ? 0.62 : 0.58;
+  const fraction = viewport.height < SHORT_SCREEN_HEIGHT ? 0.6 : 0.54;
   const wanted = Math.min(PANEL_MAX_HEIGHT, Math.max(PANEL_MIN_HEIGHT, Math.round(viewport.height * fraction)));
   const panelHeight = Math.max(200, Math.min(wanted, viewport.height - stageTop - STAGE_MIN_HEIGHT));
   const stageHeight = Math.max(1, viewport.height - panelHeight - stageTop);

@@ -48,19 +48,19 @@ function UpgradeDockPreview({ model, onClose }: { model: UpgradePanelModel; onCl
   const motion = useUpgradeDockMotion({ busy: false, onClose });
   const [tab, setTab] = useState<'upgrade' | 'story'>('upgrade');
   const lantern = model.title === 'Wisp Lantern';
-  const pick = useUpgradeLevelPick(model.levels, model.level.current, (level) => lantern ? lanternLevelArt(level) : tileLevelArt(GALLERY_OFFER.id, level));
-  return <UpgradeDock motion={motion} title={model.title} levelLabel={`Lv. ${model.level.current}`} progressLabel={model.progressLabel} progressFraction={model.progressFraction}
+  const pick = useUpgradeLevelPick(model.levels, (level) => lantern ? lanternLevelArt(level) : tileLevelArt(GALLERY_OFFER.id, level), undefined, model.levelOffset);
+  return <UpgradeDock motion={motion} title={model.title} levelLabel={`Lv. ${model.level.current + model.levelOffset}`} progressLabel={model.progressLabel} progressFraction={model.progressFraction}
     height={layout.panelHeight} width={layout.panelWidth} bottomInset={insets.bottom}
     tagline={model.tagline}
     tabs={lantern ? undefined : { items: [{ id: 'upgrade', label: 'Upgrade', icon: 'leaf.fill' }, { id: 'story', label: 'Story', icon: 'book.fill' }], value: tab, onChange: setTab }}
-    hero={<UpgradeHero art={model.locked ? null : pick.art} dim={Boolean(model.locked)} ribbon={model.locked ? undefined : pick.ribbon}
+    hero={<UpgradeHero picture={model.locked ? { glyph: '?' } : null}
       name={model.locked ? model.locked.label : pick.name ?? model.title} description={model.locked ? model.locked.reason : pick.description}
       action={pick.onFocus && model.primary ? <KatchaButton fullWidth size="compact" disabled={model.primary.disabled} label={model.primary.label}
         cost={model.primary.cost ? { currency: 'coins', amount: model.primary.cost } : undefined} onPress={motion.dismiss} /> : null}
       caption={pick.caption ?? (model.complete ? 'Fully grown' : model.primary?.cost == null && model.primary ? 'Free' : null)} />}>
     {tab === 'upgrade' ? <>
       {model.benefits.map((benefit) => <UpgradeBenefitRow key={benefit.id} benefit={benefit} />)}
-      {!model.locked && model.levels.length > 1 ? <UpgradeSection label="Stages" aside="Each one is a surprise"><UpgradeLevelSlots levels={model.levels} selected={pick.shown?.level ?? null} onSelect={pick.pick} artFor={pick.slotArt} /></UpgradeSection> : null}
+      {!model.locked && model.levels.length > 1 ? <UpgradeSection label="Stages" aside="Each one is a surprise"><UpgradeLevelSlots levels={model.levels} selected={pick.shown?.level ?? null} current={pick.current} levelOffset={model.levelOffset} onSelect={pick.pick} artFor={pick.slotArt} /></UpgradeSection> : null}
       {model.requirements.length ? <UpgradeSection label="Requires">{model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement} onAction={motion.dismiss} />)}</UpgradeSection> : null}
     </> : <ThemedText style={styles.body} lightColor={GameUI.color.inkSecondary} darkColor={GameUI.color.inkSecondary}>The Story tab holds a tile’s dialogue and a friend’s chapters.</ThemedText>}
   </UpgradeDock>;

@@ -203,6 +203,8 @@ export function islandCampaignUpgradePanelState(world: MergeWorldState, campaign
 }
 
 export type IslandCampaignPanelPresentation = {
+  /** What the action does; the panel words a chapter's start itself, short, with its cost on the button. */
+  action?: IslandCampaignPanelAction | null;
   actionLabel?: string;
   actionCost?: number;
   order: IslandCampaignPanelRequest | null;
@@ -218,6 +220,7 @@ export function islandCampaignPanelPresentation(world: MergeWorldState, campaign
   const state = islandCampaignUpgradePanelState(world, campaign);
   if (!state) return null;
   return {
+    action: state.action,
     actionLabel: state.actionLabel,
     actionCost: state.actionCost || undefined,
     order: state.order ? {

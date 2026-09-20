@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,46 +31,41 @@ function Face({ colors, radius, rim = 1.5, style, children, stroke = true }: {
 }
 
 /**
- * Which level the hero row is showing, and how much of it may be seen. Reached
- * levels show their own picture. The level being bought shows the subject as it
- * stands now, and anything further on is a question mark: what a level will look
- * like is for the world to reveal, not the panel. `currentArt` is the picture the
- * world is drawing for the subject right now; with it the panel shows that very
- * tile (its mist, its pack art) rather than a stand-in from the catalogue.
+ * Which level the hero row is describing, and how much of it may be known. The
+ * tile itself is framed above the panel, so the hero row carries no picture of
+ * it: the current stage is pictured in its own slot instead, as the world is
+ * drawing it right now (`currentArt`), and earlier stages show their own art.
+ * The level being bought and everything after it stay a question mark: what a
+ * level will look like is for the world to reveal, not the panel.
  */
-export function useUpgradeLevelPick<Art>(levels: readonly UpgradeLevelEntry[], currentLevel: number, artFor: (level: number) => Art | null, currentArt?: Art | null) {
+export function useUpgradeLevelPick<Art>(levels: readonly UpgradeLevelEntry[], artFor: (level: number) => Art | null, currentArt?: Art | null, levelOffset = 0) {
   const focus = upgradeFocusLevel(levels);
   const [picked, setPicked] = useState<number | null>(null);
   const shown = levels.find((entry) => entry.level === picked) ?? focus;
   const onFocus = shown === focus;
   const ahead = shown?.state === 'ahead';
+  const current = [...levels].reverse().find((entry) => entry.state === 'done')?.level ?? null;
   return {
     shown, onFocus, pick: setPicked, reset: () => setPicked(null),
-    // The subject as it stands now is the tile the world is drawing, when the host can say which; the catalogue's art is the stand-in.
-    art: !shown || onFocus ? currentArt ?? artFor(shown?.state === 'done' ? shown.level : currentLevel) : shown.state === 'done' ? artFor(shown.level) : null,
-    ribbon: !shown ? undefined : onFocus ? 'Current stage' : shown.state === 'done' ? `Stage ${shown.level}` : undefined,
     name: ahead ? '? ? ?' : shown?.name,
     description: ahead ? null : shown?.description,
-    caption: !shown || onFocus ? null : shown.state === 'done' ? 'Reached' : `Reach Level ${shown.level - 1} first`,
-    /** A slot's picture: only a level already reached has one. */
-    slotArt: (level: number) => levels.find((entry) => entry.level === level)?.state === 'done' ? artFor(level) : null,
+    caption: !shown || onFocus ? null : shown.state === 'done' ? (shown.level === current ? 'Current stage' : 'Reached') : `Reach Level ${shown.level - 1 + levelOffset} first`,
+    /** The stage the subject stands at now, for the slot that wears the marker. */
+    current,
+    /** A slot's picture: only a level already reached has one, and the current one is the world's own tile. */
+    slotArt: (level: number) => levels.find((entry) => entry.level === level)?.state !== 'done' ? null : level === current ? currentArt ?? artFor(level) : artFor(level),
   };
 }
 
 /**
- * The pinned row under the title: a large picture of the subject in a pale
- * mount, and beside it what it becomes, a line about it, and the action.
+ * The pinned row under the title: what the subject becomes, a line about it,
+ * and the action at full width. It carries no picture of the subject, which is
+ * framed right above the panel; only something held or hidden gets a small
+ * one (the friend resting there, the lock, the mist), because that is not what
+ * the world is showing.
  */
-export function UpgradeHero({ art, silhouette = false, dim = false, glyph, ribbon, name, description, action, caption, captionTone }: {
-  art?: ImageSourcePropType | null;
-  /** The picture as a dark shape: someone not met yet. */
-  silhouette?: boolean;
-  /** A held or hidden subject: the picture sits under a grey sky instead of an open one. */
-  dim?: boolean;
-  /** Shown in the frame when there is no picture (an unknown level, a lock). */
-  glyph?: string;
-  /** A small label over the foot of the picture (`Current stage`). */
-  ribbon?: string;
+export function UpgradeHero({ picture, name, description, action, caption, captionTone }: {
+  picture?: { art?: ImageSourcePropType | null; /** The picture as a dark shape: someone not met yet. */ silhouette?: boolean; glyph?: string } | null;
   name: string;
   description?: string | null;
   action?: ReactNode;
@@ -79,30 +74,28 @@ export function UpgradeHero({ art, silhouette = false, dim = false, glyph, ribbo
   captionTone?: 'danger';
 }) {
   return <View style={styles.hero}>
-    <View style={styles.mount}>
-      <View style={styles.picture}>
-        <LinearGradient colors={dim || silhouette || !art ? UpgradePanelUI.pictureLockedFace : UpgradePanelUI.pictureFace} style={StyleSheet.absoluteFill} />
-        {art ? <Image accessibilityIgnoresInvertColors cachePolicy="memory-disk" contentFit="contain" source={art} style={[styles.pictureArt, silhouette && styles.pictureSilhouette]} transition={0} />
-          : <Text style={styles.pictureGlyph}>{glyph ?? '?'}</Text>}
-        {ribbon ? <View style={styles.ribbon}>
-          <LinearGradient colors={UpgradePanelUI.ribbonFace} style={[StyleSheet.absoluteFill, styles.ribbonFace]} />
-          <Text numberOfLines={1} style={styles.ribbonText}>{ribbon}</Text>
-        </View> : null}
-      </View>
-    </View>
-    <View style={styles.heroText}>
-      <Text numberOfLines={2} style={styles.heroName}>{name}</Text>
-      <View style={styles.ornament}>
-        <LinearGradient colors={[UpgradePanelUI.dividerFade[0], UpgradePanelUI.dividerFade[1]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.ornamentRule} />
-        <IconSymbol color={UpgradePanelUI.leaf} name="leaf.fill" size={11} />
-        <LinearGradient colors={[UpgradePanelUI.dividerFade[1], UpgradePanelUI.dividerFade[0]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.ornamentRule} />
-      </View>
-      {description ? <Text numberOfLines={action ? 3 : 5} style={styles.heroDescription}>{description}</Text> : null}
-      {action ? <View style={styles.heroAction}>{action}</View> : null}
-      {caption ? <View style={[styles.heroStatus, captionTone === 'danger' && styles.heroStatusDanger]}>
-        <Text accessibilityLiveRegion="polite" style={[styles.heroCaption, captionTone === 'danger' && styles.heroCaptionDanger]}>{caption}</Text>
+    <View style={styles.heroTop}>
+      {picture ? <View style={styles.mount}>
+        <View style={styles.picture}>
+          <LinearGradient colors={UpgradePanelUI.pictureLockedFace} style={StyleSheet.absoluteFill} />
+          {picture.art ? <Image accessibilityIgnoresInvertColors cachePolicy="memory-disk" contentFit="contain" source={picture.art} style={[styles.pictureArt, picture.silhouette && styles.pictureSilhouette]} transition={0} />
+            : <Text style={styles.pictureGlyph}>{picture.glyph ?? '?'}</Text>}
+        </View>
       </View> : null}
+      <View style={styles.heroText}>
+        <Text numberOfLines={2} style={styles.heroName}>{name}</Text>
+        <View style={styles.ornament}>
+          <LinearGradient colors={[UpgradePanelUI.dividerFade[0], UpgradePanelUI.dividerFade[1]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.ornamentRule} />
+          <IconSymbol color={UpgradePanelUI.leaf} name="leaf.fill" size={11} />
+          <LinearGradient colors={[UpgradePanelUI.dividerFade[1], UpgradePanelUI.dividerFade[0]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.ornamentRule} />
+        </View>
+        {description ? <Text numberOfLines={3} style={styles.heroDescription}>{description}</Text> : null}
+      </View>
     </View>
+    {action ? <View>{action}</View> : null}
+    {caption ? <View style={[styles.heroStatus, captionTone === 'danger' && styles.heroStatusDanger]}>
+      <Text accessibilityLiveRegion="polite" style={[styles.heroCaption, captionTone === 'danger' && styles.heroCaptionDanger]}>{caption}</Text>
+    </View> : null}
   </View>;
 }
 
@@ -184,8 +177,12 @@ export function UpgradeRequirementRow({ requirement, disabled, onAction }: {
  * the hero row. A level gained while the panel is up (the Lantern's stays open)
  * pops its badge with a success tap.
  */
-export function UpgradeLevelSlots({ levels, selected, onSelect, artFor, disabled }: {
+export function UpgradeLevelSlots({ levels, selected, current, levelOffset = 0, onSelect, artFor, disabled }: {
   levels: readonly UpgradeLevelEntry[]; selected: number | null; onSelect: (level: number) => void;
+  /** The stage the subject stands at now: its slot wears a small marker. */
+  current?: number | null;
+  /** Added to every level shown (a tile counts from 0 inside, from 1 on screen). */
+  levelOffset?: number;
   /** Asked only for levels already reached. */
   artFor?: (level: number) => ImageSourcePropType | null | undefined; disabled?: boolean;
 }) {
@@ -203,17 +200,31 @@ export function UpgradeLevelSlots({ levels, selected, onSelect, artFor, disabled
   // Only a level actually gained replays this; the list's identity changes every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reached]);
+  // More stages than fit: the row scrolls, opened on the stage in play so the one before it and the one after it are
+  // always on screen, however far along the road is.
+  const scrolls = levels.length > SLOTS_THAT_FIT;
+  const scroller = useRef<ScrollView>(null);
+  const [rowWidth, setRowWidth] = useState(0);
+  const focusIndex = Math.max(0, levels.findIndex((entry) => entry === upgradeFocusLevel(levels)));
+  const contentWidth = levels.length * SLOT_OUTER + (levels.length - 1) * CONNECTOR + SLOT_ROW_PAD * 2;
+  const centred = Math.max(0, Math.min(contentWidth - rowWidth, SLOT_ROW_PAD + focusIndex * (SLOT_OUTER + CONNECTOR) + SLOT_OUTER / 2 - rowWidth / 2));
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!scrolls || !rowWidth) return;
+    // Placed without motion the first time, then it follows the road as levels are gained.
+    scroller.current?.scrollTo({ x: centred, animated: opened.current });
+    opened.current = true;
+  }, [centred, rowWidth, scrolls]);
   if (levels.length < 2) return null;
-  return <View accessibilityRole="radiogroup" style={styles.slots}>
-    {levels.map((entry, index) => {
+  const row = levels.map((entry, index) => {
       const art = entry.state === 'done' ? artFor?.(entry.level) : null;
       const picked = entry.level === selected;
-      const badge = <Text style={styles.badgeText}>{entry.level}</Text>;
+      const badge = <Text style={styles.badgeText}>{entry.level + levelOffset}</Text>;
       const badgeStyle = [styles.badge, entry.state === 'done' ? styles.badgeDone : entry.state === 'next' ? styles.badgeNext : styles.badgeAhead];
       return <Fragment key={entry.level}>
-        {index > 0 ? <View style={styles.connector}><View style={styles.connectorDot} /><View style={styles.connectorDot} /></View> : null}
+        {index > 0 ? <View style={[styles.connector, scrolls && styles.connectorFixed]}><View style={styles.connectorDot} /><View style={styles.connectorDot} /></View> : null}
         <Pressable accessibilityRole="radio" accessibilityState={{ selected: picked, disabled }}
-          accessibilityLabel={`Level ${entry.level}${entry.state === 'ahead' ? '' : `, ${entry.name}`}. ${entry.state === 'done' ? 'Reached' : entry.state === 'next' ? 'Next' : 'Not yet known'}`}
+          accessibilityLabel={`Level ${entry.level + levelOffset}${entry.state === 'ahead' ? '' : `, ${entry.name}`}. ${entry.level === current ? 'Current stage' : entry.state === 'done' ? 'Reached' : entry.state === 'next' ? 'Next' : 'Not yet known'}`}
           disabled={disabled} onPress={() => onSelect(entry.level)} style={({ pressed }) => [styles.slotHit, pressed && styles.slotPressed]}>
           <Face colors={entry.state === 'done' ? UpgradePanelUI.slotDoneFace : entry.state === 'next' ? UpgradePanelUI.slotNextFace : UpgradePanelUI.slotAheadFace} radius={16} rim={2}
             style={[entry.state === 'done' ? styles.slotDone : entry.state === 'next' ? styles.slotNext : styles.slotAhead, picked && styles.slotPicked]}>
@@ -223,10 +234,14 @@ export function UpgradeLevelSlots({ levels, selected, onSelect, artFor, disabled
             </View>
           </Face>
           {entry.level === popped ? <PoppingBadge style={badgeStyle}>{badge}</PoppingBadge> : <View style={badgeStyle}>{badge}</View>}
+          {entry.level === current ? <View style={styles.nowTag}><Text style={styles.nowText}>Now</Text></View> : null}
         </Pressable>
       </Fragment>;
-    })}
-  </View>;
+    });
+  return scrolls
+    ? <ScrollView ref={scroller} horizontal accessibilityRole="radiogroup" showsHorizontalScrollIndicator={false} contentOffset={{ x: centred, y: 0 }}
+      onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)} style={styles.slotScroll} contentContainerStyle={styles.slotScrollContent}>{row}</ScrollView>
+    : <View accessibilityRole="radiogroup" style={styles.slots}>{row}</View>;
 }
 
 function PoppingBadge({ style, children }: { style: object[]; children: ReactNode }) {
@@ -240,28 +255,30 @@ function PoppingBadge({ style, children }: { style: object[]; children: ReactNod
 }
 
 const SLOT = 62;
-const PICTURE = 118;
+/** A slot with its rim, the dots between two slots, and the row's own padding: the scroller's arithmetic. */
+const SLOT_OUTER = SLOT + 4;
+const CONNECTOR = 28;
+const SLOT_ROW_PAD = 6;
+const SLOTS_THAT_FIT = 4;
+const PICTURE = 64;
 const styles = StyleSheet.create({
   // Plain circular corners: the stroke inside the rim is inset by the rim's width, which is only concentric on a true arc.
   face: { overflow: 'hidden' },
   faceStroke: { ...StyleSheet.absoluteFillObject, borderColor: UpgradePanelUI.innerStroke, borderWidth: 1.5 },
-  hero: { alignItems: 'flex-start', flexDirection: 'row', gap: 14 },
+  hero: { gap: 10 },
+  heroTop: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   // A thick pale mount with its own rim, the picture under an open sky inside it.
-  mount: { backgroundColor: UpgradePanelUI.mount, borderColor: UpgradePanelUI.mountBorder, borderRadius: 20, borderWidth: 1.5, boxShadow: '0 3px 8px rgba(58,38,18,0.18)', padding: 5 },
-  picture: { alignItems: 'center', borderRadius: 15, height: PICTURE, justifyContent: 'center', overflow: 'hidden', width: PICTURE },
-  pictureArt: { height: PICTURE - 12, width: PICTURE - 12 },
+  mount: { backgroundColor: UpgradePanelUI.mount, borderColor: UpgradePanelUI.mountBorder, borderRadius: 16, borderWidth: 1.5, padding: 4 },
+  picture: { alignItems: 'center', borderRadius: 11, height: PICTURE, justifyContent: 'center', overflow: 'hidden', width: PICTURE },
+  pictureArt: { height: PICTURE - 8, width: PICTURE - 8 },
   pictureSilhouette: { opacity: 0.78, tintColor: UpgradePanelUI.ink },
-  pictureGlyph: { color: UpgradePanelUI.slotUnknownInk, fontFamily: AppFontFamilies.fredokaBold, fontSize: 56, lineHeight: 64 },
-  ribbon: { borderColor: UpgradePanelUI.ribbonBorder, borderRadius: 999, borderWidth: 1.5, bottom: 6, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 1, position: 'absolute' },
-  ribbonFace: { borderRadius: 999 },
-  ribbonText: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.ribbonInk, fontSize: 11.5, lineHeight: 16 },
-  heroText: { flex: 1, gap: 5 },
+  pictureGlyph: { color: UpgradePanelUI.slotUnknownInk, fontFamily: AppFontFamilies.fredokaBold, fontSize: 32, lineHeight: 38 },
+  heroText: { flex: 1, gap: 4 },
   heroName: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.ink, fontSize: 22, lineHeight: 26 },
   ornament: { alignItems: 'center', flexDirection: 'row', gap: 6 },
   ornamentRule: { flex: 1, height: 1.5 },
   heroDescription: { ...KatchaUI.type.companionBody, color: UpgradePanelUI.inkSoft, fontSize: 13, lineHeight: 18 },
-  heroAction: { marginTop: 3 },
-  heroStatus: { alignSelf: 'flex-start', backgroundColor: UpgradePanelUI.row, borderColor: UpgradePanelUI.rowBorder, borderRadius: 999, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 3 },
+  heroStatus: { alignSelf: 'center', backgroundColor: UpgradePanelUI.row, borderColor: UpgradePanelUI.rowBorder, borderRadius: 999, borderWidth: 1.5, paddingHorizontal: 12, paddingVertical: 3 },
   heroStatusDanger: { backgroundColor: UpgradePanelUI.dangerFace[0], borderColor: UpgradePanelUI.dangerBorder },
   heroCaption: { ...KatchaUI.type.companionBody, color: UpgradePanelUI.inkSoft, fontSize: 12, fontWeight: '800', lineHeight: 16 },
   heroCaptionDanger: { color: UpgradePanelUI.danger },
@@ -298,8 +315,12 @@ const styles = StyleSheet.create({
   tick: { alignItems: 'center', backgroundColor: UpgradePanelUI.badgeDone, borderRadius: 9, height: 18, justifyContent: 'center', width: 18 },
   amount: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.successInk, fontSize: 15, lineHeight: 19, fontVariant: ['tabular-nums'] },
   amountShort: { color: UpgradePanelUI.danger },
-  slots: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 8 },
+  slots: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 8, paddingTop: 8 },
   connector: { flexDirection: 'row', gap: 4 },
+  connectorFixed: { justifyContent: 'center', width: CONNECTOR },
+  // Room above for the Now tag and below for the level tag; the card's padding is given back so the row runs edge to edge.
+  slotScroll: { marginHorizontal: -12 },
+  slotScrollContent: { alignItems: 'center', paddingBottom: 8, paddingHorizontal: SLOT_ROW_PAD + 12, paddingTop: 8 },
   connectorDot: { backgroundColor: UpgradePanelUI.connector, borderRadius: 2, height: 4, width: 4 },
   slotHit: { alignItems: 'center' },
   slotPressed: { transform: [{ scale: 0.95 }] },
@@ -317,5 +338,7 @@ const styles = StyleSheet.create({
   badgeDone: { backgroundColor: UpgradePanelUI.badgeDone },
   badgeNext: { backgroundColor: UpgradePanelUI.badgeNext },
   badgeAhead: { backgroundColor: UpgradePanelUI.badgeAhead },
+  nowTag: { backgroundColor: UpgradePanelUI.levelPillFace[1], borderColor: UpgradePanelUI.levelPillBorder, borderRadius: 999, borderWidth: 1, paddingHorizontal: 6, position: 'absolute', top: -7 },
+  nowText: { color: UpgradePanelUI.levelPillInk, fontFamily: AppFontFamilies.fredokaBold, fontSize: 10, lineHeight: 13 },
   badgeText: { color: UpgradePanelUI.badgeInk, fontFamily: AppFontFamilies.fredokaBold, fontSize: 13, lineHeight: 16 },
 });

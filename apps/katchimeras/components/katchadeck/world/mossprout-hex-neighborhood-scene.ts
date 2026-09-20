@@ -111,6 +111,15 @@ export function natureIslandArt(islandId: MossproutNatureIslandId): NatureArtSpe
     ...(Object.keys(levelArt).length ? { levelArt } : {}),
   };
 }
+/**
+ * The art a revealed island wears at a level: its freshly revealed look at 0, its own stage art above that, and the
+ * island's one picture where a stage has none. The world and the upgrade panel's stage slots both read this, so a
+ * slot can never show a different tile from the one the map drew at that level.
+ */
+export function natureIslandLevelArt(islandId: MossproutNatureIslandId, level: number): Omit<ArtSpec, 'coord'> {
+  const art = natureIslandArt(islandId);
+  return (level <= 0 ? art.revealedArt : art.levelArt?.[level as Exclude<MossproutNatureIslandLevel, 0>]) ?? art;
+}
 export const MOSSPROUT_NATURE_ISLAND_ART: Record<string, NatureArtSpec> = {
   // The Wander Trail: the bundled pack `data/content-packs/wanderling-trail.json`; one art for every level until bespoke stages exist.
   'wanderling-trail': {
@@ -276,11 +285,7 @@ function natureLayerFor(
   revealed = false,
 ): KingdomTileArtLayer {
   const fallback = natureIslandArt(islandId);
-  const authored = level === 0 && revealed && fallback.revealedArt
-    ? { ...fallback, ...fallback.revealedArt }
-    : level > 0
-    ? { ...fallback, ...fallback.levelArt?.[level as Exclude<MossproutNatureIslandLevel, 0>] }
-    : fallback;
+  const authored = level > 0 || revealed ? { ...fallback, ...natureIslandLevelArt(islandId, level) } : fallback;
   const locked = level === 0 && !revealed;
   const rendered = locked
     ? {

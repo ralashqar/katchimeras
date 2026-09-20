@@ -2646,7 +2646,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
             if (archive) setSelectedUpgrade(archive);
           } }] : []),
         ];
-        const havenLevels = (environment?.stages ?? []).filter((stage) => stage.stage >= 1).map((stage) => ({
+        const havenLevels = (environment?.stages ?? []).map((stage) => ({
           level: stage.stage as number, name: stage.name, description: stage.narrative,
           state: stage.stage <= currentStage ? 'done' as const : stage.stage === next?.stage ? 'next' as const : 'ahead' as const,
         }));

@@ -1,5 +1,5 @@
 import type { ImageSourcePropType } from 'react-native';
-import { natureIslandArt } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
+import { natureIslandLevelArt } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
 import { LANTERN_LEVEL_ART } from '@/constants/wisp-lantern-art';
 import type { MossproutNatureIslandId } from '@/types/merge-world';
 import { KINGDOM_DREAM_MIST_LOCKED_HEX_TILE_V1, havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
@@ -19,9 +19,10 @@ export function tileLevelArt(offerId: string, level: number, misted = false): Im
     return spec ? kingdomHexTileSourceForLod(spec, 'thumb') : null;
   }
   if (kind === 'nature') {
-    const art = natureIslandArt(id as MossproutNatureIslandId);
-    const levelSources = art.levelArt?.[level as 1 | 2 | 3 | 4]?.sources;
-    return (levelSources?.thumb ?? art.sources.thumb ?? art.sources.medium ?? art.sources.full) as ImageSourcePropType;
+    // The same rule the map draws by: level 0 is the freshly revealed island, never its one default picture (which
+    // for the bundled islands is a stage in full bloom).
+    const sources = natureIslandLevelArt(id as MossproutNatureIslandId, level).sources;
+    return (sources.thumb ?? sources.medium ?? sources.full) as ImageSourcePropType;
   }
   return null;
 }
