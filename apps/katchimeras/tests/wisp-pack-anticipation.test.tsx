@@ -24,6 +24,7 @@ for (const reduced of [false, true]) test(`reward pack artwork persists from sea
     '@/features/today/egg-haptics': { createEggHatchHaptics: (quick: boolean) => createEggHapticSequence(cue => impacts.push(cue), quick) },
     '@/components/katchadeck/ui/radial-sunburst': { RotatingRadialSunburst: 'Rays' },
     '@/constants/wisp-card-art': { WISP_CARD_ART: { pack: 'pack' } },
+    './wisp-pack-handoff': { WISP_PACK_HANDOFF_MS: 150, WISP_PACK_HANDOFF_SCALE: 0.72 },
   });
   let completed = 0;
   let renderer!: ReactTestRenderer;
@@ -47,6 +48,13 @@ for (const reduced of [false, true]) test(`reward pack artwork persists from sea
   assert.equal(impacts.filter(cue => cue === 'shake').length, reduced ? 1 : 10);
   assert.deepEqual(impacts.slice(-2), ['hatch', 'settle']);
   assert.equal(completed, 1);
+  // The pack never blinks out: it hands over still visible and part-shrunk, and the card page carries the shrink on.
+  const packMotion = renderer.root.findAllByType('AnimatedView' as any).at(-1)!.props.style.read();
+  motion.advance(1000);
+  const handed = renderer.root.findAllByType('AnimatedView' as any).at(-1)!.props.style.read();
+  assert.ok(packMotion.opacity === 1 || reduced, 'full motion never fades the pack');
+  assert.equal(handed.opacity, reduced ? 0 : 1);
+  assert.ok(Math.abs(handed.transform.at(-1).scale - (reduced ? 1 : 0.72)) < 1e-9, 'it hands over at the scale the card page starts from');
   await act(async () => renderer.unmount());
   impacts.length = 0;
   await act(async () => { renderer = create(<Component opening onDone={done} />); });

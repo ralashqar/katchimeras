@@ -7,6 +7,7 @@ import { eggHatchRattle, eggHatchPulse, EGG_HATCH_SHAKE_X, EGG_HATCH_SHAKE_ROTAT
 import { createEggHatchHaptics } from '@/features/today/egg-haptics';
 import { HATCH_PHASE_DELAYS_MS, REDUCED_HATCH_PHASE_DELAYS_MS } from '@/utils/hatch-reveal-timing';
 import { WISP_CARD_ART } from '@/constants/wisp-card-art';
+import { WISP_PACK_HANDOFF_MS, WISP_PACK_HANDOFF_SCALE } from './wisp-pack-handoff';
 
 /** Reward-overlay artwork. Only the motion and haptics come from the Egg hatch. */
 export function WispPackAnticipation({ opening, onDone, size = 310 }: { opening: boolean; onDone: () => void; size?: number }) {
@@ -31,9 +32,10 @@ export function WispPackAnticipation({ opening, onDone, size = 310 }: { opening:
         cancelAnimation(shake); cancelAnimation(pulse);
         shake.value = withTiming(0, { duration: 80 });
         pulse.value = 0;
-        exit.value = withTiming(1, { duration: reduced ? 80 : 150, easing: Easing.out(Easing.cubic) });
+        // The pack starts to shrink here and the card page carries the shrink on: it never fades or snaps away.
+        exit.value = withTiming(1, { duration: reduced ? 80 : WISP_PACK_HANDOFF_MS, easing: Easing.in(Easing.quad) });
       }, timing.crossfadingSubject),
-      setTimeout(() => { haptics.advance('subject_settling'); done.current(); }, timing.crossfadingSubject + (reduced ? 80 : 150)),
+      setTimeout(() => { haptics.advance('subject_settling'); done.current(); }, timing.crossfadingSubject + (reduced ? 80 : WISP_PACK_HANDOFF_MS)),
     ];
     return () => {
       timers.forEach(clearTimeout); haptics.stop();
@@ -41,8 +43,9 @@ export function WispPackAnticipation({ opening, onDone, size = 310 }: { opening:
     };
   }, [exit, opening, pulse, reduced, shake]);
   const packStyle = useAnimatedStyle(() => ({
-    opacity: 1 - exit.value,
-    transform: [{ translateX: shake.value * EGG_HATCH_SHAKE_X }, { rotateZ: `${shake.value * EGG_HATCH_SHAKE_ROTATION}deg` }],
+    // Reduced motion has no card page animation to hand over to, so there the pack simply fades.
+    opacity: reduced ? 1 - exit.value : 1,
+    transform: [{ translateX: shake.value * EGG_HATCH_SHAKE_X }, { rotateZ: `${shake.value * EGG_HATCH_SHAKE_ROTATION}deg` }, { scale: reduced ? 1 : 1 - exit.value * (1 - WISP_PACK_HANDOFF_SCALE) }],
   }));
   const glowStyle = useAnimatedStyle(() => ({ opacity: (0.35 + pulse.value * 0.5) * (1 - exit.value), transform: [{ scale: 0.8 + pulse.value * 0.3 }] }));
   return <View pointerEvents="none" accessibilityLiveRegion="polite" accessibilityLabel={opening ? 'Opening Wisp card pack' : 'Sealed Wisp card pack'} style={[styles.stage, { width: size, height: size }]}>
