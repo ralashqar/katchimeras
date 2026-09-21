@@ -126,8 +126,8 @@ export function UpgradeBenefitRow({ benefit }: { benefit: UpgradeBenefit }) {
       accessibilityRole="text" style={styles.stripRow}>
       {/* What kind of number it is, at a glance: the same picture the rest of the game uses for it. */}
       {benefit.icon ? <View style={[styles.stripIcon, { backgroundColor: `${benefit.tint ?? UpgradePanelUI.leaf}22`, borderColor: `${benefit.tint ?? UpgradePanelUI.leaf}55` }]}>
-        {benefit.icon === 'glow'
-          ? <Image accessibilityIgnoresInvertColors contentFit="contain" source={GAME_CURRENCY_ART.coins} style={styles.stripIconArt} transition={0} />
+        {benefit.icon === 'glow' || benefit.icon === 'energy'
+          ? <Image accessibilityIgnoresInvertColors contentFit="contain" source={benefit.icon === 'glow' ? GAME_CURRENCY_ART.coins : GAME_CURRENCY_ART.mergeEnergy} style={styles.stripIconArt} transition={0} />
           : <IconSymbol color={benefit.tint ?? UpgradePanelUI.leaf} name={benefit.icon} size={18} weight="bold" />}
       </View> : null}
       <Text numberOfLines={1} style={styles.stripLabel}>{benefit.label}</Text>

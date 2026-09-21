@@ -1,0 +1,6 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "prompt": "Use the reference only for its art style: one chunky, glossy, cushiony 3D toy currency icon with soft bevels, a single soft highlight, large flat colour blocks, very low detail and no texture. Replace the golden swirl with a DIFFERENT icon: ONE plump rounded dewdrop, centred and very large, in cool bright cyan to aqua blue, with ONE bold chunky cream-white lightning bolt raised on its front. The drop is solid and opaque, never transparent glass, never gold, never orange or yellow. At most three broad colours: cyan, a deeper aqua for the shaded side, cream for the bolt. It must be unmistakable at 20 pixels and clearly different from a golden swirl. Perfectly flat pure black #000000 background for matting, the whole silhouette inside the canvas with clear padding. No second object, no ring, no coin, no sparkles, no particles, no aura, no splash, no face, no leaf, no text, no letters, no numbers, no border, no UI, no watermark, no floor, no cast shadow.",
+  "sourceSha256": "3f2b0e75a041bee2b56a18206e388ea5e8dfad4f7bd9010c83d39a83d73a4d89",
+  "referenceSha256": "3d71c3d7ceb88fef92161e03118f87cc01a3614b9f8a66029c3d2764532b3050"
+}

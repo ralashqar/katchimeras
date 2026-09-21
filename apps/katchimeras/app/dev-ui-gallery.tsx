@@ -74,7 +74,6 @@ function UpgradeDockPreview({ model, onClose }: { model: UpgradePanelModel; onCl
   const pick = useUpgradeLevelPick(model.levels, (level) => lantern ? lanternLevelArt(level) : tileLevelArt(GALLERY_OFFER.id, level), undefined, model.levelOffset);
   return <UpgradeDock motion={motion} title={model.title} levelLabel={`Lv. ${model.level.current + model.levelOffset}`} progressLabel={model.progressLabel} progressFraction={model.progressFraction}
     height={layout.panelHeight} width={layout.panelWidth} bottomInset={insets.bottom}
-    tagline={model.tagline}
     tabs={lantern ? undefined : { items: [{ id: 'upgrade', label: 'Upgrade', icon: 'leaf.fill' }, { id: 'story', label: 'Story', icon: 'book.fill' }], value: tab, onChange: setTab }}
     hero={<UpgradeHero picture={model.locked ? { glyph: '?' } : null}
       name={model.locked ? model.locked.label : pick.name ?? model.title} description={model.locked ? model.locked.reason : pick.description}

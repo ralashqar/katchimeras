@@ -174,8 +174,12 @@ test('docked panel pins its action, keeps shortage explicit, waits for its exit,
   assert.equal(tree!.root.findAllByType(host('Button')).some((node) => node.props.label === 'Tend garden'), false, 'a met requirement offers nowhere to go');
   const tabs = () => tree!.root.findAllByType(host('Pressable')).filter((node) => node.props.accessibilityRole === 'tab');
   assert.deepEqual(tabs().map((node) => node.props.accessibilityState.selected), [true, false], 'a tile with a story has an Upgrade tab and a Story tab');
+  const buttons = () => tree!.root.findAllByType(host('Button')).length;
+  const upgradeButtons = buttons();
+  assert.ok(upgradeButtons > 0, 'the Upgrade tab carries the button that buys it');
   await act(async () => tabs()[1].props.onPress());
   assert.equal(coachStates.at(-1)?.visible, false, 'the Story tab hides the upgrade guide');
+  assert.equal(buttons(), 0, 'the Story tab is the story and nothing else: no pinned name, description or upgrade button');
   assert.equal(tree!.root.findAllByType(host('ProgressBar')).length, 0, 'the Story tab shows no upgrade rows');
   await act(async () => tree!.root.findAllByType(host('Pressable')).find((node) => node.props.accessibilityLabel === 'Expand story history')!.props.onPress());
   assert.equal(tree!.root.findAllByType(host('Narrative')).length, 1, 'the story opens from its tab');

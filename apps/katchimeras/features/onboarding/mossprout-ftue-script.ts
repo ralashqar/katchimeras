@@ -198,7 +198,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       camera: mossproutWorldDialogueCamera,
       guide: { eyebrow: 'Wake Heartwood', title: 'Wake the Garden. Reconnect the paths.', body: COPY.seedOrigin },
       actions: [
-        { id: 'companion.continue_to_planting', title: 'Dig it out', description: 'The spring is under the one patch the Mist let go of.', icon: 'arrow.right', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.garden_arrival', backendEvent: true },
+        { id: 'companion.continue_to_planting', title: 'Plant it', description: 'The spring is under the one patch the Mist let go of.', icon: 'arrow.right', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.garden_arrival', backendEvent: true },
         // Receipt lookup for older saves; never shown as a second control.
         { id: 'companion.acknowledge_garden_intro', title: 'Continue', description: '', icon: 'arrow.right', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.garden_arrival', backendEvent: true },
       ],
@@ -206,14 +206,14 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'companion.order_preview', surface: 'companion', navigation: mossproutHavenHostedCompanionResume,
       camera: mossproutWorldDialogueCamera,
-      guide: { eyebrow: 'The old spring', title: 'Let’s dig it out before we do anything else.', body: 'The Mist still has most of the garden. There’s one patch of soil it let go of.' },
-      actions: [{ id: 'companion.open_garden', title: 'Dig out the spring', description: 'It is under the one patch the Mist let go of.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'companion_order_preview', nextStepId: 'world.garden_arrival', backendEvent: true }],
+      guide: { eyebrow: 'The old spring', title: 'Let’s plant it before we do anything else.', body: 'The Mist still has most of the garden. There’s one patch of soil it let go of.' },
+      actions: [{ id: 'companion.open_garden', title: 'Plant it', description: 'It is under the one patch the Mist let go of.', icon: 'leaf.fill', presentation: 'cta_action', handlerId: 'companion_order_preview', nextStepId: 'world.garden_arrival', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
     },
     {
       id: 'world.garden_arrival', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: 'The old spring', title: 'Here. The soil’s still soft.', body: '' },
-      actions: [{ id: 'world.plant_first_seed', title: 'Dig it out', description: 'Build the Dew Spring beside Heartwood.', icon: 'drop.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'world.seed_planted', backendEvent: true }],
+      actions: [{ id: 'world.plant_first_seed', title: 'Plant it', description: 'Plant the Dew Spring beside Heartwood.', icon: 'drop.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'world.seed_planted', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_garden_plant_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_garden_plant_button', characterId: 'mossprout' } },
       spotlight: {
@@ -235,7 +235,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'world.seed_planted', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       // The first restore is paid with the light that drove the wisps off (earned at the lift, never
-      // a Merge visit); this beat moves on to the offer the moment the Spring is dug out. Nothing
+      // a Merge visit); this beat moves on to the offer the moment the Spring is planted. Nothing
       // is shown for it unless the planting failed, when its guide and a retry come up. The Garden
       // board is introduced later, when Steppling's trail needs light the Mist did not give.
       guide: { eyebrow: 'The old spring', title: COPY.planted, body: 'Look at it. The Mist gave a little ground just for that.' },

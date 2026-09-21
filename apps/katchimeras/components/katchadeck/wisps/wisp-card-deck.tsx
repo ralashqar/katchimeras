@@ -124,13 +124,17 @@ function ArrivingCard({ children, settled }: { children: ReactNode; settled: boo
   return <Animated.View style={style}>{children}</Animated.View>;
 }
 
-export function WispCollectionDeck({ ownedIds, onInspect, ids = LANTERN_VISITORS }: { ownedIds: readonly WispId[]; onInspect: (id: WispId) => void; ids?: readonly WispId[] }) {
+export function WispCollectionDeck({ ownedIds, onInspect, ids = LANTERN_VISITORS, renderAction }: {
+  ownedIds: readonly WispId[]; onInspect: (id: WispId) => void; ids?: readonly WispId[];
+  /** Replaces the card's own button (a friend's menu offers to bring the Wisp along instead). */
+  renderAction?: (id: WispId, owned: boolean) => ReactNode;
+}) {
   const { height } = useWindowDimensions();
   const [selected, setSelected] = useState<string>(() => ids.find(id => ownedIds.includes(id)) ?? ids[0]);
   return <View style={styles.album}>
     <CollectibleCardDeck cards={ids.map(id => ({ id }))} selectedId={selected} onSelect={card => setSelected(card.id)} cardRatio={2 / 3} maxCardHeight={Math.min(350, height * 0.43)} navigationLabel="Wisp collection"
       renderCard={(card, index, size) => <WispCollectionCard wispId={card.id} owned={ownedIds.includes(card.id)} width={size.width} cardNumber={index + 1} />}
-      renderCaption={card => <KatchaButton label={ownedIds.includes(card.id) ? 'Meet this Wisp' : 'How to discover'} size="compact" variant="secondary" onPress={() => onInspect(card.id)} />} />
+      renderCaption={card => renderAction ? renderAction(card.id as WispId, ownedIds.includes(card.id as WispId)) : <KatchaButton label={ownedIds.includes(card.id) ? 'Meet this Wisp' : 'How to discover'} size="compact" variant="secondary" onPress={() => onInspect(card.id)} />} />
   </View>;
 }
 const styles = StyleSheet.create({

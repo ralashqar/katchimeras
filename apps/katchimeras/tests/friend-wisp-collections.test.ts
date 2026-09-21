@@ -9,7 +9,7 @@ import { WISPS_BY_ID } from '@/constants/wisps';
 import { FRIEND_POUCHES_PER_DAY, friendDailyReceipt, friendPouchFor, friendSparks, type FriendSparkActivity, type FriendSparkBondEvent } from '@/features/wisps/friend-sparks';
 import { friendBondReceipt, friendChapterReceipt, friendFriendshipReceipt, friendSignatureReceipt, planFriendWispRewards, type FriendRewardStanding, type FriendRewardsGiven } from '@/features/wisps/friend-wisp-rewards';
 import type { WispCollectionState, WispId } from '@/types/wisp';
-import { friendCollectionProgress, friendPacksWaiting, friendPerkActive, reduceFriendWispPacks } from '@/utils/friend-wisp-packs';
+import { friendCollectionProgress, friendEquippedWisp, friendPacksWaiting, friendPerkActive, reduceFriendWispPacks } from '@/utils/friend-wisp-packs';
 import { EMPTY_WISP_STATE, normalizeWispState } from '@/utils/wisp-state';
 
 const NOW = Date.UTC(2026, 8, 20, 9);
@@ -202,4 +202,30 @@ test('brightening, set rewards and the perk', () => {
   assert.equal(friendPerkActive(collector, 'steppling'), true);
   // Owned on the server but not on this device still counts.
   assert.equal(friendCollectionProgress(empty(), 'steppling', ['stride'])!.owned, 1);
+});
+
+test('a friend carries one Wisp of their own that the player has found, and only that', () => {
+  assert.equal(friendEquippedWisp(empty(), 'mossprout'), null);
+  assert.throws(() => reduceFriendWispPacks(empty(), { type: 'equip', familyId: 'mossprout', wispId: 'sprout' }, NOW), /Find this Wisp first/);
+  const found = own(empty(), ['sprout', 'fern', 'stride']);
+  assert.throws(() => reduceFriendWispPacks(found, { type: 'equip', familyId: 'mossprout', wispId: 'stride' }, NOW), /belongs with someone else/, 'Steppling’s Wisp does not follow Mossprout');
+  assert.throws(() => reduceFriendWispPacks(found, { type: 'equip', familyId: 'pagelet', wispId: 'sprout' }, NOW), /no Wisps of their own/);
+
+  let state = reduceFriendWispPacks(found, { type: 'equip', familyId: 'mossprout', wispId: 'sprout' }, NOW);
+  assert.equal(friendEquippedWisp(state, 'mossprout'), 'sprout');
+  assert.equal(reduceFriendWispPacks(state, { type: 'equip', familyId: 'mossprout', wispId: 'sprout' }, NOW), state, 'asking again changes nothing');
+  state = reduceFriendWispPacks(state, { type: 'equip', familyId: 'mossprout', wispId: 'fern' }, NOW);
+  state = reduceFriendWispPacks(state, { type: 'equip', familyId: 'steppling', wispId: 'stride' }, NOW);
+  assert.deepEqual(state.friendPacks!.equipped, { mossprout: 'fern', steppling: 'stride' }, 'each friend carries their own');
+  assert.equal(state.equippedWispId, found.equippedWispId, 'the player’s own companion Wisp is a separate choice');
+  assert.deepEqual(normalizeWispState(JSON.parse(JSON.stringify(state))).friendPacks!.equipped, { mossprout: 'fern', steppling: 'stride' }, 'it survives a save');
+
+  state = reduceFriendWispPacks(state, { type: 'equip', familyId: 'mossprout', wispId: null }, NOW);
+  assert.equal(friendEquippedWisp(state, 'mossprout'), null);
+  assert.equal(friendEquippedWisp(state, 'steppling'), 'stride');
+  // A set that changes sheds a carried Wisp that no longer belongs to that friend.
+  const stale = { ...state, friendPacks: { ...state.friendPacks!, equipped: { steppling: 'sprout' as const, nobody: 'fern' as const } } };
+  assert.deepEqual(normalizeWispState(JSON.parse(JSON.stringify(stale))).friendPacks!.equipped, {});
+  // Found on the server but not on this device still counts as found.
+  assert.equal(friendEquippedWisp(reduceFriendWispPacks(empty(), { type: 'equip', familyId: 'feastle', wispId: 'crumb' }, NOW, ['crumb']), 'feastle'), 'crumb');
 });

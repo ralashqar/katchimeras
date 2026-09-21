@@ -87,6 +87,12 @@ own palette. From top to bottom, in `components/katchadeck/upgrade/`:
    one view: a sunk pill with the selected tab riding in it, each with an icon.
    A tile with dialogue or a friend's chapters gets `Upgrade` and `Story`.
 
+### Header and tabs
+
+The title bar is one line on every panel: the name, then its level pill beside it (a long name truncates before the
+pill does). There is no description line; what a place is about is said in the body. On a tile with a story, the
+pinned hero (name, description, action) belongs to the Upgrade tab only: the Story tab shows the story and nothing else.
+
 ### Levels on screen
 
 A tile counts from 0 in the save (an unrestored tile is 0), but nobody reads a

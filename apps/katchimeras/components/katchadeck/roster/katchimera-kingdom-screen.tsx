@@ -4,9 +4,14 @@ import { HeartwoodRoad } from '@/components/katchadeck/world/heartwood-road';
 import { WispLanternPanel, WispLanternWorld } from '@/components/katchadeck/wisps/wisp-lantern';
 import { WispLanternUpgradePanel } from '@/components/katchadeck/wisps/wisp-lantern-upgrade-panel';
 import { HeartwoodBuildingPanel } from '@/components/katchadeck/world/heartwood-building-panel';
+import { FriendWispsSheet } from '@/components/katchadeck/wisps/friend-wisps-sheet';
+import { FRIEND_CONSTELLATIONS } from '@/constants/friend-wisp-constellations';
+import { katchimeraFamilyById } from '@/constants/katchimera-skins';
+import { useWisps } from '@/features/wisps/wisp-provider';
+import { friendEquippedWisp, friendPacksWaiting } from '@/utils/friend-wisp-packs';
 import { HeartwoodBuildingWorld } from '@/components/katchadeck/world/heartwood-building-world';
 import { HEARTWOOD_BUILDINGS, heartwoodBuildingById, heartwoodBuildingCost, heartwoodBuildingLevel, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
-import { FIRST_SEED_BUILDING_ID, firstSeedReadyForSpring, firstSpringAwake, firstSpringBuilt, heartwoodBuildingsEligible } from '@/features/heartwood-buildings/buildings-world';
+import { firstSeedReadyForSpring, firstSpringAwake, firstSpringBuilt, heartwoodBuildingsEligible } from '@/features/heartwood-buildings/buildings-world';
 import { lanternEligible } from '@/features/wisps/lantern-world';
 import { HeartwoodStoryScene } from '@/components/katchadeck/world/heartwood-story-scene';
 import { needsHeartwoodRecap } from '@/features/shared-adventure/heartwood-opening';
@@ -210,11 +215,11 @@ const LANTERN_PLANT_OFFER = {
   target: { kind: 'haven_garden_plot', slotId: 'front-right' },
 } as const satisfies KingdomTileUpgradeOffer;
 const FIRST_SEED_GARDEN_PLANT_OFFER = {
-  accessibilityHint: 'Builds the Dew Spring in the highlighted Heartwood patch',
+  accessibilityHint: 'Plants the Dew Spring in the highlighted Heartwood patch',
   placement: 'below',
   gap: 12,
   icon: 'drop.fill',
-  label: 'Build Dew Spring',
+  label: 'Plant it',
   target: { kind: 'haven_garden_plot', slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID },
 } as const satisfies KingdomTileUpgradeOffer;
 
@@ -390,6 +395,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [lanternUpgradeOpen, setLanternUpgradeOpen] = useState(false);
   // One of Heartwood's economy buildings, open on the shared upgrade stage. It holds the screen the way the Lantern's surfaces do.
   const [buildingPanelId, setBuildingPanelId] = useState<HeartwoodBuildingId | null>(null);
+  // A friend's own Wisps menu, opened from the small button beside them.
+  const [friendWispsFamilyId, setFriendWispsFamilyId] = useState<string | null>(null);
+  const { state: wispState } = useWisps();
+  const residentWisps = useMemo(() => Object.fromEntries(FRIEND_CONSTELLATIONS.map(({ familyId }) => [familyId, {
+    wispId: friendEquippedWisp(wispState, familyId), packWaiting: friendPacksWaiting(wispState, familyId).length > 0,
+  }])), [wispState]);
   const lanternSurfaceOpen = wispLanternOpen || lanternUpgradeOpen || buildingPanelId != null;
   const [wispPlanting, setWispPlanting] = useState(false);
   const [wispPlantError, setWispPlantError] = useState('');
@@ -600,11 +611,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // remains authoritative. Paint the seed before releasing its sprout graphic.
   const growthPresentationKey = `${activeFtueRunId ?? 'ftue'}:first-seed`;
   const [releasedSeedGrowth, setReleasedSeedGrowth] = useState<string | null>(null);
-  const [settledSeedVisual, setSettledSeedVisual] = useState<string | null>(null);
   useEffect(() => {
     if (ftueStepId !== 'world.first_seed_grew') {
       setReleasedSeedGrowth(null);
-      setSettledSeedVisual(null);
       return;
     }
     if (!screenFocused || upgradePresentation || !ftueCameraSettled) return;
@@ -637,13 +646,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const selectedMemoryPlantDefinition = selectedMemoryPlant
     ? mossproutMemoryPlantById.get(selectedMemoryPlant.definitionId) ?? null
     : null;
-  // The first session's planting beats build the Dew Spring: dug out dormant, woken with the garden. These keep the
-  // beats' old names (they are wired through the whole screen); what they read is the Spring, never a memory seed.
+  // The first session's planting beat plants the Dew Spring, and it stays exactly as planted: restoring the tree's
+  // tile does not change it, hide it or "grow" it. These keep the beats' old names (they are wired through the whole
+  // screen); what they read is the Spring, never a memory seed.
   const firstSeedPlanted = firstSpringBuilt(mergeWorld);
   const firstSeedGrown = firstSpringAwake(mergeWorld);
-  // The Spring is shown asleep until the waking beat releases it, exactly as the seed's growth used to be held.
-  const firstSpringShownDormant = firstSeedPlanted && (!firstSeedGrown || holdFirstSeedGraphic);
-  const firstSeedVisualKey = firstSeedPlanted ? `${FIRST_SEED_BUILDING_ID}:${firstSeedGrown ? 'awake' : 'dormant'}` : null;
   // A save that finished the first session when it still planted a memory seed gets the Spring it would have built.
   const firstSpringReady = Boolean(firstSeedReadyForSpring(mergeWorld)) && !ftueStepId;
   const firstSpringAttemptRef = useRef<number | null>(null);
@@ -652,9 +659,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     firstSpringAttemptRef.current = mergeWorld.revision;
     void ensureStoredFirstSpring().catch(() => { firstSpringAttemptRef.current = null; });
   }, [firstSpringReady, mergeWorld.revision]);
-  const handleMemoryPlantSettled = useCallback((visualKey: string) => {
-    if (visualKey === firstSeedVisualKey) setSettledSeedVisual(visualKey);
-  }, [firstSeedVisualKey]);
   const havenMergeBoardActive = visibleCompanionSlots.some((slot) => (
     slot.familyId === 'mossprout' && slot.kind === 'owned'
   ));
@@ -1878,12 +1882,17 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       }
       return false;
     };
-    // Every friend whose story is in progress, the one being dealt with first. This once looked only at the first in
-    // campaign order (Petalimp, once Bloom Garden is revealed), so Wanderling's finished board never continued on its
-    // own: the player had to tap the island and press a free Restore to move the story on.
+    // Only ever the friend the player is dealing with. If that friend cannot go on right now (not enough Glow, a
+    // step that needs the player), nothing happens and the player is left on the map: another friend's story in
+    // progress is never "what comes next". This once tried the friend in focus first and then every other friend, so
+    // finishing a section of Petalimp's board with no Glow to continue walked the player into Wanderling's story.
+    // With no friend in focus (a fresh launch), a story continues on its own only when it is the only one in
+    // progress, and that friend becomes the one in focus.
     const stories = activeIslandCampaigns(mergeWorld);
-    const ordered = [...stories.filter((story) => story.campaign.campaignId === restorationFocusCampaignId), ...stories.filter((story) => story.campaign.campaignId !== restorationFocusCampaignId)];
-    for (const story of ordered) if (advance(story)) return;
+    const story = restorationFocusCampaignId
+      ? stories.find((candidate) => candidate.campaign.campaignId === restorationFocusCampaignId)
+      : stories.length === 1 ? stories[0] : undefined;
+    if (story && advance(story) && !restorationFocusCampaignId) setRestorationFocusCampaignId(story.campaign.campaignId);
   }, [flushMergeWorld, interactionCreatureId, mergeWorld, openIslandCampaignNarrative, ordinaryUpgradeRun,
     pendingIslandDiscovery, requiredUpgradeStory, restorationFocusCampaignId, screenFocused, selectedUpgrade, upgradeOffers, upgradePresentation]);
 
@@ -1973,8 +1982,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // A friend mid-restoration: the marker is the board, not a panel about the board. Their own board, even while
     // another friend's is also unfinished.
     const offerCampaignId = islandCampaignForOffer(offer.id)?.campaignId;
-    if (offerCampaignId && activeIslandRestoration(mergeWorldRef.current, offerCampaignId)?.campaign.campaignId === offerCampaignId) {
-      setRestorationFocusCampaignId(offerCampaignId);
+    // Tapping a friend's island makes them the friend being dealt with, whether or not a board is open: everything
+    // that continues on its own from here continues for them.
+    if (offerCampaignId) setRestorationFocusCampaignId(offerCampaignId);
+    if (offerCampaignId && activeIslandRestoration(mergeWorldRef.current, offerCampaignId)) {
       setRestorationOpen(true);
       return;
     }
@@ -2136,8 +2147,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (level === 0 && (!buildingOffersShown || !wispLanternAllowed || buildingPanelId != null)) return [];
     return [[building.slotId, <HeartwoodBuildingWorld key={building.id} id={building.id} level={level}
       affordable={mergeWorld.coins >= (heartwoodBuildingCost(level) ?? Infinity)}
-      dormant={building.id === FIRST_SEED_BUILDING_ID && firstSpringShownDormant}
-      onSettled={building.id === FIRST_SEED_BUILDING_ID ? handleMemoryPlantSettled : undefined}
       onPress={wispLanternAllowed ? () => setBuildingPanelId(building.id) : undefined} />]];
   }));
 
@@ -2227,7 +2236,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         mossproutNatureIslandLevels={mergeWorld.haven.mossproutNatureIslands}
         mossproutNatureIslandReveals={canvasNatureIslandReveals}
         mossproutGarden={mossproutGardenScene}
-        onMemoryPlantSettled={handleMemoryPlantSettled}
         onCameraSnapshotChange={onCameraSnapshotChange}
         onCameraMotionChange={handleCameraMotionChange}
         onInteractionExitFocusComplete={closeResidentInteraction}
@@ -2275,6 +2283,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onUpgradePresentationComplete={completeUpgradePresentation}
         recenterBottom={Math.max(insets.bottom, 12) + 150}
         residentStatusGlyphs={residentStatusGlyphs}
+        residentWisps={residentWisps}
+        onResidentWispsPress={sharedAdventureAllowed ? setFriendWispsFamilyId : undefined}
         tileUpgradeOffer={wispPlanting ? LANTERN_PLANT_OFFER : ftueStepId === 'world.garden_arrival'
           ? FIRST_SEED_GARDEN_PLANT_OFFER
           : null}
@@ -2296,7 +2306,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           else openGarden(undefined, 'steppling');
         }} />
       </View> : null}
-      {ftueStepId === 'world.first_seed_grew' && firstSeedGrown && !holdFirstSeedGraphic && !upgradePresentation && ftueCameraSettled && settledSeedVisual === firstSeedVisualKey && screenFocused && !ftueReturnFocusCreatureId ? <HeartwoodStoryScene scene="signal" onContinue={beginFirstSeedReturn} /> : null}
+      {ftueStepId === 'world.first_seed_grew' && firstSeedGrown && !holdFirstSeedGraphic && !upgradePresentation && ftueCameraSettled && screenFocused && !ftueReturnFocusCreatureId ? <HeartwoodStoryScene scene="signal" onContinue={beginFirstSeedReturn} /> : null}
       {worldEventsAllowed ? <LocalWorldEvents world={mergeWorld} onMerge={openGarden} onExplore={(id) => { const action = eventActions.find(a => a.event.id === id); if (action) void openWorldEvent(action); }} /> : null}
       {worldEventsAllowed && eventActions.length > 0 ? <View style={{ position: 'absolute', left: 16, right: 16, bottom: Math.max(insets.bottom, 12) + 82, zIndex: 32, gap: 6 }}>
         {eventActions.slice(0, 2).map(action => <WorldEventActionCard key={action.event.id} action={action} onPress={() => void openWorldEvent(action)} />)}
@@ -2321,6 +2331,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onUpgrade={upgradeStoredWispLantern}
         onClose={() => { setLanternUpgradeOpen(false); setWispLanternOpen(true); }}
         onGarden={() => { setLanternUpgradeOpen(false); openGarden(undefined, 'mossprout'); }} /> : null}
+      {friendWispsFamilyId && screenFocused ? <FriendWispsSheet familyId={friendWispsFamilyId}
+        friendName={katchimeraFamilyById.get(friendWispsFamilyId)?.displayName ?? 'your friend'} onClose={() => setFriendWispsFamilyId(null)} /> : null}
       {buildingPanelId && screenFocused ? <HeartwoodBuildingPanel key={buildingPanelId} world={mergeWorld} buildingId={buildingPanelId} layout={upgradeStage} bottomInset={insets.bottom}
         onUpgrade={upgradeStoredHeartwoodBuilding}
         onClose={() => setBuildingPanelId(null)}

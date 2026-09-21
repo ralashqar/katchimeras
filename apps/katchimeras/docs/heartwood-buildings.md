@@ -86,16 +86,19 @@ The first session builds the Dew Spring. It no longer hands out or plants a memo
 
 - End of the first meeting: the card that used to read "Memory Seed received" shows the Dew Spring ("The old spring"),
   with the line that reflects what the player said the first thing grown should be for.
-- `world.garden_arrival`: the chip on the centre patch reads "Build Dew Spring"; Mossprout says "Dig it out". The tap
-  runs `buildFirstSpring`: Level 1, free, no Heartwood stage needed, and `dormant`. On its patch it is small and dim,
-  labelled without a level.
-- `world.seed_planted` moves straight on to the first restore, as before, the moment the Spring is dug out. If the
-  build did not land, the same guide and a "Try again" come up and `ensureStoredFirstSpringBuilt()` repairs it.
-- The garden wakes (`haven.grow_first_memory`): `wakeFirstSpring` clears `dormant`. The screen holds the asleep look
-  through the restore and releases it once the camera has settled; the Spring swells into life, reports
-  `dew-spring:awake`, and only then does Mossprout say "Look! The spring is running again."
+- `world.garden_arrival`: the chip on the centre patch and Mossprout's action both read "Plant it". The tap runs
+  `buildFirstSpring`: Level 1, free, no Heartwood stage needed. It is planted as it will stay.
+- `world.seed_planted` moves straight on to the first restore, as before, the moment the Spring is planted. If the
+  plant did not land, the same guide and a "Try again" come up and `ensureStoredFirstSpringBuilt()` repairs it.
+- Restoring the tree's tile does not touch the Spring: it stays drawn on its patch through the whole upgrade (buildings
+  are no longer hidden while a tile's upgrade plays) and looks the same after. `haven.grow_first_memory` is now only a
+  safety net (it plants the Spring if the planting beat never landed). Mossprout's line at that beat is about the
+  tree's first root, not the Spring.
 - The Spring stays drawn for the rest of the first session (not tappable). The `+` signs on the other four patches
   wait until the first session is over.
+
+An earlier pass planted the Spring asleep and woke it with the garden. That read as the tile upgrade also upgrading
+the Spring, and it vanished during the upgrade, so it was removed. A save from that short time has `dormant` cleared.
 
 The step ids, action ids and the three `haven.*_first_memory` capability ids are unchanged (they are save data); what
 they do is different. The screen keeps the names `firstSeedPlanted` and `firstSeedGrown`; they now read
@@ -107,7 +110,6 @@ Saves:
 - Finished the old first session (a sprouted first-session seed in the patch, no Spring): `growFirstSeedIntoSpring`
   gives them the Spring they would have built, free, and records `from` so the panel says "Grown from your Seed of
   Stillness." The Kingdom screen calls `ensureStoredFirstSpring()` for this whenever no first session is running.
-- A dormant Spring that is paid for (a story that never reached the waking beat) wakes on that upgrade.
 
 The first return notification no longer names a seed: "The old spring kept running while you were away."
 
@@ -141,6 +143,15 @@ script's `restore_enclosed` sits between them: an area enclosed by the object is
 colour there (the background is pure black by construction). The outer edge and every real gap stay exactly as the
 matting model made them. It retries a refused prompt or a network timeout three times.
 
+## Energy icon
+
+`art/assets/images/katchimeras/merge-world/ui/energy-dew-v1.webp`: a cyan dewdrop with a cream bolt, in the Glow
+swirl's chunky toy style but cool where Glow is warm, so the two never read alike in the top bar. Used by the Merge
+HUD (`GAME_CURRENCY_ART.mergeEnergy`), the Dew Spring's "Energy cap" row, and the order rail and serve overlay that
+used the old orange drop. `python scripts/generate-merge-energy-icon.py` regenerates it. The matting model kept the
+bolt and threw the flat drop away with the background, so this icon is lifted off its pure black background exactly
+instead (alpha from distance to black, colour unmixed), with no model.
+
 ## Not built yet
 
 - The Heartwood tree as the HQ that gates building levels (its stage already follows the buildings, above).
@@ -149,7 +160,6 @@ matting model made them. It retries a refused prompt or a network timeout three 
 - A ghost of the Spring on the empty patch before "Dig it out" (the old flow previewed the seed there).
 - Energy refills (Glow, rewards, offers) and an out-of-energy sheet.
 - Milestones for the Root Cellar and Garden Stall; item-maker charges and rest.
-- An asleep look for the first session's Dew Spring (today it is the same art, smaller and dimmer).
 
 ## Verification
 

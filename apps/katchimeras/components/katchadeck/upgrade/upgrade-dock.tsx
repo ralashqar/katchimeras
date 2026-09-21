@@ -74,13 +74,11 @@ export function useUpgradeDockMotion({ busy, onClose, onBack, locked = false, re
   return { busy, closing, dismiss, drag, leave, locked, progress, reduced, reopen, settled };
 }
 
-export function UpgradeDock<T extends string = string>({ motion, title, levelLabel, tagline, progressLabel, progressFraction, info, hero, tabs, height, width, bottomInset, closeLabel = 'Close upgrade', children, scrollRef }: {
+export function UpgradeDock<T extends string = string>({ motion, title, levelLabel, progressLabel, progressFraction, info, hero, tabs, height, width, bottomInset, closeLabel = 'Close upgrade', children, scrollRef }: {
   motion: UpgradeDockMotion;
   title: string;
-  /** `Lv. 2`, in a pill under the title. */
+  /** `Lv. 2`, in a pill beside the title: the header is one line. */
   levelLabel?: string;
-  /** One quiet line beside the level: what this place is about. */
-  tagline?: string;
   /** The title bar's pill: `62%`, `2 / 4`, `MAX`. */
   progressLabel?: string;
   /** How full the pill's gauge is, 0 to 1. Omitted, the pill is a plain label. */
@@ -125,15 +123,14 @@ export function UpgradeDock<T extends string = string>({ motion, title, levelLab
         <View collapsable={false} style={styles.bar}>
           <View style={styles.grabber} />
           <View style={styles.barRow}>
-            {/* With nothing to say under it, the header is one line: the name, then its level beside it. */}
-            <View style={[styles.titleGroup, !tagline && styles.titleGroupInline]}>
-              <Text accessibilityRole="header" numberOfLines={1} style={[styles.title, !tagline && styles.titleInline]}>{title}</Text>
-              {levelLabel || tagline || info ? <View style={[styles.titleMeta, !tagline && styles.titleMetaInline]}>
+            {/* One line: the name, then its level beside it. What a place is about is said in the body, not up here. */}
+            <View style={styles.titleGroup}>
+              <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>{title}</Text>
+              {levelLabel || info ? <View style={styles.titleMeta}>
                 {levelLabel ? <View style={styles.levelPill}>
                   <LinearGradient colors={UpgradePanelUI.levelPillFace} style={styles.roundFace} />
                   <Text style={styles.levelText}>{levelLabel}</Text>
                 </View> : null}
-                {tagline ? <Text numberOfLines={1} style={styles.tagline}>{tagline}</Text> : null}
                 {info}
               </View> : null}
             </View>
@@ -193,16 +190,12 @@ const styles = StyleSheet.create({
   bar: { paddingBottom: 10 },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginTop: 7, marginBottom: 2, backgroundColor: UpgradePanelUI.grabber },
   barRow: { alignItems: 'center', flexDirection: 'row', gap: 8, paddingLeft: 18, paddingRight: 8 },
-  titleGroup: { flex: 1, gap: 3, justifyContent: 'center', minHeight: KatchaUI.touchTarget },
-  title: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.barInk, fontSize: 22, lineHeight: 27, textShadowColor: UpgradePanelUI.barInkShadow, textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 0 },
-  titleMeta: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  titleGroupInline: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'flex-start' },
+  titleGroup: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 10, minHeight: KatchaUI.touchTarget },
   // The name gives way before the level does: a long name truncates, the pill always shows.
-  titleInline: { flexShrink: 1 },
-  titleMetaInline: { flexShrink: 0 },
+  title: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.barInk, flexShrink: 1, fontSize: 22, lineHeight: 27, textShadowColor: UpgradePanelUI.barInkShadow, textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 0 },
+  titleMeta: { alignItems: 'center', flexDirection: 'row', flexShrink: 0, gap: 8 },
   levelPill: { borderColor: UpgradePanelUI.levelPillBorder, borderRadius: 999, borderWidth: 1.5, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 1 },
   levelText: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.levelPillInk, fontSize: 13, lineHeight: 17, fontVariant: ['tabular-nums'] },
-  tagline: { ...KatchaUI.type.companionBody, color: UpgradePanelUI.barInkSoft, flex: 1, fontSize: 12, lineHeight: 16 },
   // A little gauge: the label sits over a fill that shows the same fraction.
   pill: { alignItems: 'center', backgroundColor: UpgradePanelUI.pill, borderColor: UpgradePanelUI.frameBorder, borderRadius: 999, borderWidth: 2, justifyContent: 'center', minHeight: 36, minWidth: 92, overflow: 'hidden' },
   pillFill: { borderRadius: 999, bottom: 0, left: 0, position: 'absolute', top: 0 },

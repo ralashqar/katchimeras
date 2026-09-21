@@ -139,7 +139,10 @@ test('two friends’ stories in progress: both are seen, so a finished board con
   assert.deepEqual(activeIslandCampaigns(state).map((story) => story.campaign.campaignId), [first.campaignId, second.campaignId], 'every story in progress, in campaign order');
   assert.equal(activeIslandCampaign(state)?.campaign, first, 'the single lookup is only ever the first of them');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  assert.match(screen, /const stories = activeIslandCampaigns\(mergeWorld\);[\s\S]*?for \(const story of ordered\) if \(advance\(story\)\) return;/, 'the screen continues whichever story is waiting');
+  // Both stories are seen, but only the friend in focus continues on its own: a friend who cannot go on right now
+  // leaves the player on the map, never in another friend's story.
+  assert.match(screen, /const stories = activeIslandCampaigns\(mergeWorld\);\s*const story = restorationFocusCampaignId\s*\? stories\.find\(\(candidate\) => candidate\.campaign\.campaignId === restorationFocusCampaignId\)\s*: stories\.length === 1 \? stories\[0\] : undefined;\s*if \(story && advance\(story\)/, 'the screen continues the friend in focus, whoever they are');
+  assert.doesNotMatch(screen, /for \(const story of ordered\)/, 'and never falls through to another friend');
   assert.match(screen, /const campaignAutoTransitionRef = useRef\(new Set<string>\(\)\);/, 'and remembers what has fired per friend, chapter and status, so two stories cannot replay each other’s scenes');
   assert.doesNotMatch(screen, /activeIslandCampaign\(mergeWorld\)/);
 });

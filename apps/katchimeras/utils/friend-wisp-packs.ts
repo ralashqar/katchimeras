@@ -15,9 +15,11 @@ export type FriendWispPackState = {
   dryPacks: Record<string, number>;
   /** Set rewards already taken: `<family>:commons`, `<family>:rares`, `<family>:all`. */
   claims: string[];
+  /** The Wisp each friend carries at their shoulder: one of their own constellation that the player owns. */
+  equipped?: Record<string, WispId>;
 };
 
-export const emptyFriendWispPacks = (): FriendWispPackState => ({ version: 1, packs: {}, dryPacks: {}, claims: [] });
+export const emptyFriendWispPacks = (): FriendWispPackState => ({ version: 1, packs: {}, dryPacks: {}, claims: [], equipped: {} });
 
 export function normalizeFriendWispPacks(raw: unknown): FriendWispPackState {
   if (!raw || typeof raw !== 'object') return emptyFriendWispPacks();
@@ -31,7 +33,12 @@ export function normalizeFriendWispPacks(raw: unknown): FriendWispPackState {
     packs[id] = { ...pack, revealed: Number.isInteger(pack.revealed) && pack.revealed >= 0 ? pack.revealed : 0 };
   }
   const dryPacks = Object.fromEntries(Object.entries(value.dryPacks ?? {}).filter(([, count]) => Number.isSafeInteger(count) && count >= 0));
-  return { version: 1, packs, dryPacks, claims: Array.isArray(value.claims) ? value.claims.filter((claim): claim is string => typeof claim === 'string') : [] };
+  // A carried Wisp must still be one of that friend's own: a set that changed sheds what no longer belongs.
+  const equipped = Object.fromEntries(Object.entries(value.equipped ?? {}).filter(([familyId, id]) => {
+    const constellation = friendConstellation(familyId);
+    return Boolean(constellation && friendConstellationWisps(constellation).includes(id));
+  }));
+  return { version: 1, packs, dryPacks, equipped, claims: Array.isArray(value.claims) ? value.claims.filter((claim): claim is string => typeof claim === 'string') : [] };
 }
 
 export type FriendWispPackCommand =
@@ -40,7 +47,9 @@ export type FriendWispPackCommand =
   | { type: 'brighten'; receiptId: string }
   | { type: 'open'; packId: string }
   | { type: 'acknowledge_reveal'; packId: string; revealed: number }
-  | { type: 'claim_set'; familyId: string; set: FriendSetId };
+  | { type: 'claim_set'; familyId: string; set: FriendSetId }
+  /** `wispId: null` sends the carried Wisp home. */
+  | { type: 'equip'; familyId: string; wispId: WispId | null };
 
 export type FriendSetId = 'commons' | 'rares' | 'all';
 export const FRIEND_SETS: readonly FriendSetId[] = ['commons', 'rares', 'all'];
@@ -105,6 +114,20 @@ export function reduceFriendWispPacks(input: WispCollectionState, command: Frien
       pack.revealed = Math.max(pack.revealed, Math.min(pack.outcomes.length, command.revealed));
       return state;
     }
+    case 'equip': {
+      const constellation = friendConstellation(command.familyId);
+      if (!constellation) throw new Error('This friend has no Wisps of their own yet.');
+      const carried = { ...friends.equipped };
+      if ((carried[command.familyId] ?? null) === command.wispId) return input;
+      if (command.wispId == null) delete carried[command.familyId];
+      else {
+        if (!friendConstellationWisps(constellation).includes(command.wispId)) throw new Error('That Wisp belongs with someone else.');
+        if (!owned(command.wispId)) throw new Error('Find this Wisp first.');
+        carried[command.familyId] = command.wispId;
+      }
+      friends.equipped = carried;
+      return state;
+    }
     case 'claim_set': {
       const claim = `${command.familyId}:${command.set}`;
       if (friends.claims.includes(claim)) return input;
@@ -129,6 +152,11 @@ export function friendCollectionProgress(state: Pick<WispCollectionState, 'inven
   const all = friendConstellationWisps(constellation);
   const owned = all.filter((id) => (state.inventory[id]?.quantity ?? 0) > 0 || externallyOwned.includes(id));
   return { owned: owned.length, total: all.length, ownedIds: owned, signatureOwned: owned.includes(constellation.signature) };
+}
+
+/** The Wisp a friend carries at their shoulder, if any. */
+export function friendEquippedWisp(state: Pick<WispCollectionState, 'friendPacks'>, familyId: string): WispId | null {
+  return state.friendPacks?.equipped?.[familyId] ?? null;
 }
 
 /** Whether a friend's completed constellation is paying its perk. */

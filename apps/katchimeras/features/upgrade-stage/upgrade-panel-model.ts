@@ -21,14 +21,14 @@ export type UpgradeBenefit = {
   /** A stat that changes with the level: shown as `from +delta` (or `from → to` when it is not a number). */
   from?: number | string;
   to?: number | string;
-  /** What kind of number this is, as a picture: an icon name, or `glow` for the Glow currency art. */
+  /** What kind of number this is, as a picture: an icon name, or `glow` / `energy` for that currency's own art. */
   icon?: UpgradeBenefitIcon;
   /** The icon's colour. */
   tint?: string;
   /** The gain as words (`+10`, `-0:15`, `+3%`) when the values are not plain numbers. */
   delta?: string;
 };
-export type UpgradeBenefitIcon = 'bolt.fill' | 'timer' | 'sparkles' | 'star.fill' | 'shippingbox.fill' | 'glow';
+export type UpgradeBenefitIcon = 'energy' | 'bolt.fill' | 'timer' | 'sparkles' | 'star.fill' | 'shippingbox.fill' | 'glow';
 
 export type UpgradeRequirementAction = 'garden';
 

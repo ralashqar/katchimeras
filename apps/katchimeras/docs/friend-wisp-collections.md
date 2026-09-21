@@ -23,6 +23,13 @@ claiming in the UI, the perks' effect on the economy, Wisps drawn for each frien
   and re-runs on launch, on return to the app, and whenever Bond or the day's activities change.
 - The trophy room's constellation block now shows the friend's nine, today's three spark pips, and an Open button for
   waiting packs (`components/katchadeck/wisps/friend-wisp-pouch.tsx`), using the Lantern's own anticipation and reveal.
+- In the Kingdom, each friend with a constellation has a small round Wisps button at their lower right (a dot on it
+  when a pack is waiting). It opens that friend's own menu (`components/katchadeck/wisps/friend-wisps-sheet.tsx`):
+  their nine cards in the game's collection deck, today's sparks and any pack to open, and for a found Wisp the
+  choice to have it follow that friend. The carried Wisp is drawn at the friend's upper right shoulder on their tile
+  and rides with them. It is stored per friend (`friendPacks.equipped`), must be one of that friend's own nine and one
+  the player has found, and is separate from the player's own companion Wisp. A family with several residents (a
+  friend's other forms) shows the button once, on the friend themselves.
 - Tests: `tests/friend-wisp-collections.test.ts`.
 
 Two changes from the design below, made while building: the household cap is "the first four friends to fill their

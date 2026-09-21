@@ -54,7 +54,7 @@ const READY_GLOW_ART = require('@incubator/art-characters/soft-glow.png');
 const ORDER_REWARD_ART = {
   bond: require('@incubator/art-merge-world/ui/bond.webp'),
   coins: GAME_CURRENCY_ART.coins,
-  energy: require('@incubator/art-merge-world/ui/energy.webp'),
+  energy: require('@incubator/art-merge-world/ui/energy-dew-v1.webp'),
 } as const;
 const CONTROLLED_EASE = Easing.bezier(0.22, 1, 0.36, 1);
 const SERVE_CELEBRATION_MS = 250;

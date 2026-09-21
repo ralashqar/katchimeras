@@ -87,10 +87,15 @@ export function islandCampaignStateLabel(campaign: IslandCampaignDefinition, sta
  * The chapter whose restoration board is open right now (paid, not yet complete), if any.
  *
  * The wake order lets only one friend be mid-restoration, but a pack's island wakes on its own condition (the
- * Wander Trail on Steppling's hatch), so two can be unfinished at once. The friend the player is dealing with
- * (`preferredCampaignId`) wins; otherwise the one started most recently, never simply the first in campaign order.
+ * Wander Trail on Steppling's hatch), so two can be unfinished at once.
+ *
+ * One rule keeps friends from being mistaken for each other: **a named friend never resolves to another friend.**
+ * With `campaignId` given, the answer is that friend's open board or nothing. When their board is finished (or they
+ * have none) the player is simply done with boards for now; another friend's unfinished board is not "next". It
+ * once fell back to the most recently started board, which is how finishing a section of Petalimp's board docked
+ * Wanderling's. Only with no friend named at all (a fresh launch) is the most recently started board offered.
  */
-export function activeIslandRestoration(world: MergeWorldState, preferredCampaignId?: string | null): { campaign: IslandCampaignDefinition; level: MossproutNatureIslandLevel; chapter: IslandCampaignChapter; progress: IslandRestorationProgress } | null {
+export function activeIslandRestoration(world: MergeWorldState, campaignId?: string | null): { campaign: IslandCampaignDefinition; level: MossproutNatureIslandLevel; chapter: IslandCampaignChapter; progress: IslandRestorationProgress } | null {
   let latest: { campaign: IslandCampaignDefinition; level: MossproutNatureIslandLevel; chapter: IslandCampaignChapter; progress: IslandRestorationProgress } | null = null;
   for (const campaign of ISLAND_CAMPAIGNS) {
     const record = islandCampaignProgress(world, campaign);
@@ -100,11 +105,11 @@ export function activeIslandRestoration(world: MergeWorldState, preferredCampaig
       const chapter = islandCampaignChapter(campaign, entry.level);
       if (!chapter?.restoration) continue;
       const found = { campaign, level: entry.level, chapter, progress: entry.restoration };
-      if (campaign.campaignId === preferredCampaignId) return found;
+      if (campaign.campaignId === campaignId) return found;
       if (!latest || found.progress.startedAt > latest.progress.startedAt) latest = found;
     }
   }
-  return latest;
+  return campaignId ? null : latest;
 }
 
 export type IslandCampaignPanelRequest = {

@@ -14,10 +14,7 @@ export type HeartwoodBuildingState = {
   builtAt: number;
   /** A save from before the buildings: the memory seed that stood here and became this building. */
   from?: string;
-  /**
-   * Built but not running yet. Only the first session does this: the Dew Spring is dug out while the garden is still
-   * under the Mist, and wakes with it. A dormant building keeps its level; it just has not come to life on screen.
-   */
+  /** Legacy: the first session briefly planted the Dew Spring asleep. Nothing sets this any more; waking clears it. */
   dormant?: true;
 };
 export type HeartwoodBuildings = Partial<Record<HeartwoodBuildingId, HeartwoodBuildingState>>;
@@ -40,7 +37,7 @@ export type HeartwoodBuildingStat = {
   format: (value: number) => string;
   /** The gain from one value to the next, as the panel words it. */
   delta: (from: number, to: number) => string;
-  icon: 'bolt.fill' | 'timer' | 'sparkles' | 'star.fill' | 'shippingbox.fill' | 'glow';
+  icon: 'energy' | 'bolt.fill' | 'timer' | 'sparkles' | 'star.fill' | 'shippingbox.fill' | 'glow';
   tint: string;
 };
 
@@ -63,7 +60,7 @@ const gainWhole = (from: number, to: number) => signed(whole(Math.abs(to - from)
 const gainPercent = (from: number, to: number) => signed(percent(Math.abs(to - from)), to >= from);
 /** A shorter wait is the gain, so it reads as time taken off. */
 const gainClock = (from: number, to: number) => signed(clock(Math.abs(to - from)), to > from);
-const TINT = { energy: '#E7A21B', time: '#4E9CC4', finds: '#8A63C9', rare: '#D98A1F', storage: '#9A6A3C', glow: '#E7A21B' } as const;
+const TINT = { energy: '#2FA9C4', time: '#4E9CC4', finds: '#8A63C9', rare: '#D98A1F', storage: '#9A6A3C', glow: '#E7A21B' } as const;
 const clampLevel = (level: number) => Math.max(0, Math.min(HEARTWOOD_BUILDING_MAX_LEVEL, Math.floor(Number.isFinite(level) ? level : 0)));
 
 export const dewSpringEnergyCap = (level: number) => MERGE_ENERGY_BASE_CAP + clampLevel(level) * 10;
@@ -86,7 +83,7 @@ export const HEARTWOOD_BUILDINGS: readonly HeartwoodBuildingDefinition[] = [
     description: 'A spring under the roots. Every tap on an item maker draws from it, and it fills again on its own.',
     lookNames: ['Dew Pool', 'Root Spring', 'Heartwood Spring'],
     stats: [
-      { label: 'Energy cap', value: dewSpringEnergyCap, format: whole, delta: gainWhole, icon: 'bolt.fill', tint: TINT.energy },
+      { label: 'Energy cap', value: dewSpringEnergyCap, format: whole, delta: gainWhole, icon: 'energy', tint: TINT.energy },
       { label: 'Recovery', value: dewSpringRegenMs, format: clock, delta: gainClock, icon: 'timer', tint: TINT.time },
     ],
   },

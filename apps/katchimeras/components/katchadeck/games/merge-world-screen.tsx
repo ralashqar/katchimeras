@@ -1255,7 +1255,7 @@ const MergeEnergyHud = memo(function MergeEnergyHud() {
   // A spend restarts the clock from the moment it happened, not from the last tick.
   useEffect(() => { setNow(gameNow()); }, [energy]);
   if (!status) return null;
-  return <GameCurrencyHud balances={[{ animateValue: false, id: 'energy', value: status.value, suffix: `/${status.cap}`,
+  return <GameCurrencyHud balances={[{ animateValue: false, art: GAME_CURRENCY_ART.mergeEnergy, id: 'energy', value: status.value, suffix: `/${status.cap}`,
     countdownSeconds: status.nextAt != null ? Math.max(0, Math.ceil((status.nextAt - now) / 1000)) : undefined,
     valueAnimationDurationMs: 0 }]} style={styles.energyHud} tone="glass" />;
 });

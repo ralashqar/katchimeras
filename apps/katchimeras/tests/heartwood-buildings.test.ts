@@ -176,7 +176,7 @@ test('the panel model: an empty patch builds, a built one shows every number wit
   assert.deepEqual(empty.primary, { label: 'Build', cost: 20, disabled: true });
   assert.equal(empty.progressLabel, '50%');
   assert.deepEqual(empty.benefits.map((benefit) => [benefit.label, benefit.icon, benefit.from, benefit.to, benefit.delta]), [
-    ['Energy cap', 'bolt.fill', '100', '110', '+10'],
+    ['Energy cap', 'energy', '100', '110', '+10'],
     ['Recovery', 'timer', '2:00', '2:00', undefined],
   ], 'a number this level does not move reads as a plain value, with no gain');
   assert.equal(empty.requirements[0]?.met, false);
@@ -204,24 +204,27 @@ type Plant = MergeWorldState['haven']['plantableMemories'][number];
 const firstSeed = (patch: Partial<Plant> = {}) => ({ id: 'memory-plant:ftue', definitionId: 'stillness', status: 'planted', slotId: 'back-centre', growthPoints: 1, earnedAt: NOW - 10, plantedAt: NOW - 5, source: { kind: 'ftue', sourceId: 'run-1' }, ...patch }) as Plant;
 const withPlants = (plants: Plant[], base = world({ coins: 0 })): MergeWorldState => ({ ...base, haven: { ...base.haven, plantableMemories: plants } });
 
-test('the first session builds the Dew Spring: dug out dormant and free, woken with the garden, and no memory seed anywhere', () => {
+test('the first session plants the Dew Spring, free, and it stays as planted through the tree’s restore: no memory seed anywhere', () => {
   const fresh = withPlants([], { ...world({ coins: 0 }), haven: { ...world().haven, tileStages: {} }, kingdomGoal: undefined } as MergeWorldState);
   assert.equal(firstSpringBuilt(fresh), false);
 
-  // "Dig it out": the planting beat.
+  // "Plant it": the planting beat.
   const dug = buildFirstSpring(fresh, NOW + 1);
-  assert.deepEqual(dug.heartwoodBuildings, { 'dew-spring': { level: 1, builtAt: NOW + 1, dormant: true } });
+  assert.deepEqual(dug.heartwoodBuildings, { 'dew-spring': { level: 1, builtAt: NOW + 1 } }, 'planted as it will stay: nothing about it waits for the garden');
   assert.equal(dug.coins, 0, 'the first Spring costs nothing, and needs no Heartwood stage to be allowed');
   assert.equal(dug.haven.plantableMemories.length, 0, 'nothing is planted');
-  assert.deepEqual([firstSpringBuilt(dug), firstSpringAwake(dug)], [true, false]);
+  assert.deepEqual([firstSpringBuilt(dug), firstSpringAwake(dug)], [true, true]);
   assert.equal(dug.energy.regenCap, 110);
-  assert.equal(heartwoodStage(dug), 'dormant', 'a sleeping Spring has not stirred the Tree');
+  assert.equal(heartwoodStage(dug), 'stirring');
   assert.equal(availableHeartwoodBeds(dug).includes('back-centre'), false);
   assert.equal(buildFirstSpring(dug, NOW + 2), dug, 'a second tap, or the recovery after an interrupted effect, changes nothing');
-  assert.deepEqual(normalizeHeartwoodBuildings(dug.heartwoodBuildings, NOW), dug.heartwoodBuildings, 'dormancy survives a save');
+  assert.deepEqual(normalizeHeartwoodBuildings(dug.heartwoodBuildings, NOW), dug.heartwoodBuildings);
 
-  // The garden wakes.
-  const running = wakeFirstSpring(dug, NOW + 3);
+  // The garden wakes: the Spring is untouched. (A save from the short time it was planted asleep has that cleared.)
+  assert.equal(wakeFirstSpring(dug, NOW + 3), dug, 'restoring the tree’s tile does not change the Spring');
+  const asleep = { ...dug, heartwoodBuildings: { 'dew-spring': { level: 1, builtAt: NOW + 1, dormant: true as const } } };
+  assert.equal(heartwoodStage(asleep), 'dormant');
+  const running = wakeFirstSpring(asleep, NOW + 3);
   assert.deepEqual(running.heartwoodBuildings, { 'dew-spring': { level: 1, builtAt: NOW + 1 } });
   assert.equal(firstSpringAwake(running), true);
   assert.equal(heartwoodStage(running), 'stirring');
@@ -233,7 +236,7 @@ test('the first session builds the Dew Spring: dug out dormant and free, woken w
   assert.deepEqual(buildingUpgradeModel(funded, 'dew-spring').primary, { label: 'Upgrade', cost: 40, disabled: false });
   assert.equal(buildingUpgradeModel(funded, 'dew-spring').note, undefined);
   // Spending on a building that is still asleep (a story that never reached the waking beat) brings it to life.
-  const paid = upgradeHeartwoodBuilding({ ...funded, heartwoodBuildings: dug.heartwoodBuildings }, 'dew-spring', 1, NOW + 5);
+  const paid = upgradeHeartwoodBuilding({ ...funded, heartwoodBuildings: asleep.heartwoodBuildings }, 'dew-spring', 1, NOW + 5);
   assert.deepEqual(paid.heartwoodBuildings?.['dew-spring'], { level: 2, builtAt: NOW + 1 });
 
   // A save caught mid-session by this change, with the old seed already in the patch: the Spring takes the patch.

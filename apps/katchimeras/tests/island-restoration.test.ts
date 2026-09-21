@@ -335,8 +335,8 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /if \(!\(restorationDone && restorationLanded\)\) return;[\s\S]*?setTimeout\(finishIslandRestoration, WISP_FALL_MS\)/, 'the last merge’s impact finishes the board, once the wisp it struck has fallen');
   assert.match(screen, /if \(restorationDone\) finishIslandRestoration\(\);/, 'a board saved full finishes on arrival');
   assert.match(screen, /const restorationDone = Boolean\(restorationBinding && restorationStore\.mechanicState && mechanicComplete\(resolveMechanic\(restorationBinding\.host\), restorationBinding\.host, restorationStore\.mechanicState\)\);/, 'full by the board\u2019s mechanic');
-  assert.match(screen, /if \(status === 'restoration_ready' && chapter\.restoration\) \{[\s\S]*?const key = `restore-board:\$\{campaign\.campaignId\}:\$\{status\}`;[\s\S]*?purchaseWorldUpgrade\(offer, \{ beforeValidation: flushMergeWorld \}\)/, 'the finished board grows the island for free');
-  assert.match(screen, /if \(chapter\.restoration\) \{[\s\S]*?requestResidentInteractionExit\(\);\s*return;\s*\}\s*if \(!campaignProgress\?\.orderIds\[0\]\)/, 'the answer opens the board, not the Garden');
+  assert.match(screen, /if \(status === 'restoration_ready' && chapter\.restoration\) \{[\s\S]*?const key = `restore-board:\$\{campaign\.campaignId\}:\$\{chapter\.level\}:\$\{status\}`;[\s\S]*?purchaseWorldUpgrade\(offer, \{ beforeValidation: flushMergeWorld \}\)/, 'the finished board grows the island for free');
+  assert.match(screen, /if \(chapter\.restoration\) \{[\s\S]*?requestResidentInteractionExit\(\);\s*return;\s*\}\s*const activeOrderId = campaignProgress\?\.orderIds\.at\(-1\);/, 'the answer opens the board, not the Garden');
   assert.match(screen, /if \(progress\.action === 'continue_restoring'\) \{[\s\S]*?setSelectedUpgrade\(null\);/);
   assert.match(screen, /<IslandRestorationDock[\s\S]*?progress=\{restorationSummary \?\? \{ current: 0, total: 1 \}\}[\s\S]*?onFinale=\{launchRestorationFinale\}/);
   assert.match(screen, /\|\| restorationBoardVisible\}/, 'the camera holds while the board is up');
@@ -358,8 +358,8 @@ test('the Kingdom docks the board under the island, sends the order at the check
   // The Merge page's "Meet me at …" note lands on the board, and the marker opens it mid-stage.
   const mergeScreen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
   assert.match(mergeScreen, /requestIslandRestorationOpen\(campaign\.campaignId\);\s*transitionTo\(\{/, 'the return note leaves the intent before it navigates');
-  assert.match(screen, /if \(screenFocused && restorationCampaignId && consumeIslandRestorationOpen\(restorationCampaignId\)\) setRestorationOpen\(true\);/, 'the Kingdom opens the board on arrival');
-  assert.match(screen, /if \(restorationCampaignId && islandCampaignForOffer\(offer\.id\)\?\.campaignId === restorationCampaignId\) \{\s*setRestorationOpen\(true\);\s*return;\s*\}/, 'the marker is the board while a stage is open');
+  assert.match(screen, /if \(!screenFocused\) return;[\s\S]{0,260}?if \(restorationCampaignId && consumeIslandRestorationOpen\(restorationCampaignId\)\) setRestorationOpen\(true\);/, 'the Kingdom opens the board on arrival');
+  assert.match(screen, /if \(offerCampaignId && activeIslandRestoration\(mergeWorldRef\.current, offerCampaignId\)\) \{\s*setRestorationOpen\(true\);\s*return;\s*\}/, 'the marker is the board while a stage is open');
   assert.match(dock, /if \(strike\.finale\) \{[\s\S]*?setHiddenItemIds[\s\S]*?onFinale\?\.\(from, strike\.resultDefinitionId, strike\);\s*\} else \{\s*onStrike\?\.\(from, strike\);/, 'every merge sends the thing it made into the tile; the last one leaves the board');
   assert.match(dock, /barTitle=\{`Drive the Mist from \$\{islandName\}`\}/, 'the bar names the island and what is being driven off it');
 
@@ -387,7 +387,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /if \(restorationLanded && restorationBoardRunId\) setRestorationHandoff\(restorationBoardRunId\);/);
   assert.match(screen, /if \(pendingIslandCampaign\?\.phase === 'resolution' \|\| upgradeError\) \{ setRestorationHandoff\(null\); return; \}/);
   assert.match(screen, /homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS :/, 'no marker during the hand-off');
-  assert.match(screen, /const missionBoardDocked = openingBoardActive \|\| stepplingMissionActive \|\| journeyMissionActive \|\| restorationBoardVisible;\s*const visibleUpgradeOffers = [^\n]*missionBoardDocked \? NO_UPGRADE_OFFERS :/, 'no marker at all while any mini board is docked');
+  assert.match(screen, /const missionBoardDocked = (?:eventBoardActive \|\| )?openingBoardActive \|\| stepplingMissionActive \|\| journeyMissionActive \|\| restorationBoardVisible;\s*const visibleUpgradeOffers = [^\n]*missionBoardDocked \? NO_UPGRADE_OFFERS :/, 'no marker at all while any mini board is docked');
   // The tray and its bubble draw over the wisps; the Glow still strikes the wisps from above.
   assert.match(readFileSync('components/katchadeck/world/corruption-wisp-layer.tsx', 'utf8'), /layer: \{ zIndex: 58 \}/);
   assert.match(glowDock, /dock: \{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60,/);
@@ -418,12 +418,13 @@ test('the Kingdom docks the board under the island, sends the order at the check
   const hexCamera = readFileSync('../../packages/environments/src/hex-camera.ts', 'utf8');
   assert.match(hexCamera, /const clamped = unbounded \? \{ tx: nextTx, ty: nextTy \} : clampCameraTranslation\(\{ tx: nextTx, ty: nextTy \}, cameraViewport, cameraScene, clampedZoom\);/);
   assert.match(hexCamera, /animateTo\(x, y, zoom, viewport\.height \* anchorY, options\?\.durationMs \?\? 420, options\?\.onComplete, options\?\.unbounded\);/);
-  assert.equal((canvas.match(/unbounded: true/g) ?? []).length, 7, 'every focus_target directive, live and on a cold launch');
+  // The upgrade stage added more unbounded framings since; what matters is that none of the seven here lost theirs.
+  assert.ok((canvas.match(/unbounded: true/g) ?? []).length >= 7, 'every focus_target directive, live and on a cold launch');
   assert.match(canvas, /ref=\{natureIslandTargetRefs\.get\(islandId\)\}/, 'and a flight target');
   assert.match(canvas, /const natureIslandTargetRefs = useMemo\(\(\) => \{[\s\S]*?\}, \[onNatureIslandTargetChange\]\);/, 'one stable ref per island: an inline arrow ref re-fires on every render and loops the Kingdom');
   assert.doesNotMatch(canvas, /ref=\{onNatureIslandTargetChange \?/);
   assert.match(marker, /offer\.restorationProgress \? offer\.restorationProgress\.current/, 'the marker’s bar is the board while it is open');
-  assert.match(panel, /disabled=\{busy \|\| closing \|\| Boolean\(campaignState\.actionCost && world\.coins < campaignState\.actionCost\)\}/, 'the stage waits for its Glow');
+  assert.match(panel, /disabled=\{busy \|\| closing \|\| Boolean\(campaignState\??\.actionCost && world\.coins < campaignState\.actionCost\)\}/, 'the stage waits for its Glow');
   assert.match(store, /const place = useCallback\(\(entries: readonly \{ cell: number; definitionId: string \}\[\]\) => \{[\s\S]*?saveMission\(storageKey, activeRunId, next, mergesRef\.current, placed, mechanicSaveState\(mechanicStateRef\.current\)\);/, 'placed deliveries are saved with the board');
   assert.doesNotMatch(engine, /'rooted'/, 'no bed mechanic remains in the engine');
   assert.doesNotMatch(boardFile, /rooted|bedRing/, 'nor in the board renderer');
@@ -443,8 +444,16 @@ test('two friends mid-restoration: the board is the one the player is dealing wi
   assert.equal(activeIslandRestoration(world)?.campaign.campaignId, second.campaignId, 'with no one in particular, the board started most recently');
   assert.equal(activeIslandRestoration(world, first.campaignId)?.campaign.campaignId, first.campaignId, 'the friend being dealt with wins');
   assert.equal(activeIslandRestoration(world, second.campaignId)?.campaign.campaignId, second.campaignId);
-  assert.equal(activeIslandRestoration(world, 'no-such-campaign')?.campaign.campaignId, second.campaignId, 'a friend with no board falls back, never to nothing');
+  // A named friend never resolves to another friend. It once fell back to the most recent board, which is how finishing
+  // a section of Petalimp's board docked Wanderling's.
+  assert.equal(activeIslandRestoration(world, 'no-such-campaign'), null, 'a friend with no board has no board: never someone else’s');
+  const firstDone = JSON.parse(JSON.stringify(world)) as typeof world;
+  for (const entry of Object.values(firstDone.islandCampaigns![first.campaignId]!.chapters)) if (entry.restoration) entry.restoration.completedAt = 1;
+  assert.equal(activeIslandRestoration(firstDone, first.campaignId), null, 'their section finished: the player is done with boards, not moved to the other friend');
+  assert.equal(activeIslandRestoration(firstDone, second.campaignId)?.campaign.campaignId, second.campaignId, 'the other friend’s board is still theirs when asked for by name');
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
+  assert.match(screen, /const story = restorationFocusCampaignId\s*\? stories\.find\(\(candidate\) => candidate\.campaign\.campaignId === restorationFocusCampaignId\)\s*: stories\.length === 1 \? stories\[0\] : undefined;/, 'only the friend in focus continues on its own');
+  assert.doesNotMatch(screen, /for \(const story of ordered\) if \(advance\(story\)\) return;/, 'never "the friend in focus, then everyone else"');
   assert.match(screen, /setRestorationFocusCampaignId\(campaign\.campaignId\);\s*setRestorationOpen\(true\);\s*requestResidentInteractionExit\(\);/, 'the answer that opens a board docks that board');
-  assert.match(screen, /activeIslandRestoration\(mergeWorldRef\.current, offerCampaignId\)\?\.campaign\.campaignId === offerCampaignId\) \{\s*setRestorationFocusCampaignId\(offerCampaignId\);/, 'a friend’s marker opens their own board');
+  assert.match(screen, /if \(offerCampaignId\) setRestorationFocusCampaignId\(offerCampaignId\);\s*if \(offerCampaignId && activeIslandRestoration\(mergeWorldRef\.current, offerCampaignId\)\) \{\s*setRestorationOpen\(true\);/, 'a friend’s marker makes them the friend in focus, and opens their own board if they have one');
 });

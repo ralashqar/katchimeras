@@ -120,10 +120,12 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   const caption = error ? error : pick.caption ?? (model.complete ? 'Fully grown' : campaignAction && campaignFree ? 'Free' : null);
 
   return <>
-    <UpgradeDock motion={motion} title={model.title} levelLabel={misted ? undefined : `Lv. ${model.level.current + model.levelOffset}`} tagline={model.tagline} progressLabel={model.progressLabel} progressFraction={model.progressFraction}
+    <UpgradeDock motion={motion} title={model.title} levelLabel={misted ? undefined : `Lv. ${model.level.current + model.levelOffset}`} progressLabel={model.progressLabel} progressFraction={model.progressFraction}
       height={layout.panelHeight} width={layout.panelWidth} bottomInset={bottomInset}
       tabs={hasStoryTab ? { items: [{ id: 'upgrade', label: offer.action === 'Restore' ? 'Restore' : 'Upgrade', icon: 'leaf.fill' }, { id: 'story', label: 'Story', icon: 'book.fill' }], value: tab, onChange: setTab } : undefined}
-      hero={<UpgradeHero
+      // The pinned hero (what it becomes, and the button that buys it) belongs to the Upgrade tab. On Story the panel
+      // is the friend's story and nothing else, or the two tabs are the same screen with a different list under it.
+      hero={tab !== 'upgrade' ? undefined : <UpgradeHero
         picture={model.locked ? { art: sleepingPortrait ?? LOCK_ART, silhouette: Boolean(sleepingPortrait) } : null}
         name={model.locked ? model.locked.label : pick.name ?? offer.nextName}
         description={model.locked ? model.locked.reason : shown ? pick.description : offer.description}

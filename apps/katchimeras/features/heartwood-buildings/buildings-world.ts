@@ -37,20 +37,25 @@ const sendPlantHome = (state: MergeWorldState, slotId: string) => {
 };
 
 /**
- * The first session's planting beat: the Dew Spring is dug out, Level 1, free, and dormant until the garden wakes.
- * Already built (a repeated tap, a recovery after an interrupted effect, a replay), it changes nothing.
+ * The first session's planting beat: the Dew Spring, Level 1, free. It is planted as it will stay: restoring the
+ * tree's tile afterwards does not change it. Already built (a repeated tap, a recovery after an interrupted effect, a
+ * replay), this changes nothing.
  */
 export function buildFirstSpring(input: MergeWorldState, now: number): MergeWorldState {
   if (heartwoodBuildingLevel(input, FIRST_SEED_BUILDING_ID) > 0) return input;
   const state = structuredClone(input);
   // A save caught mid-session by this change may have the old memory seed in the patch.
   sendPlantHome(state, heartwoodBuildingById.get(FIRST_SEED_BUILDING_ID)!.slotId);
-  state.heartwoodBuildings = { ...state.heartwoodBuildings, [FIRST_SEED_BUILDING_ID]: { level: 1, builtAt: now, dormant: true } };
+  state.heartwoodBuildings = { ...state.heartwoodBuildings, [FIRST_SEED_BUILDING_ID]: { level: 1, builtAt: now } };
   state.energy = { ...state.energy, value: state.energy.value + (mergeEnergyCap(state) - mergeEnergyCap(input)), regenCap: mergeEnergyCap(state) };
   return state;
 }
 
-/** The garden has woken: the Spring runs. If the planting beat never landed, this builds it awake rather than leave the story without it. */
+/**
+ * The garden has woken. The Spring was planted running, so this normally changes nothing; it is the story's safety
+ * net: if the planting beat never landed it plants the Spring now, and a save from the short time the Spring was
+ * planted asleep has that cleared.
+ */
 export function wakeFirstSpring(input: MergeWorldState, now: number): MergeWorldState {
   const built = buildFirstSpring(input, now);
   const spring = built.heartwoodBuildings?.[FIRST_SEED_BUILDING_ID];

@@ -5,6 +5,9 @@ import { playUpgradeSequence } from '@incubator/environments/upgrade-sequence';
 import {createHexTileRenderer} from '@incubator/environments/hex-tile';
 import { WorldUpgradeMarker } from './world-upgrade-marker';
 import { heartwoodPatchItemPosition } from '@/constants/heartwood-patch-item';
+import { companionIdForFamily } from '@/constants/katchimera-skins';
+import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
+import type { WispId } from '@/types/wisp';
 import type { HomeVeilState } from '@/features/onboarding/opening-mist';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
@@ -152,6 +155,12 @@ type Props = {
   tutorialCamera?: FtueCameraDirective | null;
   onResidentAnchorsChange?: (anchors: KingdomResidentScreenAnchor[]) => void;
   residentStatusGlyphs?: Partial<Record<string, KingdomResidentStatusGlyph>>;
+  /**
+   * Friends with Wisps of their own, by family: the Wisp that follows them (drawn at their shoulder) and whether a
+   * pack is waiting. A family listed here gets a small Wisps button beside its resident.
+   */
+  residentWisps?: Partial<Record<string, KingdomResidentWisps>>;
+  onResidentWispsPress?: (familyId: string) => void;
   recenterBottom?: number;
   onSelectLocked?: (familyId: string) => void;
   onSelectResident?: (creatureId: string, label: string) => void;
@@ -490,6 +499,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onResidentAnchorsChange,
   recenterBottom = 126,
   residentStatusGlyphs,
+  residentWisps,
+  onResidentWispsPress,
   onSelectLocked,
   onSelectResident,
   onSelectHome,
@@ -1712,6 +1723,19 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     };
   }, [artLayerById, scene.tiles]);
 
+  // A family can have several residents (a friend's other forms live on their islands). The Wisps belong to the
+  // friend: the button and the shoulder Wisp go on the friend's own resident, else on the first of the family drawn.
+  const wispResidentTileIds = useMemo(() => {
+    const chosen = new Map<string, string>();
+    if (!residentWisps) return chosen;
+    for (const tile of scene.tiles) {
+      if (tile.kind !== 'companion' || tile.companion?.kind !== 'owned' || !residentWisps[tile.companion.familyId]) continue;
+      const own = tile.companion.creature.creatureId === companionIdForFamily(tile.companion.familyId);
+      if (own || !chosen.has(tile.companion.familyId)) chosen.set(tile.companion.familyId, tile.id);
+    }
+    return chosen;
+  }, [residentWisps, scene.tiles]);
+
   const interactionResidentProjection = useMemo(() => {
     if (interactionNatureIslandId) return null;
     // Hosted FTUE dialogue uses the owned resident after the hatch renderer
@@ -1806,6 +1830,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             x={x}
             y={y}
             statusGlyph={residentStatusGlyphs?.[tile.companion.creature.creatureId] === 'ready' ? undefined : residentStatusGlyphs?.[tile.companion.creature.creatureId]}
+            wisps={wispResidentTileIds.get(tile.companion.familyId) === tile.id ? residentWisps?.[tile.companion.familyId] : undefined}
+            onWispsPress={residentInteractionEnabled && onResidentWispsPress && wispResidentTileIds.get(tile.companion.familyId) === tile.id ? onResidentWispsPress : undefined}
             worldSize={creatureWorldSize}
             onFocus={residentInteractionEnabled && !cameraLocked ? camera.focusResident : ignoreFocus}
             onSelectResident={residentInteractionEnabled ? onSelectResident : undefined}
@@ -1815,7 +1841,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
 
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [allowedResidentCharacterId, artLayerById, camera.focusResident, cameraLocked, creatureWorldSize, highlightedLockedFamilyId, homeVeil, ignoreFocus, interactionEnabled, interactionNatureIslandId, interactionResidentId, interactionResidentProjection, interactionRewardPulseKey, mossproutMeditating, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.centerTile.id, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
+  }, [residentWisps, onResidentWispsPress, wispResidentTileIds, allowedResidentCharacterId, artLayerById, camera.focusResident, cameraLocked, creatureWorldSize, highlightedLockedFamilyId, homeVeil, ignoreFocus, interactionEnabled, interactionNatureIslandId, interactionResidentId, interactionResidentProjection, interactionRewardPulseKey, mossproutMeditating, onSelectLocked, onSelectResident, residentStatusGlyphs, scene.centerTile.id, scene.tiles, tileFocusScale, upgradePhase, upgradePresentation]);
 
   const home = homePreset(identity?.selectedHomeArchetypeId);
 
@@ -1953,7 +1979,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             })}
             {focusedMossproutWorld && onHeartwoodPress && heartwoodFrame && !upgradePresentation ? <Pressable accessibilityRole="button" accessibilityLabel="Heartwood. View world recovery and Garden supplies" onPress={onHeartwoodPress} style={{ position: 'absolute', left: heartwoodFrame.left + heartwoodFrame.width * 0.42, top: heartwoodFrame.top, width: heartwoodFrame.width * 0.16, height: heartwoodFrame.height * 0.24, zIndex: 34 }} /> : null}
             {focusedMossproutWorld && !upgradePresentation && wispPatchFrame && wispLanternAdornment && !onPlantWispLantern ? <View style={[heartwoodPatchItemPosition(wispPatchFrame), { zIndex: 37 }]}>{wispLanternAdornment}</View> : null}
-            {focusedMossproutWorld && !upgradePresentation && heartwoodBuildingAdornments && !onPlantWispLantern ? gardenPlotFrames.map(({ frame, slotId }) => heartwoodBuildingAdornments[slotId]
+            {focusedMossproutWorld && heartwoodBuildingAdornments && !onPlantWispLantern ? gardenPlotFrames.map(({ frame, slotId }) => heartwoodBuildingAdornments[slotId]
               ? <View key={`heartwood-building:${slotId}`} pointerEvents="box-none" style={[heartwoodPatchItemPosition(frame), { zIndex: 37 }]}>{heartwoodBuildingAdornments[slotId]}</View> : null) : null}
             {focusedMossproutWorld && onPlantWispLantern && wispPatchFrame ? <Pressable accessibilityRole="button" accessibilityLabel="Plant Lantern in front-right patch" onPress={onPlantWispLantern} style={{ position: 'absolute', ...wispPatchFrame, zIndex: 38 }} /> : null}
             {focusedMossproutWorld && !upgradePresentation && lanternFrame && lanternPostAdornment ? <View style={{ position: 'absolute', left: lanternFrame.left + lanternFrame.width * 0.7, top: lanternFrame.top + lanternFrame.height * 0.25, zIndex: 35 }}>{lanternPostAdornment}</View> : null}
@@ -3288,6 +3314,8 @@ const MemoryPlantArtLayer = memo(function MemoryPlantArtLayer({
   );
 });
 
+export type KingdomResidentWisps = { wispId: WispId | null; packWaiting: boolean };
+
 type ResidentProps = {
   animated?: boolean;
   celebrationNonce?: number;
@@ -3300,6 +3328,8 @@ type ResidentProps = {
   onSelectResident?: (creatureId: string, label: string) => void;
   source?: ImageSourcePropType;
   statusGlyph?: KingdomResidentStatusGlyph;
+  wisps?: KingdomResidentWisps;
+  onWispsPress?: (familyId: string) => void;
   stableWorldPresentation?: boolean;
   tile: KingdomTileRender;
   worldSize: number;
@@ -3319,6 +3349,8 @@ const ResidentCreature = memo(function ResidentCreature({
   onSelectResident,
   source: sourceOverride,
   statusGlyph,
+  wisps,
+  onWispsPress,
   stableWorldPresentation = false,
   tile,
   worldSize,
@@ -3457,9 +3489,30 @@ const ResidentCreature = memo(function ResidentCreature({
             </Animated.View>
           ) : null}
           {statusGlyph ? <ResidentStatusGlyph status={statusGlyph} /> : null}
+          {/* The Wisp this friend carries, up at their right shoulder; it rides with them when they bob or react. */}
+          {wisps?.wispId ? <View style={{ position: 'absolute', right: -frameWidth * 0.04, top: frameWidth * 0.06 }}>
+            <WispCompanion id={wisps.wispId} size={Math.round(frameWidth * 0.3)} />
+          </View> : null}
         </Animated.View>
       </Pressable>
+      {wisps && onWispsPress && tile.companion?.kind === 'owned' ? <ResidentWispsButton
+        size={Math.max(18, Math.round(frameWidth * 0.24))} packWaiting={wisps.packWaiting} disabled={disabled}
+        label={`${creature?.name ?? 'Friend'}’s Wisps${wisps.packWaiting ? '. A pack is waiting' : ''}`}
+        onPress={() => onWispsPress(tile.companion!.familyId)} /> : null}
     </TileFocusTransform>
+  );
+});
+
+/** A small round button at a friend's lower right: their own Wisps. A dot says a pack is waiting. */
+const ResidentWispsButton = memo(function ResidentWispsButton({ size, packWaiting, disabled, label, onPress }: {
+  size: number; packWaiting: boolean; disabled?: boolean; label: string; onPress: () => void;
+}) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} hitSlop={10} onPress={onPress}
+      style={[styles.residentWispsButton, { borderRadius: size / 2, height: size, width: size }]}>
+      <IconSymbol color="#7A5AB8" name="sparkles" size={Math.round(size * 0.6)} weight="bold" />
+      {packWaiting ? <View style={[styles.residentWispsDot, { borderRadius: size * 0.17, height: size * 0.34, width: size * 0.34 }]} /> : null}
+    </Pressable>
   );
 });
 
@@ -3621,6 +3674,8 @@ const styles = StyleSheet.create({
   homeTileHitTarget: { height: 84, position: 'absolute', width: 108 },
   natureIslandHitTarget: { position: 'absolute' },
   gardenPlotTarget: { position: 'absolute' },
+  residentWispsButton: { alignItems: 'center', backgroundColor: '#FFF6E2', borderColor: '#C9A96A', borderWidth: 1.5, bottom: '6%', justifyContent: 'center', position: 'absolute', right: '-2%' },
+  residentWispsDot: { backgroundColor: '#F2994A', borderColor: '#FFF6E2', borderWidth: 1, position: 'absolute', right: -1, top: -1 },
   statusGlyphWrap: {
     alignItems: 'center',
     left: 0,

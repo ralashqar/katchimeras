@@ -23,7 +23,7 @@ import { rewardIconFlightScale, rewardTokenClock, rewardTokenTiming, type Reward
 import { PersistentMergeItemArt } from './feastle-persistent-merge-board';
 
 const COIN_ART = GAME_CURRENCY_ART.coins;
-const ENERGY_ART = require('@incubator/art-merge-world/ui/energy.webp');
+const ENERGY_ART = require('@incubator/art-merge-world/ui/energy-dew-v1.webp');
 const ITEM_SIZE = 38;
 const REWARD_TOKEN_SIZE = 35;
 const ITEM_FLIGHT_MS = 390;
