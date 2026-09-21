@@ -21,7 +21,7 @@ import { worldEventActions, worldEventConversation, type WorldEventAction, type 
 import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
-import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission } from '@/utils/merge-world/repository';
+import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat } from '@/utils/merge-world/repository';
 import { LocalEventMissionDock } from '@/components/katchadeck/world/local-event-mission-dock';
 import { WorldEventActionCard } from '@/components/katchadeck/world/world-event-action-card';
 import { GardenEventAdornment } from '@/components/katchadeck/world/garden-event-adornment';
@@ -45,7 +45,7 @@ import { STEPPLING_MISSION_HINT_THEME } from '@/features/onboarding/steppling-mi
 import { missionWispTarget, useMistMission, WISP_FALL_MS } from '@/features/onboarding/use-mist-mission';
 import { ISLAND_WISP_LINES, OPENING_WISP_LINES, OPENING_WISPS } from '@/features/onboarding/corruption-wisps';
 import { missionWindow } from '@/features/mission-mechanics/board-window';
-import { mechanicComplete, mechanicProgress, resolveMechanic, type MissionMechanicHost } from '@/features/mission-mechanics/mechanic';
+import { createMechanicState, mechanicComplete, mechanicProgress, resolveMechanic, type MissionMechanicHost } from '@/features/mission-mechanics/mechanic';
 import { previewMissionStorageKey, resolveRestorationForPlay } from '@/features/mission-mechanics/preview';
 import { useDevMissionMechanicPreview } from '@/hooks/use-dev-mission-mechanic-preview';
 import type { MissionStrike } from '@/types/mission-mechanic';
@@ -126,6 +126,13 @@ import { HAVEN_ENVIRONMENTS, type HavenStage } from '@/constants/haven-catalog';
 
 import type { FtueCameraDirective, FtueCueDefinition } from '@/features/onboarding/ftue-types';
 import { IslandRestorationDock } from '@/components/katchadeck/world/island-restoration-dock';
+import { WispRushDock } from '@/components/katchadeck/world/wisp-rush-dock';
+import { WispRushSheet, type WispRushResult } from '@/components/katchadeck/world/wisp-rush-sheet';
+import { createRushLive, heatHost, WISP_RUSH_HOST } from '@/features/time-trial/heat-mechanic';
+import { heatFor, heatFromRules, heatPars } from '@/features/time-trial/ladder';
+import { commandFriendWispPacks } from '@/features/wisps/friend-wisp-runtime';
+import { gameNow } from '@/utils/game-clock';
+import { localDayId } from '@/utils/world-identity-rules';
 import { HavenDetailPanel, UndiscoveredHavenPanel } from '@/components/katchadeck/world/haven-detail-panel';
 import { upgradeStageLayout } from '@/features/upgrade-stage/upgrade-stage-layout';
 import { tileLevelArt } from '@/features/upgrade-stage/upgrade-level-art';
@@ -315,8 +322,16 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     setIslandTileNodes((current) => (current[islandId] === node ? current : { ...current, [islandId]: node }));
   }, []);
   const restorationTileNode = islandRestoration ? islandTileNodes[islandRestoration.campaign.islandId] ?? null : null;
+  // Wisp Rush, Dashkit's daily time trial. Between heats: a sheet on the upgrade stage. During one: the same docked
+  // board, the same wisps over the tile and the same Glow flights as every friend's board.
+  const [rushSheetOpen, setRushSheetOpen] = useState(false);
+  const [rushRun, setRushRun] = useState<{ dayId: string; index: number; attempt: number } | null>(null);
+  const [rushResult, setRushResult] = useState<WispRushResult | null>(null);
+  const [rushNotice, setRushNotice] = useState<string | null>(null);
+  const rushSpec = useMemo(() => rushRun ? heatFor(rushRun.dayId, rushRun.index) : null, [rushRun]);
+  const rushTileNode = islandTileNodes[WISP_RUSH_HOST.islandId] ?? null;
   // Glow flies into whichever misted tile the live board sits under.
-  const openingGlow = useOpeningGlow(stepplingMissionActive ? gatewayTileNode : journeyMissionActive ? journeyTileNode : islandRestoration ? restorationTileNode : homeTileNode);
+  const openingGlow = useOpeningGlow(rushSpec ? rushTileNode : stepplingMissionActive ? gatewayTileNode : journeyMissionActive ? journeyTileNode : islandRestoration ? restorationTileNode : homeTileNode);
   // A board's finale is its last item striking the last wisp. Nothing moves on until that landing,
   // and then only once the wisp has fallen: the mission is over when the player has seen it end.
   const restorationFinaleIdRef = useRef<number | null>(null);
@@ -695,6 +710,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     kind: 'focus_target' as const, target: { kind: 'haven_nature_island' as const, islandId: restorationIslandId },
     zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700,
   } : null, [restorationIslandId, restorationOpen, screenFocused]);
+  // A heat frames Dashkit's tile the way a friend's board frames theirs; the sheet between heats frames it over the panel.
+  const rushCamera = useMemo((): FtueCameraDirective | null => !screenFocused ? null : rushSpec
+    ? { kind: 'focus_target', target: { kind: 'haven_nature_island', islandId: WISP_RUSH_HOST.islandId }, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700 }
+    : rushSheetOpen ? { kind: 'focus_target', target: { kind: 'haven_nature_island', islandId: WISP_RUSH_HOST.islandId }, zoom: 1.25, anchorY: upgradeStage.stageCenterY / Math.max(1, window.height), durationMs: 520 } : null,
+  [rushSheetOpen, rushSpec, screenFocused, upgradeStage, window.height]);
   const eventCompanionId = selectedEventAction?.encounter.companionId ?? 'mossprout';
   const eventCamera = useMemo((): FtueCameraDirective | null => eventBoardActive ? { kind: 'focus_target', target: { kind: 'haven_resident', characterId: eventCompanionId }, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700 } : null, [eventBoardActive, eventCompanionId]);
   const heartwoodIntroActive = (ftueStepId === 'companion.first_meeting' && Boolean(worldSubjectPresentation?.introRevealReady))
@@ -716,7 +736,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // The Lantern stands above its plot: frame the plot a little under the band's centre so the Lantern fills it.
     ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.7, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.2) / Math.max(1, window.height), durationMs: 520 }
     : wispLanternOpen ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.15, anchorY: 0.42, durationMs: 850 } : null, [buildingPanelId, lanternUpgradeOpen, upgradeStage, window.height, wispLanternOpen]);
-  const baseTutorialCamera = lanternCamera ?? heartwoodIntroCamera ?? eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
+  const baseTutorialCamera = lanternCamera ?? rushCamera ?? heartwoodIntroCamera ?? eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
   const tutorialCamera = useMemo(() => {
     if (!ftueStepId?.startsWith('egg.') || baseTutorialCamera?.kind !== 'focus_target') return baseTutorialCamera;
     return { ...baseTutorialCamera, zoom: sharedEggZoom(worldSubjectPresentation?.wispsCleared
@@ -1656,11 +1676,31 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const restorationBoardVisible = Boolean(islandRestoration && restorationStore.state) && restorationOpen && screenFocused && !upgradePresentation && !interactionCreatureId && !pendingIslandCampaign && !stepplingMissionActive && !journeyMissionActive && !openingBoardActive;
   // The mist, given faces: wisps over the veiled tile take the merges' Glow; the last falls on the final item, and the mist lifts with it.
   // A friend's board has them too, over the island, for as long as the board is up; their hits come from the board's saved merges.
-  const wispTarget = useMemo((): CorruptionWispTarget | null => hatchableMist.wispTarget ?? journeyMist.wispTarget ?? (openingBoardActive
+  // A chapter authored as a rush is played as one: the same clock, board and wisps as a daily heat, with the chapter's own goal.
+  const chapterRush = restorationBoardVisible ? restorationDefinition?.rush ?? null : null;
+  const [chapterRushAttempt, setChapterRushAttempt] = useState(0);
+  const [chapterRushNote, setChapterRushNote] = useState<string | null>(null);
+  const activeRush = useMemo(() => {
+    if (rushSpec && rushRun) return { kind: 'daily' as const, spec: rushSpec, goal: heatPars(rushSpec).bronze, title: `Heat ${rushRun.index + 1}`, runKey: `${rushSpec.id}:${rushRun.attempt}`, node: rushTileNode };
+    if (chapterRush && islandRestoration) {
+      const id = `${islandRestoration.campaign.campaignId}:${islandRestoration.level}:${chapterRushAttempt}`;
+      const { goal, ...rules } = chapterRush;
+      return { kind: 'chapter' as const, spec: heatFromRules(id, rules), goal, title: islandRestoration.chapter.title, runKey: id, node: restorationTileNode };
+    }
+    return null;
+  }, [chapterRush, chapterRushAttempt, islandRestoration, restorationTileNode, rushRun, rushSpec, rushTileNode]);
+  const activeRushKey = activeRush?.runKey ?? null;
+  // The run's wisps reach the wisp layer through this, not through this screen: a wisp appearing re-renders nothing here.
+  const rushLive = useMemo(() => createRushLive(), [activeRushKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rushHost = useMemo(() => activeRush ? heatHost(activeRush.spec, activeRush.goal) : null, [activeRush]);
+  const rushWispTarget = useMemo((): CorruptionWispTarget | null => activeRush && rushHost && screenFocused
+    ? { ...missionWispTarget({ key: activeRush.runKey, host: rushHost, mechanicState: createMechanicState(resolveMechanic(rushHost)), node: activeRush.node, boardMetrics: openingBoardMetrics, settled: ftueCameraSettled }), live: rushLive }
+    : null, [activeRush, ftueCameraSettled, openingBoardMetrics, rushHost, rushLive, screenFocused]);
+  const wispTarget = useMemo((): CorruptionWispTarget | null => rushWispTarget ?? hatchableMist.wispTarget ?? journeyMist.wispTarget ?? (openingBoardActive
     ? { key: 'opening-mist', node: homeTileNode, host: OPENING_MIST_HOST, mechanicState: { kind: 'glow-strikes', strikes: openingProgress }, lines: OPENING_WISP_LINES, settled: ftueCameraSettled }
     : restorationBoardVisible && restorationBinding && restorationBoardRunId && restorationStore.mechanicState
       ? missionWispTarget({ key: restorationBoardRunId, host: restorationBinding.host, mechanicState: restorationStore.mechanicState, node: restorationTileNode, boardMetrics: openingBoardMetrics, window: restorationBinding.window, lines: restorationWispLines, settled: ftueCameraSettled })
-      : null), [ftueCameraSettled, hatchableMist.wispTarget, homeTileNode, journeyMist.wispTarget, openingBoardActive, openingBoardMetrics, openingProgress, restorationBinding, restorationBoardRunId, restorationBoardVisible, restorationStore.mechanicState, restorationTileNode, restorationWispLines]);
+      : null), [rushWispTarget, ftueCameraSettled, hatchableMist.wispTarget, homeTileNode, journeyMist.wispTarget, openingBoardActive, openingBoardMetrics, openingProgress, restorationBinding, restorationBoardRunId, restorationBoardVisible, restorationStore.mechanicState, restorationTileNode, restorationWispLines]);
   useEffect(() => {
     // Back puts the board away; it never leaves the Kingdom from here.
     if (!restorationBoardVisible) return;
@@ -1688,7 +1728,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const timer = setTimeout(() => setRestorationHandoff(null), RESTORATION_HANDOFF_MAX_MS);
     return () => clearTimeout(timer);
   }, [pendingIslandCampaign?.phase, restorationHandoff, upgradeError]);
-  const soloLayerId = stepplingBoardBusy ? `structure:${activeHatchable.tile.id}` : journeyBoardBusy && journeyMission ? `structure:${journeyMission.tile.id}` : restorationBoardBusy && restorationIslandId ? `nature:mossprout:${restorationIslandId}` : null;
+  const soloLayerId = rushSpec ? `nature:mossprout:${WISP_RUSH_HOST.islandId}` : stepplingBoardBusy ? `structure:${activeHatchable.tile.id}` : journeyBoardBusy && journeyMission ? `structure:${journeyMission.tile.id}` : restorationBoardBusy && restorationIslandId ? `nature:mossprout:${restorationIslandId}` : null;
   // No marker percentage while the board is up: the request lives on the dock's tray instead.
   const soloOfferId = stepplingBoardBusy ? `mist:${activeHatchable.tile.id}` : null;
   // No tutorial on a friend's board: the step only locks the board once its bar is full.
@@ -1752,13 +1792,15 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const recordedCurrent = islandRestoration?.progress.progress.current ?? -1;
   const recordedTotal = islandRestoration?.progress.progress.total ?? -1;
   useEffect(() => {
-    if (!islandRestoration || !restorationSummary) return;
+    if (!islandRestoration || !restorationSummary || restorationDefinition?.rush) return;
     if (recordedCurrent === restorationSummary.current && recordedTotal === restorationSummary.total) return;
     void recordStoredIslandRestorationProgress(islandRestoration.campaign.campaignId, islandRestoration.level, restorationSummary).catch(() => undefined);
-  }, [islandRestoration, recordedCurrent, recordedTotal, restorationSummary]);
+  }, [islandRestoration, recordedCurrent, recordedTotal, restorationDefinition?.rush, restorationSummary]);
   // The checkpoint: the beds can go no further, so the chapter's order goes to the Main Board.
   useEffect(() => {
     if (!islandRestoration || !restorationDefinition || !restorationStore.state) return;
+    // A rush asks the Main Board for nothing: the run itself is the whole chapter.
+    if (restorationDefinition.rush) return;
     if (islandRestoration.progress.deliveryRequestedAt != null) {
       // A board that asks for what it is missing asks again once the last round has been served and placed and the beds are stuck again.
       if (!restorationDefinition.request || !restorationChapterProgress) return;
@@ -1788,6 +1830,58 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const launchRestorationFinale = useCallback((from: RewardFlightPoint, definitionId: string, strike: MissionStrike) => {
     restorationFinaleIdRef.current = launchGlowFinale(from, definitionId, strike);
   }, [launchGlowFinale]);
+  const { launch: launchGlow } = openingGlow;
+  const launchRushStrike = useCallback((from: RewardFlightPoint, strike: MissionStrike) => launchGlow(from, undefined, strike), [launchGlow]);
+  const rushAttemptRef = useRef(0);
+  const rushResultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (rushResultTimerRef.current) clearTimeout(rushResultTimerRef.current); }, []);
+  const playRushHeat = useStableCallback((index: number) => {
+    setRushSheetOpen(false); setRushResult(null); setRushNotice(null); setOpeningDockSettled(false);
+    setRushRun({ dayId: localDayId(new Date(gameNow())), index, attempt: ++rushAttemptRef.current });
+  });
+  const leaveRushHeat = useStableCallback(() => {
+    if (activeRush?.kind === 'chapter') { closeRestoration(); return; }
+    setRushRun(null); setRushSheetOpen(true);
+  });
+  const voidRushHeat = useStableCallback(() => {
+    if (activeRush?.kind === 'chapter') { setChapterRushNote('You left, so that run does not count. Again'); setChapterRushAttempt((attempt) => attempt + 1); return; }
+    setRushNotice('You left the app, so that run does not count. Run it again.'); leaveRushHeat();
+  });
+  const finishRushHeat = useStableCallback((score: number) => {
+    const active = activeRush;
+    if (!active || rushResultTimerRef.current) return;
+    const run = rushRun;
+    const restoration = islandRestoration;
+    // The last Glow is still in the air: the result waits for it to land and for the wisp to fall.
+    rushResultTimerRef.current = setTimeout(() => {
+      rushResultTimerRef.current = null;
+      if (active.kind === 'daily' && run) {
+        void recordStoredTimeTrialHeat({ dayId: run.dayId, index: run.index, score })
+          .then(({ outcome }) => { setRushResult({ index: run.index, score, outcome }); })
+          .catch((error) => setRushNotice(error instanceof Error ? error.message : 'That run could not be saved.'))
+          .finally(leaveRushHeat);
+        return;
+      }
+      if (active.kind !== 'chapter' || !restoration) return;
+      if (score < active.goal) {
+        // Short of the chapter's goal: the clock is reset and the run starts again; nothing is lost.
+        setChapterRushNote(`${active.goal - score} short. Again`);
+        setChapterRushAttempt((attempt) => attempt + 1);
+        return;
+      }
+      setChapterRushNote(null);
+      setRestorationHandoff(restorationBoardRunId);
+      void recordStoredIslandRestorationProgress(restoration.campaign.campaignId, restoration.level, { current: active.goal, total: active.goal })
+        .then(() => completeStoredIslandRestoration(restoration.campaign.campaignId, restoration.level))
+        .catch((error) => console.warn('The run could not be recorded', error));
+    }, OPENING_GLOW_FLIGHT_MS + WISP_FALL_MS);
+  });
+  const openRushChest = useStableCallback(async () => {
+    const taken = await claimStoredTimeTrialChest(localDayId(new Date(gameNow())));
+    if (!taken) return;
+    commandFriendWispPacks({ type: 'grant', receiptId: taken.receiptId, familyId: taken.familyId, kind: taken.kind, seed: Math.floor(Math.random() * 4294967296) });
+    setRushNotice('A friend pack is waiting with Steppling.');
+  });
   // Items, not Glow, fly into an island being restored; a column shot goes straight up its column.
   const restorationShot = restorationBinding ? resolveMechanic(restorationBinding.host).kind === 'column-shot' : false;
   const launchRestorationStrike = useCallback((from: RewardFlightPoint, strike: MissionStrike) => {
@@ -2079,7 +2173,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const presentedUpgradeOffers = upgradeOffers;
   // Alone until the hatch: no markers at all until the islands are drawn. And none while any mini board is
   // docked (the opening's, Steppling's, a friend's): the board is the only thing to do until it is put away.
-  const missionBoardDocked = eventBoardActive || openingBoardActive || stepplingMissionActive || journeyMissionActive || restorationBoardVisible;
+  const missionBoardDocked = eventBoardActive || openingBoardActive || stepplingMissionActive || journeyMissionActive || restorationBoardVisible || Boolean(rushSpec);
   const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : missionBoardDocked ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun, activeHatchable.tile.id);
 
   // The canvas is memoised, and it holds only if none of its props change identity on an ordinary
@@ -2088,10 +2182,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (kingdomGoalGuideActive) return;
     if (!ftueStep || ftueStep.surface !== 'haven') setLockedHintFamilyId(familyId);
   });
-  const selectNatureIsland = useStableCallback((islandId: MossproutNatureIslandId) => {
-    if (ftueStep?.surface === 'haven') return;
-    if (kingdomGoalGuideActive && islandId !== goalIslandId) return;
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  const openNatureIslandOffer = useStableCallback((islandId: MossproutNatureIslandId) => {
     const offer = presentedUpgradeOffers.find((candidate) => candidate.id === `nature:${islandId}`);
     if (offer?.lockedReason) {
       void openUpgradeOffer(offer);
@@ -2099,6 +2190,18 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }
     if (offer) void openUpgradeOffer(offer);
     else { const archive = worldUpgradeArchiveOffer(mergeWorld, `nature:${islandId}`); if (archive) setSelectedUpgrade(archive); }
+  });
+  const selectNatureIsland = useStableCallback((islandId: MossproutNatureIslandId) => {
+    if (ftueStep?.surface === 'haven') return;
+    if (kingdomGoalGuideActive && islandId !== goalIslandId) return;
+    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Dashkit's tile, once they are home, opens the daily trial; their story stays one tap away inside it (and on the tile's marker).
+    if (islandId === WISP_RUSH_HOST.islandId && (mergeWorld.haven.mossproutNatureIslands[islandId] ?? 0) >= WISP_RUSH_HOST.unlockLevel && !missionBoardDocked) {
+      setRushNotice(null);
+      setRushSheetOpen(true);
+      return;
+    }
+    openNatureIslandOffer(islandId);
   });
   const selectGateway = useStableCallback(() => {
     if (kingdomGoalGuideActive) return;
@@ -2124,7 +2227,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     [mergeWorld.haven.mossproutNatureIslandReveals],
   );
 
-  const sharedAdventureAllowed = !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId;
+  const sharedAdventureAllowed = !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId && !rushSheetOpen && !rushSpec;
   const heartwoodRecap = sharedAdventureAllowed && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed') && !havenMergeBoardActive && (mergeWorld.haven.tileStages.mossprout ?? 0) >= 1 && needsHeartwoodRecap(mergeWorld);
   const worldEventsAllowed = sharedAdventureAllowed && !havenMergeBoardActive && !heartwoodRecap;
   // havenMergeBoardActive means an owned Mossprout can open the Garden, not
@@ -2206,7 +2309,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           <GardenEventAdornment world={mergeWorld} onExplore={eventActions.length ? () => { void openWorldEvent(eventActions[0]); } : undefined} />
         </View> : null}
         background={background}
-        cameraLocked={lanternSurfaceOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(upgradeStageSubject) || Boolean(requiredUpgradeStory) || restorationBoardVisible}
+        cameraLocked={lanternSurfaceOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(upgradeStageSubject) || Boolean(requiredUpgradeStory) || restorationBoardVisible || rushSheetOpen || Boolean(rushSpec)}
         discoveredEggInteraction={stepplingEncounter.open}
         gatewayTileId={activeHatchable.tile.id}
         discoveredEggPresentation={stepplingEncounter.presentation}
@@ -2333,6 +2436,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onGarden={() => { setLanternUpgradeOpen(false); openGarden(undefined, 'mossprout'); }} /> : null}
       {friendWispsFamilyId && screenFocused ? <FriendWispsSheet familyId={friendWispsFamilyId}
         friendName={katchimeraFamilyById.get(friendWispsFamilyId)?.displayName ?? 'your friend'} onClose={() => setFriendWispsFamilyId(null)} /> : null}
+      {rushSheetOpen && !rushSpec && screenFocused ? <WispRushSheet world={mergeWorld} dayId={localDayId(new Date(gameNow()))} hostName={WISP_RUSH_HOST.hostName} layout={upgradeStage} bottomInset={insets.bottom}
+        result={rushResult} notice={rushNotice} storyLabel={`${WISP_RUSH_HOST.hostName}’s story`}
+        onPlay={playRushHeat} onOpenChest={openRushChest} onClose={() => setRushSheetOpen(false)}
+        onStory={() => { setRushSheetOpen(false); openNatureIslandOffer(WISP_RUSH_HOST.islandId); }} /> : null}
       {buildingPanelId && screenFocused ? <HeartwoodBuildingPanel key={buildingPanelId} world={mergeWorld} buildingId={buildingPanelId} layout={upgradeStage} bottomInset={insets.bottom}
         onUpgrade={upgradeStoredHeartwoodBuilding}
         onClose={() => setBuildingPanelId(null)}
@@ -2647,7 +2754,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           layoutNonce={journeyMissionStore.state.revision} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={journeyMissionStep?.spotlight ?? null} state={journeyMissionStore.state} targetRevision={journeyMissionStore.state.revision}
           visualTheme={journeyMissionStep?.spotlight ? undefined : STEPPLING_MISSION_HINT_THEME} />
       </View> : null}
-      {restorationBoardVisible && islandRestoration && restorationStore.state ? <IslandRestorationDock
+      {activeRush && screenFocused ? <WispRushDock key={activeRush.runKey} spec={activeRush.spec} goal={activeRush.goal} live={rushLive}
+        title={activeRush.kind === 'chapter' && chapterRushNote ? chapterRushNote : `${activeRush.title} · ${activeRush.goal} wisps`} width={window.width} bottomInset={insets.bottom}
+        landings={openingGlow.store} onStrike={launchRushStrike} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
+        onEntranceSettled={markOpeningDockSettled} onFinished={finishRushHeat} onVoided={voidRushHeat} onClose={leaveRushHeat} /> : null}
+      {restorationBoardVisible && islandRestoration && restorationStore.state && !chapterRush ? <IslandRestorationDock
         campaign={islandRestoration.campaign} level={islandRestoration.level} state={restorationStore.state} send={restorationStore.send} boardStep={restorationStep}
         progress={restorationSummary ?? { current: 0, total: 1 }} width={window.width} bottomInset={insets.bottom}
         order={restorationOrder} orderServed={restorationOrderServed} pendingDeliveries={restorationPendingDeliveries} speech={restorationSpeech} onOpenOrder={openRestorationOrder} onPlaceDelivery={placeRestorationDelivery}

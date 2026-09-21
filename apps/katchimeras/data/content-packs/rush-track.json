@@ -1,0 +1,716 @@
+{
+  "id": "rush-track",
+  "version": 1,
+  "contentSchemaVersion": 6,
+  "title": "The Rush Track",
+  "islands": [
+    {
+      "id": "rush-track",
+      "accent": "#E07A4A",
+      "coord": {
+        "q": 2,
+        "r": -2
+      },
+      "name": "Rush Track",
+      "shortName": "Track",
+      "theme": "Short sprints against a clock: how many wisps before it runs out, and can you beat yesterday.",
+      "levels": [
+        {
+          "level": 1,
+          "coinCost": 40,
+          "name": "The Start Line",
+          "description": "A line on the ground again, and a clock beside it.",
+          "storyGate": "chapter_zero_complete"
+        },
+        {
+          "level": 2,
+          "coinCost": 60,
+          "name": "The First Bend",
+          "description": "The bend is swept, and the lanes lean into it.",
+          "storyGate": "story_level_2"
+        },
+        {
+          "level": 3,
+          "coinCost": 150,
+          "name": "The Back Straight",
+          "description": "The long side is open, flags and all.",
+          "storyGate": "story_level_3"
+        },
+        {
+          "level": 4,
+          "coinCost": 300,
+          "name": "The Finish Arch",
+          "description": "The arch is up, with the day’s best time chalked on it.",
+          "storyGate": "story_level_4"
+        }
+      ]
+    }
+  ],
+  "islandCampaigns": [
+    {
+      "campaignId": "island-campaign:rush-track",
+      "islandId": "rush-track",
+      "residentSkinId": "dashkit",
+      "characterId": "steppling",
+      "wake": {
+        "kind": "friend_hatched",
+        "companion": "steppling"
+      },
+      "chapterIdPrefix": "rush-track",
+      "tags": [
+        "island-campaign",
+        "dashkit",
+        "rush-track"
+      ],
+      "chapters": [
+        {
+          "level": 1,
+          "title": "The Start Line",
+          "conversationId": "dashkit:island:start-line",
+          "restoration": {
+            "rows": 4,
+            "merges": 6,
+            "items": [],
+            "echoes": [],
+            "deliveryCells": [],
+            "rush": {
+              "goal": 6,
+              "durationMs": 40000,
+              "up": 2,
+              "wispEveryMs": 4000,
+              "hp": 2,
+              "hpRampEvery": 6,
+              "thickChance": 0,
+              "chains": [
+                "adventure:trail",
+                "adventure:travel"
+              ],
+              "startFill": 10,
+              "fill": 18,
+              "dealEveryMs": 1300,
+              "dealDelayMs": 450,
+              "tierTwoChance": 0.4
+            }
+          },
+          "prompt": "This was my track. I ran it against the clock every morning, and the Mistwisps hated that: you cannot sit on something that keeps moving. So they waited until I stopped. Now they are all over the start line, and more drift in the moment one goes.\n\nSo we race them. The clock runs, we knock down as many as we can before it stops. How do you want to run it?",
+          "fallbackOrder": {
+            "title": "The Start Line",
+            "description": "Nothing to fetch. The clock is the whole of it.",
+            "difficulty": "small",
+            "narrativeSignal": "curiosity",
+            "requirements": [
+              {
+                "definitionId": "adventure:trail:2",
+                "quantity": 2
+              }
+            ]
+          },
+          "choices": [
+            {
+              "id": "start-flat-out",
+              "label": "Flat out",
+              "reply": "Flat out. No warm-up. They will not see us coming.",
+              "style": "flat-out",
+              "order": {
+                "title": "Off the Line",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "small",
+                "narrativeSignal": "ease",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 2
+                  }
+                ]
+              },
+              "openingConclusion": "Six wisps in 40 seconds and the line is ours. The clock starts when you touch the board. Go at the nearest one.",
+              "returnLine": "That was quick. Right on the line.",
+              "resolutionLine": "Made it, with the clock still running. The start line is ours again."
+            },
+            {
+              "id": "start-paced",
+              "label": "Find a pace",
+              "reply": "Find a pace. Fast is no use if it does not last the clock.",
+              "style": "paced",
+              "order": {
+                "title": "A Pace to Keep",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "small",
+                "narrativeSignal": "curiosity",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 2
+                  }
+                ]
+              },
+              "openingConclusion": "Six wisps in 40 seconds and the line is ours. The clock starts when you touch the board. Keep it even.",
+              "returnLine": "Steady all the way, and here we are.",
+              "resolutionLine": "Made it, and we never rushed a step. The start line is ours again."
+            },
+            {
+              "id": "start-together",
+              "label": "Side by side",
+              "reply": "Side by side, then. I run better with someone in the next lane.",
+              "style": "together",
+              "order": {
+                "title": "Two Lanes",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "small",
+                "narrativeSignal": "connection",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 2
+                  }
+                ]
+              },
+              "openingConclusion": "Six wisps in 40 seconds and the line is ours. The clock starts when you touch the board. I will count them with you.",
+              "returnLine": "Lane one and lane two.",
+              "resolutionLine": "We made it together. The start line is ours again."
+            }
+          ]
+        },
+        {
+          "level": 2,
+          "title": "The First Bend",
+          "conversationId": "dashkit:island:first-bend",
+          "callbackLine": {
+            "flat-out": "We went flat out and beat the clock. So they moved to the bend.",
+            "paced": "We kept our pace and beat the clock. So they moved to the bend.",
+            "together": "We beat the clock side by side. So they moved to the bend."
+          },
+          "prompt": "Past the line the track leans into its first bend. That is where you lose time if you are not careful, and that is where they sit now, tougher than the ones on the line.\n\nLonger clock, more of them. How do we run the bend?",
+          "fallbackOrder": {
+            "title": "The First Bend",
+            "description": "Nothing to fetch. The clock is the whole of it.",
+            "difficulty": "medium",
+            "narrativeSignal": "curiosity",
+            "requirements": [
+              {
+                "definitionId": "adventure:trail:4",
+                "quantity": 1
+              },
+              {
+                "definitionId": "adventure:trail:2",
+                "quantity": 1
+              }
+            ]
+          },
+          "choices": [
+            {
+              "id": "bend-flat-out",
+              "label": "Lean and go",
+              "reply": "Lean and go. Trust your feet.",
+              "style": "flat-out",
+              "order": {
+                "title": "Lean and Go",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "medium",
+                "narrativeSignal": "ease",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:4",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Eight in 50 seconds. Do not slow down for the bend: quick merges in a row hit harder.",
+              "returnLine": "We never touched the brakes.",
+              "resolutionLine": "Made it. The bend is ours, and we took it at speed."
+            },
+            {
+              "id": "bend-paced",
+              "label": "Hold the line",
+              "reply": "Hold the line. The inside lane is the short one.",
+              "style": "paced",
+              "order": {
+                "title": "The Inside Lane",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "medium",
+                "narrativeSignal": "comfort",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:4",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Eight in 50 seconds. Bigger pieces hit harder, so a merge worth waiting for is worth waiting for.",
+              "returnLine": "The short way round, every step.",
+              "resolutionLine": "Made it. The bend is ours, and we ran it clean."
+            },
+            {
+              "id": "bend-together",
+              "label": "Your lane",
+              "reply": "Your lane, then. I will take the one beside it.",
+              "style": "together",
+              "order": {
+                "title": "The Lane You Chose",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "medium",
+                "narrativeSignal": "connection",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:4",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Eight in 50 seconds. Whatever you make goes at the wisp nearest to it. I am right beside you.",
+              "returnLine": "Your lane was the right one.",
+              "resolutionLine": "Made it. The bend is ours, the way you chose to run it."
+            }
+          ],
+          "restoration": {
+            "rows": 4,
+            "merges": 8,
+            "items": [],
+            "echoes": [],
+            "deliveryCells": [],
+            "rush": {
+              "goal": 8,
+              "durationMs": 50000,
+              "up": 2,
+              "wispEveryMs": 4000,
+              "hp": 3,
+              "hpRampEvery": 5,
+              "thickChance": 0.1,
+              "chains": [
+                "adventure:trail",
+                "adventure:travel"
+              ],
+              "startFill": 10,
+              "fill": 18,
+              "dealEveryMs": 1400,
+              "dealDelayMs": 450,
+              "tierTwoChance": 0.35
+            }
+          }
+        },
+        {
+          "level": 3,
+          "title": "The Back Straight",
+          "conversationId": "dashkit:island:back-straight",
+          "callbackLine": {
+            "flat-out": "The bend fell at full speed. So they went to the back straight.",
+            "paced": "The bend fell to a clean line. So they went to the back straight.",
+            "together": "The bend fell to your lane. So they went to the back straight."
+          },
+          "prompt": "The long side. Nobody watches the back straight, so it is where you find out if you mean it. A full minute on the clock, and they come three at a time out here.\n\nWhat keeps you going when the clock is long?",
+          "fallbackOrder": {
+            "title": "The Back Straight",
+            "description": "Nothing to fetch. The clock is the whole of it.",
+            "difficulty": "medium",
+            "narrativeSignal": "ease",
+            "requirements": [
+              {
+                "definitionId": "nature:garden:5",
+                "quantity": 1
+              },
+              {
+                "definitionId": "adventure:trail:2",
+                "quantity": 1
+              }
+            ]
+          },
+          "choices": [
+            {
+              "id": "straight-flat-out",
+              "label": "The speed itself",
+              "reply": "The speed itself. Nothing else feels like it.",
+              "style": "flat-out",
+              "order": {
+                "title": "Nothing Like It",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "medium",
+                "narrativeSignal": "ease",
+                "requirements": [
+                  {
+                    "definitionId": "nature:garden:5",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Ten in 60 seconds. Fast as you like, all the way down.",
+              "returnLine": "Still flying, all that way.",
+              "resolutionLine": "Made it. The back straight is ours, flags and all."
+            },
+            {
+              "id": "straight-paced",
+              "label": "Counting it down",
+              "reply": "Counting it down. Ten more seconds, then ten more.",
+              "style": "paced",
+              "order": {
+                "title": "Ten More",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "medium",
+                "narrativeSignal": "curiosity",
+                "requirements": [
+                  {
+                    "definitionId": "nature:garden:5",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Ten in 60 seconds. One stretch of the clock at a time.",
+              "returnLine": "Ten at a time, and we are here.",
+              "resolutionLine": "Made it. The back straight is ours, one stretch at a time."
+            },
+            {
+              "id": "straight-together",
+              "label": "Someone beside me",
+              "reply": "Someone beside me. That is all it ever takes.",
+              "style": "together",
+              "order": {
+                "title": "Someone in the Next Lane",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "medium",
+                "narrativeSignal": "connection",
+                "requirements": [
+                  {
+                    "definitionId": "nature:garden:5",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "adventure:trail:2",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Ten in 60 seconds. I am not going anywhere.",
+              "returnLine": "It is shorter with two.",
+              "resolutionLine": "Made it. The back straight was never as long as it looked."
+            }
+          ],
+          "restoration": {
+            "rows": 4,
+            "merges": 10,
+            "items": [],
+            "echoes": [],
+            "deliveryCells": [],
+            "rush": {
+              "goal": 10,
+              "durationMs": 60000,
+              "up": 3,
+              "wispEveryMs": 3500,
+              "hp": 3,
+              "hpRampEvery": 4,
+              "thickChance": 0.15,
+              "chains": [
+                "adventure:trail",
+                "adventure:travel"
+              ],
+              "startFill": 10,
+              "fill": 18,
+              "dealEveryMs": 1400,
+              "dealDelayMs": 450,
+              "tierTwoChance": 0.35
+            }
+          }
+        },
+        {
+          "level": 4,
+          "title": "The Finish Arch",
+          "conversationId": "dashkit:island:finish-arch",
+          "callbackLine": {
+            "flat-out": "The long side came back. So they went to the arch, where every lap ends.",
+            "paced": "The long side came back. So they went to the arch, where every lap ends.",
+            "together": "The long side came back. So they went to the arch, where every lap ends."
+          },
+          "prompt": "The last of them sit on the finish arch. Without it a lap is just running in a circle, and a time is just a number nobody wrote down. They know that.\n\nThe longest clock yet, and the toughest of them. What is a finish line for?",
+          "fallbackOrder": {
+            "title": "The Finish Arch",
+            "description": "Nothing to fetch. The clock is the whole of it.",
+            "difficulty": "major",
+            "narrativeSignal": "connection",
+            "requirements": [
+              {
+                "definitionId": "adventure:trail:3",
+                "quantity": 1
+              },
+              {
+                "definitionId": "nature:garden:6",
+                "quantity": 1
+              }
+            ]
+          },
+          "choices": [
+            {
+              "id": "arch-flat-out",
+              "label": "For crossing",
+              "reply": "For crossing. As fast as you can.",
+              "style": "flat-out",
+              "order": {
+                "title": "For Crossing",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "major",
+                "narrativeSignal": "ease",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:3",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "nature:garden:6",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Twelve in 90 seconds. Everything you have left.",
+              "returnLine": "Across the line with nothing left over.",
+              "resolutionLine": "It stands. Every lap ends somewhere now."
+            },
+            {
+              "id": "arch-paced",
+              "label": "For beating",
+              "reply": "For beating. Yesterday’s time, not anybody else’s.",
+              "style": "paced",
+              "order": {
+                "title": "For Beating",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "major",
+                "narrativeSignal": "curiosity",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:3",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "nature:garden:6",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Twelve in 90 seconds. A little better than last time is all it ever takes.",
+              "returnLine": "A little faster than we were.",
+              "resolutionLine": "It stands. There is a time to beat now, and it is ours."
+            },
+            {
+              "id": "arch-together",
+              "label": "For meeting at",
+              "reply": "For meeting at. Whoever gets there first waits.",
+              "style": "together",
+              "order": {
+                "title": "For Meeting At",
+                "description": "Nothing to fetch. The clock is the whole of it.",
+                "difficulty": "major",
+                "narrativeSignal": "connection",
+                "requirements": [
+                  {
+                    "definitionId": "adventure:trail:3",
+                    "quantity": 1
+                  },
+                  {
+                    "definitionId": "nature:garden:6",
+                    "quantity": 1
+                  }
+                ]
+              },
+              "openingConclusion": "Twelve in 90 seconds. See you at the line.",
+              "returnLine": "I waited for you. I always will.",
+              "resolutionLine": "It stands. We will meet here every day."
+            }
+          ],
+          "restoration": {
+            "rows": 4,
+            "merges": 12,
+            "items": [],
+            "echoes": [],
+            "deliveryCells": [],
+            "rush": {
+              "goal": 12,
+              "durationMs": 90000,
+              "up": 3,
+              "wispEveryMs": 3500,
+              "hp": 4,
+              "hpRampEvery": 4,
+              "thickChance": 0.2,
+              "chains": [
+                "adventure:trail",
+                "adventure:travel"
+              ],
+              "startFill": 10,
+              "fill": 18,
+              "dealEveryMs": 1500,
+              "dealDelayMs": 450,
+              "tierTwoChance": 0.3
+            }
+          }
+        }
+      ],
+      "payoff": {
+        "styles": [
+          "flat-out",
+          "paced",
+          "together"
+        ],
+        "finalChapterWeight": 1.25,
+        "insightKey": "dashkit:running-style",
+        "category": "Movement & rest",
+        "revealTitle": "How you ran it",
+        "closingLine": "The track is open, and the clock is always running. Ten heats a day, a new ladder every morning. Come and see how many you can clear.",
+        "insights": {
+          "flat-out": {
+            "id": "flat-out-runner",
+            "title": "The Flat-Out Way",
+            "emblemId": "dashkit-run-flat-out",
+            "matchOptionIds": [],
+            "reflection": "Full speed, every time, and the clock never caught you.",
+            "summary": "Going flat out beat the clock."
+          },
+          "paced": {
+            "id": "paced-runner",
+            "title": "The Steady Way",
+            "emblemId": "dashkit-run-paced",
+            "matchOptionIds": [],
+            "reflection": "You found a pace and kept it right to the last second.",
+            "summary": "A steady pace beat the clock."
+          },
+          "together": {
+            "id": "together-runner",
+            "title": "The Next-Lane Way",
+            "emblemId": "dashkit-run-together",
+            "matchOptionIds": [],
+            "reflection": "Two lanes, every time. It was never a race against each other.",
+            "summary": "Running it together beat the clock."
+          }
+        },
+        "insightChoices": {
+          "flat-out": {
+            "label": "We went flat out",
+            "reply": "We did. Every single time."
+          },
+          "paced": {
+            "label": "We kept our pace",
+            "reply": "We did. Right to the last second."
+          },
+          "together": {
+            "label": "We ran it together",
+            "reply": "We did. Lane one and lane two."
+          }
+        }
+      },
+      "copy": {
+        "discoveryDialogue": "You looked this way, and the Mist let go of me. This was my track. I raced the clock here every morning, until one morning I stopped, and the Mistwisps sat down on it and never got up. Race them with me?",
+        "discoveryActionLabel": "Talk with Dashkit",
+        "revealReactionLine": "The Mist lifts from a running track. The lanes are still swept, and there is a clock by the start line, stopped.",
+        "mistNextName": "A track with a stopped clock",
+        "mistDescription": "Something in there wants to run, and something else is sitting on the start line so it cannot.",
+        "returnNoteTitle": "Meet me on the Rush Track",
+        "returnNoteHint": "Return to Dashkit’s track for the next run",
+        "actionLabels": {
+          "start_story": "Run with Dashkit",
+          "open_merge": "Open Merge",
+          "continue_return": "Talk to Dashkit",
+          "continue_restoring": "Race the clock",
+          "continue_resolution": "See the track"
+        },
+        "stateLabels": {
+          "available": "Choose how to run this part of the track.",
+          "orders_active": "Requested in Merge",
+          "board_open": "The clock is waiting",
+          "delivery_requested": "Requested in Merge",
+          "return_ready": "Request complete",
+          "restoration_ready": "Clock beaten · Ready to grow",
+          "resolution_ready": "Run · Story waiting",
+          "complete": "Track story complete"
+        },
+        "speech": {
+          "available": {
+            "text": "{{coins|raw}} of {{cost|raw}} Glow so far. I can wait. Just not for long.",
+            "variants": [
+              {
+                "when": {
+                  "fact": "cost",
+                  "lte": 0
+                },
+                "text": "The clock is wound. Whenever you are."
+              },
+              {
+                "when": {
+                  "fact": "affordable",
+                  "eq": true
+                },
+                "text": "I know exactly where the line goes. Whenever you are ready."
+              }
+            ]
+          },
+          "delivery_requested": "The clock starts when you touch the board.",
+          "restoration_ready": {
+            "text": "We beat it. A little more light and this part can be run for good.",
+            "variants": [
+              {
+                "when": {
+                  "fact": "cost",
+                  "lte": 0
+                },
+                "text": "We beat the clock. This one is on me."
+              },
+              {
+                "when": {
+                  "fact": "affordable",
+                  "eq": true
+                },
+                "text": "We beat the clock. On your marks."
+              },
+              {
+                "when": {
+                  "fact": "halfway",
+                  "eq": false
+                },
+                "text": "{{coins|raw}} of {{cost|raw}} Glow so far. The track can wait."
+              }
+            ]
+          },
+          "board_open": "The clock starts when you touch the board. Fall short and we simply go again."
+        },
+        "fallbackReturn": "The clock for {{chapterTitle}} is ready whenever you are.",
+        "fallbackResolution": {
+          "text": "The track remembered a little more, because we beat the clock on it.",
+          "variants": [
+            {
+              "when": {
+                "fact": "level",
+                "eq": 4
+              },
+              "text": "Every part is run. The Mist has nothing left here to sit on."
+            }
+          ]
+        },
+        "wakeHandoffLine": "I was running laps nobody could see. Then you looked. There are other places under the Mist, and someone resting in each of them.",
+        "sleepingHint": "The Mist is keeping someone on this track. They will wake once Steppling is home.",
+        "wispLines": {
+          "firstStrike": "It felt that.",
+          "fell": [
+            "One down. More coming.",
+            "Another down. Keep going.",
+            "They keep coming. So do we."
+          ],
+          "last": "Down it goes. Watch the clock."
+        }
+      },
+      "residentName": "Dashkit"
+    }
+  ]
+}

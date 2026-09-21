@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { KatchaUI } from '@/constants/katcha-ui';
 import { AppFontFamilies } from '@/constants/theme';
@@ -182,6 +182,30 @@ export function UpgradeRequirementRow({ requirement, disabled, onAction }: {
 }
 
 /**
+ * A thing to do, as the same strip a requirement uses: a mark, a name, a plain line under it, and its own button at the
+ * far end (a heat to run, a chest to open). `done` draws it as a met requirement does.
+ */
+export function UpgradeActionRow({ icon = 'leaf.fill', label, detail, done, dimmed, action }: {
+  icon?: IconSymbolName; label: string; detail?: string; done?: boolean; dimmed?: boolean;
+  action?: { label: string; accessibilityLabel?: string; primary?: boolean; disabled?: boolean; onPress: () => void };
+}) {
+  return <Face colors={done ? UpgradePanelUI.rowMetFace : UpgradePanelUI.rowFace} radius={UpgradePanelUI.rowRadius} style={[done ? styles.requirementMet : styles.requirement, dimmed && styles.actionDimmed]}>
+    <View style={styles.requirementBody}>
+      <View style={styles.requirementRow}>
+        <Face colors={UpgradePanelUI.chipFace} radius={23} style={styles.mark}>
+          <IconSymbol color={done ? UpgradePanelUI.leaf : UpgradePanelUI.inkFaint} name={done ? 'checkmark' : icon} size={20} />
+        </Face>
+        <View accessible accessibilityLabel={`${label}${detail ? `. ${detail}` : ''}`} style={styles.requirementText}>
+          <Text numberOfLines={1} style={styles.requirementLabel}>{label}</Text>
+          {detail ? <Text numberOfLines={2} style={styles.requirementDetail}>{detail}</Text> : null}
+        </View>
+        {action ? <KatchaButton accessibilityLabel={action.accessibilityLabel ?? `${action.label}. ${label}`} disabled={action.disabled} label={action.label} size="compact" variant={action.primary ? 'primary' : 'secondary'} onPress={action.onPress} /> : null}
+      </View>
+    </View>
+  </Face>;
+}
+
+/**
  * The subject's road as a chain of slots. A reached level shows its picture; the
  * one being bought and everything after it show a question mark, so the panel
  * never spoils what the world will reveal. Picking a slot shows that level in
@@ -316,6 +340,7 @@ const styles = StyleSheet.create({
   requirementMet: { borderColor: UpgradePanelUI.rowMetBorder },
   requirementBody: { gap: 8, padding: 9 },
   requirementRow: { alignItems: 'center', flexDirection: 'row', gap: 10 },
+  actionDimmed: { opacity: 0.55 },
   requirementText: { flex: 1, gap: 1 },
   requirementLabel: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.ink, fontSize: 16, lineHeight: 20 },
   requirementDetail: { ...KatchaUI.type.companionBody, color: UpgradePanelUI.inkSoft, fontSize: 12, lineHeight: 16 },

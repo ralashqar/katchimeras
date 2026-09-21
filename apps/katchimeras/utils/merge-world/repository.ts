@@ -2,6 +2,8 @@ import { reduceAdventure } from '@/features/shared-adventure/runtime';
 import { placeLanternWorld, projectLanternWorld, startLanternWorld, upgradeLanternWorld } from '@/features/wisps/lantern-world';
 import { lanternResidentCapacity, type LanternLevel } from '@/constants/wisp-lantern-levels';
 import { reduceWispLantern } from '@/utils/wisp-lantern-state';
+import { claimDayChest, dayChestFor, recordTimeTrialHeat } from '@/features/time-trial/trial-world';
+import { localDayId } from '@/utils/world-identity-rules';
 import { buildFirstSpring, firstSpringAwake, firstSpringBuilt, growFirstSeedIntoSpring, upgradeHeartwoodBuilding, wakeFirstSpring } from '@/features/heartwood-buildings/buildings-world';
 import { gameNow } from '@/utils/game-clock';
 import { reconcileJourneyGardenOrders } from '@/features/companion/journey-garden-orders';
@@ -175,7 +177,7 @@ export async function saveMergeWorldState(
       catch { /* Loading already reported the damaged snapshot; recovered facts are historical. */ }
       const revision = contentRegistrySnapshot().revision;
       const backfill = !projection && priorState ? worldMilestoneEvents(priorState, revision, true) : [];
-      state = { ...state, wispLanternPlacement: priorState?.wispLanternPlacement ?? state.wispLanternPlacement, wispLanternProgress: priorState?.wispLanternProgress ?? state.wispLanternProgress, heartwoodBuildings: priorState?.heartwoodBuildings ?? state.heartwoodBuildings, localLiveOps: priorState?.localLiveOps ?? state.localLiveOps, sharedAdventure: priorState?.sharedAdventure ?? state.sharedAdventure };
+      state = { ...state, wispLanternPlacement: priorState?.wispLanternPlacement ?? state.wispLanternPlacement, wispLanternProgress: priorState?.wispLanternProgress ?? state.wispLanternProgress, heartwoodBuildings: priorState?.heartwoodBuildings ?? state.heartwoodBuildings, timeTrials: priorState?.timeTrials ?? state.timeTrials, localLiveOps: priorState?.localLiveOps ?? state.localLiveOps, sharedAdventure: priorState?.sharedAdventure ?? state.sharedAdventure };
       state = projectLanternWorld(state, options.gameplayEvents ?? []);
       state = projectLocalEvents(state, [...newWorldMilestones(priorState, state, revision), ...(options.gameplayEvents ?? [])], state.updatedAt);
       serialized = JSON.stringify(state);
@@ -268,6 +270,28 @@ const storedWorldStep = (step: (state: MergeWorldState, now: number) => MergeWor
   const next = step(state, now);
   return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
 }, now);
+
+/** A finished Wisp Rush heat: saved once, paid once, records only ever better. Throws if the run cannot be accepted. */
+export async function recordStoredTimeTrialHeat(run: { trialId?: string; dayId: string; index: number; score: number }, now = gameNow()) {
+  let outcome: import('@/features/time-trial/trial-world').HeatOutcome | null = null;
+  const result = await reduceStoredMergeWorld(state => {
+    const recorded = recordTimeTrialHeat(state, run, localDayId(new Date(now)), now);
+    outcome = recorded.outcome;
+    if (recorded.state === state) return { state, changed: false };
+    return { state: { ...recorded.state, revision: state.revision + 1, updatedAt: now }, changed: true };
+  }, now);
+  return { state: result.state, outcome: outcome! };
+}
+/** The day's chest: marks it taken and says which friend pack it holds (the caller grants that pack by its receipt). */
+export async function claimStoredTimeTrialChest(dayId: string, now = gameNow()) {
+  let chest: import('@/features/time-trial/trial-world').DayChest | null = null;
+  await reduceStoredMergeWorld(state => {
+    chest = dayChestFor(state, dayId);
+    const next = claimDayChest(state, dayId, now);
+    return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
+  }, now);
+  return chest as import('@/features/time-trial/trial-world').DayChest | null;
+}
 
 /** The first session's planting beat, and its recovery: the Dew Spring, dug out and dormant. */
 export async function ensureStoredFirstSpringBuilt(now = gameNow()) {

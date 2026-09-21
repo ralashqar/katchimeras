@@ -21,7 +21,7 @@ import { reduceMergeWorld } from '@/utils/merge-world/engine';
 const NOW = Date.UTC(2026, 8, 16, 9);
 const WINDOW = missionWindow();
 const SHIPPED_MISSIONS = [...HATCHABLE_COMPANIONS.map((definition) => ({ name: definition.companion, mission: definition.mission })), { name: 'old-grove', mission: OLD_GROVE_MISSION }];
-const SHIPPED_RESTORATIONS = ISLAND_CAMPAIGNS.flatMap((campaign) => campaign.chapters.flatMap((chapter) => chapter.restoration ? [{ name: `${campaign.campaignId}:${chapter.level}`, definition: chapter.restoration }] : []));
+const SHIPPED_RESTORATIONS = ISLAND_CAMPAIGNS.flatMap((campaign) => campaign.chapters.flatMap((chapter) => chapter.restoration && !chapter.restoration.rush ? [{ name: `${campaign.campaignId}:${chapter.level}`, definition: chapter.restoration }] : []));
 const strikeEvent = (resultCell: number, resultDefinitionId: string, wake = false) => ({ type: wake ? 'dream_echo_cleared' as const : 'merge_completed' as const, resultCell, resultDefinitionId });
 
 test('glow strikes are the way every shipped board has always played: one hit per strike, dealt in order, the last wisp on the final strike', () => {

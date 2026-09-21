@@ -77,6 +77,11 @@ test('the Wander Trail is an island with a story from the start: registered, voi
   const awake = hatchedSteppling();
   assert.equal(islandWakeState(awake, 'wanderling-trail'), 'open');
   assert.ok(openIslands(awake).includes('wanderling-trail'));
+  // Dashkit's Rush Track wakes with Steppling too: it never waits for Wanderling to come home.
+  assert.equal(islandWakeState(asleep, 'rush-track'), 'sleeping');
+  assert.equal(islandWakeState(awake, 'rush-track'), 'open');
+  assert.ok(openIslands(awake).includes('rush-track'));
+  assert.doesNotMatch(islandWakeLockedReason(asleep, 'rush-track') ?? '', /Wanderling/);
   const offer = worldUpgradeOffers(awake).find((offer) => offer.id === 'nature:wanderling-trail');
   assert.equal(offer?.eligible, true, 'the mist can be cleared');
   assert.equal(offer?.cost, island.levels[0]!.coinCost);

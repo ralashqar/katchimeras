@@ -34,6 +34,7 @@ export type MergePlaySurfaceProps = {
   /** Decorative counter bleed, independent of board and tray layout. */
   counterWidth?: number;
   animateEntrance?: boolean;
+  animateArrivals?: boolean;
   boardInteractionGate?: MergeBoardInteractionGate;
   boardLayout?: MergeBoardLayout;
   /** The opening's docked board shows only the board: no request rail, no counter. */
@@ -84,6 +85,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
   effectsActive = true,
   servingOrderId,
   animateEntrance = true,
+  animateArrivals = false,
   boardInteractionGate = { kind: 'open' },
   boardLayout,
   railHidden = false,
@@ -169,6 +171,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
           <SubscribedMergeBoard
             state={boardState}
             animateEntrance={animateEntrance}
+            animateArrivals={animateArrivals}
             hiddenItemInstanceIds={hiddenItemInstanceIds}
             interactionGate={boardInteractionGate}
             interactionSessionKey={interactionSessionKey}

@@ -266,6 +266,17 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
         }
         for (const cell of board.deliveryCells) if (!cells.has(Number(cell))) issues.push(`${where}: delivery cell ${cell} is outside the board`);
         if (board.request !== undefined && (!isRecord(board.request) || board.request.kind !== 'twins' || (board.request.max !== undefined && (!isInt(board.request.max) || Number(board.request.max) < 1 || Number(board.request.max) > 3)))) issues.push(`${where}: request must be twins, with max from 1 to 3`);
+        const rush = board.rush;
+        if (rush !== undefined) {
+          const numbers = ['goal', 'durationMs', 'up', 'wispEveryMs', 'hp', 'hpRampEvery', 'thickChance', 'startFill', 'fill', 'dealEveryMs', 'dealDelayMs', 'tierTwoChance'];
+          if (!isRecord(rush) || numbers.some((name) => typeof rush[name] !== 'number' || !Number.isFinite(rush[name]) || (rush[name] as number) < 0) || !Array.isArray(rush.chains) || !rush.chains.length) issues.push(`${where}: a rush needs a goal, a clock, its wisps, its dealer and its chains`);
+          else {
+            for (const chain of rush.chains) if (!candidateItems.has(`${chain}:1`) || !candidateItems.has(`${chain}:2`)) issues.push(`${where}: ${chain} is not a chain of known items`);
+            if (!isInt(rush.goal) || Number(rush.goal) < 1 || board.merges !== rush.goal) issues.push(`${where}: a rush's merges must equal its goal`);
+            if (Number(rush.durationMs) < 10_000 || Number(rush.up) < 1 || Number(rush.up) > 4 || Number(rush.hp) < 1 || Number(rush.wispEveryMs) < 500 || Number(rush.dealEveryMs) < 200) issues.push(`${where}: a rush runs at least ten seconds, with one to four wisps up`);
+            if (board.items.length || board.echoes.length || board.deliveryCells.length || board.request !== undefined) issues.push(`${where}: a rush authors no pieces, echoes, delivery cells or request`);
+          }
+        }
         const mechanic = board.mechanic;
         if (isRecord(mechanic) && mechanic.kind === 'column-shot') {
           const wisps = isRecord(mechanic.wisps) && Array.isArray(mechanic.wisps.cells) ? mechanic.wisps.cells : [];

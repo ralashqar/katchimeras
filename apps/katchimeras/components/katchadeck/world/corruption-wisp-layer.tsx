@@ -8,9 +8,9 @@ import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-
 import type { GlowSink } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
 import type { MissionWindow } from '@/features/mission-mechanics/board-window';
 import { glowStrikeAt } from '@/features/mission-mechanics/glow-strikes';
-import { applyStrike, resolveMechanic, wispViews, type MissionMechanicHost } from '@/features/mission-mechanics/mechanic';
+import { applyStrike, resolveMechanic, syncMechanicState, wispViews, type MissionMechanicHost } from '@/features/mission-mechanics/mechanic';
 import { wispLineForFall, type CorruptionWispLines } from '@/features/onboarding/corruption-wisps';
-import type { MissionMechanicState, MissionStrike, MissionWispView } from '@/types/mission-mechanic';
+import type { MissionMechanicLive, MissionMechanicState, MissionStrike, MissionWispView } from '@/types/mission-mechanic';
 import { mergeCellCenter, mergeCellFrame } from '@/utils/merge-world/board-geometry';
 
 const WISP_ART = require('@incubator/art-cutouts/corruption-wisp.png');
@@ -54,6 +54,8 @@ export type CorruptionWispTarget = {
   host: MissionMechanicHost;
   /** Where the board's strikes stand when the target is first seen: a resumed board starts with its wisps already felled. */
   mechanicState: MissionMechanicState;
+  /** A board whose wisps appear over time (a rush) publishes its state here, so new wisps reach this layer without the screen re-rendering for them. */
+  live?: MissionMechanicLive;
   /** What the board says as the wisps are struck and fall. */
   lines?: CorruptionWispLines;
   /** False while the camera is still gliding onto the tile: the wisps wait, and measure where it stops. */
@@ -166,6 +168,14 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
     setApplied(target.mechanicState);
     setStrikes({});
   }, [key, target]);
+  // A live board's new wisps join the copy kept here; its damage stays this layer's own.
+  const live = target?.live ?? null;
+  useEffect(() => {
+    if (!live || !mechanic) return;
+    const take = () => setApplied((current) => current ? syncMechanicState(mechanic, current, live.get()) : current);
+    take();
+    return live.subscribe(take);
+  }, [key, live, mechanic]);
   // The tile on screen, measured only while the camera is still: a board opening sends the camera onto its
   // tile, so the first measurement waits a beat for that glide to begin, and is made again once it has ended.
   // The wisps therefore first appear where the tile will stay, instead of appearing early and jumping.
@@ -279,7 +289,7 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
   if (!layout) return null;
   return <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.layer]}>
     {wisps.views.map((view, index) => <CorruptionWisp
-      key={view.id} index={index}
+      key={view.id} index={index} enterDelayMs={view.enterDelayMs}
       x={(layout.wisps[index]?.x ?? layout.frame.x) - origin.x} y={(layout.wisps[index]?.y ?? layout.frame.y) - origin.y}
       size={layout.wisps[index]?.size ?? 48}
       pip={view.hp > 1 ? `${Math.max(0, view.hp - view.damage)}` : null}
@@ -307,7 +317,7 @@ export const MissionWisps = memo(function MissionWisps({ target, glow, screenRef
 });
 
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */
-const CorruptionWisp = memo(function CorruptionWisp({ index, x, y, size, pip, alive, leaving, strikeNonce }: { index: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
+const CorruptionWisp = memo(function CorruptionWisp({ index, enterDelayMs, x, y, size, pip, alive, leaving, strikeNonce }: { index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
   const reduceMotion = useReducedMotion();
   const hover = useSharedValue(0);
   const shake = useSharedValue(0);
@@ -318,7 +328,7 @@ const CorruptionWisp = memo(function CorruptionWisp({ index, x, y, size, pip, al
   const [gone, setGone] = useState(() => !alive);
   useEffect(() => {
     if (reduceMotion) { entrance.value = 1; return; }
-    const delay = index * ENTRANCE_STAGGER_MS;
+    const delay = enterDelayMs ?? index * ENTRANCE_STAGGER_MS;
     entrance.value = withDelay(delay, withTiming(1, { duration: ENTRANCE_MS, easing: Easing.out(Easing.back(1.6)) }));
     shake.value = withDelay(delay + ENTRANCE_MS - 80, withSequence(
       withTiming(0.7, { duration: 45 }),

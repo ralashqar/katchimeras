@@ -1,0 +1,19 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "resolution": 2048,
+  "createdAt": "2026-09-21T21:06:42.754842+00:00",
+  "references": [
+    {
+      "path": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "sha256": "64b441e4c33b1d3a02e418f22fd474c4b994557243e43869a89cf8e530df0f2a"
+    },
+    {
+      "path": "assets/images/katchimeras/cutouts/dashkit.png",
+      "sha256": "bcc61266dab3b935e149eb809ea5be226dc9bdbf1610133e82954db86d65bad9"
+    }
+  ],
+  "prompt": "Use Image 1 as the authoritative camera, framing, deep tapered floating hex-island geometry and rendering reference. Preserve its six-sided top footprint, broad chunky cliff blocks, deep tapered underside, centered recessed front stairs, lighting direction and square framing. Keep the entire silhouette comfortably inside the canvas with black padding on all four sides. Perfectly flat pure-black #000000 background for BiRefNet Heavy matting; no ground plane, external drop shadow, text, numbers, UI, watermark, characters or eggs.\n\nPremium cozy 3D toy diorama matching the Mossprout reference: very low detail density, very low texture detail, broad cushiony shapes, soft rounded bevels, smooth matte clay-like surfaces, large readable color blocks, soft upper-left daylight and restrained ambient occlusion. No photographic texture, grain, tiny repeated details, speckles, cracks, grass blades, pine needles or surface noise. Every main shape must read at 256 pixels.\n\nGenerate a fully developed, welcoming Dashkit sprint-track habitat: a small running track for daily time trials, NOT a level-zero, empty, dormant or ruined environment. Image 2 is only the Dashkit identity/palette guide and must not be drawn: take its main colours for the accents of this place. Replace all Mossprout-specific top-face content from Image 1: no leaf-roof cottage, garden pond, bridge, planter boxes, flower beds or surrounding fence. Use one smooth terracotta-orange oval running track that loops around the top face with two cream lane lines, one chunky honey-timber start-and-finish arch at the rear with a plain rounded banner and no writing, one big rounded cream stopwatch-shaped marker stone beside the arch with a blank face and no numbers, a short row of three soft rounded bunting flags in cream and the accent colour, two large cushiony round bushes, and one small warm lantern on a short post. Use only these few iconic racing features, not a scatter of tiny props. Retheme the cliff blocks in coordinated warm sandstone and mossy green while preserving their shapes. The floor inside the track is broad smooth meadow green; no continuous perimeter wall, ring or parapet. Cozy toy diorama 3D: soft bevels, cushiony forms, low detail, low texture detail, big readable shapes. Reserve a generous quiet flat center/front clearing inside the track for the separately rendered live Dashkit, with no prop, platform, chair or bench behind that character area. Keep the centered front access stairs from Image 1 unchanged. A finished, cozy place to race from with several large readable forms, not an empty stage or crowded scene. No baked footprints, written signage, text or numbers. Match Image 1's soft cushiony toy forms more closely than Image 2's character rendering. Preserve the island scale and deep cliff, not a shallow disk.",
+  "assetKey": "shared_world_rush_track_hex_tile_v1",
+  "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/shared-world-rush-track-hex-tile-v1/1790024843184_grid.png",
+  "sourceSha256": "b837e152189413c1a6acd0c1c85292cb44b682e1a673f6afd37154581f97fd81"
+}

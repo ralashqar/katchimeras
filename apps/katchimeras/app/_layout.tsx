@@ -160,6 +160,7 @@ function RootLayout() {
           <Stack.Screen name="dev-profile-snapshot-capture" options={{ contentStyle: { backgroundColor: 'transparent' }, presentation: 'formSheet', sheetAllowedDetents: [0.5, 1], sheetGrabberVisible: true, title: 'Capture Profile' }} />
           <Stack.Screen name="dev-content-flow" options={{ title: 'Content Flow Inspector' }} />
           <Stack.Screen name="dev-content-packs" options={{ title: 'Content Packs' }} />
+          <Stack.Screen name="dev-wisp-rush" options={{ title: 'Wisp Rush' }} />
           <Stack.Screen name="intelligence-lab" options={{ title: 'Intelligence Lab' }} />
           <Stack.Screen name="moment-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="note-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />

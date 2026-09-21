@@ -145,6 +145,7 @@ export const KINGDOM_HEX_TILE_ALPHA_BOUNDS = {
   'resident_vesperitt_hex_tile.webp': { left: 14, top: 137, right: 1010, bottom: 887 },
   'shared_world_baristabbit_window_hex_tile_v1.webp': { left: 43, top: 44, right: 980, bottom: 952 },
   'shared_world_mossprout_old_grove_hex_tile_v1.webp': { left: 38, top: 23, right: 997, bottom: 952 },
+  'shared_world_rush_track_hex_tile_v1.webp': { left: 43, top: 54, right: 980, bottom: 952 },
   'shared_world_steppling_trailhead_hex_tile_v1.webp': { left: 43, top: 36, right: 980, bottom: 952 },
   'shared_world_wanderling_trail_hex_tile_v1.webp': { left: 43, top: 35, right: 980, bottom: 952 },
   'zodiac_aquarius_hex_tile.webp': { left: 14, top: 70, right: 1010, bottom: 953 },

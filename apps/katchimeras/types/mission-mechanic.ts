@@ -43,12 +43,23 @@ export type MissionMechanicDefinition =
       };
       /** A strike budget for a later celebration; nothing fails on it. */
       par?: number;
+    }
+  | {
+      /** Wisp Rush: wisps keep appearing over the tile for as long as the board is up; whoever runs the board says when. */
+      kind: 'wisp-rush';
+      /** Where wisps hang over the tile; how many can be up at once. */
+      perches: readonly WispPlacement[];
     };
 
 /** What a mechanic remembers between strikes; saved with the board. */
 export type MissionMechanicState =
   | { kind: 'glow-strikes'; strikes: number }
-  | { kind: 'column-shot'; strikes: number; damage: number[] };
+  | { kind: 'column-shot'; strikes: number; damage: number[] }
+  /** Every wisp that has appeared, in order; the list only grows. `bornAt` 0 marks the ones the board opened with. */
+  | { kind: 'wisp-rush'; strikes: number; wisps: { id: string; hp: number; perch: number; damage: number; bornAt: number }[] };
+
+/** A board whose state moves on its own (a rush's wisps appear over time) publishes it here; the wisp layer subscribes. */
+export type MissionMechanicLive = { get: () => MissionMechanicState; subscribe: (listener: () => void) => () => void };
 
 /** One strike a board command produced: what flies, where it lands, and what that does. */
 export type MissionStrike = {
@@ -64,7 +75,11 @@ export type MissionStrike = {
 };
 
 /** A wisp as the layer draws it: its hit points, the damage in, whether it stands, and where it hangs. */
-export type MissionWispView = { id: string; hp: number; damage: number; alive: boolean; placement: WispPlacement };
+export type MissionWispView = {
+  id: string; hp: number; damage: number; alive: boolean; placement: WispPlacement;
+  /** How long its arrival waits; by default wisps arrive one after another in order. */
+  enterDelayMs?: number;
+};
 
 /** The move a mechanic points the finger at. */
 export type MissionMechanicMove = { kind: 'wake' | 'merge'; from: number; to: number; definitionId: string | null };

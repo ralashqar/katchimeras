@@ -172,10 +172,12 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onBoardRelease, onScreenMetrics, screenMetricsRevision = 0, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true, layout = DEFAULT_MERGE_BOARD_LAYOUT }: {
+export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onBoardRelease, onScreenMetrics, screenMetricsRevision = 0, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true, animateArrivals = false, layout = DEFAULT_MERGE_BOARD_LAYOUT }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
+  /** Items that appear in the state without a move of the player's (dealt in by a time trial) arrive with the sprite entrance and a settle puff, instead of simply being there. */
+  animateArrivals?: boolean;
   maxHeight?: number;
   selectedCell: number | null;
   onSelect: (cell: number | null) => void;
@@ -326,6 +328,19 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     if (baseArtDisplayed && cellArtReady) onVisualReady?.();
   }, [baseArtDisplayed, cellArtReady, onVisualReady]);
   const emitBoardEffect = boardEffects.emit;
+  const animateArrivalsRef = useRef(animateArrivals);
+  animateArrivalsRef.current = animateArrivals;
+  /** Marks the items the board has never drawn, before they mount: their sprite starts at nothing and springs in. */
+  const markArrivals = useCallback((nextSprites: readonly SpriteRecord[]) => {
+    if (!animateArrivalsRef.current) return;
+    const known = new Set(spritesRef.current.map(spriteId));
+    for (const sprite of nextSprites) {
+      const id = spriteId(sprite);
+      if (sprite.occupant.kind !== 'item' || known.has(id)) continue;
+      introSpriteDelays.current.set(id, 0);
+      emitBoardEffect(sprite.cell, 'spawn-settle');
+    }
+  }, [emitBoardEffect]);
 
   presentationRef.current = presentation;
   spritesRef.current = sprites;
@@ -418,9 +433,10 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     if (activeOperations.current.size) return;
     presentationRef.current = state;
     const nextSprites = spritesFromState(state);
+    markArrivals(nextSprites);
     spritesRef.current = nextSprites;
     dispatchVisual({ type: 'sync', presentation: state, sprites: nextSprites });
-  }, [state, syncOccupancy]);
+  }, [markArrivals, state, syncOccupancy]);
 
   useEffect(() => {
     if (!hiddenItemInstanceIds?.size || !onHiddenItemsRetired) return;
@@ -446,6 +462,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     let reconciledSprites = spritesRef.current;
     if (!canReuseSpawnSprites(operation.kind, presentationRef.current.board, finalState.board)) {
       const canonicalSprites = spritesFromState(finalState);
+      // A piece dealt in while this operation was still animating is first seen here.
+      markArrivals(canonicalSprites);
       const canonicalIds = new Set(canonicalSprites.map(spriteId));
       // A merge temporarily keeps its consumed sprites mounted so they can fade
       // out. Remove those ghosts as soon as their own operation completes, while
@@ -469,7 +487,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     if (operation.settledRevision != null) {
       onCommandSettledRef.current?.({ operationId: operation.id, revision: operation.settledRevision, sessionId });
     }
-  }, [sessionId, timers]);
+  }, [markArrivals, sessionId, timers]);
 
   useLayoutEffect(() => {
     if (foreground) return;

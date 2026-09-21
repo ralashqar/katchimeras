@@ -131,6 +131,16 @@ export const MOSSPROUT_NATURE_ISLAND_ART: Record<string, NatureArtSpec> = {
       thumb: require('@incubator/art-world/hex/shared_world_wanderling_trail_hex_tile_v1_256.webp'),
     },
   },
+  // The Rush Track: the bundled pack `data/content-packs/rush-track.json` (Dashkit); one art for every level for now.
+  'rush-track': {
+    alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['shared_world_rush_track_hex_tile_v1.webp'],
+    coord: { q: 2, r: -2 },
+    sources: {
+      full: require('@incubator/art-world/hex/shared_world_rush_track_hex_tile_v1.webp'),
+      medium: require('@incubator/art-world/hex/shared_world_rush_track_hex_tile_v1_512.webp'),
+      thumb: require('@incubator/art-world/hex/shared_world_rush_track_hex_tile_v1_256.webp'),
+    },
+  },
   'seed-nursery': {
     alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_focused_v1_seed_nursery_hex_tile.webp'],
     coord: { q: -1, r: 1 },

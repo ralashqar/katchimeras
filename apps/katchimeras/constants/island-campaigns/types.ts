@@ -1,3 +1,4 @@
+import type { HeatRules } from '@/features/time-trial/heat';
 import type { ConversationInsightResultDefinition, ConversationOption } from '@/types/companion-conversation';
 import type { MissionMechanicDefinition } from '@/types/mission-mechanic';
 import type { KatchimeraSkinId } from '@/types/katchimera';
@@ -34,6 +35,12 @@ export type RestorationBoardDefinition = {
    * so what arrives always has something to merge with.
    */
   request?: { kind: 'twins'; max?: number };
+  /**
+   * The chapter is a timed rush instead of a puzzle board: a clock, pieces and wisps that keep arriving, and `goal`
+   * wisps to strike down before it runs out (run again, free, until it is made). Such a board authors no pieces, no
+   * echoes and no delivery, asks the Main Board for nothing, and `merges` equals `goal` (the bar).
+   */
+  rush?: HeatRules & { goal: number };
 };
 
 export type IslandCampaignChapterOrder = Pick<MergeOrder, 'title' | 'description' | 'difficulty' | 'requirements' | 'narrativeSignal'>;

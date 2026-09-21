@@ -62,7 +62,7 @@ test('the Glow aims at the wisps: every burst at the first standing, the finale 
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const layerSource = readFileSync('components/katchadeck/world/corruption-wisp-layer.tsx', 'utf8');
   const hook = readFileSync('features/onboarding/use-mist-mission.ts', 'utf8');
-  assert.match(screen, /const wispTarget = useMemo\(\(\): CorruptionWispTarget \| null => hatchableMist\.wispTarget \?\? journeyMist\.wispTarget \?\? \(openingBoardActive/, 'a docked mission\u2019s wisps come from its hook');
+  assert.match(screen, /const wispTarget = useMemo\(\(\): CorruptionWispTarget \| null => rushWispTarget \?\? hatchableMist\.wispTarget \?\? journeyMist\.wispTarget \?\? \(openingBoardActive/, 'a docked mission\u2019s wisps come from its hook');
   assert.match(hook, /missionWispTarget\(\{ key: played\.id, host: played, mechanicState: store\.mechanicState, node: tileNode, boardMetrics, window, lines: played\.lines, settled: cameraSettled, revealNonce \}\)/);
   assert.match(screen, /\? \{ key: 'opening-mist', node: homeTileNode, host: OPENING_MIST_HOST, mechanicState: \{ kind: 'glow-strikes', strikes: openingProgress \}, lines: OPENING_WISP_LINES, settled: ftueCameraSettled \}/);
   // The wisps own their state in their own component: a strike or a measurement re-renders it, never the screen. It hands the Glow its sink on every render.
@@ -111,7 +111,7 @@ test('the Glow aims at the wisps: every burst at the first standing, the finale 
   assert.match(layer, /const LINGER_MS = 800;/, 'the layer stays for the last death to play');
   // A wisp arrives: it swells up from nothing with an overshoot, staggered after the one before, and shivers into place; one already felled never appears.
   assert.match(layer, /entrance\.value = withDelay\(delay, withTiming\(1, \{ duration: ENTRANCE_MS, easing: Easing\.out\(Easing\.back\(1\.6\)\) \}\)\);/);
-  assert.match(layer, /const delay = index \* ENTRANCE_STAGGER_MS;/);
+  assert.match(layer, /const delay = enterDelayMs \?\? index \* ENTRANCE_STAGGER_MS;/);
   assert.match(layer, /shake\.value = withDelay\(delay \+ ENTRANCE_MS - 80, withSequence\(/, 'a small shake as it settles');
   assert.match(layer, /const \[gone, setGone\] = useState\(\(\) => !alive\);/);
   assert.match(layer, /\{ scale: arriving \* \(1 \+ Math\.abs\(shake\.value\) \* 0\.06\) \* \(1 - dying \* 0\.85\) \},/);

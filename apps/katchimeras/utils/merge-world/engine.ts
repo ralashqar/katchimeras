@@ -1,4 +1,5 @@
 import { normalizeAdventure } from '@/features/shared-adventure/normalize';
+import { normalizeTimeTrials } from '@/features/time-trial/trial-world';
 import { createOrderQueries } from '@incubator/merge/orders';
 import { reconcileUpgradeProgress } from '@/features/world-upgrades/world-upgrade-progress';
 const { mergeOrderReady, mergeOrderRequirementReadiness, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds, boardItemCounts } = createOrderQueries();
@@ -967,6 +968,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
       ? source.wispLanternPlacement : undefined,
     wispLanternProgress: source.wispLanternProgress,
     heartwoodBuildings: normalizeHeartwoodBuildings(source.heartwoodBuildings, now),
+    timeTrials: normalizeTimeTrials(source.timeTrials),
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
     storyWorldMutationReceipts: normalizeStoryWorldMutationReceipts(source.storyWorldMutationReceipts),
     companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, source.activeOrders, rawVersion, now),

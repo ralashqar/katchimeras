@@ -164,7 +164,8 @@ test('every authored restoration board needs its delivery on every path and fill
     for (const chapter of campaign.chapters) {
       if (!chapter.restoration) continue;
       // A board that reads its request off its own pieces has no fixed delivery to prove; it asks again whenever it is stuck.
-      if (chapter.restoration.request) continue;
+      // Nor has a chapter played against the clock: it lays out no pieces and asks the Main Board for nothing (tests/time-trial.test.ts proves those).
+      if (chapter.restoration.request || chapter.restoration.rush) continue;
       // Every answer's request carries the same items, so the proof below holds whichever the player chose.
       const items = (requirements: readonly { definitionId: string; quantity: number }[]) => requirements.flatMap((requirement) => Array.from({ length: requirement.quantity }, () => requirement.definitionId)).sort().join(',');
       const expected = items(chapter.fallbackOrder.requirements);
@@ -179,7 +180,7 @@ test('every request a board sends to the Main Board can be made there, and the e
   // The world right before each friend: the friends home by then decide which generator branches are open
   // (the Garden Basket's waterside waits for Shellio, the Journey Locker's travel branch for a later friend).
   const fixtures = buildPlayerProfileFixtures(NOW);
-  const worldBefore: Record<string, string> = { [petalimp.campaignId]: 'fixture:kingdom-before-petalimp', [FERNIP_WILDGROWTH_CAMPAIGN.campaignId]: 'fixture:kingdom-before-fernip', 'island-campaign:wanderling-trail': 'fixture:kingdom-before-petalimp' };
+  const worldBefore: Record<string, string> = { [petalimp.campaignId]: 'fixture:kingdom-before-petalimp', [FERNIP_WILDGROWTH_CAMPAIGN.campaignId]: 'fixture:kingdom-before-fernip', 'island-campaign:wanderling-trail': 'fixture:kingdom-before-petalimp', 'island-campaign:rush-track': 'fixture:kingdom-before-petalimp' };
   for (const campaign of ISLAND_CAMPAIGNS) {
   if (!campaign.chapters.some((chapter) => chapter.restoration)) continue;
   const fixtureId = worldBefore[campaign.campaignId];
@@ -205,7 +206,7 @@ test('every request a board sends to the Main Board can be made there, and the e
     }
     // What the request brings must be wanted: each delivered item merges with a twin on the spent board or frees a misted cell.
     // A board that reads its request off its own pieces asks for exactly that.
-    if (chapter.restoration!.request) continue;
+    if (chapter.restoration!.request || chapter.restoration!.rush) continue;
     const wanted = new Set(chapter.restoration!.echoes.map((echo) => echo.definitionId));
     for (const requirement of chapter.fallbackOrder.requirements) {
       const definition = MERGE_ITEMS_BY_ID.get(requirement.definitionId)!;
@@ -339,7 +340,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /if \(chapter\.restoration\) \{[\s\S]*?requestResidentInteractionExit\(\);\s*return;\s*\}\s*const activeOrderId = campaignProgress\?\.orderIds\.at\(-1\);/, 'the answer opens the board, not the Garden');
   assert.match(screen, /if \(progress\.action === 'continue_restoring'\) \{[\s\S]*?setSelectedUpgrade\(null\);/);
   assert.match(screen, /<IslandRestorationDock[\s\S]*?progress=\{restorationSummary \?\? \{ current: 0, total: 1 \}\}[\s\S]*?onFinale=\{launchRestorationFinale\}/);
-  assert.match(screen, /\|\| restorationBoardVisible\}/, 'the camera holds while the board is up');
+  assert.match(screen, /\|\| restorationBoardVisible \|\| rushSheetOpen \|\| Boolean\(rushSpec\)\}/, 'the camera holds while a board is up');
   // The board is optional: opened on purpose, put away freely, never forced.
   assert.match(screen, /const restorationBoardVisible = Boolean\(islandRestoration && restorationStore\.state\) && restorationOpen && screenFocused/, 'the board shows only when opened');
   assert.match(screen, /restorationIslandId && restorationOpen && screenFocused \? \{/, 'the camera only frames the island while the board is open');
@@ -387,7 +388,7 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /if \(restorationLanded && restorationBoardRunId\) setRestorationHandoff\(restorationBoardRunId\);/);
   assert.match(screen, /if \(pendingIslandCampaign\?\.phase === 'resolution' \|\| upgradeError\) \{ setRestorationHandoff\(null\); return; \}/);
   assert.match(screen, /homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS :/, 'no marker during the hand-off');
-  assert.match(screen, /const missionBoardDocked = (?:eventBoardActive \|\| )?openingBoardActive \|\| stepplingMissionActive \|\| journeyMissionActive \|\| restorationBoardVisible;\s*const visibleUpgradeOffers = [^\n]*missionBoardDocked \? NO_UPGRADE_OFFERS :/, 'no marker at all while any mini board is docked');
+  assert.match(screen, /const missionBoardDocked = (?:eventBoardActive \|\| )?openingBoardActive \|\| stepplingMissionActive \|\| journeyMissionActive \|\| restorationBoardVisible \|\| Boolean\(rushSpec\);\s*const visibleUpgradeOffers = [^\n]*missionBoardDocked \? NO_UPGRADE_OFFERS :/, 'no marker at all while any mini board is docked');
   // The tray and its bubble draw over the wisps; the Glow still strikes the wisps from above.
   assert.match(readFileSync('components/katchadeck/world/corruption-wisp-layer.tsx', 'utf8'), /layer: \{ zIndex: 58 \}/);
   assert.match(glowDock, /dock: \{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 60,/);

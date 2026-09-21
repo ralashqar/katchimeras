@@ -673,6 +673,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Content Flow Inspector" onPress={() => router.push('/dev-content-flow' as Href)} variant="secondary" />
                 <DevTimeSection />
                 <KatchaButton label="Content Packs (live ops)" onPress={() => router.push('/dev-content-packs' as Href)} variant="secondary" />
+                <KatchaButton label="Wisp Rush (daily time trial)" onPress={() => router.push('/dev-wisp-rush' as Href)} variant="secondary" />
                 <KatchaButton label={currencyToolsOpen ? 'Hide currency tools' : 'Currency tools'} onPress={() => setCurrencyToolsOpen((open) => !open)} variant="primary" />
                 {currencyToolsOpen ? <View style={styles.journeyTools}>
                   <View style={styles.devToggleCopy}>

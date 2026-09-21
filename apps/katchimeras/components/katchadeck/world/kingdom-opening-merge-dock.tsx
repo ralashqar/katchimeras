@@ -183,8 +183,10 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
 /** How far the header's bottom edge sits under the top of the bar. */
 const HEADER_TUCK = 24;
 
-export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, landings, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, headerGap, overlay, rootRef }: {
+export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, landings, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, headerGap, overlay, rootRef, animateArrivals }: {
   state: MergeWorldState;
+  /** Pieces that arrive on their own (a time trial's dealer) pop in the way the board's pieces do. */
+  animateArrivals?: boolean;
   /** The window over the canonical board; the opening's 5×4 by default. */
   layout?: typeof OPENING_BOARD_LAYOUT | (Omit<typeof OPENING_BOARD_LAYOUT, 'rows' | 'cellIndices' | 'accessibilityLabel'> & { rows: number; cellIndices: readonly number[]; accessibilityLabel: string });
   barTitle?: string;
@@ -311,6 +313,7 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
     </View>
     <MergePlaySurface
       animateEntrance={false}
+      animateArrivals={animateArrivals}
       boardLayout={layout}
       boardState={state}
       railHidden
