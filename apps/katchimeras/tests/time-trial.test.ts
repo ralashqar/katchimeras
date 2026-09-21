@@ -10,8 +10,10 @@ import { createRushLive, heatHost, heatMissionStrike } from '@/features/time-tri
 import { HEATS_PER_DAY, RUSH_LADDER, heatFor, heatFromRules, heatPars, maxPlausibleScore, medalFor, playHeatWithBot } from '@/features/time-trial/ladder';
 import { claimDayChest, dayChestFor, heatGlow, nextHeatIndex, normalizeTimeTrials, recordTimeTrialHeat, timeTrialFor } from '@/features/time-trial/trial-world';
 import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
+import { islandCampaignChapterOrder, islandCampaignChapterStatus } from '@/constants/island-campaigns/helpers';
+import { greetIslandFriend, revealIsland } from './helpers/island-campaign';
 import type { MergeWorldState } from '@/types/merge-world';
-import { createInitialMergeWorldState, normalizeMergeWorldState } from '@/utils/merge-world/engine';
+import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 
 const RULES: HeatRules = { chains: ['a', 'b'], durationMs: 30_000, up: 2, wispEveryMs: 4_000, hp: 2, hpRampEvery: 100, thickChance: 0, startFill: 10, fill: 18, dealEveryMs: 1_500, dealDelayMs: 450, tierTwoChance: 0.3 };
 const spec = (patch: Partial<HeatRules> = {}, id = 'test'): HeatSpec => heatFromRules(id, { ...RULES, ...patch });
@@ -285,4 +287,36 @@ test('Dashkit\'s story is played against the clock: every chapter is a rush, wit
       assert.ok(played.score >= Math.ceil(goal * 1.3), `chapter ${chapter.level}, attempt ${attempt}: a steady hand makes ${goal} with room to spare (${played.score})`);
     }
   }
+});
+
+test('a rush chapter through the world: nothing asked of the Main Board, so the chapter closes on its own; a save stuck on that request is repaired', () => {
+  const dashkit = ISLAND_CAMPAIGNS.find((candidate) => candidate.campaignId === 'island-campaign:rush-track')!;
+  const choice = dashkit.chapters[0]!.choices[0]!;
+  const fresh = createInitialMergeWorldState(NOW, ['mossprout']);
+  // The track wakes with Steppling.
+  const withSteppling = { ...fresh, coins: 200, companionDiscovery: { ...fresh.companionDiscovery, records: [...fresh.companionDiscovery.records, { characterId: 'steppling' } as never] } };
+  let state = greetIslandFriend(revealIsland(withSteppling, dashkit, NOW), dashkit, NOW + 1);
+  const order = islandCampaignChapterOrder(dashkit, 1, choice.id, NOW + 2)!;
+  state = reduceMergeWorld(state, { type: 'activateIslandCampaignChapter', campaignId: dashkit.campaignId, islandId: dashkit.islandId, residentSkinId: dashkit.residentSkinId, level: 1, selectedOptionId: choice.id, orders: [order], now: NOW + 2 }).state;
+  const record = () => state.islandCampaigns![dashkit.campaignId]!.chapters['1']!;
+  assert.deepEqual(record().orderIds, [], 'a run against the clock records no request');
+  assert.equal(islandCampaignChapterStatus(state, dashkit, 1), 'board_open');
+  const goal = dashkit.chapters[0]!.restoration!.rush!.goal;
+  state = reduceMergeWorld(state, { type: 'recordIslandRestorationProgress', campaignId: dashkit.campaignId, level: 1, current: goal, total: goal, now: NOW + 3 }).state;
+  state = reduceMergeWorld(state, { type: 'completeIslandRestoration', campaignId: dashkit.campaignId, level: 1, now: NOW + 4 }).state;
+  assert.equal(islandCampaignChapterStatus(state, dashkit, 1), 'restoration_ready');
+  const grown = reduceMergeWorld(state, { type: 'upgradeMossproutNatureIsland', islandId: dashkit.islandId, level: 1, receiptId: 'rush-1', now: NOW + 5 });
+  assert.equal(grown.changed, true, grown.message);
+  state = grown.state;
+  assert.equal(islandCampaignChapterStatus(state, dashkit, 1), 'resolution_ready');
+  const closed = reduceMergeWorld(state, { type: 'completeIslandCampaignChapter', campaignId: dashkit.campaignId, level: 1, now: NOW + 6 });
+  assert.equal(closed.changed, true, closed.message);
+  assert.equal(islandCampaignChapterStatus(closed.state, dashkit, 1), 'complete');
+
+  // A save from before: the request id was recorded and never served, and the chapter could not close. Reloading drops it.
+  const stuck = { ...state, islandCampaigns: { ...state.islandCampaigns, [dashkit.campaignId]: { ...state.islandCampaigns![dashkit.campaignId]!, chapters: { '1': { ...record(), orderIds: [order.id] } } } } };
+  assert.equal(reduceMergeWorld(stuck, { type: 'completeIslandCampaignChapter', campaignId: dashkit.campaignId, level: 1, now: NOW + 6 }).changed, false, 'stuck as it was');
+  const repaired = normalizeMergeWorldState(JSON.parse(JSON.stringify(stuck)), NOW + 7);
+  assert.deepEqual(repaired.islandCampaigns![dashkit.campaignId]!.chapters['1']!.orderIds, []);
+  assert.equal(reduceMergeWorld(repaired, { type: 'completeIslandCampaignChapter', campaignId: dashkit.campaignId, level: 1, now: NOW + 8 }).changed, true);
 });

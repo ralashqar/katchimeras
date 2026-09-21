@@ -1501,6 +1501,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       : phase === 'return' ? islandCampaignReturnConversationId(campaign, level, selectedOptionId)
         : islandCampaignResolutionConversationId(campaign, level, selectedOptionId, style);
     if (!definitionId) return;
+    // A scene plays once ever. If it has already been heard but its world write never landed (a crash, or a chapter
+    // that could not close at the time), replay only the durable step: never strand a chapter behind a scene it cannot show.
+    if (phase !== 'opening' && loadCompanionContentState().conversationSessions.some((session) => !session.preview && companionInitialConversationCompletionReady(session, definitionId))) {
+      void (phase === 'return' ? acknowledgeStoredIslandCampaignChapterReturn(campaign.campaignId, level) : completeStoredIslandCampaignChapter(campaign.campaignId, level))
+        .catch((error) => console.warn('The island chapter could not move on', error));
+      return;
+    }
     setPendingIslandCampaign({ campaign, level, phase });
     setDetailCreatureId(null);
     setInteractionCameraReady(false);

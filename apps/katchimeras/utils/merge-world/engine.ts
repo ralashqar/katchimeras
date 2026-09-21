@@ -1021,7 +1021,8 @@ function normalizeIslandCampaigns(value: unknown, now: number): NonNullable<Merg
       return [[String(level), {
         level,
         selectedOptionId: typeof chapter.selectedOptionId === 'string' ? chapter.selectedOptionId : null,
-        orderIds: uniqueStrings(chapter.orderIds),
+        // A chapter played against the clock asks the Main Board for nothing; a save from before that was so drops its request.
+        orderIds: islandCampaignById.get(campaignId)?.chapters.find((candidate) => candidate.level === level)?.restoration?.rush ? [] : uniqueStrings(chapter.orderIds),
         servedOrderIds: uniqueStrings(chapter.servedOrderIds),
         startedAt: finite(chapter.startedAt, now),
         returnConversationSeenAt: chapter.returnConversationSeenAt == null ? null : finite(chapter.returnConversationSeenAt, now),
@@ -1433,7 +1434,8 @@ function activateIslandCampaignChapter(
   if (state.coins < stageCost) return unchanged(state, 'Earn a few more Glow through Merge orders.');
   // A board chapter's request is authored data, fixed here by the answer: its id
   // is recorded now and the same order is published later, never re-derived.
-  const authoredRequest = restorationBoard && campaignDefinition ? islandCampaignChapterOrder(campaignDefinition, command.level, command.selectedOptionId ?? null, command.now) : null;
+  // A chapter played against the clock asks the Main Board for nothing: it records no request, so it can close on its own.
+  const authoredRequest = restorationBoard && !restorationBoard.rush && campaignDefinition ? islandCampaignChapterOrder(campaignDefinition, command.level, command.selectedOptionId ?? null, command.now) : null;
   const activeOrders = restorationBoard
     ? state.activeOrders
     : [...state.activeOrders, ...orders.filter((order) => !state.activeOrders.some((candidate) => candidate.id === order.id))];
