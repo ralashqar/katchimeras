@@ -1,3 +1,4 @@
+import { friendConstellation, friendConstellationWisps } from '@/constants/friend-wisp-constellations';
 import { WISP_CATALOG } from '@/constants/wisps';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { WispId } from '@/types/wisp';
@@ -35,6 +36,7 @@ export const WISP_FAMILY_SERIES: readonly WispFamilySeries[] = WISP_CATALOG
   .map((signature) => {
     const familyId = signature.primaryFamilyId as KatchimeraFamilyId;
     const pilot = PILOT[familyId];
+    const constellation = friendConstellation(familyId);
     const affinity = WISP_CATALOG
       .filter((item) => item.id !== signature.id && (item.primaryFamilyId === familyId || item.affinityFamilyIds.includes(familyId)))
       .map((item) => item.id);
@@ -42,9 +44,9 @@ export const WISP_FAMILY_SERIES: readonly WispFamilySeries[] = WISP_CATALOG
       id: signature.seriesId ?? `${familyId}-constellation`,
       familyId,
       signatureWispId: signature.id,
-      featuredWispIds: pilot?.wisps ?? [signature.id, ...affinity].slice(0, 5),
+      featuredWispIds: constellation ? friendConstellationWisps(constellation) : pilot?.wisps ?? [signature.id, ...affinity].slice(0, 5),
       cosmeticRewards: pilot?.cosmetics ?? [],
-      pilot: Boolean(pilot),
+      pilot: Boolean(pilot || constellation),
     };
   });
 

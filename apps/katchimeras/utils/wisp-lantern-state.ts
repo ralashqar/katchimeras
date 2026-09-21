@@ -4,6 +4,7 @@ import { LANTERN_COLLECTION, LANTERN_VISITORS, ORDINARY_PROTECTION, WELCOME_PACK
 import { albumPhase, albumWisps, packDefinition, wispAlbum } from '@/constants/wisp-albums';
 import type { WispCollectionState, WispId } from '@/types/wisp';
 import type { WispLanternCommand, WispLanternState, WispPackInstance } from '@/types/wisp-lantern';
+import { rollWispPack, wispRandom } from '@/utils/wisp-pack-roll';
 export function emptyWispLantern(): WispLanternState {
   return { version: 2, scope: 'local-lantern-v1', unlockedAt: null, introducedAt: null, packs: {}, echoes: 0, dryPacksByGroup: {},
     dryPacks: 0, receipts: [], residents: [], cosmetics: [], claims: [], duplicateExplained: false };
@@ -27,10 +28,7 @@ export function normalizeWispLantern(raw: unknown): WispLanternState {
   if (Object.values(dryPacksByGroup).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('Invalid pack protection');
   return { ...emptyWispLantern(), ...value, version: 2, dryPacksByGroup } as WispLanternState;
 }
-export function wispRandom(seed: number) {
-  let value = seed >>> 0;
-  return () => { value += 0x6D2B79F5; let t = Math.imul(value ^ value >>> 15, 1 | value); t ^= t + Math.imul(t ^ t >>> 7, 61 | t); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-}
+export { wispRandom };
 function own(state: WispCollectionState, id: WispId, receiptId: string, now: number) {
   state.inventory[id] = { wispId: id, quantity: 1, sources: ['visitor'], firstGrantedAt: now, giftableQuantity: 0 };
   state.unlocked[id] = { wispId: id, unlockedAt: now, sourceDayId: null, seenReveal: true };
@@ -69,30 +67,14 @@ export function reduceWispLantern(input: WispCollectionState, command: WispLante
       if (!pack || pack.scope !== 'local-lantern-v1') throw new Error('Pouch unavailable.');
       if (pack.openedAt != null) return input;
       const definition = packDefinition(pack.definitionId, pack.definitionVersion, lantern.previewSeasonStartedAt);
-      const random = wispRandom(pack.seed);
-      const selected = new Set<WispId>();
-      let discovered = false;
       const protection = definition.protectionGroup;
       const dryPacks = protection ? lantern.dryPacksByGroup[protection] ?? 0 : 0;
-      pack.outcomes = [];
-      for (let slot = 0; slot < definition.slots; slot++) {
-        const eligible = definition.pool.filter(entry => (!definition.distinct || !selected.has(entry.id)) &&
-          (definition.guaranteedRarity?.slot !== slot || WISP_RARITY[wispDefinition(entry.id).rarity].rank >= WISP_RARITY[definition.guaranteedRarity.minimum].rank));
-        const missing = eligible.filter(entry => !owned(entry.id));
-        const guarantee: boolean = slot === definition.slots - 1 && !discovered && missing.length > 0
-          && definition.guaranteeAfterDryPacks != null && dryPacks >= definition.guaranteeAfterDryPacks;
-        const pool: { id: WispId; weight: number }[] = guarantee ? missing.map(entry => ({ ...entry, weight: 1 })) : eligible;
-        let roll = random() * pool.reduce((sum, entry) => sum + entry.weight, 0);
-        const chosen = pool.find(entry => (roll -= entry.weight) < 0) ?? pool[pool.length - 1];
-        if (!chosen) throw new Error('This pouch has no eligible visitors.');
-        selected.add(chosen.id);
-        const isNew = !owned(chosen.id);
-        const echoes = isNew ? 0 : WISP_RARITY[wispDefinition(chosen.id).rarity].echoes;
-        if (isNew) own(state, chosen.id, `${pack.id}:slot:${slot}`, now);
-        lantern.echoes += echoes;
-        discovered ||= isNew;
-        pack.outcomes.push({ id: chosen.id, discovered: isNew, echoes });
-      }
+      // The roll is shared with friends' pouches; what a duplicate is worth (Echoes) is the Lantern's own rule.
+      const roll = rollWispPack(definition, pack.seed, owned, dryPacks, (id, slot) => own(state, id, `${pack.id}:slot:${slot}`, now));
+      pack.outcomes = roll.map(card => ({ ...card, echoes: card.discovered ? 0 : WISP_RARITY[wispDefinition(card.id).rarity].echoes }));
+      lantern.echoes += pack.outcomes.reduce((sum, card) => sum + card.echoes, 0);
+      const discovered = roll.some(card => card.discovered);
+      const selected = new Set(roll.map(card => card.id));
       pack.openedAt = now;
       if (protection) lantern.dryPacksByGroup[protection] = discovered || definition.pool.every(entry => owned(entry.id)) ? 0 : dryPacks + 1;
       lantern.dryPacks = lantern.dryPacksByGroup[ORDINARY_PROTECTION] ?? 0;

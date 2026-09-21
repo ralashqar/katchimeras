@@ -6,6 +6,7 @@ import type { HomeDayRecord } from '@/types/home';
 import type { WispCollectionState, WispGrantSource, WispId } from '@/types/wisp';
 import { earnedWispIds, wispProgress } from '@/utils/wisp-engine';
 import { grantStoredWisp, loadWispState, subscribeWispState, updateStoredWispState } from '@/utils/wisp-storage';
+import { useFriendWispRewards } from '@/features/wisps/use-friend-wisp-rewards';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { loadCompanionAchievementState } from '@/utils/companion-achievements-storage';
 import { useEconomy } from '@/features/economy/economy-provider';
@@ -35,6 +36,7 @@ export function WispProvider({ children }: PropsWithChildren) {
   const economy = useEconomy();
   const [state, setState] = useState(loadWispState);
   useEffect(() => subscribeWispState(setState), []);
+  useFriendWispRewards();
   const [debugEquippedWispId, setDebugEquippedWispId] = useState<WispId | null | undefined>(undefined);
   useEffect(() => {
     if (!allKatchimerasAvailable) setDebugEquippedWispId(undefined);

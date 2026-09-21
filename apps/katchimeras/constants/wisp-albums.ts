@@ -3,6 +3,7 @@ import { DEV_TOOLS_ENABLED } from './dev';
 import type { WispId } from '@/types/wisp';
 import type { WispPackDefinition } from '@/types/wisp-lantern';
 import { wispDefinition } from './wisps';
+import { FRIEND_CONSTELLATIONS, friendConstellationWisps, friendPackDefinition } from './friend-wisp-constellations';
 
 export type WispAlbumSet = { id: string; name: string; wispIds: readonly WispId[]; reward: { id: string; label: string } };
 export type WispAlbum = {
@@ -27,13 +28,26 @@ export function wispAlbums(previewStartedAt?: number): readonly WispAlbum[] {
     startsAt: previewStartedAt, endsAt: previewStartedAt + 14 * 86400000, claimEndsAt: previewStartedAt + 17 * 86400000,
     sets: [{ id: 'moon-friends', name: 'Moon friends', wispIds: LANTERN_VISITORS, reward: { id: 'dev-moonlit-habitat', label: 'Preview habitat' } }], reward: { id: 'dev-moonlit-habitat', label: 'Preview habitat' } }];
 }
+/** A friend's constellation as an album: their own sets and rewards, permanent, outside the Lantern's validation. */
+export const FRIEND_WISP_ALBUMS: readonly WispAlbum[] = FRIEND_CONSTELLATIONS.map((constellation) => ({
+  id: `${constellation.familyId}-constellation`, name: constellation.name, description: 'Little lights that gathered around this friend.', seasonal: false, artKey: 'pack' as const,
+  sets: [
+    { id: 'commons', name: 'First lights', wispIds: constellation.commons, reward: { id: `${constellation.familyId}:commons`, label: 'A decoration for their tile' } },
+    { id: 'rares', name: 'Brighter lights', wispIds: [...constellation.commons, ...constellation.rares], reward: { id: `${constellation.familyId}:rares`, label: 'A look of their own' } },
+    { id: 'all', name: 'The whole constellation', wispIds: friendConstellationWisps(constellation), reward: { id: `${constellation.familyId}:all`, label: constellation.perk.label } },
+  ],
+  reward: { id: `${constellation.familyId}:all`, label: constellation.perk.label },
+}));
+export const isFriendPackId = (definitionId: string) => definitionId.startsWith('friend-');
+
 export function albumWisps(album: WispAlbum) { return [...new Set(album.sets.flatMap(set => set.wispIds))]; }
 export function wispAlbum(id: string, previewStartedAt?: number) {
-  const album = wispAlbums(previewStartedAt).find(a => a.id === id);
+  const album = wispAlbums(previewStartedAt).find(a => a.id === id) ?? FRIEND_WISP_ALBUMS.find(a => a.id === id);
   if (!album) throw new Error('This album needs a newer version of the game.');
   return album;
 }
 export function packDefinition(id: string, version?: number, previewStartedAt?: number): WispPackDefinition {
+  if (isFriendPackId(id)) return friendPackDefinition(id, version);
   if (id === 'dev-moonlit-pack' && DEV_TOOLS_ENABLED && previewStartedAt != null && (version == null || version === 1)) {
     return { ...LANTERN_PACKS.find(p => p.id === 'lantern-pouch')!, id, version: 1, collectionId: 'dev-moonlit-preview', name: 'Moonlit Mist Pack · Preview', protectionGroup: 'dev-moonlit:ordinary' };
   }

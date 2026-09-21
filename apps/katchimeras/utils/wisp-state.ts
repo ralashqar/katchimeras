@@ -1,4 +1,5 @@
 import { WISP_CATALOG_VERSION, WISPS_BY_ID } from '@/constants/wisps';
+import { normalizeFriendWispPacks } from '@/utils/friend-wisp-packs';
 import { normalizeWispLantern } from './wisp-lantern-state';
 import type { WispCollectionState, WispGrantSource, WispId } from '@/types/wisp';
 
@@ -61,6 +62,7 @@ export function normalizeWispState(value: unknown): WispCollectionState {
   return {
     version: 3,
     lantern: candidate.lantern ? normalizeWispLantern(candidate.lantern) : undefined,
+    friendPacks: candidate.friendPacks ? normalizeFriendWispPacks(candidate.friendPacks) : undefined,
     equippedWispId: equipped,
     unlocked,
     inventory,

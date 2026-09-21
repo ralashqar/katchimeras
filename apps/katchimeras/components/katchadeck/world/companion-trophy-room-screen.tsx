@@ -22,6 +22,8 @@ import { companionAchievementIconSource } from '@/constants/achievement-icon-sou
 import { companionQuestListSpacer } from '@/utils/companion-home-layout';
 import { todayKatchimeraExplorationBackgroundKeyForEnvironment } from '@/utils/today-exploration-backgrounds';
 import { wispFamilySeries } from '@/constants/wisp-family-series';
+import { friendConstellation } from '@/constants/friend-wisp-constellations';
+import { FriendWispPouch } from '@/components/katchadeck/wisps/friend-wisp-pouch';
 import { wispDefinition } from '@/constants/wisps';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
@@ -158,6 +160,7 @@ function TrophyArchive({
   const wisps = useWisps();
   const constellation = wispFamilySeries(familyId as KatchimeraFamilyId);
   const visibleConstellationWispIds = constellation?.featuredWispIds ?? [];
+  const friendWisps = Boolean(friendConstellation(familyId));
   const [openHelpSectionId, setOpenHelpSectionId] = useState<string | null>(null);
   const sections = useMemo(() => companionAchievementSections(familyId), [familyId]);
   const [visibleSectionCount, setVisibleSectionCount] = useState(1);
@@ -211,8 +214,11 @@ function TrophyArchive({
             </ThemedText>
           </View>
           <ThemedText selectable style={styles.constellationCopy} lightColor="#78644E" darkColor="#78644E">
-            Achievements, life Wisps and matching Egg pieces gathered around this Katchimera family.
+            {friendWisps
+              ? 'Little lights that gather around this friend. Eight come in their packs; the last is theirs to give.'
+              : 'Achievements, life Wisps and matching Egg pieces gathered around this Katchimera family.'}
           </ThemedText>
+          {friendWisps ? <FriendWispPouch familyId={familyId} friendName={katchimeraFamilyById.get(familyId)?.displayName ?? 'your friend'} /> : null}
           <View style={styles.constellationWisps}>
             {visibleConstellationWispIds.map((id) => {
               const definition = wispDefinition(id);

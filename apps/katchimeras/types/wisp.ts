@@ -63,7 +63,7 @@ export type WispUnlockRecord = {
   seenReveal: boolean;
 };
 
-export type WispGrantSource = 'experience' | 'achievement' | 'family_achievement' | 'essence_shop' | 'visitor' | 'plus_claim' | 'purchase' | 'season' | 'game' | 'journey' | 'island_campaign' | 'social' | 'gift' | 'migration';
+export type WispGrantSource = 'experience' | 'achievement' | 'family_achievement' | 'essence_shop' | 'visitor' | 'plus_claim' | 'purchase' | 'season' | 'game' | 'journey' | 'island_campaign' | 'social' | 'gift' | 'migration' | 'friend_pack';
 
 export type WispInventoryRecord = {
   wispId: WispId;
@@ -97,6 +97,8 @@ export type WispCollectionState = {
   resonanceCounts?: Partial<Record<WispId, number>>;
   pendingResonance?: { wispId: WispId; previousCount: number; nextCount: number } | null;
   journeyRewards?: Record<string, JourneyWispRewardReceipt>;
+  /** Friends' own packs and set rewards: a ledger beside the Lantern's, needing no Lantern. */
+  friendPacks?: import('@/utils/friend-wisp-packs').FriendWispPackState;
 };
 
 export type WispProgress = {

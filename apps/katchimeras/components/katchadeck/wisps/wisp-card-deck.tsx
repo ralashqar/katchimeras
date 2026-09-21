@@ -8,7 +8,7 @@ import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunbur
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { AppFontFamilies } from '@/constants/theme';
 import { LANTERN_VISITORS } from '@/constants/wisp-lantern';
-import { albumWisps, packDefinition, wispAlbum } from '@/constants/wisp-albums';
+import { albumWisps, isFriendPackId, packDefinition, wispAlbum } from '@/constants/wisp-albums';
 import { WISP_CARD_ART, WISP_RARITY } from '@/constants/wisp-card-art';
 import { wispDefinition } from '@/constants/wisps';
 import type { WispId } from '@/types/wisp';
@@ -58,6 +58,7 @@ export function WispPackReveal({ pack, onFocus, onDone, pending, error, actionLa
   const echoes = cards.reduce((sum, card) => sum + card.echoes, 0);
   const album = wispAlbum(packDefinition(pack.definitionId, pack.definitionVersion, previewStartedAt).collectionId, previewStartedAt);
   const ids = albumWisps(album);
+  const friendPack = isFriendPackId(pack.definitionId);
   const packSize = Math.min(300, width - 44);
   // The rest of the page arrives once the card has grown, so the eye follows one thing at a time.
   const settle = (delay: number) => reduced ? FadeIn.duration(80) : FadeIn.delay(delay).duration(260);
@@ -67,7 +68,7 @@ export function WispPackReveal({ pack, onFocus, onDone, pending, error, actionLa
       <CelebrationParticles layerStyle={styles.confetti} tier={3} tint="#8DD56B" />
     </Animated.View> : null}
     <ScrollView style={styles.page} contentContainerStyle={styles.reveal} bounces={false}>
-      <Animated.View entering={settle(CARD_GROW_MS)} style={styles.heading}><Text style={styles.eyebrow}>{album.name.toUpperCase()}</Text><Text accessibilityRole="header" style={styles.title}>{cards.length === 1 ? 'Your first Wisp card' : 'Your Wisp cards'}</Text><Text style={styles.summary}>{newCount} new {newCount === 1 ? 'discovery' : 'discoveries'}{echoes ? ` · +${echoes} Echoes` : ''}</Text></Animated.View>
+      <Animated.View entering={settle(CARD_GROW_MS)} style={styles.heading}><Text style={styles.eyebrow}>{album.name.toUpperCase()}</Text><Text accessibilityRole="header" style={styles.title}>{cards.length === 1 ? friendPack ? 'Today’s Wisp card' : 'Your first Wisp card' : 'Your Wisp cards'}</Text><Text style={styles.summary}>{newCount} new {newCount === 1 ? 'discovery' : 'discoveries'}{echoes ? ` · +${echoes} Echoes` : ''}</Text></Animated.View>
       <CollectibleCardDeck cards={cards} selectedId={selected.id} onSelect={(_, index) => onFocus(index)} cardRatio={2 / 3} maxCardHeight={Math.min(430, Math.max(230, height * 0.5))} navigationLabel="Wisp pack"
         renderCard={(card, _, size) => {
           const face = <WispCollectionCard wispId={card.wispId} width={size.width} cardNumber={ids.indexOf(card.wispId) + 1} />;
@@ -75,7 +76,7 @@ export function WispPackReveal({ pack, onFocus, onDone, pending, error, actionLa
           // card when the arrival ends would remount the card); once arrived, a slot browsed back to mounts settled.
           return card.id === arrivingId ? <ArrivingCard settled={arrived}>{face}</ArrivingCard> : <Animated.View entering={arrived ? undefined : settle(CARD_GROW_MS + 80)}>{face}</Animated.View>;
         }}
-        renderCaption={card => <Animated.View entering={settle(CARD_GROW_MS + CARD_HOLD_MS)} style={styles.caption}><Text style={[styles.status, { color: WISP_RARITY[wispDefinition(card.wispId).rarity].glow }]}>{card.discovered ? `NEW · ${WISP_RARITY[wispDefinition(card.wispId).rarity].label.toUpperCase()}` : `ALREADY COLLECTED · +${card.echoes} ${card.echoes === 1 ? 'ECHO' : 'ECHOES'}`}</Text><Text style={styles.description}>{card.discovered ? 'Their card joins your collection. Their light joins your world.' : 'Your Wisp stays with you. Save Echoes to invite someone new.'}</Text></Animated.View>} />
+        renderCaption={card => <Animated.View entering={settle(CARD_GROW_MS + CARD_HOLD_MS)} style={styles.caption}><Text style={[styles.status, { color: WISP_RARITY[wispDefinition(card.wispId).rarity].glow }]}>{card.discovered ? `NEW · ${WISP_RARITY[wispDefinition(card.wispId).rarity].label.toUpperCase()}` : friendPack ? 'ANOTHER COPY' : `ALREADY COLLECTED · +${card.echoes} ${card.echoes === 1 ? 'ECHO' : 'ECHOES'}`}</Text><Text style={styles.description}>{card.discovered ? 'Their card joins your collection. Their light joins your world.' : friendPack ? 'Copies help this Wisp grow brighter.' : 'Your Wisp stays with you. Save Echoes to invite someone new.'}</Text></Animated.View>} />
       <Animated.View entering={settle(ARRIVAL_MS - 120)} style={styles.footer}>
         {cards.length > 1 ? <Text style={styles.hint}>Swipe to browse every card in this pack</Text> : null}
         {error ? <Text accessibilityRole="alert" style={styles.description}>{error}</Text> : null}
