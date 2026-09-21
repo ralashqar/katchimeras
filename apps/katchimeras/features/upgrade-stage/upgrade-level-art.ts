@@ -1,5 +1,7 @@
 import type { ImageSourcePropType } from 'react-native';
 import { natureIslandLevelArt } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
+import { heartwoodBuildingArt } from '@/constants/heartwood-building-art';
+import type { HeartwoodBuildingId } from '@/constants/heartwood-buildings';
 import { LANTERN_LEVEL_ART } from '@/constants/wisp-lantern-art';
 import type { MossproutNatureIslandId } from '@/types/merge-world';
 import { KINGDOM_DREAM_MIST_LOCKED_HEX_TILE_V1, havenHexTileSpec, kingdomHexTileSourceForLod } from '@/utils/world-visuals';
@@ -29,4 +31,8 @@ export function tileLevelArt(offerId: string, level: number, misted = false): Im
 
 export function lanternLevelArt(level: number): ImageSourcePropType | null {
   return (LANTERN_LEVEL_ART as Record<number, ImageSourcePropType>)[level] ?? null;
+}
+
+export function buildingLevelArt(id: HeartwoodBuildingId, level: number): ImageSourcePropType | null {
+  return level < 1 ? null : heartwoodBuildingArt(id, level);
 }

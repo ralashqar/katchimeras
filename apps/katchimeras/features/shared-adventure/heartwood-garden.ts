@@ -1,3 +1,4 @@
+import { heartwoodBuildingBySlot, heartwoodBuildingLevel } from '@/constants/heartwood-buildings';
 import type { MergeWorldState, MossproutGardenPlantSlotId, MossproutMemoryPlantId } from '@/types/merge-world';
 
 export const HEARTWOOD_CATEGORIES = ['momentum', 'stillness', 'renewal', 'warmth', 'curiosity', 'connection'] as const;
@@ -7,8 +8,14 @@ export const HEARTWOOD_BED_LABELS: Partial<Record<MossproutGardenPlantSlotId, st
   'back-centre': 'Front center', 'front-left': 'Front left', 'front-right': 'Front right', 'back-left': 'Left side', 'back-right': 'Right side',
 };
 
+const builtHeartwoodSlot = (world: MergeWorldState, bed: MossproutGardenPlantSlotId) => {
+  const building = heartwoodBuildingBySlot.get(bed);
+  return Boolean(building && heartwoodBuildingLevel(world, building.id) > 0);
+};
+
 export function availableHeartwoodBeds(world: MergeWorldState) {
-  return HEARTWOOD_BEDS.filter(bed => bed !== world.wispLanternPlacement?.slotId);
+  // A patch with the Lantern or a building standing in it is no longer a bed.
+  return HEARTWOOD_BEDS.filter(bed => bed !== world.wispLanternPlacement?.slotId && !builtHeartwoodSlot(world, bed));
 }
 
 export function heartwoodPlants(world: MergeWorldState) {

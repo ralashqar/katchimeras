@@ -66,7 +66,8 @@ export function useUpgradeLevelPick<Art>(levels: readonly UpgradeLevelEntry[], a
  */
 export function UpgradeHero({ picture, name, description, action, caption, captionTone }: {
   picture?: { art?: ImageSourcePropType | null; /** The picture as a dark shape: someone not met yet. */ silhouette?: boolean; glyph?: string } | null;
-  name: string;
+  /** Omitted, the hero is its description (if any) and its action: the title bar already names the subject. */
+  name?: string | null;
   description?: string | null;
   action?: ReactNode;
   /** A short line under the action (`Free`, `Reached`). */
@@ -74,7 +75,7 @@ export function UpgradeHero({ picture, name, description, action, caption, capti
   captionTone?: 'danger';
 }) {
   return <View style={styles.hero}>
-    <View style={styles.heroTop}>
+    {picture || name ? <View style={styles.heroTop}>
       {picture ? <View style={styles.mount}>
         <View style={styles.picture}>
           <LinearGradient colors={UpgradePanelUI.pictureLockedFace} style={StyleSheet.absoluteFill} />
@@ -91,7 +92,7 @@ export function UpgradeHero({ picture, name, description, action, caption, capti
         </View>
         {description ? <Text numberOfLines={3} style={styles.heroDescription}>{description}</Text> : null}
       </View>
-    </View>
+    </View> : description ? <Text numberOfLines={3} style={styles.heroDescription}>{description}</Text> : null}
     {action ? <View>{action}</View> : null}
     {caption ? <View style={[styles.heroStatus, captionTone === 'danger' && styles.heroStatusDanger]}>
       <Text accessibilityLiveRegion="polite" style={[styles.heroCaption, captionTone === 'danger' && styles.heroCaptionDanger]}>{caption}</Text>
@@ -118,15 +119,25 @@ export function UpgradeSection({ label, aside, children }: { label: string; asid
 export function UpgradeBenefitRow({ benefit }: { benefit: UpgradeBenefit }) {
   const stat = benefit.from != null && benefit.to != null;
   const numeric = typeof benefit.from === 'number' && typeof benefit.to === 'number';
-  const delta = numeric ? (benefit.to as number) - (benefit.from as number) : 0;
+  const changes = stat && benefit.from !== benefit.to;
+  const gain = !changes ? null : benefit.delta ?? (numeric ? `${(benefit.to as number) >= (benefit.from as number) ? '+' : ''}${(benefit.to as number) - (benefit.from as number)}` : null);
   return <Face colors={UpgradePanelUI.rowFace} radius={UpgradePanelUI.rowRadius} style={styles.strip}>
-    <View accessible accessibilityLabel={stat ? `${benefit.label}: ${benefit.from} to ${benefit.to}` : `${benefit.label}${benefit.detail ? `. ${benefit.detail}` : ''}`}
+    <View accessible accessibilityLabel={!stat ? `${benefit.label}${benefit.detail ? `. ${benefit.detail}` : ''}` : changes ? `${benefit.label}: ${benefit.from} to ${benefit.to}` : `${benefit.label}: ${benefit.from}`}
       accessibilityRole="text" style={styles.stripRow}>
-      <Face colors={UpgradePanelUI.chipFace} radius={11} style={styles.stripChip}><Text numberOfLines={1} style={styles.stripChipText}>{benefit.label}</Text></Face>
+      {/* What kind of number it is, at a glance: the same picture the rest of the game uses for it. */}
+      {benefit.icon ? <View style={[styles.stripIcon, { backgroundColor: `${benefit.tint ?? UpgradePanelUI.leaf}22`, borderColor: `${benefit.tint ?? UpgradePanelUI.leaf}55` }]}>
+        {benefit.icon === 'glow'
+          ? <Image accessibilityIgnoresInvertColors contentFit="contain" source={GAME_CURRENCY_ART.coins} style={styles.stripIconArt} transition={0} />
+          : <IconSymbol color={benefit.tint ?? UpgradePanelUI.leaf} name={benefit.icon} size={18} weight="bold" />}
+      </View> : null}
+      <Text numberOfLines={1} style={styles.stripLabel}>{benefit.label}</Text>
       {stat ? <View style={styles.stripValue}>
-        <Text style={styles.statFrom}>{benefit.from}</Text>
-        {numeric ? null : <Text style={styles.statArrow}>→</Text>}
-        <Face colors={UpgradePanelUI.successFace} radius={999} rim={1} style={styles.statGain} stroke={false}><Text style={styles.statGainText}>{numeric ? `${delta >= 0 ? '+' : ''}${delta}` : benefit.to}</Text></Face>
+        <Text style={changes ? styles.statFrom : styles.statNow}>{benefit.from}</Text>
+        {changes ? <>
+          <IconSymbol color={UpgradePanelUI.successInk} name="arrow.right" size={13} weight="bold" />
+          <Text style={styles.statTo}>{benefit.to}</Text>
+          {gain ? <Face colors={UpgradePanelUI.successFace} radius={999} rim={1} style={styles.statGain} stroke={false}><Text style={styles.statGainText}>{gain}</Text></Face> : null}
+        </> : null}
       </View> : <Text numberOfLines={2} style={[styles.stripValue, styles.stripDetail]}>{benefit.detail}</Text>}
     </View>
   </Face>;
@@ -289,15 +300,18 @@ const styles = StyleSheet.create({
   sectionRule: { flex: 1, height: 1.5 },
   sectionAside: { ...KatchaUI.type.companionBody, color: UpgradePanelUI.inkFaint, fontSize: 11.5, lineHeight: 15 },
   strip: { borderColor: UpgradePanelUI.rowBorder },
-  stripRow: { alignItems: 'center', flexDirection: 'row', gap: 10, minHeight: 42, padding: 5, paddingRight: 12 },
-  stripChip: { alignSelf: 'stretch', borderColor: UpgradePanelUI.rowBorder, justifyContent: 'center', maxWidth: '52%', paddingHorizontal: 12 },
-  stripChipText: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.ink, fontSize: 15, lineHeight: 19 },
-  stripValue: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 7 },
-  stripDetail: { ...KatchaUI.type.companionBody, color: UpgradePanelUI.ink, fontSize: 13, fontWeight: '700', lineHeight: 17 },
-  statFrom: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.ink, fontSize: 18, fontVariant: ['tabular-nums'] },
-  statArrow: { color: UpgradePanelUI.inkFaint, fontFamily: AppFontFamilies.fredokaBold, fontSize: 15 },
-  statGain: { borderColor: UpgradePanelUI.rowMetBorder, paddingHorizontal: 9, paddingVertical: 1 },
-  statGainText: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.successInk, fontSize: 15, lineHeight: 19, fontVariant: ['tabular-nums'] },
+  stripRow: { alignItems: 'center', flexDirection: 'row', gap: 9, minHeight: 46, paddingHorizontal: 9, paddingVertical: 6 },
+  stripIcon: { alignItems: 'center', borderRadius: 10, borderWidth: 1, height: 32, justifyContent: 'center', width: 32 },
+  stripIconArt: { height: 22, width: 22 },
+  stripLabel: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.ink, flexShrink: 1, fontSize: 15, lineHeight: 19 },
+  stripValue: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 6, justifyContent: 'flex-end' },
+  stripDetail: { ...KatchaUI.type.companionBody, color: UpgradePanelUI.ink, fontSize: 13, fontWeight: '700', lineHeight: 17, textAlign: 'right' },
+  // Now, quietly; next, loudly. The eye should land on the new number.
+  statFrom: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.inkSoft, fontSize: 15, fontVariant: ['tabular-nums'], lineHeight: 19 },
+  statNow: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.ink, fontSize: 17, fontVariant: ['tabular-nums'], lineHeight: 21 },
+  statTo: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.successInk, fontSize: 19, fontVariant: ['tabular-nums'], lineHeight: 23 },
+  statGain: { borderColor: UpgradePanelUI.rowMetBorder, paddingHorizontal: 7, paddingVertical: 1 },
+  statGainText: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.successInk, fontSize: 12, lineHeight: 16, fontVariant: ['tabular-nums'] },
   requirement: { borderColor: UpgradePanelUI.rowBorder },
   requirementMet: { borderColor: UpgradePanelUI.rowMetBorder },
   requirementBody: { gap: 8, padding: 9 },

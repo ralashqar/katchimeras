@@ -17,13 +17,11 @@ test('Mossprout Journey reminder targets the next local morning', () => {
 });
 
 test('return reminders speak in the companion’s voice about the player’s world', () => {
-  const first = companionReturnNotificationContent({ familyId: 'mossprout', firstReturn: true, seedName: 'Seed of Curiosity' });
+  const first = companionReturnNotificationContent({ familyId: 'mossprout', firstReturn: true });
   assert.equal(first.title, 'Mossprout is awake');
-  assert.equal(first.body, 'Your Seed of Curiosity opened while you were away. Come and see.');
-  const unnamed = companionReturnNotificationContent({ familyId: 'mossprout', firstReturn: true, seedName: '  ' });
-  assert.equal(unnamed.body, 'Something grew while you were away. Come and see.');
-  const later = companionReturnNotificationContent({ familyId: 'mossprout', firstReturn: false, seedName: 'Seed of Curiosity' });
-  assert.doesNotMatch(later.body, /Seed of/);
+  assert.equal(first.body, 'The old spring kept running while you were away. Come and see what it woke.', 'the first session builds the Dew Spring, not a seed');
+  const later = companionReturnNotificationContent({ familyId: 'mossprout', firstReturn: false });
+  assert.doesNotMatch(first.body + later.body, /Seed of/);
   for (const content of [first, later, companionReturnNotificationContent({ familyId: 'steppling', firstReturn: true }), companionReturnNotificationContent({ familyId: 'steppling', firstReturn: false })]) {
     assert.doesNotMatch(`${content.title} ${content.body}`, /chapter moment|Glow|Bond|\d/, 'no system vocabulary or numbers in a push');
     assert.ok(content.body.length <= 90, 'fits a lock-screen line');

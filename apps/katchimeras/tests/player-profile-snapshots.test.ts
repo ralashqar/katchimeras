@@ -9,7 +9,6 @@ import { buildPlayerProfileFixtures, PLAYER_PROFILE_FIXTURE_COUNT } from '@/util
 import { stepplingShoeServed } from '@/features/onboarding/steppling-garden-lesson';
 import { lanternEligible } from '@/features/wisps/lantern-world';
 import { needsHeartwoodRecap } from '@/features/shared-adventure/heartwood-opening';
-import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
 import { normalizeMergeWorldState } from '@/utils/merge-world/engine';
 import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 
@@ -48,13 +47,12 @@ test('Before-Wisp-Lantern restores a played-through Feastle and planted first me
   assert.ok(world.gardenLessons?.feastle?.servedAt);
   assert.ok(world.externalRewardReceipts.every(receipt => receipt.appliedAt != null), 'prior rewards must not replay on loading');
   assert.equal(world.activeOrders.some(order => order.id === 'feastle:discovery:first-snack'), false);
-  const plant = world.haven.plantableMemories.find(plant => plant.slotId === MOSSPROUT_FIRST_MEMORY_SLOT_ID)!;
-  assert.ok(plant);
-  assert.equal(plant.definitionId, 'momentum');
-  assert.equal(plant.status, 'planted');
-  assert.ok(plant.growthPoints >= 1);
-  assert.equal(plant.source.kind, 'ftue');
-  assert.equal(world.haven.plantableMemories.filter(plant => plant.status === 'planted').length, 1);
+  // The first session builds the Dew Spring in the first tree patch and the garden wakes it: no memory seed is planted.
+  assert.deepEqual(Object.keys(world.heartwoodBuildings ?? {}), ['dew-spring']);
+  assert.equal(world.heartwoodBuildings?.['dew-spring']?.level, 1);
+  assert.equal(world.heartwoodBuildings?.['dew-spring']?.dormant, undefined, 'the Spring is running');
+  assert.equal(world.haven.plantableMemories.filter(plant => plant.status === 'planted').length, 0);
+  assert.equal(world.energy.regenCap, 110);
   assert.equal(JSON.parse(fixture.domains.keyValue.values['katchadeck.onboarding-profile']).mossproutAnswers.firstSeedId, 'momentum');
   assert.equal(lanternEligible(world), true);
   assert.equal(needsHeartwoodRecap(world), false, 'the Heartwood recap must not block the Lantern invitation');

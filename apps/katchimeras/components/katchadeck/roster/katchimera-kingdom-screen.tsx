@@ -3,6 +3,10 @@ import { heartwoodStage, gardenSupplyStatus } from '@/features/shared-adventure/
 import { HeartwoodRoad } from '@/components/katchadeck/world/heartwood-road';
 import { WispLanternPanel, WispLanternWorld } from '@/components/katchadeck/wisps/wisp-lantern';
 import { WispLanternUpgradePanel } from '@/components/katchadeck/wisps/wisp-lantern-upgrade-panel';
+import { HeartwoodBuildingPanel } from '@/components/katchadeck/world/heartwood-building-panel';
+import { HeartwoodBuildingWorld } from '@/components/katchadeck/world/heartwood-building-world';
+import { HEARTWOOD_BUILDINGS, heartwoodBuildingById, heartwoodBuildingCost, heartwoodBuildingLevel, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
+import { FIRST_SEED_BUILDING_ID, firstSeedReadyForSpring, firstSpringAwake, firstSpringBuilt, heartwoodBuildingsEligible } from '@/features/heartwood-buildings/buildings-world';
 import { lanternEligible } from '@/features/wisps/lantern-world';
 import { HeartwoodStoryScene } from '@/components/katchadeck/world/heartwood-story-scene';
 import { needsHeartwoodRecap } from '@/features/shared-adventure/heartwood-opening';
@@ -12,7 +16,7 @@ import { worldEventActions, worldEventConversation, type WorldEventAction, type 
 import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
-import { plantStoredWispLantern, upgradeStoredWispLantern, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, ensureStoredFirstFtueMemoryPlacement, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission } from '@/utils/merge-world/repository';
+import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission } from '@/utils/merge-world/repository';
 import { LocalEventMissionDock } from '@/components/katchadeck/world/local-event-mission-dock';
 import { WorldEventActionCard } from '@/components/katchadeck/world/world-event-action-card';
 import { GardenEventAdornment } from '@/components/katchadeck/world/garden-event-adornment';
@@ -206,11 +210,11 @@ const LANTERN_PLANT_OFFER = {
   target: { kind: 'haven_garden_plot', slotId: 'front-right' },
 } as const satisfies KingdomTileUpgradeOffer;
 const FIRST_SEED_GARDEN_PLANT_OFFER = {
-  accessibilityHint: 'Plants your first Memory Seed in the highlighted Garden patch',
+  accessibilityHint: 'Builds the Dew Spring in the highlighted Heartwood patch',
   placement: 'below',
   gap: 12,
-  icon: 'leaf.fill',
-  label: 'Plant Seed',
+  icon: 'drop.fill',
+  label: 'Build Dew Spring',
   target: { kind: 'haven_garden_plot', slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID },
 } as const satisfies KingdomTileUpgradeOffer;
 
@@ -384,7 +388,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [wispLanternOpen, setWispLanternOpen] = useState(false);
   // Growing the Lantern: the hub hands over to the shared upgrade stage and takes the player back after.
   const [lanternUpgradeOpen, setLanternUpgradeOpen] = useState(false);
-  const lanternSurfaceOpen = wispLanternOpen || lanternUpgradeOpen;
+  // One of Heartwood's economy buildings, open on the shared upgrade stage. It holds the screen the way the Lantern's surfaces do.
+  const [buildingPanelId, setBuildingPanelId] = useState<HeartwoodBuildingId | null>(null);
+  const lanternSurfaceOpen = wispLanternOpen || lanternUpgradeOpen || buildingPanelId != null;
   const [wispPlanting, setWispPlanting] = useState(false);
   const [wispPlantError, setWispPlantError] = useState('');
   const wispPlantBusy = useRef(false);
@@ -613,23 +619,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     hatchableTiles,
     storyTiles,
     level: mergeWorld.haven.structures.mossproutGarden.level,
-    plantableMemories: holdFirstSeedGraphic
-      ? mergeWorld.haven.plantableMemories.map(plant => plant.source.kind === 'ftue'
-        && (!activeFtueRunId || plant.source.sourceId === activeFtueRunId) ? { ...plant, growthPoints: 0 } : plant)
-      : mergeWorld.haven.plantableMemories,
-    previewMemoryId: ftueStepId === 'world.garden_arrival'
-      ? mergeWorld.haven.plantableMemories.find((plant) => plant.source.kind === 'ftue'
-        && (!activeFtueRunId || plant.source.sourceId === activeFtueRunId) && plant.status !== 'planted')?.id
-      : undefined,
+    plantableMemories: mergeWorld.haven.plantableMemories,
     featureLevels: mergeWorld.haven.structures.mossproutGarden.featureLevels,
   }), [
     treeStage,
-    holdFirstSeedGraphic,
     gatewayState,
     hatchableTiles,
     storyTiles,
-    ftueStepId,
-    activeFtueRunId,
     stepplingEncounter.open,
     mergeWorld.haven.plantableMemories,
     mergeWorld.haven.structures.mossproutGarden.featureLevels,
@@ -641,12 +637,21 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const selectedMemoryPlantDefinition = selectedMemoryPlant
     ? mossproutMemoryPlantById.get(selectedMemoryPlant.definitionId) ?? null
     : null;
-  const firstFtueMemory = mergeWorld.haven.plantableMemories.find((plant) => (
-    plant.source.kind === 'ftue' && (!activeFtueRunId || plant.source.sourceId === activeFtueRunId)
-  )) ?? null;
-  const firstSeedPlanted = firstFtueMemory?.status === 'planted' && firstFtueMemory.slotId === MOSSPROUT_FIRST_MEMORY_SLOT_ID;
-  const firstSeedGrown = firstSeedPlanted && firstFtueMemory.growthPoints >= 1;
-  const firstSeedVisualKey = firstFtueMemory ? `${firstFtueMemory.id}:${mossproutMemoryPlantStage(firstFtueMemory.growthPoints)}:planted` : null;
+  // The first session's planting beats build the Dew Spring: dug out dormant, woken with the garden. These keep the
+  // beats' old names (they are wired through the whole screen); what they read is the Spring, never a memory seed.
+  const firstSeedPlanted = firstSpringBuilt(mergeWorld);
+  const firstSeedGrown = firstSpringAwake(mergeWorld);
+  // The Spring is shown asleep until the waking beat releases it, exactly as the seed's growth used to be held.
+  const firstSpringShownDormant = firstSeedPlanted && (!firstSeedGrown || holdFirstSeedGraphic);
+  const firstSeedVisualKey = firstSeedPlanted ? `${FIRST_SEED_BUILDING_ID}:${firstSeedGrown ? 'awake' : 'dormant'}` : null;
+  // A save that finished the first session when it still planted a memory seed gets the Spring it would have built.
+  const firstSpringReady = Boolean(firstSeedReadyForSpring(mergeWorld)) && !ftueStepId;
+  const firstSpringAttemptRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!firstSpringReady || firstSpringAttemptRef.current === mergeWorld.revision) return;
+    firstSpringAttemptRef.current = mergeWorld.revision;
+    void ensureStoredFirstSpring().catch(() => { firstSpringAttemptRef.current = null; });
+  }, [firstSpringReady, mergeWorld.revision]);
   const handleMemoryPlantSettled = useCallback((visualKey: string) => {
     if (visualKey === firstSeedVisualKey) setSettledSeedVisual(visualKey);
   }, [firstSeedVisualKey]);
@@ -701,10 +706,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }, 1000);
     return () => clearTimeout(timer);
   }, [heartwoodIntroActive, ftueCameraSettled, screenFocused, worldSubjectPresentation?.onIntroFramingReady]);
-  const lanternCamera = useMemo((): FtueCameraDirective | null => lanternUpgradeOpen
+  const lanternCamera = useMemo((): FtueCameraDirective | null => buildingPanelId
+    ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: heartwoodBuildingById.get(buildingPanelId)!.slotId }, zoom: 1.7, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.2) / Math.max(1, window.height), durationMs: 520 }
+    : lanternUpgradeOpen
     // The Lantern stands above its plot: frame the plot a little under the band's centre so the Lantern fills it.
     ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.7, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.2) / Math.max(1, window.height), durationMs: 520 }
-    : wispLanternOpen ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.15, anchorY: 0.42, durationMs: 850 } : null, [lanternUpgradeOpen, upgradeStage, window.height, wispLanternOpen]);
+    : wispLanternOpen ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.15, anchorY: 0.42, durationMs: 850 } : null, [buildingPanelId, lanternUpgradeOpen, upgradeStage, window.height, wispLanternOpen]);
   const baseTutorialCamera = lanternCamera ?? heartwoodIntroCamera ?? eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
   const tutorialCamera = useMemo(() => {
     if (!ftueStepId?.startsWith('egg.') || baseTutorialCamera?.kind !== 'focus_target') return baseTutorialCamera;
@@ -1233,13 +1240,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       evidenceRef: `garden-plot:${MOSSPROUT_FIRST_MEMORY_SLOT_ID}`,
       nextStepId: 'world.seed_planted',
     }).then(async (result) => {
-      if (result.run?.stepId !== 'world.seed_planted') throw new Error('The Garden did not accept the Seed.');
-      const sourceId = result.run.runId;
-      const placement = await ensureStoredFirstFtueMemoryPlacement(
-        sourceId,
-        `ftue-recovery:${sourceId}:place-first-memory`,
-      );
-      if (!placement.placed) throw new Error('The memory Seed could not be planted.');
+      if (result.run?.stepId !== 'world.seed_planted') throw new Error('The Garden did not accept the Spring.');
+      const placement = await ensureStoredFirstSpringBuilt();
+      if (!placement.placed) throw new Error('The Dew Spring could not be built.');
     }).catch(async () => {
       // The resume snapshot is committed before the Content Flow effect. If
       // that dispatch is interrupted, finish the idempotent placement here
@@ -1247,16 +1250,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       const run = loadFtueRun();
       if (run?.status === 'active' && run.stepId === 'world.seed_planted') {
         try {
-          const placement = await ensureStoredFirstFtueMemoryPlacement(
-            run.runId,
-            `ftue-recovery:${run.runId}:place-first-memory`,
-          );
+          const placement = await ensureStoredFirstSpringBuilt();
           if (placement.placed) {
             setFirstSeedPlacementFailed(false);
             return;
           }
         } catch {
-          // Keep the visible Plant Seed action retryable below.
+          // Keep the visible Build action retryable below.
         }
       }
       firstSeedPlantStartedRef.current = false;
@@ -1265,13 +1265,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [ftueStepId]);
 
   const ensureFirstSeedPlacement = useCallback(async () => {
-    const runId = loadFtueRun()?.runId ?? activeFtueRunId;
-    const placement = await ensureStoredFirstFtueMemoryPlacement(
-      runId,
-      `ftue-recovery:${runId ?? 'current'}:place-first-memory`,
-    );
+    const placement = await ensureStoredFirstSpringBuilt();
     return placement.placed;
-  }, [activeFtueRunId]);
+  }, []);
 
   useEffect(() => {
     if (firstSeedPlanted) {
@@ -2129,6 +2125,22 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     planted={Boolean(mergeWorld.wispLanternPlacement)} rewards={mergeWorld.wispLanternProgress?.rewards}
     onPress={wispLanternAllowed ? () => setWispLanternOpen(true) : undefined} /> : null;
 
+  // Each building stands on its own patch. While one is open on the stage the others stay drawn but do not take taps.
+  // A built one stays drawn through the rest of the first session (the Spring the first seed became); the signs on
+  // empty patches are offers, and wait until the first session is over.
+  const buildingOffersShown = heartwoodBuildingsEligible(mergeWorld) && !ftueStepId;
+  const heartwoodBuiltSlots = HEARTWOOD_BUILDINGS.filter((building) => heartwoodBuildingLevel(mergeWorld, building.id) > 0).map((building) => building.slotId);
+  const heartwoodBuildingAdornments = Object.fromEntries(HEARTWOOD_BUILDINGS.flatMap((building) => {
+    const level = heartwoodBuildingLevel(mergeWorld, building.id);
+    // An unbuilt patch's sign is an offer: it only shows while the world is free to take it.
+    if (level === 0 && (!buildingOffersShown || !wispLanternAllowed || buildingPanelId != null)) return [];
+    return [[building.slotId, <HeartwoodBuildingWorld key={building.id} id={building.id} level={level}
+      affordable={mergeWorld.coins >= (heartwoodBuildingCost(level) ?? Infinity)}
+      dormant={building.id === FIRST_SEED_BUILDING_ID && firstSpringShownDormant}
+      onSettled={building.id === FIRST_SEED_BUILDING_ID ? handleMemoryPlantSettled : undefined}
+      onPress={wispLanternAllowed ? () => setBuildingPanelId(building.id) : undefined} />]];
+  }));
+
   useEffect(() => {
     if (!wispLanternAllowed || !lanternEligible(mergeWorld) || wispAutoPresented.current || eventSelection || wakeHandoffCampaign || revealedFriendCardId || heartwoodOpenToken > 0) return;
     if (mergeWorld.wispLanternPlacement && loadWispState().lantern?.introducedAt != null) return;
@@ -2173,6 +2185,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       <KingdomHexCanvas
         onHeartwoodPress={sharedAdventureAllowed ? () => { setSelectedHeartwoodBed(undefined); setHeartwoodOpenToken(value => value + 1); } : undefined}
         wispLanternAdornment={wispLanternAdornment}
+        heartwoodBuildingAdornments={heartwoodBuildingAdornments}
+        heartwoodBuiltSlots={heartwoodBuiltSlots}
         wispLanternPlanted={Boolean(mergeWorld.wispLanternPlacement)}
         onPlantWispLantern={wispPlanting ? plantWispLantern : undefined}
         onSelectHeartwoodBed={sharedAdventureAllowed ? (slotId) => { setSelectedHeartwoodBed(slotId); setHeartwoodOpenToken(value => value + 1); } : undefined}
@@ -2307,6 +2321,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onUpgrade={upgradeStoredWispLantern}
         onClose={() => { setLanternUpgradeOpen(false); setWispLanternOpen(true); }}
         onGarden={() => { setLanternUpgradeOpen(false); openGarden(undefined, 'mossprout'); }} /> : null}
+      {buildingPanelId && screenFocused ? <HeartwoodBuildingPanel key={buildingPanelId} world={mergeWorld} buildingId={buildingPanelId} layout={upgradeStage} bottomInset={insets.bottom}
+        onUpgrade={upgradeStoredHeartwoodBuilding}
+        onClose={() => setBuildingPanelId(null)}
+        onGarden={() => { setBuildingPanelId(null); openGarden(undefined, 'mossprout'); }} /> : null}
       {SHARED_ADVENTURE_ENABLED && adventureOpen && screenFocused ? <SharedAdventurePanel world={mergeWorld} routeCompanion={routeCompanion}
         onClose={() => { setAdventureOpen(false); setRouteCompanion(undefined); }}
         onGarden={() => { setAdventureOpen(false); openGarden(undefined, 'mossprout'); }}
@@ -2571,7 +2589,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
               glow={ftueStepId === 'world.garden_arrival'}
               icon={ftueStep.actions[0]?.icon ?? 'sparkles'}
               label={ftueStepId === 'world.seed_planted' && firstSeedPlacementFailed
-                ? 'Retry Planting'
+                ? 'Try again'
                 : ftueStepId === 'world.first_bloom_offer'
                   ? 'Try again'
                   : ftueStep.actions[0]?.title ?? 'Continue'}

@@ -59,7 +59,8 @@ test('both tutorial marker spotlight targets enclose the full badge at every zoo
     for (const zoom of [0.5, 1, 3]) {
       cameraScale.value = zoom;
       const bounds = proxy.props.style[1].read();
-      const peakScale = 600 * 0.15 / 68 * zoom * 1.045;
+      // Heartwood's own button is drawn at half the size of every other tile's.
+      const peakScale = 600 * 0.15 / 68 * (id === 'haven:mossprout' ? 0.5 : 1) * zoom * 1.045;
       assert.ok(bounds.left <= 34 - 34 * peakScale);
       assert.ok(bounds.left + bounds.width >= 34 + 34 * peakScale);
       assert.ok(bounds.top <= 34 - (44 + 10) * peakScale, 'tail and rim remain in the spotlight');
@@ -72,7 +73,7 @@ test('both tutorial marker spotlight targets enclose the full badge at every zoo
     // The press target follows the painted bubble, never smaller than its 68pt floor.
     for (const zoom of [0.5, 1, 3]) {
       cameraScale.value = zoom;
-      const visual = 600 * 0.15 / 68 * zoom;
+      const visual = 600 * 0.15 / 68 * (id === 'haven:mossprout' ? 0.5 : 1) * zoom;
       const hit = pressable.props.style[1].read().transform[0].scale;
       const bubble = bubbleScaleOf(tree!.root.findAllByType(host('AnimatedView')));
       assert.equal(hit, Math.max(1, visual), `zoom ${zoom}: hit target scale`);

@@ -157,6 +157,11 @@ guided restore locks it open. `UndiscoveredHavenPanel` is the hidden-friend
 notice on the same dock. A hatchable Egg's encounter is not on the stage: it is
 the Today page's own Egg question widgets, reused as they are.
 
+Heartwood's four economy buildings (`docs/heartwood-buildings.md`) use the same
+stage: `buildingUpgradeModel(world, id)` and `HeartwoodBuildingPanel`. Each
+stands on its own garden plot, so the screen frames it with the same camera
+directive as the Lantern, aimed at the building's plot.
+
 The Lantern hub no longer has an upgrade page. Its Upgrade button closes the hub
 and opens the stage, and closing the stage returns to the hub.
 

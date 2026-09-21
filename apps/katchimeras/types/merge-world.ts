@@ -506,6 +506,8 @@ export type IslandCampaignProgress = {
 export type MergeWorldState = {
   wispLanternPlacement?: { slotId: 'front-right'; plantedAt: number };
   wispLanternProgress?: import('@/features/wisps/lantern-world').LanternWorldProgress;
+  /** Heartwood's economy buildings (Dew Spring, Seed Nursery, Root Cellar, Garden Stall), by id. Absent until one is built. */
+  heartwoodBuildings?: import('@/constants/heartwood-buildings').HeartwoodBuildings;
   sharedAdventure?: import('@/features/shared-adventure/types').SharedAdventureProgress;
   localLiveOps?: import('./local-live-ops').LocalLiveOpsState;
   /** Reading is independent of purchase flow runs; cursors count revealed lines. */
@@ -677,6 +679,7 @@ export type MergeWorldCommand =
 export type MergeWorldFailureReason =
   | 'locked_cell'
   | 'generator_resting'
+  | 'out_of_energy'
   | 'board_full'
   | 'wrong_echo_match'
   | 'sealed_mist';

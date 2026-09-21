@@ -1,4 +1,5 @@
 import type { ImageSourcePropType } from 'react-native';
+import { mossproutMemoryPlantNames } from '@/constants/mossprout-memory-plant-names';
 
 import type { MossproutGardenPlantSlotId, MossproutMemoryPlantId } from '@/types/merge-world';
 
@@ -19,7 +20,7 @@ export const MOSSPROUT_GARDEN_PLANT_SLOTS: readonly MossproutGardenPlantSlotId[]
 
 export const MOSSPROUT_MEMORY_PLANTS: readonly MossproutMemoryPlantDefinition[] = [
   {
-    id: 'momentum', name: 'Seed of Momentum', color: '#E79A39',
+    id: 'momentum', name: mossproutMemoryPlantNames.momentum, color: '#E79A39',
     description: 'For making a start, even when the first step is small.',
     reflection: 'Start small enough that starting is not scary.',
     art: {
@@ -29,7 +30,7 @@ export const MOSSPROUT_MEMORY_PLANTS: readonly MossproutMemoryPlantDefinition[] 
     },
   },
   {
-    id: 'stillness', name: 'Seed of Stillness', color: '#94BFC0',
+    id: 'stillness', name: mossproutMemoryPlantNames.stillness, color: '#94BFC0',
     description: 'For finding a little quiet when everything feels full.',
     reflection: 'Quiet can be something you grow, not something you wait for.',
     art: {
@@ -39,7 +40,7 @@ export const MOSSPROUT_MEMORY_PLANTS: readonly MossproutMemoryPlantDefinition[] 
     },
   },
   {
-    id: 'renewal', name: 'Seed of Renewal', color: '#58BDAA',
+    id: 'renewal', name: mossproutMemoryPlantNames.renewal, color: '#58BDAA',
     description: 'For getting a little energy back without demanding it all at once.',
     reflection: 'Fresh starts can arrive one small unfurling at a time.',
     art: {
@@ -49,7 +50,7 @@ export const MOSSPROUT_MEMORY_PLANTS: readonly MossproutMemoryPlantDefinition[] 
     },
   },
   {
-    id: 'warmth', name: 'Seed of Warmth', color: '#F3A66F',
+    id: 'warmth', name: mossproutMemoryPlantNames.warmth, color: '#F3A66F',
     description: 'For protecting the good in an ordinary day.',
     reflection: 'A good day is worth noticing while it is here.',
     art: {
@@ -59,7 +60,7 @@ export const MOSSPROUT_MEMORY_PLANTS: readonly MossproutMemoryPlantDefinition[] 
     },
   },
   {
-    id: 'curiosity', name: 'Seed of Curiosity', color: '#8267C7',
+    id: 'curiosity', name: mossproutMemoryPlantNames.curiosity, color: '#8267C7',
     description: 'For days when the next direction is not clear yet.',
     reflection: 'Not knowing can still be a place to begin.',
     art: {
@@ -69,7 +70,7 @@ export const MOSSPROUT_MEMORY_PLANTS: readonly MossproutMemoryPlantDefinition[] 
     },
   },
   {
-    id: 'connection', name: 'Seed of Connection', color: '#AC83D7',
+    id: 'connection', name: mossproutMemoryPlantNames.connection, color: '#AC83D7',
     description: 'For the small things that bring us closer.',
     reflection: 'A little kindness can put down roots in two places at once.',
     art: {

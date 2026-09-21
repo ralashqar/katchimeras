@@ -6,13 +6,13 @@ export const HEARTWOOD_STORY = {
   introduction: {
     title: 'Wake Heartwood',
     text: 'Every path once met beneath Heartwood. When the lights went out, our friends were stranded along them.',
-    detail: 'Five empty beds surround its roots. Mossprout saved our first seed. Plant it here, and let’s bring this circle back to life.',
-    action: 'Plant our first seed',
+    detail: 'Five empty patches surround its roots, and the old spring sleeps under one. Dig it out, and let’s bring this circle back to life.',
+    action: 'Build the Dew Spring',
   },
   signal: {
     title: 'The roots remember',
-    text: 'Look at Heartwood! Our Garden has woken its first root. A bud! And that broken marker carries the same light. Three notches… Steppling’s trail.',
-    detail: 'The Tree is Stirring! Grow the four more seed categories around its roots. Two Seeds await in your Garden parcels. Beyond the grove, Steppling needs us too.',
+    text: 'Look at Heartwood! The spring is running and its first root is awake. And that broken marker carries the same light. Three notches… Steppling’s trail.',
+    detail: 'The Tree is Stirring! The Dew Spring gives the Garden its energy. Four more patches around its roots are waiting to be built on. Two Seeds await in your Garden parcels. Beyond the grove, Steppling needs us too.',
     action: 'Talk to Mossprout',
   },
   recap: {

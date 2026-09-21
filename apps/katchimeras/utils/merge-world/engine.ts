@@ -40,6 +40,18 @@ import { islandCampaignChapterOrder, islandCampaignChapter } from '@/constants/i
 import { islandWakeLockedReason, islandWakeState } from '@/constants/island-campaigns/wake-order';
 import { COMPANION_JOURNEY_PROFILES, JOURNEY_MEDITATION_ORDER_GLOW, JOURNEY_MEDITATION_ORDER_MINUTES } from '@/constants/companion-journey-profiles';
 import {
+  MERGE_ENERGY_TAP_COST,
+  gardenStallGlowBonus,
+  heartwoodBuildingBySlot,
+  heartwoodBuildingLevel,
+  mergeEnergyCap,
+  mergeEnergyRegenMs,
+  normalizeHeartwoodBuildings,
+  rootCellarStorageBonus,
+  seedNurseryTierThreeChance,
+  seedNurseryTierTwoBonus,
+} from '@/constants/heartwood-buildings';
+import {
   MERGE_ENERGY_REGEN_CAP,
   MERGE_ENERGY_REGEN_MS,
   MERGE_GENERATORS_UNLIMITED,
@@ -312,7 +324,7 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
     case 'refreshTime':
       return result(state, current, current === state ? undefined : 'The garden is ready again.');
     case 'tapGenerator': {
-      const result = tapGenerator(current, command.generatorId, command.now, command.seed, command.activityOpportunityId);
+      const result = tapGenerator(current, command.generatorId, command.now, command.seed, command.activityOpportunityId, command.spendEnergy !== false);
       if (result.changed && command.generatorId === 'wild-garden' && result.state.glowDiscoveryLesson && !result.state.glowDiscoveryLesson.spawnedAt) {
         return { ...result, state: { ...result.state, glowDiscoveryLesson: { ...result.state.glowDiscoveryLesson, spawnedAt: command.now } } };
       }
@@ -629,6 +641,8 @@ function placePlantableMemory(
 ): MergeWorldCommandResult {
   if (hasHavenMutationReceipt(state, command.receiptId)) return unchanged(state, 'This planting was already saved.');
   if (state.wispLanternPlacement?.slotId === command.slotId) return unchanged(state, 'The Wisp Lantern lives in this patch.');
+  const standing = heartwoodBuildingBySlot.get(command.slotId);
+  if (standing && heartwoodBuildingLevel(state, standing.id) > 0) return unchanged(state, `The ${standing.name} stands in this patch.`);
   if (!MOSSPROUT_GARDEN_PLANT_SLOTS.includes(command.slotId)) return unchanged(state, 'That Garden plot does not exist.');
   const selected = state.haven.plantableMemories.find((plant) => plant.id === command.instanceId);
   if (!selected) return unchanged(state, 'That memory Seed is not available.');
@@ -885,12 +899,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     generators: source.generators && typeof source.generators === 'object'
       ? normalizeGenerators(source.generators)
       : fallback.generators,
-    energy: {
-      value: Math.max(0, finite(source.energy?.value, MERGE_INITIAL_ENERGY)),
-      regenCap: MERGE_ENERGY_REGEN_CAP,
-      lastRegenAt: finite(source.energy?.lastRegenAt, now),
-      regenPaused: Boolean(source.energy?.regenPaused),
-    },
+    energy: normalizeEnergy(source, now),
     coins: Math.max(0, finite(source.coins, 0)),
     mergeXp: Math.max(0, finite(source.mergeXp, 0)),
     mergeLevel: mergeLevelForXp(Math.max(0, finite(source.mergeXp, 0))),
@@ -957,6 +966,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     wispLanternPlacement: source.wispLanternPlacement?.slotId === 'front-right' && Number.isFinite(source.wispLanternPlacement.plantedAt)
       ? source.wispLanternPlacement : undefined,
     wispLanternProgress: source.wispLanternProgress,
+    heartwoodBuildings: normalizeHeartwoodBuildings(source.heartwoodBuildings, now),
     externalRewardReceipts: Array.isArray(source.externalRewardReceipts) ? source.externalRewardReceipts : [],
     storyWorldMutationReceipts: normalizeStoryWorldMutationReceipts(source.storyWorldMutationReceipts),
     companionDiscovery: normalizeCompanionDiscovery(source.companionDiscovery, source.unlockedCharacters, source.activeOrders, rawVersion, now),
@@ -1812,7 +1822,8 @@ function normalizeMovementEgg(value: unknown): MergeWorldState['haven']['movemen
   };
 }
 
-function tapGenerator(state: MergeWorldState, generatorId: string, now: number, seed: string, activityOpportunityId?: string): MergeWorldCommandResult {
+function tapGenerator(input: MergeWorldState, generatorId: string, now: number, seed: string, activityOpportunityId?: string, spendEnergy = true): MergeWorldCommandResult {
+  const state = regenerateEnergy(input, now);
   const generator = state.generators[generatorId];
   if (!generator) return unchanged(state, 'That item maker is not available yet.');
   const tutorialDrop = lessonDrop(state, generatorId) ?? glowTutorialDrop(state, generatorId);
@@ -1834,6 +1845,11 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
   }
   const cell = firstEmptyCell(state.board, hash(`${seed}:cell`));
   if (cell < 0) return unchanged(state, 'The board is full. Merge or store an item first.', 'board_full');
+  // A tap on the Garden's own board draws one energy from the Dew Spring. A lesson's scripted drop, a friend's
+  // authored find, and the mission boards (which pass `spendEnergy: false`) are never charged. A full board is
+  // checked first, so energy is only ever spent on an item that actually appears.
+  const chargesEnergy = spendEnergy && !tutorialDrop && !opportunity;
+  if (chargesEnergy && state.energy.value < MERGE_ENERGY_TAP_COST) return unchanged(state, 'Out of energy. It comes back on its own.', 'out_of_energy');
   // Level one always starts at tier one. Upgrades add a bounded chance of a
   // better seed without changing which authored chains the generator owns.
   // A basket only offers the branch whose friend has arrived, so the Garden
@@ -1848,9 +1864,13 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
     : undefined;
   const baseDefinitionId = tutorialDrop ?? authoredDefinitionId ?? generator.forcedDropDefinitionId ?? openDrops[dropIndex]!;
   const betterDropRoll = randomUnit(`${seed}:upgrade:${state.revision}`);
-  const bonusTier = tutorialDrop || authoredDefinitionId || generator.forcedDropDefinitionId ? 0 : generator.level >= 4 && betterDropRoll < 0.05
+  // The Seed Nursery at Heartwood adds to every item maker's own chances.
+  const nurseryLevel = heartwoodBuildingLevel(state, 'seed-nursery');
+  const tierThreeChance = (generator.level >= 4 ? 0.05 : 0) + seedNurseryTierThreeChance(nurseryLevel);
+  const tierTwoChance = Math.max(0, generator.level - 1) * 0.1 + seedNurseryTierTwoBonus(nurseryLevel);
+  const bonusTier = tutorialDrop || authoredDefinitionId || generator.forcedDropDefinitionId ? 0 : betterDropRoll < tierThreeChance
     ? 2
-    : betterDropRoll < Math.max(0, generator.level - 1) * 0.1 ? 1 : 0;
+    : betterDropRoll < tierThreeChance + tierTwoChance ? 1 : 0;
   const definitionId = bonusTier ? baseDefinitionId.replace(/:1$/, `:${1 + bonusTier}`) : baseDefinitionId;
   if (!MERGE_ITEMS_BY_ID.has(definitionId)) return unchanged(state, 'This item maker has nothing to make right now.');
   const item: MergeBoardItem = { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId };
@@ -1867,6 +1887,8 @@ function tapGenerator(state: MergeWorldState, generatorId: string, now: number, 
     ...state,
     board,
     nextInstance: state.nextInstance + 1,
+    // Spending from a full spring starts the clock: what comes back is timed from this tap.
+    energy: chargesEnergy ? { ...state.energy, value: state.energy.value - MERGE_ENERGY_TAP_COST, lastRegenAt: state.energy.value >= state.energy.regenCap ? now : state.energy.lastRegenAt } : state.energy,
     generators: { ...state.generators, [generatorId]: nextGenerator },
     characterActivityOpportunities: opportunity
       ? state.characterActivityOpportunities.map((candidate) => candidate.id === opportunity.id
@@ -2539,9 +2561,15 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number,
   };
 }
 
+/** What an order pays with the Garden Stall standing: every path below pays and reports this one figure. */
+function withGardenStallGlow(state: MergeWorldState, order: MergeOrder): MergeOrder {
+  const bonus = Math.round(order.reward.coins * gardenStallGlowBonus(heartwoodBuildingLevel(state, 'garden-stall')));
+  return bonus > 0 ? { ...order, reward: { ...order.reward, coins: order.reward.coins + bonus } } : order;
+}
+
 function serveOrder(state: MergeWorldState, orderId: string, now: number): MergeWorldCommandResult {
   const storedOrder = state.activeOrders.find((item) => item.id === orderId);
-  const order = storedOrder ? ensureOrderGlowReward(storedOrder) : undefined;
+  const order = storedOrder ? withGardenStallGlow(state, ensureOrderGlowReward(storedOrder)) : undefined;
   if (orderId.startsWith('local-event:') && (!order?.expiresAt || Math.max(now, state.localLiveOps?.clock ?? 0) >= order.expiresAt)) return unchanged(state, 'This event has ended. Your items are yours to keep.');
   if (orderId.startsWith('journey-cycle:') && (!order?.expiresAt || now >= order.expiresAt)) {
     return unchanged(state, 'Your companion is ready to return. These items are yours to keep.');
@@ -2631,7 +2659,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     coins: state.coins + order.reward.coins,
     mergeXp,
     mergeLevel: mergeLevelForXp(mergeXp),
-    storageCapacity: storageCapacityForLevel(mergeLevelForXp(mergeXp)),
+    storageCapacity: storageCapacityForLevel(mergeLevelForXp(mergeXp)) + rootCellarStorageBonus(heartwoodBuildingLevel(state, 'root-cellar')),
     completedOrderCount,
     activeOrders: state.activeOrders.filter((item) => item.id !== orderId),
     recentOrderKeys: [...state.recentOrderKeys, templateKeyForOrder(order)].slice(-RECENT_ORDER_LIMIT),
@@ -2855,7 +2883,7 @@ function serveDevHavenOrder(state: MergeWorldState, order: MergeOrder, now: numb
     coins: state.coins + order.reward.coins,
     mergeXp,
     mergeLevel,
-    storageCapacity: storageCapacityForLevel(mergeLevel),
+    storageCapacity: storageCapacityForLevel(mergeLevel) + rootCellarStorageBonus(heartwoodBuildingLevel(state, 'root-cellar')),
   }, now);
   return {
     state: next,
@@ -4065,8 +4093,42 @@ function applyDiscovery(state: MergeWorldState, definitionId: string, now: numbe
   };
 }
 
-function refreshTime(state: MergeWorldState, now: number): MergeWorldState {
-  let changedState = false;
+/**
+ * A save's energy. While energy was switched off every world was written with a cap of 0 and nothing in the wallet:
+ * such a save starts full, as a new one does, instead of waking up empty on the day energy returns.
+ */
+function normalizeEnergy(source: Partial<MergeWorldState>, now: number): MergeWorldState['energy'] {
+  const cap = mergeEnergyCap({ heartwoodBuildings: normalizeHeartwoodBuildings(source.heartwoodBuildings, now) });
+  const legacy = !(finite(source.energy?.regenCap, 0) > 0);
+  return {
+    value: legacy ? cap : Math.max(0, finite(source.energy?.value, cap)),
+    regenCap: cap,
+    lastRegenAt: legacy ? now : finite(source.energy?.lastRegenAt, now),
+    regenPaused: Boolean(source.energy?.regenPaused),
+  };
+}
+
+/** Energy as it stands at `now`: what has come back since it last moved, never past the cap. Earned energy above the cap is kept. */
+export function mergeEnergyStatus(state: Pick<MergeWorldState, 'energy' | 'heartwoodBuildings'>, now: number): { value: number; cap: number; regenMs: number; nextAt: number | null; lastRegenAt: number } {
+  const cap = mergeEnergyCap(state);
+  const regenMs = mergeEnergyRegenMs(state);
+  const { value, lastRegenAt, regenPaused } = state.energy;
+  if (regenPaused || value >= cap || regenMs <= 0) return { value, cap, regenMs, nextAt: null, lastRegenAt: value >= cap ? now : lastRegenAt };
+  const gained = Math.floor(Math.max(0, now - lastRegenAt) / regenMs);
+  const next = Math.min(cap, value + gained);
+  const movedAt = next >= cap ? now : lastRegenAt + gained * regenMs;
+  return { value: next, cap, regenMs, nextAt: next >= cap ? null : movedAt + regenMs, lastRegenAt: movedAt };
+}
+
+function regenerateEnergy(state: MergeWorldState, now: number): MergeWorldState {
+  const status = mergeEnergyStatus(state, now);
+  if (status.value === state.energy.value && status.cap === state.energy.regenCap) return state;
+  return { ...state, energy: { ...state.energy, value: status.value, regenCap: status.cap, lastRegenAt: status.lastRegenAt } };
+}
+
+function refreshTime(input: MergeWorldState, now: number): MergeWorldState {
+  const state = regenerateEnergy(input, now);
+  let changedState = state !== input;
   const generators = Object.fromEntries(Object.entries(state.generators).map(([id, generator]) => {
     if (generator.charges > 0 || generator.restStartedAt == null) return [id, generator];
     if (now - generator.restStartedAt < generator.restDurationMs) return [id, generator];

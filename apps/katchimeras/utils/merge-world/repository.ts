@@ -2,6 +2,7 @@ import { reduceAdventure } from '@/features/shared-adventure/runtime';
 import { placeLanternWorld, projectLanternWorld, startLanternWorld, upgradeLanternWorld } from '@/features/wisps/lantern-world';
 import { lanternResidentCapacity, type LanternLevel } from '@/constants/wisp-lantern-levels';
 import { reduceWispLantern } from '@/utils/wisp-lantern-state';
+import { buildFirstSpring, firstSpringAwake, firstSpringBuilt, growFirstSeedIntoSpring, upgradeHeartwoodBuilding, wakeFirstSpring } from '@/features/heartwood-buildings/buildings-world';
 import { gameNow } from '@/utils/game-clock';
 import { reconcileJourneyGardenOrders } from '@/features/companion/journey-garden-orders';
 import { availableLocalEvents, harmonyDefinition } from '@/features/live-ops/local-catalog';
@@ -31,8 +32,6 @@ import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorl
 import { createMossproutChapterZeroState, createMossproutOpeningState, createMossproutBasketParcelState } from '@/utils/merge-world/onboarding';
 import { completeMossproutChapterZeroSlice } from '@/utils/merge-world/chapter-zero-policy';
 import { MOSSPROUT_FTUE_JOURNAL_ENERGY } from '@/utils/merge-world/economy-policy';
-import { firstFtueMemoryForSource, reduceFirstFtueMemoryPlacement } from '@/utils/merge-world/first-ftue-memory';
-import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
 import { flushMergeWorldWriters } from './writer-flush';
 import { MergeWorldStaleWriteError, mergeWriteIsStale } from './write-guard';
 export { MergeWorldStaleWriteError } from './write-guard';
@@ -176,7 +175,7 @@ export async function saveMergeWorldState(
       catch { /* Loading already reported the damaged snapshot; recovered facts are historical. */ }
       const revision = contentRegistrySnapshot().revision;
       const backfill = !projection && priorState ? worldMilestoneEvents(priorState, revision, true) : [];
-      state = { ...state, wispLanternPlacement: priorState?.wispLanternPlacement ?? state.wispLanternPlacement, wispLanternProgress: priorState?.wispLanternProgress ?? state.wispLanternProgress, localLiveOps: priorState?.localLiveOps ?? state.localLiveOps, sharedAdventure: priorState?.sharedAdventure ?? state.sharedAdventure };
+      state = { ...state, wispLanternPlacement: priorState?.wispLanternPlacement ?? state.wispLanternPlacement, wispLanternProgress: priorState?.wispLanternProgress ?? state.wispLanternProgress, heartwoodBuildings: priorState?.heartwoodBuildings ?? state.heartwoodBuildings, localLiveOps: priorState?.localLiveOps ?? state.localLiveOps, sharedAdventure: priorState?.sharedAdventure ?? state.sharedAdventure };
       state = projectLanternWorld(state, options.gameplayEvents ?? []);
       state = projectLocalEvents(state, [...newWorldMilestones(priorState, state, revision), ...(options.gameplayEvents ?? [])], state.updatedAt);
       serialized = JSON.stringify(state);
@@ -261,6 +260,38 @@ export async function applyStoredAdventure(command: import('@/features/shared-ad
 export async function plantStoredWispLantern(now = gameNow()) {
   return reduceStoredMergeWorld(state => {
     const next = placeLanternWorld(state, now);
+    return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
+  }, now);
+}
+
+const storedWorldStep = (step: (state: MergeWorldState, now: number) => MergeWorldState, now: number) => reduceStoredMergeWorld(state => {
+  const next = step(state, now);
+  return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
+}, now);
+
+/** The first session's planting beat, and its recovery: the Dew Spring, dug out and dormant. */
+export async function ensureStoredFirstSpringBuilt(now = gameNow()) {
+  const result = await storedWorldStep(buildFirstSpring, now);
+  return { placed: firstSpringBuilt(result.state), state: result.state };
+}
+
+/** The garden has woken: the first Spring runs. */
+export async function wakeStoredFirstSpring(now = gameNow()) {
+  const result = await storedWorldStep(wakeFirstSpring, now);
+  return { awake: firstSpringAwake(result.state), state: result.state };
+}
+
+/** Older saves: the first session's sprouted seed becomes the Dew Spring. Safe to call at any time: it only ever happens once. */
+export async function ensureStoredFirstSpring(now = gameNow()) {
+  return reduceStoredMergeWorld(state => {
+    const next = growFirstSeedIntoSpring(state, now);
+    return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
+  }, now);
+}
+
+export async function upgradeStoredHeartwoodBuilding(id: import('@/constants/heartwood-buildings').HeartwoodBuildingId, expectedLevel: number, now = gameNow()) {
+  return reduceStoredMergeWorld(state => {
+    const next = upgradeHeartwoodBuilding(state, id, expectedLevel, now);
     return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
   }, now);
 }
@@ -588,25 +619,6 @@ export function placeStoredPlantableMemory(
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
     type: 'placePlantableMemory', instanceId, slotId, receiptId, now,
   }), now);
-}
-
-/**
- * Idempotent repair boundary for the FTUE's first planted memory.
- *
- * The authored graph and the legacy resume snapshot are persisted separately.
- * If the app is interrupted between those writes, this operation safely
- * finishes the world mutation without requiring a screen to own Merge state.
- */
-export async function ensureStoredFirstFtueMemoryPlacement(sourceId: string | null, receiptId: string) {
-  const now = gameNow();
-  const result = await reduceStoredMergeWorld((state) => (
-    reduceFirstFtueMemoryPlacement(state, sourceId, receiptId, now)
-  ), now);
-  const plant = firstFtueMemoryForSource(result.state, sourceId);
-  return {
-    placed: plant?.status === 'planted' && plant.slotId === MOSSPROUT_FIRST_MEMORY_SLOT_ID,
-    state: result.state,
-  };
 }
 
 export function growStoredPlantableMemory(instanceId: string, amount: number, receiptId: string, now = gameNow()) {

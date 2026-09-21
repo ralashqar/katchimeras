@@ -17,7 +17,7 @@ import { islandCampaignChapterOrder } from '@/constants/island-campaigns/helpers
 import { PETALIMP_BLOOM_CAMPAIGN, PETALIMP_ISLAND_CAMPAIGN_ID, PETALIMP_ISLAND_ID } from '@/constants/island-campaigns/petalimp-bloom';
 import { FEASTLE_HATCHABLE } from '@/constants/hatchable-companions/feastle';
 import { hatchableFlows } from '@/features/onboarding/hatchable-flows';
-import { MOSSPROUT_FIRST_MEMORY_SLOT_ID } from '@/utils/mossprout-garden-layout';
+import { wakeFirstSpring } from '@/features/heartwood-buildings/buildings-world';
 import { reduceAdventure } from '@/features/shared-adventure/runtime';
 import { placeLanternWorld, startLanternWorld, WELCOME_ORDER_IDS } from '@/features/wisps/lantern-world';
 import { reduceWispLantern } from '@/utils/wisp-lantern-state';
@@ -293,15 +293,13 @@ function storyRunAt(definition: ContentFlowDefinition, runId: string, nodeId: st
   return stabilizeContentFlow(definition, { ...createContentFlowRun(definition, { runId, now }), nodeId }, now).run;
 }
 
-/** Earliest Lantern invitation: established Garden/Trail, first planted memory,
+/** Earliest Lantern invitation: established Garden/Trail, the first session's Dew Spring,
  * Heartwood introduced, and Feastle's actual hatch, parcel and Snack completed. */
 function beforeWispLantern(now: number): MergeWorldState {
   let state = stepplingHome(now);
   const plantedAt = now - 5 * DAY;
-  const seedReceipt = 'fixture:first-memory:momentum';
-  state = step(state, { type: 'grantPlantableMemory', definitionId: 'momentum', source: { kind: 'ftue', sourceId: 'fixture-ftue-complete' }, receiptId: seedReceipt, now: plantedAt }, 'earn the first Seed');
-  state = step(state, { type: 'placePlantableMemory', instanceId: `memory-plant:${seedReceipt}`, slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID, receiptId: `${seedReceipt}:placed`, now: plantedAt + 1 }, 'plant the first tree patch');
-  state = step(state, { type: 'growPlantableMemory', instanceId: `memory-plant:${seedReceipt}`, amount: 1, receiptId: `${seedReceipt}:grown`, now: plantedAt + 2 }, 'grow the first sprout');
+  // The first session builds the Dew Spring and the garden wakes it: no memory seed is planted any more.
+  state = wakeFirstSpring(state, plantedAt);
   const at = now - DAY;
   state = step(state, { type: 'introduceKingdomGoal', now: at }, 'introduce Heartwood');
   state = step(state, { type: 'ackKingdomGoalCoachmark', now: at + 1 }, 'finish the Heartwood guide');
@@ -333,7 +331,7 @@ function beforeWispLantern(now: number): MergeWorldState {
  * Friend-discovery checkpoints plus the first Wisp Lantern invitation.
  */
 const FIXTURE_DEFINITIONS: readonly FixtureDefinition[] = [
-  { id: 'kingdom-before-wisp-lantern', name: 'Kingdom · Before Wisp Lantern', description: 'Feastle hatched, Pantry unpacked and first Snack shared. Steppling is home, Heartwood is introduced, and the Seed of Momentum sprouts in the first tree patch. The Lantern invitation appears in Haven: plant it in the front-right patch and open a card pack containing one random Common Wisp.', tags: ['Kingdom', 'Wisps', 'Lantern', 'Feastle', 'Heartwood'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: beforeWispLantern,
+  { id: 'kingdom-before-wisp-lantern', name: 'Kingdom · Before Wisp Lantern', description: 'Feastle hatched, Pantry unpacked and first Snack shared. Steppling is home, Heartwood is introduced, and the Dew Spring from the first session runs in the first tree patch. The Lantern invitation appears in Haven: plant it in the front-right patch and open a card pack containing one random Common Wisp.', tags: ['Kingdom', 'Wisps', 'Lantern', 'Feastle', 'Heartwood'], ftueStep: 'complete', launchRoute: '/(tabs)/katchimeras', buildWorld: beforeWispLantern,
     prepareKeyValues: (values) => {
       const profile = JSON.parse(values['katchadeck.onboarding-profile']) as OnboardingProfile;
       return { ...values, 'katchadeck.onboarding-profile': JSON.stringify({ ...profile, mossproutAnswers: { ...profile.mossproutAnswers, firstSeedId: 'momentum' } }) };

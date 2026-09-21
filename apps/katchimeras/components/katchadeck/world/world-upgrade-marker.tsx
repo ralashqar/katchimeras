@@ -15,6 +15,8 @@ const EGG_SILHOUETTE_ART = require('@incubator/art-cutouts/egg-base.webp');
 const EGG_RAYS_ART = require('@incubator/art-ui/radial-sunburst.png');
 const MARKER_SIZE = 68;
 const MARKER_TILE_WIDTH_RATIO = 0.15;
+/** Heartwood's own upgrade button, as a share of every other tile's. */
+const HEARTWOOD_MARKER_SCALE = 0.5;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY, sceneWidth, sceneHeight, moving, hidden = false, selected = false, inert = false, onPress, onTargetChange }: {
@@ -43,6 +45,9 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   const campaignPending = Boolean(markerSkin && !offer.eligible);
   const isHeartwood = offer.visualTarget?.kind === 'haven_structure' && offer.visualTarget.structureId === 'mossprout-hex-garden';
   const anchorY = isHeartwood ? 0.4 : 0.62;
+  // Heartwood's button sits among the five things on its patches: at full size it covered them, so it is drawn at half.
+  // Only the painted bubble shrinks; the press target keeps its 68pt minimum below.
+  const sizeFactor = isHeartwood ? HEARTWOOD_MARKER_SCALE : 1;
   useEffect(() => {
     visibility.value = hidden ? withTiming(0, { duration: reduced ? 80 : 140 })
       : reduced ? withTiming(1, { duration: 100 }) : withSpring(1, { damping: 12, stiffness: 220, mass: 0.7 });
@@ -78,18 +83,18 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   // and the bubble inside takes whatever remains so the painted size is
   // unchanged at every zoom.
   const hitMotion = useAnimatedStyle(() => {
-    const visual = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value * (reduced ? 1 : visibility.value);
+    const visual = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * sizeFactor * cameraScale.value * pulse.value * (reduced ? 1 : visibility.value);
     return { opacity: visibility.value * (inert ? 0.72 : 1), transform: [{ scale: Math.max(1, visual) }] };
   });
   const bubbleMotion = useAnimatedStyle(() => {
-    const visual = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * pulse.value * (reduced ? 1 : visibility.value);
+    const visual = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * sizeFactor * cameraScale.value * pulse.value * (reduced ? 1 : visibility.value);
     return { transform: [{ scale: visual / Math.max(1, visual) }] };
   });
   // Stable envelope at the maximum pulse, independent of the entrance scale.
   // Include the intrinsic percentage row, top tail, rim and shadow. Measuring
   // the 68px press target clipped these whenever the world camera zoomed in.
   const spotlightBounds = useAnimatedStyle(() => {
-    const scale = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * cameraScale.value * 1.08;
+    const scale = frame.width * MARKER_TILE_WIDTH_RATIO / MARKER_SIZE * sizeFactor * cameraScale.value * 1.08;
     return { width: (paintedWidth + 8) * scale, height: (bubbleHeight + 18) * scale,
       left: MARKER_SIZE / 2 - (paintedWidth / 2 + 4) * scale,
       top: MARKER_SIZE / 2 - (bubbleHeight / 2 + 12) * scale };

@@ -44,7 +44,7 @@ test('reminders follow acceleration, remain unique, and cancel after return', as
   assert.equal(scheduled.size, 0, 'no notification permission is requested or assumed');
 });
 
-test('Mossprout’s first return names the planted Memory Seed; later returns do not', async () => {
+test('Mossprout’s first return is about the spring the first session built; later returns are about the garden', async () => {
   const now = Date.now();
   const rest = { familyId: 'mossprout', startedAt: now, availableAt: now + 8 * 60 * 60 * 1000, reason: 'journey_rest', sourceId: 'ftue:run:first-rest' };
   let state: Record<string, unknown> = { ...emptyRelationshipProgressState(), meditations: [rest] };
@@ -64,7 +64,7 @@ test('Mossprout’s first return names the planted Memory Seed; later returns do
   await module.syncCompanionJourneyReminders();
   assert.equal(scheduled.length, 1);
   assert.equal(scheduled[0].content.title, 'Mossprout is awake');
-  assert.equal(scheduled[0].content.body, 'Your Seed of Stillness opened while you were away. Come and see.');
+  assert.equal(scheduled[0].content.body, 'The old spring kept running while you were away. Come and see what it woke.');
   state = { ...state, journeyDays: [{ familyId: 'mossprout', status: 'complete', beatId: 'quiet-patch:first-flower' }] };
   await module.syncCompanionJourneyReminders();
   assert.equal(scheduled.length, 2);

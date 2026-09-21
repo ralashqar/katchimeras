@@ -12,6 +12,7 @@ import { WispPackAnticipation } from './wisp-pack-anticipation';
 import { DiscoveryRewardSequence } from '@/components/katchadeck/world/discovery-reward-sequence';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { AppFontFamilies } from '@/constants/theme';
+import { HEARTWOOD_PATCH_ITEM as ITEM } from '@/constants/heartwood-patch-item';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import { LANTERN_INTRO } from '@/features/wisps/lantern-definition';
 import { registerLanternFlows } from '@/features/wisps/lantern-flows';
@@ -41,8 +42,9 @@ export function WispLanternWorld({ onPress, rewards, planted = true, level = 1 }
   return <Pressable disabled={!onPress} onPress={onPress} accessibilityRole="button" accessibilityLabel={planted ? 'Wisp Lantern. Open collection and card packs' : 'A home for little lights'} style={styles.world}>
     {planted ? <Animated.View key="planted" entering={reduced ? FadeIn.duration(100) : ZoomIn.duration(650)} style={styles.worldStage}>
       {lantern?.cosmetics.includes('first-gathering') ? <Image source={ART.gathering} style={styles.habitat} contentFit="contain" /> : null}
-      <Image source={LANTERN_LEVEL_ART[lanternLevel(level)]} style={styles.worldArt} contentFit="contain" transition={reduced ? 0 : 250} />
-      <View pointerEvents="none" style={[styles.residents, lantern?.cosmetics.includes('lantern-trail') && styles.trail]}>{lantern?.residents.map(id => <WispCompanion key={id} id={id} size={26} />)}</View>
+      {/* The world is zoomed by the camera: decode the art at its full size, not at this small box's, or it blurs when framed. */}
+      <Image source={LANTERN_LEVEL_ART[lanternLevel(level)]} style={styles.worldArt} contentFit="contain" allowDownscaling={false} transition={reduced ? 0 : 250} />
+      <View pointerEvents="none" style={[styles.residents, lantern?.cosmetics.includes('lantern-trail') && styles.trail]}>{lantern?.residents.map(id => <WispCompanion key={id} id={id} size={ITEM.scaled(26)} />)}</View>
     </Animated.View> : null}
     <Text style={styles.worldLabel}>{!planted ? 'Little lights…' : pouches ? `${pouches} ${pouches === 1 ? 'pack' : 'packs'}` : 'Wisp Lantern'}</Text>
   </Pressable>;
@@ -197,9 +199,11 @@ export function WispLanternPanel({ world, onClose, onGarden, onUpgrade, onPlanti
 }
 
 const styles = StyleSheet.create({
-  world: { width: 104, height: 124, alignItems: 'center', justifyContent: 'flex-end' }, worldStage: { width: 104, height: 104 }, worldArt: { width: 104, height: 104 }, habitat: { position: 'absolute', width: 130, height: 100, left: -13, top: 15 },
-  residents: { position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', borderRadius: 24 }, trail: { backgroundColor: '#FFDC8080', borderColor: '#FFE8A8', borderWidth: 2 },
-  worldLabel: { color: '#59482D', backgroundColor: '#FFF3DC', borderRadius: 10, padding: 4, fontFamily: AppFontFamilies.fredokaBold, fontSize: 11 },
+  // Sized with the four Heartwood buildings beside it, by layout and on whole pixels (constants/heartwood-patch-item).
+  world: { width: ITEM.width, height: ITEM.height, alignItems: 'center', justifyContent: 'flex-end' }, worldStage: { width: ITEM.art, height: ITEM.art }, worldArt: { width: ITEM.art, height: ITEM.art },
+  habitat: { position: 'absolute', width: ITEM.scaled(130), height: ITEM.scaled(100), left: -ITEM.scaled(13), top: ITEM.scaled(15) },
+  residents: { position: 'absolute', bottom: ITEM.scaled(8), alignSelf: 'center', flexDirection: 'row', borderRadius: 24 }, trail: { backgroundColor: '#FFDC8080', borderColor: '#FFE8A8', borderWidth: 2 },
+  worldLabel: { color: '#59482D', backgroundColor: '#FFF3DC', borderRadius: ITEM.labelRadius, padding: ITEM.labelPadding, fontFamily: AppFontFamilies.fredokaBold, fontSize: ITEM.labelFont },
   scrim: { flex: 1, backgroundColor: 'rgba(24,42,23,0.9)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 18 },
   narrativeLayer: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: 16, zIndex: 140 }, narrativePanel: { width: '100%', maxWidth: 520, paddingVertical: 18, gap: 16 },
   errorBox: { gap: 10, padding: 12, backgroundColor: '#FFF8E6', borderRadius: 16 }, error: { color: '#923F38', fontSize: 15 },

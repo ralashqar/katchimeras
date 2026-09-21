@@ -1,11 +1,34 @@
 import type { MergeWorldState } from '@/types/merge-world';
+import { HEARTWOOD_BUILDINGS, heartwoodBuildingLevel } from '@/constants/heartwood-buildings';
 import { heartwoodPlants } from './heartwood-garden';
 
 export const GARDEN_SUPPLY_INTERVAL = 12 * 60 * 60 * 1000;
 export type HeartwoodStage = 'dormant' | 'stirring' | 'rooted' | 'blooming' | 'awakened';
 export type GardenSupply = { version: 1; clock: number; startedAt: number; stored: number; nextParcel: number };
 
+const STAGES: readonly HeartwoodStage[] = ['dormant', 'stirring', 'rooted', 'blooming', 'awakened'];
+
+/**
+ * What the buildings around the Tree say about it: the Tree grows with its circle. One building stirs it, three root
+ * it, all four at Level 4 bring it to bloom and all four at Level 7 wake it. Seeds planted before the buildings
+ * existed still count: the Tree stands at whichever reading is further along.
+ */
+function buildingStage(world: MergeWorldState): HeartwoodStage {
+  // A dormant building (the first session's Spring before the garden wakes) has not stirred anything yet.
+  const levels = HEARTWOOD_BUILDINGS.map(building => world.heartwoodBuildings?.[building.id]?.dormant ? 0 : heartwoodBuildingLevel(world, building.id));
+  const built = levels.filter(level => level > 0).length;
+  if (built === levels.length && levels.every(level => level >= 7)) return 'awakened';
+  if (built === levels.length && levels.every(level => level >= 4)) return 'blooming';
+  if (built >= 3) return 'rooted';
+  return built >= 1 ? 'stirring' : 'dormant';
+}
+
 export function heartwoodStage(world: MergeWorldState): HeartwoodStage {
+  const [plants, buildings] = [plantStage(world), buildingStage(world)];
+  return STAGES.indexOf(buildings) > STAGES.indexOf(plants) ? buildings : plants;
+}
+
+function plantStage(world: MergeWorldState): HeartwoodStage {
   const plants = heartwoodPlants(world);
   const sprouts = plants.filter(plant => plant.achievedGrowth >= 1).length;
   const blooms = plants.filter(plant => plant.achievedGrowth >= 3).length;

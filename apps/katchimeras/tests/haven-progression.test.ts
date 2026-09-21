@@ -481,11 +481,15 @@ test('live Chapter 0 board installation preserves the planted Haven memory', () 
   assert.match(repository, /options: \{ preserveHaven\?: boolean \}/);
   assert.match(repository, /options\.preserveHaven[\s\S]*?haven: current\.haven/);
   assert.match(havenScreen, /beginFirstSeedPlanting[\s\S]*?evidenceRef: `garden-plot:\$\{MOSSPROUT_FIRST_MEMORY_SLOT_ID\}`/);
-  assert.match(repository, /ensureStoredFirstFtueMemoryPlacement[\s\S]*?reduceFirstFtueMemoryPlacement\(state, sourceId, receiptId, now\)/);
+  // The planting beat builds the Dew Spring: one idempotent world step, shared by the authored effect and the screen's recovery.
+  assert.match(repository, /ensureStoredFirstSpringBuilt[\s\S]*?storedWorldStep\(buildFirstSpring, now\)/);
   const bootstrap = readFileSync('features/content-flow/content-flow-bootstrap.ts', 'utf8');
-  assert.match(bootstrap, /registerContentFlowEffect\('haven.place_first_memory'[\s\S]*?ensureStoredFirstFtueMemoryPlacement\(sourceId, effectKey\)/);
+  assert.match(bootstrap, /registerContentFlowEffect\('haven.place_first_memory'[\s\S]*?ensureStoredFirstSpringBuilt\(\)/);
+  assert.match(bootstrap, /registerContentFlowEffect\('haven.grow_first_memory'[\s\S]*?wakeStoredFirstSpring\(\)/);
+  assert.doesNotMatch(bootstrap, /grantStoredPlantableMemory|growStoredPlantableMemory/, 'the first session hands out no memory seed');
   assert.doesNotMatch(bootstrap, /placeStoredPlantableMemory|slotId: 'front-left'/);
-  assert.match(havenScreen, /run\.stepId === 'world\.seed_planted'[\s\S]*?ensureStoredFirstFtueMemoryPlacement/);
+  assert.match(havenScreen, /run\.stepId === 'world\.seed_planted'[\s\S]*?ensureStoredFirstSpringBuilt/);
+  assert.match(havenScreen, /const firstSeedPlanted = firstSpringBuilt\(mergeWorld\);\s*const firstSeedGrown = firstSpringAwake\(mergeWorld\);/);
   assert.match(havenScreen, /world\.seed_planted'[\s\S]*?firstSeedPlanted/);
   assert.match(havenScreen, /world\.first_seed_grew'[\s\S]*?firstSeedGrown/);
 });

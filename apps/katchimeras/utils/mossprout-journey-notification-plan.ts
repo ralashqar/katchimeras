@@ -10,8 +10,6 @@ export type CompanionReturnNotificationInput = {
   familyId: 'mossprout' | 'steppling';
   /** No completed Journey yet: the reminder that follows the first rest. */
   firstReturn: boolean;
-  /** The planted Memory Seed's display name, when the first session saved one. */
-  seedName?: string | null;
 };
 
 /**
@@ -26,11 +24,7 @@ export function companionReturnNotificationContent(input: CompanionReturnNotific
       : { title: 'Steppling is back', body: 'Boots on. He has found the next stretch of path.' };
   }
   if (input.firstReturn) {
-    const seed = input.seedName?.trim();
-    return {
-      title: 'Mossprout is awake',
-      body: seed ? `Your ${seed} opened while you were away. Come and see.` : 'Something grew while you were away. Come and see.',
-    };
+    return { title: 'Mossprout is awake', body: 'The old spring kept running while you were away. Come and see what it woke.' };
   }
   return { title: 'Mossprout is awake', body: 'The garden kept growing. He has something to show you.' };
 }

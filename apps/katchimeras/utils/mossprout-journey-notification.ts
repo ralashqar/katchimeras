@@ -1,7 +1,5 @@
 import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-storage';
 import { companionReturnNotificationContent, nextMossproutJourneyReminderDate } from '@/utils/mossprout-journey-notification-plan';
-import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { mossproutFirstSeedForIntent } from '@/features/onboarding/mossprout-bond-share';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { currentJourneyCycle } from '@/game/katchimeras/companion-journey-cycle';
 
@@ -84,19 +82,11 @@ async function scheduleReminder(familyId: 'steppling' | 'mossprout', completedDa
   });
 }
 
-/** The first return names the planted Memory Seed; later returns stay in voice without it. */
+/** The first return is about the spring the first session dug out; later returns are about the garden. */
 function reminderContent(familyId: 'steppling' | 'mossprout') {
   const state = relationshipProgressionRepository.load();
   const firstReturn = !state.journeyDays.some((journey) => journey.familyId === familyId && journey.status === 'complete');
-  let seedName: string | null = null;
-  if (familyId === 'mossprout' && firstReturn) {
-    try {
-      seedName = mossproutFirstSeedForIntent(loadOnboardingProfile().mossproutAnswers.growthIntentId).name;
-    } catch {
-      seedName = null;
-    }
-  }
-  return companionReturnNotificationContent({ familyId, firstReturn, seedName });
+  return companionReturnNotificationContent({ familyId, firstReturn });
 }
 
 async function getNotifications() {

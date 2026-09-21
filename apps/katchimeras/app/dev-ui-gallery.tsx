@@ -11,6 +11,7 @@ import { GameBadge, GameIconWell, GameRewardChip, GameSurface } from '@/componen
 import { UpgradeDock, useUpgradeDockMotion } from '@/components/katchadeck/upgrade/upgrade-dock';
 import { UpgradeBenefitRow, UpgradeHero, UpgradeLevelSlots, UpgradeRequirementRow, UpgradeSection, useUpgradeLevelPick } from '@/components/katchadeck/upgrade/upgrade-rows';
 import { CompanionThreadSwitcher } from '@/components/katchadeck/world/companion-thread-switcher';
+import { HeartwoodBuildingPanel } from '@/components/katchadeck/world/heartwood-building-panel';
 import {
   CompanionCard,
   CompanionResultNotice,
@@ -22,11 +23,14 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
 import { GameUI, type GameSurfaceTone } from '@/constants/game-ui';
 import { KatchaUI, type KatchaSurface } from '@/constants/katcha-ui';
+import type { HeartwoodBuildingId, HeartwoodBuildings } from '@/constants/heartwood-buildings';
+import { upgradeHeartwoodBuilding } from '@/features/heartwood-buildings/buildings-world';
 import { lanternLevelArt, tileLevelArt } from '@/features/upgrade-stage/upgrade-level-art';
 import { lanternUpgradeModel, tileUpgradeModel, type UpgradePanelModel } from '@/features/upgrade-stage/upgrade-panel-model';
 import { upgradeStageLayout } from '@/features/upgrade-stage/upgrade-stage-layout';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
 import type { CompanionThread } from '@/types/companion-interaction';
+import type { MergeWorldState } from '@/types/merge-world';
 
 const GALLERY_OFFER = {
   id: 'nature:bloom-garden', name: 'Bloom Garden', nextName: 'Colour Beds', description: 'Flower beds return along the path.',
@@ -40,6 +44,25 @@ const UPGRADE_PREVIEWS: { label: string; model: UpgradePanelModel }[] = [
   { label: 'Lantern · milestones', model: lanternUpgradeModel(GALLERY_LANTERN) },
   { label: 'Lantern · fully grown', model: lanternUpgradeModel({ ...GALLERY_LANTERN, level: 3 }) },
 ];
+
+const BUILDING_PREVIEWS: { label: string; id: HeartwoodBuildingId; coins: number; buildings?: HeartwoodBuildings }[] = [
+  { label: 'Dew Spring · empty patch, short of Glow', id: 'dew-spring', coins: 12 },
+  { label: 'Dew Spring · level 3, milestone next', id: 'dew-spring', coins: 2_000, buildings: { 'dew-spring': { level: 3, builtAt: 0 } } },
+  { label: 'Seed Nursery · level 6', id: 'seed-nursery', coins: 2_000, buildings: { 'seed-nursery': { level: 6, builtAt: 0 } } },
+  { label: 'Garden Stall · fully grown', id: 'garden-stall', coins: 2_000, buildings: { 'garden-stall': { level: 10, builtAt: 0 } } },
+];
+
+/** The real building panel over a small stand-in world: Build and Upgrade run the real step, so levels, costs and rows move as they do in the Kingdom. */
+function BuildingPanelPreview({ preview, onClose }: { preview: (typeof BUILDING_PREVIEWS)[number]; onClose: () => void }) {
+  const insets = useSafeAreaInsets();
+  const layout = upgradeStageLayout(useWindowDimensions(), insets);
+  const [world, setWorld] = useState(() => ({
+    coins: preview.coins, heartwoodBuildings: preview.buildings, energy: { value: 100, regenCap: 100, lastRegenAt: 0, regenPaused: false }, storageCapacity: 8,
+    haven: { tileStages: { mossprout: 1 }, plantableMemories: [] },
+  }) as unknown as MergeWorldState);
+  return <HeartwoodBuildingPanel world={world} buildingId={preview.id} layout={layout} bottomInset={insets.bottom} onClose={onClose} onGarden={onClose}
+    onUpgrade={async (id, expectedLevel) => { setWorld((current) => upgradeHeartwoodBuilding(current, id, expectedLevel, Date.now())); }} />;
+}
 
 /** The shared upgrade stage's docked panel, over the gallery, at the size the Kingdom gives it. */
 function UpgradeDockPreview({ model, onClose }: { model: UpgradePanelModel; onClose: () => void }) {
@@ -153,6 +176,7 @@ function PlayfulGameGallery() {
 
 export default function DevUiGalleryScreen() {
   const [upgradePreview, setUpgradePreview] = useState<number | null>(null);
+  const [buildingPreview, setBuildingPreview] = useState<number | null>(null);
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -160,12 +184,15 @@ export default function DevUiGalleryScreen() {
         <View style={styles.gameGallery}>
           <ThemedText style={styles.eyebrow} lightColor={GameUI.color.creamMuted} darkColor={GameUI.color.creamMuted}>Upgrade stage · docked panel</ThemedText>
           {UPGRADE_PREVIEWS.map((preview, index) => <KatchaButton fullWidth key={preview.label} label={preview.label} size="compact" variant="secondary" onPress={() => setUpgradePreview(index)} />)}
+          <ThemedText style={styles.eyebrow} lightColor={GameUI.color.creamMuted} darkColor={GameUI.color.creamMuted}>Heartwood buildings · live panel</ThemedText>
+          {BUILDING_PREVIEWS.map((preview, index) => <KatchaButton fullWidth key={preview.label} label={preview.label} size="compact" variant="secondary" onPress={() => setBuildingPreview(index)} />)}
         </View>
         <PlayfulGameGallery />
         <KatchaSurfaceProvider surface="parchment"><CompanionGallery /></KatchaSurfaceProvider>
         <KatchaSurfaceProvider surface="parchment"><SurfaceGallery surface="parchment" /></KatchaSurfaceProvider>
         <KatchaSurfaceProvider surface="night"><SurfaceGallery surface="night" /></KatchaSurfaceProvider>
       </ScrollView>
+      {buildingPreview != null ? <BuildingPanelPreview key={`building:${buildingPreview}`} preview={BUILDING_PREVIEWS[buildingPreview]} onClose={() => setBuildingPreview(null)} /> : null}
       {upgradePreview != null ? <UpgradeDockPreview key={upgradePreview} model={UPGRADE_PREVIEWS[upgradePreview].model} onClose={() => setUpgradePreview(null)} /> : null}
     </SafeAreaView>
   );

@@ -16,13 +16,14 @@ import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
-import { applyStoredGlowDiscovery, grantStoredGeneratorParcel, reconcileStoredHavenStory, activateStoredResidentCardDiscovery, ensureStoredFirstFtueMemoryPlacement, grantStoredPlantableMemory, growStoredPlantableMemory, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget, ensureStoredOpeningGlow } from '@/utils/merge-world/repository';
-import { firstFtueMemoryForSource } from '@/utils/merge-world/first-ftue-memory';
+import { applyStoredGlowDiscovery, grantStoredGeneratorParcel, reconcileStoredHavenStory, activateStoredResidentCardDiscovery, ensureStoredFirstSpringBuilt, wakeStoredFirstSpring, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget, ensureStoredOpeningGlow } from '@/utils/merge-world/repository';
+import { heartwoodBuildingById } from '@/constants/heartwood-buildings';
+import { FIRST_SEED_BUILDING_ID } from '@/features/heartwood-buildings/buildings-world';
 import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
 import { beginKatchimeraMeditation, completeMossproutJourneyResolution, katchimeraMeditationRecord } from '@/game/katchimeras/relationship-progression';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { MOSSPROUT_FTUE_FAMILIAR_BOND_TARGET, MOSSPROUT_FTUE_NAME_BOND_TARGET, mossproutFirstSeedForIntent } from '@/features/onboarding/mossprout-bond-share';
+import { MOSSPROUT_FTUE_FAMILIAR_BOND_TARGET, MOSSPROUT_FTUE_NAME_BOND_TARGET } from '@/features/onboarding/mossprout-bond-share';
 import { localDayId } from '@/utils/world-identity';
 import { keepMossproutFirstSeed } from '@/features/onboarding/mossprout-profile';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
@@ -184,45 +185,27 @@ export function bootstrapContentFlowCatalog() {
     if (!meditation) throw new Error('The companion meditation could not be started');
     return { effectKey, familyId, sourceId, startedAt: meditation.startedAt, availableAt: meditation.availableAt };
   });
-  registerContentFlowEffect('haven.grant_first_memory', async ({ run, effectKey }) => {
-    const profile = loadOnboardingProfile();
-    const seed = mossproutFirstSeedForIntent(profile.mossproutAnswers.growthIntentId);
-    const sourceId = typeof run.variables.ftueRunId === 'string' ? run.variables.ftueRunId : run.runId;
-    const existing = firstFtueMemoryForSource(await loadMergeWorldState(), sourceId);
-    if (existing) return { effectKey, definitionId: existing.definitionId, instanceId: existing.id };
-    const granted = await grantStoredPlantableMemory(seed.id, { kind: 'ftue', sourceId }, effectKey);
-    const instanceId = `memory-plant:${effectKey}`;
-    if (!granted.changed) {
-      const world = await loadMergeWorldState();
-      if (!world.haven.plantableMemories.some((plant) => plant.id === instanceId)) {
-        throw new Error('The first memory Seed could not be earned');
-      }
-    }
-    return { effectKey, definitionId: seed.id, instanceId };
-  });
+  // The three first-memory capabilities keep their ids (they are save data) but no longer deal in memory seeds: the
+  // first thing at Heartwood is the Dew Spring. Nothing is granted ahead of time, "place" digs the Spring out dormant,
+  // and "grow" wakes it with the garden.
+  registerContentFlowEffect('haven.grant_first_memory', async ({ effectKey }) => (
+    { effectKey, buildingId: FIRST_SEED_BUILDING_ID }
+  ));
   registerContentFlowEffect('haven.opening_glow', async ({ run, effectKey }) => {
     const sourceId = typeof run.variables.ftueRunId === 'string' ? run.variables.ftueRunId : run.runId;
     const result = await ensureStoredOpeningGlow(`${sourceId}:opening-glow`);
     if (!result.state.openingGlow) throw new Error('The first light could not be kept');
     return { effectKey, amount: result.state.openingGlow.amount, receiptId: result.state.openingGlow.receiptId };
   });
-  registerContentFlowEffect('haven.place_first_memory', async ({ run, effectKey }) => {
-    const sourceId = typeof run.variables.ftueRunId === 'string' ? run.variables.ftueRunId : run.runId;
-    const placed = await ensureStoredFirstFtueMemoryPlacement(sourceId, effectKey);
-    const plant = firstFtueMemoryForSource(placed.state, sourceId);
-    if (!placed.placed || !plant) {
-      throw new Error('The first memory Seed could not be planted');
-    }
-    return { effectKey, definitionId: plant.definitionId, instanceId: plant.id, slotId: plant.slotId };
+  registerContentFlowEffect('haven.place_first_memory', async ({ effectKey }) => {
+    const built = await ensureStoredFirstSpringBuilt();
+    if (!built.placed) throw new Error('The Dew Spring could not be built');
+    return { effectKey, buildingId: FIRST_SEED_BUILDING_ID, slotId: heartwoodBuildingById.get(FIRST_SEED_BUILDING_ID)!.slotId };
   });
-  registerContentFlowEffect('haven.grow_first_memory', async ({ run, effectKey }) => {
-    const world = await loadMergeWorldState();
-    const sourceId = typeof run.variables.ftueRunId === 'string' ? run.variables.ftueRunId : run.runId;
-    const plant = world.haven.plantableMemories.find((candidate) => candidate.source.kind === 'ftue' && candidate.source.sourceId === sourceId)
-      ?? world.haven.plantableMemories.find((candidate) => candidate.source.kind === 'ftue');
-    if (!plant) throw new Error('The first memory Seed is missing');
-    await growStoredPlantableMemory(plant.id, 1, effectKey);
-    return { effectKey, instanceId: plant.id, growthPoints: plant.growthPoints + 1 };
+  registerContentFlowEffect('haven.grow_first_memory', async ({ effectKey }) => {
+    const woken = await wakeStoredFirstSpring();
+    if (!woken.awake) throw new Error('The Dew Spring could not be woken');
+    return { effectKey, buildingId: FIRST_SEED_BUILDING_ID, level: woken.state.heartwoodBuildings?.[FIRST_SEED_BUILDING_ID]?.level ?? 1 };
   });
   registerContentFlowEffect('haven.feature.upgrade', async ({ effectKey, payload }) => {
     const featureId = payload.featureId === 'path' ? 'path' : 'spring';

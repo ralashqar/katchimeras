@@ -323,8 +323,8 @@ test('a new Merge World is Mossprout-owned and begins with twenty playable cells
   assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
   assert.equal(state.energy.value, MERGE_INITIAL_ENERGY);
-  assert.equal(state.energy.regenCap, 0);
-  assert.equal(state.energy.value, 0);
+  assert.equal(state.energy.regenCap, 100);
+  assert.equal(state.energy.value, 100);
   assert.equal(state.board.filter((cell) => !cell.locked).length, 20);
   assert.deepEqual(state.generators, {});
 });
@@ -532,7 +532,7 @@ test('step Energy checkpoints cumulative pedometer totals without paying the sam
   });
   assert.equal(first.energyGranted, 20);
   assert.equal(first.stepEnergyClaim?.consumedSteps, 20 * STEPS_PER_MERGE_ENERGY);
-  assert.equal(first.state.energy.value, 20);
+  assert.equal(first.state.energy.value, initial.energy.value + 20);
   const duplicate = reduceMergeWorld(first.state, {
     type: 'claimStepEnergy', dayId: '2026-08-12', observedSteps: 6_000,
     observedAt: new Date(NOW + 2).toISOString(), allowBootstrap: true, receiptId: 'steps:first', now: NOW + 2,
@@ -552,7 +552,7 @@ test('step Energy checkpoints cumulative pedometer totals without paying the sam
     observedAt: new Date(NOW + 3).toISOString(), allowBootstrap: false, receiptId: 'steps:correction', now: NOW + 3,
   });
   assert.equal(correctedDown.energyGranted, 0);
-  assert.equal(correctedDown.state.energy.value, 20);
+  assert.equal(correctedDown.state.energy.value, initial.energy.value + 20);
 
   const remainderStart = reduceMergeWorld(createMossproutChapterZeroState(NOW), {
     type: 'claimStepEnergy', dayId: '2026-08-13', observedSteps: 299,
@@ -1028,8 +1028,9 @@ test('Merge board failures map to concise anchored callouts', () => {
   const noEnergy = reduceMergeWorld({ ...chapterZero, energy: { ...chapterZero.energy, value: 0 } }, {
     type: 'tapGenerator', generatorId: 'wild-garden', now: NOW + 2, seed: 'empty-energy',
   });
-  assert.equal(noEnergy.changed, true);
-  assert.equal(noEnergy.failureReason, undefined);
+  assert.equal(noEnergy.changed, false);
+  assert.equal(noEnergy.failureReason, 'out_of_energy');
+  assert.deepEqual(mergeCellFeedbackForFailure('out_of_energy'), { message: 'OUT OF ENERGY', tone: 'warning' });
 });
 
 test('Merge motion contracts old art before the new item overshoots into place', () => {
@@ -1167,16 +1168,16 @@ test('debug Today reset reopens only yesterday step conversion without taking ba
 });
 
 test('earned Energy crosses the natural capacity without losing any journal reward', () => {
-  const state = { ...createInitialMergeWorldState(NOW), energy: { value: 48, regenCap: 50, lastRegenAt: NOW } };
+  const state = { ...createInitialMergeWorldState(NOW), energy: { value: 98, regenCap: 100, lastRegenAt: NOW } };
   const result = reduceMergeWorld(state, {
     type: 'grantActivityRewardsBatch',
     rewards: [{ receiptId: 'journal:overflow', kind: 'daily_journal_energy', amount: 10, label: 'Journal', grantDayId: '2026-08-12' }],
     now: NOW + 1,
   });
   assert.equal(result.energyGranted, 10);
-  assert.equal(result.state.energy.value, 58);
+  assert.equal(result.state.energy.value, 108);
   const later = reduceMergeWorld(result.state, { type: 'refreshTime', now: NOW + 10 * 60 * 60_000 });
-  assert.equal(later.state.energy.value, 58);
+  assert.equal(later.state.energy.value, 108);
 });
 
 test('journal reward preview never turns life input into Merge Energy', () => {
@@ -1215,7 +1216,7 @@ test('a Tomorrow Egg companion journal is remembered without awarding Merge Ener
   assert.deepEqual(rewards.map((reward) => reward.grantDayId), ['2026-08-13', '2026-08-13']);
   const result = reduceMergeWorld(createInitialMergeWorldState(NOW), { type: 'grantActivityRewardsBatch', rewards, now: NOW + 1 });
   assert.equal(result.energyGranted, 0);
-  assert.equal(result.state.energy.value, 0);
+  assert.equal(result.state.energy.value, MERGE_INITIAL_ENERGY);
 });
 
 test('an ordinary food journal creates neither Merge Energy nor a second stock economy', () => {
@@ -1485,7 +1486,7 @@ test('Merge HUD stays board-specific with only back navigation and Coins', () =>
   assert.match(screen, /router\.canGoBack\(\)\) router\.back\(\)/);
   assert.match(screen, /router\.replace\('\/\(tabs\)\/katchimeras'\)/);
   assert.match(screen, /Return to Mossprout's Haven/);
-  assert.match(screen, /trailing=\{<View collapsable=\{false\} ref=\{coinHudPillRef\}>[\s\S]*?<GameCurrencyHud/);
+  assert.match(screen, /trailing=\{<View style=\{styles\.hudTrailing\}>[\s\S]*?<MergeEnergyHud \/>[\s\S]*?<View collapsable=\{false\} ref=\{coinHudPillRef\}>[\s\S]*?<GameCurrencyHud/);
   assert.doesNotMatch(screen, /GameHudItem|worldChapter|chapterRatio/);
   assert.doesNotMatch(screen, /<GameHudControl/);
   assert.match(screen, /hudBar: \{ elevation: 100, justifyContent: 'space-between', position: 'relative', zIndex: 100 \}/);
@@ -1821,7 +1822,7 @@ test('legacy snapshots reset cleanly into Mossprout’s current personal world',
   }, NOW + 1);
   assert.equal(normalized.version, 24);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
-  assert.equal(normalized.energy.value, 0);
+  assert.equal(normalized.energy.value, MERGE_INITIAL_ENERGY);
   assert.deepEqual(normalized.generators, {});
   assert.deepEqual(normalized.unlockedChains, []);
 });

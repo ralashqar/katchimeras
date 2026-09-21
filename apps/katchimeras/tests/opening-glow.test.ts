@@ -46,7 +46,7 @@ test('the planted memory goes straight to the offer, and nothing on the way can 
   assert.match(screen, /if \(ftueStepId === 'world\.seed_planted' && !firstSeedPlanted\) return;/, 'never before the Seed is in the ground');
   assert.match(screen, /&& \(ftueStepId !== 'world\.seed_planted' \|\| firstSeedPlacementFailed\) \? \(/, 'nothing is shown for the beat unless the planting failed');
   assert.match(screen, /\(ftueStepId !== 'world\.seed_planted' \|\| firstSeedPlacementFailed\)\s*&& \(ftueStepId !== 'world\.first_seed_grew'/, 'the only button the beat can show is the retry');
-  assert.match(screen, /ftueStepId === 'world\.seed_planted' && firstSeedPlacementFailed\s*\? 'Retry Planting'/);
+  assert.match(screen, /ftueStepId === 'world\.seed_planted' && firstSeedPlacementFailed\s*\? 'Try again'/);
   assert.doesNotMatch(screen, /gardenWorldBottomCtaActive = \(ftueStepId === 'world\.seed_planted' && \(firstSeedPlacementFailed \|\| firstSeedPlanted\)\)/);
   // The lift: the light is seen arriving; the offer: repaired under the same receipt if the wallet is short.
   assert.match(screen, /if \(ftueStepId !== OPENING_MIST_LIFT_STEP_ID\) return;[\s\S]*?ensureStoredOpeningGlow\(`\$\{activeFtueRunId \?\? 'current'\}:opening-glow`\)[\s\S]*?openingGlow\.launch\(from, glowCurrencyArtRef\.current\);/);

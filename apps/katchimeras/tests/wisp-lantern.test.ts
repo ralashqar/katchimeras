@@ -173,17 +173,19 @@ test('existing welcome pouches retain their original contents and never receive 
   assert.deepEqual(reduceWispLantern(saved, { type: 'unlock' }, NOW).lantern!.packs, saved.lantern!.packs);
 });
 
-test('Lantern placement reserves one bed without losing the first seed or displaced growth', () => {
+test('Lantern placement reserves one bed without losing a planted seed or displaced growth', () => {
   const input = buildPlayerProfileFixtures(NOW).find(f => f.id === 'fixture:kingdom-before-wisp-lantern')!.domains.mergeWorld.state;
   assert.equal(input.wispLanternPlacement, undefined);
-  const first = input.haven.plantableMemories.find(p => p.status === 'planted')!;
+  // The first session's Dew Spring already holds the centre patch; a seed of the player's own grows in another.
+  const first = { id: 'kept', definitionId: 'momentum', status: 'planted', slotId: 'back-left', growthPoints: 1, earnedAt: NOW - 10, plantedAt: NOW - 5, source: { kind: 'tending', sourceId: 'test' } } as unknown as (typeof input.haven.plantableMemories)[number];
+  input.haven.plantableMemories.push(first);
   input.haven.plantableMemories.push({ ...first, id: 'displaced', definitionId: 'warmth', source: { kind: 'tending', sourceId: 'test' }, slotId: 'front-right', growthPoints: 3 });
   const placed = placeLanternWorld(input, NOW);
   assert.equal(placed.wispLanternPlacement?.slotId, 'front-right');
   const restored = normalizeMergeWorldState(JSON.parse(JSON.stringify(placed)), NOW + 1);
   assert.deepEqual(restored.wispLanternPlacement, placed.wispLanternPlacement);
-  assert.equal(availableHeartwoodBeds(restored).length, 4);
-  assert.equal(availableHeartwoodBeds(placed).length, 4);
+  assert.equal(availableHeartwoodBeds(restored).length, 3, 'five patches, less the Lantern and the Dew Spring');
+  assert.equal(availableHeartwoodBeds(placed).length, 3);
   assert.deepEqual(placed.haven.plantableMemories.find(p => p.id === first.id), first);
   assert.equal(placed.haven.plantableMemories.find(p => p.id === 'displaced')!.status, 'earned');
   assert.equal(heartwoodPlants(placed).find(p => p.category === 'warmth')!.achievedGrowth, 3);

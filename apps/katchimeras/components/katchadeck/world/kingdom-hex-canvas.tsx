@@ -4,6 +4,7 @@ import { HatchWispLayer } from './hatch-wisp-layer';
 import { playUpgradeSequence } from '@incubator/environments/upgrade-sequence';
 import {createHexTileRenderer} from '@incubator/environments/hex-tile';
 import { WorldUpgradeMarker } from './world-upgrade-marker';
+import { heartwoodPatchItemPosition } from '@/constants/heartwood-patch-item';
 import type { HomeVeilState } from '@/features/onboarding/opening-mist';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
@@ -128,6 +129,10 @@ export type KingdomTileUpgradeOffer = WorldTileActionPlacement & {
 type Props = {
   lanternPostAdornment?: React.ReactNode;
   wispLanternAdornment?: React.ReactNode;
+  /** Heartwood's economy buildings, by the patch each stands in: drawn on the patch like the Lantern. */
+  heartwoodBuildingAdornments?: Partial<Record<MossproutGardenPlantSlotId, React.ReactNode>>;
+  /** Patches a building already stands in: no longer empty beds. */
+  heartwoodBuiltSlots?: readonly MossproutGardenPlantSlotId[];
   wispLanternPlanted?: boolean;
   onPlantWispLantern?: () => void;
   hideWorldTiles?: boolean;
@@ -505,6 +510,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   gardenEventAdornment,
   lanternPostAdornment,
   wispLanternAdornment,
+  heartwoodBuildingAdornments,
+  heartwoodBuiltSlots,
   wispLanternPlanted,
   onPlantWispLantern,
   hideWorldTiles = false,
@@ -1945,7 +1952,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               );
             })}
             {focusedMossproutWorld && onHeartwoodPress && heartwoodFrame && !upgradePresentation ? <Pressable accessibilityRole="button" accessibilityLabel="Heartwood. View world recovery and Garden supplies" onPress={onHeartwoodPress} style={{ position: 'absolute', left: heartwoodFrame.left + heartwoodFrame.width * 0.42, top: heartwoodFrame.top, width: heartwoodFrame.width * 0.16, height: heartwoodFrame.height * 0.24, zIndex: 34 }} /> : null}
-            {focusedMossproutWorld && !upgradePresentation && wispPatchFrame && wispLanternAdornment && !onPlantWispLantern ? <View style={{ position: 'absolute', left: wispPatchFrame.left + wispPatchFrame.width / 2 - 52, top: wispPatchFrame.top + wispPatchFrame.height / 2 - 90, zIndex: 37 }}>{wispLanternAdornment}</View> : null}
+            {focusedMossproutWorld && !upgradePresentation && wispPatchFrame && wispLanternAdornment && !onPlantWispLantern ? <View style={[heartwoodPatchItemPosition(wispPatchFrame), { zIndex: 37 }]}>{wispLanternAdornment}</View> : null}
+            {focusedMossproutWorld && !upgradePresentation && heartwoodBuildingAdornments && !onPlantWispLantern ? gardenPlotFrames.map(({ frame, slotId }) => heartwoodBuildingAdornments[slotId]
+              ? <View key={`heartwood-building:${slotId}`} pointerEvents="box-none" style={[heartwoodPatchItemPosition(frame), { zIndex: 37 }]}>{heartwoodBuildingAdornments[slotId]}</View> : null) : null}
             {focusedMossproutWorld && onPlantWispLantern && wispPatchFrame ? <Pressable accessibilityRole="button" accessibilityLabel="Plant Lantern in front-right patch" onPress={onPlantWispLantern} style={{ position: 'absolute', ...wispPatchFrame, zIndex: 38 }} /> : null}
             {focusedMossproutWorld && !upgradePresentation && lanternFrame && lanternPostAdornment ? <View style={{ position: 'absolute', left: lanternFrame.left + lanternFrame.width * 0.7, top: lanternFrame.top + lanternFrame.height * 0.25, zIndex: 35 }}>{lanternPostAdornment}</View> : null}
             {focusedMossproutWorld && !upgradePresentation && hearthFrame && hearthAdornment ? <View style={{ position: 'absolute', left: hearthFrame.left + hearthFrame.width * 0.65, top: hearthFrame.top + hearthFrame.height * 0.3, zIndex: 35 }}>{hearthAdornment}</View> : null}
@@ -1960,7 +1969,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                   />
                 ))
               : null}
-            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onSelectHeartwoodBed ? gardenPlotFrames.filter(({ slotId }) => !(wispLanternPlanted && slotId === 'front-right') && !mossproutGarden?.plantableMemories.some(plant => plant.status === 'planted' && plant.slotId === slotId)).map(({ frame, slotId }) => <Pressable key={`empty-heartwood:${slotId}`} accessibilityRole="button" accessibilityLabel="Empty Heartwood bed. Choose a seed" onPress={() => onSelectHeartwoodBed(slotId)} style={{ position: 'absolute', ...frame, zIndex: 36 }} />) : null}
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onSelectHeartwoodBed ? gardenPlotFrames.filter(({ slotId }) => !(wispLanternPlanted && slotId === 'front-right') && !heartwoodBuiltSlots?.includes(slotId) && !mossproutGarden?.plantableMemories.some(plant => plant.status === 'planted' && plant.slotId === slotId)).map(({ frame, slotId }) => <Pressable key={`empty-heartwood:${slotId}`} accessibilityRole="button" accessibilityLabel="Empty Heartwood bed. Choose a seed" onPress={() => onSelectHeartwoodBed(slotId)} style={{ position: 'absolute', ...frame, zIndex: 36 }} />) : null}
             {(interactionEnabled || Boolean(onPlantWispLantern))
               && !camera.isMoving
               && !upgradePresentation

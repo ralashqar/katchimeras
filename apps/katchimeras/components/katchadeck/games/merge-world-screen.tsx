@@ -64,7 +64,7 @@ import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeOrder, MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
 import { recordMergeRender } from '@/utils/merge-world/performance';
-import { mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
+import { mergeEnergyStatus, mergeOrderItemReadiness, mergeOrderServingCells, readyMergeOrderIds } from '@/utils/merge-world/engine';
 import { prioritizedVisibleMergeOrders } from '@/utils/merge-world/order-presentation';
 import { isMossproutChapterZeroActive } from '@/utils/merge-world/chapter-zero-policy';
 import { beginAuthoredCohortReturn, beginFeastleReturn, isAuthoredCohortFamily, loadAuthoredCohortStory, loadFeastleStory, subscribeCompanionStories } from '@/utils/companion-story-storage';
@@ -664,13 +664,12 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
       : null;
     if (shouldGuardFtueCommand && !commandToken) return null;
     try {
-      // Character activities use the polished Merge reducer and presentation,
-      // but their opportunities are paced by Journey content rather than the
-      // retired global Energy economy.
+      // A tap on the Garden spends one energy. The first session is never charged (a lesson must not be able to
+      // run dry), and a friend's authored Journey find is free in the engine because it carries its opportunity.
       const effectiveCommand = creatureId && command.type === 'tapGenerator'
         ? {
             ...command,
-            spendEnergy: false as const,
+            ...(currentRun?.status === 'active' ? { spendEnergy: false as const } : {}),
             ...(activityFamilyId === 'mossprout'
               && !isMossproutChapterZeroActive(currentState)
               && mossproutJourney?.status === 'activity_in_progress'
@@ -1046,8 +1045,11 @@ export function MergeWorldScreen({ active: routeActive = true, backgroundReady =
           />}
           style={styles.hudBar}
           tone="glass"
-          trailing={<View collapsable={false} ref={coinHudPillRef}>
-            <MergeCoinHud artRef={coinArtRef} hudRef={coinHudRef} presentation={coinPresentation} pulseNonce={serveFlight ? 0 : coinPulseNonce} />
+          trailing={<View style={styles.hudTrailing}>
+            {ftueActive ? null : <MergeEnergyHud />}
+            <View collapsable={false} ref={coinHudPillRef}>
+              <MergeCoinHud artRef={coinArtRef} hudRef={coinHudRef} presentation={coinPresentation} pulseNonce={serveFlight ? 0 : coinPulseNonce} />
+            </View>
           </View>}
         />
         {/* Static game geometry: onboarding guidance must never be inserted in
@@ -1236,6 +1238,28 @@ const MergeCoinHud = memo(function MergeCoinHud({ artRef, hudRef, presentation, 
     valueAnimationDurationMs: 0 }]} style={styles.currencyHud} tone="glass" />;
 });
 
+const selectEnergy = (snapshot: { state: MergeWorldState | null }) => snapshot.state?.energy ?? null;
+const selectBuildings = (snapshot: { state: MergeWorldState | null }) => snapshot.state?.heartwoodBuildings;
+/** Energy as it stands this second: the saved value only moves on a command, so the pill counts what has come back itself. */
+const MergeEnergyHud = memo(function MergeEnergyHud() {
+  const energy = useMergeWorldSelector(selectEnergy);
+  const heartwoodBuildings = useMergeWorldSelector(selectBuildings);
+  const [now, setNow] = useState(() => gameNow());
+  const status = energy ? mergeEnergyStatus({ energy, heartwoodBuildings }, now) : null;
+  const filling = status?.nextAt != null;
+  useEffect(() => {
+    if (!filling) return;
+    const timer = setInterval(() => setNow(gameNow()), 1000);
+    return () => clearInterval(timer);
+  }, [filling]);
+  // A spend restarts the clock from the moment it happened, not from the last tick.
+  useEffect(() => { setNow(gameNow()); }, [energy]);
+  if (!status) return null;
+  return <GameCurrencyHud balances={[{ animateValue: false, id: 'energy', value: status.value, suffix: `/${status.cap}`,
+    countdownSeconds: status.nextAt != null ? Math.max(0, Math.ceil((status.nextAt - now) / 1000)) : undefined,
+    valueAnimationDurationMs: 0 }]} style={styles.energyHud} tone="glass" />;
+});
+
 function MergeCommandFeedback() {
   const lastResult = useMergeWorldLastResult();
   const feedback = useGameFeedback();
@@ -1262,6 +1286,8 @@ const styles = StyleSheet.create({
   game: { flex: 1, gap: 7, minHeight: 0 },
   loading: { alignItems: 'center', backgroundColor: '#2B1B13', flex: 1, gap: 12, justifyContent: 'center' },
   currencyHud: { flex: 0, paddingLeft: 18, width: 106 },
+  energyHud: { flex: 0, width: 118 },
+  hudTrailing: { alignItems: 'center', flexDirection: 'row' },
   hudBar: { elevation: 100, justifyContent: 'space-between', position: 'relative', zIndex: 100 },
   mergeArea: { flex: 1, marginTop: 18, minHeight: 0, position: 'relative' },
   errorBanner: { alignSelf: 'center', maxWidth: 360, position: 'absolute', width: '92%', zIndex: GameUI.layer.notice },

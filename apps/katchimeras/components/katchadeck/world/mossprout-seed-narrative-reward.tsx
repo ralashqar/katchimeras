@@ -3,7 +3,9 @@ import { Image } from 'expo-image';
 import Animated, { Keyframe, useReducedMotion } from 'react-native-reanimated';
 import { DayActionCardSurface } from '@/components/katchadeck/ui/day-action-card';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
-import { mossproutMemoryPlantById } from '@/constants/mossprout-memory-plants';
+import { heartwoodBuildingArt } from '@/constants/heartwood-building-art';
+import { heartwoodBuildingById } from '@/constants/heartwood-buildings';
+import { FIRST_SEED_BUILDING_ID } from '@/features/heartwood-buildings/buildings-world';
 import { mossproutFirstSeedForIntent } from '@/features/onboarding/mossprout-bond-share';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { CelebrationParticles } from './companion-achievement-celebration';
@@ -14,22 +16,24 @@ const SEED_REWARD_IN = new Keyframe({
   100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] },
 }).duration(440);
 
-/** The existing FTUE handoff owns the grant; this only reveals its reward. */
+/**
+ * The end of the first meeting: what the player said they wanted, and the first thing it will build. The first
+ * session builds the Dew Spring (it used to hand over a memory seed); the planting beat owns the building itself.
+ */
 export function MossproutSeedNarrativeReward() {
   const reduced = useReducedMotion();
   const seed = mossproutFirstSeedForIntent(loadOnboardingProfile().mossproutAnswers.growthIntentId);
-  const plant = mossproutMemoryPlantById.get(seed.id);
-  if (!plant) return null;
-  return <View accessibilityLabel="Memory Seed received" style={{ paddingVertical: 20 }}>
+  const spring = heartwoodBuildingById.get(FIRST_SEED_BUILDING_ID)!;
+  return <View accessibilityLabel="The old spring, found" style={{ paddingVertical: 20 }}>
     <CelebrationParticles tier={1} tint="#A7CE81" layerStyle={{ zIndex: 0 }} />
     <Animated.View entering={reduced ? undefined : SEED_REWARD_IN} style={{ zIndex: 1 }}>
       <DayActionCardSurface
         artwork={<View style={styles.seedStage}>
           <RotatingRadialSunburst baseOpacity={0.82} rotationDurationMs={24_000} size={126} style={styles.seedRays} />
-          <Image contentFit="contain" source={plant.art.seed} style={styles.seedArt} />
+          <Image contentFit="contain" source={heartwoodBuildingArt(FIRST_SEED_BUILDING_ID, 1)} style={styles.seedArt} />
         </View>}
-        eyebrow="MEMORY SEED RECEIVED" title={plant.name}
-        subtitle={`${seed.message}\nReady to plant in the Garden.`} trailing={<View />} />
+        eyebrow="THE OLD SPRING" title={spring.name}
+        subtitle={`${seed.message}\nReady to build beside Heartwood.`} trailing={<View />} />
     </Animated.View>
   </View>;
 }

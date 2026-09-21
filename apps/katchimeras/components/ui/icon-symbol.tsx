@@ -76,6 +76,7 @@ const MAPPING = {
   'face.very_sad': 'sentiment-very-dissatisfied',
   'briefcase.fill': 'work',
   'cart.fill': 'shopping-cart',
+  'shippingbox.fill': 'inventory-2',
   'fork.knife.circle.fill': 'restaurant',
   'globe.americas.fill': 'public',
   'scope': 'center-focus-strong',

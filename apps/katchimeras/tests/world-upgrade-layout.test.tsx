@@ -111,7 +111,7 @@ test('the Lantern maps its free milestones onto the same rows', () => {
   assert.equal(waiting.levelOffset, 0, 'the Lantern already counts from 1');
   assert.equal(waiting.progressLabel, '66%', '1 of 2 requests and 7 of 10 orders');
   assert.deepEqual(waiting.levels.map((entry) => [entry.name, entry.state]), [['First Light', 'done'], ['Gathering', 'next'], ['Brighter Light', 'ahead']]);
-  assert.deepEqual(waiting.benefits[0], { id: 'residents', label: 'Resident Wisps', from: 3, to: 4 });
+  assert.deepEqual(waiting.benefits[0], { id: 'residents', label: 'Resident Wisps', icon: 'sparkles', tint: '#8A63C9', from: 3, to: 4 });
   assert.deepEqual(waiting.requirements.map((item) => [item.id, item.met, item.current, item.total]), [['welcome', false, 1, 2], ['orders', false, 7, 10]]);
   assert.ok(waiting.requirements.every((item) => item.action?.id === 'garden'), 'every open milestone leads to the Garden');
   assert.deepEqual(waiting.primary, { label: 'Upgrade', cost: null, disabled: true });
@@ -158,6 +158,7 @@ test('a stage slot shows the tile the map drew at that level, the freshly reveal
   const art = loadNativeModule('features/upgrade-stage/upgrade-level-art.ts', {
     '@/components/katchadeck/world/mossprout-hex-neighborhood-scene': scene,
     '@/constants/wisp-lantern-art': { LANTERN_LEVEL_ART: {} },
+    '@/constants/heartwood-building-art': { heartwoodBuildingArt: (id: string, level: number) => `${id}:${level}` },
     '@/utils/world-visuals': { KINGDOM_DREAM_MIST_LOCKED_HEX_TILE_V1: 'mist', havenHexTileSpec: () => null, kingdomHexTileSourceForLod: () => null },
   });
   const drawn = (level: number) => {
@@ -168,6 +169,8 @@ test('a stage slot shows the tile the map drew at that level, the freshly reveal
   const slots = [0, 1, 2, 3, 4].map((level) => art.tileLevelArt('nature:bloom-garden', level));
   assert.deepEqual(slots, [0, 1, 2, 3, 4].map(drawn), 'every slot is the map’s own tile for that level');
   assert.match(String(slots[0]), /level_0/, 'level 0 is the freshly revealed garden');
+  assert.equal(art.buildingLevelArt('dew-spring', 0), null, 'an unbuilt patch has no picture yet');
+  assert.equal(art.buildingLevelArt('dew-spring', 4), 'dew-spring:4');
   assert.notEqual(slots[0], slots[3], 'never the default picture, which is the garden in bloom');
   assert.equal(new Set(slots).size, 5, 'Bloom Garden has a complete visual ladder');
   assert.equal(art.tileLevelArt('nature:bloom-garden', 0, true), 'mist', 'still under the mist, it is pictured as mist');

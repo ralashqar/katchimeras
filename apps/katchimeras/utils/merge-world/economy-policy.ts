@@ -1,11 +1,13 @@
 import type { HomeDayRecord, JournalRecord } from '@/types/home';
 import type { MergeStepEnergyDay } from '@/types/merge-world';
+import { MERGE_ENERGY_BASE_CAP, MERGE_ENERGY_BASE_REGEN_MS } from '@/constants/heartwood-buildings';
 
-// Kept as zero-valued compatibility fields while v18 snapshots and older
-// action receipts are retired.
-export const MERGE_ENERGY_REGEN_CAP = 0;
-export const MERGE_INITIAL_ENERGY = 0;
-export const MERGE_ENERGY_REGEN_MS = 0;
+// Energy is the Garden's pace: every tap on an item maker spends one, it fills again on its own, and the Dew Spring
+// at Heartwood decides how much it holds and how fast it returns (`constants/heartwood-buildings.ts`). These are the
+// numbers with no Spring built. The life-input grants below stay at zero until that loop is redesigned.
+export const MERGE_ENERGY_REGEN_CAP = MERGE_ENERGY_BASE_CAP;
+export const MERGE_INITIAL_ENERGY = MERGE_ENERGY_BASE_CAP;
+export const MERGE_ENERGY_REGEN_MS = MERGE_ENERGY_BASE_REGEN_MS;
 export const MERGE_DAILY_JOURNAL_ENERGY = 0;
 export const MERGE_JOURNAL_ENERGY_CURVE = [0] as const;
 export const MERGE_DAILY_COMPANION_ENERGY = 0;
@@ -13,8 +15,8 @@ export const MERGE_DAILY_QUEST_ENERGY = 0;
 export const STEPS_PER_MERGE_ENERGY = 300;
 export const MOSSPROUT_FTUE_JOURNAL_ENERGY = 0;
 
-// Temporary product policy: keep capacity/rest data in saved worlds for the
-// eventual economy redesign, but never consume it or block generator taps.
+// Item makers themselves stay unlimited: energy is the one limit on tapping them. Their capacity/rest data is kept
+// in saved worlds for a later pass, but is never consumed and never blocks a tap.
 // Authored Journey baskets also cycle their useful drops instead of exhausting.
 export const MERGE_GENERATORS_UNLIMITED = true;
 

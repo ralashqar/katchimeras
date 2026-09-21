@@ -125,9 +125,10 @@ export function UpgradeDock<T extends string = string>({ motion, title, levelLab
         <View collapsable={false} style={styles.bar}>
           <View style={styles.grabber} />
           <View style={styles.barRow}>
-            <View style={styles.titleGroup}>
-              <Text accessibilityRole="header" numberOfLines={1} style={styles.title}>{title}</Text>
-              {levelLabel || tagline || info ? <View style={styles.titleMeta}>
+            {/* With nothing to say under it, the header is one line: the name, then its level beside it. */}
+            <View style={[styles.titleGroup, !tagline && styles.titleGroupInline]}>
+              <Text accessibilityRole="header" numberOfLines={1} style={[styles.title, !tagline && styles.titleInline]}>{title}</Text>
+              {levelLabel || tagline || info ? <View style={[styles.titleMeta, !tagline && styles.titleMetaInline]}>
                 {levelLabel ? <View style={styles.levelPill}>
                   <LinearGradient colors={UpgradePanelUI.levelPillFace} style={styles.roundFace} />
                   <Text style={styles.levelText}>{levelLabel}</Text>
@@ -195,6 +196,10 @@ const styles = StyleSheet.create({
   titleGroup: { flex: 1, gap: 3, justifyContent: 'center', minHeight: KatchaUI.touchTarget },
   title: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.barInk, fontSize: 22, lineHeight: 27, textShadowColor: UpgradePanelUI.barInkShadow, textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 0 },
   titleMeta: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  titleGroupInline: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'flex-start' },
+  // The name gives way before the level does: a long name truncates, the pill always shows.
+  titleInline: { flexShrink: 1 },
+  titleMetaInline: { flexShrink: 0 },
   levelPill: { borderColor: UpgradePanelUI.levelPillBorder, borderRadius: 999, borderWidth: 1.5, overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 1 },
   levelText: { ...KatchaUI.type.companionCardTitle, color: UpgradePanelUI.levelPillInk, fontSize: 13, lineHeight: 17, fontVariant: ['tabular-nums'] },
   tagline: { ...KatchaUI.type.companionBody, color: UpgradePanelUI.barInkSoft, flex: 1, fontSize: 12, lineHeight: 16 },
