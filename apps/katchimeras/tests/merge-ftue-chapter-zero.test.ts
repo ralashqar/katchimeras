@@ -105,6 +105,6 @@ test('the Chapter 0 request is gone from the manifest; the retired drags and the
   assert.equal(order('effect.haven.first_light'), -1, 'no grant beat either: the profile starts with the first restore’s Glow');
   for (const id of ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom', 'merge.serve_sprout']) {
     assert.equal(order(id), -1);
-    assert.equal((MOSSPROUT_FTUE_FLOW.migrations as Record<string, string>)[id], 'garden.first-bloom-offer.focus');
+    assert.equal((MOSSPROUT_FTUE_FLOW.migrations as Record<string, string>)[id], 'world.first_seed_grew');
   }
 });

@@ -563,9 +563,10 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
     case 'prepareGlowDiscoveryLesson':
       return reduceGlowDiscovery(current, command);
     case 'grantOpeningGlow': {
-      // Once per run: the flow's effect after the lift and the world screen's repair at the first
-      // restore both ask with the run's receipt; whichever comes first grants, the other changes nothing.
-      if (current.openingGlow) return unchanged(current);
+      // Once per receipt: the flow's effect after the lift and the world screen's repair at the first
+      // build both ask with the run's receipt; whichever comes first grants, the other changes nothing.
+      // A first session run again on the same profile carries a new run's receipt, and is lit again.
+      if (current.openingGlow?.receiptId === command.receiptId) return unchanged(current);
       const amount = Math.max(0, Math.floor(command.amount));
       return changed(touch({
         ...current,

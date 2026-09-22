@@ -4,6 +4,7 @@ import { lanternResidentCapacity, type LanternLevel } from '@/constants/wisp-lan
 import { reduceWispLantern } from '@/utils/wisp-lantern-state';
 import { claimDayChest, dayChestFor, recordTimeTrialHeat } from '@/features/time-trial/trial-world';
 import { localDayId } from '@/utils/world-identity-rules';
+import { heartwoodBuildingCost } from '@/constants/heartwood-buildings';
 import { buildFirstSpring, firstSpringAwake, firstSpringBuilt, growFirstSeedIntoSpring, upgradeHeartwoodBuilding, wakeFirstSpring } from '@/features/heartwood-buildings/buildings-world';
 import { gameNow } from '@/utils/game-clock';
 import { reconcileJourneyGardenOrders } from '@/features/companion/journey-garden-orders';
@@ -294,8 +295,17 @@ export async function claimStoredTimeTrialChest(dayId: string, now = gameNow()) 
 }
 
 /** The first session's planting beat, and its recovery: the Dew Spring, dug out and dormant. */
+export const FIRST_SPRING_HEARTWOOD_RECEIPT_ID = 'ftue:first-spring:heartwood';
 export async function ensureStoredFirstSpringBuilt(now = gameNow()) {
-  const result = await storedWorldStep(buildFirstSpring, now);
+  const result = await reduceStoredMergeWorld((state) => {
+    const built = buildFirstSpring(state, now);
+    // Heartwood wakes with its Spring: the tile's first stage comes free with the build, never as an upgrade of its own.
+    const woken = firstSpringBuilt(built) && (built.haven.tileStages.mossprout ?? 0) < 1
+      ? reduceMergeWorld(built, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now, receiptId: FIRST_SPRING_HEARTWOOD_RECEIPT_ID, economyMode: 'free' })
+      : null;
+    const next = woken?.changed ? woken.state : built;
+    return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
+  }, now);
   return { placed: firstSpringBuilt(result.state), state: result.state };
 }
 
@@ -723,6 +733,18 @@ export async function applyStoredStepplingEgg(action: import('@/features/onboard
  * run (the receipt is the run's) by the flow after the lift, and repaired by the world screen at the
  * first restore. Reports whether this call was the one that granted it.
  */
+/**
+ * The planting beat needs the Spring's price on the counter: the opening's light if it has not been kept yet, and
+ * otherwise (a profile that spent it) the shortfall, once per run.
+ */
+export async function ensureStoredFirstSpringLight(runId: string, now = gameNow()) {
+  const cost = heartwoodBuildingCost(0) ?? 0;
+  const lit = await ensureStoredOpeningGlow(`${runId}:opening-glow`, GLOW.firstRestorationCost, now);
+  if (lit.state.coins >= cost) return lit.state;
+  const short = cost - lit.state.coins;
+  return (await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantOpeningGlow', receiptId: `${runId}:first-spring-light`, amount: short, now }), now)).state;
+}
+
 export async function ensureStoredOpeningGlow(receiptId: string, amount = GLOW.firstRestorationCost, now = gameNow()) {
   const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantOpeningGlow', receiptId, amount, now }), now);
   return { state: result.state, granted: result.changed, amount };

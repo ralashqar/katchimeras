@@ -106,7 +106,6 @@ test('streamlined introduction resumes at every boundary and hands off to the se
   assert.equal(events.filter((type) => type === 'ftue.merge_completed').length, 7, 'the opening counts seven merges: two chains and the one that joins them');
   assert.equal(events.filter((type) => type === 'ftue.item_spawned').length, 0);
   assert.ok(visited.has('effect.haven.start_glow_discovery'));
-  assert.ok(visited.has('world.seed_planted'));
   assert.ok(visited.has('world.first_seed_grew'));
   for (const removed of ['companion.day_one_action', 'companion.bond_spotlight', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.water_response', 'companion.first_insight', 'merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom'] as const) {
     assert.equal(visited.has(removed), false);
@@ -294,14 +293,7 @@ test('the first memory is planted by its own world action and growth remains vis
   if (placing.pendingWork.kind !== 'effect') return;
   assert.equal(placing.pendingWork.effectType, 'haven.place_first_memory');
   const planted = reduceContentFlow(flow, placing.run, { type: 'effect_completed', effectKey: placing.pendingWork.key, now: 3 });
-  assert.equal(planted.run.nodeId, 'world.seed_planted');
-
-  const beforeGrowth = { ...base, nodeId: 'effect.haven.grow_first_memory', phase: 'awaiting_effect' as const };
-  const growthWork = reduceContentFlow(flow, beforeGrowth, { type: 'retry', now: 4 });
-  assert.equal(growthWork.pendingWork.kind, 'effect');
-  if (growthWork.pendingWork.kind !== 'effect') return;
-  const grown = reduceContentFlow(flow, growthWork.run, { type: 'effect_completed', effectKey: growthWork.pendingWork.key, now: 5 });
-  assert.equal(grown.run.nodeId, 'world.first_seed_grew');
+  assert.equal(planted.run.nodeId, 'world.first_seed_grew', 'the Spring is the first session’s one build: its effect leads straight to the bud');
 });
 
 test('world upgrade recipes expand into focus, atomic commit, and receipt-backed reveal', () => {

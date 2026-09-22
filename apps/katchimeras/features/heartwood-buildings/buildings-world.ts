@@ -44,6 +44,9 @@ const sendPlantHome = (state: MergeWorldState, slotId: string) => {
 export function buildFirstSpring(input: MergeWorldState, now: number): MergeWorldState {
   if (heartwoodBuildingLevel(input, FIRST_SEED_BUILDING_ID) > 0) return input;
   const state = structuredClone(input);
+  // Paid with the light the opening left (the profile starts with exactly this much); a save without it still builds.
+  const cost = heartwoodBuildingCost(0) ?? 0;
+  if (state.coins >= cost) state.coins -= cost;
   // A save caught mid-session by this change may have the old memory seed in the patch.
   sendPlantHome(state, heartwoodBuildingById.get(FIRST_SEED_BUILDING_ID)!.slotId);
   state.heartwoodBuildings = { ...state.heartwoodBuildings, [FIRST_SEED_BUILDING_ID]: { level: 1, builtAt: now } };

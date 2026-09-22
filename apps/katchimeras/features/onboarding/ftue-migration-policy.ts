@@ -11,7 +11,11 @@ export function streamlinedFtueStep(run: Pick<FtueRunState, 'stepId' | 'status'>
     'companion.bond_intro': 'companion.garden_intro',
     'companion.bond_spotlight': 'companion.garden_intro',
     'companion.order_preview': 'companion.garden_intro',
-    'world.garden_handoff': 'world.seed_planted',
+    'world.garden_handoff': 'world.first_seed_grew',
+    // v53: the first session ends its planting at the bud; nothing stands between any more.
+    'world.seed_planted': 'world.first_seed_grew',
+    'world.first_bloom_offer': 'world.first_seed_grew',
+    'world.first_bloom_restore': 'world.first_seed_grew',
     'companion.chapter_zero_return': 'companion.water_together',
     'companion.water_response': 'companion.first_rest',
     'companion.first_insight': 'companion.first_rest',

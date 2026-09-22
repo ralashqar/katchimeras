@@ -11,7 +11,7 @@ import { useWisps } from '@/features/wisps/wisp-provider';
 import { friendEquippedWisp, friendPacksWaiting } from '@/utils/friend-wisp-packs';
 import { HeartwoodBuildingWorld } from '@/components/katchadeck/world/heartwood-building-world';
 import { HEARTWOOD_BUILDINGS, heartwoodBuildingById, heartwoodBuildingCost, heartwoodBuildingLevel, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
-import { firstSeedReadyForSpring, firstSpringAwake, firstSpringBuilt, heartwoodBuildingsEligible } from '@/features/heartwood-buildings/buildings-world';
+import { FIRST_SEED_BUILDING_ID, firstSeedReadyForSpring, firstSpringAwake, firstSpringBuilt, heartwoodBuildingsEligible } from '@/features/heartwood-buildings/buildings-world';
 import { COIN_FLIGHT_WINDOW_MS } from '@incubator/environments/upgrade-effects';
 import { lanternEligible } from '@/features/wisps/lantern-world';
 import { HeartwoodStoryScene } from '@/components/katchadeck/world/heartwood-story-scene';
@@ -22,7 +22,7 @@ import { worldEventActions, worldEventConversation, type WorldEventAction, type 
 import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
-import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat } from '@/utils/merge-world/repository';
+import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, ensureStoredFirstSpringLight, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat } from '@/utils/merge-world/repository';
 import { LocalEventMissionDock } from '@/components/katchadeck/world/local-event-mission-dock';
 import { WorldEventActionCard } from '@/components/katchadeck/world/world-event-action-card';
 import { GardenEventAdornment } from '@/components/katchadeck/world/garden-event-adornment';
@@ -1256,26 +1256,85 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     });
   }, [activeFtueRunId, homeVeil]);
 
+  // Upgrading a building is a small version of upgrading a tile: the Glow leaves the top bar as coins, each one rocks
+  // the building as it lands and the counter counts down with them; on the last landing the upgrade is written and
+  // the tile upgrade's field of light (rays, embers, arrows) plays around the building while it glows.
+  const HEARTWOOD_BUILDING_PALETTE = useMemo(() => ({ accent: '#C9F29B', glow: '#A8E873', mist: 'rgba(226,255,213,0.88)', primary: '#4F9F57' }), []);
+  const [buildingFx, setBuildingFx] = useState<(HeartwoodBuildingFx & { id: HeartwoodBuildingId }) | null>(null);
+  const [buildingImpact, setBuildingImpact] = useState<{ id: HeartwoodBuildingId; nonce: number } | null>(null);
+  const buildingFxNonceRef = useRef(0);
+  const buildingFxTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => { for (const timer of buildingFxTimersRef.current) clearTimeout(timer); }, []);
+  const playHeartwoodBuildingFx = useStableCallback(async <T extends { state: MergeWorldState }>(id: HeartwoodBuildingId, cost: number, write: () => Promise<T>, options?: { /** Resolve once the field of light has finished too, not at the write (the first session waits for the whole thing). */ settleAfterField?: boolean }): Promise<T> => {
+    const building = heartwoodBuildingById.get(id)!;
+    const nonce = ++buildingFxNonceRef.current;
+    const timers = buildingFxTimersRef.current;
+    const later = (ms: number, action: () => void) => { timers.push(setTimeout(action, ms)); };
+    const coinOrigin = await measureGlowCurrencyOrigin();
+    setGlowSpend({ amount: cost, counting: false });
+    setBuildingFx({ id, nonce, slotId: building.slotId, coinOrigin, palette: HEARTWOOD_BUILDING_PALETTE, phase: 'payment',
+      onCoinLanded: () => setBuildingImpact((current) => ({ id, nonce: (current?.nonce ?? 0) + 1 })) });
+    // The counter follows the coins down; the world is written as the last one seats.
+    later(180, () => setGlowSpend({ amount: cost, counting: true }));
+    const settled = new Promise<T>((resolve, reject) => {
+      later(COIN_FLIGHT_WINDOW_MS, () => { write().then(resolve, reject); });
+    });
+    try {
+      const result = await settled;
+      setDisplayedGlow(result.state.coins);
+      setBuildingFx((current) => current?.nonce === nonce ? { ...current, phase: 'cover' } : current);
+      later(320, () => setBuildingFx((current) => current?.nonce === nonce ? { ...current, phase: 'reveal' } : current));
+      later(900, () => setBuildingFx((current) => current?.nonce === nonce ? { ...current, phase: 'react' } : current));
+      const over = new Promise<void>((resolve) => later(1_500, () => { setBuildingFx((current) => current?.nonce === nonce ? null : current); setGlowSpend(null); resolve(); }));
+      if (options?.settleAfterField) await over;
+      return result;
+    } catch (error) {
+      setBuildingFx((current) => current?.nonce === nonce ? null : current);
+      setGlowSpend(null);
+      throw error;
+    }
+  });
+  const upgradeHeartwoodBuildingWithFx = useStableCallback((id: HeartwoodBuildingId, expectedLevel: number) => {
+    const cost = heartwoodBuildingCost(expectedLevel) ?? 0;
+    // Reduced motion, or nothing to pay: the write alone, as before.
+    if (reduceMotion || cost <= 0 || buildingFx) return upgradeStoredHeartwoodBuilding(id, expectedLevel);
+    return playHeartwoodBuildingFx(id, cost, () => upgradeStoredHeartwoodBuilding(id, expectedLevel));
+  });
   const beginFirstSeedPlanting = useCallback(() => {
     if (ftueStepId !== 'world.garden_arrival' || firstSeedPlantStartedRef.current) return;
     firstSeedPlantStartedRef.current = true;
     setFirstSeedPlacementBusy(true);
     setFirstSeedPlacementFailed(false);
-    void advanceFtueActionDurably({
-      expectedStepId: 'world.garden_arrival',
-      actionId: 'world.plant_first_seed',
-      evidenceRef: `garden-plot:${MOSSPROUT_FIRST_MEMORY_SLOT_ID}`,
-      nextStepId: 'world.seed_planted',
-    }).then(async (result) => {
-      if (result.run?.stepId !== 'world.seed_planted') throw new Error('The Garden did not accept the Spring.');
+    // The planting is the first session's one build, and it looks like every build after it: the light leaves the
+    // top bar as coins, the patch flashes under each, and the Spring swells up out of the glow as the story's own
+    // step writes it. The write is the story's, so a relaunch lands exactly where it always did.
+    const build = async () => {
       const placement = await ensureStoredFirstSpringBuilt();
       if (!placement.placed) throw new Error('The Dew Spring could not be built.');
-    }).catch(async () => {
+      return placement;
+    };
+    const advance = async () => {
+      const result = await advanceFtueActionDurably({
+        expectedStepId: 'world.garden_arrival',
+        actionId: 'world.plant_first_seed',
+        evidenceRef: `garden-plot:${MOSSPROUT_FIRST_MEMORY_SLOT_ID}`,
+        nextStepId: 'world.first_seed_grew',
+      });
+      if (result.run?.stepId !== 'world.first_seed_grew') throw new Error('The Garden did not accept the Spring.');
+    };
+    const cost = heartwoodBuildingCost(0) ?? 0;
+    // The Spring's price is on the counter first (the opening's light, or a top-up for a profile that spent it); the
+    // world is written as the last coin lands; the story moves on only once the field of light is over.
+    void ensureStoredFirstSpringLight(activeFtueRunId ?? 'current').then((lit) => {
+      setDisplayedGlow(lit.coins);
+      const paid = lit.coins >= cost && cost > 0;
+      return reduceMotion || !paid || buildingFx ? build() : playHeartwoodBuildingFx(FIRST_SEED_BUILDING_ID, cost, build, { settleAfterField: true });
+    }).then(advance).catch(async () => {
       // The resume snapshot is committed before the Content Flow effect. If
       // that dispatch is interrupted, finish the idempotent placement here
       // instead of making the player's first tap a no-op.
       const run = loadFtueRun();
-      if (run?.status === 'active' && run.stepId === 'world.seed_planted') {
+      if (run?.status === 'active' && run.stepId === 'world.first_seed_grew') {
         try {
           const placement = await ensureStoredFirstSpringBuilt();
           if (placement.placed) {
@@ -1289,15 +1348,16 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       firstSeedPlantStartedRef.current = false;
       setFirstSeedPlacementFailed(true);
     }).finally(() => setFirstSeedPlacementBusy(false));
-  }, [ftueStepId]);
+  }, [activeFtueRunId, buildingFx, ftueStepId, playHeartwoodBuildingFx, reduceMotion]);
 
   const ensureFirstSeedPlacement = useCallback(async () => {
     const placement = await ensureStoredFirstSpringBuilt();
     return placement.placed;
   }, []);
 
+  const heartwoodWoken = (mergeWorld.haven.tileStages.mossprout ?? 0) >= 1;
   useEffect(() => {
-    if (firstSeedPlanted) {
+    if (firstSeedPlanted && heartwoodWoken) {
       setFirstSeedPlacementBusy(false);
       setFirstSeedPlacementFailed(false);
       return;
@@ -1313,7 +1373,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       .catch(() => { if (!cancelled) setFirstSeedPlacementFailed(true); })
       .finally(() => { if (!cancelled) setFirstSeedPlacementBusy(false); });
     return () => { cancelled = true; };
-  }, [activeFtueRunId, ensureFirstSeedPlacement, firstSeedPlanted, ftueStepId]);
+  }, [activeFtueRunId, ensureFirstSeedPlacement, firstSeedPlanted, ftueStepId, heartwoodWoken]);
 
   const acknowledgeFirstSeedPlanting = useCallback(() => {
     if (ftueStepId !== 'world.seed_planted' || firstSeedPlacementBusy) return;
@@ -2275,47 +2335,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // empty patches are offers, and wait until the first session is over.
   const buildingOffersShown = heartwoodBuildingsEligible(mergeWorld) && !ftueStepId;
   const heartwoodBuiltSlots = HEARTWOOD_BUILDINGS.filter((building) => heartwoodBuildingLevel(mergeWorld, building.id) > 0).map((building) => building.slotId);
-  // Upgrading a building is a small version of upgrading a tile: the Glow leaves the top bar as coins, each one rocks
-  // the building as it lands and the counter counts down with them; on the last landing the upgrade is written and
-  // the tile upgrade's field of light (rays, embers, arrows) plays around the building while it glows.
-  const HEARTWOOD_BUILDING_PALETTE = useMemo(() => ({ accent: '#C9F29B', glow: '#A8E873', mist: 'rgba(226,255,213,0.88)', primary: '#4F9F57' }), []);
-  const [buildingFx, setBuildingFx] = useState<(HeartwoodBuildingFx & { id: HeartwoodBuildingId }) | null>(null);
-  const [buildingImpact, setBuildingImpact] = useState<{ id: HeartwoodBuildingId; nonce: number } | null>(null);
-  const buildingFxNonceRef = useRef(0);
-  const buildingFxTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  useEffect(() => () => { for (const timer of buildingFxTimersRef.current) clearTimeout(timer); }, []);
-  const upgradeHeartwoodBuildingWithFx = useStableCallback(async (id: HeartwoodBuildingId, expectedLevel: number) => {
-    const reduced = reduceMotion;
-    const building = heartwoodBuildingById.get(id)!;
-    const cost = heartwoodBuildingCost(expectedLevel) ?? 0;
-    // Reduced motion, or nothing to pay: the write alone, as before.
-    if (reduced || cost <= 0 || buildingFx) return upgradeStoredHeartwoodBuilding(id, expectedLevel);
-    const nonce = ++buildingFxNonceRef.current;
-    const timers = buildingFxTimersRef.current;
-    const later = (ms: number, action: () => void) => { timers.push(setTimeout(action, ms)); };
-    const coinOrigin = await measureGlowCurrencyOrigin();
-    setGlowSpend({ amount: cost, counting: false });
-    setBuildingFx({ id, nonce, slotId: building.slotId, coinOrigin, palette: HEARTWOOD_BUILDING_PALETTE, phase: 'payment',
-      onCoinLanded: () => setBuildingImpact((current) => ({ id, nonce: (current?.nonce ?? 0) + 1 })) });
-    // The counter follows the coins down; the world is written as the last one seats.
-    later(180, () => setGlowSpend({ amount: cost, counting: true }));
-    const settled = new Promise<Awaited<ReturnType<typeof upgradeStoredHeartwoodBuilding>>>((resolve, reject) => {
-      later(COIN_FLIGHT_WINDOW_MS, () => { upgradeStoredHeartwoodBuilding(id, expectedLevel).then(resolve, reject); });
-    });
-    try {
-      const result = await settled;
-      setDisplayedGlow(result.state.coins);
-      setBuildingFx((current) => current?.nonce === nonce ? { ...current, phase: 'cover' } : current);
-      later(320, () => setBuildingFx((current) => current?.nonce === nonce ? { ...current, phase: 'reveal' } : current));
-      later(900, () => setBuildingFx((current) => current?.nonce === nonce ? { ...current, phase: 'react' } : current));
-      later(1_500, () => { setBuildingFx((current) => current?.nonce === nonce ? null : current); setGlowSpend(null); });
-      return result;
-    } catch (error) {
-      setBuildingFx((current) => current?.nonce === nonce ? null : current);
-      setGlowSpend(null);
-      throw error;
-    }
-  });
   const heartwoodBuildingAdornments = Object.fromEntries(HEARTWOOD_BUILDINGS.flatMap((building) => {
     const level = heartwoodBuildingLevel(mergeWorld, building.id);
     // An unbuilt patch's sign is an offer: it only shows while the world is free to take it. Its first build keeps

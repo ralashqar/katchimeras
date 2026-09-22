@@ -127,7 +127,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 52,
+  version: 53,
   entryStepId: 'world.mist_open',
   terminalStepId: 'complete',
   steps: [
@@ -213,7 +213,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'world.garden_arrival', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: 'The old spring', title: 'Here. The soil’s still soft.', body: '' },
-      actions: [{ id: 'world.plant_first_seed', title: 'Plant it', description: 'Plant the Dew Spring beside Heartwood.', icon: 'drop.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'world.seed_planted', backendEvent: true }],
+      actions: [{ id: 'world.plant_first_seed', title: 'Plant it', description: 'Plant the Dew Spring beside Heartwood.', icon: 'drop.fill', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'world.first_seed_grew', backendEvent: true }],
       interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_garden_plant_button', characterId: 'mossprout' } } },
       cue: { kind: 'tap', target: { kind: 'haven_garden_plant_button', characterId: 'mossprout' } },
       spotlight: {
@@ -229,18 +229,6 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       },
       // Cold-start projection only. The live pan is owned by the atomic
       // world.camera node in mossprout-ftue-flow.
-      camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
-      blockingBeat: 'mossprout_intro',
-    },
-    {
-      id: 'world.seed_planted', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      // The first restore is paid with the light that drove the wisps off (earned at the lift, never
-      // a Merge visit); this beat moves on to the offer the moment the Spring is planted. Nothing
-      // is shown for it unless the planting failed, when its guide and a retry come up. The Garden
-      // board is introduced later, when Steppling's trail needs light the Mist did not give.
-      guide: { eyebrow: 'The old spring', title: COPY.planted, body: 'Look at it. The Mist gave a little ground just for that.' },
-      spotlight: { targets: [{ kind: 'haven_guide' }, { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID }], grouping: 'individual', padding: 7 },
-      actions: [{ id: 'world.acknowledge_seed_dormant', title: 'Continue', description: '', icon: 'sparkles', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_offer', backendEvent: true }],
       camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
       blockingBeat: 'mossprout_intro',
     },
@@ -337,36 +325,8 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       edges: [{
         event: { type: 'order_served', orderId: 'mossprout:chapter-0:first-sprout' },
         commitActionId: 'merge.serve_sprout',
-        nextStepId: 'world.first_bloom_offer',
+        nextStepId: 'world.first_seed_grew',
       }],
-    },
-    {
-      id: 'world.first_bloom_offer', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'First light', title: 'See that? Light.', body: 'Twenty Glow. The light that drove them off stayed with you, and it is the only thing the Mist gives ground to. Tap the glowing bubble.' },
-      actions: [{ id: 'world.open_first_bloom_upgrade', title: 'See what the light does', description: '', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_restore' }],
-      cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
-      spotlight: { targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }], padding: 7, radius: 18, dimOpacity: 0.58 },
-      camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
-    },
-    {
-      id: 'world.first_bloom_restore', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'First light', title: 'Enough to wake this patch.', body: 'Tap to wake the garden.' },
-      actions: [
-        { id: 'world.restore_with_first_bloom', title: 'Wake the garden', description: 'Spend the light here. The Mist gives ground where it’s spent.', icon: 'sparkles', presentation: 'observed_game_action', handlerId: 'acknowledgement', nextStepId: 'world.first_bloom_restore', backendEvent: true },
-        { id: 'world.complete_first_bloom_restore', title: 'Garden awake', description: 'Continue after the garden wakes.', icon: 'checkmark.circle.fill', presentation: 'observed_game_action', handlerId: 'haven_upgrade', nextStepId: 'world.first_seed_grew', backendEvent: true },
-      ],
-      interaction: { mode: 'exclusive', allowed: { kind: 'target_tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } } },
-      cue: { kind: 'tap', target: { kind: 'haven_upgrade_button', characterId: 'mossprout' } },
-      spotlight: {
-        targets: [{ kind: 'haven_upgrade_button', characterId: 'mossprout' }],
-        grouping: 'bounding_rect',
-        padding: 7,
-        radius: 22,
-        dimOpacity: 0.58,
-      },
-      edges: [{ event: { type: 'haven_upgrade_completed', characterId: 'mossprout', stage: 1 }, commitActionId: 'world.complete_first_bloom_restore', nextStepId: 'world.first_seed_grew' }],
-      camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
-      blockingBeat: 'chapter_complete',
     },
     {
       id: 'world.first_seed_grew', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
@@ -829,8 +789,7 @@ export function mossproutFtueAction(stepId: string, actionId: string) { return m
 /** Hide Garden during dialogue and the post-restoration Continue handoff. */
 export function mossproutFtueShowsWorldGarden(stepId: string | null | undefined) {
   return !stepId || stepId === 'complete' || [
-    'world.garden_arrival', 'world.seed_planted', 'world.garden_handoff',
-    'world.first_bloom_offer', 'world.first_bloom_restore',
+    'world.garden_arrival', 'world.garden_handoff',
   ].includes(stepId);
 }
 export function mossproutFtueUsesHostedCompanionStage(stepId: string | null | undefined) {

@@ -103,14 +103,14 @@ test('hero copy fits three lines without captions and Haven spotlight retries na
   assert.doesNotMatch(screen, /cameraSettleRevisionRef.current \+= 1/);
 });
 
-test('planted Seed highlights top copy and Garden button without the obsolete plant-order tray', () => {
-  const step = mossproutFtueStep('world.seed_planted')!;
-  // The planted memory earns the first light itself: no Garden button to tap, only the guide and the plot lit.
-  assert.equal(step.cue, undefined);
-  assert.deepEqual(step.spotlight?.targets, [{ kind: 'haven_guide' }, { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'back-centre' }]);
-  assert.equal(step.spotlight?.targetGroups, undefined);
-  assert.equal(step.spotlight?.grouping, 'individual');
-  assert.equal(step.actions[0]?.title, 'Continue');
+test('planting leads straight to the bud: nothing stands between the Spring and Heartwood waking', () => {
+  assert.equal(mossproutFtueAction('world.garden_arrival', 'world.plant_first_seed')?.nextStepId, 'world.first_seed_grew');
+  for (const retired of ['world.seed_planted', 'world.first_bloom_offer', 'world.first_bloom_restore']) assert.equal(mossproutFtueStep(retired), null, `${retired} is retired`);
+  assert.match(readFileSync('features/onboarding/mossprout-ftue-flow.ts', 'utf8'), /id: 'effect\.haven\.place_first_memory',\s*capability: 'haven\.place_first_memory',\s*next: 'world\.first_seed_grew',/, 'the Spring’s effect leads to the bud');
+  assert.equal(MOSSPROUT_FTUE_FLOW.nodes.some((node: { id: string }) => node.id.startsWith('garden.first-bloom')), false, 'Heartwood’s tile is never upgraded as a beat of its own');
+});
+
+test('the spotlight cutout and the Garden handoff keep their shape without the obsolete plant-order tray', () => {
   const holes = [{ x: 20, y: 30, width: 280, height: 130 }, { x: 180, y: 480, width: 160, height: 240 }];
   const mask = roundedMultiCutoutSegments(holes, 16, { width: 360, height: 780 });
   const dimmed = (x: number, y: number) => mask.some((r) => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height);
@@ -144,7 +144,7 @@ test('v43 migration moves removed checkpoints forward without restarting complet
     'companion.day_one_action': 'companion.garden_intro',
     'companion.bond_spotlight': 'companion.garden_intro',
     'companion.order_preview': 'companion.garden_intro',
-    'world.garden_handoff': 'world.seed_planted',
+    'world.garden_handoff': 'world.first_seed_grew',
     'companion.chapter_zero_return': 'companion.water_together',
     'companion.water_response': 'companion.first_rest',
     'companion.first_insight': 'companion.first_rest',
@@ -434,20 +434,14 @@ test('Chapter 0 asks for one Plant on a free board; the guided drags are retired
   const pairStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.seed_pairs');
   const finalServeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_plant');
   const sproutEchoStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.sprout_pair');
-  assert.equal(mossproutFtueAction('world.seed_planted', 'world.acknowledge_seed_dormant')?.nextStepId, 'world.first_bloom_offer', 'the first restore is paid with granted light: no Merge visit');
-  assert.equal(mossproutFtueStep('world.seed_planted')?.cue, undefined, 'nothing to tap but Continue');
-  assert.match(readFileSync('features/onboarding/mossprout-ftue-flow.ts', 'utf8'), /scene\('world\.seed_planted', 'haven', \[\{ id: 'world\.acknowledge_seed_dormant', next: 'garden\.first-bloom-offer\.focus' \}\]\),/, 'straight on to the offer');
   assert.ok(mergeStep, 'retired beats stay authored for old fixtures');
   assert.equal(MOSSPROUT_FTUE_FLOW.nodes.some((node: { id: string }) => ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom'].includes(node.id)), false);
-  for (const id of ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom', 'merge.serve_sprout']) assert.equal((MOSSPROUT_FTUE_FLOW.migrations as Record<string, string>)[id], 'garden.first-bloom-offer.focus');
+  for (const id of ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom', 'merge.serve_sprout']) assert.equal((MOSSPROUT_FTUE_FLOW.migrations as Record<string, string>)[id], 'world.first_seed_grew');
   assert.equal(sproutEchoStep?.edges?.[0]?.nextStepId, 'merge.serve_plant');
   assert.equal(spawnStep?.edges?.[0]?.requiredCount, undefined);
   assert.equal(pairStep?.edges?.[0]?.event.type, 'dream_echo_cleared');
   assert.equal(pairStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
-  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'world.first_bloom_offer');
-  assert.equal(mossproutFtueAction('world.first_bloom_offer', 'world.open_first_bloom_upgrade')?.nextStepId, 'world.first_bloom_restore');
-  assert.equal(mossproutFtueAction('world.first_bloom_restore', 'world.restore_with_first_bloom')?.nextStepId, 'world.first_bloom_restore');
-  assert.equal(mossproutFtueAction('world.first_bloom_restore', 'world.complete_first_bloom_restore')?.nextStepId, 'world.first_seed_grew');
+  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'world.first_seed_grew', 'a retired request served lands on the bud');
   assert.equal(mossproutFtueAction('world.first_seed_grew', 'world.acknowledge_first_seed_growth')?.nextStepId, 'companion.water_together');
   assert.equal(mossproutFtueAction('companion.chapter_zero_return', 'companion.complete_chapter_zero_return')?.nextStepId, 'companion.water_together');
   assert.equal(mossproutFtueAction('companion.bond_intro', 'companion.acknowledge_friendship')?.nextStepId, 'companion.bond_spotlight');
@@ -1154,8 +1148,6 @@ test('Haven keeps one world-map compositor through the Egg to Companion handoff'
   assert.match(kingdomScreen, /gardenWorldGuidanceActive[\s\S]*?top: insets\.top \+ 18/);
   assert.match(kingdomScreen, /gardenWorldBottomCtaActive = \(ftueStepId === 'world\.seed_planted' && firstSeedPlacementFailed\)[\s\S]*?ftueStepId === 'world\.first_seed_grew'/);
   assert.doesNotMatch(kingdomScreen, /gardenWorldBottomCtaActive = ftueStepId === 'world\.garden_arrival'/);
-  assert.match(kingdomScreen, /ftueStepId === 'world\.seed_planted' && !firstSeedPlanted[\s\S]*?onFtueInspectRef\.current\?\.\(\)/);
-  assert.equal(mossproutFtueStep('world.seed_planted')?.autoAdvanceMs, undefined);
   assert.doesNotMatch(kingdomScreen, /\? 'Plant Seed'[\s\S]*?: ftueStep\.actions/);
   assert.match(kingdomScreen, /gardenWorldBottomCtaActive[\s\S]*?bottom: Math\.max\(insets\.bottom, 12\) \+ 22[\s\S]*?justifyContent: 'space-between'[\s\S]*?top: insets\.top \+ 18/);
   assert.match(kingdomScreen, /function FtueOpeningFade\(\)[\s\S]*?opacity\.value = withDelay\([\s\S]*?duration: reduceMotion \? 140 : 1_350/);
@@ -1790,7 +1782,7 @@ test('world Garden stays hidden through Mossprout dialogue and Grow, but returns
       assert.equal(mossproutFtueShowsWorldGarden(step.id), false, step.id);
     }
   }
-  for (const stepId of ['world.garden_arrival', 'world.seed_planted', 'world.garden_handoff', 'world.first_bloom_restore']) {
+  for (const stepId of ['world.garden_arrival', 'world.garden_handoff']) {
     assert.equal(mossproutFtueShowsWorldGarden(stepId), true, stepId);
   }
   for (const stepId of [undefined, null, 'complete']) assert.equal(mossproutFtueShowsWorldGarden(stepId), true);

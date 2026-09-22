@@ -23,7 +23,7 @@ test('the first light is earned once per run when the last wisp falls, and pays 
   state = reload(granted.state);
   assert.deepEqual(state.openingGlow, granted.state.openingGlow, 'survives a reload');
   assert.equal(reduceMergeWorld(state, { type: 'grantOpeningGlow', receiptId: 'ftue-1:opening-glow', amount: 20, now: NOW + 1 }).changed, false, 'the flow effect and the world screen’s repair may both ask; only one grants');
-  assert.equal(reduceMergeWorld(state, { type: 'grantOpeningGlow', receiptId: 'other', amount: 20, now: NOW + 1 }).changed, false);
+  assert.equal(reduceMergeWorld(state, { type: 'grantOpeningGlow', receiptId: 'ftue-2:opening-glow', amount: 20, now: NOW + 1 }).changed, true, 'a first session run again on the same profile is lit again');
   const restored = reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, receiptId: 'test:first-restore', now: NOW });
   assert.equal(restored.changed, true, restored.message);
   assert.equal(restored.state.coins, 0, 'exactly the first restore');
