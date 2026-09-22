@@ -2318,7 +2318,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     [mergeWorld.haven.mossproutNatureIslandReveals],
   );
 
-  const sharedAdventureAllowed = !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId && !rushSheetOpen && !rushSpec;
+  // A friend without a page is looked at on a detail card: that is an interaction too, and nothing of the world's begins under it.
+  const sharedAdventureAllowed = !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !detailCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId && !rushSheetOpen && !rushSpec;
   const heartwoodRecap = sharedAdventureAllowed && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed') && !havenMergeBoardActive && (mergeWorld.haven.tileStages.mossprout ?? 0) >= 1 && needsHeartwoodRecap(mergeWorld);
   const worldEventsAllowed = sharedAdventureAllowed && !havenMergeBoardActive && !heartwoodRecap;
   // havenMergeBoardActive means an owned Mossprout can open the Garden, not
