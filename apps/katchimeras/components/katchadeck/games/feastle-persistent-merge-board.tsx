@@ -330,16 +330,22 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const emitBoardEffect = boardEffects.emit;
   const animateArrivalsRef = useRef(animateArrivals);
   animateArrivalsRef.current = animateArrivals;
-  /** Marks the items the board has never drawn, before they mount: their sprite starts at nothing and springs in. */
+  /**
+   * Marks the items the board has never drawn, before they mount: their sprite starts at nothing and springs in. The
+   * settle puff is emitted a frame later, never inside the commit that mounts the sprite (which may be the one that
+   * reconciles a finished merge), so nothing else animating on that frame is disturbed.
+   */
   const markArrivals = useCallback((nextSprites: readonly SpriteRecord[]) => {
     if (!animateArrivalsRef.current) return;
     const known = new Set(spritesRef.current.map(spriteId));
+    const arrived: number[] = [];
     for (const sprite of nextSprites) {
       const id = spriteId(sprite);
-      if (sprite.occupant.kind !== 'item' || known.has(id)) continue;
+      if (sprite.occupant.kind !== 'item' || known.has(id) || introSpriteDelays.current.has(id)) continue;
       introSpriteDelays.current.set(id, 0);
-      emitBoardEffect(sprite.cell, 'spawn-settle');
+      arrived.push(sprite.cell);
     }
+    if (arrived.length) requestAnimationFrame(() => { for (const cell of arrived) emitBoardEffect(cell, 'spawn-settle'); });
   }, [emitBoardEffect]);
 
   presentationRef.current = presentation;

@@ -1843,8 +1843,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const rushResultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (rushResultTimerRef.current) clearTimeout(rushResultTimerRef.current); }, []);
   const playRushHeat = useStableCallback((index: number) => {
+    // Called from the sheet's own close animation: the sheet (and its gesture tree) leaves first, and the board with
+    // its own gesture tree mounts on a later frame, never in the same commit as that unmount.
     setRushSheetOpen(false); setRushResult(null); setRushNotice(null); setOpeningDockSettled(false);
-    setRushRun({ dayId: localDayId(new Date(gameNow())), index, attempt: ++rushAttemptRef.current });
+    const attempt = ++rushAttemptRef.current;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (rushAttemptRef.current !== attempt) return;
+      setRushRun({ dayId: localDayId(new Date(gameNow())), index, attempt });
+    }));
   });
   const leaveRushHeat = useStableCallback(() => {
     if (activeRush?.kind === 'chapter') { closeRestoration(); return; }
