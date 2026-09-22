@@ -200,7 +200,6 @@ type Props = {
   background: TodayAtmosphereBackground;
   companionSlots: KingdomHexCompanionSlot[];
   onContentReady?: () => void;
-  onBackToHavenSelector: () => void;
   navigationLocked?: boolean;
   interactionRequest?: MossproutWorldInteractionRequest | null;
   onInteractionRequestConsumed?: () => void;
@@ -275,7 +274,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   background,
   companionSlots,
   onContentReady,
-  onBackToHavenSelector,
   navigationLocked = false,
   interactionRequest,
   onInteractionRequestConsumed,
@@ -2578,12 +2576,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
             leading={ftueGardenUpgradeActive || seedPlantingFtueActive || upgradePresentation || kingdomGoalGuideActive || restorationHandoff
               // The lesson owns Back only while it has a surface up. Hiding it
               // for an active run with nothing on screen strands the player.
-              || (stepplingLesson.active && Boolean(interactionCreatureId)) ? undefined : <KatchimeraBackButton
-              accessibilityHint={restorationBoardVisible ? 'Puts the restoration board away' : interactionCreatureId ? "Returns to this Katchimera's world" : 'Returns to the Katchimera world map'}
-              accessibilityLabel={restorationBoardVisible ? 'Put the board away' : interactionCreatureId ? 'Exit interaction' : 'All Havens'}
+              || (stepplingLesson.active && Boolean(interactionCreatureId))
+              // The world is the game's top level: Back is only there while something inside it can be put away.
+              || !(stepplingEncounter.open || restorationBoardVisible || interactionCreatureId) ? undefined : <KatchimeraBackButton
+              accessibilityHint={restorationBoardVisible ? 'Puts the restoration board away' : stepplingEncounter.open ? 'Closes the encounter' : "Returns to this Katchimera's world"}
+              accessibilityLabel={restorationBoardVisible ? 'Put the board away' : stepplingEncounter.open ? 'Close' : 'Exit interaction'}
               compact
-              disabled={stepplingEncounter.busy || stepplingEncounter.hatching || interactionExiting || (!interactionCreatureId && (navigationLocked || glowDiscoveryLocksCamera(glowRun)))}
-              onPress={stepplingEncounter.open ? stepplingEncounter.close : restorationBoardVisible ? closeRestoration : interactionCreatureId ? requestResidentInteractionExit : onBackToHavenSelector}
+              disabled={stepplingEncounter.busy || stepplingEncounter.hatching || interactionExiting}
+              onPress={stepplingEncounter.open ? stepplingEncounter.close : restorationBoardVisible ? closeRestoration : requestResidentInteractionExit}
             />}
             content={kingdomGoal?.introducedAt && !kingdomGoalGuideActive && !ftueStepId && !stepplingLesson.active && !upgradePresentation && !restorationHandoff && !interactionCreatureId && !stepplingEncounter.open
               ? <View style={styles.progressPill}><KingdomProgressPill progress={progressSummary} onPress={() => setProgressSheetOpen(true)} /></View>

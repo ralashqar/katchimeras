@@ -347,7 +347,8 @@ test('the Kingdom docks the board under the island, sends the order at the check
   assert.match(screen, /if \(progress\.action === 'continue_restoring'\) \{[\s\S]*?setRestorationOpen\(true\);/, 'the marker reopens it');
   assert.match(screen, /setRestorationOpen\(true\);\s*requestResidentInteractionExit\(\);/, 'the answer opens it');
   assert.match(screen, /if \(!restorationBoardVisible\) return;\s*const subscription = BackHandler\.addEventListener\('hardwareBackPress', \(\) => \{ closeRestoration\(\); return true; \}\);/, 'hardware Back puts it away');
-  assert.match(screen, /restorationBoardVisible \? closeRestoration : interactionCreatureId \? requestResidentInteractionExit : onBackToHavenSelector/, 'the HUD Back puts it away instead of leaving the Kingdom');
+  assert.match(screen, /restorationBoardVisible \? closeRestoration : requestResidentInteractionExit/, 'the HUD Back puts it away');
+  assert.match(screen, /\|\| !\(stepplingEncounter\.open \|\| restorationBoardVisible \|\| interactionCreatureId\) \? undefined : <KatchimeraBackButton/, 'and is only there while something in the world can be put away');
   assert.doesNotMatch(dock, /closeLabel|onClose/, 'no Later button of its own: Back puts it away');
   // Beside the card, the friend's own line for the stage; the row hangs a little above the bar.
   assert.match(dock, /\{speech \? <FriendSpeechBubble text=\{speech\}[^>]*\/> : null\}\s*<MergeOrderTrayCard/, 'the bubble sits to the left of the card');
