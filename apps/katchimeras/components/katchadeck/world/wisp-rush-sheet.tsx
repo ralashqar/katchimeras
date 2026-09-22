@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { UpgradeDock, useUpgradeDockMotion } from '@/components/katchadeck/upgrade/upgrade-dock';
 import { UpgradeActionRow, UpgradeHero, UpgradeSection } from '@/components/katchadeck/upgrade/upgrade-rows';
+import { MERGE_WORLD_UI_ART } from '@/constants/merge-world-ui-art';
 import { HEATS_PER_DAY, heatFor, heatPars } from '@/features/time-trial/ladder';
 import { dayChestFor, heatGlow, heatsCleared, nextHeatIndex, timeTrialFor, type HeatOutcome } from '@/features/time-trial/trial-world';
 import type { UpgradeStageLayout } from '@/features/upgrade-stage/upgrade-stage-layout';
@@ -54,7 +55,7 @@ export function WispRushSheet({ world, dayId, hostName, layout, bottomInset, res
         const open = index <= cleared;
         const spec = open ? heatFor(dayId, index) : null;
         const pars = spec ? heatPars(spec) : null;
-        return <UpgradeActionRow key={index} icon="timer" done={Boolean(heat)} dimmed={!open}
+        return <UpgradeActionRow key={index} art={MERGE_WORLD_UI_ART.rushTimer} done={Boolean(heat)} dimmed={!open}
           label={`Heat ${index + 1}${heat?.medal ? ` · ${MEDAL_NAME[heat.medal]}` : ''}`}
           detail={spec && pars
             ? `${heat ? `Best ${heat.best} · ` : ''}${formatHeatClock(spec.durationMs)} · Bronze ${pars.bronze} · Silver ${pars.silver} · Gold ${pars.gold}${heat ? '' : ` · +${heatGlow(index)} Glow`}`

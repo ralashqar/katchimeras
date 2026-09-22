@@ -1,7 +1,9 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, BackHandler, StyleSheet, Text, View } from 'react-native';
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
+import { Image } from 'expo-image';
+import { MERGE_WORLD_UI_ART } from '@/constants/merge-world-ui-art';
 import { AppFontFamilies } from '@/constants/theme';
 import type { HeatSpec } from '@/features/time-trial/heat';
 import { heatMissionStrike, type RushLive } from '@/features/time-trial/heat-mechanic';
@@ -25,6 +27,7 @@ const HeatClock = memo(function HeatClock({ remainingMs, running, score, goal }:
     return () => clearInterval(timer);
   }, [remainingMs, running]);
   return <View style={styles.clock} accessible accessibilityLabel={`${formatHeatClock(shown)} left. ${score} of ${goal} wisps`}>
+    <Image accessibilityIgnoresInvertColors cachePolicy="memory-disk" contentFit="contain" source={MERGE_WORLD_UI_ART.rushTimer} style={styles.clockArt} transition={0} />
     <Text style={[styles.clockText, shown <= 10_000 && styles.clockLate]}>{formatHeatClock(shown)}</Text>
     <Text style={[styles.clockScore, score >= goal && styles.clockMade]}>{score} / {goal}</Text>
   </View>;
@@ -56,6 +59,19 @@ export const WispRushDock = memo(function WispRushDock({ spec, goal, title, live
   if (!sessionRef.current) sessionRef.current = createMergeBoardSession();
   const { finished, voided, score } = run;
   const heat = run.board.heat;
+  // Leaving with the clock running throws the run away: ask first. Before the first move, or once it is over, just go.
+  const running = run.started && !finished && !voided;
+  const leave = useCallback(() => {
+    if (!running) { onClose(); return; }
+    Alert.alert('Leave the run?', 'The clock is running. If you leave now, this heat does not count and you run it again from the start.', [
+      { text: 'Keep running', style: 'cancel' },
+      { text: 'Leave', style: 'destructive', onPress: onClose },
+    ]);
+  }, [onClose, running]);
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => { leave(); return true; });
+    return () => subscription.remove();
+  }, [leave]);
   useEffect(() => { live?.publish(heat); }, [heat, live]);
   useEffect(() => { if (finished) onFinished(score); }, [finished, onFinished, score]);
   useEffect(() => { if (voided) onVoided(); }, [onVoided, voided]);
@@ -86,13 +102,14 @@ export const WispRushDock = memo(function WispRushDock({ spec, goal, title, live
     interactionKey={`wisp-rush:${spec.id}`} sessionId={sessionRef.current.id} hiddenItemIds={EMPTY_IDS} animateArrivals
     width={width} bottomInset={bottomInset} landings={landings}
     onCommand={dispatch} onBoardMetrics={handleMetrics} onBlockedInteraction={onBlockedInteraction} onEntranceSettled={onEntranceSettled}
-    onClose={onClose} closeLabel="Leave the run"
-    header={<View style={styles.header}><HeatClock remainingMs={run.remainingMs} running={run.started && !finished && !voided} score={score} goal={goal} /></View>} headerGap={8} />;
+    onClose={leave} closeLabel="Leave the run"
+    header={<View style={styles.header}><HeatClock remainingMs={run.remainingMs} running={running} score={score} goal={goal} /></View>} headerGap={8} />;
 });
 
 const styles = StyleSheet.create({
   header: { alignItems: 'center', alignSelf: 'stretch' },
-  clock: { alignItems: 'baseline', backgroundColor: 'rgba(22,16,40,0.62)', borderRadius: 18, flexDirection: 'row', gap: 12, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 5 },
+  clock: { alignItems: 'center', backgroundColor: 'rgba(22,16,40,0.62)', borderRadius: 18, flexDirection: 'row', gap: 10, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 5 },
+  clockArt: { width: 28, height: 28 },
   clockText: { color: '#FFF6E2', fontFamily: AppFontFamilies.fredokaBold, fontSize: 26, fontVariant: ['tabular-nums'] },
   clockLate: { color: '#FFB37A' },
   clockScore: { color: '#CFC4E6', fontFamily: AppFontFamilies.fredokaBold, fontSize: 16, fontVariant: ['tabular-nums'] },

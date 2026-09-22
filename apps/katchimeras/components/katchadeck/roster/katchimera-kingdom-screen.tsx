@@ -129,7 +129,8 @@ import { IslandRestorationDock } from '@/components/katchadeck/world/island-rest
 import { WispRushDock } from '@/components/katchadeck/world/wisp-rush-dock';
 import { WispRushSheet, type WispRushResult } from '@/components/katchadeck/world/wisp-rush-sheet';
 import { createRushLive, heatHost, WISP_RUSH_HOST } from '@/features/time-trial/heat-mechanic';
-import { heatFor, heatFromRules, heatPars } from '@/features/time-trial/ladder';
+import { HEATS_PER_DAY, heatFor, heatFromRules, heatPars } from '@/features/time-trial/ladder';
+import { heatsCleared, nextHeatIndex, timeTrialFor } from '@/features/time-trial/trial-world';
 import { commandFriendWispPacks } from '@/features/wisps/friend-wisp-runtime';
 import { gameNow } from '@/utils/game-clock';
 import { localDayId } from '@/utils/world-identity-rules';
@@ -2083,6 +2084,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [screenFocused, stepplingLesson.active, stepplingLesson.run, havenMergeBoardActive, companionSlots, interactionCreatureId, activeInteractionResidentId, activeLessonHatchable.companion, selectResident, openGarden]);
 
   const openUpgradeOffer = useCallback(async (offer: WorldUpgradeOffer) => {
+    // The trial's clock on the Rush Track opens today's ladder, not an upgrade.
+    if (offer.trial) { setRushNotice(null); setRushSheetOpen(true); return; }
     if (upgradePressBusy.current || upgradePurchasing || upgradePresentation) return;
     // Resting friends are on the map from the first frame, but not yet the player's business.
     if (offer.sleepingSkinId && ftueStepId) return;
@@ -2183,7 +2186,18 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     finally { upgradePressBusy.current = false; setUpgradePurchasing(false); }
   }, [flushMergeWorld, ftueStepId, gatewayTileNode, measureGlowCurrencyOrigin, openingGlow, sharedUpgrade, upgradeCommitted, upgradeError]);
   // Sleeping islands arrive from the offers layer already locked, in wake order.
-  const presentedUpgradeOffers = upgradeOffers;
+  // Once Dashkit is home the Rush Track's marker is the trial's clock, with today's heats, unless a story chapter is mid-run on it.
+  const rushTrialOpen = (mergeWorld.haven.mossproutNatureIslands[WISP_RUSH_HOST.islandId] ?? 0) >= WISP_RUSH_HOST.unlockLevel && !activeIslandRestoration(mergeWorld, WISP_RUSH_HOST.campaignId);
+  const presentedUpgradeOffers = useMemo(() => {
+    if (!rushTrialOpen) return upgradeOffers;
+    const day = timeTrialFor(mergeWorld).days[localDayId(new Date(gameNow()))];
+    const trial = { heat: nextHeatIndex(day) + 1, total: HEATS_PER_DAY, done: heatsCleared(day) >= HEATS_PER_DAY };
+    const id = `nature:${WISP_RUSH_HOST.islandId}`;
+    const base = upgradeOffers.find((offer) => offer.id === id) ?? worldUpgradeArchiveOffer(mergeWorld, id);
+    if (!base) return upgradeOffers;
+    const clock: WorldUpgradeOffer = { ...base, trial, eligible: !trial.done, affordable: !trial.done, missingGlow: 0, markerSkinId: undefined, restorationProgress: undefined, lockedReason: undefined };
+    return upgradeOffers.some((offer) => offer.id === id) ? upgradeOffers.map((offer) => (offer.id === id ? clock : offer)) : [...upgradeOffers, clock];
+  }, [mergeWorld, rushTrialOpen, upgradeOffers]);
   // Alone until the hatch: no markers at all until the islands are drawn. And none while any mini board is
   // docked (the opening's, Steppling's, a friend's): the board is the only thing to do until it is put away.
   const missionBoardDocked = eventBoardActive || openingBoardActive || stepplingMissionActive || journeyMissionActive || restorationBoardVisible || Boolean(rushSpec);

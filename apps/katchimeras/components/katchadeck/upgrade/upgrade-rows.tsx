@@ -8,6 +8,7 @@ import { ProgressBar } from '@/components/katchadeck/progress-bar';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { GAME_CURRENCY_ART } from '@/constants/game-currency-art';
+import { MERGE_WORLD_UI_ART } from '@/constants/merge-world-ui-art';
 import { KatchaUI } from '@/constants/katcha-ui';
 import { AppFontFamilies } from '@/constants/theme';
 import { UpgradePanelUI } from '@/constants/upgrade-panel';
@@ -182,20 +183,25 @@ export function UpgradeRequirementRow({ requirement, disabled, onAction }: {
 }
 
 /**
- * A thing to do, as the same strip a requirement uses: a mark, a name, a plain line under it, and its own button at the
- * far end (a heat to run, a chest to open). `done` draws it as a met requirement does.
+ * A thing to do, as the same strip a requirement uses: a mark (a symbol, or a piece of the game's art), a name, a plain
+ * line under it, and its own button at the far end (a heat to run, a chest to open). `done` draws it as a met
+ * requirement does, with the same green tick the Merge board's ready orders wear.
  */
-export function UpgradeActionRow({ icon = 'leaf.fill', label, detail, done, dimmed, action }: {
-  icon?: IconSymbolName; label: string; detail?: string; done?: boolean; dimmed?: boolean;
+export function UpgradeActionRow({ icon = 'leaf.fill', art, label, detail, done, dimmed, action }: {
+  icon?: IconSymbolName; art?: ImageSourcePropType; label: string; detail?: string; done?: boolean; dimmed?: boolean;
   action?: { label: string; accessibilityLabel?: string; primary?: boolean; disabled?: boolean; onPress: () => void };
 }) {
   return <Face colors={done ? UpgradePanelUI.rowMetFace : UpgradePanelUI.rowFace} radius={UpgradePanelUI.rowRadius} style={[done ? styles.requirementMet : styles.requirement, dimmed && styles.actionDimmed]}>
     <View style={styles.requirementBody}>
       <View style={styles.requirementRow}>
         <Face colors={UpgradePanelUI.chipFace} radius={23} style={styles.mark}>
-          <IconSymbol color={done ? UpgradePanelUI.leaf : UpgradePanelUI.inkFaint} name={done ? 'checkmark' : icon} size={20} />
+          {done
+            ? <Image accessibilityIgnoresInvertColors cachePolicy="memory-disk" contentFit="contain" source={MERGE_WORLD_UI_ART.readyTick} style={styles.markArt} transition={0} />
+            : art
+              ? <Image accessibilityIgnoresInvertColors cachePolicy="memory-disk" contentFit="contain" source={art} style={styles.markArt} transition={0} />
+              : <IconSymbol color={UpgradePanelUI.inkFaint} name={icon} size={20} />}
         </Face>
-        <View accessible accessibilityLabel={`${label}${detail ? `. ${detail}` : ''}`} style={styles.requirementText}>
+        <View accessible accessibilityLabel={`${label}${detail ? `. ${detail}` : ''}${done ? '. Done' : ''}`} style={styles.requirementText}>
           <Text numberOfLines={1} style={styles.requirementLabel}>{label}</Text>
           {detail ? <Text numberOfLines={2} style={styles.requirementDetail}>{detail}</Text> : null}
         </View>
@@ -348,6 +354,7 @@ const styles = StyleSheet.create({
   requirementBar: { flex: 1 },
   mark: { alignItems: 'center', borderColor: UpgradePanelUI.rowBorder, height: 46, justifyContent: 'center', width: 46 },
   currencyArt: { width: 32, height: 32 },
+  markArt: { width: 34, height: 34 },
   amountPill: { borderColor: UpgradePanelUI.dangerBorder },
   amountPillMet: { borderColor: UpgradePanelUI.rowMetBorder },
   amountRow: { alignItems: 'center', flexDirection: 'row', gap: 6, paddingHorizontal: 10, paddingVertical: 5 },

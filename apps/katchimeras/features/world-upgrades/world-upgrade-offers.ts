@@ -49,6 +49,8 @@ export type WorldUpgradeOffer = WorldUpgradeDefinition & {
   restorationProgress?: { current: number; total: number };
   /** A hatchable companion's misted tile: the marker is a silhouette Egg, lit by where the tile stands. */
   hatchable?: { companion: MergeCharacterId; state: HatchableTileState; sleepingLine: string };
+  /** A tile whose everyday life is a time trial: the marker is its clock, with today's heats, and a tick once the day is done. */
+  trial?: { heat: number; total: number; done: boolean };
 };
 
 export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [

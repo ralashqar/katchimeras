@@ -36,6 +36,7 @@ test('both tutorial marker spotlight targets enclose the full badge at every zoo
     '@incubator/art-world/ui/upgrade-toy-v1.png': 1,
     '@incubator/art-world/ui/clear-mist-toy-v1.png': 2,
     '@incubator/art-cutouts/egg-base.webp': 3,
+    '@/constants/merge-world-ui-art': { MERGE_WORLD_UI_ART: { readyTick: 4, rushTimer: 5 } },
     '@/components/katchadeck/ui/radial-sunburst': { RotatingRadialSunburst: 'RotatingRadialSunburst' },
   });
   const Marker = module.WorldUpgradeMarker as React.ComponentType<Record<string, unknown>>;
@@ -113,6 +114,7 @@ test('an inert marker is visible but cannot be opened and does not pulse', async
     '@incubator/art-world/ui/upgrade-toy-v1.png': 1,
     '@incubator/art-world/ui/clear-mist-toy-v1.png': 2,
     '@incubator/art-cutouts/egg-base.webp': 3,
+    '@/constants/merge-world-ui-art': { MERGE_WORLD_UI_ART: { readyTick: 4, rushTimer: 5 } },
     '@/components/katchadeck/ui/radial-sunburst': { RotatingRadialSunburst: 'RotatingRadialSunburst' },
     '@incubator/art-world/hex/kingdom_dream_mist_lock_v1_512.webp': 3,
   });
@@ -148,6 +150,7 @@ test('a hatchable tile’s marker is a silhouette Egg with still rays: dim aslee
     '@incubator/art-world/ui/upgrade-toy-v1.png': 1,
     '@incubator/art-world/ui/clear-mist-toy-v1.png': 2,
     '@incubator/art-cutouts/egg-base.webp': 3,
+    '@/constants/merge-world-ui-art': { MERGE_WORLD_UI_ART: { readyTick: 4, rushTimer: 5 } },
     '@incubator/art-world/hex/kingdom_dream_mist_lock_v1_512.webp': 4,
     '@incubator/art-ui/radial-sunburst.png': 5,
   });
