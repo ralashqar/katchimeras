@@ -18,8 +18,9 @@ function tapCoinLanding(last: boolean) {
     .catch(() => undefined);
 }
 
-type HavenUpgradeEffectsProps = Omit<ComponentProps<typeof BaseHavenUpgradeEffects>, 'onCoinLanded'>;
+type HavenUpgradeEffectsProps = ComponentProps<typeof BaseHavenUpgradeEffects>;
 
-export function HavenUpgradeEffects(props: HavenUpgradeEffectsProps) {
-  return <BaseHavenUpgradeEffects {...props} onCoinLanded={tapCoinLanding} />;
+/** The tap on every landing is always played; a caller may listen for landings as well (a building rocking under them). */
+export function HavenUpgradeEffects({ onCoinLanded, ...props }: HavenUpgradeEffectsProps) {
+  return <BaseHavenUpgradeEffects {...props} onCoinLanded={(last) => { tapCoinLanding(last); onCoinLanded?.(last); }} />;
 }

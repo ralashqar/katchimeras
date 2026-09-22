@@ -12,6 +12,7 @@ import { friendEquippedWisp, friendPacksWaiting } from '@/utils/friend-wisp-pack
 import { HeartwoodBuildingWorld } from '@/components/katchadeck/world/heartwood-building-world';
 import { HEARTWOOD_BUILDINGS, heartwoodBuildingById, heartwoodBuildingCost, heartwoodBuildingLevel, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
 import { firstSeedReadyForSpring, firstSpringAwake, firstSpringBuilt, heartwoodBuildingsEligible } from '@/features/heartwood-buildings/buildings-world';
+import { COIN_FLIGHT_WINDOW_MS } from '@incubator/environments/upgrade-effects';
 import { lanternEligible } from '@/features/wisps/lantern-world';
 import { HeartwoodStoryScene } from '@/components/katchadeck/world/heartwood-story-scene';
 import { needsHeartwoodRecap } from '@/features/shared-adventure/heartwood-opening';
@@ -95,6 +96,7 @@ import Animated, {
 
 import {
   KingdomHexCanvas,
+  type HeartwoodBuildingFx,
   type KingdomResidentStatusGlyph,
   type KingdomTileUpgradeOffer,
 } from '@/components/katchadeck/world/kingdom-hex-canvas';
@@ -2273,12 +2275,55 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // empty patches are offers, and wait until the first session is over.
   const buildingOffersShown = heartwoodBuildingsEligible(mergeWorld) && !ftueStepId;
   const heartwoodBuiltSlots = HEARTWOOD_BUILDINGS.filter((building) => heartwoodBuildingLevel(mergeWorld, building.id) > 0).map((building) => building.slotId);
+  // Upgrading a building is a small version of upgrading a tile: the Glow leaves the top bar as coins, each one rocks
+  // the building as it lands and the counter counts down with them; on the last landing the upgrade is written and
+  // the tile upgrade's field of light (rays, embers, arrows) plays around the building while it glows.
+  const HEARTWOOD_BUILDING_PALETTE = useMemo(() => ({ accent: '#C9F29B', glow: '#A8E873', mist: 'rgba(226,255,213,0.88)', primary: '#4F9F57' }), []);
+  const [buildingFx, setBuildingFx] = useState<(HeartwoodBuildingFx & { id: HeartwoodBuildingId }) | null>(null);
+  const [buildingImpact, setBuildingImpact] = useState<{ id: HeartwoodBuildingId; nonce: number } | null>(null);
+  const buildingFxNonceRef = useRef(0);
+  const buildingFxTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => { for (const timer of buildingFxTimersRef.current) clearTimeout(timer); }, []);
+  const upgradeHeartwoodBuildingWithFx = useStableCallback(async (id: HeartwoodBuildingId, expectedLevel: number) => {
+    const reduced = reduceMotion;
+    const building = heartwoodBuildingById.get(id)!;
+    const cost = heartwoodBuildingCost(expectedLevel) ?? 0;
+    // Reduced motion, or nothing to pay: the write alone, as before.
+    if (reduced || cost <= 0 || buildingFx) return upgradeStoredHeartwoodBuilding(id, expectedLevel);
+    const nonce = ++buildingFxNonceRef.current;
+    const timers = buildingFxTimersRef.current;
+    const later = (ms: number, action: () => void) => { timers.push(setTimeout(action, ms)); };
+    const coinOrigin = await measureGlowCurrencyOrigin();
+    setGlowSpend({ amount: cost, counting: false });
+    setBuildingFx({ id, nonce, slotId: building.slotId, coinOrigin, palette: HEARTWOOD_BUILDING_PALETTE, phase: 'payment',
+      onCoinLanded: () => setBuildingImpact((current) => ({ id, nonce: (current?.nonce ?? 0) + 1 })) });
+    // The counter follows the coins down; the world is written as the last one seats.
+    later(180, () => setGlowSpend({ amount: cost, counting: true }));
+    const settled = new Promise<Awaited<ReturnType<typeof upgradeStoredHeartwoodBuilding>>>((resolve, reject) => {
+      later(COIN_FLIGHT_WINDOW_MS, () => { upgradeStoredHeartwoodBuilding(id, expectedLevel).then(resolve, reject); });
+    });
+    try {
+      const result = await settled;
+      setDisplayedGlow(result.state.coins);
+      setBuildingFx((current) => current?.nonce === nonce ? { ...current, phase: 'cover' } : current);
+      later(320, () => setBuildingFx((current) => current?.nonce === nonce ? { ...current, phase: 'reveal' } : current));
+      later(900, () => setBuildingFx((current) => current?.nonce === nonce ? { ...current, phase: 'react' } : current));
+      later(1_500, () => { setBuildingFx((current) => current?.nonce === nonce ? null : current); setGlowSpend(null); });
+      return result;
+    } catch (error) {
+      setBuildingFx((current) => current?.nonce === nonce ? null : current);
+      setGlowSpend(null);
+      throw error;
+    }
+  });
   const heartwoodBuildingAdornments = Object.fromEntries(HEARTWOOD_BUILDINGS.flatMap((building) => {
     const level = heartwoodBuildingLevel(mergeWorld, building.id);
     // An unbuilt patch's sign is an offer: it only shows while the world is free to take it.
     if (level === 0 && (!buildingOffersShown || !wispLanternAllowed || buildingPanelId != null)) return [];
     return [[building.slotId, <HeartwoodBuildingWorld key={building.id} id={building.id} level={level}
       affordable={mergeWorld.coins >= (heartwoodBuildingCost(level) ?? Infinity)}
+      impactNonce={buildingImpact?.id === building.id ? buildingImpact.nonce : 0}
+      charged={buildingFx?.id === building.id && buildingFx.phase !== 'payment'}
       onPress={wispLanternAllowed ? () => setBuildingPanelId(building.id) : undefined} />]];
   }));
 
@@ -2327,6 +2372,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onHeartwoodPress={sharedAdventureAllowed ? () => { setSelectedHeartwoodBed(undefined); setHeartwoodOpenToken(value => value + 1); } : undefined}
         wispLanternAdornment={wispLanternAdornment}
         heartwoodBuildingAdornments={heartwoodBuildingAdornments}
+        heartwoodBuildingFx={buildingFx}
         heartwoodBuiltSlots={heartwoodBuiltSlots}
         wispLanternPlanted={Boolean(mergeWorld.wispLanternPlacement)}
         onPlantWispLantern={wispPlanting ? plantWispLantern : undefined}
@@ -2470,7 +2516,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onPlay={playRushHeat} onOpenChest={openRushChest} onClose={() => setRushSheetOpen(false)}
         onStory={() => { setRushSheetOpen(false); openNatureIslandOffer(WISP_RUSH_HOST.islandId); }} /> : null}
       {buildingPanelId && screenFocused ? <HeartwoodBuildingPanel key={buildingPanelId} world={mergeWorld} buildingId={buildingPanelId} layout={upgradeStage} bottomInset={insets.bottom}
-        onUpgrade={upgradeStoredHeartwoodBuilding}
+        onUpgrade={upgradeHeartwoodBuildingWithFx}
         onClose={() => setBuildingPanelId(null)}
         onGarden={() => { setBuildingPanelId(null); openGarden(undefined, 'mossprout'); }} /> : null}
       {SHARED_ADVENTURE_ENABLED && adventureOpen && screenFocused ? <SharedAdventurePanel world={mergeWorld} routeCompanion={routeCompanion}

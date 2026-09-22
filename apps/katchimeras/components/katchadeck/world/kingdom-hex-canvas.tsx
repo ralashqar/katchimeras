@@ -4,7 +4,7 @@ import { HatchWispLayer } from './hatch-wisp-layer';
 import { playUpgradeSequence } from '@incubator/environments/upgrade-sequence';
 import {createHexTileRenderer} from '@incubator/environments/hex-tile';
 import { WorldUpgradeMarker } from './world-upgrade-marker';
-import { heartwoodPatchItemPosition } from '@/constants/heartwood-patch-item';
+import { HEARTWOOD_PATCH_ITEM, heartwoodPatchItemPosition } from '@/constants/heartwood-patch-item';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
 import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
 import type { WispId } from '@/types/wisp';
@@ -102,6 +102,7 @@ import {
   type HavenTileUpgradePresentation,
   type HavenUpgradePresentationPhase,
 } from '@/utils/haven-upgrade-presentation';
+import type { HavenUpgradeEffectPalette } from '@incubator/environments/upgrade-presentation';
 import { ScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import {
   type KingdomHexTileLod,
@@ -136,6 +137,8 @@ type Props = {
   heartwoodBuildingAdornments?: Partial<Record<MossproutGardenPlantSlotId, React.ReactNode>>;
   /** Patches a building already stands in: no longer empty beds. */
   heartwoodBuiltSlots?: readonly MossproutGardenPlantSlotId[];
+  /** A building being upgraded: the tile upgrade's own coins and field of light, played small around its patch. */
+  heartwoodBuildingFx?: HeartwoodBuildingFx | null;
   wispLanternPlanted?: boolean;
   onPlantWispLantern?: () => void;
   hideWorldTiles?: boolean;
@@ -248,6 +251,9 @@ type Props = {
   soloLayerId?: string | null;
   soloOfferId?: string | null;
 };
+
+/** A Heartwood building's upgrade as the canvas plays it: which patch, where the Glow comes from, and how far along it is. */
+export type HeartwoodBuildingFx = { nonce: number; slotId: MossproutGardenPlantSlotId; coinOrigin: { x: number; y: number }; palette: HavenUpgradeEffectPalette; phase: HavenUpgradePresentationPhase; onCoinLanded?: (last: boolean) => void };
 
 type HavenUpgradeLayers = {
   fromLayer: KingdomTileArtLayer;
@@ -523,6 +529,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   wispLanternAdornment,
   heartwoodBuildingAdornments,
   heartwoodBuiltSlots,
+  heartwoodBuildingFx,
   wispLanternPlanted,
   onPlantWispLantern,
   hideWorldTiles = false,
@@ -1636,6 +1643,25 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       },
     };
   }, [cameraSnapshot, scene.height, scene.width, upgradeLayers]);
+  // The upgrade's effect is drawn in screen space (as the tile's is): the building's box on its patch, through the camera.
+  const buildingFxFrame = heartwoodBuildingFx ? gardenPlotFrames.find((plot) => plot.slotId === heartwoodBuildingFx.slotId)?.frame ?? null : null;
+  const buildingFxSnapshot = camera.snapshot;
+  const buildingFxGeometry = useMemo(() => {
+    if (!buildingFxFrame) return null;
+    const box = heartwoodPatchItemPosition(buildingFxFrame);
+    const project = (x: number, y: number) => ({
+      x: scene.width / 2 + buildingFxSnapshot.tx + (x - scene.width / 2) * buildingFxSnapshot.scale,
+      y: scene.height / 2 + buildingFxSnapshot.ty + (y - scene.height / 2) * buildingFxSnapshot.scale,
+    });
+    const topLeft = project(box.left, box.top);
+    const size = { width: HEARTWOOD_PATCH_ITEM.width * buildingFxSnapshot.scale, height: HEARTWOOD_PATCH_ITEM.art * buildingFxSnapshot.scale };
+    // A little wider than the building, so the embers and arrows rise around it, not out of it.
+    const pad = size.width * 0.35;
+    return {
+      area: { left: topLeft.x - pad, top: topLeft.y - size.height * 0.25, width: size.width + pad * 2, height: size.height * 1.25 },
+      target: { x: topLeft.x + size.width / 2, y: topLeft.y + size.height * 0.6 },
+    };
+  }, [buildingFxFrame, buildingFxSnapshot, scene.height, scene.width]);
   const discoveryEffectGeometry = useMemo(() => {
     if (!discoveryLayers) return null;
     const screenFrame = (layer: KingdomTileArtLayer) => ({
@@ -2183,6 +2209,18 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           showCoins={upgradePresentation.showCoins}
           showReaction={!upgradePresentation.natureIslandId}
           target={upgradeEffectGeometry.target}
+        />
+      ) : null}
+      {heartwoodBuildingFx && buildingFxGeometry && heartwoodBuildingFx.phase !== 'complete' ? (
+        <HavenUpgradeEffects
+          key={`building-fx:${heartwoodBuildingFx.nonce}`}
+          area={buildingFxGeometry.area}
+          phase={heartwoodBuildingFx.phase}
+          presentation={{ nonce: heartwoodBuildingFx.nonce, coinOrigin: heartwoodBuildingFx.coinOrigin, palette: heartwoodBuildingFx.palette, reactionLine: '' }}
+          reducedMotion={reduceMotion}
+          showReaction={false}
+          target={buildingFxGeometry.target}
+          onCoinLanded={heartwoodBuildingFx.onCoinLanded}
         />
       ) : null}
       {!upgradePresentation && discoveryPresentation && discoveryEffectGeometry && discoveryLayers && discoveryPhase !== 'complete' ? (

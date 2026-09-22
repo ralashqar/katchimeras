@@ -8,6 +8,8 @@ import { HEARTWOOD_PATCH_ITEM as ITEM } from '@/constants/heartwood-patch-item';
 import { AppFontFamilies } from '@/constants/theme';
 
 const ASLEEP = { opacity: 0.5, scale: 0.84 };
+const SOFT_GLOW = require('@incubator/art-characters/soft-glow.png');
+const GLOW_TINT = '#C9F29B';
 
 /**
  * A Heartwood building standing on its patch, the same size and footing as the
@@ -18,9 +20,18 @@ const ASLEEP = { opacity: 0.5, scale: 0.84 };
  * small and dim. When it clears the building swells into life, and `onSettled`
  * reports each look once it has come to rest (`<id>:dormant`, `<id>:awake`) so
  * the story only speaks about what the player has actually seen.
+ *
+ * While it is being upgraded, each Glow coin that lands (`impactNonce`) rocks
+ * it and flashes a soft glow behind it; `charged` keeps the glow breathing
+ * while the upgrade's field of light plays. The glow is a view that is always
+ * mounted at opacity 0, so nothing mounts or unmounts on an impact.
  */
-export function HeartwoodBuildingWorld({ id, level, affordable, dormant = false, onSettled, onPress }: {
+export function HeartwoodBuildingWorld({ id, level, affordable, dormant = false, impactNonce = 0, charged = false, onSettled, onPress }: {
   id: HeartwoodBuildingId; level: number; affordable?: boolean; dormant?: boolean;
+  /** Bumps once per coin landing during an upgrade. */
+  impactNonce?: number;
+  /** The upgrade's field of light is playing over it. */
+  charged?: boolean;
   onSettled?: (visualKey: string) => void; onPress?: () => void;
 }) {
   const reduced = useReducedMotion();
@@ -28,6 +39,8 @@ export function HeartwoodBuildingWorld({ id, level, affordable, dormant = false,
   const built = level > 0;
   const life = useSharedValue(dormant ? 0 : 1);
   const pop = useSharedValue(0);
+  const rock = useSharedValue(0);
+  const glow = useSharedValue(0);
   const settledRef = useRef(onSettled);
   settledRef.current = onSettled;
   useEffect(() => {
@@ -46,10 +59,31 @@ export function HeartwoodBuildingWorld({ id, level, affordable, dormant = false,
     life.value = withTiming(dormant ? 0 : 1, { duration: 580 }, (finished) => { if (finished) runOnJS(settle)(); });
     return () => { cancelAnimation(life); cancelAnimation(pop); };
   }, [built, dormant, id, life, pop, reduced]);
+  // A coin lands: a quick rock and a flash of light behind the building.
+  const firstImpact = useRef(true);
+  useEffect(() => {
+    if (firstImpact.current) { firstImpact.current = false; return; }
+    if (!impactNonce || reduced) return;
+    rock.value = 0;
+    rock.value = withSequence(withTiming(1, { duration: 45 }), withTiming(-0.8, { duration: 70 }), withTiming(0.4, { duration: 60 }), withTiming(0, { duration: 70 }));
+    glow.value = withSequence(withTiming(1, { duration: 60 }), withTiming(charged ? 0.45 : 0, { duration: 420 }));
+  }, [charged, glow, impactNonce, reduced, rock]);
+  // The field of light: the glow breathes until it is over.
+  useEffect(() => {
+    if (reduced) { glow.value = 0; return; }
+    if (!charged) { glow.value = withTiming(0, { duration: 360 }); return; }
+    glow.value = withSequence(withTiming(0.9, { duration: 220 }), withTiming(0.5, { duration: 380 }), withTiming(0.85, { duration: 380 }), withTiming(0.4, { duration: 420 }));
+    return () => cancelAnimation(glow);
+  }, [charged, glow, reduced]);
   const stageStyle = useAnimatedStyle(() => ({
     opacity: ASLEEP.opacity + (1 - ASLEEP.opacity) * life.value,
-    transform: [{ scale: ASLEEP.scale + (1 - ASLEEP.scale) * life.value + pop.value * 0.12 }],
+    transform: [
+      { translateX: rock.value * 3 },
+      { rotate: `${rock.value * 4}deg` },
+      { scale: ASLEEP.scale + (1 - ASLEEP.scale) * life.value + pop.value * 0.12 + Math.abs(rock.value) * 0.05 },
+    ],
   }));
+  const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value * 0.9, transform: [{ scale: 1.5 + glow.value * 0.35 }] }));
   const label = <Text style={[styles.label, !built && styles.sign, !built && affordable && styles.signReady]}>
     {!built ? `+ ${definition.name}` : dormant ? definition.name : `${definition.name} · ${level}`}
   </Text>;
@@ -60,6 +94,9 @@ export function HeartwoodBuildingWorld({ id, level, affordable, dormant = false,
   return <Pressable disabled={!onPress} onPress={onPress} accessibilityRole="button"
     accessibilityLabel={dormant ? `${definition.name}, not running yet` : `${definition.name}, Level ${level}. Open upgrades`} style={styles.world}>
     <Animated.View key="built" entering={reduced ? FadeIn.duration(100) : ZoomIn.duration(650)} style={styles.stage}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, glowStyle]}>
+        <Image accessibilityIgnoresInvertColors contentFit="contain" source={SOFT_GLOW} style={StyleSheet.absoluteFill} tintColor={GLOW_TINT} transition={0} />
+      </Animated.View>
       <Animated.View style={[styles.stage, stageStyle]}>
         {/* The world is zoomed by the camera: decode the art at its full size, not at this small box's, or it blurs when framed. */}
         <Image source={heartwoodBuildingArt(id, level)} style={styles.art} contentFit="contain" allowDownscaling={false} transition={reduced ? 0 : 250} />
