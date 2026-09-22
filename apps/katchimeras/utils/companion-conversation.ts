@@ -156,7 +156,8 @@ export function answerConversation(
       ? Math.max(0, node.questions.findIndex((candidate) => candidate.id === nextQuestionId))
       : workingSession.gameQuestionIndex + 1,
     ...(node.kind === 'profile_game' && nextQuestionId ? { gameQuestionId: nextQuestionId } : {}),
-    pendingReply: option.reply,
+    // An answer with nothing to say back has no reply beat: the conversation moves straight on.
+    pendingReply: option.reply || undefined,
     pendingNextNodeId: completedGame ? node.revealNodeId : node.id,
     turns,
     affinityScores,

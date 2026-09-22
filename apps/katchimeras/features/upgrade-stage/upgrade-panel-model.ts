@@ -2,11 +2,15 @@ import { HAVEN_ENVIRONMENTS } from '@/constants/haven-catalog';
 import { HEARTWOOD_BUILDING_MAX_LEVEL, heartwoodBuildingById, heartwoodBuildingCost, heartwoodBuildingLevel, heartwoodBuildingLook, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
 import { heartwoodBuildingsEligible } from '@/features/heartwood-buildings/buildings-world';
 import { mossproutMemoryPlantNames } from '@/constants/mossprout-memory-plant-names';
-import type { MergeWorldState } from '@/types/merge-world';
+import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
+import { abilityForCompanion, abilityTier } from '@/constants/companion-abilities';
+import { katchimeraSkinById } from '@/constants/katchimera-skins';
+import { canUpgradeKatchimera, KATCHIMERA_MAX_LEVEL, katchimeraProgress, katchimeraUpgradeCost, katchimeraXpForLevel } from '@/constants/katchimera-progression';
+import type { CompanionAbilityDefinition, CompanionAbilityTier } from '@/types/companion-ability';
 import { mossproutNatureIslandById } from '@/constants/mossprout-nature-islands';
 import { LANTERN_LEVELS, LANTERN_RECURRING_ORDERS, lanternLevel } from '@/constants/wisp-lantern-levels';
 import type { WorldUpgradeOffer } from '@/features/world-upgrades/world-upgrade-offers';
-import { WELCOME_ORDER_IDS, canUpgradeLantern, type LanternWorldProgress } from '@/features/wisps/lantern-world';
+import { WELCOME_CLEARS, canUpgradeLantern, type LanternWorldProgress } from '@/features/wisps/lantern-world';
 
 /**
  * What the shared upgrade panel shows, whatever is being upgraded. A tile and
@@ -30,7 +34,7 @@ export type UpgradeBenefit = {
 };
 export type UpgradeBenefitIcon = 'energy' | 'bolt.fill' | 'timer' | 'sparkles' | 'star.fill' | 'shippingbox.fill' | 'glow';
 
-export type UpgradeRequirementAction = 'garden';
+export type UpgradeRequirementAction = 'garden' | 'mist';
 
 export type UpgradeRequirement = {
   id: string;
@@ -114,9 +118,9 @@ export function tileUpgradeModel(offer: WorldUpgradeOffer, glow: number, options
   const affordable = glow >= offer.cost;
   const purchasable = !complete && !locked && offer.eligible;
   const requirements: UpgradeRequirement[] = !purchasable || offer.cost <= 0 ? [] : [{
-    id: 'glow', label: 'Glow', detail: 'Earned by tending the Garden.', currency: 'coins', met: affordable,
+    id: 'glow', label: 'Glow', detail: 'Earned in the Mist.', currency: 'coins', met: affordable,
     current: Math.min(glow, offer.cost), total: offer.cost,
-    action: affordable ? undefined : { id: 'garden', label: 'Tend garden' },
+    action: affordable ? undefined : { id: 'mist', label: 'Enter the Mist' },
   }];
   return {
     title: offer.name,
@@ -139,30 +143,82 @@ export function lanternUpgradeModel(progress: LanternWorldProgress | undefined):
   const current = lanternLevel(progress?.level);
   const entry = LANTERN_LEVELS[current - 1];
   const next = LANTERN_LEVELS.find((level) => level.level === current + 1) ?? null;
-  const welcome = WELCOME_ORDER_IDS.filter((id) => progress?.welcomeServed.includes(id)).length;
+  const welcome = Math.min(WELCOME_CLEARS, progress?.welcomeServed.length ?? 0);
   const orders = progress?.lifetimeOrders ?? 0;
-  const needed = WELCOME_ORDER_IDS.length + (next?.orders ?? 0);
+  const needed = WELCOME_CLEARS + (next?.orders ?? 0);
   return {
     title: 'Wisp Lantern',
     levelOffset: 0,
     level: { current, next: next?.level ?? null, max: LANTERN_LEVELS.length },
-    progressLabel: next ? `${percent(Math.min(welcome, WELCOME_ORDER_IDS.length) + Math.min(orders, next.orders), needed)}%` : 'MAX',
-    progressFraction: next ? percent(Math.min(welcome, WELCOME_ORDER_IDS.length) + Math.min(orders, next.orders), needed) / 100 : 1,
+    progressLabel: next ? `${percent(welcome + Math.min(orders, next.orders), needed)}%` : 'MAX',
+    progressFraction: next ? percent(welcome + Math.min(orders, next.orders), needed) / 100 : 1,
     levels: LANTERN_LEVELS.map((level) => ({ level: level.level, name: level.name, description: level.benefit, state: levelState(level.level, current, next?.level ?? null) })),
     benefits: next ? [
       { id: 'residents', label: 'Resident Wisps', icon: 'sparkles', tint: '#8A63C9', from: entry.residents, to: next.residents },
       next.level === 2
-        ? { id: 'bonus', label: 'Bonus pack', icon: 'star.fill', tint: '#D98A1F', detail: `Every ${LANTERN_RECURRING_ORDERS} Garden orders` }
+        ? { id: 'bonus', label: 'Bonus pack', icon: 'star.fill', tint: '#D98A1F', detail: `Every ${LANTERN_RECURRING_ORDERS} Mist clears` }
         : { id: 'rare', label: 'Bonus packs', icon: 'star.fill', tint: '#D98A1F', detail: 'Rare or better guaranteed' },
     ] : [],
     requirements: next ? [
-      { id: 'welcome', label: 'Welcome requests', met: welcome >= WELCOME_ORDER_IDS.length, current: welcome, total: WELCOME_ORDER_IDS.length,
-        action: welcome >= WELCOME_ORDER_IDS.length ? undefined : { id: 'garden', label: 'Go' } },
-      { id: 'orders', label: 'Garden orders', met: orders >= next.orders, current: Math.min(orders, next.orders), total: next.orders,
-        action: orders >= next.orders ? undefined : { id: 'garden', label: 'Go' } },
+      { id: 'welcome', label: 'Welcome clears', met: welcome >= WELCOME_CLEARS, current: welcome, total: WELCOME_CLEARS,
+        action: welcome >= WELCOME_CLEARS ? undefined : { id: 'mist', label: 'Go' } },
+      { id: 'orders', label: 'Mist clears', met: orders >= next.orders, current: Math.min(orders, next.orders), total: next.orders,
+        action: orders >= next.orders ? undefined : { id: 'mist', label: 'Go' } },
     ] : [],
     complete: !next,
     primary: next ? { label: 'Upgrade', cost: null, disabled: !canUpgradeLantern(progress) } : null,
+  };
+}
+
+/** What an ability's tier does, in one line. */
+export function abilityTierSummary(ability: CompanionAbilityDefinition, tier: CompanionAbilityTier): string {
+  const every = `every ${tier.chargeEvery} merges`;
+  if (ability.id === 'bloom') return `Bloom ${every} · raises a plant up to tier ${tier.maxTier ?? 2}${tier.clearsAdjacentLight ? ' · clears light Mist beside it' : ''}${tier.twoTargets ? ' · first use raises two' : ''}`;
+  if (ability.id === 'trailfinder') return `Trailfinder ${every} · reveals ${tier.cells ?? 1} Mist cell${(tier.cells ?? 1) === 1 ? '' : 's'}`;
+  return `Focus ${every} · +${tier.charges ?? 1} charge${(tier.charges ?? 1) === 1 ? '' : 's'}, better drops for ${tier.taps ?? 3} taps`;
+}
+
+/**
+ * A playable Katchimera's level: ten steps, each paid in Glow once the Mist has taught them enough, each carrying the
+ * ability's next tier. The rows are the ability's numbers now and at the next level.
+ */
+export function companionUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'katchimeraProgress'>, id: MergeCharacterId): UpgradePanelModel {
+  const progress = katchimeraProgress(world, id);
+  const current = progress.level;
+  const next = current >= KATCHIMERA_MAX_LEVEL ? null : current + 1;
+  const cost = katchimeraUpgradeCost(current);
+  const needed = next == null ? null : katchimeraXpForLevel(next);
+  const check = canUpgradeKatchimera(world, id);
+  const ability = abilityForCompanion(id);
+  const name = katchimeraSkinById.get(id)?.displayName ?? id;
+  const tierAt = (level: number) => (ability ? abilityTier(ability, level) : null);
+  const [tierNow, tierNext] = [tierAt(current), tierAt(next ?? current)];
+  return {
+    title: name,
+    levelOffset: 0,
+    tagline: ability ? `${ability.name}: ${ability.description}` : undefined,
+    level: { current, next, max: KATCHIMERA_MAX_LEVEL },
+    progressLabel: next == null || needed == null ? 'MAX' : `${percent(progress.xp, needed)}%`,
+    progressFraction: next == null || needed == null ? 1 : percent(progress.xp, needed) / 100,
+    levels: Array.from({ length: KATCHIMERA_MAX_LEVEL }, (_, index) => {
+      const level = index + 1;
+      const tier = tierAt(level);
+      const reached = ability && tier && tier.level === level;
+      return { level, name: reached ? `${ability!.name} grows` : `Level ${level}`, description: ability && tier ? abilityTierSummary(ability, tier) : undefined, state: levelState(level, current, next) };
+    }),
+    benefits: ability && tierNow && tierNext ? [
+      { id: 'charge', label: 'Charges every', icon: 'bolt.fill', tint: '#2FA9C4', from: `${tierNow.chargeEvery}`, to: `${tierNext.chargeEvery}`, delta: tierNow.chargeEvery === tierNext.chargeEvery ? undefined : `-${tierNow.chargeEvery - tierNext.chargeEvery}` },
+      ...(ability.id === 'bloom' ? [{ id: 'reach', label: 'Raises up to tier', icon: 'sparkles' as const, tint: '#8A63C9', from: `${tierNow.maxTier ?? 2}`, to: `${tierNext.maxTier ?? 2}`, delta: (tierNow.maxTier ?? 2) === (tierNext.maxTier ?? 2) ? undefined : `+${(tierNext.maxTier ?? 2) - (tierNow.maxTier ?? 2)}` }] : []),
+      ...(ability.id === 'trailfinder' ? [{ id: 'cells', label: 'Cells revealed', icon: 'sparkles' as const, tint: '#8A63C9', from: `${tierNow.cells ?? 1}`, to: `${tierNext.cells ?? 1}`, delta: (tierNow.cells ?? 1) === (tierNext.cells ?? 1) ? undefined : `+${(tierNext.cells ?? 1) - (tierNow.cells ?? 1)}` }] : []),
+      ...(ability.id === 'focus' ? [{ id: 'charges', label: 'Charges added', icon: 'star.fill' as const, tint: '#D98A1F', from: `${tierNow.charges ?? 1}`, to: `${tierNext.charges ?? 1}`, delta: (tierNow.charges ?? 1) === (tierNext.charges ?? 1) ? undefined : `+${(tierNext.charges ?? 1) - (tierNow.charges ?? 1)}` }] : []),
+    ] : [],
+    requirements: next == null || cost == null || needed == null ? [] : [
+      { id: 'xp', label: 'Experience', detail: 'Earned in the Mist together.', met: progress.xp >= needed, current: Math.min(progress.xp, needed), total: needed, action: progress.xp >= needed ? undefined : { id: 'mist', label: 'Enter the Mist' } },
+      { id: 'glow', label: 'Glow', detail: 'Earned in the Mist.', currency: 'coins', met: world.coins >= cost, current: Math.min(world.coins, cost), total: cost, action: world.coins >= cost ? undefined : { id: 'mist', label: 'Enter the Mist' } },
+    ],
+    note: ability ? `${ability.name} is ${name}’s own.` : undefined,
+    complete: next == null,
+    primary: next != null && cost != null ? { label: 'Level up', cost, disabled: !check.ok } : null,
   };
 }
 
@@ -197,9 +253,9 @@ export function buildingUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'hea
       return { id: stat.label, label: stat.label, icon: stat.icon, tint: stat.tint, from: stat.format(from), to: stat.format(to), delta: from === to ? undefined : stat.delta(from, to) };
     }),
     requirements: next == null || cost == null ? [] : [{
-      id: 'glow', label: 'Glow', detail: 'Earned by tending the Garden.', currency: 'coins', met: affordable,
+      id: 'glow', label: 'Glow', detail: 'Earned in the Mist.', currency: 'coins', met: affordable,
       current: Math.min(world.coins, cost), total: cost,
-      action: affordable ? undefined : { id: 'garden', label: 'Tend garden' },
+      action: affordable ? undefined : { id: 'mist', label: 'Enter the Mist' },
     }],
     locked: eligible ? undefined : { label: 'Not yet', reason: 'Heartwood has to stir before anything can be built here.' },
     note: origin ? `Grown from your ${origin}.` : undefined,

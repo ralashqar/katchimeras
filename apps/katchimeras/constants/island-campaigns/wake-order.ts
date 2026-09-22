@@ -2,10 +2,12 @@ import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeWorldState, MossproutNatureIslandId } from '@/types/merge-world';
 import { hatchableEggProgress } from '@/features/onboarding/hatchable-egg-policy';
+import { heartwoodStage, type HeartwoodStage } from '@/features/shared-adventure/heartwood-progression';
 import { ISLAND_CAMPAIGNS, islandCampaignForIsland, islandCampaignForResident } from './registry';
 import type { IslandWakeCondition } from './types';
 
 export type IslandWakeEntry = { islandId: MossproutNatureIslandId; residentSkinId: KatchimeraSkinId };
+const HEARTWOOD_STAGES: readonly HeartwoodStage[] = ['dormant', 'stirring', 'rooted', 'blooming', 'awakened'];
 
 /**
  * Friends drifted into the mist one by one; they come home in this order.
@@ -37,6 +39,7 @@ export function islandWakeConditionHolds(world: MergeWorldState, condition: Isla
     case 'always': return true;
     case 'friend_home': return islandFriendHome(world, condition.residentSkinId);
     case 'friend_hatched': return Boolean(hatchableEggProgress(world, { companion: condition.companion })?.hatchedAt) || world.companionDiscovery.records.some((record) => record.characterId === condition.companion);
+    case 'tree_stage': return HEARTWOOD_STAGES.indexOf(heartwoodStage(world)) >= HEARTWOOD_STAGES.indexOf(condition.stage);
   }
 }
 

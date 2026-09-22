@@ -116,6 +116,7 @@ export default function ExploreScreen() {
   const [journeyToolsOpen, setJourneyToolsOpen] = useState(false);
   const [journeyQuickMode, setJourneyQuickMode] = useState(isJourneyQuickModeEnabled());
   const [missionMechanicPreview, setMissionMechanicPreview] = useState(getDevMissionMechanicPreview() === 'column-shot');
+  const [darkWispsPreview, setDarkWispsPreview] = useState(getDevMissionMechanicPreview() === 'dark-wisps');
 
   const handleResetKatchimerasProgress = () => {
     Alert.alert(
@@ -168,6 +169,7 @@ export default function ExploreScreen() {
       setStoredState(homeRepository.load());
       setJourneyQuickMode(isJourneyQuickModeEnabled());
       setMissionMechanicPreview(getDevMissionMechanicPreview() === 'column-shot');
+      setDarkWispsPreview(getDevMissionMechanicPreview() === 'dark-wisps');
 
       void loadMergeWorldState().then((state) => {
         if (active) setDevWallet({ glow: state.coins, energy: state.energy.value });
@@ -363,7 +365,7 @@ export default function ExploreScreen() {
       beginFirstSession({ restart: true });
       await prepareMossproutMergeFtueForDebug(step);
       jumpFtueToStep(step);
-      returnToTabs(router, '/(tabs)/games');
+      returnToTabs(router, '/(tabs)/katchimeras');
     } catch (caught) {
       Alert.alert('Merge FTUE setup failed', caught instanceof Error ? caught.message : 'The Merge tutorial could not be prepared.');
     }
@@ -725,9 +727,26 @@ export default function ExploreScreen() {
                       onValueChange={(enabled) => {
                         setDevMissionMechanicPreview(enabled ? 'column-shot' : null);
                         setMissionMechanicPreview(enabled);
+                        if (enabled) setDarkWispsPreview(false);
                       }}
                       trackColor={{ false: 'rgba(200,216,255,0.2)', true: '#5FA87B' }}
                       value={missionMechanicPreview}
+                    />
+                  </View>
+                  <View style={styles.devToggleRow}>
+                    <View style={styles.devToggleCopy}>
+                      <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">Mist board: Dark Wisps encounter</ThemedText>
+                      <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">Every docked mist board plays the campaign pivot’s encounter: a Resolve budget, a Seed Pod with charges, Mist of its own, two Dark Wisps that fight back, and Mossprout’s Bloom. Saved apart from the real boards.</ThemedText>
+                    </View>
+                    <Switch
+                      accessibilityLabel="Preview the Dark Wisps encounter"
+                      onValueChange={(enabled) => {
+                        setDevMissionMechanicPreview(enabled ? 'dark-wisps' : null);
+                        setDarkWispsPreview(enabled);
+                        if (enabled) setMissionMechanicPreview(false);
+                      }}
+                      trackColor={{ false: 'rgba(200,216,255,0.2)', true: '#5FA87B' }}
+                      value={darkWispsPreview}
                     />
                   </View>
                 </View> : null}

@@ -1,10 +1,13 @@
 import type { ConversationDefinition } from '@/types/companion-conversation';
+import { regionLadder, type RegionRung } from './ladder';
+import type { EncounterDifficulty, EncounterGrade } from '@/types/encounter';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { IslandCampaignProgress, IslandRestorationProgress, MergeOrder, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import { mossproutNatureIslandLevelDefinition } from '@/constants/mossprout-nature-islands';
 import { resolveContentLine } from '@/utils/content-predicate';
 import { ISLAND_CAMPAIGNS } from './registry';
 import type {
+  RegionMissionDefinition,
   IslandCampaignChapter,
   IslandCampaignChapterLevel,
   IslandCampaignChapterStatus,
@@ -58,6 +61,17 @@ export function islandCampaignChapterStatus(world: MergeWorldState, campaign: Is
   if (!progress) return 'available';
   if (progress.completedAt != null) return 'complete';
   const restored = (world.haven.mossproutNatureIslands[campaign.islandId] ?? 0) >= level;
+  // The campaign pivot: a chapter with no request and no board of its own plays as rungs of the region's ladder.
+  // A chapter from before it (a request published, a board opened) keeps the flow it started in.
+  const rungIds = regionLadder(campaign).filter((rung) => rung.chapterLevel === level).map((rung) => rung.mission.id);
+  const ledger = world.encounters;
+  const activeHere = Boolean(ledger?.active && rungIds.includes(ledger.active.missionId));
+  const anyCleared = rungIds.some((id) => Boolean(ledger?.clears[id]));
+  const legacy = Boolean(progress.restoration) || progress.orderIds.length > 0;
+  if (!legacy || activeHere || anyCleared) {
+    if (restored) return 'resolution_ready';
+    return activeHere ? 'in_encounter' : 'mission_available';
+  }
   if (progress.restoration) {
     // A board chapter: paid up front, the board is the request, the Main Board is its delivery.
     if (restored) return 'resolution_ready';
@@ -72,15 +86,40 @@ export function islandCampaignChapterStatus(world: MergeWorldState, campaign: Is
 
 /** Shared labels for the restoration-board states, for friends whose copy does not voice them. */
 export const RESTORATION_ACTION_LABEL = 'Keep restoring';
-export const RESTORATION_STATE_LABELS: Record<'board_open' | 'delivery_requested', string> = {
+export const RESTORATION_STATE_LABELS: Record<'board_open' | 'delivery_requested' | 'mission_available' | 'in_encounter', string> = {
   board_open: 'Restoring',
   delivery_requested: 'Requested in Merge',
+  mission_available: 'The Mist waits',
+  in_encounter: 'In the Mist',
+};
+export const SHARED_ACTION_LABELS: Record<'continue_restoring' | 'enter_mist' | 'resume_mist', string> = {
+  continue_restoring: RESTORATION_ACTION_LABEL,
+  enter_mist: 'Enter the Mist',
+  resume_mist: 'Back into the Mist',
 };
 export function islandCampaignActionLabel(campaign: IslandCampaignDefinition, action: IslandCampaignPanelAction): string {
-  return campaign.copy.actionLabels[action] ?? RESTORATION_ACTION_LABEL;
+  return campaign.copy.actionLabels[action] ?? (action in SHARED_ACTION_LABELS ? SHARED_ACTION_LABELS[action as keyof typeof SHARED_ACTION_LABELS] : RESTORATION_ACTION_LABEL);
 }
 export function islandCampaignStateLabel(campaign: IslandCampaignDefinition, status: IslandCampaignChapterStatus): string {
-  return campaign.copy.stateLabels[status] ?? (status === 'board_open' || status === 'delivery_requested' ? RESTORATION_STATE_LABELS[status] : status);
+  return campaign.copy.stateLabels[status] ?? (status in RESTORATION_STATE_LABELS ? RESTORATION_STATE_LABELS[status as keyof typeof RESTORATION_STATE_LABELS] : status);
+}
+
+/** One rung of the ladder as the panel lists it. */
+export type RegionLadderEntry = { missionId: string; title: string; difficulty: EncounterDifficulty; chapterLevel: MossproutNatureIslandLevel; state: 'done' | 'next' | 'ahead'; bestGrade?: EncounterGrade };
+
+/** The ladder with the world's clears on it, and the rung to play next (the one that is up, else the first not cleared). */
+export function regionLadderProgress(world: MergeWorldState, campaign: IslandCampaignDefinition): { ladder: RegionLadderEntry[]; next: RegionRung | null } {
+  const ledger = world.encounters;
+  const rungs = regionLadder(campaign);
+  const active = ledger?.active ? rungs.find((rung) => rung.mission.id === ledger.active!.missionId) ?? null : null;
+  const firstOpen = rungs.find((rung) => !ledger?.clears[rung.mission.id] && islandCampaignProgress(world, campaign)?.chapters[String(rung.chapterLevel)]?.completedAt == null) ?? null;
+  const next = active ?? firstOpen;
+  const ladder = rungs.map((rung): RegionLadderEntry => {
+    const clear = ledger?.clears[rung.mission.id];
+    const chapterDone = islandCampaignProgress(world, campaign)?.chapters[String(rung.chapterLevel)]?.completedAt != null;
+    return { missionId: rung.mission.id, title: rung.mission.title, difficulty: rung.mission.difficulty, chapterLevel: rung.chapterLevel, state: clear || chapterDone ? 'done' : rung === next ? 'next' : 'ahead', ...(clear ? { bestGrade: clear.bestGrade } : {}) };
+  });
+  return { ladder, next };
 }
 
 /**
@@ -144,10 +183,16 @@ export type IslandCampaignUpgradePanelState = {
   status: IslandCampaignChapterStatus;
   /** Glow the panel action spends: a restoration board opening (chapter 1 is the gift). */
   actionCost: number;
+  /** The region's ladder with the world's clears on it, and the rung the action leads into (the campaign pivot). */
+  ladder: RegionLadderEntry[];
+  mission: RegionMissionDefinition | null;
+  rung: RegionRung | null;
 };
 
 const PANEL_ACTIONS: Record<IslandCampaignChapterStatus, IslandCampaignPanelAction | null> = {
   available: 'start_story',
+  mission_available: 'enter_mist',
+  in_encounter: 'resume_mist',
   orders_active: 'open_merge',
   return_ready: 'continue_return',
   board_open: 'continue_restoring',
@@ -182,6 +227,8 @@ export function islandCampaignUpgradePanelState(world: MergeWorldState, campaign
   const speech = status === 'return_ready' || status === 'restoration_ready' || deliveredToBeds
     ? choice?.returnLine ?? islandFallbackReturn(campaign, chapter.title)
     : null;
+  const ladderProgress = regionLadderProgress(world, campaign);
+  const rung = status === 'mission_available' || status === 'in_encounter' ? ladderProgress.next : null;
   const completedChapters = campaign.chapters
     .filter((candidate) => islandCampaignChapterStatus(world, campaign, candidate.level) === 'complete')
     .map((candidate) => ({
@@ -204,6 +251,9 @@ export function islandCampaignUpgradePanelState(world: MergeWorldState, campaign
     completedChapters,
     status,
     actionCost: status === 'available' && chapter.restoration ? cost : 0,
+    ladder: ladderProgress.ladder,
+    mission: rung?.mission ?? null,
+    rung,
   };
 }
 
@@ -218,6 +268,9 @@ export type IslandCampaignPanelPresentation = {
   stateLabel: string;
   speech?: string | null;
   completedChapters?: IslandCampaignChapterLogEntry[];
+  /** The region's ladder and the rung the action leads into (the campaign pivot). */
+  ladder?: RegionLadderEntry[];
+  mission?: RegionMissionDefinition | null;
 };
 
 /** The panel's props, so screens pass state through without mapping it. */
@@ -242,6 +295,8 @@ export function islandCampaignPanelPresentation(world: MergeWorldState, campaign
     stateLabel: state.voicedStateLabel,
     speech: state.speech,
     completedChapters: state.completedChapters,
+    ladder: state.ladder,
+    mission: state.mission,
   };
 }
 

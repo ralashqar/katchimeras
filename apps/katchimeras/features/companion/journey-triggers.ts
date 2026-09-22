@@ -125,9 +125,10 @@ export function journeyConditionHolds(condition: JourneyUnlockCondition, chapter
     }
     case 'story_tile_revealed': { const tile = storyTileById(condition.tileId); return Boolean(world && tile && storyTileRevealed(world, tile)); }
     case 'orders_served': {
-      if (!world) return false;
-      const served = new Set(world.externalRewardReceipts.filter((receipt) => receipt.kind === 'story_order_served').map((receipt) => receipt.id.replace('merge-story-served:', '')));
-      return condition.orderIds.every((orderId) => served.has(orderId));
+      // The campaign pivot: the Main Board that served these requests is gone, so a delivery never holds a chapter
+      // back. The episode's own time and Bond gates still pace it.
+      void condition;
+      return true;
     }
     default: return false;
   }

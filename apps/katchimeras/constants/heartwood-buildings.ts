@@ -63,6 +63,12 @@ const gainClock = (from: number, to: number) => signed(clock(Math.abs(to - from)
 const TINT = { energy: '#2FA9C4', time: '#4E9CC4', finds: '#8A63C9', rare: '#D98A1F', storage: '#9A6A3C', glow: '#E7A21B' } as const;
 const clampLevel = (level: number) => Math.max(0, Math.min(HEARTWOOD_BUILDING_MAX_LEVEL, Math.floor(Number.isFinite(level) ? level : 0)));
 
+/** Dew Spring: Resolve brought into every board, two a level; and, high up, a step of Resolve back on a Perfect clear. */
+export const dewSpringResolveBonus = (level: number) => clampLevel(level) * 2;
+export const dewSpringSecondWind = (level: number) => { const at = clampLevel(level); return at >= 10 ? 2 : at >= 7 ? 1 : 0; };
+/** Root Cellar: Mist cells opened before the first move, one every two levels. */
+export const rootCellarOpenCells = (level: number) => Math.floor(clampLevel(level) / 2);
+// The energy numbers stay for the world's dormant energy state; no building moves them any more.
 export const dewSpringEnergyCap = (level: number) => MERGE_ENERGY_BASE_CAP + clampLevel(level) * 10;
 export const dewSpringRegenMs = (level: number) => {
   const at = clampLevel(level);
@@ -79,18 +85,18 @@ export const gardenStallGlowBonus = (level: number) => clampLevel(level) * 0.04;
 export const HEARTWOOD_BUILDINGS: readonly HeartwoodBuildingDefinition[] = [
   {
     id: 'dew-spring', name: 'Dew Spring', slotId: 'back-centre',
-    tagline: 'How much energy the Garden can hold.',
-    description: 'A spring under the roots. Every tap on an item maker draws from it, and it fills again on its own.',
+    tagline: 'How much Resolve you bring into the Mist.',
+    description: 'A spring under the roots. Drink before you go in, and the Mist takes longer to wear you down.',
     lookNames: ['Dew Pool', 'Root Spring', 'Heartwood Spring'],
     stats: [
-      { label: 'Energy cap', value: dewSpringEnergyCap, format: whole, delta: gainWhole, icon: 'energy', tint: TINT.energy },
-      { label: 'Recovery', value: dewSpringRegenMs, format: clock, delta: gainClock, icon: 'timer', tint: TINT.time },
+      { label: 'Starting Resolve', value: dewSpringResolveBonus, format: (value) => `+${whole(value)}`, delta: gainWhole, icon: 'energy', tint: TINT.energy },
+      { label: 'Second wind', value: dewSpringSecondWind, format: (value) => `+${whole(value)}`, delta: gainWhole, icon: 'timer', tint: TINT.time },
     ],
   },
   {
     id: 'seed-nursery', name: 'Seed Nursery', slotId: 'front-left',
-    tagline: 'How good the things your item makers find are.',
-    description: 'Seedlings raised under glass. The better they are tended, the more often an item maker finds something a step ahead.',
+    tagline: 'How good the things your spawners make are.',
+    description: 'Seedlings raised under glass. The better they are tended, the more often a spawner in the Mist makes something a step ahead.',
     lookNames: ['Seed Trays', 'Glass Nursery', 'Propagation House'],
     stats: [
       { label: 'Better finds', value: seedNurseryTierTwoBonus, format: (value) => `+${percent(value)}`, delta: gainPercent, icon: 'sparkles', tint: TINT.finds },
@@ -99,17 +105,17 @@ export const HEARTWOOD_BUILDINGS: readonly HeartwoodBuildingDefinition[] = [
   },
   {
     id: 'root-cellar', name: 'Root Cellar', slotId: 'back-left',
-    tagline: 'How much you can put away.',
-    description: 'A cool room between the roots for whatever the board has no space for right now.',
+    tagline: 'How much of the Mist is open when you arrive.',
+    description: 'A cool room between the roots. What is kept here goes ahead of you: a little of every board is open before the first move.',
     lookNames: ['Root Hollow', 'Root Cellar', 'Deep Cellar'],
-    stats: [{ label: 'Storage slots', value: rootCellarStorageBonus, format: (value) => `+${whole(value)}`, delta: gainWhole, icon: 'shippingbox.fill', tint: TINT.storage }],
+    stats: [{ label: 'Open cells', value: rootCellarOpenCells, format: (value) => `+${whole(value)}`, delta: gainWhole, icon: 'shippingbox.fill', tint: TINT.storage }],
   },
   {
     id: 'garden-stall', name: 'Garden Stall', slotId: 'back-right',
-    tagline: 'How much Glow an order brings in.',
-    description: 'A little stall by the path. What the Garden makes is worth more when there is somewhere to offer it.',
+    tagline: 'How much Glow a cleared Mist brings in.',
+    description: 'A little stall by the path. What you bring back from the Mist is worth more when there is somewhere to offer it.',
     lookNames: ['Trestle Table', 'Garden Stall', 'Market Stall'],
-    stats: [{ label: 'Glow from orders', value: gardenStallGlowBonus, format: (value) => `+${percent(value)}`, delta: gainPercent, icon: 'glow', tint: TINT.glow }],
+    stats: [{ label: 'Glow from missions', value: gardenStallGlowBonus, format: (value) => `+${percent(value)}`, delta: gainPercent, icon: 'glow', tint: TINT.glow }],
   },
 ];
 

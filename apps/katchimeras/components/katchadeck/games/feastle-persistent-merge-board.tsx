@@ -1201,6 +1201,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
                       ? `A path to ${dormantNames.join(' or ')}. Meet them to open this space.`
                       : 'A future Katchimera story will open this space.'
                 : cell.mist?.kind === 'veiled' ? 'Thick mist. Wake the sleeping cell beside it and it lets go.'
+                : cell.mist?.kind === 'encounter' ? cell.mist.type === 'wisp-bound' ? 'Mist held by a wisp. It goes when the wisp falls.' : cell.mist.type === 'root' ? 'Root mist. Only a plant merge beside it wears it down.' : `${cell.mist.type === 'dense' ? 'Dense' : 'Light'} mist. ${cell.mist.hp} merge${cell.mist.hp === 1 ? '' : 's'} beside it and it clears.`
                 : cell.mist ? 'Something is hidden in the Dream Mist.' : 'Empty board space';
         return <BoardCell
           accessibilityActionLabel={gateKind === 'drag' && index === gateFromCell

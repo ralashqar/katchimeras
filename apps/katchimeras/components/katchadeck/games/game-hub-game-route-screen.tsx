@@ -100,7 +100,7 @@ export function GameHubGameRouteScreen() {
 
   const returnAfterRound = useCallback(() => {
     if (fromTodayCare) router.dismissTo('/today');
-    else router.dismissTo('/games');
+    else router.dismissTo('/katchimeras');
   }, [fromTodayCare, router]);
 
   const abandon = useCallback(() => {

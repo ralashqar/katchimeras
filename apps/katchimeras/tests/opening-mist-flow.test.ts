@@ -68,7 +68,7 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
   assert.equal(open.actions[0]?.id, 'world.look_closer');
   assert.equal(open.actions[0]?.nextStepId, 'world.mist_clear');
   assert.equal(open.guide.title, 'Once, every path led home. Then the lights went out.');
-  assert.equal(open.guide.body, 'A flicker beneath the Mist. Someone is still in there.');
+  assert.equal(open.guide.body, '', 'one line: the button arrives on the beat the second line used to');
   const clear = mossproutFtueStep('world.mist_clear')!;
   assert.equal(clear.surface, 'haven', 'a haven step keeps the docked board ungated and resumes to the Kingdom');
   assert.equal(clear.interaction?.mode, 'none');
@@ -79,8 +79,8 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
   const lift = mossproutFtueStep('world.mist_lift')!;
   assert.equal(lift.actions[0]?.id, 'world.mist_lifted');
   assert.equal(lift.actions[0]?.nextStepId, 'world.egg_intro');
-  assert.equal(lift.guide.title, 'The Mist has cleared.');
-  assert.equal(mossproutFtueStep('world.egg_intro')?.guide.title, 'The Mist has cleared.');
+  assert.equal(lift.guide.title, 'The Mist lets go.');
+  assert.equal(mossproutFtueStep('world.egg_intro')?.guide.title, 'The Mist lets go.');
   assert.equal(mossproutFtueStep('world.egg_intro')?.actions[0]?.nextStepId, 'egg.opening');
   assert.deepEqual(lift.guide, mossproutFtueStep('world.egg_intro')?.guide, 'the reveal caption stays unchanged during the approach');
   assert.deepEqual(lift.camera, mossproutFtueStep('world.egg_intro')?.camera, 'the intro must not restart the approach with a different camera directive');
@@ -254,7 +254,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(egg, /const scriptedActions = stepId === 'world\.egg_intro' \|\| stepId === 'world\.mist_lift'/);
   const caption = readFileSync('components/katchadeck/world/kingdom-opening-caption.tsx', 'utf8');
   assert.match(caption, /setTimeout\(\(\) => setPage\(1\), reduceMotion \? 1_200 : OPENING_CAPTION_PAGE_MS\)/);
-  assert.match(caption, /disabled=\{page === 1\}[\s\S]*?onPress=\{\(\) => setPage\(1\)\}/, 'the first caption can be tapped through');
+  assert.match(caption, /disabled=\{page === 1 \|\| single\}[\s\S]*?onPress=\{\(\) => setPage\(1\)\}/, 'a two-line caption can be tapped through; a one-line one has nothing to skip');
 });
 
 

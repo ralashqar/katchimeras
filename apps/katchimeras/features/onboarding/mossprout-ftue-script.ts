@@ -127,7 +127,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 53,
+  version: 54,
   entryStepId: 'world.mist_open',
   terminalStepId: 'complete',
   steps: [
@@ -169,7 +169,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     ...openingQuestionSteps,
     {
       id: 'egg.ready', surface: 'haven',
-      guide: { eyebrow: 'The wisps are gone', title: 'Your Glow freed the egg.', body: 'It knows a little about you already.' },
+      guide: { eyebrow: 'The wisps are gone', title: 'Your Glow freed the egg.', body: '' },
       actions: [{ id: 'egg.hatch', title: 'Hatch', description: 'See who heard you.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'discovery_hatch', nextStepId: 'companion.first_meeting', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: mossproutWorldEggZoom('egg.ready'), anchorY: 0.5, durationMs: 520 },
@@ -178,7 +178,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       id: 'companion.first_meeting', surface: 'haven', navigation: mossproutHavenHostedCompanionResume,
       camera: mossproutWorldDialogueCamera,
       guide: { eyebrow: 'Out of the Mist', title: 'Meet Mossprout.', body: '' },
-      actions: [{ id: 'companion.complete_first_meeting', title: 'Continue', description: COPY.seedOrigin, icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'companion.garden_intro', backendEvent: true }],
+      actions: [{ id: 'companion.complete_first_meeting', title: 'Continue', description: COPY.seedOrigin, icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'companion_conversation', nextStepId: 'world.garden_arrival', backendEvent: true }],
       blockingBeat: 'mossprout_intro',
     },
     {
@@ -330,8 +330,9 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.first_seed_grew', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'The roots remember', title: COPY.growth, body: 'Our first connection is awake. Find Steppling at the broken trail.' },
-      actions: [{ id: 'world.acknowledge_first_seed_growth', title: 'Continue', description: 'A moment with Mossprout.', icon: 'arrow.right', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: 'companion.water_together', backendEvent: true }],
+      guide: { eyebrow: 'The roots remember', title: COPY.growth, body: '' },
+      // Committed by the Kingdom once the planting's field of light has ended: a caption, never a sheet.
+      actions: [{ id: 'world.acknowledge_first_seed_growth', title: 'Continue', description: 'Continues when the bud has settled.', icon: 'arrow.right', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'companion.first_rest', backendEvent: true }],
       camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.55, durationMs: 900, projectionOnly: true },
       blockingBeat: 'chapter_complete',
     },
@@ -769,7 +770,7 @@ const stepsById = new Map(MOSSPROUT_FTUE_SCRIPT.steps.map((step) => [step.id, st
 // These authored beats remain available to old local/debug fixtures. The live
 // first-session route grows the First Bloom, then returns after one order.
 const retiredFirstSessionStepIds = new Set(MOSSPROUT_FTUE_SCRIPT.steps
-  .filter((step) => ['companion.day_one_action', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.water_response', 'companion.first_insight', 'egg.context', 'egg.mind', 'egg.nature_theme', 'egg.companion_identity', 'companion.nickname', 'companion.bond_intro', 'companion.bond_spotlight', 'companion.resident_affinity', 'companion.resident_parcel_ready', 'companion.resident_match_result'].includes(step.id)
+  .filter((step) => ['companion.day_one_action', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.garden_intro', 'companion.water_together', 'companion.first_grow', 'companion.first_notice', 'companion.notice_bond_spotlight', 'companion.water_response', 'companion.first_insight', 'egg.context', 'egg.mind', 'egg.nature_theme', 'egg.companion_identity', 'companion.nickname', 'companion.bond_intro', 'companion.bond_spotlight', 'companion.resident_affinity', 'companion.resident_parcel_ready', 'companion.resident_match_result'].includes(step.id)
     || step.id.startsWith('merge.plant.')
     || step.id.startsWith('merge.energy')
     || step.id.startsWith('energy.')

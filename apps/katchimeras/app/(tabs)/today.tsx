@@ -578,7 +578,7 @@ export function LegacyTodayScreen() {
           throw new Error('Merge did not accept the returning FTUE step');
         }
         setOnboardingEnergyReady(null);
-        router.navigate({ pathname: '/games', params: { familyId: 'mossprout' } });
+        router.navigate('/katchimeras');
       },
     });
   }, [router, transitionTo]);
@@ -1804,7 +1804,7 @@ export function LegacyTodayScreen() {
         transitionTo({
           announcement: 'Opening Merge',
           target: 'merge',
-          navigate: () => router.navigate('/games'),
+          navigate: () => router.navigate('/katchimeras'),
         });
         return;
       case 'inline_mood':
@@ -3321,7 +3321,7 @@ export function LegacyTodayScreen() {
                 transitionTo({
                   announcement: 'Opening Merge',
                   target: 'merge',
-                  navigate: () => router.navigate({ pathname: '/games', params: { familyId } }),
+                  navigate: () => router.navigate('/katchimeras'),
                 });
               }}
               style={({ pressed }) => [styles.feastleRewardButton, pressed && { opacity: 0.82 }]}>

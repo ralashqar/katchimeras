@@ -37,7 +37,7 @@ export type KingdomPlaceEntry = {
 };
 
 export type KingdomNext = {
-  kind: 'clear_mist' | 'talk' | 'merge' | 'restore' | 'story' | 'journey' | 'complete' | 'shared_adventure';
+  kind: 'clear_mist' | 'talk' | 'merge' | 'mist' | 'restore' | 'story' | 'journey' | 'complete' | 'shared_adventure';
   label: string;
   islandId?: MossproutNatureIslandId;
   residentSkinId?: KatchimeraSkinId;
@@ -94,6 +94,8 @@ function nextStep(world: MergeWorldState, friends: KingdomFriendEntry[]): Kingdo
     const base = { islandId: campaign.islandId, residentSkinId: campaign.residentSkinId, campaignId: campaign.campaignId };
     switch (status) {
       case 'available': return { ...base, kind: 'talk', label: `Plan with ${campaign.residentName} at ${islandName}` };
+      case 'mission_available': return { ...base, kind: 'mist', label: `Enter the Mist at ${islandName}` };
+      case 'in_encounter': return { ...base, kind: 'mist', label: `Back into the Mist at ${islandName}` };
       case 'orders_active': return { ...base, kind: 'merge', label: `Make ${campaign.residentName}’s request in Merge` };
       case 'board_open': return { ...base, kind: 'restore', label: `Restore ${islandName} with ${campaign.residentName}` };
       case 'delivery_requested': return { ...base, kind: 'merge', label: `Make ${campaign.residentName}’s delivery in Merge` };

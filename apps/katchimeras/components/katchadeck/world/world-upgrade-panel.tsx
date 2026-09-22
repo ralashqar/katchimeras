@@ -7,6 +7,11 @@ import { AppFontFamilies } from '@/constants/theme';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { UpgradeDock, useUpgradeDockMotion } from '@/components/katchadeck/upgrade/upgrade-dock';
 import { UpgradeBenefitRow, UpgradeHero, UpgradeLevelSlots, UpgradeRequirementRow, UpgradeSection, useUpgradeLevelPick } from '@/components/katchadeck/upgrade/upgrade-rows';
+import { UpgradeLadderRow, UpgradeLoadoutRow, UpgradeMissionCard, type EncounterLoadoutChoice } from '@/components/katchadeck/upgrade/upgrade-mission-rows';
+import type { RegionLadderEntry } from '@/constants/island-campaigns/helpers';
+import type { IslandCampaignPanelAction, RegionMissionDefinition } from '@/constants/island-campaigns/types';
+import { PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
+import type { MergeCharacterId } from '@/types/merge-world';
 import { GameUI } from '@/constants/game-ui';
 import { UpgradePanelUI } from '@/constants/upgrade-panel';
 import { islandCampaignForOffer } from '@/constants/island-campaigns/registry';
@@ -28,8 +33,16 @@ export type UpgradeCoachmarkState = { visible: boolean; revision: number };
 
 export type WorldUpgradeCampaignState = {
   /** What the action does. Starting a chapter is worded by the panel: short, with its cost on the button. */
-  action?: 'start_story' | 'open_merge' | 'continue_return' | 'continue_restoring' | 'continue_resolution' | null;
+  action?: IslandCampaignPanelAction | null;
   actionLabel?: string;
+  /** The campaign pivot: the region's ladder, the rung the action enters, what may be brought in and what was last time. */
+  ladder?: readonly RegionLadderEntry[];
+  mission?: RegionMissionDefinition | null;
+  loadout?: EncounterLoadoutChoice | null;
+  playable?: readonly MergeCharacterId[];
+  ownedWispIds?: readonly string[];
+  /** How the rung was cleared before, if it was. */
+  cleared?: { bestGrade: string } | null;
   /** Glow the action spends (a restoration stage opening); the button waits until the player has it. */
   actionCost?: number;
   order?: CompanionMergeRequest | null;
@@ -54,7 +67,7 @@ type PanelTab = 'upgrade' | 'story';
  */
 export function WorldUpgradePanel({ offer, world, busy, error, coached = false, actionRef, campaignState, onCampaignAction, onClose, onConfirm, onGarden, registerDismiss, saveRead, onCoachmarkChange, layout, bottomInset, currentArt }: {
   offer: WorldUpgradeOffer; world: MergeWorldState; busy: boolean; error?: string | null; coached?: boolean;
-  campaignState?: WorldUpgradeCampaignState | null; onCampaignAction?: () => void;
+  campaignState?: WorldUpgradeCampaignState | null; onCampaignAction?: (loadout: EncounterLoadoutChoice) => void;
   actionRef: RefObject<View | null>; onClose: () => void; onConfirm: () => void; onGarden: () => void;
   onCoachmarkChange?: (state: UpgradeCoachmarkState) => void;
   registerDismiss?: (dismiss: (() => void) | null) => void;
@@ -66,6 +79,11 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
 }) {
   const [history, setHistory] = useState(false);
   const [tab, setTab] = useState<PanelTab>('upgrade');
+  // What the player brings into the Mist: the last loadout, else Mossprout alone; the rung may narrow the choice.
+  const playable = campaignState?.playable ?? PLAYABLE_KATCHIMERAS;
+  const eligible = campaignState?.mission?.eligible ?? null;
+  const defaultKatchimera = (campaignState?.loadout?.katchimeraId && (!eligible || eligible.includes(campaignState.loadout.katchimeraId)) ? campaignState.loadout.katchimeraId : playable.find((id) => !eligible || eligible.includes(id))) ?? 'mossprout';
+  const [loadout, setLoadout] = useState<EncounterLoadoutChoice>({ katchimeraId: defaultKatchimera, helperWispId: campaignState?.loadout?.helperWispId ?? null });
   const closeHistory = useCallback(() => { if (!history) return false; setHistory(false); return true; }, [history]);
   const motion = useUpgradeDockMotion({ busy, onClose, onBack: closeHistory, registerDismiss });
   const { closing, leave, reopen, settled } = motion;
@@ -105,7 +123,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   // nothing of the price, so the button reads as every other upgrade does: the verb, and the Glow it spends.
   const campaignAction = !model.primary && !locked && campaignState?.actionLabel && onCampaignAction
     ? campaignState.action === 'start_story' ? 'Restore' : campaignState.actionLabel : null;
-  const campaignFree = campaignState?.action === 'start_story' && !campaignState.actionCost;
+  const campaignFree = (campaignState?.action === 'start_story' || campaignState?.action === 'enter_mist' || campaignState?.action === 'resume_mist') && !campaignState.actionCost;
   const action = !onFocus ? null
     // A held tile says why in the hero row; a disabled button would only repeat its label.
     : model.locked ? null
@@ -115,7 +133,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
       </View>
         : campaignAction ? <KatchaButton fullWidth size="compact" label={campaignAction} disabled={busy || closing || Boolean(campaignState?.actionCost && world.coins < campaignState.actionCost)}
           cost={campaignState?.actionCost ? { currency: 'coins', amount: campaignState.actionCost } : undefined}
-          onPress={() => go(onCampaignAction!)} />
+          onPress={() => go(() => onCampaignAction!(loadout))} />
           : null;
   const caption = error ? error : pick.caption ?? (model.complete ? 'Fully grown' : campaignAction && campaignFree ? 'Free' : null);
 
@@ -133,6 +151,11 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
       {tab === 'upgrade' ? <>
         {sleepingHint ? <Text style={styles.note}>{sleepingHint}</Text> : null}
         {model.benefits.map((benefit) => <UpgradeBenefitRow key={benefit.id} benefit={benefit} />)}
+        {!locked && campaignState?.mission && (campaignState.action === 'enter_mist' || campaignState.action === 'resume_mist') ? <UpgradeSection label="The Mist" aside={campaignState.ladder ? `${campaignState.ladder.filter((entry) => entry.state === 'done').length} / ${campaignState.ladder.length}` : undefined}>
+          <UpgradeMissionCard mission={campaignState.mission} cleared={campaignState.cleared ?? null} />
+          {campaignState.ladder?.length ? <UpgradeLadderRow ladder={campaignState.ladder} /> : null}
+          <UpgradeLoadoutRow world={world} playable={playable} ownedWispIds={campaignState.ownedWispIds ?? []} value={loadout} eligible={eligible} disabled={busy || closing || campaignState.action === 'resume_mist'} onChange={setLoadout} />
+        </UpgradeSection> : null}
         {!locked && model.levels.length > 1 ? <UpgradeSection label="Stages" aside="Each one is a surprise">
           <UpgradeLevelSlots levels={model.levels} selected={shown?.level ?? null} current={pick.current} levelOffset={model.levelOffset} onSelect={pick.pick} artFor={pick.slotArt} disabled={busy || closing} />
         </UpgradeSection> : null}
@@ -160,7 +183,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
             countLabel={campaignState.order.served ? 'Complete' : 'Requested'}
             eyebrow="MERGE ORDER"
             onRequestPress={campaignState.actionLabel === 'Open Merge' && onCampaignAction
-              ? () => go(onCampaignAction)
+              ? () => go(() => onCampaignAction!(loadout))
               : undefined}
             palette={COMPANION_MERGE_REQUEST_PALETTE}
             requests={[campaignState.order]}

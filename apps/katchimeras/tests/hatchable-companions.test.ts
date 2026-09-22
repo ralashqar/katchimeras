@@ -26,6 +26,7 @@ const fixture = (name: string) => JSON.parse(readFileSync(`tests/fixtures/hatcha
 
 test('Steppling on the definition is Steppling exactly: the three generated flows equal the ones his saves were written against', () => {
   // Captured from the hand-written flows before the definition existed. A change here is a save migration, not a refactor.
+  // (v13, Sept 22 2026: the Garden lesson left the discovery; saves parked on its nodes migrate to the ticket.)
   assert.deepEqual(JSON.parse(JSON.stringify(GLOW_DISCOVERY_FLOW)), fixture('glow-steppling-discovery'));
   assert.deepEqual(JSON.parse(JSON.stringify(STEPPLING_DAY_ONE_FLOW)), fixture('steppling-day-one'));
   assert.deepEqual(JSON.parse(JSON.stringify(STEPPLING_GARDEN_FLOW)), fixture('steppling-garden-lesson'));
@@ -47,7 +48,7 @@ test('Steppling on the definition is Steppling exactly: the three generated flow
 
 test('the shared world is read from the registry: Mossprout fixed, every other tile a hatchable companion’s', () => {
   assert.deepEqual(Object.keys(SHARED_WORLD_TILES), ['mossprout-home', ...HATCHABLE_COMPANIONS.map((definition) => definition.tile.id), ...STORY_TILES.map((tile) => tile.id)]);
-  assert.deepEqual(STEPPLING_TILE, { residentVisible: false, companion: 'steppling', coord: { q: 0, r: 0 }, unlockId: 'mossprout:overgrown-trail', price: 40, name: 'Misty clearing', revealPreset: 'mist-clear' });
+  assert.deepEqual(STEPPLING_TILE, { residentVisible: false, companion: 'steppling', coord: { q: 0, r: 0 }, unlockId: 'mossprout:overgrown-trail', price: 20, name: 'Misty clearing', revealPreset: 'mist-clear' });
   assert.deepEqual(SHARED_WORLD_PURCHASES.filter((purchase) => !purchase.story).map((purchase) => purchase.tileId), HATCHABLE_COMPANIONS.map((definition) => definition.tile.id));
   for (const definition of HATCHABLE_COMPANIONS) {
     assert.equal(hatchableByCompanion(definition.companion), definition);
@@ -72,7 +73,7 @@ test('every definition is sound: unique ids, tiles apart, flows that compile, an
     for (const flow of [flows.discovery, flows.dayOne, flows.gardenLesson]) {
       assert.deepEqual(validateContentFlowDefinition(flow), [], `${flow.id} compiles`);
     }
-    assert.ok(definition.tile.price > 0);
+    assert.ok(definition.tile.price >= 0);
     assert.ok(HATCHABLE_TILE_ART_IDS.includes(definition.tile.id), `${definition.tile.id} has cleared tile art registered`);
     assert.ok(readFileSync('constants/hatchable-companions/tile-art.ts', 'utf8').includes(definition.tile.alphaBoundsKey.replace('.webp', '')), 'the art registered for the tile is the art its bounds are generated for');
     assert.ok(readFileSync('constants/kingdom-hex-tile-bounds.gen.ts', 'utf8').includes(`'${definition.tile.alphaBoundsKey}'`), 'and its alpha bounds are generated');
@@ -141,9 +142,9 @@ test('a tile’s state is read from its definition: asleep until its turn, savin
   assert.equal(hatchableTileState({ ...woken, coins: 0, hatchableMissions: { baristabbit: { paidAt: NOW, paidCoins: 60, receiptId: 'ticket' } } }, later), 'board', 'a paid ticket: the board is the tile’s business');
   assert.equal(hatchableTileState({ ...woken, coins: 0, worldUnlocks: { 'later:unlock': { unlockedAt: NOW, paid: 60, destination: 'baristabbit', transferredAt: null, hatchedAt: null } } }, later), 'egg');
   assert.equal(hatchableTileState({ ...woken, companionDiscovery: { ...woken.companionDiscovery, records: [{ characterId: 'baristabbit', source: 'ftue_hatch', gateId: 'gate-3-first-choice', pathId: 'warm-light', discoveredAt: NOW, revealSeenAt: NOW, firstOrderCompletedAt: null, permanentFeatureId: null }] } }, later), 'open');
-  // Steppling, never asleep: saving at 39, ready at 40.
-  assert.equal(hatchableTileState({ ...world, coins: 39 }, STEPPLING_HATCHABLE), 'saving');
-  assert.equal(hatchableTileState({ ...world, coins: 40 }, STEPPLING_HATCHABLE), 'ready');
+  // Steppling, never asleep: his clearing costs 20 Glow, which the story hands over as it opens.
+  assert.equal(hatchableTileState({ ...world, coins: 0 }, STEPPLING_HATCHABLE), 'saving');
+  assert.equal(hatchableTileState({ ...world, coins: 20 }, STEPPLING_HATCHABLE), 'ready');
   // The engine refuses a purchase while the tile sleeps, in the tile's own words, and records the definition's gate at the hatch.
   const policy = readFileSync('utils/merge-world/glow-discovery-policy.ts', 'utf8');
   assert.match(policy, /if \(hatchable && !existing && !owned && !hatchableAvailable\(state, hatchable\)\) return no\(hatchable\.tile\.markerLines\.sleeping\);/);
@@ -212,4 +213,22 @@ test('a friend’s daily cards and photo feed are content, and the Kingdom begin
   assert.match(kingdom, /result = await payStoredHatchableMission\(confirmedHatchable\.companion, hatchableTicketReceiptId\(confirmedHatchable\.discoveryFlow\.runId\)\);[\s\S]*?await startHatchableDiscovery\(confirmedHatchable\);\s*await resumeHatchableDiscovery\(confirmedHatchable, result\.state\);/, 'confirm pays the ticket before the story begins');
   const progression = readFileSync('utils/merge-world/companion-discovery-progression.ts', 'utf8');
   assert.match(progression, /!isHatchableCompanion\(id\)/, 'the legacy board discovery never offers a hatchable friend');
+});
+
+test('Steppling’s mist costs 20 Glow, and the story hands those 20 over once while it is still locked', async () => {
+  const { GLOW } = await import('@/constants/glow');
+  const { STEPPLING_HATCHABLE } = await import('@/constants/hatchable-companions/registry');
+  const { createInitialMergeWorldState, reduceMergeWorld } = await import('@/utils/merge-world/engine');
+  assert.equal(STEPPLING_HATCHABLE.tile.price, GLOW.stepplingMistCost);
+  assert.equal(GLOW.stepplingMistCost, 20);
+  const start = { ...createInitialMergeWorldState(Date.UTC(2026, 8, 22), ['mossprout']), coins: 0 };
+  const grant = { type: 'grantStoryGlow' as const, receiptId: 'story-glow:steppling-mist', amount: 20, now: Date.UTC(2026, 8, 22) };
+  const once = reduceMergeWorld(start, grant);
+  assert.equal(once.state.coins, 20);
+  const twice = reduceMergeWorld(once.state, grant);
+  assert.equal(twice.changed, false);
+  assert.equal(twice.state.coins, 20);
+  const runtime = readFileSync('features/onboarding/glow-discovery-runtime.ts', 'utf8');
+  assert.match(runtime, /hatchableGatewayState\(world, STEPPLING_HATCHABLE\) !== 'locked'\) return world;/, 'a cleared mist never pays out again');
+  assert.match(runtime, /await grantStepplingMistGlow\(\);\s*return startHatchableDiscovery/);
 });

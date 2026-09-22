@@ -20,6 +20,28 @@ export type WispPlacement =
 
 export type ColumnShotWisp = { id: string; column: number; row: number; hp: number; size?: number };
 
+/**
+ * How a Dark Wisp fights back, every `every` actions the player spends: a
+ * shrouder covers an open cell in Mist again; a hungry one eats the lowest
+ * loose piece; a rootbound one spreads root Mist (and takes extra from plant
+ * merges); a mender heals when it has not been struck since its last turn.
+ */
+export type DarkWispBehaviour =
+  | { kind: 'plain' }
+  | { kind: 'shrouder'; every: number }
+  | { kind: 'hungry'; every: number; maxTier: number }
+  | { kind: 'rootbound'; every: number; plantBonus: number }
+  | { kind: 'mender'; every: number; amount?: number };
+
+export type DarkWisp = { id: string; hp: number; placement: WispPlacement; behaviour?: DarkWispBehaviour };
+
+/** What a mechanic did to the board after an action, for the layer to show. */
+export type MechanicEffect =
+  | { kind: 'shrouded'; wisp: number; cell: number }
+  | { kind: 'ate'; wisp: number; cell: number; definitionId: string }
+  | { kind: 'root_mist'; wisp: number; cell: number }
+  | { kind: 'mended'; wisp: number; amount: number };
+
 export type MissionMechanicDefinition =
   | {
       kind: 'glow-strikes';
@@ -49,6 +71,17 @@ export type MissionMechanicDefinition =
       kind: 'wisp-rush';
       /** Where wisps hang over the tile; how many can be up at once. */
       perches: readonly WispPlacement[];
+    }
+  | {
+      /**
+       * Dark Wisps: each has hit points and a behaviour of its own. A merge strikes one wisp (the first standing, or
+       * the weakest) for the damage its result's tier deals; what is left over is lost. Between strikes the wisps act.
+       */
+      kind: 'dark-wisps';
+      wisps: readonly DarkWisp[];
+      /** Damage by the result's tier (index 0 = tier 1); the last entry repeats. Default: one, whatever is made. */
+      damageByTier?: readonly number[];
+      targeting?: 'in-order' | 'weakest';
     };
 
 /** What a mechanic remembers between strikes; saved with the board. */
@@ -56,7 +89,9 @@ export type MissionMechanicState =
   | { kind: 'glow-strikes'; strikes: number }
   | { kind: 'column-shot'; strikes: number; damage: number[] }
   /** Every wisp that has appeared, in order; the list only grows. `bornAt` 0 marks the ones the board opened with. */
-  | { kind: 'wisp-rush'; strikes: number; wisps: { id: string; hp: number; perch: number; damage: number; bornAt: number }[] };
+  | { kind: 'wisp-rush'; strikes: number; wisps: { id: string; hp: number; perch: number; damage: number; bornAt: number }[] }
+  /** Damage on each wisp, how many actions have been spent, and the action each wisp was last struck on (-1: never). */
+  | { kind: 'dark-wisps'; strikes: number; actions: number; damage: number[]; struckAt: number[] };
 
 /** A board whose state moves on its own (a rush's wisps appear over time) publishes it here; the wisp layer subscribes. */
 export type MissionMechanicLive = { get: () => MissionMechanicState; subscribe: (listener: () => void) => () => void };

@@ -107,7 +107,8 @@ export function KatchimeraCompanionRouteScreen({ creatureId, worldEventAction, s
   renderRegularStage?: boolean;
   reuseUnderlyingStage?: boolean;
   hostedInHaven?: boolean;
-  onHostedClose?: () => void;
+  /** `handsOver`: the first session's rest ended and Steppling's clearing owns the camera now. */
+  onHostedClose?: (options?: { handsOver?: boolean }) => void;
   onHostedFtueComplete?: () => void;
   onHostedInitialConversationComplete?: (definitionId: string, session: ConversationSession) => void | Promise<void>;
   onHostedOpenMerge?: (orderId?: string | null, familyId?: KatchimeraFamilyId) => void;
@@ -368,8 +369,8 @@ export function KatchimeraCompanionRouteScreen({ creatureId, worldEventAction, s
           updateFtueRun({ mergeInstalled: true });
         }
         const meetingResult = await advanceFtueActionDurably({ expectedStepId: 'companion.first_meeting', actionId: 'companion.complete_first_meeting', evidenceRef: ftueConversationDefinitionId ?? 'mossprout-ftue' });
-        if (meetingResult.run?.stepId !== 'companion.garden_intro') throw new Error('Mossprout did not accept the Seed handoff');
-        // Leave the durable introduction checkpoint on screen: Heartwood is shown before planting.
+        if (meetingResult.run?.stepId !== 'world.garden_arrival') throw new Error('Mossprout did not accept the Seed handoff');
+        // The world takes over at the planting: no sheet stands between the meeting and the soil.
         setNarrativeHandoffActive(false);
         await flushFtuePersistence();
       } catch (error) {
@@ -452,9 +453,14 @@ export function KatchimeraCompanionRouteScreen({ creatureId, worldEventAction, s
     setMistHandoffActive(true);
     setMistHandoffError(false);
     try {
-      await advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden', evidenceRef: 'mossprout:playable-handoff' });
-      await startGlowDiscovery();
-      if (hostedInHaven) onHostedClose?.();
+      // Re-entered once the first session is already complete (the handoff hook fires again): nothing to advance.
+      const current = loadFtueRun();
+      if (current?.status === 'active' && current.stepId === 'companion.meditating') {
+        await advanceFtueActionDurably({ expectedStepId: 'companion.meditating', actionId: 'companion.tend_garden', evidenceRef: 'mossprout:playable-handoff' });
+      }
+      // Steppling's clearing is the next thing; a failure to start it never keeps the player on this page.
+      await startGlowDiscovery().catch((error) => console.warn('Steppling\u2019s clearing could not start yet', error));
+      if (hostedInHaven) onHostedClose?.({ handsOver: true });
       else {
         const accepted = transitionTo({ announcement: 'Exploring the mist', target: 'katchimeras', navigate: () => router.replace('/(tabs)/katchimeras') });
         if (!accepted) throw new Error('The world is not ready');
@@ -829,16 +835,8 @@ export function KatchimeraCompanionRouteScreen({ creatureId, worldEventAction, s
         navigate: () => router.dismissTo('/(tabs)/katchimeras'),
       }) : router.back();
       }}
-      onOpenMerge={onHostedOpenMerge ?? (familyId === 'mossprout' || hatchable ? (orderId) => {
-        transitionTo({
-          announcement: hatchable ? `Opening ${hatchable.displayName}'s Garden` : "Opening Mossprout's Garden",
-          target: 'merge',
-          navigate: () => router.push({
-            pathname: '/katchimera/[creatureId]/activity',
-            params: { creatureId: hatchable ? SHARED_GARDEN_CREATURE_ID : creatureId, requestCharacterId: familyId, ...(orderId ? { focusOrderId: orderId } : {}) },
-          }),
-        });
-      } : undefined)}
+      // The campaign pivot: the Merge page is gone; a hosted page defers to the Haven, a standalone one has no way there.
+      onOpenMerge={onHostedOpenMerge}
       presentation="companion"
       renderRegularStage={renderRegularStage}
       reuseUnderlyingStage={reuseUnderlyingStage}

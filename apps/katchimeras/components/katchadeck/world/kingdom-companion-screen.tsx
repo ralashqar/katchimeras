@@ -508,10 +508,7 @@ export function KingdomCompanionScreen({
           }}
           onOpenMerge={(orderId, familyId) => onOpenMerge
             ? onOpenMerge(orderId, familyId)
-            : router.navigate({
-                pathname: '/games',
-                params: { familyId: familyId ?? quests.selectedResident?.creature.familyId ?? 'mossprout', ...(orderId ? { focusOrderId: orderId } : {}) },
-              })}
+            : router.navigate('/katchimeras')}
           onJournalFood={() => {
             const resident = quests.selectedResident;
             if (!resident) return;

@@ -273,6 +273,23 @@ const storedWorldStep = (step: (state: MergeWorldState, now: number) => MergeWor
 }, now);
 
 /** A finished Wisp Rush heat: saved once, paid once, records only ever better. Throws if the run cannot be accepted. */
+/** A Mist encounter begins: the board that is up and the loadout brought in are remembered with the world. */
+export async function startStoredEncounter(input: { missionId: string; runId: string; campaignId?: string; katchimeraId: import('@/types/merge-world').MergeCharacterId; helperWispId: import('@/types/wisp').WispId | null }, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'startEncounter', ...input, now }), now);
+}
+export async function abandonStoredEncounter(now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'abandonEncounter', now }), now);
+}
+/** A cleared encounter paid once per receipt: Glow, experience, the clear, and the island a level up when the rung was its chapter's last. */
+export async function completeStoredEncounter(input: { receiptId: string; missionId: string; campaignId?: string; katchimeraId: import('@/types/merge-world').MergeCharacterId; helperWispId: import('@/types/wisp').WispId | null; outcome: import('@/features/encounter/outcome').EncounterOutcome; difficulty: import('@/types/encounter').EncounterDifficulty; base?: { glow: number; xp: number } | null }, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'completeEncounter', ...input, now }), now);
+}
+export async function ackStoredEncounterOutcome(now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'ackEncounterOutcome', now }), now);
+}
+export async function upgradeStoredKatchimera(characterId: import('@/types/merge-world').MergeCharacterId, expectedLevel: number, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'upgradeKatchimera', characterId, expectedLevel, now }), now);
+}
 export async function recordStoredTimeTrialHeat(run: { trialId?: string; dayId: string; index: number; score: number }, now = gameNow()) {
   let outcome: import('@/features/time-trial/trial-world').HeatOutcome | null = null;
   const result = await reduceStoredMergeWorld(state => {
@@ -743,6 +760,11 @@ export async function ensureStoredFirstSpringLight(runId: string, now = gameNow(
   if (lit.state.coins >= cost) return lit.state;
   const short = cost - lit.state.coins;
   return (await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantOpeningGlow', receiptId: `${runId}:first-spring-light`, amount: short, now }), now)).state;
+}
+
+/** Glow the story hands over once per receipt (Steppling's mist price after the first session). */
+export async function grantStoredStoryGlow(receiptId: string, amount: number, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantStoryGlow', receiptId, amount, now }), now);
 }
 
 export async function ensureStoredOpeningGlow(receiptId: string, amount = GLOW.firstRestorationCost, now = gameNow()) {

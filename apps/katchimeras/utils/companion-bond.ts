@@ -26,7 +26,9 @@ export type CompanionBondEventKind =
   | 'insight_engaged'
   | 'conversation_completed'
   | 'journey_day_completed'
-  | 'merge_order_completed';
+  | 'merge_order_completed'
+  /** A Mist encounter cleared with this Katchimera. */
+  | 'mist_cleared';
 
 export type CompanionBondEvent = {
   id: string;
@@ -95,6 +97,7 @@ export const COMPANION_BOND_REWARDS: Record<CompanionBondEventKind, number> = {
   conversation_completed: 8,
   journey_day_completed: 20,
   merge_order_completed: 0,
+  mist_cleared: 8,
 };
 
 export type CompanionFriendshipProgress = {

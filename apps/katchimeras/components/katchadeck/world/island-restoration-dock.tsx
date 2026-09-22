@@ -18,6 +18,7 @@ import type { MissionCommandResult } from '@/features/onboarding/use-opening-mis
 import type { MergeOrder, MergeWorldCommand, MergeWorldState, MossproutNatureIslandLevel } from '@/types/merge-world';
 import type { MissionStrike } from '@/types/mission-mechanic';
 import { mergeCellCenter } from '@/utils/merge-world/board-geometry';
+import { FriendSpeechBubble } from './friend-speech-bubble';
 import { MistMissionDock, type GlowLandingSource } from './kingdom-opening-merge-dock';
 
 /**
@@ -45,15 +46,6 @@ const BUBBLE_RAISE = 18;
  * at the card. It fades in when it appears and out when it goes; a new line
  * (the request's, then the answer's once the delivery is in) crossfades.
  */
-const FriendSpeechBubble = memo(function FriendSpeechBubble({ text, reduceMotion }: { text: string; reduceMotion: boolean }) {
-  return <Animated.View key={text} entering={FadeIn.duration(reduceMotion ? 80 : 280).delay(reduceMotion ? 0 : 120)} exiting={FadeOut.duration(reduceMotion ? 60 : 180)}
-    pointerEvents="none" style={styles.bubbleColumn}>
-    <View style={styles.bubble}>
-      <Text style={styles.bubbleText}>{text}</Text>
-      <View style={styles.bubbleTail} />
-    </View>
-  </Animated.View>;
-});
 
 /**
  * A friend's restoration board under their island: the same dock the mist
@@ -248,12 +240,4 @@ const styles = StyleSheet.create({
   // A low, dark panel gathers the bubble and the card into one section; its top clears the card's portrait.
   trayPanel: { alignSelf: 'stretch', borderRadius: 24, borderCurve: 'continuous', backgroundColor: 'rgba(22,16,40,0.26)', paddingTop: 18, paddingBottom: 10, paddingHorizontal: 10 },
   trayRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 8, paddingHorizontal: 4 },
-  bubbleColumn: { flexShrink: 1, maxWidth: 220, marginBottom: BUBBLE_RAISE },
-  bubble: {
-    paddingHorizontal: 12, paddingVertical: 9, borderRadius: 16, borderCurve: 'continuous',
-    backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF', boxShadow: '0 4px 14px rgba(20,40,60,0.16)',
-  },
-  bubbleText: { color: '#2E4A66', fontFamily: AppFontFamilies.fredokaBold, fontSize: 13, lineHeight: 17 },
-  // The tail: a corner of the same bubble, turned to point at the card.
-  bubbleTail: { position: 'absolute', right: -6, top: '50%', marginTop: -6, width: 12, height: 12, backgroundColor: '#F4F9FD', borderRightWidth: 1.5, borderTopWidth: 1.5, borderColor: '#FFFFFF', transform: [{ rotate: '45deg' }] },
 });

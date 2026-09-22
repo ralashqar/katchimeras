@@ -110,41 +110,6 @@ test('passive capture is one-shot while live game watchers guard late async comp
   assert.match(liveStepSource, /mounted\.current = false;\s*cleanup\(\)/);
 });
 
-test('game mode releases background UI work and avoids full Kingdom hydration', () => {
-  const tabsSource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', '_layout.tsx'), 'utf8');
-  const mergeRouteSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-route-screen.tsx'), 'utf8');
-  const mergeBoardSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'feastle-persistent-merge-board.tsx'), 'utf8');
-  const mergeProviderSource = readFileSync(path.join(process.cwd(), 'features', 'merge-world', 'merge-world-provider.tsx'), 'utf8');
-  const companionRouteSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx'), 'utf8');
-  const companionSheetSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
-  const todaySource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
-  const captureSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'day-capture-session.tsx'), 'utf8');
-  const gameSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'game-hub-game-route-screen.tsx'), 'utf8');
-  assert.match(tabsSource, /name="today"[\s\S]*?freezeOnBlur: false/);
-  assert.match(tabsSource, /name="games"[\s\S]*?freezeOnBlur: false/);
-  assert.match(mergeRouteSource, /useIsFocused/);
-  assert.match(mergeRouteSource, /isFocused \? hydrateAllDays\(homeState, profile, now\) : days/);
-  assert.match(mergeRouteSource, /\[days, isFocused\]/);
-  assert.match(mergeRouteSource, /\{isFocused \? <>/);
-  assert.match(mergeRouteSource, /<MergeWorldProvider active=\{isFocused\}/);
-  assert.match(mergeBoardSource, /useDisposableTimers\('merge-board-feedback'\)/);
-  assert.match(mergeBoardSource, /acquireLifecycleResource\('merge_board'/);
-  assert.doesNotMatch(mergeBoardSource, /useMergeMotionPerformanceProbe|useFrameCallback|effectsPaused|motionActive|reducedFx/);
-  assert.match(mergeBoardSource, /timers\.cancelAll\(\)/);
-  assert.match(mergeBoardSource, /animateEntrance[\s\S]*?\? spritesFromState/);
-  assert.match(mergeProviderSource, /if \(!active\) return;[\s\S]*?subscribeCompanionQuickGoals/);
-  assert.match(mergeProviderSource, /if \(!active \|\| loading\) return;/);
-  assert.match(mergeProviderSource, /if \(!activeRef\.current \|\| !isAppForeground\(\)\) return null;/);
-  assert.match(companionRouteSource, /const surfaceActive = hostedInHaven \|\| isFocused/);
-  assert.match(companionRouteSource, /if \(!surfaceActive \|\| \(!discovery\.ready && !hostedInHaven\) \|\| \(residentMergeFtueActive && !residentStoryResumeActive\)\) \{[\s\S]*?return <View style=\{styles\.inactiveScreen\} \/>;/);
-  assert.doesNotMatch(companionSheetSource, /idealSkin/, 'no closest-form questionnaire retry loop');
-  assert.match(todaySource, /const flowBusy =\s*!screenFocused \|\|/);
-  assert.ok((captureSource.match(/enabled: captureGates\.captureEnabled/g) ?? []).length >= 3);
-  assert.match(captureSource, /const captureActive = pathname === '\/today'/);
-  assert.doesNotMatch(tabsSource, /DayCaptureSession/);
-  assert.doesNotMatch(gameSource, /useAllDays|deriveKingdom|applyWardrobeToKingdom/);
-});
-
 test('Today capture uses staggered cooldown gates and incremental photo cursors', () => {
   const gateSource = readFileSync(path.join(process.cwd(), 'hooks', 'use-passive-capture-gates.ts'), 'utf8');
   const captureSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'home', 'day-capture-session.tsx'), 'utf8');
@@ -184,26 +149,6 @@ test('Today remounts from current home state before a cancelled capture can show
   assert.match(homeStateSource, /hasSynchronizedStateRef\.current\s*&&\s*!forceDerive/);
   assert.match(mutationSource, /const current = homeRepository\.load\(\) \?\? storedStateRef\?\.current \?\? null/);
   assert.match(todaySource, /homeRepository\.flush\(\)\.then\(\(\) => \{\s*router\.push\(\{ pathname: '\/moment-capture'/);
-});
-
-test('heavy game surfaces navigate only under the shared readiness curtain', () => {
-  const rootSource = readFileSync(path.join(process.cwd(), 'app', '_layout.tsx'), 'utf8');
-  const tabsSource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', '_layout.tsx'), 'utf8');
-  const transitionSource = readFileSync(path.join(process.cwd(), 'features', 'navigation', 'game-screen-transition.tsx'), 'utf8');
-  const mergeSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'games', 'merge-world-screen.tsx'), 'utf8');
-  const companionSource = readFileSync(path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'), 'utf8');
-
-  assert.match(rootSource, /<GameScreenTransitionProvider>[\s\S]*?<Stack>/);
-  assert.match(transitionSource, /commitPhase\('covering'\)[\s\S]*?current\.navigate\(\)[\s\S]*?commitPhase\('waiting_ready'\)/);
-  assert.match(transitionSource, /READINESS_TIMEOUT_MS = 8_000/);
-  assert.match(transitionSource, /retryCountRef\.current === 0[\s\S]*?activeRequest\.navigate\(\)[\s\S]*?commitPhase\('failed_recoverable'\)/);
-  assert.match(transitionSource, /This page is taking longer than expected[\s\S]*?onPress=\{onRetry\}[\s\S]*?onPress=\{onReturn\}/);
-  assert.doesNotMatch(transitionSource, /Destination readiness timed out[\s\S]{0,700}beginReveal\(\)/);
-  assert.match(transitionSource, /useReducedMotion\(\)/);
-  assert.match(tabsSource, /tabBar=\{\(\) => null\}/);
-  assert.doesNotMatch(tabsSource, /MeadowTabBar/);
-  assert.match(mergeSource, /useGameSurfaceReadiness\('merge',[\s\S]*?foreground: boardMetrics != null/);
-  assert.match(companionSource, /useGameSurfaceReadiness\('companion',[\s\S]*?transitionCreatureReady/);
 });
 
 test('repeat entries to You never latch the curtain to image or layout callbacks', () => {

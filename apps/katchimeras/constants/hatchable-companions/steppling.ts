@@ -19,7 +19,8 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
   displayName: 'Steppling',
   tile: {
     id: 'steppling-home', coord: MOSSPROUT_LAYOUT.gate.coord,
-    unlockId: 'mossprout:overgrown-trail', price: GLOW.mistUnlockCost,
+    // The campaign pivot: the clearing is the rescue rung of the region, not a ticket; nothing is charged.
+    unlockId: 'mossprout:overgrown-trail', price: GLOW.stepplingMistCost,
     name: 'Misty clearing', revealPreset: 'mist-clear',
     alphaBoundsKey: 'shared_world_steppling_trailhead_hex_tile_v1.webp',
     markerLines: { sleeping: 'Three notches on a broken marker. Steppling’s trail starts here.' },
@@ -67,7 +68,7 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
     lines: STEPPLING_WISP_LINES,
   },
   discoveryFlow: {
-    id: 'glow-steppling-discovery', version: 12, runId: 'story:glow-steppling-v1',
+    id: 'glow-steppling-discovery', version: 13, runId: 'story:glow-steppling-v1',
     gardenLesson: {
       open: { guide: { eyebrow: 'The next root connection', title: 'Light is made on the Garden board.', body: 'Grow Mossprout’s Plant. Its light will reach the broken trail and help us find Steppling.' }, actionLabel: 'Open Garden' },
       prepareCapability: 'glow.lesson.prepare',

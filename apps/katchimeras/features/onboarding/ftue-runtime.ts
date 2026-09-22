@@ -122,6 +122,12 @@ function migrateCurrentScript(run: FtueRunState): FtueRunState {
     && !run.receipts.some((receipt) => receipt.actionId === 'world.inspect_mossprout_egg')) {
     return { ...run, schemaVersion: 6, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: 'world.mist_open', objectiveProgress: run.objectiveProgress ?? {}, updatedAt: new Date().toISOString() };
   }
+  // v54: the Heartwood modal before the planting and the chat after it are gone; a run parked on
+  // one of them continues at the next real beat.
+  const v54Removed: Record<string, string> = { 'companion.garden_intro': 'world.garden_arrival', 'companion.water_together': 'companion.first_rest', 'companion.first_grow': 'companion.first_rest', 'companion.first_notice': 'companion.first_rest', 'companion.notice_bond_spotlight': 'companion.first_rest' };
+  if (run.status === 'active' && run.scriptVersion < 54 && v54Removed[run.stepId]) {
+    return { ...run, scriptVersion: MOSSPROUT_FTUE_SCRIPT.version, stepId: v54Removed[run.stepId]!, updatedAt: new Date().toISOString() };
+  }
   // v50 pays the first restore with granted light: a run parked on the old
   // Chapter 0 request skips it and continues at the offer, where the light arrives.
   if (run.status === 'active' && run.scriptVersion < 50 && run.stepId === 'merge.serve_sprout') {

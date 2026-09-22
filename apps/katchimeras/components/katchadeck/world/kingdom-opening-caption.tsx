@@ -22,6 +22,8 @@ export function KingdomOpeningCaption({ step, bottomInset, onLookCloser }: {
 }) {
   const reduceMotion = useReducedMotion();
   const [page, setPage] = useState<0 | 1>(0);
+  // One line only: the button arrives on the same beat the second line would have.
+  const single = !step.guide.body;
   useEffect(() => {
     if (page === 1) return;
     const timer = setTimeout(() => setPage(1), reduceMotion ? 1_200 : OPENING_CAPTION_PAGE_MS);
@@ -31,14 +33,14 @@ export function KingdomOpeningCaption({ step, bottomInset, onLookCloser }: {
   const fadeIn = FadeIn.duration(reduceMotion ? 80 : 520);
   return <View pointerEvents="box-none" style={[styles.layer, { bottom: bottomInset + 22 }]}>
     <Pressable
-      accessibilityHint={page === 0 ? 'Shows the next line' : undefined}
-      accessibilityLabel={page === 0 ? step.guide.title : step.guide.body}
+      accessibilityHint={page === 0 && !single ? 'Shows the next line' : undefined}
+      accessibilityLabel={page === 0 || single ? step.guide.title : step.guide.body}
       accessibilityRole="text"
-      disabled={page === 1}
+      disabled={page === 1 || single}
       onPress={() => setPage(1)}
       style={styles.caption}>
       {/* Stretched: the hero title fits its font to the panel only when the panel owns the full caption width. */}
-      {page === 0
+      {page === 0 || single
         ? <Animated.View key="noticed" entering={fadeIn} style={styles.page}>
           <FtueGuideCopy guide={{ eyebrow: step.guide.eyebrow, title: step.guide.title, body: '' }} hero />
         </Animated.View>

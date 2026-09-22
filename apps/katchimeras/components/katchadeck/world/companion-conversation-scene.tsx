@@ -134,6 +134,8 @@ export function CompanionConversationScene({
   const node = conversationNode(definition, session.currentNodeId);
   const journeyNarrative = definition.purpose === 'journey' && definition.format === 'narrative';
   const islandCampaignNarrative = definition.tags?.includes('island-campaign') ?? false;
+  // The first meeting ends on the Seed: its one button is the planting.
+  const firstMeeting = definition.id.startsWith('mossprout:ftue:first-meeting:');
   const narrativeOverlay = conversationUsesNarrativeOverlay(definition);
   const activeGameQuestion = node?.kind === 'profile_game' || node?.kind === 'insight_game'
     ? conversationGameQuestion(node, session) : null;
@@ -193,10 +195,10 @@ export function CompanionConversationScene({
             requests={journeyTaskRequests}
             title={journeyTaskTitle ?? 'Today’s Garden requests'}
           /> : <NarrativeTransition
-            label={journeyNarrative
+            label={firstMeeting ? 'The old spring' : journeyNarrative
               ? journeyTaskHandoff ? 'Your Garden request is ready' : islandCampaignNarrative ? 'Continue the island story' : 'Finish today’s Journey'
               : storyFlow && !storyFinale ? 'Opening the next chapter…' : 'Finish this conversation'}
-            actionLabel={journeyNarrative
+            actionLabel={firstMeeting ? 'Plant it' : journeyNarrative
               ? journeyTaskHandoff ? 'Go to the Garden' : islandCampaignNarrative ? 'Continue' : 'Finish Journey'
               : undefined}
             onAdvance={onAdvance}

@@ -37,9 +37,14 @@ export const HATCHABLE_LESSON_FINALE_NODE_IDS: readonly string[] = ['closing', '
 export function createHatchableDiscoveryFlow(definition: HatchableCompanionDefinition, compile: typeof defineStory = defineStory) {
   const { discoveryFlow: flow } = definition;
   const target = hatchableStoryTarget(definition);
-  const lesson = flow.gardenLesson;
+  // The campaign pivot: the Garden board and its lesson are gone. A friend's discovery begins at the ticket, on the
+  // marker the player is already looking at; a save parked on a lesson node from before moves there.
+  const lesson = null as typeof flow.gardenLesson | null;
+  const removedLessonNodes = new Set(['gateway.focus', 'garden.open', 'lesson.single.prepare', 'gateway.ready', ...(flow.gardenLesson?.beats.map((beat) => beat.id) ?? [])]);
+  const lessonMigrations = Object.fromEntries([...removedLessonNodes].map((id) => [id, HATCHABLE_MISSION_PAY_NODE_ID]));
+  // A definition's own migrations that led to a lesson node lead to the ticket now.
+  const ownMigrations = Object.fromEntries(Object.entries(flow.migrations ?? {}).map(([from, to]) => [from, removedLessonNodes.has(to) ? HATCHABLE_MISSION_PAY_NODE_ID : to]));
   return compile({
-    // Without a lesson the story begins at the pay step, on the marker the player is already looking at.
     id: flow.id, version: flow.version, entryNodeId: lesson ? 'gateway.focus' : HATCHABLE_MISSION_PAY_NODE_ID, metadata: { kind: 'story' },
     nodes: [
       ...(lesson ? [
@@ -61,7 +66,7 @@ export function createHatchableDiscoveryFlow(definition: HatchableCompanionDefin
       story.task({ id: 'egg.enter', capability: HATCHABLE_DISCOVERY_TASK_CAPABILITY, surface: 'haven', taskId: 'egg.enter', requirements: [{ id: 'entered', event: { type: HATCHABLE_EGG_ENTERED_EVENT } }], next: 'complete' }),
       story.complete(),
     ],
-    migrations: flow.migrations ?? {},
+    migrations: { ...lessonMigrations, ...ownMigrations },
   });
 }
 

@@ -294,7 +294,7 @@ test('v20 restored Havens keep their main stage but restart all new satellites a
     haven: { ...current.haven, tileStages: { ...current.haven.tileStages, mossprout: 4 }, revealState: 'revealed' as const },
   };
   const migrated = normalizeMergeWorldState(legacy, NOW);
-  assert.equal(migrated.version, 24);
+  assert.equal(migrated.version, 25);
   assert.equal(migrated.haven.tileStages.mossprout, 4);
   assert.deepEqual(Object.values(migrated.haven.mossproutNatureIslands), [1, 1, 1, 1, 1, 1]);
 });
@@ -303,20 +303,12 @@ test('v13 Mossprout saves reset into the current personal-world contract', () =>
   const current = mossproutWorld();
   const legacy = { ...current, version: 13, haven: undefined };
   const migrated = normalizeMergeWorldState(legacy, NOW);
-  assert.equal(migrated.version, 24);
+  assert.equal(migrated.version, 25);
   assert.equal(migrated.ownerCharacterId, 'mossprout');
   assert.equal(migrated.haven.tileStages.mossprout, undefined);
   assert.equal(migrated.haven.revealState, 'hidden');
 });
 
-test('procedural Merge orders keep a saved queue separate from story orders', () => {
-  const fresh = createInitialMergeWorldState(NOW, ['mossprout', 'steppling']);
-  fresh.unlockedChains = ['nature:garden', 'nature:waterside', 'adventure:trail', 'adventure:travel'];
-  const state = normalizeMergeWorldState(fresh, NOW);
-  const procedural = state.activeOrders.filter((order) => !order.storyArcId);
-  assert.equal(procedural.length, 3);
-  assert.ok(procedural.every((order) => order.purpose === 'normal' && !order.signature && !order.chapterId));
-});
 
 test('Haven order islands share canonical chapter, journey, and character priority', () => {
   const fresh = normalizeMergeWorldState(createInitialMergeWorldState(NOW, ['mossprout', 'steppling']), NOW);
@@ -421,55 +413,6 @@ test('Mossprout FTUE turns one Bond answer into a Garden upgrade and an intimate
   assert.equal(mossproutFtueStep('merge.resident_card_reward')?.edges?.[0]?.nextStepId, 'companion.resident_match_result');
   assert.equal(mossproutFtueStep('companion.resident_match_result')?.actions[0]?.nextStepId, 'companion.meditating');
   assert.equal(mossproutFtueStep('world.complete'), null);
-});
-
-test('FTUE upgrade is explicit and meditation Back exits without reopening Merge', () => {
-  const rosterRoute = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
-  const mergeRoute = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  const havenScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
-
-  assert.match(rosterRoute, /stepId === 'companion\.meditating'[\s\S]*?completeFtueRun\(\)/);
-  assert.match(mergeRoute, /ftueRun\.stepId !== 'companion\.chapter_zero_return'[\s\S]*?target: 'companion'/);
-  assert.match(mergeRoute, /!\['world\.first_bloom_offer', 'world\.first_bloom_restore'\]\.includes\(ftueRun\.stepId\)[\s\S]*?announcement: 'Returning to the Garden'[\s\S]*?target: 'katchimeras'[\s\S]*?flushFtuePersistence/);
-  assert.match(havenScreen, /gardenOrdersInteractive=\{false\}/);
-  assert.match(havenScreen, /havenOpeningActive && ftueStep && !activeInteractionResidentId && ftueStepId !== 'world\.first_bloom_restore'/);
-  assert.match(havenScreen, /!interactionCreatureId \|\| !ftueStepId \|\| ftueStepId\.startsWith\('companion\.'\)[\s\S]*?closeResidentInteraction\(\)/);
-  assert.match(havenScreen, /!upgradePresentation && !interactionCreatureId && \(ftueStepId === 'haven\.mossprout\.focus'/);
-  assert.match(havenScreen, /FIRST_BLOOM_GARDEN_UPGRADE_OFFER[\s\S]*?anchor: \{ x: 0\.5, y: 0\.76 \}[\s\S]*?target: \{ kind: 'haven_structure', structureId: 'mossprout-hex-garden' \}/);
-  assert.match(havenScreen, /FIRST_SEED_GARDEN_PLANT_OFFER[\s\S]*?placement: 'below'[\s\S]*?target: \{ kind: 'haven_garden_plot', slotId: MOSSPROUT_FIRST_MEMORY_SLOT_ID \}/);
-  assert.match(havenScreen, /tileUpgradeOffer=\{ftueStepId === 'world\.garden_arrival'[\s\S]*?FIRST_SEED_GARDEN_PLANT_OFFER[\s\S]*?: null\}/);
-  assert.match(canvas, /function TileUpgradeOffer[\s\S]*?worldTileActionFrame\(frame,[\s\S]*?styles\.tileUpgradeOffer,[\s\S]*?actionFrame/);
-  assert.match(canvas, /interactionEnabled[\s\S]*?!camera\.isMoving[\s\S]*?!upgradePresentation[\s\S]*?tileUpgradeOffer/);
-  assert.match(canvas, /camera\.isMoving \? null : tileUpgradeOfferNodeRef\.current/);
-  assert.match(canvas, /const committedScene = useMemo[\s\S]*?const upgradeFromScene = useMemo[\s\S]*?upgradePresentation\.fromStage[\s\S]*?complete rendered world on the receipt's from-state[\s\S]*?storySceneGuard\?\.scene \?\? committedScene/);
-  assert.match(canvas, /payload\.operation === 'preserve'[\s\S]*?payload\.holdWorldState[\s\S]*?setStorySceneGuard[\s\S]*?requestAnimationFrame/);
-  assert.match(readFileSync('components/katchadeck/world/mossprout-hex-neighborhood-scene.ts', 'utf8'), /HEARTWOOD_ART\[gardenState\.heartwoodStage[\s\S]*?Object\.values\(HEARTWOOD_BOUNDS\)\.reduce/);
-  assert.match(readFileSync('components/katchadeck/world/mossprout-hex-neighborhood-scene.ts', 'utf8'), /MEMORY_PLANT_ART_CONTACT_Y = 366 \/ 384[\s\S]*?baseY - size \* MEMORY_PLANT_ART_CONTACT_Y/);
-  assert.match(canvas, /const ProjectedMemoryPlant[\s\S]*?allowDownscaling=\{false\}/);
-  assert.match(canvas, /MEMORY_PLANT_NATIVE_SURFACE_SCALE[\s\S]*?revealScale\.value[\s\S]*?withSequence\([\s\S]*?withTiming\(1\.14[\s\S]*?withTiming\(1,/);
-  assert.match(canvas, /revealRequestedForVisualKeyRef[\s\S]*?if \(animateReveal\) revealRequestedForVisualKeyRef\.current = visualKey[\s\S]*?revealRequestedForVisualKeyRef\.current !== visualKey/);
-  assert.doesNotMatch(canvas, /\}, \[animateReveal, celebrationOpacity/);
-  // A memory plant that grows keeps its instance, so the stage swap has to be
-  // staged during render and blended between two layers. Resetting opacity in
-  // the post-paint effect showed the grown art in full for a frame first.
-  assert.match(canvas, /if \(artLayers\.current\.key !== visualKey\)[\s\S]*?outgoing: state\.current/);
-  assert.match(canvas, /const firstAppearance = handledVisualKeyRef\.current === null[\s\S]*?if \(firstAppearance\) \{[\s\S]*?revealOpacity\.value = 0/);
-  assert.match(canvas, /outgoingStage \?[\s\S]*?enters=\{false\}[\s\S]*?fadeOut=\{blendReady\}[\s\S]*?enters=\{outgoingStage !== null\}[\s\S]*?onPainted=\{handleIncomingPainted\}/);
-  assert.match(canvas, /const MemoryPlantArtLayer[\s\S]*?useSharedValue\(enters \? 0 : 1\)[\s\S]*?onDisplay=\{confirmPainted\}/);
-  assert.match(canvas, /RotatingRadialSunburst[\s\S]*?CelebrationParticles[\s\S]*?memory-plant-confetti-/);
-  assert.match(canvas, /Centre the celebration on the planted[\s\S]*?top: \(nativeHeight - raySize\) \/ 2 \+ nativeHeight \* 0\.14/);
-  assert.doesNotMatch(canvas, /animatePlant/);
-  assert.match(havenScreen, /onGardenPlotTargetChange=\{setGardenPlotNode\}/);
-  assert.match(havenScreen, /icon=\{ftueStep\.actions\[0\]\?\.icon \?\? 'sparkles'\}/);
-  assert.match(havenScreen, /ftueStepId === 'world\.first_seed_grew'[\s\S]*?beginFirstSeedReturn/);
-  assert.match(havenScreen, /garden-plant-button:mossprout/);
-  assert.match(havenScreen, /beginFirstSeedReturn[\s\S]*?setFtueReturnFocusCreatureId\(mossprout\.creature\.creatureId\)/);
-  assert.match(havenScreen, /ftueReturnFocusCreatureId === creatureId[\s\S]*?advanceFtueActionDurably\([\s\S]*?world\.acknowledge_first_seed_growth[\s\S]*?companion\.water_together/);
-  assert.match(havenScreen, /mossproutFtueStep\('companion\.chapter_zero_return'\)\?\.camera[\s\S]*?interactionResidentAnchorY=\{ftueReturnResidentAnchorY\}/);
-  assert.doesNotMatch(rosterRoute, /announcement: 'Returning to Mossprout'[\s\S]*?target: 'companion'/);
-  assert.doesNotMatch(canvas, /gardenIslandHitTarget/);
-  assert.doesNotMatch(havenScreen, /collapsable=\{false\} ref=\{setFirstBloomRestoreButtonNode\}/);
 });
 
 test('live Chapter 0 board installation preserves the planted Haven memory', () => {

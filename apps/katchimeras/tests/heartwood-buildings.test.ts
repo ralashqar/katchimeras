@@ -107,8 +107,8 @@ test('building takes Glow and the patch; a stale or repeated request changes not
   const built = upgradeHeartwoodBuilding(planted, 'dew-spring', 0, NOW + 1);
   assert.equal(built.coins, 80);
   assert.deepEqual(built.heartwoodBuildings, { 'dew-spring': { level: 1, builtAt: NOW + 1 } });
-  assert.equal(built.energy.regenCap, 110);
-  assert.equal(built.energy.value, planted.energy.value + 10, 'the new room arrives full');
+  assert.equal(built.energy.regenCap, planted.energy.regenCap, 'no building moves the dormant energy any more');
+  assert.equal(built.energy.value, planted.energy.value, 'what the Spring gives is read on the way into the Mist');
   const plant = built.haven.plantableMemories[0]!;
   assert.deepEqual([plant.status, plant.slotId, plant.growthPoints], ['earned', null, 2], 'the plant goes back to the collection with its growth');
   assert.equal(planted.haven.plantableMemories[0]!.status, 'planted', 'the input world is untouched');
@@ -176,8 +176,8 @@ test('the panel model: an empty patch builds, a built one shows every number wit
   assert.deepEqual(empty.primary, { label: 'Build', cost: 20, disabled: true });
   assert.equal(empty.progressLabel, '50%');
   assert.deepEqual(empty.benefits.map((benefit) => [benefit.label, benefit.icon, benefit.from, benefit.to, benefit.delta]), [
-    ['Energy cap', 'energy', '100', '110', '+10'],
-    ['Recovery', 'timer', '2:00', '2:00', undefined],
+    ['Starting Resolve', 'energy', '+0', '+2', '+2'],
+    ['Second wind', 'timer', '+0', '+0', undefined],
   ], 'a number this level does not move reads as a plain value, with no gain');
   assert.equal(empty.requirements[0]?.met, false);
   assert.equal(empty.levels.length, 10);
@@ -185,13 +185,16 @@ test('the panel model: an empty patch builds, a built one shows every number wit
 
   const milestone = buildingUpgradeModel(world({ buildings: { 'dew-spring': { level: 3, builtAt: NOW } } }), 'dew-spring');
   assert.deepEqual(milestone.primary, { label: 'Upgrade', cost: 140, disabled: false });
-  assert.deepEqual(milestone.benefits.map((benefit) => [benefit.label, benefit.from, benefit.to, benefit.delta]), [['Energy cap', '130', '140', '+10'], ['Recovery', '2:00', '1:45', '-0:15']], 'a shorter wait reads as time taken off');
+  assert.deepEqual(milestone.benefits.map((benefit) => [benefit.label, benefit.from, benefit.to, benefit.delta]), [['Starting Resolve', '+6', '+8', '+2'], ['Second wind', '+0', '+0', undefined]]);
+  const secondWind = buildingUpgradeModel(world({ buildings: { 'dew-spring': { level: 6, builtAt: NOW } } }), 'dew-spring');
+  assert.deepEqual(secondWind.benefits[1], { id: 'Second wind', label: 'Second wind', icon: 'timer', tint: '#4E9CC4', from: '+0', to: '+1', delta: '+1' }, 'level seven brings a step of Resolve back');
   const icons = Object.fromEntries((['seed-nursery', 'root-cellar', 'garden-stall'] as const).map((id) => [id, buildingUpgradeModel(world(), id).benefits.map((benefit) => [benefit.icon, benefit.delta])]));
-  assert.deepEqual(icons, { 'seed-nursery': [['sparkles', '+3%'], ['star.fill', undefined]], 'root-cellar': [['shippingbox.fill', '+1']], 'garden-stall': [['glow', '+4%']] });
+  assert.deepEqual(icons, { 'seed-nursery': [['sparkles', '+3%'], ['star.fill', undefined]], 'root-cellar': [['shippingbox.fill', undefined]], 'garden-stall': [['glow', '+4%']] }, 'the Cellar opens its first cell at level two');
+  assert.deepEqual(buildingUpgradeModel(world({ buildings: { 'root-cellar': { level: 1, builtAt: NOW } } }), 'root-cellar').benefits.map((benefit) => [benefit.from, benefit.to, benefit.delta]), [['+0', '+1', '+1']]);
 
   const done = buildingUpgradeModel(world({ buildings: { 'root-cellar': { level: 10, builtAt: NOW } } }), 'root-cellar');
   assert.equal(done.complete, true);
-  assert.deepEqual(done.benefits.map((benefit) => [benefit.from, benefit.to, benefit.delta]), [['+10', '+10', undefined]], 'fully grown, it still shows what it gives');
+  assert.deepEqual(done.benefits.map((benefit) => [benefit.from, benefit.to, benefit.delta]), [['+5', '+5', undefined]], 'fully grown, it still shows what it gives');
   assert.equal(done.primary, null);
   assert.equal(done.progressLabel, 'MAX');
 

@@ -1,6 +1,6 @@
 import type { ActiveContentPack, ContentPack, ContentPackContent, ContentRegistrySnapshot } from '@/types/content-pack';
 
-export const CONTENT_KINDS = ['characters', 'families', 'skins', 'mergeChains', 'mergeGenerators', 'islands', 'islandCampaigns', 'storyTiles', 'hatchables', 'missions', 'chapters', 'conversations', 'flows', 'liveEvents', 'harmonyDefinitions'] as const satisfies readonly (keyof ContentPackContent)[];
+export const CONTENT_KINDS = ['characters', 'families', 'skins', 'mergeChains', 'mergeGenerators', 'islands', 'islandCampaigns', 'storyTiles', 'hatchables', 'missions', 'encounters', 'chapters', 'conversations', 'flows', 'liveEvents', 'harmonyDefinitions'] as const satisfies readonly (keyof ContentPackContent)[];
 
 export function canonicalContent(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalContent).join(',')}]`;

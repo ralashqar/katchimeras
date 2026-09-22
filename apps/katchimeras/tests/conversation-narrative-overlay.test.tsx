@@ -252,22 +252,6 @@ test('Seed reveal uses the selected intention and keeps its celebration behind t
 });
 
 
-test('Garden handoff presents Heartwood and waits for the player before planting', async () => {
-  const loaded = loadNativeModule('components/katchadeck/world/garden-planting-handoff.tsx', {
-    './heartwood-story-scene': { HeartwoodStoryScene: host('HeartwoodScene') },
-  });
-  const Handoff = loaded.GardenPlantingHandoff as React.ComponentType<any>;
-  let calls = 0;
-  let tree!: ReactTestRenderer;
-  await act(async () => { tree = create(<Handoff onContinue={() => { calls++; }} />); });
-  assert.equal(calls, 0, 'no automatic skip past the destination');
-  const scene = tree.root.findByType(host('HeartwoodScene'));
-  assert.equal(scene.props.scene, 'introduction');
-  await act(async () => scene.props.onContinue());
-  assert.equal(calls, 1);
-  await act(async () => tree.unmount());
-});
-
 test('a reply arrives with the answer, later lines pace quickly, and new speech scrolls the reader down even after they scrolled up', async () => {
   const ids = ['prompt-one', 'answer-one', 'reply-one', 'prompt-two'];
   const entries = ids.map((id, index) => ({ id, speaker: index === 1 ? 'player' : 'mossprout' } as const));

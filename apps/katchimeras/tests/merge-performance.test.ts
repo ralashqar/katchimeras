@@ -31,19 +31,6 @@ test('reward batch timeline preserves stagger and freezes each coin at its endpo
   }
 });
 
-test('coin contacts update only the HUD and no longer start per-token hover loops', () => {
-  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  const arrival = screen.slice(screen.indexOf('const handleCoinArrive'), screen.indexOf('const handleEnergyArrive'));
-  assert.doesNotMatch(arrival, /setCoinPulseNonce|setPresentedCoins|setCoinValueAnimationDurationMs/);
-  assert.match(arrival, /coinPresentation.publish/);
-  assert.match(arrival, /Haptics.impactAsync/);
-  const overlay = readFileSync('components/katchadeck/games/merge-serve-reward-overlay.tsx', 'utf8');
-  assert.doesNotMatch(overlay, /withRepeat/);
-  assert.match(overlay, /if \(!arrived \|\| notified.value\) return/);
-  assert.match(overlay, /cancelAnimation\(elapsed\)/);
-  assert.match(overlay, /cancelAnimation\(landed\)/);
-});
-
 test('burst pool preserves unchanged effects and notifies only its subscribers', () => {
   const pool = createMergeBoardEffects();
   let updates = 0;

@@ -11,20 +11,17 @@ import { mossproutFtueConversationDefinitions, resolveMossproutFtueConversation 
 const NOW = Date.parse('2026-09-18T12:00:00Z');
 test('Heartwood is available without a development global; every greeting establishes the destination and first action', () => {
   assert.equal(SHARED_ADVENTURE_ENABLED, true);
-  assert.match(HEARTWOOD_STORY.introduction.text, /Heartwood/);
+  assert.equal('introduction' in HEARTWOOD_STORY, false, 'the first session shows Heartwood in the world, never on a sheet');
   for (const option of MOSSPROUT_GREETING_OPTIONS) {
-    assert.match(option.reply, /Heartwood/);
-    assert.match(option.reply, /Garden/);
+    assert.match(option.reply, /Heartwood|Garden/, 'every answer lands on the destination or the first action');
   }
   for (const definition of mossproutFtueConversationDefinitions.filter(d => d.id.includes('first-meeting'))) {
     const resolved = resolveMossproutFtueConversation(definition, 'calm', definition.version, 'A day with some rain.');
     const hello = resolved.nodes.find(n => n.id === 'hello');
     assert.ok(hello?.kind === 'choice');
     assert.match(hello.prompt, /Heartwood/);
-    const followup = resolved.nodes.find(n => n.id === 'followup');
-    assert.ok(followup?.kind === 'choice');
-    assert.match(followup.prompt, /our home/);
-    assert.equal(followup.options.length, 3);
+    assert.equal(resolved.nodes.some(n => n.id === 'followup'), false, 'one question, then the Seed');
+    assert.equal(hello.options.length, 3);
   }
   assert.match(MOSSPROUT_FTUE_COPY.farewell, /needn’t wait/);
 });
@@ -72,6 +69,6 @@ test('every old shared scene has a semantic migration; only the finale receives 
     });
   }
   assert.equal(ADVENTURE_FLOWS.at(-1)?.migrations?.['line:2'], 'receive-answer');
-  assert.doesNotMatch(HEARTWOOD_STORY.signal.text, /answer|someone.*flash/i);
+  assert.equal('signal' in HEARTWOOD_STORY, false, 'the bud is a caption, never a sheet');
   assert.match(FIRST_ANSWER.beats.at(-1)!.lines[2], /Three flashes back/);
 });

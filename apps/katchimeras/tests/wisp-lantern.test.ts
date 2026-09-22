@@ -11,7 +11,7 @@ import { LANTERN_VISITORS, ORDINARY_PACK, ORDINARY_PROTECTION, validateLanternPa
 import { WISP_CATALOG } from '@/constants/wisps';
 import { wispOwnershipState } from '@/utils/wisp-ownership';
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
-import { placeLanternWorld, lanternEligible, startLanternWorld, projectLanternWorld, WELCOME_ORDER_IDS } from '@/features/wisps/lantern-world';
+import { placeLanternWorld, lanternEligible, startLanternWorld, projectLanternWorld, WELCOME_CLEARS, WELCOME_ORDER_IDS } from '@/features/wisps/lantern-world';
 import { mergeCommandEvents } from '@/features/live-ops/merge-events';
 import type { WispCollectionState } from '@/types/wisp';
 import type { GameplayEvent } from '@/types/gameplay-event';
@@ -103,44 +103,42 @@ test('legacy ownership and server-only ownership contribute once without manufac
   assert.equal(assigned.inventory.crystal, undefined, 'read-only external ownership never becomes a local grant');
   assert.throws(() => reduceWispLantern(local, { type: 'exchange', receiptId: 'already-owned', wispId: 'crystal' }, NOW, 1, ['crystal']));
 });
-test('eligibility requires Feastle and Heartwood, and welcome orders give exactly one pouch each', () => {
+test('eligibility requires Feastle and Heartwood, and the first Mist clears welcome the Lantern with exactly one pouch each', () => {
   assert.equal(lanternEligible(createInitialMergeWorldState(NOW)), false);
   let world = startLanternWorld(readyWorld(), NOW);
   assert.equal(startLanternWorld(world, NOW), world);
-  for (const id of WELCOME_ORDER_IDS) {
-    const order = world.activeOrders.find(o => o.id === id)!;
-    let cell = 0;
-    for (const requirement of order.requirements) for (let n = 0; n < requirement.quantity; n++) {
-      world.board[cell] = { ...world.board[cell], locked: false, blocker: null, mist: null, occupant: { kind: 'item', definitionId: requirement.definitionId, instanceId: `supply:${cell}` } }; cell++;
-    }
-    const command = { type: 'serveOrder' as const, orderId: id, now: NOW };
+  assert.ok(!world.activeOrders.some(o => WELCOME_ORDER_IDS.includes(o.id as typeof WELCOME_ORDER_IDS[number])), 'the Lantern asks the Main Board for nothing');
+  const outcome = { cleared: true, grade: 'cleared' as const, resolveLeft: 3, actions: 9, merges: 8, continues: 0, rescued: false };
+  for (let n = 0; n < WELCOME_CLEARS; n += 1) {
+    const command = { type: 'completeEncounter' as const, receiptId: `welcome:${n}`, missionId: `test:rung:${n}`, katchimeraId: 'mossprout' as const, helperWispId: null, outcome, difficulty: 'calm' as const, now: NOW + n };
     const result = reduceMergeWorld(world, command);
     assert.equal(result.changed, true, result.message);
-    assert.deepEqual(result.state.externalRewardReceipts, world.externalRewardReceipts, 'visitor requests never create companion-story receipts');
     const events = mergeCommandEvents(world, command, result, 1);
-    const coins = world.coins;
     world = projectLanternWorld(result.state, events);
-    assert.equal(world.coins, coins);
-    assert.equal(world.wispLanternProgress!.dailyOrders, 0);
+    assert.equal(world.wispLanternProgress!.dailyOrders, 0, 'a welcome clear is not a day clear');
+    assert.equal(world.wispLanternProgress!.lifetimeOrders, 0);
     assert.deepEqual(projectLanternWorld(world, events), world);
   }
-  assert.equal(Object.keys(world.wispLanternProgress!.rewards).length, 2);
-  assert.ok(!world.activeOrders.some(o => WELCOME_ORDER_IDS.includes(o.id as typeof WELCOME_ORDER_IDS[number])));
+  assert.equal(Object.keys(world.wispLanternProgress!.rewards).length, WELCOME_CLEARS);
+  assert.deepEqual(world.wispLanternProgress!.welcomeServed, ['test:rung:0', 'test:rung:1']);
 });
-test('daily rewards exclude untagged, historical and replayed events and resist clock rollback', () => {
+test('daily rewards exclude historical and replayed clears and resist clock rollback', () => {
   let world = startLanternWorld(readyWorld(), NOW);
-  const event = (id: string, at: number, tags = ['lantern-daily-order']): GameplayEvent => ({ version: 1, id, kind: 'order_completed', source: 'merge-world', sourceRevision: 1, contentRevision: 1, occurredAt: at, quantity: 1, context: { targetId: id, tags } });
-  world = projectLanternWorld(world, [event('story', NOW, []), { ...event('historic', NOW), historical: true }]);
-  assert.equal(world.wispLanternProgress!.dailyOrders, 0);
+  const event = (id: string, at: number): GameplayEvent => ({ version: 1, id, kind: 'encounter_cleared', source: 'merge-world', sourceRevision: 1, contentRevision: 1, occurredAt: at, quantity: 1, context: { targetId: id, tags: ['first-clear'] } });
+  world = projectLanternWorld(world, [{ ...event('historic', NOW), historical: true }]);
+  assert.equal(world.wispLanternProgress!.welcomeServed.length, 0);
+  world = projectLanternWorld(world, [event('w0', NOW), event('w1', NOW)]);
+  assert.equal(Object.keys(world.wispLanternProgress!.rewards).length, 2, 'two welcomes');
   const first = Array.from({ length: 8 }, (_, n) => event(`first:${n}`, NOW));
   world = projectLanternWorld(world, first);
-  assert.equal(Object.keys(world.wispLanternProgress!.rewards).length, 1);
+  assert.equal(world.wispLanternProgress!.dailyOrders, 5, 'the day caps at five');
+  assert.equal(Object.keys(world.wispLanternProgress!.rewards).length, 3, 'and the day pack');
   world = projectLanternWorld(world, first);
+  assert.equal(Object.keys(world.wispLanternProgress!.rewards).length, 3, 'replayed clears change nothing');
   world = projectLanternWorld(world, Array.from({ length: 5 }, (_, n) => event(`next:${n}`, NOW + 86_400_000)));
   world = projectLanternWorld(world, Array.from({ length: 5 }, (_, n) => event(`rollback:${n}`, NOW)));
-  assert.equal(Object.keys(world.wispLanternProgress!.rewards).length, 2);
+  assert.equal(Object.keys(world.wispLanternProgress!.rewards).length, 4);
 });
-
 test('local event pouch rewards validate, claim once and reject verified scope', () => {
   const definition = createLocalEventPilot(new Date(NOW - 1000).toISOString()).liveEvents![0];
   definition.enabled = true;

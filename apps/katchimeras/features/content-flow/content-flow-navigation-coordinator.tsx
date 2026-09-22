@@ -6,5 +6,5 @@ import {useGameScreenTransition} from '@/features/navigation/game-screen-transit
 import {recordStoryFlowDiagnostic} from './story-flow-diagnostics';
 export const {ContentFlowNavigationCoordinator}=createContentFlowNavigation({catalog,repository,director,useGameScreenTransition,diagnostics:recordStoryFlowDiagnostic,
  gameSurface(surface) { if(surface==='collection') return 'katchimeras'; if(surface==='haven'||surface==='companion') return 'companion'; if(surface==='today'||surface==='merge') return surface; return null; },
- onReturn:router=>router.replace('/katchimera/mossprout/activity'), shouldBypassPath:pathname=>pathname.startsWith('/dev-')
+ onReturn:router=>router.replace('/(tabs)/katchimeras'), shouldBypassPath:pathname=>pathname.startsWith('/dev-')
 });

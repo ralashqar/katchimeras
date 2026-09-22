@@ -26,7 +26,7 @@ const PLACE_STATUS: Record<KingdomPlaceEntry['status'], string> = {
 };
 
 /** The Kingdom's long-term goal at a glance: who is home, what is restored, and the one next step. */
-export function KingdomProgressSheet({ progress, onClose, onNext, world, onMerge, onExplore, onSharedAdventure }: {
+export function KingdomProgressSheet({ progress, onClose, onNext, world, onMerge, onExplore, onSharedAdventure, onDailyMist, onGrove }: {
   progress: KingdomProgress;
   onClose: () => void;
   onNext: (next: KingdomNext) => void;
@@ -34,6 +34,10 @@ export function KingdomProgressSheet({ progress, onClose, onNext, world, onMerge
   onMerge: () => void;
   onExplore: (eventId: string) => void;
   onSharedAdventure?: () => void;
+  /** The Daily Mist, once it is open. */
+  onDailyMist?: () => void;
+  /** The Sleeping Grove, Mossprout's own region, after the first session. */
+  onGrove?: () => void;
 }) {
   const [eventsOpen, setEventsOpen] = useState(false);
   const harmony = useHarmonyProgress();
@@ -50,6 +54,16 @@ export function KingdomProgressSheet({ progress, onClose, onNext, world, onMerge
         <ThemedText lightColor="#8E7130" darkColor="#8E7130" style={styles.sectionTitle}>THE PATH TO HEARTWOOD</ThemedText>
         <ThemedText lightColor="#332918" darkColor="#332918">{world.sharedAdventure?.completedAt ? 'Someone answered. Keep the lantern paths open while we find the next light.' : 'Mossprout, Steppling and Feastle are making a signal together.'}</ThemedText>
         <KatchaButton label={world.sharedAdventure?.completedAt ? 'Lantern Routes' : 'The First Answer'} onPress={onSharedAdventure} />
+      </View> : null}
+      {onGrove ? <View style={styles.next}>
+        <ThemedText lightColor="#8E7130" darkColor="#8E7130" style={styles.sectionTitle}>THE SLEEPING GROVE</ThemedText>
+        <ThemedText lightColor="#332918" darkColor="#332918">Mossprout’s own patch, still under the Mist. One patch at a time.</ThemedText>
+        <KatchaButton label="The Sleeping Grove" onPress={onGrove} />
+      </View> : null}
+      {onDailyMist ? <View style={styles.next}>
+        <ThemedText lightColor="#8E7130" darkColor="#8E7130" style={styles.sectionTitle}>DAILY MIST</ThemedText>
+        <ThemedText lightColor="#332918" darkColor="#332918">The Mist moves every night. Three patches a day, each cleared once for its Glow.</ThemedText>
+        <KatchaButton label="Daily Mist" onPress={onDailyMist} />
       </View> : null}
       <View style={styles.next}>
         <ThemedText lightColor="#8E7130" darkColor="#8E7130" style={styles.sectionTitle}>HARMONY · {harmony.points}</ThemedText>

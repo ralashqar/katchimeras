@@ -118,23 +118,3 @@ test('camera completion is once-only across interrupted, superseded and cancelle
   }
   assert.equal(completed, 30);
 });
-
-test('native surfaces wire foreground recovery without replaying settled world framing', () => {
-  const read = (file: string) => readFileSync(file, 'utf8');
-  const board = read('components/katchadeck/games/feastle-persistent-merge-board.tsx');
-  const screen = read('components/katchadeck/games/merge-world-screen.tsx');
-  const provider = read('features/merge-world/merge-world-provider.tsx');
-  const camera = read('components/katchadeck/world/use-kingdom-hex-camera.ts');
-  assert.match(board, /if \(foreground\) return;[\s\S]*?operation.remaining.clear\(\);[\s\S]*?finishOperationIfReady\(operation.id\)/);
-  assert.match(board, /timers.cancel\(operationTimeouts.current.get\(operationId\)\)/);
-  assert.match(board, /epoch !== dragEpoch.value/);
-  assert.match(board, /boardEffects.clear\(\)/);
-  assert.match(board, /cancelAnimation\(progress\);[\s\S]*?scale.value = 1/);
-  assert.match(screen, /visualGenerationRef.current \+= 1/);
-  assert.match(screen, /activeServeOrderRef.current = null;[\s\S]*?setServeFlight\(null\)/);
-  assert.match(provider, /routeActive && foreground/);
-  assert.match(provider, /wasActive && !nextActive/);
-  assert.match(camera, /if \(!resumeNeededRef.current\) return/);
-  assert.match(camera, /completeCameraMove\(move.id\)/);
-  assert.doesNotMatch(read('components/katchadeck/world/kingdom-hex-canvas.tsx'), /cameraRestoreNonce/);
-});

@@ -7,7 +7,7 @@ import { HEARTWOOD_STORY } from '@/features/shared-adventure/heartwood-opening';
 import type { HeartwoodPresentation } from '@/features/shared-adventure/types';
 import { applyStoredAdventure } from '@/utils/merge-world/repository';
 
-export function HeartwoodStoryScene({ scene, onContinue }: { scene: HeartwoodPresentation; onContinue: () => unknown }) {
+export function HeartwoodStoryScene({ scene, onContinue }: { scene: Extract<HeartwoodPresentation, 'recap'>; onContinue: () => unknown }) {
   const insets = useSafeAreaInsets();
   const busy = useRef(false);
   const [pending, setPending] = useState(false);

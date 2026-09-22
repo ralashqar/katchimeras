@@ -1,5 +1,7 @@
 /** Public action contract. These are observations, never client authority to grant money. */
-export type GameplayEventKind = 'merge' | 'order_completed' | 'mist_cleared' | 'hex_restored' | 'structure_upgraded' | 'friend_rescued' | 'bond_gained' | 'wisp_discovered' | 'journey_completed' | 'expedition_completed' | 'incursion_completed';
+export type GameplayEventKind = 'merge' | 'order_completed' | 'mist_cleared' | 'hex_restored' | 'structure_upgraded' | 'friend_rescued' | 'bond_gained' | 'wisp_discovered' | 'journey_completed' | 'expedition_completed' | 'incursion_completed'
+  /** A Mist encounter cleared: `targetId` is the mission, `level` the grade's rank (0 cleared, 1 bright, 2 perfect). */
+  | 'encounter_cleared';
 
 export type GameplayEvent = {
   version: 1;

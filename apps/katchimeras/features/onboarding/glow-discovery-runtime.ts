@@ -1,6 +1,9 @@
 import type { ContentFlowRun } from '@/types/content-flow';
 import type { MergeWorldState } from '@/types/merge-world';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
+import { GLOW } from '@/constants/glow';
+import { hatchableGatewayState } from '@/utils/merge-world/glow-discovery-policy';
+import { grantStoredStoryGlow, loadMergeWorldState } from '@/utils/merge-world/repository';
 import {
   acknowledgeHatchableEggEntry, completeHatchableMission, migrateHatchableEggHandoff, reconcileHatchableLesson, recoverHatchableEggHandoff,
   startHatchableDiscovery, submitHatchableAction, useHatchableRuns,
@@ -11,7 +14,18 @@ import {
  * shared hatchable runtime called with his definition. New friends use the
  * runtime directly with theirs.
  */
-export function startGlowDiscovery() {
+/** Once per save: the Glow Steppling's mist costs, handed over as his clearing opens (no Merge page to earn it on). */
+export const STEPPLING_MIST_GLOW_RECEIPT = 'story-glow:steppling-mist';
+
+export async function grantStepplingMistGlow() {
+  const world = await loadMergeWorldState();
+  // A mist already cleared (or a friend already home) never pays out again.
+  if (hatchableGatewayState(world, STEPPLING_HATCHABLE) !== 'locked') return world;
+  return (await grantStoredStoryGlow(STEPPLING_MIST_GLOW_RECEIPT, GLOW.stepplingMistCost)).state;
+}
+
+export async function startGlowDiscovery() {
+  await grantStepplingMistGlow();
   return startHatchableDiscovery(STEPPLING_HATCHABLE);
 }
 

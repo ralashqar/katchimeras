@@ -20,6 +20,11 @@ export function mergeCommandEvents(before: MergeWorldState, command: MergeWorldC
       tags: order && boardId === 'mossprout' && (!order.storyArcId || order.storyArcId === 'mossprout:casual-garden') && order.purpose === 'normal' && !order.id.includes('tutorial') && !order.id.includes('chapter-0') ? ['lantern-daily-order'] : [],
     } });
   }
+  if (command.type === 'completeEncounter' && result.encounterCleared) {
+    const cleared = result.encounterCleared;
+    events.push({ ...base, id: `${id}:encounter:${cleared.missionId}`, kind: 'encounter_cleared', context: { targetId: cleared.missionId, companionId: cleared.katchimeraId, regionId: cleared.campaignId ?? regionId, level: cleared.grade === 'perfect' ? 2 : cleared.grade === 'bright' ? 1 : 0,
+      tags: [cleared.firstClear ? 'first-clear' : 'replay', ...(cleared.missionId.startsWith('daily:') ? ['daily-mist'] : [])] } });
+  }
   return events;
 }
 

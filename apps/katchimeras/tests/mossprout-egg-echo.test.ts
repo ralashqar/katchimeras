@@ -34,8 +34,8 @@ test('first-session copy stays short, in voice, and free of system nouns', () =>
     assert.doesNotMatch(line, SYSTEM_NOUNS, line);
     for (const page of ftueDialoguePages(line)) assert.ok(page.length <= FTUE_DIALOGUE_MAX_CHARACTERS, page);
   }
-  assert.equal(ftueDialoguePages(MOSSPROUT_FTUE_COPY.farewell).length, 2, 'the farewell carries one idea per page');
-  const shippingMergeSteps = ['merge.serve_sprout', 'world.first_bloom_offer', 'world.first_bloom_restore', 'world.first_seed_grew'];
+  assert.equal(ftueDialoguePages(MOSSPROUT_FTUE_COPY.farewell).length, 1, 'the farewell is one page: the marker, and the rest');
+  const shippingMergeSteps = ['merge.serve_sprout', 'world.garden_arrival', 'world.first_seed_grew'];
   for (const stepId of shippingMergeSteps) {
     const guide = mossproutFtueStep(stepId)!.guide;
     assert.doesNotMatch(guide.title, SYSTEM_NOUNS, `${stepId} title speaks as Mossprout`);

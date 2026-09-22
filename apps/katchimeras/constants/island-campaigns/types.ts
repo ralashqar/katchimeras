@@ -1,15 +1,20 @@
 import type { HeatRules } from '@/features/time-trial/heat';
 import type { ConversationInsightResultDefinition, ConversationOption } from '@/types/companion-conversation';
 import type { MissionMechanicDefinition } from '@/types/mission-mechanic';
+import type { EncounterDefinition, EncounterDifficulty } from '@/types/encounter';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeOrder, MossproutNatureIslandId, MossproutNatureIslandLevel } from '@/types/merge-world';
 import type { CorruptionWispLines } from '@/features/onboarding/corruption-wisps';
 import type { ContentLine } from '@/types/content-predicate';
 
 export type IslandCampaignChapterLevel = Exclude<MossproutNatureIslandLevel, 0>;
-export type IslandCampaignChapterStatus = 'available' | 'orders_active' | 'return_ready' | 'board_open' | 'delivery_requested' | 'restoration_ready' | 'resolution_ready' | 'complete';
+/** `mission_available` and `in_encounter` are the campaign pivot's: the chapter plays as rungs of the region's ladder. The order and board states are the flow from before it. */
+export type IslandCampaignChapterStatus = 'available' | 'mission_available' | 'in_encounter' | 'orders_active' | 'return_ready' | 'board_open' | 'delivery_requested' | 'restoration_ready' | 'resolution_ready' | 'complete';
 export type IslandCampaignPhase = 'opening' | 'return' | 'resolution';
-export type IslandCampaignPanelAction = 'start_story' | 'open_merge' | 'continue_return' | 'continue_restoring' | 'continue_resolution';
+export type IslandCampaignPanelAction = 'start_story' | 'enter_mist' | 'resume_mist' | 'open_merge' | 'continue_return' | 'continue_restoring' | 'continue_resolution';
+/** The states and actions every campaign voices itself; the rest fall back to shared labels. */
+export type IslandCampaignVoicedStatus = Exclude<IslandCampaignChapterStatus, 'board_open' | 'delivery_requested' | 'mission_available' | 'in_encounter'>;
+export type IslandCampaignVoicedAction = Exclude<IslandCampaignPanelAction, 'continue_restoring' | 'enter_mist' | 'resume_mist'>;
 
 /** A cell half-hidden in mist with an item inside: match it to set it free (an ordinary Dream Echo). */
 export type RestorationEcho = { id: string; cell: number; definitionId: string };
@@ -43,6 +48,29 @@ export type RestorationBoardDefinition = {
   rush?: HeatRules & { goal: number };
 };
 
+/**
+ * One rung of a region's ladder (content schema 7): an encounter with what it
+ * teaches, where it docks and what it pays. A chapter owns one to three; the
+ * last raises the island a level, and the final chapter's last is the boss.
+ */
+export type RegionMissionDefinition = {
+  /** Save data: the encounter ledger's key. */
+  id: string;
+  title: string;
+  /** One line of what to do, for the mission card. */
+  objective: string;
+  difficulty: EncounterDifficulty;
+  encounter: EncounterDefinition;
+  /** Base rewards before grade and first-clear factors. */
+  rewards: { glow: number; xp: number };
+  /** Katchimeras that may take this rung; absent, any playable one. */
+  eligible?: readonly MergeCharacterId[];
+  /** The Kingdom anchor the board docks under; absent, the island. */
+  tileId?: string;
+  /** A timed rush chapter: played on the rush dock against its clock, never as a puzzle board. */
+  rush?: boolean;
+};
+
 export type IslandCampaignChapterOrder = Pick<MergeOrder, 'title' | 'description' | 'difficulty' | 'requirements' | 'narrativeSignal'>;
 
 /** One authored answer: it shapes the Merge request, the return and the payoff of its chapter. */
@@ -71,6 +99,8 @@ export type IslandCampaignChapter<S extends string = string> = {
   callbackLine?: Partial<Record<S, string>>;
   /** When authored, the chapter plays on the docked restoration board and the order becomes its delivery. */
   restoration?: RestorationBoardDefinition;
+  /** The chapter's rungs on the campaign ladder (content schema 7); absent, `restoration` (or a fallback) is read as its one rung. */
+  missions?: readonly RegionMissionDefinition[];
   fallbackOrder: IslandCampaignChapterOrder;
   choices: readonly IslandCampaignChoice<S>[];
 };
@@ -106,9 +136,9 @@ export type IslandCampaignCopy = {
   returnNoteHint: string;
   /** Optional mechanics hint under the chapter question; empty keeps the moment personal. */
   helperText?: string;
-  actionLabels: Record<Exclude<IslandCampaignPanelAction, 'continue_restoring'>, string> & Partial<Record<'continue_restoring', string>>;
+  actionLabels: Record<IslandCampaignVoicedAction, string> & Partial<Record<Exclude<IslandCampaignPanelAction, IslandCampaignVoicedAction>, string>>;
   /** Machine-readable panel states; `speech` voices the ones the friend cares about. Restoration-board states fall back to shared labels. */
-  stateLabels: Record<Exclude<IslandCampaignChapterStatus, 'board_open' | 'delivery_requested'>, string> & Partial<Record<'board_open' | 'delivery_requested', string>>;
+  stateLabels: Record<IslandCampaignVoicedStatus, string> & Partial<Record<Exclude<IslandCampaignChapterStatus, IslandCampaignVoicedStatus>, string>>;
   /** Lines read the facts `coins`, `cost`, `affordable`, `halfway`, `chapterTitle`, `level`, `choiceId`. */
   speech?: Partial<Record<IslandCampaignChapterStatus, ContentLine<IslandCampaignSpeechContext>>>;
   /** Read `{{chapterTitle}}`. */
@@ -127,6 +157,8 @@ export type IslandCampaignCopy = {
 export type IslandWakeCondition =
   | { kind: 'friend_hatched'; companion: string }
   | { kind: 'friend_home'; residentSkinId: KatchimeraSkinId }
+  /** Once the Heart Tree has reached a stage (content schema 7). */
+  | { kind: 'tree_stage'; stage: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage }
   | { kind: 'always' };
 
 export type IslandCampaignDefinition<S extends string = string> = {

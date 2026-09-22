@@ -404,7 +404,7 @@ export function buildPlayerProfileFixtures(now = Date.now()): PlayerProfileSnaps
       timePolicy: 'relative',
       createdAt: new Date(now).toISOString(),
       tags: fixture.tags,
-      launchRoute: fixture.launchRoute ?? (fixture.ftueStep == null ? '/(tabs)/today' : '/(tabs)/games'),
+      launchRoute: fixture.launchRoute ?? (fixture.ftueStep == null ? '/(tabs)/today' : '/(tabs)/katchimeras'),
       summary: fixtureSummary(state, fixture.ftueStep),
       domains: {
         keyValue: { schemaVersion: 1, values: fixture.prepareKeyValues?.(keyValues, now) ?? keyValues },

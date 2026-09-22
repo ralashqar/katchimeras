@@ -118,6 +118,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
   const storyTiles = list(raw.storyTiles, issues, 'storyTiles');
   const hatchables = list(raw.hatchables, issues, 'hatchables');
   const missions = list(raw.missions, issues, 'missions');
+  const encounters = list(raw.encounters, issues, 'encounters');
   const chapters = list(raw.chapters, issues, 'chapters');
   const conversations = list(raw.conversations, issues, 'conversations');
   const flows = list(raw.flows, issues, 'flows');
@@ -234,7 +235,8 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     if (!isText(campaign.residentName) || !isText(campaign.chapterIdPrefix) || !isRecord(campaign.payoff) || !isRecord(campaign.copy)) issues.push(`island campaign ${id} needs a resident name, chapter id prefix, payoff and copy`);
     const wake = campaign.wake;
     if (wake !== undefined) {
-      if (!isRecord(wake) || !['friend_hatched', 'friend_home', 'always'].includes(String(wake.kind))) issues.push(`island campaign ${id}: wake must be friend_hatched, friend_home or always`);
+      if (!isRecord(wake) || !['friend_hatched', 'friend_home', 'always', 'tree_stage'].includes(String(wake.kind))) issues.push(`island campaign ${id}: wake must be friend_hatched, friend_home, tree_stage or always`);
+      else if (wake.kind === 'tree_stage' && (Number(raw.contentSchemaVersion) < 7 || !['dormant', 'stirring', 'rooted', 'blooming', 'awakened'].includes(String(wake.stage)))) issues.push(`island campaign ${id}: a tree_stage wake needs content schema 7 and a Heartwood stage`);
       else if (wake.kind === 'friend_hatched' && !companionIds.has(String(wake.companion))) issues.push(`island campaign ${id}: wake names ${wake.companion}, who is not a friend`);
       else if (wake.kind === 'friend_home' && !skinIds.has(String(wake.residentSkinId))) issues.push(`island campaign ${id}: wake names form ${wake.residentSkinId}, which does not exist`);
     }
@@ -306,6 +308,17 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     if (!newId('mission', mission.id, bundledMissions.map((item) => item.id), seenMissions)) continue;
     if (!isRecord(mission.guides) || !isRecord(mission.lines)) { issues.push(`mission ${mission.id} needs guides and lines`); continue; }
     issues.push(...validateMissionDefinition(mission as never, undefined, candidateItems));
+  }
+  // An encounter (content schema 7) is a mission board with a budget, spawners and Mist of its own; its seed, wisps and mechanic walk the same check.
+  if (encounters.length && Number(raw.contentSchemaVersion) < 7) issues.push('encounters require content schema 7');
+  const seenEncounters = new Set<string>();
+  for (const encounter of encounters) {
+    if (!newId('encounter', encounter.id, [...bundledMissions.map((item) => item.id), ...missions.map((item) => String(item.id))], seenEncounters)) continue;
+    if (!isRecord(encounter.lines) || !isRecord(encounter.seed)) { issues.push(`encounter ${encounter.id} needs a seed and lines`); continue; }
+    if (encounter.rows !== 3 && encounter.rows !== 4) issues.push(`encounter ${encounter.id}: rows must be 3 or 4`);
+    if (encounter.resolve != null && (!isInt(encounter.resolve) || (encounter.resolve as number) <= 0)) issues.push(`encounter ${encounter.id}: resolve must be a positive count or null`);
+    if (!Array.isArray(encounter.mist) || !Array.isArray(encounter.spawners)) issues.push(`encounter ${encounter.id}: mist and spawners must be lists`);
+    issues.push(...validateMissionDefinition(encounter as never, undefined, candidateItems));
   }
   const seenHatchables = new Set<string>();
   for (const definition of hatchables) {
@@ -454,6 +467,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     ...(storyTiles.length ? { storyTiles: storyTiles as never } : {}),
     ...(hatchables.length ? { hatchables: hatchables as never } : {}),
     ...(missions.length ? { missions: missions as never } : {}),
+    ...(encounters.length ? { encounters: encounters as never } : {}),
     ...(chapters.length ? { chapters: chapters as never } : {}),
     ...(conversations.length ? { conversations: conversations as never } : {}),
     ...(flows.length ? { flows: flows as never } : {}),

@@ -112,7 +112,7 @@ export type JourneyGardenOrder = {
 export type JourneyConsequence =
   | { kind: 'reveal_story_tile'; tileId: string }
   /** A Dark Wisp on a story tile: a board docked beneath it, carried here or named by id from the missions registry. */
-  | { kind: 'mist_mission'; tileId: string; mission?: JourneyMissionDefinition; missionId?: string }
+  | { kind: 'mist_mission'; tileId: string; mission?: JourneyMissionDefinition; missionId?: string; /** An encounter from the encounters registry (content schema 7), in place of a mission. */ encounterId?: string }
   | { kind: 'reveal_island'; islandId: MossproutNatureIslandId }
   | { kind: 'grant'; rewardId: string; generatorId: string }
   /** Garden orders placed for the player; the next episode usually unlocks on them being served. */

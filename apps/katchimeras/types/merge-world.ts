@@ -57,7 +57,9 @@ export type MergeDreamMist =
   | { kind: 'rootbound_echo'; id: string; gateId: string; definitionId: string; chapter: MossproutBoardChapter; ready: boolean }
   | { kind: 'resident_card'; discoveryId: string; gateId: string; residentId: KatchimeraSkinId | null; ready: boolean }
   | { kind: 'discovery_fork'; gateId: string; candidateIds: MergeCharacterId[]; recommendedCharacterId: MergeCharacterId | null }
-  | { kind: 'dreambound_item'; discoveryId: string; gateId: string; pathId: string; sequenceIndex: number; boundDefinitionId: string; active: boolean };
+  | { kind: 'dreambound_item'; discoveryId: string; gateId: string; pathId: string; sequenceIndex: number; boundDefinitionId: string; active: boolean }
+  /** An encounter's own Mist: worn down by merges beside it (or by its wisp's fall), revealing what it holds. */
+  | { kind: 'encounter'; type: import('./encounter').EncounterMistType; hp: number; wispId?: string; holds?: import('./encounter').EncounterMistHolds };
 
 export type MergeBoardCell = {
   /** Compatibility projection. In v10 this is true whenever `mist` is present. */
@@ -453,7 +455,7 @@ export type StoryWorldMutationReceipt = {
   target: { kind: 'haven_tile'; characterId: MergeCharacterId } | { kind: 'haven_nature_island'; islandId: MossproutNatureIslandId } | { kind: 'haven_structure'; structureId: string };
   fromLevel: number;
   toLevel: number;
-  economyMode: 'normal' | 'free' | 'grant';
+  economyMode: 'normal' | 'free' | 'grant' | 'encounter';
   coinCost: number;
   createdAt: number;
   transition?: 'island_reveal';
@@ -503,7 +505,31 @@ export type IslandCampaignProgress = {
   chapters: Record<string, IslandCampaignChapterProgress>;
 };
 
+/** A mission cleared, however many times, and how well. */
+export type EncounterClearRecord = { firstClearedAt: number; clears: number; bestGrade: import('./encounter').EncounterGrade; lastKatchimeraId: MergeCharacterId };
+export type EncounterActive = { missionId: string; runId: string; campaignId?: string; katchimeraId: MergeCharacterId; helperWispId: WispId | null; startedAt: number };
+export type EncounterOutcomeRecord = { missionId: string; receiptId: string; grade: import('./encounter').EncounterGrade; glow: number; xp: number; firstClear: boolean; katchimeraId: MergeCharacterId; ackedAt: number | null };
+/**
+ * Everything the world keeps of the Mist encounters: exactly-once receipts,
+ * what has been cleared, the board that is up, the last loadout, the Daily
+ * Mist by day, and the last outcome until it is seen.
+ */
+export type EncounterLedger = {
+  receipts: string[];
+  clears: Record<string, EncounterClearRecord>;
+  active: EncounterActive | null;
+  loadout: { katchimeraId: MergeCharacterId; helperWispId: WispId | null } | null;
+  daily: Record<string, { slots: Record<string, { clearedAt: number; grade: import('./encounter').EncounterGrade }> }>;
+  lastOutcome: EncounterOutcomeRecord | null;
+};
+/** A playable Katchimera's level and the experience toward the next; level-ups spend Glow. */
+export type KatchimeraProgress = { level: number; xp: number; upgradedAt: number | null };
+
 export type MergeWorldState = {
+  /** Set once a save has crossed into the campaign pivot (v25); orders and the persistent board are history. */
+  pivot?: 'campaign-v1';
+  encounters?: EncounterLedger;
+  katchimeraProgress?: Partial<Record<MergeCharacterId, KatchimeraProgress>>;
   wispLanternPlacement?: { slotId: 'front-right'; plantedAt: number };
   wispLanternProgress?: import('@/features/wisps/lantern-world').LanternWorldProgress;
   /** Heartwood's economy buildings (Dew Spring, Seed Nursery, Root Cellar, Garden Stall), by id. Absent until one is built. */
@@ -534,7 +560,7 @@ export type MergeWorldState = {
   gardenLessons?: Partial<Record<MergeCharacterId, { preparedAt: number; servedAt?: number }>>;
   /** Mossprout's wish — bring every friend home — once it has been told, and once its map hint was seen. */
   kingdomGoal?: { introducedAt: number; coachmarkSeenAt: number | null };
-  version: 24;
+  version: 25;
   /** The first personal Merge World is owned by Mossprout. */
   ownerCharacterId: 'mossprout';
   revision: number;
@@ -615,11 +641,13 @@ export type MergeWorldCommand =
   | { type: 'prepareGlowDiscoveryLesson'; now: number }
   /** The first light: the Glow that drove the opening's wisps off stays with you, once per run. */
   | { type: 'grantOpeningGlow'; receiptId: string; amount: number; now: number }
+  /** Glow the story hands over once (e.g. Steppling's mist price), keyed in the encounter ledger's receipts. */
+  | { type: 'grantStoryGlow'; receiptId: string; amount: number; now: number }
   /** `prepareStepplingGardenLesson` is the same command for Steppling, kept for callers and saves. */
   | { type: 'prepareStepplingGardenLesson'; now: number }
   | { type: 'prepareGardenLesson'; companion: MergeCharacterId; now: number }
   | { type: 'refreshTime'; boardId?: MergeBoardId; now: number }
-  | { type: 'tapGenerator'; boardId?: MergeBoardId; generatorId: string; now: number; seed: string; spendEnergy?: boolean; activityOpportunityId?: string }
+  | { type: 'tapGenerator'; boardId?: MergeBoardId; generatorId: string; now: number; seed: string; spendEnergy?: boolean; activityOpportunityId?: string; /** An encounter's spawner: its charges are spent whatever the world's policy says. */ enforceCharges?: boolean; /** An encounter's odds of a better drop, in place of the world's own. */ dropProfile?: { tierTwoChance: number; tierThreeChance: number } }
   | { type: 'setGeneratorForcedDrop'; boardId?: MergeBoardId; generatorId: string; definitionId: string | null; now: number }
   | { type: 'upgradeGenerator'; boardId?: MergeBoardId; generatorId: string; now: number }
   | { type: 'move'; boardId?: MergeBoardId; from: number; to: number; now: number }
@@ -639,7 +667,6 @@ export type MergeWorldCommand =
   | { type: 'grantKatchimeraCard'; cardId: KatchimeraSkinId; familyId: MergeCharacterId; sourceReceiptId: string; now: number }
   | { type: 'purchaseKatchimeraCard'; cardId: KatchimeraSkinId; familyId: MergeCharacterId; cost: number; purchaseId: string; now: number }
   | { type: 'ackGeneratorUnlock'; receiptId: string; now: number }
-  | { type: 'rerollOrder'; boardId?: MergeBoardId; orderId: string; now: number }
   | { type: 'startStepplingDiscovery'; now: number }
   | { type: 'openCompanionDiscoveryGate'; gateId: string; candidateIds: MergeCharacterId[]; recommendedCharacterId: MergeCharacterId | null; now: number }
   | { type: 'selectCompanionDiscoveryPath'; characterId: MergeCharacterId; now: number }
@@ -676,7 +703,18 @@ export type MergeWorldCommand =
   | { type: 'upgradeHavenFeature'; structureId: 'mossprout-garden'; featureId: MossproutGardenFeatureId; level: number; receiptId: string; now: number }
   | { type: 'revealMovementEgg'; receiptId: string; now: number }
   | { type: 'recordMovementEggProgress'; observedSteps?: number; manualMovement?: boolean; receiptId: string; now: number }
-  | { type: 'ackExternalReward'; receiptId: string; now: number };
+  | { type: 'ackExternalReward'; receiptId: string; now: number }
+  /** A Mist encounter begins: the board that is up, and what was brought in. */
+  | { type: 'startEncounter'; missionId: string; runId: string; campaignId?: string; katchimeraId: MergeCharacterId; helperWispId: WispId | null; now: number }
+  | { type: 'abandonEncounter'; now: number }
+  /**
+   * A cleared encounter pays once per receipt: Glow to the world, experience to the Katchimera, the clear to the ledger,
+   * and, when the rung was the last of its chapter, the island a level up.
+   */
+  | { type: 'completeEncounter'; receiptId: string; missionId: string; campaignId?: string; katchimeraId: MergeCharacterId; helperWispId: WispId | null; outcome: import('@/features/encounter/outcome').EncounterOutcome; difficulty: import('./encounter').EncounterDifficulty; base?: { glow: number; xp: number } | null; now: number }
+  | { type: 'ackEncounterOutcome'; now: number }
+  /** A Katchimera a level up, for Glow, once their experience allows; a stale expected level changes nothing. */
+  | { type: 'upgradeKatchimera'; characterId: MergeCharacterId; expectedLevel: number; now: number };
 
 export type MergeWorldFailureReason =
   | 'locked_cell'
@@ -684,7 +722,11 @@ export type MergeWorldFailureReason =
   | 'out_of_energy'
   | 'board_full'
   | 'wrong_echo_match'
-  | 'sealed_mist';
+  | 'sealed_mist'
+  /** An encounter: the Mist allows no more actions. */
+  | 'out_of_resolve'
+  /** An encounter: the spawner has no charge left. */
+  | 'spawner_spent';
 
 export type MergeWorldCommandResult = {
   spawnedGenerator?: { generatorId: string; cell: number };
@@ -712,4 +754,8 @@ export type MergeWorldCommandResult = {
   havenUpgrade?: { characterId: MergeCharacterId; stage: HavenStage; coinCost: number };
   natureIslandUpgrade?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; coinCost: number; completedTier: boolean };
   storyWorldMutationReceipt?: StoryWorldMutationReceipt;
+  /** An encounter just paid: what it paid and to whom, for the provider's celebration, Bond and sparks. */
+  encounterCleared?: { missionId: string; campaignId?: string; glow: number; xp: number; grade: import('./encounter').EncounterGrade; firstClear: boolean; katchimeraId: MergeCharacterId; islandRaised?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel } };
+  /** A Katchimera just levelled. */
+  katchimeraUpgraded?: { characterId: MergeCharacterId; level: number; cost: number };
 };

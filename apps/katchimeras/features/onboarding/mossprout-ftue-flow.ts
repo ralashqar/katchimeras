@@ -1,7 +1,7 @@
 import type { ContentFlowAction, ContentFlowNode, ContentFlowRequirement, ContentFlowSurface } from '@/types/content-flow';
 import { defineStory, story } from '@/features/content-flow/story-manifest';
 import { defineStoryVariants } from '@/features/content-flow/story-variant-registry';
-import { storyOperations, upgradeWorldTargetRecipe } from '@/features/content-flow/story-world-operations';
+import { storyOperations } from '@/features/content-flow/story-world-operations';
 import { MOSSPROUT_FTUE_REST_MS } from '@/game/katchimeras/relationship-progression';
 
 const scene = (id: string, surface: ContentFlowSurface, actions: readonly ContentFlowAction[]): ContentFlowNode => ({
@@ -60,7 +60,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
   // Independent from the legacy FTUE schema version. Bumping this lets v39
   // journal runs migrate onto the direct manifest without mutating a release.
-  version: 55,
+  version: 56,
   entryNodeId: 'world.mist_open',
   metadata: {
     kind: 'ftue' as const,
@@ -87,9 +87,8 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     story.effect({
       id: 'effect.haven.grant_first_memory',
       capability: 'haven.grant_first_memory',
-      next: 'companion.garden_intro',
+      next: 'garden.first-visit.focus',
     }),
-    scene('companion.garden_intro', 'companion', [{ id: 'companion.continue_to_planting', next: 'garden.first-visit.focus' }]),
     storyOperations.focusCamera({
       id: 'garden.first-visit.focus',
       target: MOSSPROUT_GARDEN_FOCUS_TARGET,
@@ -109,15 +108,8 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     story.effect({
       id: 'effect.relationship.first_bloom_bond',
       capability: 'relationship.first_bloom_bond',
-      next: 'companion.water_together',
+      next: 'companion.first_rest',
     }),
-    scene('companion.water_together', 'companion', [{ id: 'companion.choose_garden_return', next: 'companion.first_grow' }]),
-    scene('companion.first_grow', 'companion', [{ id: 'companion.open_first_grow', next: 'companion.first_notice' }]),
-    scene('companion.first_notice', 'companion', [
-      { id: 'companion.complete_first_notice', next: 'companion.notice_bond_spotlight' },
-      { id: 'companion.skip_first_notice', next: 'companion.first_rest' },
-    ]),
-    scene('companion.notice_bond_spotlight', 'companion', [{ id: 'companion.acknowledge_notice_bond', next: 'companion.first_rest' }]),
     scene('companion.first_rest', 'companion', [{ id: 'companion.begin_rest', next: 'effect.relationship.begin_meditation' }]),
     story.effect({
       id: 'effect.relationship.begin_meditation',
@@ -154,10 +146,17 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     'haven.first_bloom': 'world.first_seed_grew',
     'effect.haven.seed_first_memory': 'effect.haven.grant_first_memory',
     'companion.day_one_action': 'effect.relationship.complete_day_one_lesson',
-    'companion.bond_spotlight': 'companion.garden_intro',
-    'companion.order_preview': 'companion.garden_intro',
+    'companion.bond_spotlight': 'garden.first-visit.focus',
+    'companion.order_preview': 'garden.first-visit.focus',
     'world.garden_handoff': 'world.first_seed_grew',
-    'companion.chapter_zero_return': 'companion.water_together',
+    'companion.chapter_zero_return': 'companion.first_rest',
+    // v56: the first session is the merges, the Egg, one meeting, the planting and the rest. The Heartwood
+    // modal before the planting and the chat after it are gone; a run parked on them continues at the next real beat.
+    'companion.garden_intro': 'garden.first-visit.focus',
+    'companion.water_together': 'companion.first_rest',
+    'companion.first_grow': 'companion.first_rest',
+    'companion.first_notice': 'companion.first_rest',
+    'companion.notice_bond_spotlight': 'companion.first_rest',
     'companion.water_response': 'companion.first_rest',
     'companion.first_insight': 'companion.first_rest',
   },

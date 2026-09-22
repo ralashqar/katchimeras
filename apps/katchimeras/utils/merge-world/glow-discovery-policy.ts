@@ -95,7 +95,7 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
     if (state.hatchableMissions?.[command.companion]) return no();
     if (state.worldUnlocks?.[hatchable.tile.unlockId] || state.companionDiscovery.records.some((record) => record.characterId === command.companion)) return no();
     if (!hatchableAvailable(state, hatchable)) return no(hatchable.tile.markerLines.sleeping);
-    if (state.coins < hatchable.tile.price) return no('Complete requests to earn more Glow.');
+    if (state.coins < hatchable.tile.price) return no('Clear the Mist to earn more Glow.');
     return changed(state, {
       ...state, coins: state.coins - hatchable.tile.price,
       hatchableMissions: { ...state.hatchableMissions, [command.companion]: { paidAt: command.now, paidCoins: hatchable.tile.price, receiptId: command.receiptId } },
@@ -175,7 +175,7 @@ export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<Mer
     // A mission ticket paid at the bubble is the price: the reveal after the board charges nothing more.
     const ticket = state.hatchableMissions?.[definition.destination];
     const cost = existing || owned || ticket ? 0 : definition.price;
-    if (state.coins < cost) return no('Complete requests to earn more Glow.');
+    if (state.coins < cost) return no('Clear the Mist to earn more Glow.');
     const receipt = command.receiptId ? {
       id: command.receiptId, kind: 'haven_upgrade' as const,
       target: { kind: 'haven_structure' as const, structureId: definition.tileId },

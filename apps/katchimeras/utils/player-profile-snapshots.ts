@@ -62,7 +62,7 @@ export async function capturePlayerProfileSnapshot(input: {
     timePolicy: 'frozen',
     createdAt: new Date().toISOString(),
     tags: ['Local capture'],
-    launchRoute: input.launchRoute ?? '/(tabs)/games',
+    launchRoute: input.launchRoute ?? '/(tabs)/katchimeras',
     summary: summarizePlayerProfileSnapshot(state, ftueStep),
     domains: {
       keyValue: { schemaVersion: 1, values },

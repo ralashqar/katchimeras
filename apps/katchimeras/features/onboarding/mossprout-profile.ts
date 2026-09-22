@@ -46,13 +46,16 @@ export function mossproutResidentForPlace(placeId: string | null | undefined): K
   return placeId ? RESIDENT_BY_PLACE[placeId] ?? null : null;
 }
 
+/** The Egg's "what helps" answers (hatch-profile v2) as the Seed intents the meeting's Seed is chosen from. */
+const MOSSPROUT_SUPPORT_INTENTS: Record<string, string> = { small_action: 'progress', steady_guidance: 'unsure', breathing_room: 'calm' };
+
 export function recordMossproutOnboardingAnswer(actionId: string, optionId: string) {
   const questionId = actionId === 'egg.day_texture' ? 'friction' : actionId === 'egg.desired_help' ? 'support' : null;
   const hatchAnswer = questionId ? makeHatchAnswer('mossprout', questionId, optionId, Date.now()) : null;
-  if (hatchAnswer) {
-    recordHatchProfileAnswers('mossprout', [hatchAnswer]);
-    return loadOnboardingProfile();
-  }
+  if (hatchAnswer) recordHatchProfileAnswers('mossprout', [hatchAnswer]);
+  // The Egg's second answer is what the player said would help: it chooses the Seed Mossprout brings to the meeting.
+  if (actionId === 'egg.desired_help') optionId = MOSSPROUT_SUPPORT_INTENTS[optionId] ?? optionId;
+  else if (hatchAnswer) return loadOnboardingProfile();
   const field = ACTION_FIELDS[actionId];
   if (!field) return loadOnboardingProfile();
   if (field === 'growthIntentId') optionId = normalizeMossproutIntent(optionId);

@@ -68,22 +68,3 @@ test('a multi-order chapter only offers a return after its final delivery', () =
   world.externalRewardReceipts.push(receipt('last'));
   assert.equal(journeyGardenReturnNotes(relationships, world, [chapter]).length, 1);
 });
-
-test('chapter return opens the companion without invoking legacy reward progression', () => {
-  const pushed: unknown[] = [];
-  const { openCharacterReturn } = loadNativeModule('components/katchadeck/games/merge-world-screen.tsx', {}, {
-    useCallback: (callback: unknown) => callback,
-    active: true,
-    storyNavigationPendingRef: { current: false },
-    parseIslandCampaignReturnNoteId: () => null,
-    MOSSPROUT_FTUE_RETURN_NOTE_ID: 'ftue',
-    JOURNEY_DELIVERY_NOTE_PREFIX: 'chat-note:journey-delivery:',
-    transitionTo: ({ navigate }: { navigate: () => void }) => { navigate(); return true; },
-    router: { push: (route: unknown) => pushed.push(route) },
-    mossproutJourneyDayId: null,
-    returnToIslandCampaign: () => {},
-    beginFeastleReturn: () => assert.fail('must not replay legacy return'),
-  }, 'openCharacterReturn');
-  openCharacterReturn('feastle', 'chat-note:journey-delivery:feastle:day-2');
-  assert.deepEqual(JSON.parse(JSON.stringify(pushed)), [{ pathname: '/katchimera/[creatureId]', params: { creatureId: 'companion:feastle', source: 'merge-world', story: 'return', journeyDelivery: 'chat-note:journey-delivery:feastle:day-2' } }]);
-});

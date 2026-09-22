@@ -20,7 +20,6 @@ import {
   MERGE_ITEM_CATALOG,
   MERGE_ITEMS_BY_ID,
   MERGE_ORDER_TEMPLATES,
-  MERGE_REPEATABLE_ORDER_TEMPLATES,
   MERGE_CHAIN_IDS,
   MERGE_CHAPTER_LANDMARKS,
   MERGE_CHARACTER_NAMES,
@@ -60,7 +59,17 @@ import {
   STEPS_PER_MERGE_ENERGY,
 } from '@/utils/merge-world/economy-policy';
 import { AUTHORED_COHORT_ORDER_POOLS, BARISTABBIT_CHAPTER_ONE_ORDER_POOL, FEASTLE_ACT_TWO_ORDER_POOL, type AuthoredCohortFamilyId, authoredCohortOrderPool } from '@/utils/companion-story';
+import type { EncounterGrade, EncounterMistHolds, EncounterMistType } from '@/types/encounter';
+import { encounterRewards } from '@/features/encounter/encounter-rewards';
+import { wispPerk } from '@/constants/helper-wisps';
+import { regionRung } from '@/constants/island-campaigns/ladder';
+import { katchimeraProgress, katchimeraUpgradeCost, katchimeraXpForLevel, KATCHIMERA_MAX_LEVEL } from '@/constants/katchimera-progression';
+import type { WispId } from '@/types/wisp';
 import type {
+  EncounterClearRecord,
+  EncounterLedger,
+  EncounterOutcomeRecord,
+  KatchimeraProgress,
   MergeBoardCell,
   MergeItemDefinition,
   MergeBoardId,
@@ -205,7 +214,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     occupant: null,
   }));
   let state: MergeWorldState = {
-    version: 24,
+    version: 25,
     ownerCharacterId: 'mossprout',
     revision: 0,
     createdAt: now,
@@ -220,6 +229,9 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     generatorUnlockReceipts: [],
     generators: {},
     energy: { value: MERGE_INITIAL_ENERGY, regenCap: MERGE_ENERGY_REGEN_CAP, lastRegenAt: now, regenPaused: false },
+    pivot: 'campaign-v1',
+    encounters: { receipts: [], clears: {}, active: null, loadout: null, daily: {}, lastOutcome: null },
+    katchimeraProgress: {},
     coins: 0,
     mergeXp: 0,
     mergeLevel: 1,
@@ -325,7 +337,7 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
     case 'refreshTime':
       return result(state, current, current === state ? undefined : 'The garden is ready again.');
     case 'tapGenerator': {
-      const result = tapGenerator(current, command.generatorId, command.now, command.seed, command.activityOpportunityId, command.spendEnergy !== false);
+      const result = tapGenerator(current, command.generatorId, command.now, command.seed, command.activityOpportunityId, command.spendEnergy !== false, command.enforceCharges === true, command.dropProfile);
       if (result.changed && command.generatorId === 'wild-garden' && result.state.glowDiscoveryLesson && !result.state.glowDiscoveryLesson.spawnedAt) {
         return { ...result, state: { ...result.state, glowDiscoveryLesson: { ...result.state.glowDiscoveryLesson, spawnedAt: command.now } } };
       }
@@ -373,7 +385,7 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       return next === current ? unchanged(current) : changed(touch(next, command.now));
     }
     case 'ensureCompanionDailyGarden': {
-      const next = ensureProceduralOrders(ensureCompanionDailyGarden(current, command.familyId, command.now), command.now);
+      const next = identityOrders(ensureCompanionDailyGarden(current, command.familyId, command.now), command.now);
       return next === current ? unchanged(current) : changed(touch(next, command.now));
     }
     case 'reconcileJourneyMeditation': {
@@ -447,8 +459,6 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       if (receipts.every((receipt, index) => receipt === current.generatorUnlockReceipts[index])) return unchanged(current);
       return changed(touch({ ...current, generatorUnlockReceipts: receipts }, command.now));
     }
-    case 'rerollOrder':
-      return rerollOrder(current, command.orderId, command.now);
     case 'startStepplingDiscovery':
       return startStepplingDiscovery(current, command.now);
     case 'openCompanionDiscoveryGate':
@@ -574,6 +584,15 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
         openingGlow: { receiptId: command.receiptId, amount, grantedAt: command.now },
       }, command.now));
     }
+    case 'grantStoryGlow': {
+      const ledger = encounterLedger(current);
+      if (ledger.receipts.includes(command.receiptId)) return unchanged(current);
+      return changed(touch({
+        ...current,
+        coins: Math.min(999_999, current.coins + Math.max(0, Math.floor(command.amount))),
+        encounters: { ...ledger, receipts: [...ledger.receipts, command.receiptId] },
+      }, command.now));
+    }
     case 'revealMovementEgg':
       return mutateMovementEgg(current, command.receiptId, command.now, (egg) => ({ ...egg, status: 'revealed', updatedAt: command.now }));
     case 'recordMovementEggProgress':
@@ -588,6 +607,16 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
           updatedAt: command.now,
         };
       });
+    case 'startEncounter':
+      return startEncounter(current, command);
+    case 'abandonEncounter':
+      return abandonEncounter(current, command.now);
+    case 'completeEncounter':
+      return completeEncounter(current, command);
+    case 'ackEncounterOutcome':
+      return ackEncounterOutcome(current, command.now);
+    case 'upgradeKatchimera':
+      return upgradeKatchimera(current, command.characterId, command.expectedLevel, command.now);
     case 'ackExternalReward': {
       const receipts = current.externalRewardReceipts.map((receipt) => receipt.id === command.receiptId && receipt.appliedAt == null
         ? { ...receipt, appliedAt: command.now }
@@ -870,7 +899,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // v18 intentionally starts the first personal Merge World cleanly. Earlier
   // snapshots are shared-board prototypes and cannot be assigned safely to a
   // single companion without carrying their ownership compromises forward.
-  if ((rawVersion !== 18 && rawVersion !== 19 && rawVersion !== 20 && rawVersion !== 21 && rawVersion !== 22 && rawVersion !== 23 && rawVersion !== 24) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
+  if ((rawVersion !== 18 && rawVersion !== 19 && rawVersion !== 20 && rawVersion !== 21 && rawVersion !== 22 && rawVersion !== 23 && rawVersion !== 24 && rawVersion !== 25) || !Array.isArray(source.board) || source.board.length !== MERGE_WORLD_SIZE) {
     return createInitialMergeWorldState(now);
   }
   const fallback = createInitialMergeWorldState(now);
@@ -881,7 +910,10 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     companionDailyGardenVersion: source.companionDailyGardenVersion,
     ...normalizeHatchableEggs(source),
     openingGlow: normalizeOpeningGlow(source.openingGlow),
-    version: 24,
+    version: 25,
+    pivot: 'campaign-v1',
+    encounters: normalizeEncounters(source.encounters, now),
+    katchimeraProgress: normalizeKatchimeraProgress(source.katchimeraProgress, now),
     ownerCharacterId: 'mossprout',
     revision: finite(source.revision, 0),
     createdAt: finite(source.createdAt, now),
@@ -1001,7 +1033,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   normalized = reconcileDiscoveryMist(normalized, now);
   // Version 1/2 Pantry charges, cooldowns, and parcels intentionally disappear.
   // Version 3's five single-chain generators migrate into the shared eight.
-  normalized = ensureProceduralOrders(normalized, now);
+  normalized = identityOrders(normalized, now);
   normalized = repairOrderChains(normalized);
   return reconcileUpgradeProgress(ensureOrdersRequireMerge(refreshTime(normalized, now)));
 }
@@ -1201,7 +1233,7 @@ function upgradeMossproutNatureIsland(
   requestedLevel: MossproutNatureIslandLevel,
   now: number,
   receiptId?: string,
-  economyMode: 'normal' | 'free' | 'grant' = 'normal',
+  economyMode: 'normal' | 'free' | 'grant' | 'encounter' = 'normal',
   grantedCoins = 0,
 ): MergeWorldCommandResult {
   const existingReceipt = receiptId ? state.storyWorldMutationReceipts.find((receipt) => receipt.id === receiptId) : null;
@@ -1233,7 +1265,9 @@ function upgradeMossproutNatureIsland(
       return unchanged(state, 'Clear the mist and discover the garden first.');
     }
     const chapter = campaign.chapters[String(requestedLevel)];
-    if (chapter?.restoration) {
+    // A cleared rung of the region's ladder is the whole condition: the chapter's requests and returns are history.
+    if (economyMode === 'encounter') paidStage = true;
+    else if (chapter?.restoration) {
       // The board finishing is the whole condition.
       if (chapter.restoration.completedAt == null) return unchanged(state, `Finish ${campaignDefinition.residentName}’s restoration board first.`);
       paidStage = true;
@@ -1246,7 +1280,7 @@ function upgradeMossproutNatureIsland(
     }
   }
   const grant = economyMode === 'grant' && !paidStage ? Math.max(0, Math.floor(grantedCoins)) : 0;
-  const coinCost = economyMode === 'free' || paidStage ? 0 : definition.coinCost;
+  const coinCost = economyMode === 'free' || economyMode === 'encounter' || paidStage ? 0 : definition.coinCost;
   if (paidStage) economyMode = 'free';
   if (state.coins + grant < coinCost) {
     return unchanged(state, 'Earn a few more Glow through Merge orders.');
@@ -1425,12 +1459,14 @@ function activateIslandCampaignChapter(
   const existingChapter = existingCampaign?.chapters[String(command.level)];
   if (existingChapter) return unchanged(state, 'That island request is already active.');
   const orders = command.orders.filter((order) => order.storyArcId === command.campaignId && order.storyTargetLevel === command.level);
-  if (!orders.length) return unchanged(state, 'That island chapter has no request.');
-  // A restoration chapter is paid now (the first is the friend's gift) and opens
-  // its board; its order only reaches the Main Board when the board asks for it.
+  // The campaign pivot: a chapter started with no request plays as rungs of the region's ladder, free, with no board of its own.
   const campaignDefinition = islandCampaignById.get(command.campaignId) ?? null;
   const chapterDefinition = campaignDefinition?.chapters.find((candidate) => candidate.level === command.level);
-  const restorationBoard = chapterDefinition?.restoration ?? null;
+  // A timed rush chapter keeps its own board and clock (it never asked the Main Board for anything anyway).
+  const asRungs = !orders.length && !chapterDefinition?.restoration?.rush;
+  // A restoration chapter is paid now (the first is the friend's gift) and opens
+  // its board; its order only reaches the Main Board when the board asks for it.
+  const restorationBoard = asRungs ? null : chapterDefinition?.restoration ?? null;
   const stageCost = restorationBoard && command.level > 1 ? mossproutNatureIslandLevelDefinition(command.islandId, command.level)?.coinCost ?? 0 : 0;
   if (state.coins < stageCost) return unchanged(state, 'Earn a few more Glow through Merge orders.');
   // A board chapter's request is authored data, fixed here by the answer: its id
@@ -1477,7 +1513,7 @@ function activateIslandCampaignChapter(
         },
       },
     },
-  }, command.now), restorationBoard ? `${campaign.residentSkinId} is ready to restore.` : `${orders[0]!.title} is ready in the Garden.`);
+  }, command.now), restorationBoard ? `${campaign.residentSkinId} is ready to restore.` : asRungs ? 'The Mist waits.' : `${orders[0]!.title} is ready in the Garden.`);
 }
 
 function islandRestorationChapter(state: MergeWorldState, campaignId: string, level: MossproutNatureIslandLevel) {
@@ -1559,6 +1595,97 @@ function completeIslandRestoration(state: MergeWorldState, campaignId: string, l
     returnConversationSeenAt: found.chapter.returnConversationSeenAt ?? now,
     restoration: { ...found.restoration, completedAt: now },
   }), now), 'The garden is ready to grow.');
+}
+
+const EMPTY_ENCOUNTER_LEDGER: EncounterLedger = { receipts: [], clears: {}, active: null, loadout: null, daily: {}, lastOutcome: null };
+const encounterLedger = (state: MergeWorldState): EncounterLedger => state.encounters ?? EMPTY_ENCOUNTER_LEDGER;
+
+function startEncounter(state: MergeWorldState, command: Extract<MergeWorldCommand, { type: 'startEncounter' }>): MergeWorldCommandResult {
+  if (!KNOWN_CHARACTERS.has(command.katchimeraId)) return unchanged(state, 'That Katchimera is not here.');
+  const ledger = encounterLedger(state);
+  if (ledger.active?.missionId === command.missionId && ledger.active.runId === command.runId) return unchanged(state);
+  const active = { missionId: command.missionId, runId: command.runId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), katchimeraId: command.katchimeraId, helperWispId: command.helperWispId, startedAt: command.now };
+  return changed(touch({ ...state, encounters: { ...ledger, active, loadout: { katchimeraId: command.katchimeraId, helperWispId: command.helperWispId } } }, command.now));
+}
+
+function abandonEncounter(state: MergeWorldState, now: number): MergeWorldCommandResult {
+  const ledger = encounterLedger(state);
+  if (!ledger.active) return unchanged(state);
+  return changed(touch({ ...state, encounters: { ...ledger, active: null } }, now));
+}
+
+/**
+ * A cleared encounter pays once per receipt. Glow follows the difficulty,
+ * the grade, whether this is the first clear, and what the Garden Stall and
+ * the helper Wisp add; experience goes to the Katchimera who was there; the
+ * clear is written to the ledger; and the last rung of a chapter raises the
+ * island to that chapter's level, free.
+ */
+function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCommand, { type: 'completeEncounter' }>): MergeWorldCommandResult {
+  const ledger = encounterLedger(state);
+  if (ledger.receipts.includes(command.receiptId)) return unchanged(state);
+  if (!command.outcome.cleared) return unchanged(state, 'The Mist is still there.');
+  if (!KNOWN_CHARACTERS.has(command.katchimeraId)) return unchanged(state, 'That Katchimera is not here.');
+  const previous = ledger.clears[command.missionId];
+  const firstClear = !previous;
+  const perk = wispPerk(command.helperWispId);
+  const glowBonus = heartwoodGardenStallGlowBonusOf(state) + (perk?.kind === 'glow' ? perk.fraction : 0);
+  const paid = encounterRewards({ difficulty: command.difficulty, base: command.base ?? null, grade: command.outcome.grade, firstClear, glowBonus });
+  const order: Record<EncounterGrade, number> = { cleared: 0, bright: 1, perfect: 2 };
+  const bestGrade = previous && order[previous.bestGrade] >= order[command.outcome.grade] ? previous.bestGrade : command.outcome.grade;
+  const clears = { ...ledger.clears, [command.missionId]: { firstClearedAt: previous?.firstClearedAt ?? command.now, clears: (previous?.clears ?? 0) + 1, bestGrade, lastKatchimeraId: command.katchimeraId } };
+  const progress = katchimeraProgress(state, command.katchimeraId);
+  const katchimeraProgressNext = { ...state.katchimeraProgress, [command.katchimeraId]: { ...progress, xp: progress.xp + paid.xp } };
+  const receipts = [...ledger.receipts, command.receiptId].slice(-200);
+  const lastOutcome = { missionId: command.missionId, receiptId: command.receiptId, grade: command.outcome.grade, glow: paid.glow, xp: paid.xp, firstClear, katchimeraId: command.katchimeraId, ackedAt: null };
+  const dailyMatch = /^daily:(\d{4}-\d{2}-\d{2}):(\d+)$/.exec(command.missionId);
+  const daily = dailyMatch
+    ? { ...ledger.daily, [dailyMatch[1]!]: { slots: { ...ledger.daily[dailyMatch[1]!]?.slots, [dailyMatch[2]!]: ledger.daily[dailyMatch[1]!]?.slots[dailyMatch[2]!] ?? { clearedAt: command.now, grade: command.outcome.grade } } } }
+    : ledger.daily;
+  let next: MergeWorldState = touch({
+    ...state,
+    coins: state.coins + paid.glow,
+    katchimeraProgress: katchimeraProgressNext,
+    encounters: { ...ledger, receipts, clears, active: ledger.active?.missionId === command.missionId ? null : ledger.active, daily, lastOutcome },
+  }, command.now);
+  let islandRaised: NonNullable<MergeWorldCommandResult['encounterCleared']>['islandRaised'];
+  // The last rung of a chapter grows the island to the chapter's level, as the restoration boards did.
+  const campaign = command.campaignId ? islandCampaignById.get(command.campaignId) : null;
+  const rung = campaign ? regionRung(campaign, command.missionId) : null;
+  if (campaign && rung?.lastOfChapter && firstClear && (next.haven.mossproutNatureIslands[campaign.islandId] ?? 0) < rung.chapterLevel) {
+    const grown = upgradeMossproutNatureIsland(next, campaign.islandId, rung.chapterLevel, command.now, `${command.receiptId}:island`, 'encounter');
+    if (grown.changed) { next = grown.state; islandRaised = { islandId: campaign.islandId, level: rung.chapterLevel }; }
+  }
+  return {
+    state: next, changed: true,
+    message: `${paid.glow} Glow.`,
+    encounterCleared: { missionId: command.missionId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), glow: paid.glow, xp: paid.xp, grade: command.outcome.grade, firstClear, katchimeraId: command.katchimeraId, ...(islandRaised ? { islandRaised } : {}) },
+  };
+}
+
+const heartwoodGardenStallGlowBonusOf = (state: MergeWorldState) => gardenStallGlowBonus(heartwoodBuildingLevel(state, 'garden-stall'));
+
+function ackEncounterOutcome(state: MergeWorldState, now: number): MergeWorldCommandResult {
+  const ledger = encounterLedger(state);
+  if (!ledger.lastOutcome || ledger.lastOutcome.ackedAt != null) return unchanged(state);
+  return changed(touch({ ...state, encounters: { ...ledger, lastOutcome: { ...ledger.lastOutcome, ackedAt: now } } }, now));
+}
+
+function upgradeKatchimera(state: MergeWorldState, characterId: MergeCharacterId, expectedLevel: number, now: number): MergeWorldCommandResult {
+  if (!KNOWN_CHARACTERS.has(characterId)) return unchanged(state, 'That Katchimera is not here.');
+  const progress = katchimeraProgress(state, characterId);
+  // A second tap, or a request made against an older world: already done.
+  if (progress.level !== expectedLevel) return unchanged(state);
+  if (progress.level >= KATCHIMERA_MAX_LEVEL) return unchanged(state, 'Nothing more to learn here.');
+  const cost = katchimeraUpgradeCost(progress.level)!;
+  const needed = katchimeraXpForLevel(progress.level + 1);
+  if (progress.xp < needed) return unchanged(state, `${(needed - progress.xp).toLocaleString()} more experience in the Mist first.`);
+  if (state.coins < cost) return unchanged(state, `You need ${(cost - state.coins).toLocaleString()} more Glow.`);
+  const level = progress.level + 1;
+  return {
+    state: touch({ ...state, coins: state.coins - cost, katchimeraProgress: { ...state.katchimeraProgress, [characterId]: { ...progress, level, upgradedAt: now } } }, now),
+    changed: true, message: `Level ${level}.`, katchimeraUpgraded: { characterId, level, cost },
+  };
 }
 
 function acknowledgeIslandCampaignChapterReturn(
@@ -1694,7 +1821,7 @@ function normalizeHaven(value: unknown, source: Partial<MergeWorldState>, rawVer
   const mossproutNatureIslands = emptyMossproutNatureIslandLevels(baselineIslandLevel);
   // v18-v20 deliberately restart the new satellite tracks at Level 1. v21+
   // snapshots preserve their independent levels.
-  if ((rawVersion === 21 || rawVersion === 22 || rawVersion === 23 || rawVersion === 24) && raw.mossproutNatureIslands && typeof raw.mossproutNatureIslands === 'object') {
+  if ((rawVersion === 21 || rawVersion === 22 || rawVersion === 23 || rawVersion === 24 || rawVersion === 25) && raw.mossproutNatureIslands && typeof raw.mossproutNatureIslands === 'object') {
     for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) {
       const level = raw.mossproutNatureIslands[islandId];
       if (Number.isInteger(level) && Number(level) >= 0 && Number(level) <= 4) {
@@ -1827,7 +1954,7 @@ function normalizeMovementEgg(value: unknown): MergeWorldState['haven']['movemen
   };
 }
 
-function tapGenerator(input: MergeWorldState, generatorId: string, now: number, seed: string, activityOpportunityId?: string, spendEnergy = true): MergeWorldCommandResult {
+function tapGenerator(input: MergeWorldState, generatorId: string, now: number, seed: string, activityOpportunityId?: string, spendEnergy = true, enforceCharges = false, dropProfile?: { tierTwoChance: number; tierThreeChance: number }): MergeWorldCommandResult {
   const state = regenerateEnergy(input, now);
   const generator = state.generators[generatorId];
   if (!generator) return unchanged(state, 'That item maker is not available yet.');
@@ -1845,6 +1972,8 @@ function tapGenerator(input: MergeWorldState, generatorId: string, now: number, 
   if (opportunity && !MERGE_GENERATORS_UNLIMITED && opportunity.usedCount >= opportunity.dropDefinitionIds.length) {
     return unchanged(state, "That's everything Mossprout found today.");
   }
+  // An encounter's spawner spends its charges whatever the world's policy says: empty is empty.
+  if (enforceCharges && generator.charges < 1) return unchanged(state, `${generator.name} has nothing left.`, 'spawner_spent');
   if (!tutorialDrop && !MERGE_GENERATORS_UNLIMITED && !opportunity && generator.charges < 1) {
     return unchanged(state, `${generator.name} is growing more supplies.`, 'generator_resting');
   }
@@ -1871,8 +2000,8 @@ function tapGenerator(input: MergeWorldState, generatorId: string, now: number, 
   const betterDropRoll = randomUnit(`${seed}:upgrade:${state.revision}`);
   // The Seed Nursery at Heartwood adds to every item maker's own chances.
   const nurseryLevel = heartwoodBuildingLevel(state, 'seed-nursery');
-  const tierThreeChance = (generator.level >= 4 ? 0.05 : 0) + seedNurseryTierThreeChance(nurseryLevel);
-  const tierTwoChance = Math.max(0, generator.level - 1) * 0.1 + seedNurseryTierTwoBonus(nurseryLevel);
+  const tierThreeChance = dropProfile ? dropProfile.tierThreeChance : (generator.level >= 4 ? 0.05 : 0) + seedNurseryTierThreeChance(nurseryLevel);
+  const tierTwoChance = dropProfile ? dropProfile.tierTwoChance : Math.max(0, generator.level - 1) * 0.1 + seedNurseryTierTwoBonus(nurseryLevel);
   const bonusTier = tutorialDrop || authoredDefinitionId || generator.forcedDropDefinitionId ? 0 : betterDropRoll < tierThreeChance
     ? 2
     : betterDropRoll < tierThreeChance + tierTwoChance ? 1 : 0;
@@ -1881,7 +2010,7 @@ function tapGenerator(input: MergeWorldState, generatorId: string, now: number, 
   const item: MergeBoardItem = { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId };
   const board = [...state.board];
   board[cell] = { ...board[cell], occupant: item };
-  const usesCapacity = !tutorialDrop && !MERGE_GENERATORS_UNLIMITED && !opportunity;
+  const usesCapacity = enforceCharges || (!tutorialDrop && !MERGE_GENERATORS_UNLIMITED && !opportunity);
   const charges = usesCapacity ? Math.max(0, generator.charges - 1) : generator.charges;
   const nextGenerator = usesCapacity ? {
     ...generator,
@@ -2588,7 +2717,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
   if (order.storyArcId === DAILY_GARDEN_ARC) {
     const next = completeDailyGardenOrder({ ...state, board, coins: state.coins + order.reward.coins, completedOrderCount: state.completedOrderCount + 1, activeOrders: state.activeOrders.filter((item) => item.id !== orderId) }, order, now);
     const bonus = next.coins - state.coins > order.reward.coins;
-    return { ...changed(touch(ensureProceduralOrders(next, now), now), bonus ? `Today’s garden complete! +${order.reward.coins} Glow + ${DAILY_GARDEN_BONUS} bonus Glow.` : `+${order.reward.coins} Glow`), servedOrderId: order.id };
+    return { ...changed(touch(identityOrders(next, now), now), bonus ? `Today’s garden complete! +${order.reward.coins} Glow + ${DAILY_GARDEN_BONUS} bonus Glow.` : `+${order.reward.coins} Glow`), servedOrderId: order.id };
   }
   if (orderId.startsWith('local-event:') && (!order?.expiresAt || Math.max(now, state.localLiveOps?.clock ?? 0) >= order.expiresAt)) return unchanged(state, 'This event has ended. Your items are yours to keep.');
   if (orderId.startsWith('journey-cycle:')) return { ...changed(touch({
@@ -2858,7 +2987,7 @@ function serveOrder(state: MergeWorldState, orderId: string, now: number): Merge
     }
   }
   const residentSequenceActive = next.residentCardDiscovery.records.some((record) => record.status !== 'locked' && record.status !== 'card_earned');
-  if (!residentSequenceActive) next = ensureProceduralOrders(next, now);
+  if (!residentSequenceActive) next = identityOrders(next, now);
   next = touch(next, now);
   return {
     state: next,
@@ -2977,7 +3106,7 @@ function claimArrival(state: MergeWorldState, arrivalId: string, now: number): M
       generatorUnlockReceipts,
       arrivals: state.arrivals.map((entry) => entry.id === arrivalId ? { ...entry, claimedAt: now, seenAt: now } : entry),
     });
-    return { ...changed(touch(ensureProceduralOrders(installed, now), now)), spawnedGenerator: alreadyInstalled ? undefined : { generatorId, cell } };
+    return { ...changed(touch(identityOrders(installed, now), now)), spawnedGenerator: alreadyInstalled ? undefined : { generatorId, cell } };
   }
   if (arrival.kind === 'memory_arrival') {
     return changed(touch({
@@ -3140,48 +3269,11 @@ function claimStepEnergy(
   };
 }
 
-function rerollOrder(state: MergeWorldState, orderId: string, now: number): MergeWorldCommandResult {
-  const order = state.activeOrders.find((item) => item.id === orderId);
-  const dayId = localDayId(now);
-  if (!order || order.purpose === 'signature' || (order.storyArcId && order.storyArcId !== 'mossprout:casual-garden')) {
-    return unchanged(state, 'Story requests stay until you are ready.');
-  }
-  if (order.storyArcId === 'mossprout:casual-garden') {
-    if (state.lastFreeRerollDayId === dayId) return unchanged(state, 'Your free request change has already been used today.');
-    const residents = MOSSPROUT_RESIDENT_IDS.filter((id) => state.mossproutResidentSkinIds.includes(id));
-    const currentRecipient = (order.recipientSkinId ?? 'mossprout') as (typeof MOSSPROUT_RESIDENT_IDS)[number];
-    const currentIndex = Math.max(0, residents.indexOf(currentRecipient));
-    const recipientSkinId = residents.length > 1 ? residents[(currentIndex + 1) % residents.length]! : residents[0] ?? 'mossprout';
-    const resident = mossproutResidentById.get(recipientSkinId)!;
-    const copyIndex = proceduralOrderRank(`${order.id}:reroll:${dayId}`, 37) % resident.requestCopy.length;
-    const replacement: MergeOrder = {
-      ...order,
-      recipientSkinId,
-      title: resident.requestCopy[copyIndex]!.title,
-      description: resident.requestCopy[copyIndex]!.description,
-      createdAt: now,
-      rerollAvailableAt: now + 86_400_000,
-    };
-    return changed(touch({
-      ...state,
-      activeOrders: state.activeOrders.map((candidate) => candidate.id === orderId ? replacement : candidate),
-      lastFreeRerollDayId: dayId,
-      mossproutDailyGardenOrders: state.mossproutDailyGardenOrders ? {
-        ...state.mossproutDailyGardenOrders,
-        lastRecipientSkinId: recipientSkinId,
-      } : null,
-    }, now), 'A different garden resident has a request.');
-  }
-  if ((order.rerollAvailableAt ?? order.createdAt + 86_400_000) > now) return unchanged(state, 'This request can be changed after it has had a day on the table.');
-  if (state.lastFreeRerollDayId === dayId) return unchanged(state, 'Your free request change has already been used today.');
-  const next: MergeWorldState = { ...state, activeOrders: state.activeOrders.filter((item) => item.id !== orderId), lastFreeRerollDayId: dayId, recentOrderKeys: [...state.recentOrderKeys, templateKeyForOrder(order)].slice(-RECENT_ORDER_LIMIT) };
-  return changed(touch(ensureProceduralOrders(next, now), now), 'A different request drifted in.');
-}
 
 function reconcileCharacters(state: MergeWorldState, ids: string[], now: number): MergeWorldState {
   const additions = ids.filter((id): id is MergeCharacterId => KNOWN_CHARACTERS.has(id as MergeCharacterId) && !state.unlockedCharacters.includes(id as MergeCharacterId));
   if (!additions.length) return reconcileDiscoveryMist(state, now);
-  const reconciled = touch(ensureProceduralOrders({
+  const reconciled = touch(identityOrders({
     ...state,
     unlockedCharacters: [...state.unlockedCharacters, ...additions],
     companionDiscovery: {
@@ -3216,7 +3308,7 @@ function reconcileFriendship(state: MergeWorldState, levels: Partial<Record<Merg
     changedState = true;
   }
   const next = changedState ? { ...state, characterProgress } : state;
-  return next === state ? state : touch(ensureProceduralOrders(next, now), now);
+  return next === state ? state : touch(identityOrders(next, now), now);
 }
 
 function reconcileMossproutResidents(
@@ -4004,71 +4096,6 @@ function ensureCharacterGenerators(state: MergeWorldState, characterId: MergeCha
   return generatorIds.reduce((current, generatorId) => ensureGenerator(current, generatorId, now), state);
 }
 
-function ensureProceduralOrders(state: MergeWorldState, now: number): MergeWorldState {
-  // Chapter 0 is still teaching the authored loop. The repeatable economy
-  // begins after the first non-Mossprout companion completes their introduction.
-  const unlocked = state.companionDiscovery.records.some((record) => record.characterId !== 'mossprout' && record.firstOrderCompletedAt != null)
-    || HATCHABLE_COMPANIONS.some((definition) => lessonOrderServed(state, definition))
-    || Object.values(state.companionDailyGarden ?? {}).some((batch) => Boolean(batch?.bonusReceiptId))
-    // A hatched friend whose parcel is open on the board: the economy has begun even before the lesson's request is served.
-    || HATCHABLE_COMPANIONS.some((definition) => state.worldUnlocks?.[definition.tile.unlockId]?.hatchedAt != null
-      && state.arrivals.some((arrival) => arrival.generatorId === definition.economy.generatorId && arrival.claimedAt != null));
-  if (!unlocked) return state;
-  // Rehydrate the same batches displayed by Tend garden, including older saves
-  // whose daily requests were removed by story reconciliation.
-  for (const familyId of ['mossprout' as const, ...HATCHABLE_COMPANIONS.map((definition) => definition.companion)]) state = ensureCompanionDailyGarden(state, familyId, now);
-  const procedural = state.activeOrders.filter((order) => !order.storyArcId);
-  const existingKeys = new Set(procedural.map(templateKeyForOrder));
-  const recent = new Set(state.recentOrderKeys);
-  const eligible = MERGE_REPEATABLE_ORDER_TEMPLATES.filter((template) => {
-    if (template.signature || template.chapterId || !state.unlockedCharacters.includes(template.characterId)) return false;
-    if (existingKeys.has(template.key)) return false;
-    const friendship = state.characterProgress[template.characterId]?.friendshipLevel ?? 1;
-    if (template.minimumFriendshipLevel && friendship < template.minimumFriendshipLevel) return false;
-    if (template.maximumFriendshipLevel && friendship > template.maximumFriendshipLevel) return false;
-    return template.requirements.every((requirement) => {
-      const definition = MERGE_ITEMS_BY_ID.get(requirement.definitionId);
-      return Boolean(definition && state.unlockedChains.includes(definition.chainId));
-    });
-  });
-  const ranked = [...eligible].sort((left, right) => {
-    const leftRecent = recent.has(left.key) ? 1 : 0;
-    const rightRecent = recent.has(right.key) ? 1 : 0;
-    if (leftRecent !== rightRecent) return leftRecent - rightRecent;
-    const leftFavourite = left.characterId === state.favouriteCharacterId ? 0 : 1;
-    const rightFavourite = right.characterId === state.favouriteCharacterId ? 0 : 1;
-    if (leftFavourite !== rightFavourite) return leftFavourite - rightFavourite;
-    return proceduralOrderRank(left.key, state.completedOrderCount + state.haven.nextProceduralOrder)
-      - proceduralOrderRank(right.key, state.completedOrderCount + state.haven.nextProceduralOrder);
-  });
-  const represented = new Set(procedural.map((order) => order.characterId));
-  const guaranteed = ranked.filter((template) => {
-    if (represented.has(template.characterId)) return false;
-    represented.add(template.characterId);
-    return true;
-  });
-  const selected = [...guaranteed, ...ranked.filter((template) => !guaranteed.includes(template))]
-    .slice(0, Math.max(guaranteed.length, 3 - procedural.length));
-  const count = selected.length;
-  if (count < 1) return state;
-  const orders = selected.map((template, index): MergeOrder => ({
-    id: `merge-order:${state.haven.nextProceduralOrder + index}:${template.key}`,
-    characterId: template.characterId,
-    title: template.title,
-    difficulty: template.difficulty,
-    requirements: template.requirements.map((requirement) => ({ ...requirement })),
-    reward: { ...template.reward },
-    createdAt: now,
-    rerollAvailableAt: now + 86_400_000,
-    signature: false,
-    purpose: 'normal',
-  })).map(ensureOrderGlowReward);
-  return {
-    ...state,
-    activeOrders: [...state.activeOrders, ...orders],
-    haven: { ...state.haven, nextProceduralOrder: state.haven.nextProceduralOrder + count },
-  };
-}
 
 function proceduralOrderRank(key: string, seed: number) {
   let hash = seed | 0;
@@ -4438,6 +4465,7 @@ function normalizeDreamMist(value: unknown, legacyLocked: boolean, index: number
   if (!value || typeof value !== 'object') return legacyLocked ? authoredDormantMistForCell(index) : null;
   const mist = value as { kind?: unknown; id?: unknown; definitionId?: unknown; generatorId?: unknown; ownerCharacterId?: unknown; discoveryId?: unknown; gateId?: unknown; residentId?: unknown; pathId?: unknown; sequenceIndex?: unknown; boundDefinitionId?: unknown; active?: unknown; candidateIds?: unknown; characterIds?: unknown; clearingId?: unknown; revealDay?: unknown; recommendedCharacterId?: unknown; chapter?: unknown; ready?: unknown };
   if (mist.kind === 'dormant') return authoredDormantMistForCell(index);
+  if (mist.kind === 'encounter') return normalizeEncounterMist(mist as { type?: unknown; hp?: unknown; wispId?: unknown; holds?: unknown }, legacyLocked, index);
 
   if (mist.kind === 'garden_growth') {
     const authored = authoredDormantMistForCell(index);
@@ -4500,6 +4528,80 @@ function normalizeDreamMist(value: unknown, legacyLocked: boolean, index: number
   }
   return legacyLocked ? authoredDormantMistForCell(index) : null;
 }
+
+const ENCOUNTER_RECEIPT_LIMIT = 200;
+const ENCOUNTER_DAILY_DAYS_KEPT = 7;
+const ENCOUNTER_MIST_TYPES = new Set(['light', 'dense', 'root', 'wisp-bound']);
+const isEncounterGrade = (value: unknown): value is EncounterGrade => value === 'cleared' || value === 'bright' || value === 'perfect';
+
+/** An encounter's own Mist survives a reload: its type, hits left and what it holds; anything unreadable is plain locked mist. */
+function normalizeEncounterMist(mist: { type?: unknown; hp?: unknown; wispId?: unknown; holds?: unknown }, legacyLocked: boolean, index: number): MergeBoardCell['mist'] {
+  if (typeof mist.type !== 'string' || !ENCOUNTER_MIST_TYPES.has(mist.type)) return legacyLocked ? authoredDormantMistForCell(index) : null;
+  const type = mist.type as EncounterMistType;
+  const rawHolds = mist.holds && typeof mist.holds === 'object' ? mist.holds as { kind?: unknown; definitionId?: unknown; spawnerId?: unknown } : null;
+  const holds: EncounterMistHolds | undefined = rawHolds?.kind === 'item' && typeof rawHolds.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(rawHolds.definitionId)
+    ? { kind: 'item', definitionId: rawHolds.definitionId }
+    : rawHolds?.kind === 'spawner' && typeof rawHolds.spawnerId === 'string'
+      ? { kind: 'spawner', spawnerId: rawHolds.spawnerId }
+      : undefined;
+  return {
+    kind: 'encounter', type,
+    hp: Math.max(0, Math.floor(finite(mist.hp, 1))),
+    ...(typeof mist.wispId === 'string' ? { wispId: mist.wispId } : {}),
+    ...(holds ? { holds } : {}),
+  };
+}
+
+function normalizeEncounters(value: unknown, now: number): EncounterLedger {
+  const empty: EncounterLedger = { receipts: [], clears: {}, active: null, loadout: null, daily: {}, lastOutcome: null };
+  if (!value || typeof value !== 'object') return empty;
+  const source = value as Partial<EncounterLedger>;
+  const character = (id: unknown): MergeCharacterId | null => typeof id === 'string' && KNOWN_CHARACTERS.has(id as MergeCharacterId) ? id as MergeCharacterId : null;
+  const wisp = (id: unknown): WispId | null => typeof id === 'string' ? id as WispId : null;
+  const clears: EncounterLedger['clears'] = {};
+  for (const [missionId, raw] of Object.entries(source.clears ?? {})) {
+    const record = raw as Partial<EncounterClearRecord> | null;
+    const katchimeraId = character(record?.lastKatchimeraId);
+    if (!missionId || !record || !katchimeraId || !isEncounterGrade(record.bestGrade)) continue;
+    clears[missionId] = { firstClearedAt: finite(record.firstClearedAt, now), clears: Math.max(1, Math.floor(finite(record.clears, 1))), bestGrade: record.bestGrade, lastKatchimeraId: katchimeraId };
+  }
+  const active = source.active && typeof source.active === 'object' && typeof source.active.missionId === 'string' && typeof source.active.runId === 'string' && character(source.active.katchimeraId)
+    ? { missionId: source.active.missionId, runId: source.active.runId, ...(typeof source.active.campaignId === 'string' ? { campaignId: source.active.campaignId } : {}), katchimeraId: character(source.active.katchimeraId)!, helperWispId: wisp(source.active.helperWispId), startedAt: finite(source.active.startedAt, now) }
+    : null;
+  const loadout = source.loadout && typeof source.loadout === 'object' && character(source.loadout.katchimeraId)
+    ? { katchimeraId: character(source.loadout.katchimeraId)!, helperWispId: wisp(source.loadout.helperWispId) }
+    : null;
+  const dayIds = Object.keys(source.daily ?? {}).filter((dayId) => /^\d{4}-\d{2}-\d{2}$/.test(dayId)).sort().slice(-ENCOUNTER_DAILY_DAYS_KEPT);
+  const daily: EncounterLedger['daily'] = {};
+  for (const dayId of dayIds) {
+    const slots: Record<string, { clearedAt: number; grade: EncounterGrade }> = {};
+    for (const [slot, raw] of Object.entries(source.daily?.[dayId]?.slots ?? {})) {
+      const record = raw as { clearedAt?: unknown; grade?: unknown } | null;
+      if (record && isEncounterGrade(record.grade)) slots[slot] = { clearedAt: finite(record.clearedAt, now), grade: record.grade };
+    }
+    daily[dayId] = { slots };
+  }
+  const outcome = source.lastOutcome && typeof source.lastOutcome === 'object' ? source.lastOutcome as Partial<EncounterOutcomeRecord> : null;
+  const lastOutcome = outcome && typeof outcome.missionId === 'string' && typeof outcome.receiptId === 'string' && isEncounterGrade(outcome.grade) && character(outcome.katchimeraId)
+    ? { missionId: outcome.missionId, receiptId: outcome.receiptId, grade: outcome.grade, glow: Math.max(0, finite(outcome.glow, 0)), xp: Math.max(0, finite(outcome.xp, 0)), firstClear: Boolean(outcome.firstClear), katchimeraId: character(outcome.katchimeraId)!, ackedAt: outcome.ackedAt == null ? null : finite(outcome.ackedAt, now) }
+    : null;
+  return { receipts: uniqueStrings(source.receipts).slice(-ENCOUNTER_RECEIPT_LIMIT), clears, active, loadout, daily, lastOutcome };
+}
+
+function normalizeKatchimeraProgress(value: unknown, now: number): NonNullable<MergeWorldState['katchimeraProgress']> {
+  const progress: NonNullable<MergeWorldState['katchimeraProgress']> = {};
+  if (!value || typeof value !== 'object') return progress;
+  for (const [id, raw] of Object.entries(value)) {
+    const record = raw as Partial<KatchimeraProgress> | null;
+    if (!record || !KNOWN_CHARACTERS.has(id as MergeCharacterId)) continue;
+    progress[id as MergeCharacterId] = { level: Math.max(1, Math.min(KATCHIMERA_PROGRESS_MAX_LEVEL, Math.floor(finite(record.level, 1)))), xp: Math.max(0, Math.floor(finite(record.xp, 0))), upgradedAt: record.upgradedAt == null ? null : finite(record.upgradedAt, now) };
+  }
+  return progress;
+}
+const KATCHIMERA_PROGRESS_MAX_LEVEL = 10;
+
+/** The campaign pivot: nothing tops the Main Board up any more; the call sites that did stay a no-op until the orders go entirely. */
+const identityOrders = (state: MergeWorldState, _now: number): MergeWorldState => state;
 
 function normalizeMossproutDailyGardenOrders(value: unknown): MergeWorldState['mossproutDailyGardenOrders'] {
   if (!value || typeof value !== 'object') return null;
@@ -4839,7 +4941,7 @@ export function mergeWorldCatalogIssues(): string[] {
   for (const item of MERGE_ITEM_CATALOG) {
     if (item.nextItemId && !MERGE_ITEMS_BY_ID.has(item.nextItemId)) issues.push(`${item.id} has missing next item ${item.nextItemId}`);
   }
-  for (const template of [...MERGE_ORDER_TEMPLATES, ...MERGE_REPEATABLE_ORDER_TEMPLATES]) {
+  for (const template of MERGE_ORDER_TEMPLATES) {
     if (!Number.isFinite(template.reward.coins) || template.reward.coins <= 0) issues.push(`${template.key} must award Glow`);
     for (const requirement of template.requirements) {
       if (!MERGE_ITEMS_BY_ID.has(requirement.definitionId)) issues.push(`${template.key} requests missing ${requirement.definitionId}`);

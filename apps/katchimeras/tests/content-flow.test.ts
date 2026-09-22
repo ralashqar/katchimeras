@@ -279,7 +279,7 @@ test('Day 1 Content Flow completion durably crosses the relationship effect befo
   if (seeded.pendingWork.kind !== 'effect') return;
   assert.equal(seeded.pendingWork.effectType, 'haven.grant_first_memory');
   const advanced = reduceContentFlow(flow, seeded.run, { type: 'effect_completed', effectKey: seeded.pendingWork.key, now: 4 });
-  assert.equal(advanced.run.nodeId, 'companion.garden_intro');
+  assert.equal(advanced.run.nodeId, 'garden.first-visit.focus', 'straight to the soil: no Heartwood sheet between the meeting and the planting');
   assert.equal(Object.keys(advanced.run.effectReceipts).length, 2);
 });
 

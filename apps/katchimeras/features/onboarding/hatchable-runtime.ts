@@ -172,13 +172,15 @@ export async function readGardenLessonRun(definition: HatchableCompanionDefiniti
   return await repairUnknownLessonNode(definition, await loadContentFlowRun(definition.lesson.flow.runId));
 }
 
-const lessonStarts = new Map<MergeCharacterId, Promise<ContentFlowRun>>();
+const lessonStarts = new Map<MergeCharacterId, Promise<ContentFlowRun | null>>();
 export function ensureGardenLesson(definition: HatchableCompanionDefinition) {
+  // The campaign pivot: the Garden lesson lived on the Merge page, which is gone. Nothing new is started; a save
+  // already on a lesson keeps its run (read here) so nothing it recorded is lost.
   let starting = lessonStarts.get(definition.companion);
   if (!starting) {
     starting = (async () => {
       registerGardenLessonFlow(definition);
-      return await readGardenLessonRun(definition) ?? await startContentFlow(hatchableFlows(definition).gardenLesson, { runId: definition.lesson.flow.runId });
+      return await readGardenLessonRun(definition);
     })().finally(() => { lessonStarts.delete(definition.companion); });
     lessonStarts.set(definition.companion, starting);
   }
@@ -207,9 +209,11 @@ export type HatchableRuns = {
   ready: boolean;
   discovery: Partial<Record<MergeCharacterId, ContentFlowRun | null>>;
   lessons: Partial<Record<MergeCharacterId, ContentFlowRun | null>>;
+  /** Each friend's day-one journey run: completed once their first conversation has been settled. */
+  dayOnes: Partial<Record<MergeCharacterId, ContentFlowRun | null>>;
 };
 
-const EMPTY_RUNS: HatchableRuns = { ready: false, discovery: {}, lessons: {} };
+const EMPTY_RUNS: HatchableRuns = { ready: false, discovery: {}, lessons: {}, dayOnes: {} };
 
 /**
  * Every hatchable companion's discovery and garden-lesson runs, refreshed on
@@ -224,13 +228,14 @@ export function useHatchableRuns(): HatchableRuns {
     let retry: ReturnType<typeof setTimeout> | undefined;
     const refresh = () => {
       const request = ++revision;
-      void Promise.all(HATCHABLE_COMPANIONS.map(async (definition) => [definition.companion, await loadContentFlowRun(definition.discoveryFlow.runId), await readGardenLessonRun(definition)] as const))
+      void Promise.all(HATCHABLE_COMPANIONS.map(async (definition) => [definition.companion, await loadContentFlowRun(definition.discoveryFlow.runId), await readGardenLessonRun(definition), await loadContentFlowRun(definition.dayOne.flow.runId)] as const))
         .then((entries) => {
           if (!live || request !== revision) return;
           setRuns({
             ready: true,
             discovery: Object.fromEntries(entries.map(([companion, discovery]) => [companion, discovery])),
             lessons: Object.fromEntries(entries.map(([companion, , lesson]) => [companion, lesson])),
+            dayOnes: Object.fromEntries(entries.map(([companion, , , dayOne]) => [companion, dayOne])),
           });
         })
         .catch(() => { if (live && request === revision) retry = setTimeout(refresh, 1000); });

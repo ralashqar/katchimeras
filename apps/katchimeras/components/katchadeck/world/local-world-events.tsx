@@ -99,7 +99,8 @@ export function LocalWorldEvents({ world, onMerge, initiallyOpen = false, onClos
               {next && !companionHome ? <ThemedText lightColor="#332918" darkColor="#332918">Find this friend on their hex tile and complete their rescue to continue the event story.</ThemedText> : null}
               {next && companionHome && phase === 'active' ? <KatchaButton label="Continue in the world" onPress={() => { setOpen(false); onClose?.(); onExplore?.(definition.id); }} /> : null}
               {current.completedAt ? <ThemedText lightColor="#332918" darkColor="#332918">The Mist has lifted. Your keepsake is safe in the collection below.</ThemedText> : null}
-              {!definition.encounters && phase === 'active' ? <KatchaButton label="Help with a request" onPress={() => { setOpen(false); onMerge(); }} /> : null}
+              {/* The campaign pivot: an event's requests were served on the Merge page, which is gone; its encounters stay. */}
+              {false && !definition.encounters && phase === 'active' ? <KatchaButton label="Help with a request" onPress={() => { setOpen(false); onMerge(); }} /> : null}
               {definition.tiers.map(t => <View key={t.id} style={styles.reward}>
                 <ThemedText lightColor="#332918" darkColor="#332918">{t.points} points · {t.free.items.map(i => i.kind === 'glow' ? `${i.amount} Glow` : i.kind === 'cosmetic' ? definition.keepsakes?.find(k => k.id === i.id)?.title : '').join(', ')}</ThemedText>
                 <KatchaButton label={current.claims[t.id] !== undefined ? 'Collected' : 'Collect'} disabled={busy || current.claims[t.id] !== undefined || current.progress.points < t.points || !['active', 'claim'].includes(phase)} onPress={() => void run({ type: 'claim', eventId: definition.id, tierId: t.id })} />

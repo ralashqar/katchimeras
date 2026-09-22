@@ -9,8 +9,10 @@ export function migrateStepplingDayOneSession(session: ConversationSession): Con
 }
 /** A completed day-one conversation whose garden handoff has not been taken up yet. */
 export function gardenHandoffPendingFor(session: ConversationSession, definitionId: string, minimumVersion = 3): boolean {
-  return session.definitionId === definitionId && session.definitionVersion >= minimumVersion && !session.preview
-    && session.status === 'completed' && session.gardenHandoffAt == null;
+  // The campaign pivot: the Merge Garden and its lesson are gone, so a friend's day one hands over to nothing.
+  // It ends on the Haven, where the Kingdom's goal takes over.
+  void session; void definitionId; void minimumVersion;
+  return false;
 }
 export function stepplingGardenHandoffPending(session: ConversationSession): boolean {
   return gardenHandoffPendingFor(session, DEFINITION_ID);

@@ -1,8 +1,9 @@
 import type { CorruptionWispSpec } from '@/features/onboarding/corruption-wisps';
 import type { MergeItemDefinition, MergeWorldState } from '@/types/merge-world';
-import type { MissionMechanicDefinition, MissionMechanicMove, MissionMechanicState, MissionStrike, MissionWispView } from '@/types/mission-mechanic';
+import type { MechanicEffect, MissionMechanicDefinition, MissionMechanicMove, MissionMechanicState, MissionStrike, MissionWispView } from '@/types/mission-mechanic';
 import type { MissionWindow } from './board-window';
 import { applyColumnShot, columnShotComplete, columnShotMove, columnShotProgress, columnShotStrike, columnShotTotalHp, columnShotViews, createColumnShotState, normalizeColumnShotState } from './column-shot';
+import { applyDarkWisps, createDarkWispsState, darkWispsAfterAction, darkWispsComplete, darkWispsMove, darkWispsProgress, darkWispsStrike, darkWispsTotalHp, darkWispsViews, normalizeDarkWispsState } from './dark-wisps';
 import { glowStrikeAt, glowStrikesMove, glowStrikesViews } from './glow-strikes';
 import { applyWispRushStrike, createWispRushState, syncWispRush, wispRushFallen, wispRushViews } from './wisp-rush';
 
@@ -11,13 +12,20 @@ import { applyWispRushStrike, createWispRushState, syncWispRush, wispRushFallen,
  * authored on: a mission's requirement, its wisps over the tile, and the
  * mechanic it plays by (none means glow strikes). The store resolves strikes
  * through here, the dock reads progress and the finale, the wisp layer draws
- * `wispViews`, and the guidance asks for `mechanicMove`. Nothing outside this
- * module branches on the mechanic's kind.
+ * `wispViews`, the guidance asks for `mechanicMove`, and the wisps take
+ * their turn through `afterAction`. Nothing outside this module branches on
+ * the mechanic's kind.
  */
 export type MissionMechanicHost = { required: number; wisps: readonly CorruptionWispSpec[]; mechanic?: MissionMechanicDefinition };
 
 /** A board's strike, in the terms the engine's result gives: which cell holds the thing that was made. */
 export type MissionStrikeEvent = { type: 'merge_completed' | 'dream_echo_cleared'; resultCell: number; resultDefinitionId: string };
+
+/** What an action was and how the wisps may draw their luck for it. */
+export type MechanicActionContext = { window: MissionWindow; action: 'merge' | 'tap' | 'ability'; rng: (label: string) => number; items?: ReadonlyMap<string, MergeItemDefinition> };
+
+/** What a mechanic keeps in the board's save beyond the merge count. */
+export type MechanicSaveState = { damage: number[]; actions?: number; struckAt?: number[] };
 
 const GLOW_STRIKES: MissionMechanicDefinition = { kind: 'glow-strikes' };
 
@@ -27,18 +35,22 @@ export function resolveMechanic(host: MissionMechanicHost): MissionMechanicDefin
 
 export function createMechanicState(mechanic: MissionMechanicDefinition): MissionMechanicState {
   if (mechanic.kind === 'wisp-rush') return createWispRushState();
+  if (mechanic.kind === 'dark-wisps') return createDarkWispsState(mechanic);
   return mechanic.kind === 'column-shot' ? createColumnShotState(mechanic) : { kind: 'glow-strikes', strikes: 0 };
 }
 
 /** Strikes (or hit points) that fill the bar. */
 export function mechanicRequired(mechanic: MissionMechanicDefinition, host: MissionMechanicHost): number {
-  return mechanic.kind === 'column-shot' ? columnShotTotalHp(mechanic) : host.required;
+  if (mechanic.kind === 'column-shot') return columnShotTotalHp(mechanic);
+  if (mechanic.kind === 'dark-wisps') return darkWispsTotalHp(mechanic);
+  return host.required;
 }
 
 export function mechanicProgress(mechanic: MissionMechanicDefinition, host: MissionMechanicHost, state: MissionMechanicState): { current: number; total: number } {
   // A rush counts wisps struck down against the host's goal.
   if (mechanic.kind === 'wisp-rush' && state.kind === 'wisp-rush') return { current: Math.min(host.required, wispRushFallen(state)), total: host.required };
   if (mechanic.kind === 'column-shot' && state.kind === 'column-shot') return columnShotProgress(mechanic, state);
+  if (mechanic.kind === 'dark-wisps' && state.kind === 'dark-wisps') return darkWispsProgress(mechanic, state);
   const total = host.required;
   return { current: Math.max(0, Math.min(total, Math.floor(state.strikes))), total };
 }
@@ -47,6 +59,7 @@ export function mechanicComplete(mechanic: MissionMechanicDefinition, host: Miss
   // A rush is over when its clock says so, never because the wisps ran out: they do not.
   if (mechanic.kind === 'wisp-rush') return false;
   if (mechanic.kind === 'column-shot' && state.kind === 'column-shot') return columnShotComplete(mechanic, state);
+  if (mechanic.kind === 'dark-wisps' && state.kind === 'dark-wisps') return darkWispsComplete(mechanic, state);
   return state.strikes >= host.required;
 }
 
@@ -57,6 +70,7 @@ export function strikeFor(mechanic: MissionMechanicDefinition, host: MissionMech
   // by the heat's dock; a stored board never resolves one.
   if (mechanic.kind === 'wisp-rush') return { next: state, strike: null };
   if (mechanic.kind === 'column-shot' && state.kind === 'column-shot') return columnShotStrike(mechanic, window, state, event, items);
+  if (mechanic.kind === 'dark-wisps' && state.kind === 'dark-wisps') return darkWispsStrike(mechanic, state, event, items);
   const strike = glowStrikeAt(host, state.strikes, 'glow', event.resultCell, event.resultDefinitionId);
   return { next: { kind: 'glow-strikes', strikes: state.strikes + 1 }, strike };
 }
@@ -65,44 +79,67 @@ export function strikeFor(mechanic: MissionMechanicDefinition, host: MissionMech
 export function applyStrike(mechanic: MissionMechanicDefinition, state: MissionMechanicState, strike: MissionStrike): MissionMechanicState {
   if (mechanic.kind === 'wisp-rush' && state.kind === 'wisp-rush') return applyWispRushStrike(state, strike);
   if (mechanic.kind === 'column-shot' && state.kind === 'column-shot') return applyColumnShot(state, strike);
+  if (mechanic.kind === 'dark-wisps' && state.kind === 'dark-wisps') return applyDarkWisps(state, strike);
   return { kind: 'glow-strikes', strikes: state.strikes + 1 };
 }
 
 /**
  * What the wisp layer's own copy takes from the board's state while the board is up. For most mechanics nothing (the
- * copy moves only as flights land); a rush's wisps appear over time, so the copy gains each new one. The same object
- * back means nothing changed.
+ * copy moves only as flights land); a rush's wisps appear over time, so the copy gains each new one; Dark Wisps mend
+ * and act between strikes, so the copy takes their damage as the board has it. The same object back means nothing changed.
  */
 export function syncMechanicState(mechanic: MissionMechanicDefinition, shown: MissionMechanicState, incoming: MissionMechanicState): MissionMechanicState {
-  return mechanic.kind === 'wisp-rush' && shown.kind === 'wisp-rush' && incoming.kind === 'wisp-rush' ? syncWispRush(shown, incoming) : shown;
+  if (mechanic.kind === 'wisp-rush' && shown.kind === 'wisp-rush' && incoming.kind === 'wisp-rush') return syncWispRush(shown, incoming);
+  if (mechanic.kind === 'dark-wisps' && shown.kind === 'dark-wisps' && incoming.kind === 'dark-wisps') {
+    return shown.actions === incoming.actions && shown.damage.every((value, index) => value === incoming.damage[index]) ? shown : { ...shown, actions: incoming.actions, damage: [...incoming.damage] };
+  }
+  return shown;
 }
 
 export function wispViews(mechanic: MissionMechanicDefinition, host: MissionMechanicHost, state: MissionMechanicState): MissionWispView[] {
   if (mechanic.kind === 'wisp-rush' && state.kind === 'wisp-rush') return wispRushViews(mechanic, state);
   if (mechanic.kind === 'column-shot' && state.kind === 'column-shot') return columnShotViews(mechanic, state);
+  if (mechanic.kind === 'dark-wisps' && state.kind === 'dark-wisps') return darkWispsViews(mechanic, state);
   return glowStrikesViews(host, state);
 }
 
 export function mechanicMove(mechanic: MissionMechanicDefinition, board: MergeWorldState, state: MissionMechanicState, window: MissionWindow): MissionMechanicMove | null {
   if (mechanic.kind === 'column-shot' && state.kind === 'column-shot') return columnShotMove(mechanic, board, state, window);
+  if (mechanic.kind === 'dark-wisps') return darkWispsMove(board, window);
   return glowStrikesMove(board, window);
 }
 
 /**
+ * The wisps' turn once the player has spent an action: what they do to the
+ * board and to themselves, and the effects for the layer to show. Every
+ * mechanic but Dark Wisps leaves the board as it is.
+ */
+export function afterAction(mechanic: MissionMechanicDefinition, host: MissionMechanicHost, state: MissionMechanicState, board: MergeWorldState, context: MechanicActionContext): { state: MissionMechanicState; board: MergeWorldState; effects: MechanicEffect[] } {
+  if (mechanic.kind === 'dark-wisps' && state.kind === 'dark-wisps') return darkWispsAfterAction(mechanic, state, board, context.window, context.rng, context.items);
+  return { state, board, effects: [] };
+}
+
+/**
  * A saved board's mechanic state: glow strikes are the saved merge count; a
- * column-shot board must carry a readable damage vector, or, with no strike
- * yet, starts fresh. Null means the save cannot be read.
+ * column-shot or Dark Wisps board must carry a readable damage vector, or,
+ * with no strike yet, starts fresh. Null means the save cannot be read.
  */
 export function normalizeMechanicState(mechanic: MissionMechanicDefinition, value: unknown, strikes: number): MissionMechanicState | null {
   const count = Math.max(0, Math.floor(Number.isFinite(strikes) ? strikes : 0));
   // A rush is never saved mid-run: its board starts fresh.
   if (mechanic.kind === 'wisp-rush') return createWispRushState();
+  if (mechanic.kind === 'dark-wisps') {
+    if (value == null) return count === 0 ? createDarkWispsState(mechanic) : null;
+    return normalizeDarkWispsState(mechanic, value, count);
+  }
   if (mechanic.kind !== 'column-shot') return { kind: 'glow-strikes', strikes: count };
   if (value == null) return count === 0 ? createColumnShotState(mechanic) : null;
   return normalizeColumnShotState(mechanic, value, count);
 }
 
 /** What a mechanic keeps in the board's save. */
-export function mechanicSaveState(state: MissionMechanicState | null): { damage: number[] } | undefined {
-  return state?.kind === 'column-shot' ? { damage: state.damage } : undefined;
+export function mechanicSaveState(state: MissionMechanicState | null): MechanicSaveState | undefined {
+  if (state?.kind === 'column-shot') return { damage: state.damage };
+  if (state?.kind === 'dark-wisps') return { damage: state.damage, actions: state.actions, struckAt: state.struckAt };
+  return undefined;
 }

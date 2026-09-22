@@ -1,4 +1,3 @@
-import { GardenPlantingHandoff } from './garden-planting-handoff';
 import { loadFtueNarrativeHistory } from '@/features/onboarding/ftue-narrative-history';
 import { FtueBondNarrative } from './ftue-bond-narrative';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
@@ -188,7 +187,6 @@ export function MossproutFtueStoryStage({ actionStackTargetRef, mode = 'garden',
     </Animated.View>
   );
 
-  if (mode === 'garden_intro') return <GardenPlantingHandoff onContinue={onContinue} />;
 
   if (mode === 'water_together' || mode === 'first_grow') {
     return <MossproutFirstGrowStage onNarration={onNarration} onBondRewardRequest={onBondRewardRequest} />;

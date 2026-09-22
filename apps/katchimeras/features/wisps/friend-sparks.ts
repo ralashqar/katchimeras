@@ -11,7 +11,7 @@ export const FRIEND_POUCHES_PER_DAY = 4;
 export type FriendSparkBondEvent = { id: string; kind: string; dayId?: string | null };
 export type FriendSparkActivity = { kind: 'photo' | 'notice' | 'moment'; status: 'pending' | 'complete'; dayId: string; photo?: { match: string } | null };
 
-export type FriendSparkSource = 'photo' | 'notice' | 'moment' | 'steps' | 'journey';
+export type FriendSparkSource = 'photo' | 'notice' | 'moment' | 'steps' | 'journey' | 'mist';
 export type FriendSparks = {
   total: number;
   bySource: Partial<Record<FriendSparkSource, number>>;
@@ -40,6 +40,8 @@ export function friendSparks(familyId: string, dayId: string, bondEvents: readon
   const steps = new Set(bondEvents.filter((event) => event.id.startsWith(stepPrefix)).map((event) => event.id)).size;
   add('steps', steps);
   add('journey', 2 * bondEvents.filter((event) => event.kind === 'journey_day_completed' && event.dayId === dayId).length);
+  // Two encounters a day count; the Mist is not the way to farm a friend's pouch.
+  add('mist', Math.min(2, bondEvents.filter((event) => event.kind === 'mist_cleared' && event.dayId === dayId).length));
   const total = Object.values(bySource).reduce((sum, value) => sum + (value ?? 0), 0);
   return { total, bySource, standout: readyPhoto && stepMilestones > 0 && steps >= stepMilestones };
 }

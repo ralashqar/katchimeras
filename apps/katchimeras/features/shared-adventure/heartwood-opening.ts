@@ -2,19 +2,11 @@ import { heartwoodStage } from './heartwood-progression';
 import type { MergeWorldState } from '@/types/merge-world';
 import { adventureNext, feastleReady } from './runtime';
 
+/**
+ * The first session no longer shows Heartwood on a sheet: the planting records the `introduction` receipt and the bud
+ * the `signal` one, so the road below and the recap rule read as they always did. Only the recap (legacy saves) has copy.
+ */
 export const HEARTWOOD_STORY = {
-  introduction: {
-    title: 'Wake Heartwood',
-    text: 'Every path once met beneath Heartwood. When the lights went out, our friends were stranded along them.',
-    detail: 'Five empty patches surround its roots. Mossprout kept the old spring’s seed safe. Plant it here, and let’s bring this circle back to life.',
-    action: 'Plant it',
-  },
-  signal: {
-    title: 'The roots remember',
-    text: 'Look at Heartwood! Our Garden has woken its first root. A bud! And that broken marker carries the same light. Three notches… Steppling’s trail.',
-    detail: 'The Tree is Stirring! The Dew Spring gives the Garden its energy. Four more patches around its roots are waiting to be built on. Two Seeds await in your Garden parcels. Beyond the grove, Steppling needs us too.',
-    action: 'Talk to Mossprout',
-  },
   recap: {
     title: 'Our living Heartwood',
     text: 'These homes once met at Heartwood. The Mist broke the paths between them. Every place we restore gives the next friend a way home.',

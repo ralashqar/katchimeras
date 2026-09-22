@@ -18,7 +18,7 @@ import { upgradeFocusLevel, type UpgradeBenefit, type UpgradeLevelEntry, type Up
  * Every raised thing in the panel: a gradient face inside a rim, with a light
  * stroke just inside that rim all the way round (not a line along the top).
  */
-function Face({ colors, radius, rim = 1.5, style, children, stroke = true }: {
+export function Face({ colors, radius, rim = 1.5, style, children, stroke = true }: {
   colors: readonly [string, string, ...string[]]; radius: number; rim?: number; style?: StyleProp<ViewStyle>; children?: ReactNode; stroke?: boolean;
 }) {
   // The fill carries the rim's inner radius: clipped only by `overflow: 'hidden'` (the OUTER curve), a square-cornered

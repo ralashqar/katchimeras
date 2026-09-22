@@ -100,9 +100,8 @@ test('first Mossprout dialogue reflects both answers without claiming an unasked
   assert.ok(hello?.kind === 'choice');
   assert.match(hello.prompt, /beginning gets tangled/);
   assert.match(hello.prompt, /fond of tiny beginnings/);
-  const followup = meeting.nodes.find((node) => node.id === 'followup');
-  assert.ok(followup?.kind === 'choice');
-  assert.doesNotMatch(followup.prompt, /You said a little progress/);
+  assert.equal(meeting.nodes.some((node) => node.id === 'followup'), false, 'one question in the meeting, not two');
+  assert.ok(hello.options.every((option) => option.reply === '' && meeting.nodes.some((node) => node.id === option.nextNodeId && node.kind === 'end')), 'each answer ends the meeting on its reply and the Seed');
 });
 
 

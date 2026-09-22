@@ -174,7 +174,8 @@ export type KatchimeraActionRewardReceipt = {
     | 'insight_engaged'
     | 'conversation_completed'
     | 'journey_day_completed'
-    | 'merge_order_completed';
+    | 'merge_order_completed'
+    | 'mist_cleared';
   points: number;
   occurredAt: number;
   beforeTotal: number;

@@ -77,7 +77,7 @@ test('saves that already grew an island keep it revealed and inherit a completed
   const grown = fresh();
   const raw = { ...grown, version: 23, haven: { ...grown.haven, mossproutNatureIslands: { ...grown.haven.mossproutNatureIslands, 'bloom-garden': 2 as const, 'pond-sanctuary': 2 as const } } };
   const migrated = normalizeMergeWorldState(JSON.parse(JSON.stringify(raw)), NOW);
-  assert.equal(migrated.version, 24);
+  assert.equal(migrated.version, 25);
   assert.equal(islandWakeState(migrated, 'bloom-garden'), 'revealed');
   assert.equal(islandWakeState(migrated, 'pond-sanctuary'), 'revealed', 'nothing earned goes back under mist');
   const bloom = migrated.islandCampaigns?.['island-campaign:petalimp-bloom'];

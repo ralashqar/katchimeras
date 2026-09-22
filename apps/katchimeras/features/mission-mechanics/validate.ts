@@ -7,17 +7,14 @@ import { reduceMissionMove } from '@/utils/merge-world/engine';
 import { missionPairs, missionWakes, missionWindow, windowColumn, type MissionWindow } from './board-window';
 import { columnShotTotalHp } from './column-shot';
 import { createMechanicState, mechanicComplete, mechanicMove, resolveMechanic, strikeFor } from './mechanic';
+import { darkWispsTotalHp } from './dark-wisps';
+import { isEncounterDefinition, validateEncounterDefinition } from '@/features/encounter/validate-encounter';
 
 /** How many distinct positions a board may pass through before its walk is called off: a guard, not a rule. */
 const MAX_WALK_STATES = 20_000;
 
-/**
- * Whether a mission board is sound: its cells are on the window, its pieces
- * are known things, its bar and mechanic agree, and every way of playing it
- * finishes with a move to point at all the way. The same walk the registry
- * tests make, for a board a content pack brings.
- */
-export function validateMissionDefinition(mission: Omit<HatchableMissionDefinition, 'camera'>, now = Date.UTC(2026, 0, 1), items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): string[] {
+/** The checks every board gets before its walk: cells on the window, known pieces, a bar its mechanic agrees with. */
+export function missionBoardIssues(mission: Omit<HatchableMissionDefinition, 'camera'>, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): string[] {
   const issues: string[] = [];
   const window = missionWindow();
   const cells = new Set(window.cellIndices);
@@ -33,7 +30,11 @@ export function validateMissionDefinition(mission: Omit<HatchableMissionDefiniti
     if (!items.has(entry.definitionId)) issues.push(`${mission.id}: ${entry.definitionId} is not a known item`);
   }
   const mechanic = resolveMechanic(mission);
-  if (mechanic.kind === 'column-shot') {
+  if (mechanic.kind === 'dark-wisps') {
+    if (!mechanic.wisps?.length) issues.push(`${mission.id}: a Dark Wisps board needs wisps`);
+    for (const wisp of mechanic.wisps ?? []) if (!Number.isInteger(wisp.hp) || wisp.hp <= 0) issues.push(`${mission.id}: wisp ${wisp.id} needs hit points`);
+    if (mission.required !== darkWispsTotalHp(mechanic)) issues.push(`${mission.id}: required (${mission.required}) must equal the wisps' hit points (${darkWispsTotalHp(mechanic)})`);
+  } else if (mechanic.kind === 'column-shot') {
     if (!mechanic.wisps?.cells?.length) issues.push(`${mission.id}: a column-shot board needs wisps`);
     if (!Array.isArray(mechanic.damageByTier) || !mechanic.damageByTier.length || mechanic.damageByTier.some((damage) => !Number.isFinite(damage) || damage < 0)) issues.push(`${mission.id}: damageByTier must list non-negative damage by tier`);
     for (const wisp of mechanic.wisps?.cells ?? []) {
@@ -46,7 +47,23 @@ export function validateMissionDefinition(mission: Omit<HatchableMissionDefiniti
     if (!Number.isInteger(mission.required) || mission.required <= 0) issues.push(`${mission.id}: required must be a positive count of strikes`);
     if (!mission.wisps?.length) issues.push(`${mission.id}: a glow-strikes board needs wisps over its tile`);
   }
+  return issues;
+}
+
+/**
+ * Whether a mission board is sound: its cells are on the window, its pieces
+ * are known things, its bar and mechanic agree, and every way of playing it
+ * finishes with a move to point at all the way. The same walk the registry
+ * tests make, for a board a content pack brings.
+ */
+export function validateMissionDefinition(mission: Omit<HatchableMissionDefinition, 'camera'>, now = Date.UTC(2026, 0, 1), items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): string[] {
+  // An encounter (a budget, Mist of its own, spawners, a cache) is checked by the encounter's own search.
+  if (isEncounterDefinition(mission)) return validateEncounterDefinition(mission, missionBoardIssues(mission, items), items);
+  const issues = missionBoardIssues(mission, items);
   if (issues.length) return issues;
+  const mechanic = resolveMechanic(mission);
+  const window = missionWindow();
+  const seed = mission.seed;
   if (mechanic.kind === 'column-shot' && mechanic.emptyColumn === 'lost') { issues.push(...walkWithMisses(mission, mechanic, window, now, items)); return issues; }
   // Every way of playing the board finishes, and never without a move to point at.
   const start = createMissionState(seed, 'mossprout', now);

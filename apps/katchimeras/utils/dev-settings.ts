@@ -31,11 +31,12 @@ export function subscribeAllKatchimerasAvailable(listener: () => void): () => vo
 }
 
 /** The mechanic every docked mission board is swapped to (under its own storage key), or none. */
-export function getDevMissionMechanicPreview(): 'column-shot' | null {
-  return isDevBuild() && getStoredJson<string | null>(MISSION_MECHANIC_PREVIEW_KEY, null) === 'column-shot' ? 'column-shot' : null;
+export function getDevMissionMechanicPreview(): 'column-shot' | 'dark-wisps' | null {
+  const stored = isDevBuild() ? getStoredJson<string | null>(MISSION_MECHANIC_PREVIEW_KEY, null) : null;
+  return stored === 'column-shot' || stored === 'dark-wisps' ? stored : null;
 }
 
-export function setDevMissionMechanicPreview(preview: 'column-shot' | null): void {
+export function setDevMissionMechanicPreview(preview: 'column-shot' | 'dark-wisps' | null): void {
   if (!isDevBuild()) return;
   setStoredJson(MISSION_MECHANIC_PREVIEW_KEY, preview);
   missionMechanicPreviewListeners.forEach((listener) => listener());

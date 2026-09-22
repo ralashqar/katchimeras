@@ -317,13 +317,8 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
           actionId: ftueRun.stepId === 'world.seed_planted' ? 'world.acknowledge_seed_dormant' : 'world.open_garden',
           evidenceRef: 'mossprout-world:garden-button',
         });
-        if (result.run?.status !== 'active' || result.step?.surface !== 'merge') {
-          throw new Error('Mossprout Garden did not accept FTUE ownership');
-        }
-        router.push({
-          pathname: '/katchimera/[creatureId]/activity',
-          params: { creatureId: 'companion:mossprout' },
-        });
+        // The campaign pivot: the Merge page is gone; the step is advanced and the player stays on the Haven.
+        void result;
       },
     });
   }, [ftueRun, router, transitionTo]);

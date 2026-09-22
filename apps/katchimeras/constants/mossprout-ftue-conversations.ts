@@ -6,34 +6,12 @@ export const MOSSPROUT_FTUE_CONVERSATION_PREFIX = 'mossprout:ftue:first-meeting'
 export const MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID = 'mossprout:ftue:chapter-zero-return';
 export const MOSSPROUT_FIRST_REST_CONVERSATION_ID = 'mossprout:ftue:first-rest';
 
+/**
+ * The meeting opens on what the Egg heard (the hatch profile's own replies to the two answers), so the first thing
+ * Mossprout says is about the player. One key: the answers shape the line, never the graph.
+ */
 const openingLines: Record<string, string> = {
-  trying_to_start: 'Oh! Getting started can be tricky. Hatching took me a while too.',
-  too_much_at_once: 'There was a lot happening outside my shell. We can start with one thing.',
-  radiant: 'I felt a burst of sunshine through the shell. The Mist hates that. I’m glad we get to share it.',
-  light: 'There was a gentle warmth around my shell, right through the Mist. I think that was you.',
-  meh: 'A quiet sort of day? We don’t have to make it into anything bigger.',
-  heavy: 'A heavy day. You can set a little of it down here. I’m glad you came.',
-  stormy: 'Sounds like there’s a lot moving around inside. Even that is light to me. We can start with one small thing.',
-  pretty_good: 'So that little patch of sunshine was you.',
-  mostly_drifting: 'Oh! I felt the breeze carrying us along. Drifting can still bring you somewhere new.',
-  taking_today_as_it_comes: 'Seeing where the day takes us? I’ve only just acquired feet. Excellent timing.',
-  more_energy: 'You said you wanted more energy. This garden definitely does.',
-  more_calm: 'You said you wanted more calm. I think this place could use some too.',
-  something_new: 'You wanted something new. Well… this is pretty new.',
-  calm: 'I felt a quiet glow in my shell.',
-  encouragement: 'I felt a brave little spark in my shell.',
-  fun: 'I heard something bright and playful outside.',
-  company: 'I could tell you wanted someone to share the day with.',
-  discovery: 'I felt your curiosity tapping on my shell.',
-  outside: 'You brought the outside with you. I could feel the air tapping on my shell.',
-  family: 'There were people close to you today. Their warmth reached my shell.',
-  friends: 'Your friends made today feel busy-bright.',
-  relaxing: 'Your quiet found me in there. It felt like moss after rain.',
-  work: 'You carried a lot today. I felt it humming through the shell.',
-  tired: 'You are tired. We will grow something small.',
-  rough: 'That day had thorns. Thank you for sharing a piece of it.',
-  home: 'Home reached me first. That seems like a good place to start.',
-  default: 'Your answers found me in the Mist. That’s how I knew where to hatch.',
+  default: 'Your answers found me in the Mist. That is how I knew where to hatch.',
 };
 
 /** Opening-only wording; IDs still select the same optional personal activities. */
@@ -57,7 +35,7 @@ function openingFollowup(intent: string | null | undefined) {
 function definition(key: string, opening: string): ConversationDefinition {
   return {
     id: `${MOSSPROUT_FTUE_CONVERSATION_PREFIX}:${key}`,
-    version: 11,
+    version: 12,
     familyId: 'mossprout',
     title: 'Meet Mossprout',
     trigger: 'evergreen',
@@ -72,19 +50,24 @@ function definition(key: string, opening: string): ConversationDefinition {
     topicKey: 'first-meeting',
     tags: ['ftue', 'story', 'first-meeting'],
     entryNodeId: 'hello',
+    // One question, and the answer's reply is the way out: the reply, the seed and the Seed card on one screen, one tap.
     nodes: [
       {
-        id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout. See that great tree? Heartwood. Every path used to meet beneath it.`,
-        options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ ...option, nextNodeId: 'followup' })),
+        id: 'hello', kind: 'choice', phase: 'opening', prompt: `${opening}\n\nI’m Mossprout. That tree is Heartwood. Every path used to meet beneath it.`,
+        options: MOSSPROUT_GREETING_OPTIONS.map((option) => ({ id: option.id, label: option.label, reply: '', nextNodeId: `end:${option.id}` })),
       },
-      { id: 'followup', kind: 'choice', prompt: openingFollowup('progress').prompt, options: openingFollowup('progress').options.map((option) => ({ id: `life:${option.id}`, label: option.label, reply: option.reply, nextNodeId: 'end' })) },
-      { id: 'end', kind: 'end', message: MOSSPROUT_FTUE_COPY.seedOrigin },
+      ...MOSSPROUT_GREETING_OPTIONS.map((option) => ({ id: `end:${option.id}`, kind: 'end' as const, message: `${option.reply}\n\n${MOSSPROUT_FTUE_COPY.seedOrigin}` })),
     ],
   };
 }
 
 export function resolveMossproutFtueConversation(definition: ConversationDefinition, intent: string | null | undefined, savedVersion: number, hatchInsight?: string) {
   if (!definition.id.startsWith(MOSSPROUT_FTUE_CONVERSATION_PREFIX)) return definition;
+  if (savedVersion >= 12) {
+    return { ...definition, nodes: definition.nodes.map((node) => node.id === 'hello' && node.kind === 'choice' && hatchInsight
+      ? { ...node, prompt: `${hatchInsight}\n\nI’m Mossprout. That tree is Heartwood. Every path used to meet beneath it.` }
+      : node) };
+  }
   const followup = savedVersion >= 11 ? openingFollowup(intent) : mossproutFollowup(intent);
   // New meetings connect the player’s intention to the Seed before planting.
   // Keep older sessions on their saved route, including the v8 follow-up.

@@ -79,7 +79,7 @@ test('the Before-Steppling and Before-Petalimp fixtures land right before each r
   const glow = mist.domains.contentFlow?.runs.find((run) => run.runId === 'story:glow-steppling-v1');
   assert.equal(glow?.nodeId, 'gateway.pay', 'the bubble waits to be paid');
   assert.equal(glow?.status, 'active');
-  assert.equal(glow?.definitionVersion, 12);
+  assert.equal(glow?.definitionVersion, 13, 'v13: the discovery begins at the ticket; the Garden lesson is history');
   const before = fixtures.find((candidate) => candidate.id === 'fixture:kingdom-before-petalimp')!;
   const world = before.domains.mergeWorld.state;
   assert.ok(world.unlockedCharacters.includes('steppling'), 'Steppling is home');

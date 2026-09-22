@@ -116,9 +116,6 @@ export function upgradeHeartwoodBuilding(input: MergeWorldState, id: HeartwoodBu
   // Spending on a building brings it to life, whatever the story was doing with it.
   const { dormant: _dormant, ...standing } = state.heartwoodBuildings?.[id] ?? { builtAt: now };
   state.heartwoodBuildings = { ...state.heartwoodBuildings, [id]: { ...standing, level: level + 1 } };
-  // A bigger spring holds more at once: the new room arrives full, so an upgrade is felt the moment it lands.
-  if (id === 'dew-spring') state.energy = { ...state.energy, value: state.energy.value + (mergeEnergyCap(state) - mergeEnergyCap(input)), regenCap: mergeEnergyCap(state) };
-  // The Cellar's new shelf is there at once, not after the next order recounts storage.
-  if (id === 'root-cellar') state.storageCapacity += 1;
+  // What a building gives is read on the way into the Mist (`features/encounter/spawner-profile.ts`); nothing here moves the world's dormant energy or storage.
   return state;
 }

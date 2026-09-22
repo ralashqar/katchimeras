@@ -64,12 +64,11 @@ export function GlowGatewayGuide({ world, onClose, onOpenMerge }: {
       <Image key={artAttempt} source={hatchableTileArt(definition.tile.id).full} style={{ width: 1, height: 1 }} onLoad={() => setArtReady(true)} onError={() => setError('The clearing could not load. Tap to try again.')} />
     </View>
     <FtueGuideCopy hero guide={{
-      ...(scene?.view.guide ?? { eyebrow: 'Light a path', title: 'Back to the Garden.', body: 'Complete requests to earn Glow.' }),
-      body: `${scene?.view.guide.body ?? 'Complete requests to earn Glow.'}${egg || buying ? '' : `\n${Math.min(world.coins, definition.tile.price)} / ${definition.tile.price} Glow`}`,
+      ...(scene?.view.guide ?? { eyebrow: 'Light a path', title: 'Back to the Garden.', body: 'Clear the Mist to earn Glow.' }),
+      body: `${scene?.view.guide.body ?? 'Clear the Mist to earn Glow.'}${egg || buying ? '' : `\n${Math.min(world.coins, definition.tile.price)} / ${definition.tile.price} Glow`}`,
     }} />
     {error || failed ? <ThemedText accessibilityRole="alert">{error ?? run.error ?? 'Please try again.'}</ThemedText> : null}
-    <KatchaButton fullWidth loading={busy} cost={buying && affordable && artReady && !failed ? { currency: 'coins', amount: definition.tile.price } : undefined} label={failedPurchase && !affordable ? 'Earn Glow in Merge' : failed ? 'Try again' : inLesson ? 'Continue in Merge' : buying ? !affordable ? 'Earn Glow in Merge' : !artReady ? 'Load clearing' : scene?.view.actionLabel ?? 'Clear mist' : scene?.view.actionLabel ?? 'Continue'} icon="sparkles" onPress={() => void perform()} />
-    {failed && inLesson ? <KatchaButton label="Make room in Merge" onPress={onOpenMerge} /> : null}
+    <KatchaButton fullWidth loading={busy} cost={buying && affordable && artReady && !failed ? { currency: 'coins', amount: definition.tile.price } : undefined} label={failedPurchase && !affordable ? 'Earn Glow in the Mist' : failed ? 'Try again' : inLesson ? 'Continue' : buying ? !affordable ? 'Earn Glow in the Mist' : !artReady ? 'Load clearing' : scene?.view.actionLabel ?? 'Clear mist' : scene?.view.actionLabel ?? 'Continue'} icon="sparkles" onPress={() => void perform()} />
     {!glowDiscoveryLocksCamera(run) ? <Pressable accessibilityRole="button" accessibilityLabel="Explore later" onPress={onClose} style={{ alignSelf: 'center', padding: 12 }}><ThemedText lightColor="#FFF4D4" darkColor="#FFF4D4">Explore later</ThemedText></Pressable> : null}
   </Animated.View>;
 }

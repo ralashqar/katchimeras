@@ -22,7 +22,7 @@ export type PlayerProfileSnapshot = {
   timePolicy: PlayerProfileSnapshotTimePolicy;
   createdAt: string;
   tags: string[];
-  launchRoute: '/(tabs)/today' | '/(tabs)/games' | '/(tabs)/katchimeras';
+  launchRoute: '/(tabs)/today' | '/(tabs)/katchimeras';
   summary: PlayerProfileSnapshotSummary;
   domains: {
     keyValue: { schemaVersion: 1; values: Record<string, string> };

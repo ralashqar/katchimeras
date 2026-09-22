@@ -69,17 +69,6 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="games"
-          options={{
-            // This route owns its own focus boundary. Let it observe blur so
-            // it can unmount the visual board/worklets while retaining the
-            // warm provider and its already-hydrated merge state.
-            freezeOnBlur: false,
-            href: null,
-            title: 'Activities',
-          }}
-        />
-        <Tabs.Screen
           name="collection"
           options={{
             freezeOnBlur: true,

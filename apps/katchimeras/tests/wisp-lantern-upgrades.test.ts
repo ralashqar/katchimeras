@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createInitialMergeWorldState } from '@/utils/merge-world/engine';
-import { canUpgradeLantern, projectLanternWorld, startLanternWorld, upgradeLanternWorld, WELCOME_ORDER_IDS } from '@/features/wisps/lantern-world';
+import { canUpgradeLantern, projectLanternWorld, startLanternWorld, upgradeLanternWorld } from '@/features/wisps/lantern-world';
 import { normalizeWispLantern, reduceWispLantern } from '@/utils/wisp-lantern-state';
 import { EMPTY_WISP_STATE, normalizeWispState } from '@/utils/wisp-state';
 import * as lanternDefinitions from '@/constants/wisp-lantern';
@@ -15,7 +15,7 @@ import { DEV_TOOLS_ENABLED } from '@/constants/dev';
 
 const NOW = Date.parse('2026-09-20T12:00:00Z');
 const { ORDINARY_PACK, ORDINARY_PROTECTION, RARE_PACK, WELCOME_RECEIPT, lanternPackDefinition } = lanternDefinitions;
-const event = (n: number, tags = ['lantern-daily-order']): GameplayEvent => ({ version: 1, id: `order:${n}`, kind: 'order_completed', source: 'merge-world', sourceRevision: 1, contentRevision: 1, occurredAt: NOW + n, quantity: 1, context: { targetId: `order:${n}`, tags } });
+const event = (n: number, tags = ['first-clear']): GameplayEvent => ({ version: 1, id: `clear:${n}`, kind: 'encounter_cleared', source: 'merge-world', sourceRevision: 1, contentRevision: 1, occurredAt: NOW + n, quantity: 1, context: { targetId: `clear:${n}`, tags } });
 const events = (start: number, count: number) => Array.from({ length: count }, (_, i) => event(start + i));
 function world() {
   const state = createInitialMergeWorldState(NOW);
@@ -25,12 +25,13 @@ function world() {
 }
 test('milestone upgrades, daily cap, recurring carry and reward versions survive replay', () => {
   let state = world();
-  state = projectLanternWorld(state, [...events(1, 10), event(100, []), { ...event(101), historical: true }]);
-  assert.equal(state.wispLanternProgress!.lifetimeOrders, 10);
+  // Ten clears: the first two welcome the Lantern, the eight after count (the day caps at five). A historical clear never counts.
+  state = projectLanternWorld(state, [...events(1, 10), { ...event(101), historical: true }]);
+  assert.equal(state.wispLanternProgress!.welcomeServed.length, 2);
+  assert.equal(state.wispLanternProgress!.lifetimeOrders, 8);
   assert.equal(state.wispLanternProgress!.dailyOrders, 5);
-  assert.equal(canUpgradeLantern(state.wispLanternProgress), false);
-  assert.throws(() => upgradeLanternWorld(state, 2));
-  state.wispLanternProgress!.welcomeServed = [...WELCOME_ORDER_IDS];
+  assert.equal(canUpgradeLantern(state.wispLanternProgress), true);
+  assert.throws(() => upgradeLanternWorld(state, 3), 'one level at a time');
   state = upgradeLanternWorld(state, 2);
   assert.equal(upgradeLanternWorld(state, 2), state);
   assert.equal(state.wispLanternProgress!.recurringOrders, 0);
@@ -38,11 +39,12 @@ test('milestone upgrades, daily cap, recurring carry and reward versions survive
   const earned = state.wispLanternProgress!.rewards['lantern:recurring:1'];
   assert.equal(earned.packId, ORDINARY_PACK);
   assert.equal(earned.definitionVersion, 1);
-  assert.equal(state.wispLanternProgress!.recurringOrders, 10);
+  assert.equal(state.wispLanternProgress!.recurringGranted, 3, 'thirty clears at level two: a pack every ten');
+  assert.equal(state.wispLanternProgress!.recurringOrders, 0);
+  assert.equal(state.wispLanternProgress!.lifetimeOrders, 38);
   state = upgradeLanternWorld(state, 3);
-  assert.equal(state.wispLanternProgress!.recurringOrders, 10);
   state = projectLanternWorld(state, events(41, 10));
-  assert.equal(state.wispLanternProgress!.rewards['lantern:recurring:2'].packId, RARE_PACK);
+  assert.equal(state.wispLanternProgress!.rewards['lantern:recurring:4'].packId, RARE_PACK);
   assert.deepEqual(state.wispLanternProgress!.rewards['lantern:recurring:1'], earned);
   const saved = structuredClone(state.wispLanternProgress);
   state = projectLanternWorld(state, events(1, 50));

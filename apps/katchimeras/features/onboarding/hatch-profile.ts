@@ -91,11 +91,11 @@ export const LEGACY_HATCH_PROFILES: Readonly<Record<string, HatchProfileDefiniti
 export const HATCH_PROFILES: Readonly<Record<string, HatchProfileDefinition>> = Object.fromEntries([
   FEASTLE_HATCH_PROFILE,
   profile('mossprout', 'growth',
-    question('friction', 'What makes it hard to get going?', 'primaryFriction', [
+    question('friction', 'What gets in the way, usually?', 'primaryFriction', [
       ['starting', '🧭 Not sure where to start', 'The beginning gets tangled sometimes.'],
       ['overloaded', '🍽️ Too much on my plate', 'A crowded patch leaves little room for a new shoot.'],
       ['follow_through', '🍂 Losing momentum', 'Keeping a little thing growing takes care, too.'],
-    ]), question('support', 'What would help you get started?', 'supportPreference', [
+    ]), question('support', 'And what helps?', 'supportPreference', [
       ['small_action', '🌱 One tiny step', 'Good thing I’m rather fond of tiny beginnings.'],
       ['steady_guidance', '🏮 A little guidance', 'We can find the next patch of light together.'],
       ['breathing_room', '🌿 A little breathing room', 'Then we’ll leave room around the roots. No tugging.'],

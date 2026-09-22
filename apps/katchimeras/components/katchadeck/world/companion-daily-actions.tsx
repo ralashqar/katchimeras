@@ -1,4 +1,3 @@
-import { CompanionGardenAction } from './companion-garden-action';
 import { CompanionDailyQuestionSlot } from './companion-daily-question';
 import { CompanionLifeActivityCard } from './companion-life-activity-card';
 import { CompanionStepGoal } from './companion-step-goal';
@@ -35,14 +34,13 @@ export function CompanionDailyActions({ definition, onReaction, onOpenConversati
   const [lifeOpen, setLifeOpen] = useState(false);
   useEffect(() => { onSubmenuChange?.(gardenOpen || lifeOpen); }, [gardenOpen, lifeOpen, onSubmenuChange]);
   const hasLife = Boolean(daily?.photo || daily?.notice || daily?.water || daily?.moment);
-  return <CompanionGardenAction familyId={companion} onOpenMerge={onOpenMerge} storyRequests={requests} onSubmenuChange={setGardenOpen}>
-    {(gardenCard) => <View style={{ gap: 7 }}>
+  // The campaign pivot: the Garden card and its Merge requests are gone; the day's cards stand on their own.
+  void onOpenMerge; void requests; void setGardenOpen;
+  return <View style={{ gap: 7 }}>
       {daily?.goal ? <CompanionStepGoal companion={companion} config={daily.goal} onReaction={onReaction} onBondRewardRequest={onBondRewardRequest} externalGesture={externalGesture} /> : null}
       {daily && hasLife ? <CompanionLifeActivityCard companion={companion} config={daily} onNarration={onReaction} onOpenChange={setLifeOpen}
         onBondRewardRequest={onBondRewardRequest} externalGesture={externalGesture} /> : null}
-      {gardenCard}
       {daily ? <CompanionDailyQuestionSlot companion={companion} polls={daily.polls} subtitle={daily.questionSubtitle} active={active}
         onOpenConversation={onOpenConversation} onBondRewardRequest={onBondRewardRequest} externalGesture={externalGesture} /> : null}
-    </View>}
-  </CompanionGardenAction>;
+  </View>;
 }

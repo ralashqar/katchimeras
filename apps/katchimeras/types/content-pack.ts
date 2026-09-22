@@ -6,6 +6,7 @@ import type { StoryTileDefinition } from '@/constants/story-tiles/registry';
 import type { ConversationDefinition } from '@/types/companion-conversation';
 import type { CompanionJourneyChapterDefinition, JourneyMissionDefinition } from '@/types/companion-journey-chapter';
 import type { ContentFlowDefinition } from '@/types/content-flow';
+import type { EncounterDefinition } from '@/types/encounter';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import type { MergeItemDefinition } from '@/types/merge-world';
 import type { AlphaBounds } from '@/utils/hex-alpha-bounds';
@@ -17,7 +18,7 @@ import type { AlphaBounds } from '@/utils/hex-alpha-bounds';
  * the bundle. A pack only adds: an id the bundle already has is refused. The
  * schema version gates what an older app will load.
  */
-export const CONTENT_SCHEMA_VERSION = 6;
+export const CONTENT_SCHEMA_VERSION = 7;
 
 export type ContentPackArtEntry = {
   /** Where to fetch the file (https, or file:// for a pack on the device). */
@@ -72,6 +73,8 @@ export type ContentPackContent = {
   storyTiles?: readonly StoryTileDefinition[];
   hatchables?: readonly HatchableCompanionDefinition[];
   missions?: readonly JourneyMissionDefinition[];
+  /** Self-contained Mist boards (content schema 7): Resolve, spawners, Mist of their own, Dark Wisps; docked from a region rung or an episode by id. */
+  encounters?: readonly EncounterDefinition[];
   chapters?: readonly CompanionJourneyChapterDefinition[];
   conversations?: readonly ConversationDefinition[];
   flows?: readonly ContentFlowDefinition[];

@@ -46,17 +46,3 @@ test('the repository flushes writers before reading or reducing, tags snapshot o
   assert.match(repository, /if \(row && mergeWriteIsStale\(row\.revision, options\.baseRevision\)\)[\s\S]*?throw new MergeWorldStaleWriteError\(current\)/);
   assert.match(repository, /'SELECT revision, state_json FROM merge_world_snapshot WHERE profile_id = \?'/);
 });
-
-test('the provider registers its flush, adopts store writes, and never retries a stale save', () => {
-  const provider = readFileSync('features/merge-world/merge-world-provider.tsx', 'utf8');
-  assert.match(provider, /useEffect\(\(\) => registerMergeWorldWriterFlush\(flush\), \[flush\]\)/);
-  assert.match(provider, /subscribeMergeWorldSnapshots\(\(freshState, origin\) => \{[\s\S]*?if \(origin === 'provider' && freshState\.revision <= \(stateRef\.current\?\.revision \?\? -1\)\) return;[\s\S]*?if \(origin === 'store' && freshState\.revision <= \(baseRevisionRef\.current \?\? -1\)\) return;[\s\S]*?baseRevisionRef\.current = freshState\.revision;/);
-  assert.match(provider, /await saveMergeWorldState\(pending\.state, \[\.\.\.pending\.receiptIds\], \{ baseRevision: baseRevisionRef\.current \?\? undefined, gameplayEvents: pending\.gameplayEvents \}\);[\s\S]*?baseRevisionRef\.current = pending\.state\.revision;/);
-  assert.match(provider, /if \(caught instanceof MergeWorldStaleWriteError\) \{[\s\S]*?baseRevisionRef\.current = caught\.current\.revision;[\s\S]*?stateRef\.current = caught\.current;[\s\S]*?return;/);
-  assert.match(provider, /options\?\.persist !== 'immediate' && \(command\.type === 'move' \|\| command\.type === 'tapGenerator'\)/);
-  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  assert.match(screen, /send\(effectiveCommand, currentStep\?\.surface === 'merge' \? \{ persist: 'immediate' \} : undefined\)/);
-  assert.match(screen, /const chapterZeroTarget = mossproutChapterZeroRepairTarget\(ftueRun, state\);[\s\S]*?repairFtueStep\(ftueRun\.stepId, chapterZeroTarget, \{ clearStepIds: chapterZeroStepsFrom\(chapterZeroTarget\) \}\);/);
-  const glow = readFileSync('features/onboarding/hatchable-runtime.ts', 'utf8');
-  assert.match(glow, /eventId: `\$\{run\.runId\}:\$\{run\.nodeId\}:domain-complete:\$\{run\.revision\}`/);
-});

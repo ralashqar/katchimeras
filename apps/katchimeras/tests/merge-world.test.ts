@@ -318,7 +318,7 @@ test('board geometry renders and hit-tests with one coordinate system', () => {
 test('a new Merge World is Mossprout-owned and begins with twenty playable cells', () => {
   const state = createInitialMergeWorldState(NOW);
   assert.deepEqual(mergeWorldCatalogIssues(), []);
-  assert.equal(state.version, 24);
+  assert.equal(state.version, 25);
   assert.equal(state.ownerCharacterId, 'mossprout');
   assert.equal(state.storageCapacity, 8);
   assert.equal(state.energy.regenCap, MERGE_ENERGY_REGEN_CAP);
@@ -620,7 +620,7 @@ test('normalization intentionally resets pre-v18 Merge snapshots', () => {
     },
   };
   const normalized = normalizeMergeWorldState(stale, NOW + 1);
-  assert.equal(normalized.version, 24);
+  assert.equal(normalized.version, 25);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.deepEqual(normalized.generators, {});
 });
@@ -835,66 +835,6 @@ test('legacy saves: advanced Mossprout orders show one different unlocked reside
   assert.equal(orders.length, 3);
   assert.equal(new Set(orders.map((order) => order.recipientSkinId)).size, 3);
   assert.ok(orders.every((order) => state.mossproutResidentSkinIds.includes(order.recipientSkinId!)));
-});
-
-test('legacy saves: an early Mossprout day serves its authored batch before continuing one order at a time', () => {
-  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  assert.doesNotMatch(screen, /mossprout:\$\{localDayId\(\)\}:unavailable/);
-  assert.match(screen, /mossproutJourney\?\.status === 'activity_in_progress'/);
-  let state = completeMossproutChapterZeroSlice(legacyGardenState(createMossproutChapterZeroState(NOW)), NOW + 1);
-  assert.equal(state.activeOrders.some((order) => order.id.startsWith('mossprout:chapter-0:')), false);
-  assert.equal(state.energy.regenPaused, false);
-  const reconciled = reduceMergeWorld(state, {
-    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23',
-    status: 'complete', activity: null, now: NOW + 1,
-  });
-  state = reconciled.state;
-  assert.equal(state.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden').length, 1);
-  assert.equal(state.mossproutDailyGardenOrders?.chapterId, 'quiet-patch');
-  assert.deepEqual(state.mossproutDailyGardenOrders?.offeredOrderIds, [
-    'merge-order:mossprout:daily:2026-08-23:1',
-    'merge-order:mossprout:daily:2026-08-23:2',
-    'merge-order:mossprout:daily:2026-08-23:3',
-  ]);
-  const observed: { difficulty: string; tiers: number[]; coins: number }[] = [];
-  for (let step = 1; step <= 3; step += 1) {
-    const order = state.activeOrders.find((candidate) => candidate.storyArcId === 'mossprout:casual-garden')!;
-    observed.push({
-      difficulty: order.difficulty,
-      tiers: order.requirements.map((requirement) => MERGE_ITEMS_BY_ID.get(requirement.definitionId)!.tier),
-      coins: order.reward.coins,
-    });
-    let instance = 0;
-    const board = state.board.map((cell) => ({ ...cell }));
-    for (const requirement of order.requirements) {
-      for (let quantity = 0; quantity < requirement.quantity; quantity += 1) {
-        const cell = board.findIndex((candidate) => !candidate.locked && !candidate.mist && !candidate.occupant);
-        assert.ok(cell >= 0);
-        board[cell] = { ...board[cell], occupant: { kind: 'item', instanceId: `daily:${step}:${instance++}`, definitionId: requirement.definitionId } };
-      }
-    }
-    state = reduceMergeWorld({ ...state, board }, { type: 'serveOrder', orderId: order.id, now: NOW + step + 1 }).state;
-    assert.equal(state.mossproutDailyGardenOrders?.servedOrderIds.length, step);
-  }
-  assert.deepEqual(observed, [
-    { difficulty: 'small', tiers: [2], coins: 20 },
-    { difficulty: 'medium', tiers: [2, 2], coins: 45 },
-    { difficulty: 'major', tiers: [4, 3], coins: 80 },
-  ]);
-  assert.equal(state.mossproutDailyGardenOrders?.complete, true);
-  const tailOrder = state.activeOrders.find((order) => order.storyArcId === 'mossprout:casual-garden');
-  assert.match(tailOrder?.id ?? '', /:tail:4$/);
-  assert.equal(tailOrder?.reward.coins, 8);
-  assert.equal(tailOrder?.reward.mergeXp, 7);
-  assert.equal(tailOrder?.reward.friendshipXp, 0);
-  assert.equal(tailOrder?.reward.energy, 0);
-
-  const tomorrow = reduceMergeWorld(state, {
-    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-24',
-    status: 'complete', activity: null, now: NOW + 10,
-  }).state;
-  assert.equal(tomorrow.mossproutDailyGardenOrders?.dayId, '2026-08-24');
-  assert.equal(tomorrow.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden').length, 1);
 });
 
 test('Reset Today replaces an exhausted Mossprout Garden ledger with the first order in its fresh batch', () => {
@@ -1328,7 +1268,7 @@ test('pre-v18 activity parcels are discarded by the intentional world reset', ()
     rewardInbox: [{ id: 'unknown-old-parcel', createdAt: NOW, items: ['adventure:trail:4'], source: 'activity' }],
   }, NOW + 1);
   assert.equal(normalized.rewardInbox.some((entry) => entry.source === 'activity'), false);
-  assert.equal(normalized.version, 24);
+  assert.equal(normalized.version, 25);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.deepEqual(normalized.arrivals, []);
 });
@@ -1362,64 +1302,6 @@ test('item parcels reject a full board without consuming the arrival', () => {
   assert.match(result.message ?? '', /more board spaces/);
 });
 
-test('Merge page keeps a stable parcel stack first in the tray and the board attached to its separator', () => {
-  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  const parcel = readFileSync('components/katchadeck/games/merge-parcel-overlay.tsx', 'utf8');
-  const gameSurface = readFileSync(require.resolve('@incubator/game-ui/game-surface'), 'utf8');
-  const rail = readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8');
-  const mergeSurface = readFileSync('components/katchadeck/games/merge-play-surface.tsx', 'utf8');
-  assert.doesNotMatch(screen, /arrivalDock|Memory Shelf|worldChangeRow|basketButton/);
-  assert.match(screen, /return \[\.\.\.parcelEntries, \.\.\.returnEntries, \.\.\.orderEntries\]/);
-  assert.match(screen, /id: 'parcel-stack'/);
-  assert.doesNotMatch(screen, /<MergeParcelButton/);
-  assert.match(mergeSurface, /boardStage: \{[^}]*justifyContent: 'flex-start'/);
-  assert.match(screen, /mergeArea: \{[^}]*marginTop: 18/);
-  assert.match(parcel, /<GameBadge label=\{count\} style=\{styles\.countBadge\} tone="gold"/);
-  assert.match(parcel, /arrival\.kind === 'discovery_parcel'[\s\S]*?<GameBadge icon="sparkles"/);
-  assert.match(gameSurface, /badgeText: \{[^}]*fontFamily: GameUI\.type\.title\.fontFamily/);
-  assert.match(gameSurface, /badge: \{[^}]*alignItems: 'center'[^}]*justifyContent: 'center'/);
-  assert.match(parcel, /opacity: interpolate\(value, \[0, 0\.08, 1\], \[0, 1, 1\]\)/);
-  assert.doesNotMatch(parcel, /\[0, 1, 1, 0\.18\]/);
-  assert.match(screen, /destinationSize: boardMetrics\.geometry\.cellSize - 4/);
-  assert.match(parcel, /FLIGHT_ITEM_SIZE \/ item\.destinationSize/);
-  assert.match(parcel, /<PersistentMergeItemArt definitionId=\{item\.definitionId\} size=\{item\.destinationSize\}/);
-  assert.doesNotMatch(parcel, /\[0\.6, 1\.1, 1, 0\.92\]/);
-  assert.match(rail, /entry\.kind === 'parcel' \? PARCEL_STACK_EXIT : TRAY_SERVE_EXIT/);
-  assert.match(rail, /layout=\{reduceMotion \? undefined : LinearTransition/);
-  assert.match(screen, /arrival\.kind === 'discovery_parcel'/);
-  assert.match(screen, /postFtueDiscoveryGuidance/);
-  assert.match(screen, /kind: 'board_discovery_fork'/);
-});
-
-test('Merge board keeps a persistent selected-cell inspector below the playable grid', () => {
-  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
-  const inspector = readFileSync('components/katchadeck/games/merge-cell-inspector.tsx', 'utf8');
-  const mergeSurface = readFileSync('components/katchadeck/games/merge-play-surface.tsx', 'utf8');
-  const playerCopy = readFileSync('utils/merge-world/merge-board-player-copy.ts', 'utf8');
-
-  assert.match(mergeSurface, /<View onLayout=\{measureBoardArea\} style=\{styles\.boardStage\}>[\s\S]*?<MergeCellInspector/);
-  assert.match(screen, /if \(cell != null\) setInspectedCell\(cell\)/);
-  assert.match(board, /if \(boardCell\?\.mist \|\| boardCell\?\.locked\) \{\s*onSelectRef\.current\(cell\)/);
-  assert.match(inspector, /Tap an item or covered cell for details/);
-  assert.match(inspector, /Opens on Mossprout Chapter/);
-  assert.match(playerCopy, /Save one nature memory/);
-  assert.match(playerCopy, /Choose a nature direction with Mossprout/);
-  assert.match(playerCopy, /Complete 3 activities that support your nature direction/);
-  assert.doesNotMatch(playerCopy, /Nearby Nature Focus stage/);
-  assert.match(inspector, /Meet \$\{names\.join\(' or '\)\} to lift this mist/);
-  assert.match(inspector, /mossproutRootRewardArt\(gate\.id\)/);
-  assert.match(inspector, /model\.dreamMist === 'lower'[\s\S]*?DREAM_MIST_LOWER/);
-  assert.match(playerCopy, /the Wild Garden can find Sprouts and Shells/);
-  assert.match(playerCopy, /the Memory Nursery grows Pressed Leaves more often/);
-  assert.match(inspector, /MOSSPROUT ITEM MAKER/);
-  assert.doesNotMatch(playerCopy, /upgrades .* to Level/);
-  assert.doesNotMatch(inspector, /ITEM MAKER .* LEVEL/);
-  assert.doesNotMatch(inspector, /ITEM · LEVEL/);
-  assert.doesNotMatch(board, /Root Match Parcel|Board fallback|active Chapter|Garden Growth Mist|Discovery Mist|tier \$\{definition\.tier\}|Feastle merge board/);
-  assert.doesNotMatch(screen, /New generator unlocked|new merge chain/);
-});
-
 test('locked cells take selection focus and keep a motionless corner frame', () => {
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
 
@@ -1428,34 +1310,6 @@ test('locked cells take selection focus and keep a motionless corner frame', () 
   assert.match(board, /staticFrame=\{presentation\.board\[selectedCell\]\.locked\}/);
   assert.match(board, /reduceMotion \|\| staticFrame/);
   assert.match(board, /transform: \[\{ scale: staticFrame \? 1/);
-});
-
-test('Merge coin rewards land on the visible HUD coin and count across the contact window', () => {
-  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  const rewardOverlay = readFileSync('components/katchadeck/games/merge-serve-reward-overlay.tsx', 'utf8');
-  const currencyHud = readFileSync('components/katchadeck/ui/game-currency-hud.tsx', 'utf8');
-
-  assert.match(currencyHud, /<View collapsable=\{false\} ref=\{targetRef\} style=\{\[styles\.currencyIcon/);
-  assert.doesNotMatch(currencyHud, /<Animated\.View[^>]*ref=\{targetRef\}/);
-  assert.match(screen, /measureViewInWindow\(coinArtRef\)/);
-  assert.match(currencyHud, /ref=\{artTargetRef\} style=\{\[styles.art/);
-  assert.match(screen, /artRef=\{coinArtRef\}/);
-  assert.match(screen, /artTargetRef: artRef/);
-  assert.match(screen, /coinTargetSize: \{ width: coinRect.width, height: coinRect.height \}/);
-  assert.match(screen, /pulseNonce=\{serveFlight \? 0 : coinPulseNonce\}/);
-  assert.match(rewardOverlay, /targetSize=\{flight.coinTargetSize\}/);
-  assert.match(rewardOverlay, /rewardIconFlightScale\(rise, value, REWARD_TOKEN_SIZE, targetSize\)/);
-  assert.match(rewardOverlay, /opacity: variant === 'coin' \? rise \* \(1 - landed.value\)/);
-  assert.match(rewardOverlay, /withDelay\(variant === 'coin' \? 32 : 0/);
-  assert.match(screen, /coinTo = \{ x: coinRect\.x - screenRect\.x \+ coinRect\.width \/ 2, y: coinRect\.y - screenRect\.y \+ coinRect\.height \/ 2 \}/);
-  assert.match(rewardOverlay, /const contactWindowMs = mergeRewardContactWindowMs\(count, reduceMotion\)/);
-  assert.match(rewardOverlay, /runOnJS\(onArrive\)\(amount, contactWindowMs, index, totalAmount\)/);
-  assert.doesNotMatch(rewardOverlay, /runOnJS\(onArrive\)\(\{[\s\S]*?mergeRewardContactWindowMs/);
-  assert.match(rewardOverlay, /Math\.max\(0, count - 1\) \* \(reduceMotion \? 25 : COIN_STAGGER_MS\)/);
-  assert.match(screen, /coinPresentation.publish\(\(coinPresentation.getSnapshot\(\).*\+ amount\)/);
-  assert.match(screen, /useSyncExternalStore\(presentation.subscribe, presentation.getSnapshot, presentation.getSnapshot\)/);
-  assert.match(screen, /animateValue: false[\s\S]*?valueAnimationDurationMs: 0/);
-  assert.match(currencyHud, /durationMs=\{animateValue \? valueAnimationDurationMs : 0\}[\s\S]*?easing="linear"/);
 });
 
 test('reward coins finish at the measured artwork size without a shrinking-out tail', () => {
@@ -1475,24 +1329,6 @@ test('reward coins finish at the measured artwork size without a shrinking-out t
   }
 });
 
-test('Merge HUD stays board-specific with only back navigation and Coins', () => {
-  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-
-  assert.doesNotMatch(screen, /KatchimeraPageHeader/);
-  assert.doesNotMatch(screen, /onOpenCards|onOpenTrophies/);
-    assert.match(screen, /leading=\{stepplingLesson.active \? <View \/> : <KatchimeraBackButton/);
-  assert.match(screen, /source === 'haven-world'/);
-  assert.match(screen, /announcement: "Returning to Mossprout's Haven"[\s\S]*?target: 'katchimeras'[\s\S]*?navigate: \(\) => \{/);
-  assert.match(screen, /router\.canGoBack\(\)\) router\.back\(\)/);
-  assert.match(screen, /router\.replace\('\/\(tabs\)\/katchimeras'\)/);
-  assert.match(screen, /Return to Mossprout's Haven/);
-  assert.match(screen, /trailing=\{<View style=\{styles\.hudTrailing\}>[\s\S]*?<MergeEnergyHud \/>[\s\S]*?<View collapsable=\{false\} ref=\{coinHudPillRef\}>[\s\S]*?<GameCurrencyHud/);
-  assert.doesNotMatch(screen, /GameHudItem|worldChapter|chapterRatio/);
-  assert.doesNotMatch(screen, /<GameHudControl/);
-  assert.match(screen, /hudBar: \{ elevation: 100, justifyContent: 'space-between', position: 'relative', zIndex: 100 \}/);
-  assert.match(screen, /currencyHud: \{ flex: 0, paddingLeft: 18, width: 106 \}/);
-});
-
 test('rail FTUE target refs keep stable callback identities across target revision renders', () => {
   const rail = readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8');
   assert.match(rail, /onRailTargetRef=\{onRailTargetRef\}/);
@@ -1501,17 +1337,6 @@ test('rail FTUE target refs keep stable callback identities across target revisi
   assert.match(rail, /const handleParcelTargetRef = useCallback\(/);
   assert.doesNotMatch(rail, /onServeTargetRef=\{\(orderId, view\)/);
   assert.doesNotMatch(rail, /targetRef=\{\(view\) => onRailTargetRef/);
-});
-
-test('served item sprites stay suppressed until the board confirms they are retired', () => {
-  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
-  assert.match(screen, /const \[serveHiddenItemIds, setServeHiddenItemIds\] = useState/);
-  assert.match(screen, /setServeHiddenItemIds\(new Set\(items\.map\(\(item\) => item\.instanceId\)\)\);[\s\S]*?setServeFlight\(/);
-  assert.match(screen, /if \(!result\?\.changed\) setServeHiddenItemIds\(new Set\(\)\);[\s\S]*?setServeFlight\(null\);/);
-  assert.match(screen, /onHiddenItemsRetired=\{handleHiddenItemsRetired\}/);
-  assert.match(board, /const retiredIds = \[\.\.\.hiddenItemInstanceIds\]\.filter\(\(instanceId\) => !mountedItemIds\.has\(instanceId\)\);/);
-  assert.match(board, /if \(retiredIds\.length\) onHiddenItemsRetired\(retiredIds\);/);
 });
 
 test('Merge board retains destination selection and decorates generators with ambient motion', () => {
@@ -1568,52 +1393,6 @@ test('the dedicated Merge board keeps the direct-index flat rendering fast path'
   assert.doesNotMatch(visualScaleMapper, /activeDragId|dragTranslationY|grabY/);
   assert.match(board, /projection \? Math\.round\(20 \+ worldY\) : 10/);
   assert.match(geometry, /if \(!geometry\.projection\) \{[\s\S]*?depthScale: 1/);
-});
-
-test('Merge FTUE commits before visual settlement and preserves all native animation paths', () => {
-  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
-  const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
-  const route = readFileSync('components/katchadeck/games/merge-world-route-screen.tsx', 'utf8');
-  const crashReporting = readFileSync('utils/crash-reporting.ts', 'utf8');
-  const runtime = readFileSync('features/onboarding/ftue-runtime.ts', 'utf8');
-  const sync = readFileSync('features/onboarding/ftue-sync.ts', 'utf8');
-  const artCache = readFileSync('hooks/use-merge-art-cache.ts', 'utf8');
-  assert.match(screen, /ftueCoordinator\.begin\(currentStep\?\.id \?\? 'unknown', currentState\.revision\)/);
-  assert.match(screen, /const nextRun = dispatchFtueEvent\(/);
-  assert.match(screen, /ftueCoordinator\.complete\(commandToken\)/);
-  assert.doesNotMatch(screen, /ftueCoordinator\.settle|ftueCoordinator\.awaitGate|ftueCoordinator\.acknowledgeGate/);
-  assert.doesNotMatch(screen, /onCommandSettled=|onInteractionGateCommitted=/);
-  assert.doesNotMatch(screen, /ftueAdvanceFrameRef|pendingAnimatedFtueEventsRef|requestAnimationFrame\(\(\) => \{\s*requestAnimationFrame/);
-  assert.match(board, /settledRevision: predicted\.state\.revision/);
-  assert.match(board, /onCommandSettledRef\.current\?\.\(\{ operationId: operation\.id, revision: operation\.settledRevision, sessionId \}\)/);
-  assert.match(board, /useLayoutEffect\(\(\) => \{[\s\S]*?onInteractionGateCommittedRef\.current\?\.\(\{ interactionKey: interactionSessionKey, sessionId \}\)/);
-  assert.doesNotMatch(overlay, /return \(\) => \{\s*cancelAnimation\(progress\);\s*progress\.value = 0;/);
-  assert.doesNotMatch(overlay, /key=\{`(?:spotlight|cue):/);
-  assert.match(overlay, /measurementGenerationRef/);
-  assert.match(overlay, /stateRef\.current/);
-  assert.doesNotMatch(overlay, /requestAnimationFrame/);
-  assert.match(overlay, /spotlightTransitionDurationMs: 420/);
-  assert.match(overlay, /<SpotlightDimMask/);
-  assert.doesNotMatch(overlay.slice(overlay.indexOf('function FtueSpotlight('), overlay.indexOf('function mergeFtueOverlayPropsEqual(')), /boxShadow/, 'the mask is bands and a hollow frame, not a screen-sized shadow spread');
-  assert.match(overlay, /<NativeSpotlightRing slot=\{slot0\}/);
-  assert.doesNotMatch(overlay, /@shopify\/react-native-skia|<Canvas|usePathValue|BlurMask/);
-  assert.doesNotMatch(route, /useSharedValue|effectsPaused/);
-  assert.doesNotMatch(board, /useMergeMotionPerformanceProbe|effectsPaused|motionActive|reducedFx/);
-  assert.doesNotMatch(screen, /addMergeFtueBreadcrumb|setMergeFtueDiagnosticContext|markFlowStart|reportFlowReady/);
-  assert.doesNotMatch(overlay, /addMergeFtueBreadcrumb/);
-  assert.doesNotMatch(crashReporting, /tracesSampleRate|tracesSampler|enableTracing/);
-  assert.match(runtime, /setStoredJson/);
-  assert.match(runtime, /objectiveProgress,[\s\S]*?receipts: \[\.\.\.current\.receipts, receipt\]/);
-  assert.match(sync, /RECEIPT_SYNC_QUIET_MS = 1_500/);
-  assert.match(sync, /waitForCriticalInteractionIdle/);
-  assert.match(artCache, /workerCount = Math\.min\(1, missing\.length\)/);
-  assert.match(artCache, /await waitForCriticalInteractionIdle\(cancellation.signal\)/);
-  const spawnEffects = readFileSync('components/katchadeck/games/merge-spawn-effects-layer.tsx', 'utf8');
-  assert.match(spawnEffects, /MERGE_EFFECT_PARTICLES\.map/);
-  assert.match(readFileSync('utils/merge-world/board-effects.ts', 'utf8'), /'spawn-origin' \| 'spawn-settle' \| 'merge'/);
-  assert.doesNotMatch(spawnEffects, /@shopify\/react-native-skia|<Canvas/);
-  assert.match(board, /DREAM_MIST_PARTICLES\.map/);
 });
 
 test('animated merge sprites retain their full-resolution authored textures', () => {
@@ -1820,7 +1599,7 @@ test('legacy snapshots reset cleanly into Mossprout’s current personal world',
     energy: { value: 99, cap: 100, lastRegenAt: NOW },
     generators: { 'starter-pantry': { id: 'starter-pantry', familyId: 'food', name: 'Picnic Pantry', level: 1, enabledBranches: ['table'], charges: 9, maxCharges: 12, readyAt: NOW + 1000 } },
   }, NOW + 1);
-  assert.equal(normalized.version, 24);
+  assert.equal(normalized.version, 25);
   assert.equal(normalized.ownerCharacterId, 'mossprout');
   assert.equal(normalized.energy.value, MERGE_INITIAL_ENERGY);
   assert.deepEqual(normalized.generators, {});
@@ -2004,7 +1783,7 @@ test('v10 companion ownership resets instead of populating Mossprout’s world',
   const legacy = { ...current, version: 10 } as unknown as Record<string, unknown>;
   delete legacy.companionDiscovery;
   const migrated = normalizeMergeWorldState(legacy, NOW + 1);
-  assert.equal(migrated.version, 24);
+  assert.equal(migrated.version, 25);
   assert.deepEqual(migrated.unlockedCharacters, []);
   assert.deepEqual(migrated.companionDiscovery.records, []);
 });
@@ -2227,28 +2006,3 @@ function withItems(state: MergeWorldState, placements: [number, MergeBoardItem][
   for (const [cell, boardItem] of placements) board[cell] = { ...board[cell], locked: false, occupant: boardItem };
   return { ...state, board };
 }
-
-test('a spawner reward shows everything it can make: each chain tier one to the top, a branch a later friend opens dimmed with their name, once the parcel has landed', () => {
-  const beforeVoyagle = spawnerRewardChains({ unlockedCharacters: ['mossprout', 'steppling'] }, 'journey-locker');
-  assert.deepEqual(beforeVoyagle.map((chain) => [chain.id, chain.open, chain.note, chain.items.map((item) => item.tier)]), [
-    ['adventure:trail', true, null, [1, 2, 3, 4, 5, 6]],
-    ['adventure:travel', false, 'Opens when Voyagle arrives', [1, 2, 3, 4, 5, 6]],
-  ]);
-  assert.equal(beforeVoyagle[0]?.title, 'Sock to Expedition Kit');
-  assert.deepEqual(chainLadder('adventure:trail').map((item) => item.name), ['Sock', 'Shoe', 'Boot', 'Hiking Gear', 'Adventure Pack', 'Expedition Kit']);
-  assert.equal(spawnerRewardChains({ unlockedCharacters: ['mossprout', 'steppling', 'voyagle'] }, 'journey-locker')[1]?.open, true);
-  assert.deepEqual(spawnerRewardChains({ unlockedCharacters: ['mossprout'] }, 'wild-garden').map((chain) => [chain.open, chain.note]), [[true, null], [false, 'Opens when Shellio arrives']]);
-  assert.deepEqual(spawnerRewardChains({ unlockedCharacters: [] }, 'no-such-spawner'), []);
-  const screen = readFileSync('components/katchadeck/games/merge-world-screen.tsx', 'utf8');
-  assert.match(screen, /chains: spawnerRewardChains\(\{ unlockedCharacters: state\?\.unlockedCharacters \?\? \[\] \}, receipt\.generatorId\)\s*\.map\(\(chain\) => \(\{ \.\.\.chain, items: chain\.items\.map\(\(entry\) => \(\{ \.\.\.entry, image: \(mergeWorldItemArt\(entry\.id\) as number \| null\) \?\? null \}\)\) \}\)\),/, 'the screen attaches each tier’s art');
-  assert.match(screen, /\{active && !parcelFlight && mergeCelebrationRewards\.length \? <RewardSplash/, 'the reward page waits for the parcel to land');
-  // In the first session only the spawner's page shows, and its ack goes straight to the world so a lesson's exclusive step never blocks it.
-  assert.match(screen, /const lessonGuidingBoard = Boolean\(ftueStep\) \|\| stepplingLesson\.active;\s*const mergeCelebrationRewards = useMemo\(\(\) => lessonGuidingBoard \? generatorUnlockRewards : \[\.\.\.companionDiscoveryRewards, \.\.\.generatorUnlockRewards\]/);
-  assert.match(screen, /: send\(\{ type: 'ackGeneratorUnlock', receiptId, now: Date\.now\(\) \}\)\}/);
-  assert.doesNotMatch(screen, /dispatch\(\{ type: 'ackGeneratorUnlock'/);
-  const achievements = readFileSync('hooks/use-companion-achievements.ts', 'utf8');
-  assert.match(achievements, /const firstSessionOver = Boolean\(world && stepplingShoeServed\(world\)\);/, 'no achievement celebration until the first session is over');
-  const splash = readFileSync('components/katchadeck/ui/reward-splash.tsx', 'utf8');
-  assert.match(splash, /\{item\.chains\?\.length \? <ChainLadders chains=\{item\.chains\} compact=\{compact\} width=\{width\} \/> : null\}/);
-  assert.match(splash, /const heroShare = item\?\.chains\?\.length \? 0\.66 : 1;/, 'the ladder takes its room from the hero, never from the buttons');
-});
