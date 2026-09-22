@@ -2318,12 +2318,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   });
   const heartwoodBuildingAdornments = Object.fromEntries(HEARTWOOD_BUILDINGS.flatMap((building) => {
     const level = heartwoodBuildingLevel(mergeWorld, building.id);
-    // An unbuilt patch's sign is an offer: it only shows while the world is free to take it.
-    if (level === 0 && (!buildingOffersShown || !wispLanternAllowed || buildingPanelId != null)) return [];
+    // An unbuilt patch's sign is an offer: it only shows while the world is free to take it. Its first build keeps
+    // the spot mounted, sign away, so the coins have somewhere to land and the building can swell up out of it.
+    const spawning = level === 0 && buildingFx?.id === building.id;
+    if (level === 0 && !spawning && (!buildingOffersShown || !wispLanternAllowed || buildingPanelId != null)) return [];
     return [[building.slotId, <HeartwoodBuildingWorld key={building.id} id={building.id} level={level}
       affordable={mergeWorld.coins >= (heartwoodBuildingCost(level) ?? Infinity)}
       impactNonce={buildingImpact?.id === building.id ? buildingImpact.nonce : 0}
-      charged={buildingFx?.id === building.id && buildingFx.phase !== 'payment'}
+      charged={buildingFx?.id === building.id && buildingFx.phase !== 'payment'} spawning={spawning}
       onPress={wispLanternAllowed ? () => setBuildingPanelId(building.id) : undefined} />]];
   }));
 

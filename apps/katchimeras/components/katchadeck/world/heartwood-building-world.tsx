@@ -24,10 +24,15 @@ const GLOW_TINT = '#C9F29B';
  * While it is being upgraded, each Glow coin that lands (`impactNonce`) rocks
  * it and flashes a soft glow behind it; `charged` keeps the glow breathing
  * while the upgrade's field of light plays. The glow is a view that is always
- * mounted at opacity 0, so nothing mounts or unmounts on an impact.
+ * mounted at opacity 0, so nothing mounts or unmounts on an impact. Being
+ * built for the first time (`spawning`), the bare patch takes the coins the
+ * same way: its sign is put away, the spot flashes under each landing, and the
+ * building swells up out of the glow once the upgrade is written.
  */
-export function HeartwoodBuildingWorld({ id, level, affordable, dormant = false, impactNonce = 0, charged = false, onSettled, onPress }: {
+export function HeartwoodBuildingWorld({ id, level, affordable, dormant = false, impactNonce = 0, charged = false, spawning = false, onSettled, onPress }: {
   id: HeartwoodBuildingId; level: number; affordable?: boolean; dormant?: boolean;
+  /** Its first build is playing on the bare patch. */
+  spawning?: boolean;
   /** Bumps once per coin landing during an upgrade. */
   impactNonce?: number;
   /** The upgrade's field of light is playing over it. */
@@ -89,7 +94,12 @@ export function HeartwoodBuildingWorld({ id, level, affordable, dormant = false,
   </Text>;
   // Built, the whole building is the button. Unbuilt, only the sign is: the plant under it keeps its own tap.
   if (!built) return <View pointerEvents="box-none" style={styles.world}>
-    <Pressable disabled={!onPress} onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Build the ${definition.name}`}>{label}</Pressable>
+    <View pointerEvents="none" style={styles.stage}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, glowStyle]}>
+        <Image accessibilityIgnoresInvertColors contentFit="contain" source={SOFT_GLOW} style={StyleSheet.absoluteFill} tintColor={GLOW_TINT} transition={0} />
+      </Animated.View>
+    </View>
+    {spawning ? null : <Pressable disabled={!onPress} onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Build the ${definition.name}`}>{label}</Pressable>}
   </View>;
   return <Pressable disabled={!onPress} onPress={onPress} accessibilityRole="button"
     accessibilityLabel={dormant ? `${definition.name}, not running yet` : `${definition.name}, Level ${level}. Open upgrades`} style={styles.world}>
