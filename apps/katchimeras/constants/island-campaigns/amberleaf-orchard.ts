@@ -23,6 +23,7 @@ export const AMBERLEAF_ORCHARD_CAMPAIGN: IslandCampaignDefinition<AmberleafSeaso
     {
       level: 1,
       title: 'Below Watering-Can Height',
+      summary: 'The sapling smaller than a watering can survived another season: a fourth pressed leaf.',
       conversationId: 'mossprout:island:amberleaf:watering-can-height',
       prompt: 'There is one sapling here, smaller than my watering can. I have pressed a leaf from every season it survived. That is three leaves. I would like there to be more.\n\nWhen something in your life is changing, what do you tend to hold on to?',
       fallbackOrder: order('The Sheltered Sapling', 'Make one Flower to shelter the smallest tree in the orchard.', 'small', 'comfort', [{ definitionId: 'nature:garden:4', quantity: 1 }]),
@@ -56,6 +57,7 @@ export const AMBERLEAF_ORCHARD_CAMPAIGN: IslandCampaignDefinition<AmberleafSeaso
     {
       level: 2,
       title: 'Counting Very Generously',
+      summary: 'Six berries on the little bush, counted generously and shared.',
       conversationId: 'mossprout:island:amberleaf:counting-generously',
       callbackLine: {
         keeping: 'You keep small things from before. I pressed the first petal you gave me. It is on the top of the box.',
@@ -94,6 +96,7 @@ export const AMBERLEAF_ORCHARD_CAMPAIGN: IslandCampaignDefinition<AmberleafSeaso
     {
       level: 3,
       title: 'A Basket for the Baskets',
+      summary: 'Heavy branches, too many baskets, and a harvest finally picked and eaten.',
       conversationId: 'mossprout:island:amberleaf:basket-for-baskets',
       callbackLine: {
         keeping: 'You wrote the six berries down. I read the page when the branches feel too heavy.',
@@ -132,6 +135,7 @@ export const AMBERLEAF_ORCHARD_CAMPAIGN: IslandCampaignDefinition<AmberleafSeaso
     {
       level: 4,
       title: 'A Picnic Roof',
+      summary: 'The trees make a picnic roof now, with a space kept for anyone arriving late.',
       conversationId: 'mossprout:island:amberleaf:picnic-roof',
       callbackLine: {
         keeping: 'You kept one perfect thing. It is on the shelf, and I look at it more than the whole box.',

@@ -120,7 +120,8 @@ export type IslandCampaignPanelRequest = {
   served: boolean;
 };
 
-export type IslandCampaignChapterLogEntry = { level: MossproutNatureIslandLevel; title: string; line: string };
+/** A finished chapter in the story log: its authored summary. */
+export type IslandCampaignChapterLogEntry = { level: MossproutNatureIslandLevel; title: string; summary: string };
 
 /** Everything the Bloom-style upgrade panel shows for a discovered island friend. */
 export type IslandCampaignUpgradePanelState = {
@@ -186,8 +187,7 @@ export function islandCampaignUpgradePanelState(world: MergeWorldState, campaign
     .map((candidate) => ({
       level: candidate.level,
       title: candidate.title,
-      line: islandCampaignChapterChoice(campaign, candidate.level, progress.chapters[String(candidate.level)]?.selectedOptionId)?.resolutionLine
-        ?? islandFallbackResolution(campaign, candidate.level),
+      summary: candidate.summary,
     }));
   return {
     campaignId: campaign.campaignId,

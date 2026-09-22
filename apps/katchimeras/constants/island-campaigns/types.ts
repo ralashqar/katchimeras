@@ -61,6 +61,8 @@ export type IslandCampaignChoice<S extends string = string> = {
 export type IslandCampaignChapter<S extends string = string> = {
   level: IslandCampaignChapterLevel;
   title: string;
+  /** One plain sentence of what happened in this chapter, for the story log once it is done. */
+  summary: string;
   /** Conversation ids are save data; return and resolution ids derive from this one. */
   conversationId: string;
   /** Must contain one blank line: situation, then the question. */

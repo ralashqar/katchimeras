@@ -23,6 +23,7 @@ export const MISTLE_ANCIENT_TREE_CAMPAIGN: IslandCampaignDefinition<MistleMistSt
     {
       level: 1,
       title: 'A Soft Patch Around the Roots',
+      summary: 'A soft patch to rest on at the roots of the tree older than the fog.',
       conversationId: 'mossprout:island:mistle:soft-patch',
       prompt: 'You noticed me. Most people hurry past the mist. This tree is older than the fog, and I have been sitting at its roots trying to work out what it remembers. I have not worked it out.\n\nWhen you cannot see how something will turn out, what do you do first?',
       fallbackOrder: order('The Root Patch', 'Make one Tidepool so the roots have somewhere soft and reflective to rest.', 'small', 'comfort', [{ definitionId: 'nature:waterside:3', quantity: 1 }]),
@@ -56,6 +57,7 @@ export const MISTLE_ANCIENT_TREE_CAMPAIGN: IslandCampaignDefinition<MistleMistSt
     {
       level: 2,
       title: 'Doorways in the Roots',
+      summary: 'A lantern hung in the first doorway the roots made, and something small came out to see.',
       conversationId: 'mossprout:island:mistle:root-doorways',
       callbackLine: {
         gentle: 'You started with one small thing you could see. I have been counting them. I am up to nine.',
@@ -94,6 +96,7 @@ export const MISTLE_ANCIENT_TREE_CAMPAIGN: IslandCampaignDefinition<MistleMistSt
     {
       level: 3,
       title: 'What the Branches Remember',
+      summary: 'Mistle climbed into the fog and found the ground exactly where it was left.',
       conversationId: 'mossprout:island:mistle:branches-remember',
       callbackLine: {
         gentle: 'You said a small light, not a map. Every doorway has one now, and nobody has been lost since.',
@@ -132,6 +135,7 @@ export const MISTLE_ANCIENT_TREE_CAMPAIGN: IslandCampaignDefinition<MistleMistSt
     {
       level: 4,
       title: 'A Heart Full of Light',
+      summary: 'The heartwood glows through the mist now, so anyone lost can see it.',
       conversationId: 'mossprout:island:mistle:heart-of-light',
       callbackLine: {
         gentle: 'You gave me something steady. I climb higher now, one branch at a time.',

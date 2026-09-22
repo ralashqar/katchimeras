@@ -103,7 +103,7 @@ test('Petalimp keeps prices out of her mouth and remembers the previous answer',
   assert.equal(islandCampaignPreviousStyle(state, PETALIMP_BLOOM_CAMPAIGN, 2), 'curious');
   const log = petalimpIslandUpgradePanelState(state)!;
   assert.deepEqual(log.completedChapters.map((entry) => entry.level), [1]);
-  assert.equal(log.completedChapters[0]?.line, PETALIMP_ISLAND_CHAPTERS[0]!.choices[1]!.resolutionLine);
+  assert.equal(log.completedChapters[0]?.summary, PETALIMP_ISLAND_CHAPTERS[0]!.summary, 'the log says what happened, not the last line said');
   // The Glow is asked for before the beds open, in her voice, never in a return line.
   const waiting = petalimpIslandUpgradePanelState({ ...state, coins: 10 })!;
   assert.equal(waiting.status, 'available');

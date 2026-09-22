@@ -36,6 +36,7 @@ export const FERNIP_WILDGROWTH_CAMPAIGN: IslandCampaignDefinition<FernipRestStyl
     {
       level: 1,
       title: 'Somewhere Soft to Spread',
+      summary: 'One plant grew under the Mistwisps\' weight; the first patch of the grove is back.',
       conversationId: 'mossprout:island:fernip:soft-spread',
       // Four Seeds make two Sprouts; one frees the misted Sprout and becomes a Plant, or both become one.
       // Either way the patch stops there: the request's Plant makes the Flower that frees the last misted cell.
@@ -77,6 +78,7 @@ export const FERNIP_WILDGROWTH_CAMPAIGN: IslandCampaignDefinition<FernipRestStyl
     {
       level: 2,
       title: 'Neighbours at Ankle Height',
+      summary: 'The oldest patch of the grove, quiet for years, is growing again.',
       conversationId: 'mossprout:island:fernip:ankle-neighbours',
       // Two misted cells, a Sprout and a Plant, and a Plant already on the board: however the Seeds are paired,
       // the hollow stops at one Flower. The request's Flower and Sprout free whatever the mist still holds.
@@ -127,6 +129,7 @@ export const FERNIP_WILDGROWTH_CAMPAIGN: IslandCampaignDefinition<FernipRestStyl
     {
       level: 3,
       title: 'An Enthusiastic Thicket',
+      summary: 'A way through the thicket, sheltered the whole way; the wisps kept only the far end.',
       conversationId: 'mossprout:island:fernip:enthusiastic-thicket',
       // Three Plants (two on the board, one from the Seeds), a misted Plant and a misted Flower: the thicket climbs
       // to a Rare Flower and stops. The request's Rare Flower is its twin; its Boot frees the misted way through.
@@ -181,6 +184,7 @@ export const FERNIP_WILDGROWTH_CAMPAIGN: IslandCampaignDefinition<FernipRestStyl
     {
       level: 4,
       title: 'Room to Be Yourself',
+      summary: 'The far end cleared; the whole grove is Fernip\'s again, and it can rest.',
       conversationId: 'mossprout:island:fernip:room-to-be',
       // The last stretch: Seeds, a Plant and two Flowers climb through a misted Flower to a Rare Flower, then through the
       // misted Rare Flower to a Magical Plant, and stop. The request's Magical Plant is its twin; its Hiking Gear

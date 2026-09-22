@@ -23,6 +23,7 @@ export const DRIZZLET_POND_CAMPAIGN: IslandCampaignDefinition<DrizzletFeelingSty
     {
       level: 1,
       title: 'A Hollow for the Sky',
+      summary: 'The dry hollow holds a little sky again, and Drizzlet put its rain down there.',
       conversationId: 'mossprout:island:drizzlet:hollow-for-sky',
       prompt: 'This hollow used to hold a little sky. Now it is dry, and I have been carrying my own rain around with nowhere to put it down.\n\nWhen a feeling arrives, what do you usually do with it first?',
       fallbackOrder: order('The Stone Pool', 'Make one Shell so the hollow can hold a little water again.', 'small', 'comfort', [{ definitionId: 'nature:waterside:2', quantity: 1 }]),
@@ -56,6 +57,7 @@ export const DRIZZLET_POND_CAMPAIGN: IslandCampaignDefinition<DrizzletFeelingSty
     {
       level: 2,
       title: 'Tiny Umbrellas',
+      summary: 'Lily pads the right size for very small fish, and room made for a bigger feeling.',
       conversationId: 'mossprout:island:drizzlet:tiny-umbrellas',
       callbackLine: {
         still: 'You said sit with it. I have been sitting with the pool every evening. It is getting deeper.',
@@ -94,6 +96,7 @@ export const DRIZZLET_POND_CAMPAIGN: IslandCampaignDefinition<DrizzletFeelingSty
     {
       level: 3,
       title: 'A Little Song',
+      summary: 'A waterfall that sounds like rain, because it is; Drizzlet let it.',
       conversationId: 'mossprout:island:drizzlet:little-song',
       callbackLine: {
         still: 'You wanted somewhere quiet to feel it. The reeds have grown taller, as if they knew.',
@@ -132,6 +135,7 @@ export const DRIZZLET_POND_CAMPAIGN: IslandCampaignDefinition<DrizzletFeelingSty
     {
       level: 4,
       title: 'A Place to Pause',
+      summary: 'A lotus planted in the still patch of light; the pond has never been so clear.',
       conversationId: 'mossprout:island:drizzlet:place-to-pause',
       callbackLine: {
         still: 'You went quiet enough to hear it. So did I. So, eventually, did the frogs.',

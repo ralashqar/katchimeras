@@ -25,6 +25,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
     {
       level: 1,
       title: 'One Small Beginning',
+      summary: 'One flower planted beside Heartwood\'s roots; the first patch of the garden is back.',
       conversationId: 'mossprout:island:petalimp:first-welcome',
       // Four Seeds become one Plant that frees the misted Plant; the Flower it becomes waits for the request's twin.
       restoration: {
@@ -65,6 +66,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
     {
       level: 2,
       title: 'Colours That Belong',
+      summary: 'A faded bed brought back in colour, and the Mistwisps pulled back from it.',
       conversationId: 'mossprout:island:petalimp:colours-belong',
       // Two misted cells, a Sprout and a Plant: the local Sprouts can free either; the request's Flower and Sprout finish the rest.
       restoration: {
@@ -110,6 +112,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
     {
       level: 3,
       title: 'A Path at Your Pace',
+      summary: 'A path cleared through the garden to its far end, where the last wisps went.',
       conversationId: 'mossprout:island:petalimp:wandering-walk',
       // The path: local pieces free the misted Flower and stop at a Rare Flower; the request's Rare Flower and Shoe finish the walk.
       // Every request only asks for what the Main Board can make by now: Seeds from the Garden Basket
@@ -162,6 +165,7 @@ export const PETALIMP_BLOOM_CAMPAIGN: IslandCampaignDefinition<PetalimpGrowthSty
     {
       level: 4,
       title: 'Room for Every Bloom',
+      summary: 'The last patch cleared; the whole garden is Petalimp\'s again.',
       conversationId: 'mossprout:island:petalimp:every-bloom',
       // The last patch: the local pieces climb to a Magical Plant through the misted Rare Flower; the request's Magical Plant is its twin, its Boot frees the misted pair.
       restoration: {

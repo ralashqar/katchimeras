@@ -23,6 +23,7 @@ export const BLOSSLE_NURSERY_CAMPAIGN: IslandCampaignDefinition<BlossleBeginning
     {
       level: 1,
       title: 'A Pot Saved for Something Brave',
+      summary: 'The empty pot saved for something brave has its first seedling.',
       conversationId: 'mossprout:island:blossle:brave-pot',
       prompt: 'I have been keeping one empty pot on the shelf for something brave. I check it every morning. It is still a pot.\n\nWhen you are about to begin something new, what do you need first?',
       fallbackOrder: order('The First Bed', 'Grow two Sprouts so the empty pot finally has company.', 'small', 'curiosity', [{ definitionId: 'nature:garden:2', quantity: 2 }]),
@@ -56,6 +57,7 @@ export const BLOSSLE_NURSERY_CAMPAIGN: IslandCampaignDefinition<BlossleBeginning
     {
       level: 2,
       title: 'Probably a Leaf',
+      summary: 'The sprout labelled \'probably a leaf\' was given a shelf and a while.',
       conversationId: 'mossprout:island:blossle:probably-a-leaf',
       callbackLine: {
         patient: 'You said you needed time. I stopped checking the pot every morning. It bloomed the day I forgot.',
@@ -94,6 +96,7 @@ export const BLOSSLE_NURSERY_CAMPAIGN: IslandCampaignDefinition<BlossleBeginning
     {
       level: 3,
       title: 'Something to Lean On',
+      summary: 'A trellis the shoots could actually reach; every one of them is climbing now.',
       conversationId: 'mossprout:island:blossle:something-to-lean-on',
       callbackLine: {
         patient: 'You said wait and see. I saw. It was worth the wait.',
@@ -132,6 +135,7 @@ export const BLOSSLE_NURSERY_CAMPAIGN: IslandCampaignDefinition<BlossleBeginning
     {
       level: 4,
       title: 'More Seedlings Than Pots',
+      summary: 'More seedlings than pots, so some were let go to begin somewhere else.',
       conversationId: 'mossprout:island:blossle:more-than-pots',
       callbackLine: {
         patient: 'You slowed right down. The trellis is full and I never once hurried it.',

@@ -39,7 +39,7 @@ export type WorldUpgradeCampaignState = {
   /** The friend's own line for this moment, shown as speech above the request. */
   speech?: string | null;
   /** Resolved chapters, newest last, so the story stays readable from the panel. */
-  completedChapters?: readonly { level: number; title: string; line: string }[];
+  completedChapters?: readonly { level: number; title: string; summary: string }[];
 };
 
 const LOCK_ART = require('@incubator/art-world/hex/kingdom_dream_mist_lock_v1_512.webp');
@@ -178,7 +178,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
         {chapters.length ? <UpgradeSection label={`${campaignState!.residentName}’s story so far`}>
           {chapters.map((entry) => <View key={entry.level} style={styles.chapterEntry}>
             <Text style={styles.chapterEntryTitle}>{`${entry.level}. ${entry.title}`}</Text>
-            <Text style={styles.chapterEntryLine}>{`“${entry.line}”`}</Text>
+            <Text style={styles.chapterEntryLine}>{entry.summary}</Text>
           </View>)}
         </UpgradeSection> : null}
       </>}

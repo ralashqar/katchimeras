@@ -66,6 +66,7 @@
         {
           "level": 1,
           "title": "The Start Line",
+          "summary": "Raced the clock for the first time and took the start line back from the Mistwisps.",
           "conversationId": "dashkit:island:start-line",
           "restoration": {
             "rows": 4,
@@ -174,6 +175,7 @@
         {
           "level": 2,
           "title": "The First Bend",
+          "summary": "A longer clock and tougher wisps; the bend is swept and the lanes lean into it again.",
           "conversationId": "dashkit:island:first-bend",
           "callbackLine": {
             "flat-out": "We went flat out and beat the clock. So they moved to the bend.",
@@ -303,6 +305,7 @@
         {
           "level": 3,
           "title": "The Back Straight",
+          "summary": "A full minute on the long side, three wisps at a time, and the flags are back up.",
           "conversationId": "dashkit:island:back-straight",
           "callbackLine": {
             "flat-out": "The bend fell at full speed. So they went to the back straight.",
@@ -432,6 +435,7 @@
         {
           "level": 4,
           "title": "The Finish Arch",
+          "summary": "The longest run yet. The arch stands, and there is a time to beat now.",
           "conversationId": "dashkit:island:finish-arch",
           "callbackLine": {
             "flat-out": "The long side came back. So they went to the arch, where every lap ends.",

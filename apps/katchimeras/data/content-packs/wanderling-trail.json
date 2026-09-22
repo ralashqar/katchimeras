@@ -66,6 +66,7 @@
         {
           "level": 1,
           "title": "The First Cairn",
+          "summary": "One stone put back; the first cairn marks the trail again.",
           "conversationId": "wanderling:island:first-cairn",
           "restoration": {
             "rows": 3,
@@ -233,6 +234,7 @@
         {
           "level": 2,
           "title": "Off the Marked Path",
+          "summary": "The bend away from the village routes is walked again.",
           "conversationId": "wanderling:island:off-the-path",
           "callbackLine": {
             "unplanned": "We stopped, and the stone held. So they moved to the bend.",
@@ -385,6 +387,7 @@
         {
           "level": 3,
           "title": "The Meadow Edge",
+          "summary": "Flowers back along the meadow edge where grass meets path.",
           "conversationId": "wanderling:island:meadow-edge",
           "callbackLine": {
             "unplanned": "The long bend held. So they went to the meadow edge.",
@@ -541,6 +544,7 @@
         {
           "level": 4,
           "title": "Nowhere to Be",
+          "summary": "The last open ground cleared; the whole trail is Wanderling's, going nowhere in particular.",
           "conversationId": "wanderling:island:nowhere-to-be",
           "callbackLine": {
             "unplanned": "The edge came back. So they went to the end of the trail, where there is no end.",

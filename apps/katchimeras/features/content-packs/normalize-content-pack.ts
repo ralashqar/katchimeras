@@ -244,6 +244,7 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     for (const chapter of chapters) {
       const where = `island campaign ${id} level ${chapter.level}`;
       if (!isText(chapter.title) || !isText(chapter.prompt) || !String(chapter.prompt).includes('\n\n')) issues.push(`${where}: needs a title and a prompt of situation, blank line, question`);
+      if (!isText(chapter.summary)) issues.push(`${where}: needs a summary for the story log`);
       if (!newId('conversation', chapter.conversationId, bundledConversationIds, seenConversationIds)) continue;
       const choices = list(chapter.choices, issues, `${where} choices`);
       if (choices.length !== 3) issues.push(`${where}: three answers`);
