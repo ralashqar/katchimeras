@@ -1,3 +1,6 @@
+/** A scheduled timer's handle, whatever the platform's `setTimeout` returns. */
+export type TimerHandle = ReturnType<typeof setTimeout>;
+
 /** One foreground worker, with at most one trailing request. No work is queued
  * while backgrounded; a brief inactive/active bounce is debounced. */
 export function createForegroundTask(
@@ -5,17 +8,19 @@ export function createForegroundTask(
   options: {
     onError: (error: unknown) => void;
     delayMs?: number;
-    schedule?: (callback: () => void, delay: number) => ReturnType<typeof setTimeout>;
-    cancel?: (timer: ReturnType<typeof setTimeout>) => void;
+    schedule?: (callback: () => void, delay: number) => TimerHandle;
+    cancel?: (timer: TimerHandle) => void;
   },
 ) {
-  const schedule = options.schedule ?? setTimeout;
-  const cancel = options.cancel ?? clearTimeout;
+  // The timer's handle is whatever the platform's setTimeout returns: a number on the web, an object in Node.
+  // Both globals are typed here as one shape so the type checker never sees a union of the two.
+  const schedule: (callback: () => void, delay: number) => TimerHandle = options.schedule ?? ((callback, delay) => setTimeout(callback, delay) as unknown as TimerHandle);
+  const cancel: (timer: TimerHandle) => void = options.cancel ?? ((timer) => clearTimeout(timer as unknown as Parameters<typeof clearTimeout>[0]));
   let active = false;
   let disposed = false;
   let running = false;
   let requested = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  let timer: TimerHandle | null = null;
   const isActive = () => active && !disposed;
   const enqueue = () => {
     if (!isActive() || running || timer != null || !requested) return;
