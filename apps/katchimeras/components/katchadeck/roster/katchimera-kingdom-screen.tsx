@@ -2205,8 +2205,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
 
   // The canvas is memoised, and it holds only if none of its props change identity on an ordinary
   // screen render: these handlers read live state through a ref instead of being re-created.
+  // While a mini board is docked under a tile, the world behind it takes no taps: the only ways out are its own Back
+  // or Leave and finishing it. (Markers are already gone; this covers the tiles themselves.)
   const selectLockedFamily = useStableCallback((familyId: string) => {
-    if (kingdomGoalGuideActive) return;
+    if (kingdomGoalGuideActive || missionBoardDocked) return;
     if (!ftueStep || ftueStep.surface !== 'haven') setLockedHintFamilyId(familyId);
   });
   const openNatureIslandOffer = useStableCallback((islandId: MossproutNatureIslandId) => {
@@ -2219,11 +2221,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     else { const archive = worldUpgradeArchiveOffer(mergeWorld, `nature:${islandId}`); if (archive) setSelectedUpgrade(archive); }
   });
   const selectNatureIsland = useStableCallback((islandId: MossproutNatureIslandId) => {
-    if (ftueStep?.surface === 'haven') return;
+    if (ftueStep?.surface === 'haven' || missionBoardDocked) return;
     if (kingdomGoalGuideActive && islandId !== goalIslandId) return;
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Dashkit's tile, once they are home, opens the daily trial; their story stays one tap away inside it (and on the tile's marker).
-    if (islandId === WISP_RUSH_HOST.islandId && (mergeWorld.haven.mossproutNatureIslands[islandId] ?? 0) >= WISP_RUSH_HOST.unlockLevel && !missionBoardDocked) {
+    if (islandId === WISP_RUSH_HOST.islandId && (mergeWorld.haven.mossproutNatureIslands[islandId] ?? 0) >= WISP_RUSH_HOST.unlockLevel) {
       setRushNotice(null);
       setRushSheetOpen(true);
       return;
@@ -2231,7 +2233,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     openNatureIslandOffer(islandId);
   });
   const selectGateway = useStableCallback(() => {
-    if (kingdomGoalGuideActive) return;
+    if (kingdomGoalGuideActive || missionBoardDocked) return;
     // The Egg on the live companion's tile opens their encounter.
     if (hatchableGatewayState(mergeWorld, activeHatchable) === 'egg' && !glowDiscoveryLocksCamera(glowRun)) {
       setFtueCameraSettled(false);
@@ -2246,7 +2248,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     void resumeActiveHatchable();
   });
   const selectResidentFromCanvas = useStableCallback((creatureId: string) => {
-    if (glowDiscoveryLocksCamera(glowRun) || kingdomGoalGuideActive) return;
+    if (glowDiscoveryLocksCamera(glowRun) || kingdomGoalGuideActive || missionBoardDocked) return;
     selectResident(creatureId);
   });
   const canvasNatureIslandReveals = useMemo(
@@ -2400,7 +2402,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onSelectNatureIsland={selectNatureIsland}
         focusNatureIslandId={focusIslandId}
         onFocusNatureIslandComplete={completeIslandFocus}
-        onSelectMemoryPlant={kingdomGoalGuideActive ? undefined : setSelectedMemoryPlantId}
+        onSelectMemoryPlant={kingdomGoalGuideActive || missionBoardDocked ? undefined : setSelectedMemoryPlantId}
         onGatewayTargetChange={setGatewayNode}
         onNatureIslandTargetChange={setNatureIslandTileNode}
         onStoryTileTargetChange={setStoryTileNode}
