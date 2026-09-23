@@ -1,6 +1,12 @@
 import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { INTENT_WORDS } from '@/features/encounter/encounter-copy';
+import { usePulseAim } from '@/features/encounter/pulse-aim';
+import { DARK_WISP_LOOK_ART } from '@/constants/dark-wisp-look-art';
+import { isDarkWispLook } from '@/constants/dark-wisp-looks';
+import { pulseTarget } from '@/features/mission-mechanics/dark-wisps';
 import { StyleSheet, Text, View, type View as ViewType } from 'react-native';
-import Animated, { cancelAnimation, Easing, FadeInDown, FadeOut, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, FadeInDown, FadeOut, ZoomIn, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
@@ -85,6 +91,8 @@ export type CorruptionWisps = {
   leaving: boolean;
   layout: WispLayout | null;
   views: readonly MissionWispView[];
+  /** Territory: the wisp a merge landing on a cell would strike, for the aim ring; absent when the wisps are not on the board. */
+  aimTarget?: (cell: number, tier: number) => number | null;
   /** Bumps when a Glow strikes that wisp. */
   strikes: Readonly<Record<number, number>>;
   /** The Glow hook's aim: where the next burst goes, and what each landing does. */
@@ -93,7 +101,7 @@ export type CorruptionWisps = {
   caption: { id: number; text: string } | null;
 };
 
-/** Every wisp's place on screen: over the tile by its fractions, or on the sky grid above the board. */
+/** Every wisp's place on screen: over the tile by its fractions, on the sky grid above the board, or on its nest cell. */
 export function wispLayout(target: CorruptionWispTarget, views: readonly MissionWispView[], tileFrame: WispFrame | null): WispLayout | null {
   const mechanic = resolveMechanic(target.host);
   const anchor = target.anchor;
@@ -105,6 +113,19 @@ export function wispLayout(target: CorruptionWispTarget, views: readonly Mission
     if (!columns.length) return null;
     const first = mergeCellFrame(geometry, columns[0]!).bounds;
     const last = mergeCellFrame(geometry, columns[columns.length - 1]!).bounds;
+    // A territory battle: each wisp sits on its nest, a cell of the board; no tile to measure.
+    if (views.some((view) => view.placement.kind === 'cell')) {
+      const bottom = mergeCellFrame(geometry, anchor.window.cellIndices[anchor.window.cellIndices.length - 1]!).bounds;
+      const frame = { x: metrics.x + first.left, y: metrics.y + first.top, width: last.left + last.width - first.left, height: bottom.top + bottom.height - first.top };
+      const wisps = views.map((view) => {
+        const cell = view.placement.kind === 'cell' ? view.placement.cell : anchor.window.cellIndices[Math.floor(anchor.window.columns / 2)]!;
+        const center = mergeCellCenter(geometry, cell);
+        const bounds = mergeCellFrame(geometry, cell).bounds;
+        return { x: metrics.x + center.x, y: metrics.y + center.y, size: Math.max(36, bounds.width * (view.placement.kind === 'cell' ? view.placement.size ?? 0.9 : 0.9)) };
+      });
+      // The line goes just above the board, where the wisps are.
+      return { frame, wisps, captionTop: frame.y - 34 };
+    }
     const rows = mechanic.kind === 'column-shot' ? Math.max(1, mechanic.wisps.rows) : 1;
     // The sky sits over the tile, as every other board's wisps do: each column's x is the board's, so a shot flies
     // straight up its column, and the rows climb the tile from its middle. Nothing is drawn until the tile is
@@ -273,6 +294,7 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
     leaving: !target && leaving,
     layout: shownLayout,
     views,
+    ...(mechanic?.kind === 'dark-wisps' && state?.kind === 'dark-wisps' && target?.anchor ? { aimTarget: (cell: number, tier: number) => pulseTarget(mechanic, state, cell, tier, target.anchor!.window) } : {}),
     strikes,
     sink,
     caption,
@@ -286,13 +308,22 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
     screenRef.current?.measureInWindow((x, y) => setOrigin({ x, y }));
   }, [screenRef, wisps.layout]);
   const layout = wisps.layout;
+  // Territory: the wisp a held piece would strike where it is over, rung while it is held.
+  const aim = usePulseAim();
+  const aimedIndex = aim && wisps.aimTarget ? wisps.aimTarget(aim.cell, aim.tier) : null;
   if (!layout) return null;
-  return <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.layer]}>
+  // Territory wisps sit on the board's own cells, so they are drawn over the docked board rather than under it.
+  const onBoard = wisps.views.some((view) => view.placement.kind === 'cell');
+  return <View pointerEvents="none" style={[StyleSheet.absoluteFill, onBoard ? styles.layerOnBoard : styles.layer]}>
     {wisps.views.map((view, index) => <CorruptionWisp
       key={view.id} index={index} enterDelayMs={view.enterDelayMs}
       x={(layout.wisps[index]?.x ?? layout.frame.x) - origin.x} y={(layout.wisps[index]?.y ?? layout.frame.y) - origin.y}
       size={layout.wisps[index]?.size ?? 48}
       pip={view.hp > 1 ? `${Math.max(0, view.hp - view.damage)}` : null}
+      intent={view.intent ?? null}
+      aimed={aimedIndex === index}
+      look={view.look ?? null}
+      weakTo={view.weakTo ?? null}
       alive={view.alive} leaving={wisps.leaving} strikeNonce={wisps.strikes[index] ?? 0} />)}
     {wisps.caption ? <Animated.View key={wisps.caption.id} entering={FadeInDown.duration(220)} exiting={FadeOut.duration(260)} pointerEvents="none"
       style={[styles.caption, { left: layout.frame.x - origin.x, width: layout.frame.width, top: layout.captionTop - origin.y }]}>
@@ -317,7 +348,7 @@ export const MissionWisps = memo(function MissionWisps({ target, glow, screenRef
 });
 
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */
-const CorruptionWisp = memo(function CorruptionWisp({ index, enterDelayMs, x, y, size, pip, alive, leaving, strikeNonce }: { index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
+const CorruptionWisp = memo(function CorruptionWisp({ index, enterDelayMs, x, y, size, pip, intent, aimed = false, look = null, weakTo = null, alive, leaving, strikeNonce }: { /** v2: the chain it is weak to. */ weakTo?: 'growth' | 'water' | null; /** v2: its Dark Wisp art, when it has one. */ look?: string | null; /** v2: the wisp a held piece would hit. */ aimed?: boolean; index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; /** v2: what it will do next, and in how many turns. */ intent: MissionWispView['intent'] | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
   const reduceMotion = useReducedMotion();
   const hover = useSharedValue(0);
   const shake = useSharedValue(0);
@@ -326,6 +357,16 @@ const CorruptionWisp = memo(function CorruptionWisp({ index, enterDelayMs, x, y,
   const entrance = useSharedValue(0);
   // A wisp already felled when it mounts (a resumed board) was never here: no death to play.
   const [gone, setGone] = useState(() => !alive);
+  // v2: one held back until called arrives the first time it is alive.
+  useEffect(() => {
+    if (!alive || !gone) return;
+    setGone(false);
+    death.value = 0;
+    entrance.value = 0;
+    entrance.value = withTiming(1, { duration: reduceMotion ? 80 : ENTRANCE_MS, easing: Easing.out(Easing.back(1.6)) });
+  // Only when it comes to life.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alive]);
   useEffect(() => {
     if (reduceMotion) { entrance.value = 1; return; }
     const delay = enterDelayMs ?? index * ENTRANCE_STAGGER_MS;
@@ -397,21 +438,62 @@ const CorruptionWisp = memo(function CorruptionWisp({ index, enterDelayMs, x, y,
       ],
     };
   });
+  const badgeStyle = useAnimatedStyle(() => {
+    const arriving = Math.max(0, Math.min(1, entrance.value));
+    return { opacity: Math.min(1, arriving / 0.7) * (1 - death.value), transform: [{ scale: 0.6 + arriving * 0.4 }] };
+  });
   const rimStyle = useAnimatedStyle(() => ({
     opacity: (0.42 + pulse.value * 0.3) * (1 - death.value) * Math.min(1, entrance.value),
     transform: [{ scale: (1.55 + pulse.value * 0.12 + death.value * 0.5) * Math.max(0.2, Math.min(1, entrance.value)) }],
   }));
+  // Its place: where it first appears it simply is; a move after that (a burrow, the board settling) glides there.
+  const placeX = useSharedValue(x);
+  const placeY = useSharedValue(y);
+  useEffect(() => {
+    placeX.value = reduceMotion ? x : withTiming(x, { duration: 420, easing: Easing.inOut(Easing.cubic) });
+    placeY.value = reduceMotion ? y : withTiming(y, { duration: 420, easing: Easing.inOut(Easing.cubic) });
+  }, [placeX, placeY, reduceMotion, x, y]);
+  const placeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: placeX.value - x }, { translateY: placeY.value - y }] }));
   if (gone) return null;
-  return <View pointerEvents="none" style={[styles.wisp, { left: x - size / 2, top: y - size / 2, width: size, height: size }]}>
+  return <Animated.View pointerEvents="none" style={[styles.wisp, { left: x - size / 2, top: y - size / 2, width: size, height: size }, placeStyle]}>
     <Animated.View style={[StyleSheet.absoluteFill, styles.rim, rimStyle]}>
       <Image accessibilityIgnoresInvertColors contentFit="contain" source={SOFT_GLOW} style={StyleSheet.absoluteFill} tintColor={RIM} transition={0} />
     </Animated.View>
     {!reduceMotion && alive ? EMBERS.map((ember, emberIndex) => <Ember key={emberIndex} ember={ember} size={size} />) : null}
     <Animated.View style={[StyleSheet.absoluteFill, bodyStyle]}>
-      <Image accessibilityIgnoresInvertColors accessibilityLabel="A corruption wisp" contentFit="contain" source={WISP_ART} style={StyleSheet.absoluteFill} transition={0} />
+      <Image accessibilityIgnoresInvertColors accessibilityLabel={look ? `A ${look} wisp` : 'A corruption wisp'} contentFit="contain" source={isDarkWispLook(look) ? DARK_WISP_LOOK_ART[look] : WISP_ART} style={StyleSheet.absoluteFill} transition={0} />
     </Animated.View>
     {!alive ? <DeathBurst size={size} reduceMotion={reduceMotion} /> : null}
-    {pip && alive ? <View style={[styles.pip, { top: size * 0.86 }]}><Text style={styles.pipText}>{pip}</Text></View> : null}
+    {aimed && alive ? <Animated.View entering={reduceMotion ? undefined : ZoomIn.duration(160)} exiting={reduceMotion ? undefined : FadeOut.duration(140)} pointerEvents="none" style={[styles.aim, { width: size * 1.35, height: size * 1.35, borderRadius: size, left: -size * 0.175, top: -size * 0.175 }]} /> : null}
+    {/* Its badges arrive with it: they grow in as it does, never before it. */}
+    <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, badgeStyle]}>
+      {pip && alive ? <View style={[styles.pip, { top: size * 0.86 }]}><Text style={styles.pipText}>{pip}</Text></View> : null}
+      {intent && alive ? <IntentChip intent={intent} size={size} /> : null}
+      {weakTo && alive ? <View accessible accessibilityLabel={`Weak to ${weakTo === 'growth' ? 'Growth' : 'Water'}`} style={[styles.weak, { top: size * 0.86, right: -size * 0.12 }, weakTo === 'water' ? styles.weakWater : styles.weakGrowth]}>
+        <IconSymbol name={weakTo === 'water' ? 'water.waves' : 'leaf.fill'} size={11} color="#FFFFFF" />
+      </View> : null}
+    </Animated.View>
+  </Animated.View>;
+});
+
+const INTENT_ICON: Readonly<Record<NonNullable<MissionWispView['intent']>['kind'], IconSymbolName>> = {
+  surge: 'cloud.fog.fill', snuff: 'cloud.fog.fill', shroud: 'cloud.fill', root: 'leaf.fill', devour: 'exclamationmark.triangle.fill',
+  ward: 'shield.fill', mend: 'heart.fill', call: 'sparkles', gather: 'bolt.fill', burrow: 'chevron.down', spores: 'circle.grid.2x2.fill',
+};
+/** Intents that take ground: the chip turns warm while one is coming. */
+const SPREADING: ReadonlySet<string> = new Set(['surge', 'snuff', 'gather', 'shroud', 'root', 'spores']);
+
+/** v2: over the wisp, what it will do next and in how many turns; its ward beside it; a gather's stagger bar under it. */
+const IntentChip = memo(function IntentChip({ intent, size }: { intent: NonNullable<MissionWispView['intent']>; size: number }) {
+  const urgent = intent.countdown <= 1;
+  const threat = SPREADING.has(intent.kind);
+  return <View accessible accessibilityLabel={`In ${intent.countdown} ${intent.countdown === 1 ? 'turn' : 'turns'}, it ${INTENT_WORDS[intent.kind]}${intent.ward ? `. Ward ${intent.ward}` : ''}`}
+    style={[styles.intent, { top: -size * 0.34 }, threat && styles.intentThreat, urgent && styles.intentUrgent]}>
+    <IconSymbol name={INTENT_ICON[intent.kind]} size={13} color={threat ? '#FFE1B8' : '#EDE3FF'} />
+    <Text style={styles.intentText}>{`${intent.countdown}`}</Text>
+    {intent.amount && intent.amount > 1 ? <Text style={styles.intentText}>{`\u00d7${intent.amount}`}</Text> : null}
+    {intent.ward ? <><IconSymbol name="shield.fill" size={11} color="#BFE3FF" /><Text style={styles.intentText}>{`${intent.ward}`}</Text></> : null}
+    {intent.kind === 'gather' && intent.stagger ? <View style={styles.staggerTrack}><View style={[styles.staggerFill, { width: `${Math.min(100, ((intent.gathered ?? 0) / intent.stagger) * 100)}%` }]} /></View> : null}
   </View>;
 });
 
@@ -462,9 +544,21 @@ function DeathMote({ index, size, t }: { index: number; size: number; t: SharedV
 const styles = StyleSheet.create({
   // Over the map and its markers, under the docked board (60) and everything the board's beats draw; the Glow (100) strikes them from above.
   layer: { zIndex: 58 },
+  // Over the docked board (60), under the Glow (100).
+  layerOnBoard: { zIndex: 61 },
   caption: { position: 'absolute', alignItems: 'center', zIndex: 4 },
   pip: { position: 'absolute', alignSelf: 'center', zIndex: 3, paddingHorizontal: 7, paddingVertical: 1, borderRadius: 9, backgroundColor: 'rgba(38,18,58,0.78)' },
   pipText: { fontFamily: 'FredokaBold', fontSize: 12, color: '#F3E6FF', textAlign: 'center' },
+  aim: { position: 'absolute', borderWidth: 3, borderColor: '#FFD27A', backgroundColor: 'rgba(255,210,122,0.12)', zIndex: 2 },
+  weak: { position: 'absolute', zIndex: 4, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
+  weakWater: { backgroundColor: '#3B9CC4' },
+  weakGrowth: { backgroundColor: '#4E9F57' },
+  intent: { position: 'absolute', alignSelf: 'center', zIndex: 4, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10, backgroundColor: 'rgba(38,18,58,0.82)', borderWidth: 1, borderColor: 'rgba(200,170,255,0.55)' },
+  intentThreat: { backgroundColor: 'rgba(92,30,24,0.88)', borderColor: 'rgba(255,170,120,0.8)' },
+  intentUrgent: { borderWidth: 2, borderColor: '#FFD27A' },
+  intentText: { fontFamily: 'FredokaBold', fontSize: 12, color: '#FFF4E6' },
+  staggerTrack: { position: 'absolute', left: 6, right: 6, bottom: -4, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden' },
+  staggerFill: { height: 3, backgroundColor: '#FFD27A' },
   captionText: { fontFamily: 'FredokaBold', fontSize: 17, color: '#FFF4D6', textAlign: 'center', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, backgroundColor: 'rgba(38,18,58,0.72)', overflow: 'hidden' },
   wisp: { position: 'absolute', alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
   rim: { zIndex: 0 },

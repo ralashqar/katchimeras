@@ -103,7 +103,8 @@ test('a helper Wisp is one light perk by rarity, a friend’s signature pays in 
   const world = { ...createInitialMergeWorldState(NOW), heartwoodBuildings: { 'dew-spring': { level: 3, builtAt: NOW }, 'seed-nursery': { level: 2, builtAt: NOW }, 'root-cellar': { level: 4, builtAt: NOW }, 'garden-stall': { level: 5, builtAt: NOW } } };
   const profile = encounterProfile(world, { companionId: 'mossprout', level: 1, wispId: 'sprout' });
   assert.equal(profile.startingResolve, 6 + 1, 'Dew Spring two a level, and the common Wisp’s one');
-  assert.equal(profile.openCells, 2, 'Root Cellar: one cell every two levels');
+  assert.equal(profile.openCells, 2 + 1, 'Root Cellar: one cell every two levels; the common Wisp opens one more');
+  assert.equal(profile.delay, 1, 'the Dew Spring at level 3 holds the wisps back a turn');
   assert.equal(Math.round(profile.tierTwoChance * 100), 6);
   assert.equal(Math.round(profile.glowBonus * 100), 20);
   assert.equal(encounterProfile(null, null).startingResolve, 0);

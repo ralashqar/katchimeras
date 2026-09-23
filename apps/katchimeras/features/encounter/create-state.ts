@@ -55,6 +55,13 @@ export function createEncounterState(encounter: EncounterDefinition, owner: Merg
       mist: { kind: 'encounter', type: mist.type, hp: Math.max(1, Math.floor(mist.hp ?? ENCOUNTER_MIST_DEFAULT_HP[mist.type])), ...(mist.wispId ? { wispId: mist.wispId } : {}), ...(mist.holds ? { holds: mist.holds } : {}) },
     };
   }
+  // A territory battle's wisps each nest on their cell: Mist bound to them, gone when they fall.
+  if (encounter.mechanic?.kind === 'dark-wisps') {
+    for (const wisp of encounter.mechanic.wisps) {
+      if (wisp.hidden || wisp.placement.kind !== 'cell' || !inside.has(wisp.placement.cell)) continue;
+      cells[wisp.placement.cell] = { ...cells[wisp.placement.cell]!, locked: true, blocker: null, occupant: null, mist: { kind: 'encounter', type: 'wisp-bound', hp: 1, wispId: wisp.id } };
+    }
+  }
   let state: MergeWorldState = { ...base, board: cells };
   for (const spawner of encounter.spawners) {
     if (spawner.hidden || !inside.has(spawner.cell)) continue;

@@ -84,7 +84,7 @@ test('the Wander Trail is an island with a story from the start: registered, voi
   assert.doesNotMatch(islandWakeLockedReason(asleep, 'rush-track') ?? '', /Wanderling/);
   const offer = worldUpgradeOffers(awake).find((offer) => offer.id === 'nature:wanderling-trail');
   assert.equal(offer?.eligible, true, 'the mist can be cleared');
-  assert.equal(offer?.cost, island.levels[0]!.coinCost);
+  assert.equal(offer?.cost, 0, 'a friend’s mist never costs Glow');
   assert.equal(offer?.transition, 'island_reveal');
   // Revealed, the story runs as Petalimp's does, and the card it earns is Wanderling's, of Steppling's family.
   const revealed = revealIsland({ ...awake, coins: 500 }, campaign, NOW);

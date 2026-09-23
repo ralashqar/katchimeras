@@ -7,9 +7,41 @@ import { HeartwoodBuildingPanel } from '@/components/katchadeck/world/heartwood-
 import { KatchimeraUpgradePanel } from '@/components/katchadeck/world/katchimera-upgrade-panel';
 /** The campaign pivot removed the Merge page: nothing on the Haven leads to it. */
 const MERGE_PAGE_REMOVED = true;
-import { DailyMistSheet } from '@/components/katchadeck/world/daily-mist-sheet';
-import { GroveSheet } from '@/components/katchadeck/world/grove-sheet';
-import { dailyMistMission, dailyMistUnlocked } from '@/features/encounters/daily-mist';
+
+/** The synthetic marker on Mossprout's own tile: the Grove's levels, then today's Daily Mist. */
+const HOME_TRACK_OFFER_ID = 'track:home';
+
+/**
+ * Every friend's island marker shows its level track (levels cleared of all), and Mossprout's tile gets one marker
+ * for the Grove (or, once it is done, today's Daily Mist). Sleeping islands keep their silhouette; the first
+ * session shows none of it.
+ */
+function withTrackBadges(world: MergeWorldState, offers: readonly WorldUpgradeOffer[], afterFirstSession: boolean): WorldUpgradeOffer[] {
+  if (!afterFirstSession) return [...offers];
+  const badged = offers.map((offer) => {
+    const campaign = offer.trial || offer.sleepingSkinId ? null : islandCampaignForOffer(offer.id);
+    if (!campaign) return offer;
+    const revealed = Boolean(world.haven.mossproutNatureIslandReveals[campaign.islandId] || (world.haven.mossproutNatureIslands[campaign.islandId] ?? 0) > 0);
+    if (revealed && world.islandCampaigns?.[campaign.campaignId]?.discoveryRevealSeenAt == null) return offer;
+    // Before the Kingdom's goal a misted friend keeps the marker it had (the goal is what points at them).
+    if (!revealed && world.kingdomGoal?.introducedAt == null) return offer;
+    const track = islandTrack(world, campaign);
+    return { ...offer, track: { kind: 'island' as const, cleared: track.cleared, total: track.total, label: `${track.cleared}/${track.total}` }, eligible: true, affordable: true, missingGlow: 0, lockedReason: undefined };
+  });
+  const grove = groveTrack(world, { ftueComplete: true });
+  const home = grove.cleared < grove.total ? grove : dailyMistUnlocked(world) ? dailyTrack(world, localDayId(new Date(gameNow()))) : null;
+  if (!home || (world.haven.tileStages.mossprout ?? 0) < 1) return badged;
+  // Framed as Mossprout's own restore marker is: over his garden.
+  return [...badged, {
+    id: HOME_TRACK_OFFER_ID, target: { kind: 'haven_tile' as const, familyId: 'mossprout' }, visualTarget: { kind: 'haven_structure' as const, structureId: 'mossprout-hex-garden' }, name: home.title, nextName: home.title, description: home.caption,
+    nextLevel: 0, cost: 0, action: 'Upgrade', currentLevel: 0, maxLevel: 0, eligible: true, affordable: true, missingGlow: 0,
+    track: { kind: home.kind, cleared: home.cleared, total: home.total, label: home.kind === 'daily' ? `${home.cleared}/${home.total} today` : `${home.cleared}/${home.total}` },
+  }];
+}
+import { LevelTrackSheet } from '@/components/katchadeck/world/level-track-sheet';
+import { dailyTrack, groveTrack, islandTrack, isMistLevel, type LevelNode } from '@/features/level-tracks/level-track';
+import { claimStoredTrackMilestone, payStoredEncounterContinue } from '@/utils/merge-world/repository';
+import { dailyMistUnlocked } from '@/features/encounters/daily-mist';
 import type { RegionMissionDefinition } from '@/constants/island-campaigns/types';
 import { recordEncounterBond } from '@/features/encounter/encounter-bond';
 import { FriendWispsSheet } from '@/components/katchadeck/wisps/friend-wisps-sheet';
@@ -194,8 +226,11 @@ import {
   pendingIslandCampaignCardReveal,
   pendingIslandCampaignDiscovery,
   activeIslandRestoration,
+  islandCampaignChapterStatus,
 } from '@/constants/island-campaigns/helpers';
-import { islandCampaignForIsland, islandCampaignForOffer } from '@/constants/island-campaigns/registry';
+import { regionLadder, regionRung } from '@/constants/island-campaigns/ladder';
+import { islandCampaignById, islandCampaignForIsland, islandCampaignForOffer } from '@/constants/island-campaigns/registry';
+import { MERGE_CHARACTER_NAMES } from '@/constants/merge-world-catalog';
 import type { IslandCampaignDefinition, IslandCampaignPhase } from '@/constants/island-campaigns/types';
 import { nextOpenIsland } from '@/constants/island-campaigns/wake-order';
 import { KingdomGoalScene } from '@/components/katchadeck/onboarding/kingdom-goal-scene';
@@ -337,8 +372,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const islandEncounterRung = islandEncounter;
   const islandEncounterIslandId = islandEncounter?.islandId ?? null;
   const islandEncounterTileNode = islandEncounterIslandId ? islandTileNodes[islandEncounterIslandId] ?? null : homeTileNode;
-  const [dailyMistOpen, setDailyMistOpen] = useState(false);
-  const [groveOpen, setGroveOpen] = useState(false);
+  // The tile whose level track is open on the upgrade stage: a friend's island, Mossprout's Grove, or the Daily Mist.
+  const [trackOpen, setTrackOpen] = useState<{ kind: 'island'; campaignId: string } | { kind: 'grove' } | { kind: 'daily' } | null>(null);
+  const [trackNotice, setTrackNotice] = useState<string | null>(null);
+  const [trackBusy, setTrackBusy] = useState(false);
+  /** The track to bring back once the level, story or reveal in front of it has gone: the player lands back on the tile's levels. */
+  /** A level waiting on the story in front of it: once the conversation has closed, it starts (or the track comes back). */
+  const [levelAfterStory, setLevelAfterStory] = useState<{ campaignId: string; missionId: string; choice: EncounterLoadoutChoice } | null>(null);
+  const [trackReopen, setTrackReopen] = useState<{ kind: 'island'; campaignId: string } | { kind: 'grove' } | { kind: 'daily' } | null>(null);
   const setNatureIslandTileNode = useCallback((islandId: MossproutNatureIslandId, node: View | null) => {
     setIslandTileNodes((current) => (current[islandId] === node ? current : { ...current, [islandId]: node }));
   }, []);
@@ -439,7 +480,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const residentWisps = useMemo(() => Object.fromEntries(FRIEND_CONSTELLATIONS.map(({ familyId }) => [familyId, {
     wispId: friendEquippedWisp(wispState, familyId), packWaiting: friendPacksWaiting(wispState, familyId).length > 0,
   }])), [wispState]);
-  const lanternSurfaceOpen = wispLanternOpen || lanternUpgradeOpen || buildingPanelId != null || katchimeraPanelId != null || dailyMistOpen || groveOpen;
+  const lanternSurfaceOpen = wispLanternOpen || lanternUpgradeOpen || buildingPanelId != null || katchimeraPanelId != null || trackOpen != null;
   const [wispPlanting, setWispPlanting] = useState(false);
   const [wispPlantError, setWispPlantError] = useState('');
   const wispPlantBusy = useRef(false);
@@ -545,6 +586,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // submitted, a paid ticket's event recorded so the board opens. Keyed on everything that can move it.
   const hatchableTicketHeld = Boolean(mergeWorld.hatchableMissions?.[activeHatchable.companion]);
   const hatchableTileUnlocked = Boolean(mergeWorld.worldUnlocks?.[activeHatchable.tile.unlockId]);
+  /** A hatchable's discovery is under way (its clearing, board, Egg): nothing else takes the camera until it ends. */
+  const hatchableStoryOpen = Boolean(glowRun && glowRun.status !== 'completed');
+  const hatchableStoryOpenRef = useRef(hatchableStoryOpen);
+  hatchableStoryOpenRef.current = hatchableStoryOpen;
   const resumeActiveHatchable = useCallback(() => resumeHatchableDiscovery(activeHatchable, mergeWorldRef.current)
     .then((result) => { if (result.blockedBy === 'garden') openGardenRef.current?.(undefined, activeHatchable.companion); return result; })
     .catch((error) => { setUpgradeError(error instanceof Error ? error.message : 'Please try again.'); return null; }), [activeHatchable]);
@@ -750,7 +795,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const islandEncounterCamera = useMemo((): FtueCameraDirective | null => !screenFocused ? null : islandEncounter ? {
     kind: 'focus_target' as const, target: islandEncounterIslandId ? { kind: 'haven_nature_island' as const, islandId: islandEncounterIslandId } : { kind: 'haven_tile' as const, characterId: 'mossprout' as const },
     zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700,
-  } : dailyMistOpen || groveOpen ? { kind: 'focus_target' as const, target: { kind: 'haven_tile' as const, characterId: 'mossprout' as const }, zoom: 1.25, anchorY: upgradeStage.stageCenterY / Math.max(1, window.height), durationMs: 520 } : null, [dailyMistOpen, groveOpen, islandEncounter, islandEncounterIslandId, screenFocused, upgradeStage, window.height]);
+  } : trackOpen ? {
+    // The track's tile framed over the docked panel: a friend's island, else Mossprout's own tile.
+    kind: 'focus_target' as const,
+    target: trackOpen.kind === 'island' && islandCampaignById.get(trackOpen.campaignId)
+      ? { kind: 'haven_nature_island' as const, islandId: islandCampaignById.get(trackOpen.campaignId)!.islandId }
+      : { kind: 'haven_tile' as const, characterId: 'mossprout' as const },
+    zoom: 1.25, anchorY: upgradeStage.stageCenterY / Math.max(1, window.height), durationMs: 520,
+  } : null, [islandEncounter, islandEncounterIslandId, screenFocused, trackOpen, upgradeStage, window.height]);
   // A heat frames Dashkit's tile the way a friend's board frames theirs; the sheet between heats frames it over the panel.
   const rushCamera = useMemo((): FtueCameraDirective | null => !screenFocused ? null : rushSpec
     ? { kind: 'focus_target', target: { kind: 'haven_nature_island', islandId: WISP_RUSH_HOST.islandId }, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700 }
@@ -780,7 +832,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // The Lantern stands above its plot: frame the plot a little under the band's centre so the Lantern fills it.
     ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.7, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.2) / Math.max(1, window.height), durationMs: 520 }
     : wispLanternOpen ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.15, anchorY: 0.42, durationMs: 850 } : null, [buildingPanelId, lanternUpgradeOpen, upgradeStage, window.height, wispLanternOpen]);
-  const baseTutorialCamera = katchimeraCamera ?? lanternCamera ?? rushCamera ?? heartwoodIntroCamera ?? eventCamera ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : islandEncounterCamera ?? restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
+  // A level on a tile (or its open track) frames that tile, whatever story would otherwise resume its camera.
+  const baseTutorialCamera = katchimeraCamera ?? lanternCamera ?? rushCamera ?? heartwoodIntroCamera ?? eventCamera ?? (islandEncounter || trackOpen ? islandEncounterCamera : null) ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : islandEncounterCamera ?? restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
   const tutorialCamera = useMemo(() => {
     if (!ftueStepId?.startsWith('egg.') || baseTutorialCamera?.kind !== 'focus_target') return baseTutorialCamera;
     return { ...baseTutorialCamera, zoom: sharedEggZoom(worldSubjectPresentation?.wispsCleared
@@ -1664,8 +1717,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   islandNarrativeAfterUpgradeRef.current = openIslandCampaignNarrative;
 
   const handleIslandCampaignPanelAction = useCallback((choice?: EncounterLoadoutChoice) => {
-    const campaign = sharedUpgradeCampaign;
-    const progress = campaign ? islandCampaignUpgradePanelState(mergeWorldRef.current, campaign) : null;
+    if (sharedUpgradeCampaign) runIslandCampaignActionRef.current?.(sharedUpgradeCampaign, choice);
+  }, [sharedUpgradeCampaign]);
+  const runIslandCampaignActionRef = useRef<((campaign: IslandCampaignDefinition, choice?: EncounterLoadoutChoice) => void) | null>(null);
+  /** What a friend's island does next (a story beat, a board kept from before the pivot, a rung), from its panel or its level track. */
+  const runIslandCampaignAction = useCallback((campaign: IslandCampaignDefinition, choice?: EncounterLoadoutChoice) => {
+    const progress = islandCampaignUpgradePanelState(mergeWorldRef.current, campaign);
     if (!campaign || !progress?.action) return;
     if (progress.action === 'enter_mist' || progress.action === 'resume_mist') {
       // Into the Mist: the rung docks under the island with the Katchimera and Wisp chosen on the panel.
@@ -1695,7 +1752,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       ? 'opening'
       : progress.action === 'continue_return' ? 'return' : 'resolution');
     setSelectedUpgrade(null);
-  }, [openGarden, openIslandCampaignNarrative, sharedUpgradeCampaign]);
+  }, [openGarden, openIslandCampaignNarrative]);
+  runIslandCampaignActionRef.current = runIslandCampaignAction;
 
   const continueFromIslandDiscovery = useCallback(async (campaign: IslandCampaignDefinition) => {
     if (islandDiscoveryContinueBusy.current) return;
@@ -1719,11 +1777,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (!chapter) return;
     if (phase === 'return') {
       await acknowledgeStoredIslandCampaignChapterReturn(campaign.campaignId, chapter.level);
+      setTrackReopen({ kind: 'island', campaignId: campaign.campaignId });
       requestResidentInteractionExit();
       return;
     }
     if (phase === 'resolution') {
       await completeStoredIslandCampaignChapter(campaign.campaignId, chapter.level);
+      // A finished island has nothing left to show but its replays; the next chapter's story waits on its track.
+      setTrackReopen({ kind: 'island', campaignId: campaign.campaignId });
       requestResidentInteractionExit();
       return;
     }
@@ -1770,8 +1831,16 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       return;
     }
     const activeOrderId = campaignProgress?.orderIds.at(-1);
-    if (!activeOrderId) throw new Error(`${campaign.residentName}’s request could not be opened. Please try again.`);
-    openGarden(activeOrderId, 'mossprout');
+    if (activeOrderId) { openGarden(activeOrderId, 'mossprout'); return; }
+    // The campaign pivot: the chapter plays as levels. The conversation closes and its first level starts (the one the
+    // player pressed, or the chapter's first after a discovery); the island's levels come back up when nothing waits.
+    if (!levelAfterStoryRef.current || levelAfterStoryRef.current.campaignId !== campaign.campaignId) {
+      const first = regionLadder(campaign).find((rung) => rung.chapterLevel === chapter.level);
+      const remembered = mergeWorldRef.current.encounters?.loadout;
+      if (first) setLevelAfterStory({ campaignId: campaign.campaignId, missionId: first.mission.id, choice: { katchimeraId: remembered?.katchimeraId ?? 'mossprout', helperWispId: remembered?.helperWispId ?? null } });
+      else setTrackReopen({ kind: 'island', campaignId: campaign.campaignId });
+    }
+    requestResidentInteractionExit();
   }, [measureGlowCurrencyOrigin, openGarden, openingGlow, pendingIslandCampaign, requestResidentInteractionExit]);
 
   const openWorldEvent = useCallback(async (action: WorldEventAction) => {
@@ -1833,6 +1902,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const restorationStore = useMissionBoard(islandRestoration ? previewMissionStorageKey(restorationStorageKey(islandRestoration.campaign.campaignId, islandRestoration.level), mechanicPreview) : 'katchimeras.mist-mission.none.v1', restorationBoardRunId, createRestorationBoard, repairRestorationBoard, restorationBinding);
   const restorationChapterProgress = islandRestoration ? mergeWorld.islandCampaigns?.[islandRestoration.campaign.campaignId]?.chapters[String(islandRestoration.level)] ?? null : null;
   const islandEncounterActive = Boolean(islandEncounterRung) && screenFocused && !upgradePresentation && !interactionCreatureId && !pendingIslandCampaign && !stepplingMissionActive && !journeyMissionActive && !openingBoardActive;
+  // A battle's dock fades in afresh: its wisps wait for it to settle (below), so each level starts unsettled.
+  const islandEncounterMissionId = islandEncounterActive ? islandEncounterRung?.mission.id ?? null : null;
+  useEffect(() => { setOpeningDockSettled(false); }, [islandEncounterMissionId]);
   const islandEncounterRef = useRef(islandEncounter);
   islandEncounterRef.current = islandEncounter;
   const islandEncounterRungRef = useRef(islandEncounterRung);
@@ -1842,6 +1914,25 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     setIslandEncounter(null);
   }, []);
   const islandMistOutcomeRef = useRef<{ outcome: import('@/features/encounter/outcome').EncounterOutcome | null; runId: string | null }>({ outcome: null, runId: null });
+  /** A friend's first level won: the Mist lifts through the same reveal (and its presentation) a paid reveal used to run, free. */
+  const liftIslandMist = useStableCallback(async (campaignId: string) => {
+    const campaign = islandCampaignById.get(campaignId);
+    if (!campaign) return;
+    const offer = worldUpgradeOffers(mergeWorldRef.current).find((candidate) => candidate.id === `nature:${campaign.islandId}` && candidate.transition === 'island_reveal');
+    if (!offer) return;
+    try {
+      const run = await purchaseWorldUpgrade(offer, { beforeValidation: flushMergeWorld });
+      if (run?.status === 'failed_recoverable') setTrackNotice('The Mist did not lift yet. Tap Lift the Mist to try again.');
+    } catch (error) {
+      console.warn('The Mist could not lift', error);
+      setTrackNotice('The Mist did not lift yet. Tap Lift the Mist to try again.');
+    }
+  });
+  /** A friend pack named by a clear or a chest joins that Katchimera's Wisps (its receipt keeps it to once). */
+  const grantTrackPack = useCallback((pack: { receiptId: string; familyId: string; kind: 'gift' | 'gift-rare' | 'finale' | 'bright' }) => {
+    commandFriendWispPacks({ type: 'grant', receiptId: pack.receiptId, familyId: pack.familyId, kind: pack.kind, seed: Math.floor(Math.random() * 4294967296) });
+  }, []);
+  const payIslandKeepGoing = useCallback((receiptId: string) => payStoredEncounterContinue(receiptId, GLOW.keepGoingCost), []);
   const completeIslandEncounter = useCallback(async () => {
     const focus = islandEncounterRef.current;
     const found = islandEncounterRungRef.current;
@@ -1854,9 +1945,20 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     });
     // The friend who was there remembers it: Bond, and the day's sparks toward their pouch.
     recordEncounterBond(result);
+    const cleared = result.encounterCleared;
+    if (cleared?.bossPack) grantTrackPack({ ...cleared.bossPack, kind: 'bright' });
     setIslandEncounter(null);
-  }, []);
-  const islandMist = useMistMission({ active: islandEncounterActive, mission: null, encounter: islandEncounterRung?.mission.encounter ?? null, owner: 'mossprout', loadout: islandEncounter?.loadout ?? null, world: mergeWorld, tileNode: islandEncounterTileNode, boardMetrics: openingBoardMetrics, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: completeIslandEncounter, onLeave: leaveIslandEncounter });
+    // A friend's first level lifts their island's Mist, and the discovery that always followed it plays.
+    if (focus.campaignId && isMistLevel(focus.mission.id) && cleared?.firstClear) { void liftIslandMist(focus.campaignId); return; }
+    // A chapter's last level grows the island and its closing conversation opens on its own; that story brings the
+    // track back when it ends. Any other level lands straight back on its tile's levels.
+    if (cleared?.islandRaised) return;
+    setTrackReopen(focus.campaignId ? { kind: 'island', campaignId: focus.campaignId }
+      : focus.mission.id.startsWith('daily:') ? { kind: 'daily' } : { kind: 'grove' });
+  }, [grantTrackPack, liftIslandMist]);
+  const islandMist = useMistMission({ guided: false, keepGoingCost: GLOW.keepGoingCost, payKeepGoing: payIslandKeepGoing, active: islandEncounterActive, mission: null, encounter: islandEncounterRung?.mission.encounter ?? null, owner: 'mossprout', loadout: islandEncounter?.loadout ?? null, world: mergeWorld, tileNode: islandEncounterTileNode,
+    // A battle's wisps stand on the board's cells: they appear only once the dock has finished rising, where they stay.
+    boardMetrics: openingDockSettled ? openingBoardMetrics : null, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: completeIslandEncounter, onLeave: leaveIslandEncounter });
   islandMistOutcomeRef.current = { outcome: islandMist.encounter?.outcome ?? null, runId: islandMist.runId };
   const islandEncounterBusy = islandEncounterActive && !islandMist.landed;
   useEffect(() => {
@@ -1865,23 +1967,107 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => { leaveIslandEncounter(); return true; });
     return () => subscription.remove();
   }, [islandEncounterActive, leaveIslandEncounter]);
-  const enterDailyMist = useCallback((slot: 0 | 1 | 2, choice: EncounterLoadoutChoice) => {
-    const dayId = localDayId(new Date(gameNow()));
-    const mission = dailyMistMission(dayId, slot, mergeWorldRef.current);
+  /** A level from a track, docked under its tile: a friend's island under theirs, the Grove and the Daily Mist under Mossprout's. */
+  const enterTrackLevel = useCallback((node: LevelNode, choice: EncounterLoadoutChoice) => {
+    const mission = node.mission;
+    const open = trackOpenRef.current;
+    if (!mission || !open || hatchableStoryOpenRef.current) return;
+    const campaign = open.kind === 'island' ? islandCampaignById.get(open.campaignId) ?? null : null;
+    if (campaign && node.opensStory) {
+      // The story in front of this level plays first; the level starts when it closes.
+      setTrackOpen(null);
+      setTrackNotice(null);
+      setLevelAfterStory({ campaignId: campaign.campaignId, missionId: mission.id, choice });
+      runIslandCampaignActionRef.current?.(campaign);
+      return;
+    }
     const helperWispId = choice.helperWispId as EncounterLoadout['wispId'] | null;
     const loadout: EncounterLoadout = { companionId: choice.katchimeraId, level: katchimeraLevel(mergeWorldRef.current, choice.katchimeraId), ...(helperWispId ? { wispId: helperWispId } : {}) };
-    void startStoredEncounter({ missionId: mission.id, runId: encounterRunId(mission.encounter, 1, loadout), katchimeraId: choice.katchimeraId, helperWispId: helperWispId ?? null }).catch(() => undefined);
-    setDailyMistOpen(false);
-    setIslandEncounter({ mission, loadout });
+    void startStoredEncounter({ missionId: mission.id, runId: encounterRunId(mission.encounter, 1, loadout), ...(campaign ? { campaignId: campaign.campaignId } : {}), katchimeraId: choice.katchimeraId, helperWispId: helperWispId ?? null }).catch(() => undefined);
+    setTrackOpen(null);
+    setTrackNotice(null);
+    setIslandEncounter(campaign ? { campaignId: campaign.campaignId, islandId: campaign.islandId, mission, loadout } : { mission, loadout });
   }, []);
-  /** A rung of the Sleeping Grove, docked under Mossprout's tile. */
-  const enterGrove = useCallback((mission: RegionMissionDefinition, choice: EncounterLoadoutChoice) => {
-    const helperWispId = choice.helperWispId as EncounterLoadout['wispId'] | null;
-    const loadout: EncounterLoadout = { companionId: choice.katchimeraId, level: katchimeraLevel(mergeWorldRef.current, choice.katchimeraId), ...(helperWispId ? { wispId: helperWispId } : {}) };
-    void startStoredEncounter({ missionId: mission.id, runId: encounterRunId(mission.encounter, 1, loadout), katchimeraId: choice.katchimeraId, helperWispId: helperWispId ?? null }).catch(() => undefined);
-    setGroveOpen(false);
-    setIslandEncounter({ mission, loadout });
-  }, []);
+  useEffect(() => {
+    if (!trackReopen || !screenFocused || islandEncounter || interactionCreatureId || pendingIslandCampaign || upgradePresentation
+      || requiredUpgradeStory || pendingIslandDiscovery || selectedUpgrade || trackOpen) return;
+    // One beat, so the camera leaving the level or the story has settled before the tile is framed over the panel.
+    const timer = setTimeout(() => { setTrackNotice(null); setTrackOpen(trackReopen); setTrackReopen(null); }, 250);
+    return () => clearTimeout(timer);
+  }, [interactionCreatureId, islandEncounter, pendingIslandCampaign, pendingIslandDiscovery, requiredUpgradeStory, screenFocused, selectedUpgrade, trackOpen, trackReopen, upgradePresentation]);
+  const levelAfterStoryRef = useRef(levelAfterStory);
+  levelAfterStoryRef.current = levelAfterStory;
+  useEffect(() => {
+    if (!levelAfterStory || !screenFocused || islandEncounter || interactionCreatureId || pendingIslandCampaign || upgradePresentation
+      || requiredUpgradeStory || pendingIslandDiscovery || selectedUpgrade || trackOpen) return;
+    const timer = setTimeout(() => {
+      const waiting = levelAfterStoryRef.current;
+      setLevelAfterStory(null);
+      const campaign = waiting ? islandCampaignById.get(waiting.campaignId) : null;
+      const rung = campaign && waiting ? regionRung(campaign, waiting.missionId) : null;
+      if (!campaign || !rung || !waiting) return;
+      const status = islandCampaignChapterStatus(mergeWorldRef.current, campaign, rung.chapterLevel);
+      // The story it waited on opened its chapter: in it goes. Anything else (a chapter's close) lands back on the track.
+      if (status !== 'mission_available' && status !== 'in_encounter') { setTrackOpen({ kind: 'island', campaignId: campaign.campaignId }); return; }
+      const helperWispId = waiting.choice.helperWispId as EncounterLoadout['wispId'] | null;
+      const loadout: EncounterLoadout = { companionId: waiting.choice.katchimeraId, level: katchimeraLevel(mergeWorldRef.current, waiting.choice.katchimeraId), ...(helperWispId ? { wispId: helperWispId } : {}) };
+      void startStoredEncounter({ missionId: rung.mission.id, runId: encounterRunId(rung.mission.encounter, 1, loadout), campaignId: campaign.campaignId, katchimeraId: waiting.choice.katchimeraId, helperWispId: helperWispId ?? null }).catch(() => undefined);
+      setIslandEncounter({ campaignId: campaign.campaignId, islandId: campaign.islandId, mission: rung.mission, loadout });
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [interactionCreatureId, islandEncounter, levelAfterStory, pendingIslandCampaign, pendingIslandDiscovery, requiredUpgradeStory, screenFocused, selectedUpgrade, trackOpen, upgradePresentation]);
+  const trackOpenRef = useRef(trackOpen);
+  trackOpenRef.current = trackOpen;
+  const openTrack = useMemo(() => {
+    if (!trackOpen) return null;
+    if (trackOpen.kind === 'grove') return groveTrack(mergeWorld, { ftueComplete: !ftueStepId });
+    if (trackOpen.kind === 'daily') return dailyTrack(mergeWorld, localDayId(new Date(gameNow())));
+    const campaign = islandCampaignById.get(trackOpen.campaignId);
+    return campaign ? islandTrack(mergeWorld, campaign) : null;
+  }, [ftueStepId, mergeWorld, trackOpen]);
+  // The open track's levels as stepping-stones on its tile (held while a board is docked there).
+  const levelTrackStones = useMemo(() => openTrack && !islandEncounter ? {
+    islandId: openTrack.islandId,
+    stones: openTrack.levels.map((node) => ({ key: node.key, number: node.number, state: node.state, stars: node.stars, boss: node.boss, playable: node.playable })),
+  } : null, [islandEncounter, openTrack]);
+  /** A stone tapped: its level, with whoever and whichever Wisp came last time. */
+  const playTrackStone = useStableCallback((key: string) => {
+    const node = openTrack?.levels.find((candidate) => candidate.key === key);
+    if (!node?.playable) return;
+    const remembered = mergeWorldRef.current.encounters?.loadout;
+    const playable = PLAYABLE_KATCHIMERAS.filter((id) => id === 'mossprout' || mergeWorldRef.current.unlockedCharacters.includes(id));
+    const chosen = remembered && playable.includes(remembered.katchimeraId) ? remembered.katchimeraId : 'mossprout';
+    const katchimeraId = node.mission?.eligible && !node.mission.eligible.includes(chosen) ? node.mission.eligible[0]! as MergeCharacterId : chosen;
+    enterTrackLevel(node, { katchimeraId, helperWispId: remembered?.helperWispId ?? null });
+  });
+  const openTrackStory = useCallback((level: number) => {
+    const open = trackOpenRef.current;
+    const campaign = open?.kind === 'island' ? islandCampaignById.get(open.campaignId) : null;
+    void level;
+    setTrackOpen(null);
+    if (campaign) runIslandCampaignAction(campaign);
+  }, [runIslandCampaignAction]);
+  const revealFromTrack = useCallback(() => {
+    const open = trackOpenRef.current;
+    setTrackOpen(null);
+    if (open?.kind === 'island') void liftIslandMist(open.campaignId);
+  }, [liftIslandMist]);
+  const openTrackChest = useCallback(async (threshold: number) => {
+    const open = trackOpenRef.current;
+    const trackId = open?.kind === 'island' ? open.campaignId : open?.kind === 'grove' ? 'sleeping-grove' : null;
+    if (!trackId) return;
+    setTrackBusy(true);
+    try {
+      const result = await claimStoredTrackMilestone(trackId, threshold);
+      const claimed = result.milestoneClaimed;
+      if (claimed) {
+        grantTrackPack({ receiptId: claimed.receiptId, familyId: claimed.familyId, kind: claimed.pack });
+        setTrackNotice(`+${claimed.glow} Glow, and a friend pack is waiting with ${MERGE_CHARACTER_NAMES[claimed.familyId] ?? 'Mossprout'}.`);
+      } else if (result.message) setTrackNotice(result.message);
+    } catch (error) {
+      setTrackNotice(error instanceof Error ? error.message : 'The chest did not open. Try again.');
+    } finally { setTrackBusy(false); }
+  }, [grantTrackPack]);
   const restorationBoardVisible = Boolean(islandRestoration && restorationStore.state) && restorationOpen && screenFocused && !upgradePresentation && !interactionCreatureId && !pendingIslandCampaign && !stepplingMissionActive && !journeyMissionActive && !openingBoardActive && !islandEncounterActive;
   // The mist, given faces: wisps over the veiled tile take the merges' Glow; the last falls on the final item, and the mist lifts with it.
   // A friend's board has them too, over the island, for as long as the board is up; their hits come from the board's saved merges.
@@ -2126,7 +2312,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [islandRestoration, mechanicPreview]);
 
   useEffect(() => {
-    if (!screenFocused || pendingIslandDiscovery
+    if (!screenFocused || pendingIslandDiscovery || islandEncounter || trackOpen
       || interactionCreatureId || selectedUpgrade || upgradePresentation || requiredUpgradeStory || ordinaryUpgradeRun) return;
     // Not `mergeWorld.revision`: that bumps on every command in the game,
     // including ones that have nothing to do with this campaign (an energy
@@ -2202,8 +2388,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       ? stories.find((candidate) => candidate.campaign.campaignId === restorationFocusCampaignId)
       : stories.length === 1 ? stories[0] : undefined;
     if (story && advance(story) && !restorationFocusCampaignId) setRestorationFocusCampaignId(story.campaign.campaignId);
-  }, [flushMergeWorld, interactionCreatureId, mergeWorld, openIslandCampaignNarrative, ordinaryUpgradeRun,
-    pendingIslandDiscovery, requiredUpgradeStory, restorationFocusCampaignId, screenFocused, selectedUpgrade, upgradeOffers, upgradePresentation]);
+  }, [flushMergeWorld, interactionCreatureId, islandEncounter, mergeWorld, openIslandCampaignNarrative, ordinaryUpgradeRun,
+    pendingIslandDiscovery, requiredUpgradeStory, restorationFocusCampaignId, screenFocused, selectedUpgrade, trackOpen, upgradeOffers, upgradePresentation]);
 
   // Mossprout's wish plays once Steppling's garden lesson is over: a blocking
   // full-screen scene, then a guided walk to the first mist. Both phases are
@@ -2215,7 +2401,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     || (stepplingLesson.run ? stepplingLesson.run.status === 'completed' : stepplingShoeServed(mergeWorld)));
   const kingdomGoalWanted = screenFocused && stepplingLessonDone && !kingdomGoal?.introducedAt
     && loadFtueRun()?.status === 'complete' && hatchableRuns.discovery[HATCHABLE_COMPANIONS[0]!.companion]?.status === 'completed'
-    && !sharedUpgrade && !upgradePresentation && !requiredUpgradeStory && !stepplingEggOpen && !pendingIslandDiscovery;
+    && !sharedUpgrade && !upgradePresentation && !requiredUpgradeStory && !stepplingEggOpen && !pendingIslandDiscovery && !islandEncounter && !trackOpen;
   // Steppling's page has to be gone before the wish, not behind it. Two
   // full-screen sheets that swap in the same frame can leave the second one
   // unpresented, and his ordinary greeting would otherwise speak over the
@@ -2234,7 +2420,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const kingdomGoalGuideActive = Boolean(screenFocused && kingdomGoal?.introducedAt && kingdomGoal.coachmarkSeenAt == null && goalIslandOffer
     && !ftueStepId && !adventureOpen && !lanternSurfaceOpen && !progressSheetOpen && !wakeHandoffCampaign && !selectedUpgrade
     && !eventBoardActive && !openingBoardActive && !stepplingMissionActive && !journeyMissionActive && !restorationBoardVisible && !upgradeHandoffPending
-    && !interactionCreatureId && !activeInteractionResidentId && !stepplingEggOpen && !upgradePresentation && !requiredUpgradeStory && !ordinaryUpgradeRun);
+    && !interactionCreatureId && !activeInteractionResidentId && !stepplingEggOpen && !upgradePresentation && !requiredUpgradeStory && !ordinaryUpgradeRun
+    // A level on a tile, or a track open over one, owns the camera and the touches: the guide never comes back over it.
+    && !islandEncounter && !trackOpen);
   const goalFocusStartedRef = useRef(false);
   useEffect(() => {
     if (!kingdomGoalGuideActive) { goalFocusStartedRef.current = false; return; }
@@ -2295,6 +2483,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const openUpgradeOffer = useCallback(async (offer: WorldUpgradeOffer) => {
     // The trial's clock on the Rush Track opens today's ladder, not an upgrade.
     if (offer.trial) { setRushNotice(null); setRushSheetOpen(true); return; }
+    // Mossprout's own tile carries the Grove's track, and the Daily Mist's once the Grove is done.
+    if (offer.id === HOME_TRACK_OFFER_ID && offer.track) { setTrackNotice(null); setTrackOpen({ kind: offer.track.kind === 'daily' ? 'daily' : 'grove' }); return; }
     if (upgradePressBusy.current || upgradePurchasing || upgradePresentation) return;
     // Resting friends are on the map from the first frame, but not yet the player's business.
     if (offer.sleepingSkinId && ftueStepId) return;
@@ -2307,6 +2497,35 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (offerCampaignId && activeIslandRestoration(mergeWorldRef.current, offerCampaignId)) {
       setRestorationOpen(true);
       return;
+    }
+    // A friend's island is its level track: the Mist to lift, then each chapter's levels with the story between.
+    // A reveal waiting on its discovery keeps the panel it always had, which carries that moment.
+    if (offerCampaignId && !ftueStepId) {
+      // A friend's hatch story (Steppling's clearing, the next hatchable's) owns the camera and its panel until it
+      // is finished: a level started under it framed the wrong tile and took no touches. The tap goes back to it.
+      if (hatchableStoryOpenRef.current) {
+        setSelectedUpgrade(null);
+        setGlowPanelOpen(true);
+        void resumeActiveHatchable();
+        return;
+      }
+      const world = mergeWorldRef.current;
+      const campaign = islandCampaignById.get(offerCampaignId);
+      const revealed = campaign ? Boolean(world.haven.mossproutNatureIslandReveals[campaign.islandId] || (world.haven.mossproutNatureIslands[campaign.islandId] ?? 0) > 0) : false;
+      const discovered = world.islandCampaigns?.[offerCampaignId]?.discoveryRevealSeenAt != null;
+      // A misted friend waits for the Kingdom's goal (told after Steppling's first day): the story points at them first.
+      if (campaign && !revealed && world.kingdomGoal?.introducedAt == null) { setSelectedUpgrade(null); return; }
+      if (campaign && (!revealed || discovered)) {
+        // The goal's guide pointed here: tapping its island is the guide done (it would otherwise come back over the level).
+        if (goalIslandIdRef.current && offer.id === `nature:${goalIslandIdRef.current}` && world.kingdomGoal?.introducedAt && world.kingdomGoal.coachmarkSeenAt == null) {
+          setGoalCoachmarkArmed(false);
+          void acknowledgeStoredKingdomGoalCoachmark().catch(() => undefined);
+        }
+        setTrackNotice(null);
+        setTrackOpen({ kind: 'island', campaignId: offerCampaignId });
+        setSelectedUpgrade(null);
+        return;
+      }
     }
     upgradePressBusy.current = true;
     setUpgradeError(null); setUpgradeCommitted(false);
@@ -2365,7 +2584,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         try { result = await payStoredHatchableMission(confirmedHatchable.companion, hatchableTicketReceiptId(confirmedHatchable.discoveryFlow.runId)); }
         catch (error) { setGlowSpend(null); throw error; }
         const paid = Boolean(result.state.hatchableMissions?.[confirmedHatchable.companion] || result.state.worldUnlocks?.[confirmedHatchable.tile.unlockId]);
-        if (!paid) { setGlowSpend(null); throw new Error(result.message ?? 'Earn a few more Glow through Merge orders.'); }
+        if (!paid) { setGlowSpend(null); throw new Error(result.message ?? 'Clear the Mist to earn more Glow.'); }
         if (cost > 0 && result.changed) {
           const spent = result.state.coins;
           void measureGlowCurrencyOrigin().then((origin) => {
@@ -2397,7 +2616,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // Sleeping islands arrive from the offers layer already locked, in wake order.
   // Once Dashkit is home the Rush Track's marker is the trial's clock, with today's heats, unless a story chapter is mid-run on it.
   const rushTrialOpen = (mergeWorld.haven.mossproutNatureIslands[WISP_RUSH_HOST.islandId] ?? 0) >= WISP_RUSH_HOST.unlockLevel && !activeIslandRestoration(mergeWorld, WISP_RUSH_HOST.campaignId);
-  const presentedUpgradeOffers = useMemo(() => {
+  const rushTrialOffers = useMemo(() => {
     if (!rushTrialOpen) return upgradeOffers;
     const day = timeTrialFor(mergeWorld).days[localDayId(new Date(gameNow()))];
     const trial = { heat: nextHeatIndex(day) + 1, total: HEATS_PER_DAY, done: heatsCleared(day) >= HEATS_PER_DAY };
@@ -2407,9 +2626,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const clock: WorldUpgradeOffer = { ...base, trial, eligible: !trial.done, affordable: !trial.done, missingGlow: 0, markerSkinId: undefined, restorationProgress: undefined, lockedReason: undefined };
     return upgradeOffers.some((offer) => offer.id === id) ? upgradeOffers.map((offer) => (offer.id === id ? clock : offer)) : [...upgradeOffers, clock];
   }, [mergeWorld, rushTrialOpen, upgradeOffers]);
+  const presentedUpgradeOffers = useMemo(() => withTrackBadges(mergeWorld, rushTrialOffers, !ftueStepId), [ftueStepId, mergeWorld, rushTrialOffers]);
   // Alone until the hatch: no markers at all until the islands are drawn. And none while any mini board is
   // docked (the opening's, Steppling's, a friend's): the board is the only thing to do until it is put away.
-  const missionBoardDocked = eventBoardActive || openingBoardActive || stepplingMissionActive || journeyMissionActive || restorationBoardVisible || Boolean(rushSpec);
+  // A level docked under a tile (a friend's island, the Grove, the Daily Mist) holds the world like every other board: no markers, no taps on tiles.
+  const missionBoardDocked = eventBoardActive || openingBoardActive || stepplingMissionActive || journeyMissionActive || restorationBoardVisible || Boolean(rushSpec) || islandEncounterActive;
   const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : missionBoardDocked ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun, activeHatchable.tile.id);
 
   // The canvas is memoised, and it holds only if none of its props change identity on an ordinary
@@ -2466,7 +2687,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   );
 
   // A friend without a page is looked at on a detail card: that is an interaction too, and nothing of the world's begins under it.
-  const sharedAdventureAllowed = !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !detailCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId && !rushSheetOpen && !rushSpec;
+  const sharedAdventureAllowed = !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !detailCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId && !rushSheetOpen && !rushSpec && !islandEncounter && !trackOpen;
   const heartwoodRecap = sharedAdventureAllowed && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed') && !havenMergeBoardActive && (mergeWorld.haven.tileStages.mossprout ?? 0) >= 1 && needsHeartwoodRecap(mergeWorld);
   const worldEventsAllowed = sharedAdventureAllowed && !havenMergeBoardActive && !heartwoodRecap;
   // havenMergeBoardActive means an owned Mossprout can open the Garden, not
@@ -2553,7 +2774,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           <GardenEventAdornment world={mergeWorld} onExplore={eventActions.length ? () => { void openWorldEvent(eventActions[0]); } : undefined} />
         </View> : null}
         background={background}
-        cameraLocked={lanternSurfaceOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(upgradeStageSubject) || Boolean(requiredUpgradeStory) || restorationBoardVisible || rushSheetOpen || Boolean(rushSpec)}
+        cameraLocked={lanternSurfaceOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(upgradeStageSubject) || Boolean(requiredUpgradeStory) || restorationBoardVisible || rushSheetOpen || Boolean(rushSpec) || islandEncounterActive}
         discoveredEggInteraction={stepplingEncounter.open}
         gatewayTileId={activeHatchable.tile.id}
         discoveredEggPresentation={stepplingEncounter.presentation}
@@ -2571,6 +2792,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         highlightedLockedFamilyId={null}
         interactionEnabled={!lanternSurfaceOpen && !activeInteractionResidentId && !stepplingEncounter.open && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
         interactionExitNonce={interactionExitNonce}
+        levelTrackStones={levelTrackStones}
+        onLevelTrackStonePress={playTrackStone}
         interactionNatureIslandId={pendingIslandCampaign?.campaign.islandId ?? null}
         preserveInteractionCameraOnExit={Boolean(pendingIslandCampaign || eventSelection || interactionExitHandsOver)}
         interactionResidentAnchorY={ftueReturnResidentAnchorY}
@@ -2679,8 +2902,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onGarden={() => { setLanternUpgradeOpen(false); openGarden(undefined, 'mossprout'); }} /> : null}
       {friendWispsFamilyId && screenFocused ? <FriendWispsSheet familyId={friendWispsFamilyId}
         friendName={katchimeraFamilyById.get(friendWispsFamilyId)?.displayName ?? 'your friend'} onClose={() => setFriendWispsFamilyId(null)} /> : null}
-      {groveOpen && !islandEncounter && screenFocused ? <GroveSheet world={mergeWorld} ftueComplete={!ftueStepId} layout={upgradeStage} bottomInset={insets.bottom} ownedWispIds={Object.keys(wispState.unlocked)} onEnter={enterGrove} onClose={() => setGroveOpen(false)} /> : null}
-      {dailyMistOpen && !islandEncounter && screenFocused ? <DailyMistSheet world={mergeWorld} dayId={localDayId(new Date(gameNow()))} layout={upgradeStage} bottomInset={insets.bottom} ownedWispIds={Object.keys(wispState.unlocked)} onEnter={enterDailyMist} onClose={() => setDailyMistOpen(false)} /> : null}
+      {openTrack && !islandEncounter && screenFocused ? <LevelTrackSheet key={openTrack.id} track={openTrack} world={mergeWorld} layout={upgradeStage} bottomInset={insets.bottom}
+        ownedWispIds={Object.keys(wispState.unlocked)} busy={trackBusy} notice={trackNotice}
+        onPlay={enterTrackLevel} onStory={openTrackStory} onReveal={revealFromTrack} onChest={(threshold) => { void openTrackChest(threshold); }}
+        onClose={() => { setTrackOpen(null); setTrackNotice(null); }} /> : null}
       {rushSheetOpen && !rushSpec && screenFocused ? <WispRushSheet world={mergeWorld} dayId={localDayId(new Date(gameNow()))} hostName={WISP_RUSH_HOST.hostName} layout={upgradeStage} bottomInset={insets.bottom}
         result={rushResult} notice={rushNotice} storyLabel={`${WISP_RUSH_HOST.hostName}’s story`}
         onPlay={playRushHeat} onOpenChest={openRushChest} onClose={() => setRushSheetOpen(false)}
@@ -2866,8 +3091,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onSharedAdventure={SHARED_ADVENTURE_ENABLED && kingdomGoal?.introducedAt ? () => { setProgressSheetOpen(false); setAdventureOpen(true); } : undefined}
         world={mergeWorld}
         onMerge={() => { setProgressSheetOpen(false); openGarden(); }}
-        onDailyMist={dailyMistUnlocked(mergeWorld) ? () => { setProgressSheetOpen(false); setDailyMistOpen(true); } : undefined}
-        onGrove={!ftueStepId ? () => { setProgressSheetOpen(false); setGroveOpen(true); } : undefined}
+        onDailyMist={dailyMistUnlocked(mergeWorld) && !hatchableStoryOpen ? () => { setProgressSheetOpen(false); setTrackOpen({ kind: 'daily' }); } : undefined}
+        onGrove={!ftueStepId && !hatchableStoryOpen ? () => { setProgressSheetOpen(false); setTrackOpen({ kind: 'grove' }); } : undefined}
         onExplore={(id) => { setProgressSheetOpen(false); const action = eventActions.find(a => a.event.id === id); if (action) void openWorldEvent(action); }}
       /> : null}
       {screenFocused && wakeHandoffCampaign && !pendingIslandCardReveal && !sharedUpgrade && !upgradePresentation && !interactionCreatureId && goalIslandId ? <IslandWakeHandoffSheet

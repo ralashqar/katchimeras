@@ -38,6 +38,8 @@ export type HatchableTileDefinition = {
 export type HatchableAvailability =
   | { kind: 'after_ftue' }
   | { kind: 'kingdom_goal_introduced' }
+  /** Once an island friend is home (their island story finished): a Katchimera rescued at the end of a friend's campaign. */
+  | { kind: 'island_friend_home'; residentSkinId: string }
   | { kind: 'after_companion'; companion: MergeCharacterId }
   /** An event introduces this permanent tile; its normal rescue arc takes over. */
   | { kind: 'event_joined'; eventId: string };

@@ -62,6 +62,9 @@ export type MergePlaySurfaceProps = {
   onRailTargetRef?: (targetKey: string, view: View | null) => void;
   onReroll: Parameters<typeof MergeOrderRail>[0]['onReroll'];
   onScreenMetrics?: (metrics: MergeBoardScreenMetrics) => void;
+  /** The cell a held piece is over (-1 when none). */
+  onHoverCell?: (cell: number, source: number) => void;
+  externalEffects?: ComponentProps<typeof FeastlePersistentMergeBoard>['externalEffects'];
   onSelect: (cell: number | null) => void;
   onServe: (order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => Promise<boolean> | boolean;
   onUseGrovelight: (gateId: string) => void;
@@ -112,6 +115,8 @@ export const MergePlaySurface = memo(function MergePlaySurface({
   onRailTargetRef,
   onReroll,
   onScreenMetrics,
+  onHoverCell,
+  externalEffects,
   onSelect,
   onServe,
   onUseGrovelight,
@@ -184,6 +189,8 @@ export const MergePlaySurface = memo(function MergePlaySurface({
             onInspectMist={onInspectMist}
             onInspectRootbound={onInspectRootbound}
             onScreenMetrics={onScreenMetrics}
+            onHoverCell={onHoverCell}
+            externalEffects={externalEffects}
             onSelect={onSelect}
             onVisualReady={onVisualReady}
             screenMetricsRevision={screenMetricsRevision}

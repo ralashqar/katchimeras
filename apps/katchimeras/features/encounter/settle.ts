@@ -6,8 +6,8 @@ import type { MergeItemDefinition, MergeWorldCommand, MergeWorldCommandResult, M
 import type { MechanicEffect, MissionMechanicState, MissionStrike } from '@/types/mission-mechanic';
 import { actionOf, resolveCost } from './costs';
 import { placeSpawner } from './create-state';
-import { canAfford, encounterStatus, spend, type EncounterRunState, type EncounterStatus } from './encounter-run';
-import { clearBoundMist, clearMistAround, type MistOpened } from './mist';
+import { canAfford, encounterStatus, objectiveMet, recordCoverage, spend, type EncounterRunState, type EncounterStatus } from './encounter-run';
+import { clearBoundMist, harmonyPulse, type MistOpened } from './mist';
 import { seededUnit } from './seed';
 
 /**
@@ -53,11 +53,13 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
   const unchanged = (refused?: MergeWorldFailureReason): SettleResult => ({ ...before, strike: null, effects: [], opened: [], status: encounterStatus(encounter, host, before.mechanicState, before.run, before.state, window), ...(refused ? { refused } : {}) });
   const action = actionOf(command, result);
   if (!action) return unchanged();
-  const cost = resolveCost(action);
+  // A territory battle: nothing costs; a turn is a merge, and only merges give the wisps their turn.
+  const territory = Boolean(before.run.territory);
+  const cost = territory ? 0 : resolveCost(action);
   if (!canAfford(before.run, cost)) return unchanged('out_of_resolve');
 
   let state = result.state;
-  let run = spend(before.run, cost);
+  let run = territory && action === 'merge' ? { ...before.run, actions: before.run.actions + 1 } : spend(before.run, cost);
   let mechanicState = before.mechanicState;
   let strike: MissionStrike | null = null;
   const opened: MistOpened[] = [];
@@ -71,9 +73,9 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
     const resolved = strikeFor(mechanic, host, window, mechanicState, event, items);
     mechanicState = resolved.next;
     strike = resolved.strike;
-    // The Mist beside what was made wears down; the Mist bound to a wisp that fell lets go.
+    // The Harmony pulse wears the Mist in reach of what was made; the Mist bound to a wisp that fell lets go.
     if (event) {
-      const around = clearMistAround(state, result.mergedCell, event.resultDefinitionId, window, items);
+      const around = harmonyPulse(state, result.mergedCell, event.resultDefinitionId, window, items);
       state = around.board;
       opened.push(...around.opened);
     }
@@ -110,11 +112,14 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
     if (spawner) state = placeSpawner(state, spawner, entry.cell);
   }
   // The wisps' turn, once the player's action has cost them something and the Dark Wisps' delay is spent.
-  if (cost > 0 && run.actions > run.delay) {
+  // A territory battle: after every merge that did not just win the level.
+  const wispsTurn = territory ? action === 'merge' && run.merges > run.delay && !objectiveMet(encounter, host, mechanicState, run) : cost > 0 && run.actions > run.delay;
+  if (wispsTurn) {
     const turn = afterAction(mechanic, host, mechanicState, state, { window, action: action === 'tap' ? 'tap' : 'merge', rng, items });
     mechanicState = turn.state;
     state = turn.board;
     effects = turn.effects;
   }
+  run = recordCoverage(run, state, window);
   return { state, run, mechanicState, strike, effects, opened, status: encounterStatus(encounter, host, mechanicState, run, state, window) };
 }

@@ -3,13 +3,13 @@ import test from 'node:test';
 
 import { DAILY_MIST_TEMPLATES } from '@/constants/daily-mist-templates';
 import { dailyMissionId, dailyMistChains, dailyMistDay, dailyMistMissions, dailyMistUnlocked, fillDailyTemplate } from '@/features/encounters/daily-mist';
-import { solveEncounter } from '@/features/encounter/solvability';
+import { fairness } from '@/features/encounter/playtest';
 import { validateEncounterDefinition } from '@/features/encounter/validate-encounter';
 import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 
 const NOW = Date.UTC(2026, 8, 22, 9);
 
-test('the same day makes the same three patches for everyone, each sound and clearable inside its Resolve; another day differs', () => {
+test('the same day makes the same three patches for everyone, each sound, played by Light and won by the careful player; another day differs', () => {
   const a = dailyMistMissions('2026-09-22');
   const b = dailyMistMissions('2026-09-22');
   assert.deepEqual(a, b);
@@ -18,10 +18,12 @@ test('the same day makes the same three patches for everyone, each sound and cle
   for (const mission of a) {
     const issues = validateEncounterDefinition(mission.encounter);
     assert.deepEqual(issues, [], `${mission.id}: ${issues.join(' | ')}`);
-    const solution = solveEncounter(mission.encounter);
-    assert.ok(solution.minActions != null && mission.encounter.resolve! - solution.minActions >= 3, `${mission.id}: ${solution.minActions} within ${mission.encounter.resolve}`);
+    assert.equal(mission.encounter.resolve, null, 'no Resolve: a territory battle, lost to the Mist');
+    assert.ok((mission.encounter.territory?.overrun ?? 0) >= 0.5);
+    assert.ok(mission.encounter.mechanic?.kind === 'dark-wisps' && mission.encounter.mechanic.wisps.every((wisp) => wisp.placement.kind === 'cell'), 'every wisp nests on the board');
+    assert.ok(fairness(mission.encounter, 'careful', 5).wins >= 4, `${mission.id}: the careful player wins it`);
     assert.equal(mission.encounter.mechanic?.kind, 'dark-wisps');
-    assert.equal(mission.encounter.storageKey, `katchimeras.daily-mist.2026-09-22.${mission.id.at(-1)}.v1`);
+    assert.equal(mission.encounter.storageKey, `katchimeras.daily-mist.2026-09-22.${mission.id.at(-1)}.v4`);
   }
   const later = dailyMistMissions('2026-09-23');
   assert.notDeepEqual(later.map((mission) => mission.encounter.seed), a.map((mission) => mission.encounter.seed), 'a new day is a new layout');
@@ -45,10 +47,10 @@ test('a week of days all clear, from every template', () => {
   }
 });
 
-test('the day opens with the Kingdom goal, its chains widen with hatched friends, and a cleared slot is written to the day', () => {
+test('the day opens once the Grove’s fifth patch is cleared, its chains widen with hatched friends, and a cleared slot is written to the day', () => {
   const world = createInitialMergeWorldState(NOW, ['mossprout']);
   assert.equal(dailyMistUnlocked(world), false);
-  assert.equal(dailyMistUnlocked({ kingdomGoal: { introducedAt: NOW, coachmarkSeenAt: null } }), true);
+  assert.equal(dailyMistUnlocked({ encounters: { receipts: [], clears: { 'sleeping-grove:5': { firstClearedAt: NOW, clears: 1, bestGrade: 'cleared', lastKatchimeraId: 'mossprout' } }, active: null, loadout: null, daily: {}, lastOutcome: null } }), true);
   assert.deepEqual(dailyMistChains(world).map((chain) => chain.chainId), ['nature:garden']);
   assert.deepEqual(dailyMistChains({ unlockedCharacters: ['mossprout', 'steppling'] }).map((chain) => chain.chainId), ['nature:garden', 'adventure:trail']);
   assert.deepEqual(dailyMistDay(world, '2026-09-22').map((entry) => entry.cleared), [null, null, null]);

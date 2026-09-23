@@ -70,7 +70,7 @@ export function strikeFor(mechanic: MissionMechanicDefinition, host: MissionMech
   // by the heat's dock; a stored board never resolves one.
   if (mechanic.kind === 'wisp-rush') return { next: state, strike: null };
   if (mechanic.kind === 'column-shot' && state.kind === 'column-shot') return columnShotStrike(mechanic, window, state, event, items);
-  if (mechanic.kind === 'dark-wisps' && state.kind === 'dark-wisps') return darkWispsStrike(mechanic, state, event, items);
+  if (mechanic.kind === 'dark-wisps' && state.kind === 'dark-wisps') return darkWispsStrike(mechanic, state, event, items, window);
   const strike = glowStrikeAt(host, state.strikes, 'glow', event.resultCell, event.resultDefinitionId);
   return { next: { kind: 'glow-strikes', strikes: state.strikes + 1 }, strike };
 }
@@ -91,7 +91,11 @@ export function applyStrike(mechanic: MissionMechanicDefinition, state: MissionM
 export function syncMechanicState(mechanic: MissionMechanicDefinition, shown: MissionMechanicState, incoming: MissionMechanicState): MissionMechanicState {
   if (mechanic.kind === 'wisp-rush' && shown.kind === 'wisp-rush' && incoming.kind === 'wisp-rush') return syncWispRush(shown, incoming);
   if (mechanic.kind === 'dark-wisps' && shown.kind === 'dark-wisps' && incoming.kind === 'dark-wisps') {
-    return shown.actions === incoming.actions && shown.damage.every((value, index) => value === incoming.damage[index]) ? shown : { ...shown, actions: incoming.actions, damage: [...incoming.damage] };
+    // v2: the intents, wards and calls move with the board too.
+    const same = (a?: readonly unknown[], b?: readonly unknown[]) => (a ?? []).length === (b ?? []).length && (a ?? []).every((value, index) => value === b![index]);
+    // Territory: nests move (a burrow, a call) and spores come and go with them.
+    if (shown.actions === incoming.actions && same(shown.damage, incoming.damage) && same(shown.countdown, incoming.countdown) && same(shown.ward, incoming.ward) && same(shown.called, incoming.called) && same(shown.cycle, incoming.cycle) && same(shown.nest, incoming.nest) && (shown.spores ?? []).length === (incoming.spores ?? []).length) return shown;
+    return { ...shown, actions: incoming.actions, damage: [...incoming.damage], countdown: incoming.countdown && [...incoming.countdown], cycle: incoming.cycle && [...incoming.cycle], ward: incoming.ward && [...incoming.ward], gathered: incoming.gathered && [...incoming.gathered], called: incoming.called && [...incoming.called], nest: incoming.nest && [...incoming.nest], split: incoming.split && [...incoming.split], spores: incoming.spores && incoming.spores.map((spore) => ({ ...spore })) };
   }
   return shown;
 }

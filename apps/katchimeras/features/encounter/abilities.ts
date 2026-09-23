@@ -20,6 +20,8 @@ export const abilityReady = (run: EncounterRunState, tier: CompanionAbilityTier)
 export type AbilityEffect =
   | { kind: 'bloomed'; cell: number; definitionId: string }
   | { kind: 'revealed'; opened: MistOpened[] }
+  /** v2 (Trailfinder): every wisp's next move a turn further off. */
+  | { kind: 'pushed_back' }
   | { kind: 'focused'; generatorId: string; charges: number };
 
 /** Cells the ability may be used on: plants Bloom can raise, spawners Focus can tend; none for Trailfinder. */
@@ -44,8 +46,10 @@ export function applyAbility(definition: CompanionAbilityDefinition, tier: Compa
   const effects: AbilityEffect[] = [];
   if (definition.targeting === 'none') {
     const revealed = revealMistCells(board, window, tier.cells ?? 1);
-    if (!revealed.opened.length) return null;
-    effects.push({ kind: 'revealed', opened: revealed.opened });
+    // Trailfinder also sets every wisp's next move a turn further off, so in a territory battle it is never wasted.
+    if (!revealed.opened.length && !run.territory) return null;
+    if (revealed.opened.length) effects.push({ kind: 'revealed', opened: revealed.opened });
+    if (run.territory) effects.push({ kind: 'pushed_back' });
     return { board: revealed.board, run: spent, effects };
   }
   const targets = abilityTargets(definition, tier, board, window, items);

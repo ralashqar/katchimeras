@@ -53,7 +53,8 @@ export function solveBudget(encounter: EncounterDefinition): { resolve: number; 
 export const budgetKey = (encounter: EncounterDefinition) => `${encounter.id}:${encounterFingerprint(encounter)}`;
 
 export function withSolvedBudget(encounter: EncounterDefinition, options: { rush?: boolean } = {}): EncounterDefinition {
-  if (options.rush || encounter.resolve != null) return encounter;
+  // A territory battle has no Resolve budget to read.
+  if (options.rush || encounter.resolve != null || encounter.territory != null) return encounter;
   const key = budgetKey(encounter);
   const cached = memo.get(key);
   if (cached) return cached;

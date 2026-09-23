@@ -160,11 +160,15 @@ export function mergeWorldItemArt(definitionId: string): ArtSource | null {
  * board alone, and changed face the moment it landed).
  */
 export function mergeWorldGeneratorArt(generatorId: string, options?: { level?: number }) {
+  if (generatorId === 'mist-spring') return MIST_SPRING_ART;
   if (generatorId === 'wild-garden' && (options?.level ?? 1) >= 3) return MOSSPROUT_PROGRESSION_ART.wildGardenUpgrades[1];
   if (generatorId === 'wild-garden' && (options?.level ?? 1) >= 2) return MOSSPROUT_PROGRESSION_ART.wildGardenUpgrades[0];
   if (generatorId === 'memory-nursery') return MOSSPROUT_PROGRESSION_ART.memoryNursery[Math.max(0, Math.min(2, (options?.level ?? 1) - 1))];
   return MERGE_WORLD_GENERATOR_ART[generatorId as MergeWorldAuthoredGeneratorId] ?? null;
 }
+
+/** Encounter v2: the Spring a battle's Mist hides. */
+const MIST_SPRING_ART = require('@incubator/art-merge-world/generators/mist-spring.webp');
 
 export const MOSSPROUT_PROGRESSION_ART = {
   memoryNursery: [

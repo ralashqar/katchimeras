@@ -1,7 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
-import { templateEncounter } from '@/constants/island-campaigns/ladder';
-import { encounterFromRestoration } from '@/features/encounter/adapt';
+import { chapterBoards, mistLevelBoard } from '@/constants/island-campaigns/ladder';
 import { budgetKey, solveBudget } from '@/features/encounter/budget';
 import type { EncounterDefinition } from '@/types/encounter';
 
@@ -9,12 +8,13 @@ import type { EncounterDefinition } from '@/types/encounter';
  * The Resolve budget of every bundled board that is authored without one (the
  * friends' islands, read as ladders): searched once here, read at runtime.
  */
-const DIFFICULTY = ['calm', 'thick', 'thick', 'dark'] as const;
 const boards: EncounterDefinition[] = [];
-for (const campaign of ISLAND_CAMPAIGNS) for (const chapter of campaign.chapters) {
-  if (chapter.missions?.length) { for (const mission of chapter.missions) if (!mission.rush && mission.encounter.resolve == null) boards.push(mission.encounter); continue; }
-  if (chapter.restoration) { if (!chapter.restoration.rush) boards.push(encounterFromRestoration(chapter.restoration, campaign.campaignId, chapter.level, `katchimeras.mist-mission.${campaign.campaignId}.${chapter.level}.v1`, chapter.fallbackOrder.requirements, DIFFICULTY[chapter.level - 1])); continue; }
-  boards.push(templateEncounter(campaign, chapter));
+for (const campaign of ISLAND_CAMPAIGNS) {
+  // Territory battles have no Resolve budget; only the older boards left are searched.
+  if (mistLevelBoard(campaign).territory == null) boards.push(mistLevelBoard(campaign));
+  for (const chapter of campaign.chapters) for (const mission of chapterBoards(campaign, chapter)) {
+    if (!mission.rush && mission.encounter.resolve == null && mission.encounter.territory == null) boards.push(mission.encounter);
+  }
 }
 const table: Record<string, ReturnType<typeof solveBudget>> = {};
 for (const board of boards) table[budgetKey(board)] = solveBudget(board);

@@ -29,7 +29,7 @@ test('completeEncounter pays once per receipt, records the clear and the best gr
   assert.equal(first.state.coins, 10 + 25);
   assert.equal(first.state.katchimeraProgress?.mossprout?.xp, 15);
   assert.deepEqual(first.state.encounters?.clears['test:rung'], { firstClearedAt: NOW, clears: 1, bestGrade: 'bright', lastKatchimeraId: 'mossprout' });
-  assert.deepEqual(first.encounterCleared, { missionId: 'test:rung', glow: 25, xp: 15, grade: 'bright', firstClear: true, katchimeraId: 'mossprout' });
+  assert.deepEqual(first.encounterCleared, { missionId: 'test:rung', glow: 25, xp: 15, grade: 'bright', firstClear: true, katchimeraId: 'mossprout', trackId: 'test:rung' });
   assert.equal(first.state.encounters?.lastOutcome?.ackedAt, null);
   const again = reduceMergeWorld(first.state, command);
   assert.equal(again.changed, false, 'the same receipt pays nothing more');
@@ -68,8 +68,9 @@ test('an encounter that is up is remembered with its loadout, and put down again
 test('the last rung of a chapter raises the island to the chapter’s level, free, on its first clear', () => {
   const petalimp = ISLAND_CAMPAIGNS.find((campaign) => campaign.campaignId.includes('petalimp'))!;
   const ladder = regionLadder(petalimp);
-  const first = ladder[0]!;
-  assert.equal(first.lastOfChapter, true, 'a chapter with one rung: its rung is the last');
+  // The first chapter's last level grows the island.
+  const first = ladder.find((rung) => rung.chapterLevel === 1 && rung.lastOfChapter)!;
+  assert.equal(ladder.filter((rung) => rung.chapterLevel === 1).length, 2);
   const world: MergeWorldState = greetIslandFriend(revealIsland({ ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 200 }, petalimp, NOW), petalimp, NOW + 1);
   const done = reduceMergeWorld(world, { type: 'completeEncounter', receiptId: 'r', missionId: first.mission.id, campaignId: petalimp.campaignId, katchimeraId: 'mossprout', helperWispId: null, outcome: cleared(), difficulty: first.mission.difficulty, now: NOW });
   assert.equal(done.changed, true);

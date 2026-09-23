@@ -119,7 +119,9 @@ export function missionBoardStep(mission: Omit<HatchableMissionDefinition, 'came
   const idPrefix = `mission.${mission.id.replace(/^mission:/, '')}`;
   const mechanic = resolveMechanic(mission);
   const move = mechanicMove(mechanic, state, mechanicState ?? createMechanicState(mechanic), missionWindow());
-  if (merges === 0 && move?.kind === 'merge') {
+  // The first-merge lesson holds the board to one drag; a board with no words for it (an encounter played unguided) has no lesson.
+  const firstMergeTaught = Boolean(guides.firstMerge.title || guides.firstMerge.body);
+  if (merges === 0 && move?.kind === 'merge' && firstMergeTaught) {
     const from: FtueTarget = { kind: 'board_cell', cell: move.from };
     const to: FtueTarget = { kind: 'board_cell', cell: move.to };
     return {

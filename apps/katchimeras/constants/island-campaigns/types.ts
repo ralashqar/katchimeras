@@ -159,6 +159,8 @@ export type IslandWakeCondition =
   | { kind: 'friend_home'; residentSkinId: KatchimeraSkinId }
   /** Once the Heart Tree has reached a stage (content schema 7). */
   | { kind: 'tree_stage'; stage: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage }
+  /** Once a level has been cleared (a Grove rung, another island's level): content packs gate on play, never on Glow. */
+  | { kind: 'rung_cleared'; missionId: string }
   | { kind: 'always' };
 
 export type IslandCampaignDefinition<S extends string = string> = {

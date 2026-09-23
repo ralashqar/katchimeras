@@ -54,6 +54,8 @@ export function hatchableAvailable(state: MergeWorldState, definition: Hatchable
   if (availability.kind === 'event_joined') return Boolean(state.localLiveOps?.runs[availability.eventId]);
   if (availability.kind === 'after_ftue') return true;
   if (availability.kind === 'kingdom_goal_introduced') return state.kingdomGoal?.introducedAt != null;
+  if (availability.kind === 'island_friend_home') return state.ownedKatchimeraCards.some((card) => card.cardId === availability.residentSkinId)
+    || Object.values(state.islandCampaigns ?? {}).some((campaign) => campaign.residentSkinId === availability.residentSkinId && campaign.cardEarnedAt != null);
   return state.companionDiscovery.records.some((record) => record.characterId === availability.companion);
 }
 export type HatchableTileState = 'sleeping' | 'saving' | 'ready' | 'board' | 'egg' | 'open';

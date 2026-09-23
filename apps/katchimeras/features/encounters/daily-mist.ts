@@ -2,7 +2,8 @@ import { DAILY_MIST_CHAINS, DAILY_MIST_GLOW, DAILY_MIST_SLOT_NAMES, DAILY_MIST_T
 import type { RegionMissionDefinition } from '@/constants/island-campaigns/types';
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { hashSeed, seededUnit } from '@/features/encounter/seed';
-import { solveEncounter } from '@/features/encounter/solvability';
+import { fairness } from '@/features/encounter/playtest';
+import { OVERRUN_BY_DIFFICULTY, withNests } from '@/constants/island-campaigns/island-levels';
 import { validateEncounterDefinition } from '@/features/encounter/validate-encounter';
 import { missionWindow } from '@/features/mission-mechanics/board-window';
 import { ISLAND_WISP_LINES } from '@/features/onboarding/corruption-wisps';
@@ -24,8 +25,10 @@ const SLOT_DIFFICULTY: readonly EncounterDifficulty[] = ['calm', 'thick', 'dark'
 export const dailyMissionId = (dayId: string, slot: DailyMistSlot) => `daily:${dayId}:${slot}`;
 
 /** Open after the first session, once the Kingdom's goal has been introduced. */
-export function dailyMistUnlocked(world: Pick<MergeWorldState, 'kingdomGoal'>): boolean {
-  return world.kingdomGoal?.introducedAt != null;
+/** The Daily Mist opens once the Grove's Thick Mist (its fifth patch) is cleared: the player has met every Mist it uses. */
+export const DAILY_MIST_UNLOCK_MISSION_ID = 'sleeping-grove:5';
+export function dailyMistUnlocked(world: Pick<MergeWorldState, 'encounters'>): boolean {
+  return Boolean(world.encounters?.clears[DAILY_MIST_UNLOCK_MISSION_ID]);
 }
 
 /** The chains the day may use: the garden, and a friend's once they are here. */
@@ -42,7 +45,7 @@ function shuffle<T>(list: readonly T[], seed: string): T[] {
   return out;
 }
 
-/** One fill of a template: pieces on the lower rows, Mist on the upper, the spawner in the bottom corner, from the seed. */
+/** One fill of a template: pieces on the lower rows, the wisps nested along the top row with Mist around them, the spawner in the bottom corner, from the seed. */
 export function fillDailyTemplate(template: DailyMistTemplate, dayId: string, attempt: number, chain: { chainId: string; generatorId: string }): EncounterDefinition {
   const seed = `${template.id}:${dayId}:${attempt}`;
   const window = missionWindow(template.rows);
@@ -55,30 +58,32 @@ export function fillDailyTemplate(template: DailyMistTemplate, dayId: string, at
   const tierTwo = `${chain.chainId}:2`;
   const pieceCells = shuffle(lower, `${seed}:pieces`).slice(0, template.pieces.tierOne + template.pieces.tierTwo);
   const items = pieceCells.map((cell, index) => ({ cell, definitionId: index < template.pieces.tierTwo ? tierTwo : tierOne }));
-  const mistCells = shuffle(upper, `${seed}:mist`);
+  const wisps = withNests(template.wisps.map((wisp, index) => ({ id: `daily-${index}`, hp: wisp.hp, placement: { kind: 'tile' as const, fx: 0.5, fy: 0.3, size: index === 0 ? 0.24 : 0.2 }, behaviour: wisp.behaviour, ...(wisp.intents ? { intents: wisp.intents } : {}) })));
+  const nests = new Set(wisps.flatMap((wisp) => (wisp.placement.kind === 'cell' ? [wisp.placement.cell] : [])));
+  const mistCells = shuffle(upper.filter((cell) => !nests.has(cell)), `${seed}:mist`);
   const mist: EncounterMistCell[] = [];
   let at = 0;
   const take = (count: number, type: EncounterMistCell['type']) => { for (let n = 0; n < count && at < mistCells.length; n += 1, at += 1) mist.push({ cell: mistCells[at]!, type, ...(type === 'dense' && n === 0 ? { holds: { kind: 'item', definitionId: tierTwo } } : {}) }); };
   take(template.mist.light, 'light');
   take(template.mist.dense, 'dense');
   take(template.mist.root, 'root');
-  const placements = [{ fx: 0.52, fy: 0.24, size: 0.22 }, { fx: 0.26, fy: 0.38, size: 0.18 }, { fx: 0.76, fy: 0.36, size: 0.18 }];
-  const wisps = template.wisps.map((wisp, index) => ({ id: `daily-${index}`, hp: wisp.hp, placement: { kind: 'tile' as const, ...placements[index % placements.length]! }, behaviour: wisp.behaviour }));
   const required = wisps.reduce((sum, wisp) => sum + wisp.hp, 0);
   return {
     id: `daily:${dayId}:${template.slot}`,
-    storageKey: `katchimeras.daily-mist.${dayId}.${template.slot}.v1`,
+    storageKey: `katchimeras.daily-mist.${dayId}.${template.slot}.v4`,
     rows,
     difficulty: SLOT_DIFFICULTY[template.slot]!,
     seed: { items, echoes: [], veiled: [] },
     mist,
     spawners: template.spawner ? [{ id: 'pod', generatorId: chain.generatorId, cell: spawnerCell, charges: template.spawner.charges, drops: [tierOne], recharge: { kind: 'merges', every: template.spawner.every, amount: 1 } }] : [],
-    mechanic: { kind: 'dark-wisps', wisps, damageByTier: template.damageByTier },
+    // v2: the islands' damage table (a Sprout one, a Plant two), so the Daily Mist asks as much of the player.
+    mechanic: { kind: 'dark-wisps', wisps, damageByTier: [1, 1, 2, 3], targeting: 'adjacent' },
     required,
     wisps: [],
     objective: { kind: 'wisps' },
-    // The budget is set from the shortest play once the fill is searched (`dailyMistMission`).
-    resolve: 1,
+    // A territory battle; the fill is checked by the careful player (`dailyMistMission`).
+    resolve: null,
+    territory: { overrun: OVERRUN_BY_DIFFICULTY[SLOT_DIFFICULTY[template.slot]!] },
     grades: ENCOUNTER_DEFAULT_GRADES,
     rewards: { glow: DAILY_MIST_GLOW[template.slot]!, xp: DAILY_MIST_XP[template.slot]! },
     lines: ISLAND_WISP_LINES,
@@ -95,13 +100,14 @@ export function dailyMistMission(dayId: string, slot: DailyMistSlot, world?: Pic
   for (let attempt = 0; attempt < REROLLS && !chosen; attempt += 1) {
     const filled = fillDailyTemplate(template, dayId, attempt, chain);
     if (!MERGE_ITEMS_BY_ID.has(`${chain.chainId}:1`)) break;
-    const solution = solveEncounter({ ...filled, resolve: null });
-    if (solution.minActions == null) continue;
-    const candidate = { ...filled, resolve: solution.minActions + template.margin };
-    if (validateEncounterDefinition(candidate).length === 0) chosen = candidate;
+    // A fair fill: the careful player wins it on every one of a few seeds.
+    if (validateEncounterDefinition(filled).length) continue;
+    const check = fairness(filled, 'careful', 3);
+    if (check.wins === check.seeds) chosen = filled;
   }
-  // No fill cleared: the garden's plain fill of the template, given a generous budget, stands in.
-  const encounter = chosen ?? { ...fillDailyTemplate(template, 'fallback', 0, DAILY_MIST_CHAINS[0]!), id: `daily:${dayId}:${slot}`, storageKey: `katchimeras.daily-mist.${dayId}.${slot}.v1`, resolve: 30 };
+  // No fill passed: the garden's plain fill of the template, with more room before the Mist wins, stands in.
+  const fallback = fillDailyTemplate(template, 'fallback', 0, DAILY_MIST_CHAINS[0]!);
+  const encounter = chosen ?? { ...fallback, id: `daily:${dayId}:${slot}`, storageKey: `katchimeras.daily-mist.${dayId}.${slot}.v4`, territory: { overrun: Math.min(0.85, (fallback.territory?.overrun ?? 0.65) + 0.1) } };
   return {
     id: encounter.id,
     title: DAILY_MIST_SLOT_NAMES[slot]!,

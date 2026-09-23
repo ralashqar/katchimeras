@@ -235,7 +235,8 @@ export function normalizeContentPack(value: unknown): NormalizedContentPack {
     if (!isText(campaign.residentName) || !isText(campaign.chapterIdPrefix) || !isRecord(campaign.payoff) || !isRecord(campaign.copy)) issues.push(`island campaign ${id} needs a resident name, chapter id prefix, payoff and copy`);
     const wake = campaign.wake;
     if (wake !== undefined) {
-      if (!isRecord(wake) || !['friend_hatched', 'friend_home', 'always', 'tree_stage'].includes(String(wake.kind))) issues.push(`island campaign ${id}: wake must be friend_hatched, friend_home, tree_stage or always`);
+      if (!isRecord(wake) || !['friend_hatched', 'friend_home', 'always', 'tree_stage', 'rung_cleared'].includes(String(wake.kind))) issues.push(`island campaign ${id}: wake must be friend_hatched, friend_home, tree_stage, rung_cleared or always`);
+      else if (wake.kind === 'rung_cleared' && (typeof wake.missionId !== 'string' || !wake.missionId)) issues.push(`island campaign ${id}: a rung_cleared wake names the level (missionId)`);
       else if (wake.kind === 'tree_stage' && (Number(raw.contentSchemaVersion) < 7 || !['dormant', 'stirring', 'rooted', 'blooming', 'awakened'].includes(String(wake.stage)))) issues.push(`island campaign ${id}: a tree_stage wake needs content schema 7 and a Heartwood stage`);
       else if (wake.kind === 'friend_hatched' && !companionIds.has(String(wake.companion))) issues.push(`island campaign ${id}: wake names ${wake.companion}, who is not a friend`);
       else if (wake.kind === 'friend_home' && !skinIds.has(String(wake.residentSkinId))) issues.push(`island campaign ${id}: wake names form ${wake.residentSkinId}, which does not exist`);

@@ -40,6 +40,7 @@ export function islandWakeConditionHolds(world: MergeWorldState, condition: Isla
     case 'friend_home': return islandFriendHome(world, condition.residentSkinId);
     case 'friend_hatched': return Boolean(hatchableEggProgress(world, { companion: condition.companion })?.hatchedAt) || world.companionDiscovery.records.some((record) => record.characterId === condition.companion);
     case 'tree_stage': return HEARTWOOD_STAGES.indexOf(heartwoodStage(world)) >= HEARTWOOD_STAGES.indexOf(condition.stage);
+    case 'rung_cleared': return Boolean(world.encounters?.clears[condition.missionId]);
   }
 }
 

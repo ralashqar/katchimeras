@@ -174,10 +174,14 @@ export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
   generator('community-cart', 'Community Cart', 'sparkles', '#D88762', 40, ['social:gathering', 'social:celebration'], 'Everything needed to welcome people and mark a joyful moment.'),
   generator('study-desk', 'Study Desk', 'sparkles', '#668EAA', 46, ['mind:work', 'mind:books'], 'Small tools for focus, planning, stories, and thoughtful curiosity.'),
   generator('creative-playroom', 'Creative Playroom', 'sparkles', '#9A72C4', 47, ['creative:art', 'creative:screen'], 'Art materials and playful screens for making and imagining.'),
+  // Encounter v2: a battle's Spring, found under the Mist; it makes the waterside chain. Never on the player's own board.
+  generator('mist-spring', 'Mist Spring', 'water.waves', '#6FB9C9', 48, ['nature:waterside', 'nature:waterside'], 'A spring the Mist was hiding: Pebbles that wash the Mist away.'),
   ...packEntries('mergeGenerators').map((entry) => generator(entry.id, entry.name, entry.icon, entry.color, entry.initialCell, entry.chainIds, entry.unlockDescription)),
 ];
 
 export const MERGE_GENERATORS_BY_ID = new Map(MERGE_GENERATORS.map((item) => [item.id, item]));
+/** Item makers that only a battle places: never on the player's own board, never in its echoes. */
+export const ENCOUNTER_ONLY_GENERATORS: ReadonlySet<string> = new Set(['mist-spring']);
 
 // One authored Dream Echo for every shared generator tier-one drop. The Seed
 // is deliberately omitted because Mossprout's FTUE already authors and clears
@@ -193,7 +197,7 @@ const MERGE_LOCKED_TIER_ONE_ECHO_CELLS = [
   49, 50, // Creative Playroom
 ] as const;
 
-export const MERGE_LOCKED_TIER_ONE_ECHOES = MERGE_GENERATORS.filter((generator) => generator.id !== 'memory-nursery' && generator.id !== 'cafe-counter').flatMap((generator, generatorIndex) => (
+export const MERGE_LOCKED_TIER_ONE_ECHOES = MERGE_GENERATORS.filter((generator) => generator.id !== 'memory-nursery' && generator.id !== 'cafe-counter' && !ENCOUNTER_ONLY_GENERATORS.has(generator.id)).flatMap((generator, generatorIndex) => (
   generator.tierOneDropDefinitionIds.map((definitionId, branchIndex) => ({
     cell: MERGE_LOCKED_TIER_ONE_ECHO_CELLS[generatorIndex * 2 + branchIndex],
     definitionId,

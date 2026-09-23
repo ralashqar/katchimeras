@@ -3,11 +3,9 @@ import test from 'node:test';
 
 import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
 import { EXTRA_RUNGS } from '@/constants/island-campaigns/extra-rungs';
-import { chapterMissions } from '@/constants/island-campaigns/ladder';
-import { ENCOUNTER_BUDGETS } from '@/constants/encounters/budgets.generated';
+import { chapterMissions, regionLadder } from '@/constants/island-campaigns/ladder';
 import { GROVE_MISSION_ID, SLEEPING_GROVE_RUNGS, groveMission } from '@/constants/regions/sleeping-grove';
-import { budgetKey, budgetMargin } from '@/features/encounter/budget';
-import { solveEncounter } from '@/features/encounter/solvability';
+import { fairness } from '@/features/encounter/playtest';
 import { validateEncounterDefinition } from '@/features/encounter/validate-encounter';
 import { groveProgress } from '@/features/encounters/grove-progress';
 import type { MergeWorldState } from '@/types/merge-world';
@@ -25,13 +23,14 @@ test('the Sleeping Grove has ten rungs in order: an opening, eight encounters, a
   assert.equal(groveMission('nope'), null);
 });
 
-test('every authored rung validates and its pinned Resolve covers the shortest clear plus the margin', () => {
-  assert.ok(authored.length >= 11);
+test('every authored rung validates, is a territory battle, and the careful player wins it on nine seeds of ten', () => {
+  assert.ok(authored.length >= 9);
   for (const mission of authored) {
     assert.deepEqual(validateEncounterDefinition(mission.encounter), [], mission.id);
-    const solved = solveEncounter({ ...mission.encounter, resolve: null });
-    assert.ok(solved.minActions != null, `${mission.id}: clearable`);
-    assert.ok(mission.encounter.resolve! >= solved.minActions! + budgetMargin(solved.minActions!), `${mission.id}: ${mission.encounter.resolve} < ${solved.minActions} + margin`);
+    assert.equal(mission.encounter.resolve, null);
+    assert.ok(mission.encounter.territory, `${mission.id}: a territory battle`);
+    const record = fairness(mission.encounter, 'careful', 10);
+    assert.ok(record.wins >= 9, `${mission.id}: the careful player won ${record.wins} of 10`);
     assert.ok(!/!/.test(mission.objective), `${mission.id}: no exclamation in Mist lines`);
   }
 });
@@ -47,12 +46,19 @@ test('the extra rungs sit after their chapter’s own board, so the chapter stil
   }
 });
 
-test('the generated budget table is current: every ladder rung without a pinned Resolve has its entry', () => {
-  for (const campaign of ISLAND_CAMPAIGNS) for (const chapter of campaign.chapters) for (const mission of chapterMissions(campaign, chapter)) {
-    if (chapter.restoration?.rush) continue;
-    const pinned = authored.some((entry) => entry.id === mission.id);
-    if (!pinned) assert.ok(ENCOUNTER_BUDGETS[budgetKey({ ...mission.encounter, resolve: null })] != null || mission.encounter.resolve != null, `${mission.id}: run npm run encounters:budgets`);
+test('every island level is a territory battle won by the careful player on nine seeds of ten; the bosses beat careless play (a board with a clock keeps its own rules)', () => {
+  for (const campaign of ISLAND_CAMPAIGNS) for (const rung of regionLadder(campaign)) {
+    if (rung.mission.rush || rung.mission.encounter.territory == null) continue;
+    const record = fairness(rung.mission.encounter, 'careful', 10);
+    assert.ok(record.wins >= 9, `${rung.mission.id}: the careful player won ${record.wins} of 10 (${JSON.stringify(record.losses)})`);
+    // A boss asks for reading it: merging next to it whenever possible usually loses.
+    if (rung.mission.difficulty === 'boss') {
+      const careless = fairness(rung.mission.encounter, 'careless', 10);
+      assert.ok(careless.wins <= 4, `${rung.mission.id}: careless play won ${careless.wins} of 10`);
+    }
   }
+  const petalimp = ISLAND_CAMPAIGNS.find((campaign) => campaign.campaignId.includes('petalimp'))!;
+  assert.ok(regionLadder(petalimp).every((rung) => rung.mission.encounter.territory != null), 'Petalimp\u2019s island is a territory battle from its first level');
 });
 
 test('grove progress: opens in order, the rescue waits at Steppling’s clearing, First Steps needs Steppling home', () => {
@@ -68,4 +74,12 @@ test('grove progress: opens in order, the rescue waits at Steppling’s clearing
   assert.equal(home[8]!.state, 'done');
   assert.equal(home[9]!.state, 'next');
   assert.equal(home[9]!.note, undefined);
+});
+
+test('a boss is won by reading it: the careless player (merging anywhere, tapping the Pod whenever it can) usually loses the island bosses', () => {
+  for (const campaign of ISLAND_CAMPAIGNS.filter((entry) => /petalimp|fernip/.test(entry.campaignId))) {
+    const boss = regionLadder(campaign).find((rung) => rung.mission.difficulty === 'boss')!;
+    const record = fairness(boss.mission.encounter, 'careless', 10);
+    assert.ok(record.wins <= 4, `${boss.mission.id}: the careless player won ${record.wins} of 10`);
+  }
 });

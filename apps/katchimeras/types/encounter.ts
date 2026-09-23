@@ -88,8 +88,15 @@ export type EncounterDefinition = {
   /** The wisps over the tile, for glow strikes. */
   wisps: readonly CorruptionWispSpec[];
   objective: EncounterObjective;
-  /** Actions the Mist allows; null is a board with no budget (every board from before the pivot). */
+  /** Actions the Mist allows; null is a board with no budget (every board from before the pivot). Ignored once `light` is set. */
   resolve: number | null;
+  /**
+   * Territory battles (`docs/encounter-territory.md`): Dark Wisps nest on the board and spread their Mist; merges
+   * cleanse it. A turn is a merge. The level is lost when the Mist holds `overrun` of the board (a fraction), or with
+   * no free cell and no merge left. `stars` are the most of the board still misted at the end for a Perfect and a
+   * Bright clear (fractions; default 0.25 and 0.45).
+   */
+  territory?: EncounterTerritory;
   companion?: EncounterCompanion;
   /** Resolve left for a Bright and a Perfect clear. */
   grades: { bright: number; perfect: number };
@@ -102,6 +109,9 @@ export type EncounterDefinition = {
   /** For a hatchable's mission, the camera its tile is framed with. */
   camera?: FtueCameraDirective;
 };
+
+export type EncounterTerritory = { overrun: number; stars?: readonly [number, number] };
+export const TERRITORY_DEFAULT_STARS: readonly [number, number] = [0.25, 0.45];
 
 /** What the player brings in: the Katchimera and its level, and one helper Wisp. */
 export type EncounterLoadout = { companionId: MergeCharacterId; level: number; wispId?: WispId };

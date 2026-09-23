@@ -70,7 +70,7 @@ test('an attempt round-trips through its save and a new attempt, loadout or auth
   assert.equal(a, encounterRunId(makeEncounter(), 1, { companionId: 'mossprout', level: 1 }));
 });
 
-test('light Mist goes on one hit beside a merge, dense on two, root only to a plant, and what a cell held lands there', () => {
+test('light Mist goes on one hit of a merge’s pulse, dense on two, root only to a plant, and what a cell held lands there', () => {
   const encounter = makeEncounter({
     resolve: 10, required: 3,
     seed: { items: [{ cell: 36, definitionId: SEED }, { cell: 37, definitionId: SEED }, { cell: 38, definitionId: SEED }, { cell: 39, definitionId: SEED }], echoes: [], veiled: [] },
@@ -88,10 +88,12 @@ test('light Mist goes on one hit beside a merge, dense on two, root only to a pl
   // A Sprout made at 38: its neighbours are 31 (dense) and 37, 39.
   game = play(game, move(39, 38));
   assert.deepEqual(mistAt(game.state, 31), { kind: 'encounter', type: 'dense', hp: 1 }, 'dense Mist worn, not cleared');
-  // A Plant made at 38 from the two Sprouts: 31 clears now; 32 (root) is not beside it.
+  // A Plant made at 38 from the two Sprouts: its pulse reaches the eight around it, so 31 clears and the root at 32
+  // (a diagonal) is cut too; 23 is out of reach.
   game = play(game, move(37, 38));
   assert.equal(mistAt(game.state, 31), null);
-  assert.deepEqual(mistAt(game.state, 32), { kind: 'encounter', type: 'root', hp: 1 });
+  assert.equal(mistAt(game.state, 32), null);
+  assert.deepEqual(mistAt(game.state, 23), { kind: 'encounter', type: 'light', hp: 1 });
   assert.equal(game.last?.status, 'cleared');
 });
 

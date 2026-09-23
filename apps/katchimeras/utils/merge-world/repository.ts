@@ -284,6 +284,10 @@ export async function abandonStoredEncounter(now = gameNow()) {
 export async function completeStoredEncounter(input: { receiptId: string; missionId: string; campaignId?: string; katchimeraId: import('@/types/merge-world').MergeCharacterId; helperWispId: import('@/types/wisp').WispId | null; outcome: import('@/features/encounter/outcome').EncounterOutcome; difficulty: import('@/types/encounter').EncounterDifficulty; base?: { glow: number; xp: number } | null }, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'completeEncounter', ...input, now }), now);
 }
+/** A star milestone on a level track: Glow once; the result names the friend pack for the caller to grant. */
+export async function claimStoredTrackMilestone(trackId: string, threshold: number, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'claimTrackMilestone', trackId, threshold, now }), now);
+}
 export async function ackStoredEncounterOutcome(now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'ackEncounterOutcome', now }), now);
 }
@@ -602,7 +606,7 @@ export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryW
   const target = payload.target;
   if (payload.transition === 'island_reveal') {
     const campaign = target.kind === 'haven_nature_island' ? islandCampaignForIsland(target.islandId) : null;
-    if (!campaign || payload.toLevel !== 1 || payload.economy.mode !== 'normal') {
+    if (!campaign || payload.toLevel !== 1 || (payload.economy.mode !== 'normal' && payload.economy.mode !== 'free')) {
       throw new Error('Unknown nature-island reveal');
     }
     return reduceStoredMergeWorld((state) => reduceMergeWorld(state, {
@@ -610,7 +614,7 @@ export function upgradeStoredStoryWorldTarget(effectKey: string, payload: StoryW
       islandId: campaign.islandId,
       campaignId: campaign.campaignId,
       residentSkinId: campaign.residentSkinId,
-      cost: mossproutNatureIslandLevelDefinition(campaign.islandId, 1)?.coinCost ?? 40,
+      cost: 0,
       receiptId: effectKey,
       now,
     }), now);
@@ -760,6 +764,12 @@ export async function ensureStoredFirstSpringLight(runId: string, now = gameNow(
   if (lit.state.coins >= cost) return lit.state;
   const short = cost - lit.state.coins;
   return (await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantOpeningGlow', receiptId: `${runId}:first-spring-light`, amount: short, now }), now)).state;
+}
+
+/** Keep going on a lost level: true once its Glow is paid (a replay of the receipt counts as paid). */
+export async function payStoredEncounterContinue(receiptId: string, cost: number, now = gameNow()): Promise<boolean> {
+  const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'payEncounterContinue', receiptId, cost, now }), now);
+  return Boolean(result.state.encounters?.receipts.includes(receiptId));
 }
 
 /** Glow the story hands over once per receipt (Steppling's mist price after the first session). */

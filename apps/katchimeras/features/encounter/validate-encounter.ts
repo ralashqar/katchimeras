@@ -4,6 +4,10 @@ import type { HatchableMissionDefinition } from '@/types/hatchable-companion';
 import type { EncounterDefinition } from '@/types/encounter';
 import type { MergeItemDefinition } from '@/types/merge-world';
 import { encounterSolvabilityIssues, solveEncounter } from './solvability';
+import { fairness } from './playtest';
+import { isDarkWispLook } from '@/constants/dark-wisp-looks';
+
+const INTENT_KINDS = new Set(['surge', 'snuff', 'shroud', 'root', 'devour', 'ward', 'mend', 'call', 'gather', 'burrow', 'spores']);
 
 const MIST_TYPES = new Set(['light', 'dense', 'root', 'wisp-bound']);
 
@@ -55,7 +59,37 @@ export function validateEncounterDefinition(encounter: EncounterDefinition, boar
     for (const entry of encounter.cache.contents.items) if (!items.has(entry.definitionId) || !Number.isInteger(entry.quantity) || entry.quantity <= 0) issues.push(`${id}: the cache asks for ${entry.quantity} of ${entry.definitionId}`);
   }
   if (encounter.objective.kind === 'dark-wisp' && !wispIds.has(encounter.objective.wispId)) issues.push(`${id}: the objective names wisp ${encounter.objective.wispId}, not on the board`);
+  // Territory: intents are known kinds with a countdown; nests sit on the board on cells nothing else uses; the Mist
+  // must start short of what loses the level.
+  const territory = encounter.territory;
+  if (territory && (!(territory.overrun > 0) || territory.overrun > 1)) issues.push(`${id}: overrun is a share of the board, above 0 and at most 1`);
+  if (encounter.mechanic?.kind === 'dark-wisps') {
+    const wispById = new Map(encounter.mechanic.wisps.map((wisp) => [wisp.id, wisp]));
+    for (const wisp of encounter.mechanic.wisps) {
+      if (wisp.placement.kind === 'cell' && !wisp.hidden) claim(wisp.placement.cell, `wisp ${wisp.id}'s nest`);
+      if (wisp.splitsInto != null && !wispById.get(wisp.splitsInto)?.hidden) issues.push(`${id}: wisp ${wisp.id} splits into ${wisp.splitsInto}, which must be a hidden wisp on the board`);
+      if (wisp.weakTo != null && wisp.weakTo !== 'growth' && wisp.weakTo !== 'water') issues.push(`${id}: wisp ${wisp.id} is weak to ${wisp.weakTo}; only growth or water`);
+      if (wisp.look != null && !isDarkWispLook(wisp.look)) issues.push(`${id}: wisp ${wisp.id} wears an unknown look ${wisp.look}`);
+      for (const intent of wisp.intents ?? []) {
+        if (!INTENT_KINDS.has(intent.kind)) issues.push(`${id}: wisp ${wisp.id} has an unknown intent ${intent.kind}`);
+        if (!Number.isInteger(intent.every) || intent.every < 1) issues.push(`${id}: wisp ${wisp.id}'s ${intent.kind} needs a countdown of at least one turn`);
+      }
+    }
+    const twins = new Set(encounter.mechanic.wisps.flatMap((wisp) => (wisp.splitsInto ? [wisp.splitsInto] : [])));
+    if (encounter.mechanic.wisps.some((wisp) => wisp.hidden && !twins.has(wisp.id)) && !encounter.mechanic.wisps.some((wisp) => wisp.intents?.some((intent) => intent.kind === 'call'))) issues.push(`${id}: a hidden wisp needs a caller`);
+  }
+  if (territory) {
+    const cellsOnBoard = encounter.rows * 5;
+    const nests = encounter.mechanic?.kind === 'dark-wisps' ? encounter.mechanic.wisps.filter((wisp) => !wisp.hidden && wisp.placement.kind === 'cell').length : 0;
+    const start = encounter.mist.length + nests;
+    if (start >= Math.ceil(territory.overrun * cellsOnBoard - 1e-9)) issues.push(`${id}: the Mist starts on ${start} cells, already enough to lose`);
+  }
   if (issues.length) return issues;
+  // A territory battle is checked by playing it (the careful player wins on at least four of five seeds).
+  if (territory) {
+    const record = fairness(encounter, 'careful', 5);
+    return record.wins >= 4 ? [] : [`${id}: the careful player won ${record.wins} of 5 (${Object.entries(record.losses).map(([reason, count]) => `${count} by ${reason}`).join(', ')}); it must win at least 4`];
+  }
   // A board with no budget, Mist, spawner or cache is a plain mission wearing the shape; the search still applies.
   return encounterSolvabilityIssues(encounter, solveEncounter(encounter, { items }));
 }

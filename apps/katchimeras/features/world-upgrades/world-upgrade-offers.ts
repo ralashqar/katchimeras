@@ -51,6 +51,8 @@ export type WorldUpgradeOffer = WorldUpgradeDefinition & {
   hatchable?: { companion: MergeCharacterId; state: HatchableTileState; sleepingLine: string };
   /** A tile whose everyday life is a time trial: the marker is its clock, with today's heats, and a tick once the day is done. */
   trial?: { heat: number; total: number; done: boolean };
+  /** A tile whose business is its level track: the marker shows levels cleared (a friend's island, the Grove, today's Daily Mist). */
+  track?: { kind: 'island' | 'grove' | 'daily'; cleared: number; total: number; label: string };
 };
 
 export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [
@@ -61,7 +63,7 @@ export const WORLD_UPGRADE_DEFINITIONS: readonly WorldUpgradeDefinition[] = [
       id: `nature:${campaign.islandId}`, target: { kind: 'haven_nature_island', islandId: campaign.islandId },
       visualTarget: { kind: 'haven_nature_island', islandId: campaign.islandId }, name: island.name,
       nextName: campaign.copy.mistNextName, description: campaign.copy.mistDescription, nextLevel: 0,
-      cost: island.levels[0]!.coinCost, action: 'Clear mist', transition: 'island_reveal',
+      cost: 0, action: 'Clear mist', transition: 'island_reveal',
     };
   }),
   ...Object.values(HAVEN_ENVIRONMENTS).flatMap((environment) => environment!.stages.filter((stage) => stage.stage > 0
@@ -119,10 +121,9 @@ export function worldUpgradeOffers(world: MergeWorldState): WorldUpgradeOffer[] 
     if (campaign) {
       const level = definition.nextLevel as MossproutNatureIslandLevel;
       eligible = islandCampaignChapterStatus(world, campaign, level) === 'restoration_ready';
-      if (level === 1) {
-        cost = 0;
-        economyMode = 'free';
-      }
+      // A friend's island grows through their story, never for Glow.
+      cost = 0;
+      economyMode = 'free';
       const restoration = world.islandCampaigns?.[campaign.campaignId]?.chapters[String(level)]?.restoration;
       if (restoration) {
         // Paid when the beds opened: the upgrade costs nothing more, and the marker's bar is the beds.

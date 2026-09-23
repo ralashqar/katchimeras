@@ -65,6 +65,9 @@ const clampLevel = (level: number) => Math.max(0, Math.min(HEARTWOOD_BUILDING_MA
 
 /** Dew Spring: Resolve brought into every board, two a level; and, high up, a step of Resolve back on a Perfect clear. */
 export const dewSpringResolveBonus = (level: number) => clampLevel(level) * 2;
+/** Encounter v2: a flame of Light at levels 3, 6 and 9. */
+/** Territory: turns before the Dark Wisps first act, one at levels 3, 6 and 9. */
+export const dewSpringCalmTurns = (level: number) => Math.floor(clampLevel(level) / 3);
 export const dewSpringSecondWind = (level: number) => { const at = clampLevel(level); return at >= 10 ? 2 : at >= 7 ? 1 : 0; };
 /** Root Cellar: Mist cells opened before the first move, one every two levels. */
 export const rootCellarOpenCells = (level: number) => Math.floor(clampLevel(level) / 2);
@@ -89,7 +92,7 @@ export const HEARTWOOD_BUILDINGS: readonly HeartwoodBuildingDefinition[] = [
     description: 'A spring under the roots. Drink before you go in, and the Mist takes longer to wear you down.',
     lookNames: ['Dew Pool', 'Root Spring', 'Heartwood Spring'],
     stats: [
-      { label: 'Starting Resolve', value: dewSpringResolveBonus, format: (value) => `+${whole(value)}`, delta: gainWhole, icon: 'energy', tint: TINT.energy },
+      { label: 'Calm before the Mist', value: dewSpringCalmTurns, format: (value) => `+${whole(value)} ${Math.floor(value) === 1 ? 'turn' : 'turns'}`, delta: gainWhole, icon: 'energy', tint: TINT.energy },
       { label: 'Second wind', value: dewSpringSecondWind, format: (value) => `+${whole(value)}`, delta: gainWhole, icon: 'timer', tint: TINT.time },
     ],
   },

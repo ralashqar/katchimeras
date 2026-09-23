@@ -176,7 +176,7 @@ test('the panel model: an empty patch builds, a built one shows every number wit
   assert.deepEqual(empty.primary, { label: 'Build', cost: 20, disabled: true });
   assert.equal(empty.progressLabel, '50%');
   assert.deepEqual(empty.benefits.map((benefit) => [benefit.label, benefit.icon, benefit.from, benefit.to, benefit.delta]), [
-    ['Starting Resolve', 'energy', '+0', '+2', '+2'],
+    ['Calm before the Mist', 'energy', '+0 turns', '+0 turns', undefined],
     ['Second wind', 'timer', '+0', '+0', undefined],
   ], 'a number this level does not move reads as a plain value, with no gain');
   assert.equal(empty.requirements[0]?.met, false);
@@ -185,7 +185,7 @@ test('the panel model: an empty patch builds, a built one shows every number wit
 
   const milestone = buildingUpgradeModel(world({ buildings: { 'dew-spring': { level: 3, builtAt: NOW } } }), 'dew-spring');
   assert.deepEqual(milestone.primary, { label: 'Upgrade', cost: 140, disabled: false });
-  assert.deepEqual(milestone.benefits.map((benefit) => [benefit.label, benefit.from, benefit.to, benefit.delta]), [['Starting Resolve', '+6', '+8', '+2'], ['Second wind', '+0', '+0', undefined]]);
+  assert.deepEqual(milestone.benefits.map((benefit) => [benefit.label, benefit.from, benefit.to, benefit.delta]), [['Calm before the Mist', '+1 turn', '+1 turn', undefined], ['Second wind', '+0', '+0', undefined]]);
   const secondWind = buildingUpgradeModel(world({ buildings: { 'dew-spring': { level: 6, builtAt: NOW } } }), 'dew-spring');
   assert.deepEqual(secondWind.benefits[1], { id: 'Second wind', label: 'Second wind', icon: 'timer', tint: '#4E9CC4', from: '+0', to: '+1', delta: '+1' }, 'level seven brings a step of Resolve back');
   const icons = Object.fromEntries((['seed-nursery', 'root-cellar', 'garden-stall'] as const).map((id) => [id, buildingUpgradeModel(world(), id).benefits.map((benefit) => [benefit.icon, benefit.delta])]));

@@ -1,6 +1,8 @@
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { MissionWindow } from '@/features/mission-mechanics/board-window';
 import { isPlantItem } from '@/features/mission-mechanics/dark-wisps';
+import { chainRole, WATER_WASH } from './chains';
+import { pulseArea, windowDistance } from './pulse';
 import type { EncounterMistHolds } from '@/types/encounter';
 import type { MergeBoardCell, MergeItemDefinition, MergeWorldState } from '@/types/merge-world';
 
@@ -46,18 +48,24 @@ function wear(board: MergeWorldState, cell: number, amount: number): { board: Me
 }
 
 /**
- * A merge's result beside the Mist: every neighbouring Mist cell takes a
- * hit, root Mist only from a plant, wisp-bound Mist never.
+ * A merge's Harmony pulse (`features/encounter/pulse.ts`): every Mist cell in
+ * reach of what was made takes the pulse's hits. The bigger the result, the
+ * further it reaches and the harder it hits; root Mist only listens to Growth,
+ * Water washes light and thick Mist twice as hard, wisp-bound Mist never wears.
  */
-export function clearMistAround(board: MergeWorldState, mergedCell: number, resultDefinitionId: string, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): { board: MergeWorldState; opened: MistOpened[]; worn: number[] } {
-  const plant = isPlantItem(resultDefinitionId, items);
+export function harmonyPulse(board: MergeWorldState, mergedCell: number, resultDefinitionId: string, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): { board: MergeWorldState; opened: MistOpened[]; worn: number[] } {
+  // Roots only listen to Growth (a waterside piece is nature too, but it cannot cut a root); Water washes.
+  const role = chainRole(resultDefinitionId, items);
+  const plant = role ? role === 'growth' : isPlantItem(resultDefinitionId, items);
+  const wash = role === 'water' ? WATER_WASH : 1;
+  const pulse = pulseArea(mergedCell, Math.max(1, Math.floor(items.get(resultDefinitionId)?.tier ?? 1)), window);
   let next = board;
   const opened: MistOpened[] = [];
   const worn: number[] = [];
-  for (const cell of windowNeighbours(mergedCell, window)) {
+  for (const cell of pulse.cells) {
     const mist = encounterMist(next.board[cell]);
     if (!mist || mist.type === 'wisp-bound' || (mist.type === 'root' && !plant)) continue;
-    const result = wear(next, cell, 1);
+    const result = wear(next, cell, mist.type === 'root' ? pulse.hits : pulse.hits * wash);
     next = result.board;
     if (result.opened) opened.push(result.opened); else worn.push(cell);
   }
@@ -112,7 +120,34 @@ export function revealMistCells(board: MergeWorldState, window: MissionWindow, c
   return { board: next, opened };
 }
 
-/** Encounter Mist cells still on the window. */
+/** Encounter Mist cells still on the window (a territory battle's coverage: nests count). */
 export function encounterMistLeft(board: MergeWorldState, window: MissionWindow): number {
   return window.cellIndices.filter((cell) => encounterMist(board.board[cell])).length;
+}
+
+/** The Mist a territory battle can be lost to: its cells over the window's, 0 to 1. */
+export function mistCoverage(board: MergeWorldState, window: MissionWindow): number {
+  return window.cellIndices.length ? encounterMistLeft(board, window) / window.cellIndices.length : 0;
+}
+
+/**
+ * Keep going on a territory battle: the Mist pulled back `count` cells, the
+ * ones furthest from any nest first (wisp-bound Mist stays). What they held
+ * comes back with them.
+ */
+export function pullBackMist(board: MergeWorldState, window: MissionWindow, count: number): { board: MergeWorldState; opened: MistOpened[] } {
+  const nests = window.cellIndices.filter((cell) => encounterMist(board.board[cell])?.type === 'wisp-bound');
+  const distance = (cell: number) => (nests.length ? Math.min(...nests.map((nest) => windowDistance(cell, nest, window))) : 0);
+  const candidates = window.cellIndices
+    .filter((cell) => { const mist = encounterMist(board.board[cell]); return Boolean(mist) && mist!.type !== 'wisp-bound'; })
+    .sort((a, b) => distance(b) - distance(a) || a - b)
+    .slice(0, Math.max(0, Math.floor(count)));
+  let next = board;
+  const opened: MistOpened[] = [];
+  for (const cell of candidates) {
+    const result = openMistCell(next, cell);
+    next = result.board;
+    opened.push(result.opened);
+  }
+  return { board: next, opened };
 }

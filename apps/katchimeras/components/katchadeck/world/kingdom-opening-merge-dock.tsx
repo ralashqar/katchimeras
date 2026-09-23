@@ -1,5 +1,6 @@
 import type { ArtSource } from '@/utils/art-source';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
+import type { MergeBoardEffectKind } from '@/utils/merge-world/board-effects';
 import { Pressable, StyleSheet, Text, View, type View as ViewType } from 'react-native';
 import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
@@ -183,7 +184,11 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
 /** How far the header's bottom edge sits under the top of the bar. */
 const HEADER_TUCK = 24;
 
-export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, landings, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, headerGap, overlay, rootRef, animateArrivals }: {
+export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, landings, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, headerGap, overlay, rootRef, animateArrivals, onHoverCell, externalEffects }: {
+  /** The cell a held piece is over (-1 when none). */
+  onHoverCell?: (cell: number, source: number) => void;
+  /** Effects the owner asks the board to play on cells (a piece a wisp ate puffs away). */
+  externalEffects?: readonly { id: number; cell: number; kind: MergeBoardEffectKind }[];
   state: MergeWorldState;
   /** Pieces that arrive on their own (a time trial's dealer) pop in the way the board's pieces do. */
   animateArrivals?: boolean;
@@ -333,6 +338,8 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
       onOpenParcel={() => {}}
       onReroll={() => {}}
       onScreenMetrics={handleMetrics}
+      onHoverCell={onHoverCell}
+      externalEffects={externalEffects}
       onSelect={setSelectedCell}
       onServe={() => false}
       onUseGrovelight={() => {}}

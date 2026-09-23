@@ -1,4 +1,5 @@
 import { EGG_FEED_TARGET_Y_RATIO } from '@/features/today/egg-feed-target';
+import { LevelTrackStones, type LevelTrackStone } from './level-track-stones';
 import { eggHatchRattle, eggHatchPulse } from '@/components/katchadeck/ui/egg-hatch-motion';
 import { HatchWispLayer } from './hatch-wisp-layer';
 import { playUpgradeSequence } from '@incubator/environments/upgrade-sequence';
@@ -206,6 +207,9 @@ type Props = {
   mossproutMeditating?: boolean;
   interactionResidentAnchorY?: number;
   interactionExitNonce?: number;
+  /** A tile's level track while its sheet is open: stepping-stones on the island (or on Mossprout's garden when `islandId` is null). */
+  levelTrackStones?: { islandId: MossproutNatureIslandId | null; stones: readonly LevelTrackStone[] } | null;
+  onLevelTrackStonePress?: (key: string) => void;
   /** Island narrative handoffs keep their close-up for the following restoration. */
   preserveInteractionCameraOnExit?: boolean;
   interactionRewardPulseKey?: number;
@@ -557,6 +561,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   mossproutMeditating = false,
   interactionResidentAnchorY,
   interactionExitNonce = 0,
+  levelTrackStones = null,
+  onLevelTrackStonePress,
   preserveInteractionCameraOnExit = false,
   interactionRewardPulseKey = 0,
   onInteractionExitFocusComplete,
@@ -2010,6 +2016,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             {focusedMossproutWorld && onPlantWispLantern && wispPatchFrame ? <Pressable accessibilityRole="button" accessibilityLabel="Plant Lantern in front-right patch" onPress={onPlantWispLantern} style={{ position: 'absolute', ...wispPatchFrame, zIndex: 38 }} /> : null}
             {focusedMossproutWorld && !upgradePresentation && lanternFrame && lanternPostAdornment ? <View style={{ position: 'absolute', left: lanternFrame.left + lanternFrame.width * 0.7, top: lanternFrame.top + lanternFrame.height * 0.25, zIndex: 35 }}>{lanternPostAdornment}</View> : null}
             {focusedMossproutWorld && !upgradePresentation && hearthFrame && hearthAdornment ? <View style={{ position: 'absolute', left: hearthFrame.left + hearthFrame.width * 0.65, top: hearthFrame.top + hearthFrame.height * 0.3, zIndex: 35 }}>{hearthAdornment}</View> : null}
+            {levelTrackStones && !upgradePresentation ? (() => {
+              const frame = levelTrackStones.islandId ? natureIslandFrames.find((entry) => entry.islandId === levelTrackStones.islandId)?.frame ?? null : gardenFrame;
+              return frame ? <LevelTrackStones tileKey={levelTrackStones.islandId ?? 'home'} frame={frame} stones={levelTrackStones.stones} reducedMotion={reduceMotion} onPress={onLevelTrackStonePress} /> : null;
+            })() : null}
             {focusedMossproutWorld && interactionEnabled && !upgradePresentation && gardenFrame && gardenEventAdornment ? <View style={{ position: 'absolute', left: gardenFrame.left + gardenFrame.width * 0.72, top: gardenFrame.top + gardenFrame.height * 0.3, zIndex: 35 }}>{gardenEventAdornment}</View> : null}
             {focusedMossproutWorld && onGardenPlotTargetChange
               ? gardenPlotFrames.map(({ frame, slotId }) => (

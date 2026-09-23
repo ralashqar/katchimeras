@@ -1,6 +1,7 @@
 import { encounterFromRestoration } from '@/features/encounter/adapt';
 import { withSolvedBudget } from '@/features/encounter/budget';
 import { EXTRA_RUNGS } from './extra-rungs';
+import { FERNIP_LEVEL_SPECS, islandLevel, MIST_LEVEL_SPEC, patternLevelSpecs, PETALIMP_LEVEL_SPECS, type IslandLevelSpec } from './island-levels';
 import { ENCOUNTER_DEFAULT_GRADES, type EncounterDefinition, type EncounterDifficulty } from '@/types/encounter';
 import type { MossproutNatureIslandLevel } from '@/types/merge-world';
 import { ISLAND_WISP_LINES } from '@/features/onboarding/corruption-wisps';
@@ -64,21 +65,55 @@ export function templateEncounter(campaign: IslandCampaignDefinition, chapter: I
   };
 }
 
-/** The rungs a chapter gives: its own, the board it had, or one from the template. */
+/**
+ * A chapter's levels, in order: the campaign's own (`missions`, a pack's), the bundled authored levels
+ * (`island-levels.ts`), a board with a clock or a mechanic of its own read as it is, else two from the pattern.
+ * A plain restoration board from before the pivot is no longer played: its pieces arrived by delivery, which is gone.
+ */
 export function chapterMissions(campaign: IslandCampaignDefinition, chapter: IslandCampaignChapter): RegionMissionDefinition[] {
-  return [...chapterOwnMissions(campaign, chapter), ...(EXTRA_RUNGS[campaign.campaignId]?.[chapter.level] ?? [])];
+  return [...chapterBoards(campaign, chapter), ...(EXTRA_RUNGS[campaign.campaignId]?.[chapter.level] ?? [])]
+    .map((mission) => ({ ...mission, encounter: withSolvedBudget(mission.encounter, { rush: mission.rush }) }));
 }
 
-function chapterOwnMissions(campaign: IslandCampaignDefinition, chapter: IslandCampaignChapter): RegionMissionDefinition[] {
-  if (chapter.missions?.length) return chapter.missions.map((mission) => ({ ...mission, encounter: withSolvedBudget(mission.encounter, { rush: mission.rush }) }));
-  if (chapter.restoration) {
+/** The levels before their Resolve is read (the budget generator solves these). */
+export function chapterBoards(campaign: IslandCampaignDefinition, chapter: IslandCampaignChapter): RegionMissionDefinition[] {
+  if (chapter.missions?.length) return [...chapter.missions];
+  const lines = campaign.copy.wispLines ?? ISLAND_WISP_LINES;
+  const authored = BUNDLED_LEVEL_SPECS[campaign.campaignId]?.[chapter.level as 1 | 2 | 3 | 4];
+  if (authored?.length) return authored.map((spec, index) => islandLevel(campaign.campaignId, `c${chapter.level}-${index + 1}`, spec, lines));
+  if (chapter.restoration && (chapter.restoration.rush || chapter.restoration.mechanic)) {
     const rush = Boolean(chapter.restoration.rush);
-    const adapted = encounterFromRestoration(chapter.restoration, campaign.campaignId, chapter.level, restorationStorageKey(campaign.campaignId, chapter.level), chapter.fallbackOrder.requirements, CHAPTER_DIFFICULTY[chapter.level - 1]);
-    const encounter = withSolvedBudget(adapted, { rush });
+    const encounter = encounterFromRestoration(chapter.restoration, campaign.campaignId, chapter.level, restorationStorageKey(campaign.campaignId, chapter.level), chapter.fallbackOrder.requirements, CHAPTER_DIFFICULTY[chapter.level - 1]);
     return [{ id: encounter.id, title: chapter.title, objective: rush ? `Strike down ${chapter.restoration.rush!.goal} wisps before the clock runs out.` : 'Clear the Mist over the island.', difficulty: encounter.difficulty, encounter, rewards: { glow: 0, xp: 0 }, ...(rush ? { rush: true } : {}) }];
   }
-  const encounter = withSolvedBudget(templateEncounter(campaign, chapter));
-  return [{ id: encounter.id, title: chapter.title, objective: 'Drive the Dark Wisps off the island.', difficulty: encounter.difficulty, encounter, rewards: { glow: 0, xp: 0 } }];
+  return patternLevelSpecs(chapter.level, campaign.residentName).map((spec, index) => islandLevel(campaign.campaignId, `c${chapter.level}-${index + 1}`, spec, lines));
+}
+
+/** Bundled islands whose levels are written out by hand. */
+const BUNDLED_LEVEL_SPECS: Readonly<Record<string, Partial<Record<1 | 2 | 3 | 4, readonly IslandLevelSpec[]>>>> = {
+  'island-campaign:petalimp-bloom': PETALIMP_LEVEL_SPECS,
+  'island-campaign:fernip-wildgrowth': FERNIP_LEVEL_SPECS,
+};
+
+/** The id of a friend's first level, the one that lifts the Mist off their island. */
+export const mistLevelId = (campaignId: string) => `${campaignId}:mist`;
+export const isMistLevel = (missionId: string) => missionId.endsWith(':mist');
+
+/**
+ * Before a friend's story there is their island under the Mist: level one is
+ * clearing it. A calm board from the template (or the campaign's own), and
+ * winning it is what reveals the island. It costs nothing and belongs to no
+ * chapter (`chapterLevel` 0), so it never raises the island itself.
+ */
+export function mistLevel(campaign: IslandCampaignDefinition): RegionMissionDefinition {
+  const encounter = withSolvedBudget(mistLevelBoard(campaign));
+  return { id: encounter.id, title: 'Lift the Mist', objective: MIST_LEVEL_SPEC.objective, difficulty: 'calm', encounter, rewards: { glow: 0, xp: 0 } };
+}
+
+/** The mist level's board before its budget is read (the budget generator solves this). */
+export function mistLevelBoard(campaign: IslandCampaignDefinition): EncounterDefinition {
+  // Level one of every friend: two Mistwisps in lanes and the light Mist, played by Light.
+  return islandLevel(campaign.campaignId, 'mist', MIST_LEVEL_SPEC, campaign.copy.wispLines ?? ISLAND_WISP_LINES).encounter;
 }
 
 const ladders = new WeakMap<IslandCampaignDefinition, RegionRung[]>();
@@ -86,7 +121,7 @@ const ladders = new WeakMap<IslandCampaignDefinition, RegionRung[]>();
 export function regionLadder(campaign: IslandCampaignDefinition): RegionRung[] {
   const known = ladders.get(campaign);
   if (known) return known;
-  const rungs: RegionRung[] = [];
+  const rungs: RegionRung[] = [{ index: 0, chapterLevel: 0, mission: mistLevel(campaign), lastOfChapter: true, boss: false }];
   const finalLevel = campaign.chapters[campaign.chapters.length - 1]?.level;
   for (const chapter of campaign.chapters) {
     const missions = chapterMissions(campaign, chapter);

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { ISLAND_CAMPAIGNS } from '@/constants/island-campaigns/registry';
-import { chapterMissions, regionLadder, regionRung, templateEncounter } from '@/constants/island-campaigns/ladder';
+import { chapterMissions, regionLadder, regionRung } from '@/constants/island-campaigns/ladder';
 import { ENCOUNTER_BUDGETS } from '@/constants/encounters/budgets.generated';
 import { budgetKey } from '@/features/encounter/budget';
 import { solveEncounter } from '@/features/encounter/solvability';
@@ -34,20 +34,25 @@ test('every bundled island has a ladder: one rung per chapter at least, the last
   }
 });
 
-test('a chapter with a restoration board reads it as its rung, its request the cache; a chapter with nothing gets one from the template', () => {
+test('an island plays authored levels (Petalimp), the pattern when it has none, and keeps only a board with a clock', () => {
   const petalimp = ISLAND_CAMPAIGNS.find((campaign) => campaign.campaignId.includes('petalimp'))!;
   const first = chapterMissions(petalimp, petalimp.chapters[0]!);
-  assert.equal(first.length, 1);
-  const firstMin = solveEncounter({ ...first[0]!.encounter, resolve: null }).minActions!;
-  assert.ok(first[0]!.encounter.resolve! >= firstMin + 3, 'an adapted board gets a solved Resolve budget with margin');
-  assert.equal(first[0]!.encounter.cache?.contents.kind, 'items');
-  assert.equal(first[0]!.encounter.storageKey, `katchimeras.mist-mission.${petalimp.campaignId}.1.v1`, 'a saved board resumes');
+  assert.equal(first.length, 2);
+  assert.equal(first[0]!.id, `${petalimp.campaignId}:c1-1`);
+  assert.ok(first.every((mission) => mission.encounter.spawners.length === 1 && !mission.encounter.cache), 'a Seed Pod, and nothing that arrives by itself');
+  assert.ok(first.every((mission) => mission.encounter.resolve == null && mission.encounter.territory?.overrun === 0.7), 'a territory battle: lost at 70% Mist on a calm level');
+  assert.ok(first.every((mission) => mission.encounter.mechanic?.kind === 'dark-wisps' && mission.encounter.mechanic.wisps.every((wisp) => wisp.placement.kind === 'cell')), 'every wisp nests on the board');
   const bare = ISLAND_CAMPAIGNS.find((campaign) => campaign.chapters.every((chapter) => !chapter.restoration && !chapter.missions))!;
   assert.ok(bare, 'an island with panel-only chapters');
-  const template = chapterMissions(bare, bare.chapters[2]!);
-  assert.equal(template.length, 1);
-  assert.deepEqual({ ...template[0]!.encounter, resolve: null }, templateEncounter(bare, bare.chapters[2]!));
-  assert.equal(template[0]!.encounter.mechanic?.kind, 'dark-wisps');
-  assert.equal(template[0]!.encounter.resolve, ENCOUNTER_BUDGETS[budgetKey(templateEncounter(bare, bare.chapters[2]!))]?.resolve, 'the budget comes from the generated table');
-  assert.equal(template[0]!.encounter.mist.length, 3, 'level three: light, dense and root Mist');
+  const pattern = chapterMissions(bare, bare.chapters[2]!);
+  assert.equal(pattern.length, 2);
+  assert.equal(pattern[1]!.encounter.mechanic?.kind, 'dark-wisps');
+  assert.equal(pattern[0]!.encounter.resolve, null);
+  assert.ok(pattern[1]!.encounter.mechanic?.kind === 'dark-wisps' && pattern[1]!.encounter.mechanic.wisps.some((wisp) => wisp.intents?.length), 'its wisps show what they will do');
+  const rush = ISLAND_CAMPAIGNS.flatMap((campaign) => campaign.chapters.filter((chapter) => chapter.restoration?.rush).map((chapter) => ({ campaign, chapter })))[0];
+  if (rush) {
+    const kept = chapterMissions(rush.campaign, rush.chapter);
+    assert.equal(kept.length, 1);
+    assert.equal(kept[0]!.rush, true, 'a chapter with a clock keeps its board');
+  }
 });

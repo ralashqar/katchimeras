@@ -67,7 +67,10 @@ export function islandCampaignChapterStatus(world: MergeWorldState, campaign: Is
   const ledger = world.encounters;
   const activeHere = Boolean(ledger?.active && rungIds.includes(ledger.active.missionId));
   const anyCleared = rungIds.some((id) => Boolean(ledger?.clears[id]));
-  const legacy = Boolean(progress.restoration) || progress.orderIds.length > 0;
+  // Only a chapter still on a board with a clock (Wisp Rush's) keeps the board flow; every other chapter, old saves
+  // mid-request or mid-board included, plays as its levels.
+  const chapterDefinition = campaign.chapters.find((candidate) => candidate.level === level);
+  const legacy = Boolean(progress.restoration && (chapterDefinition?.restoration?.rush || chapterDefinition?.restoration?.mechanic));
   if (!legacy || activeHere || anyCleared) {
     if (restored) return 'resolution_ready';
     return activeHere ? 'in_encounter' : 'mission_available';
@@ -112,11 +115,14 @@ export function regionLadderProgress(world: MergeWorldState, campaign: IslandCam
   const ledger = world.encounters;
   const rungs = regionLadder(campaign);
   const active = ledger?.active ? rungs.find((rung) => rung.mission.id === ledger.active!.missionId) ?? null : null;
-  const firstOpen = rungs.find((rung) => !ledger?.clears[rung.mission.id] && islandCampaignProgress(world, campaign)?.chapters[String(rung.chapterLevel)]?.completedAt == null) ?? null;
+  // The mist level is done once the island is revealed (older saves paid for that instead of playing it).
+  const revealed = Boolean(world.haven.mossproutNatureIslandReveals[campaign.islandId] || (world.haven.mossproutNatureIslands[campaign.islandId] ?? 0) > 0);
+  const chapterDoneAt = (rung: RegionRung) => rung.chapterLevel === 0 ? revealed : islandCampaignProgress(world, campaign)?.chapters[String(rung.chapterLevel)]?.completedAt != null;
+  const firstOpen = rungs.find((rung) => !ledger?.clears[rung.mission.id] && !chapterDoneAt(rung)) ?? null;
   const next = active ?? firstOpen;
   const ladder = rungs.map((rung): RegionLadderEntry => {
     const clear = ledger?.clears[rung.mission.id];
-    const chapterDone = islandCampaignProgress(world, campaign)?.chapters[String(rung.chapterLevel)]?.completedAt != null;
+    const chapterDone = chapterDoneAt(rung);
     return { missionId: rung.mission.id, title: rung.mission.title, difficulty: rung.mission.difficulty, chapterLevel: rung.chapterLevel, state: clear || chapterDone ? 'done' : rung === next ? 'next' : 'ahead', ...(clear ? { bestGrade: clear.bestGrade } : {}) };
   });
   return { ladder, next };
@@ -219,7 +225,8 @@ export function islandCampaignUpgradePanelState(world: MergeWorldState, campaign
   const orderComplete = Boolean(orderId && chapterProgress?.servedOrderIds.includes(orderId));
   const action = PANEL_ACTIONS[status];
   const choice = islandCampaignChapterChoice(campaign, chapter.level, chapterProgress?.selectedOptionId);
-  const cost = chapter.level === 1 ? 0 : mossproutNatureIslandLevelDefinition(campaign.islandId, chapter.level)?.coinCost ?? 0;
+  // Friend tiles cost nothing: the Mist pays Glow, a friend never asks for it.
+  const cost = 0;
   const speechLine = campaign.copy.speech?.[status];
   const voiced = speechLine ? islandSpeech(speechLine, { chapter, choice, coins: world.coins, cost }) : undefined;
   // A board chapter's return happens at the beds: the served delivery is greeted with the same line.

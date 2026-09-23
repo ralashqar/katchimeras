@@ -22,10 +22,10 @@ export const BARISTABBIT_HATCHABLE: HatchableCompanionDefinition = {
     unlockId: 'mossprout:warm-light', price: 60,
     name: 'A lit window', revealPreset: 'mist-clear',
     alphaBoundsKey: 'shared_world_baristabbit_window_hex_tile_v1.webp',
-    markerLines: { sleeping: 'The Mist keeps this window for now.' },
+    markerLines: { sleeping: 'The Mist keeps this window until Petalimp is home.' },
   },
-  // The window wakes once Mossprout's wish has been told: the Kingdom has a purpose before a second friend.
-  availability: { kind: 'kingdom_goal_introduced' },
+  // The window wakes once Petalimp is home: Baristabbit is the rescue at the end of her island's levels.
+  availability: { kind: 'island_friend_home', residentSkinId: 'petalimp' },
   discovery: { gateId: 'gate-3-first-choice', pathId: 'warm-light' },
   mission: {
     id: 'mission:baristabbit',

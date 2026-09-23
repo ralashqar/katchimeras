@@ -36,6 +36,9 @@ import { advanceGlowRequests, glowTutorialDrop, normalizeGlowDiscoveryFields, re
 import { normalizeHatchableEgg, reduceHatchableEgg } from '@/features/onboarding/hatchable-egg-policy';
 import { sharedWorldPurchase } from '@/constants/shared-world';
 import { ISLAND_CAMPAIGNS, isIslandCampaignId, islandCampaignById, islandCampaignForIsland } from '@/constants/island-campaigns/registry';
+import { trackIdFor, trackMissionIds, trackPackFamily, trackStars } from '@/features/level-tracks/track-ids';
+import { trackMilestones } from '@/constants/level-track-milestones';
+import { FRIEND_CONSTELLATIONS } from '@/constants/friend-wisp-constellations';
 import { islandCampaignChapterOrder, islandCampaignChapter } from '@/constants/island-campaigns/helpers';
 import { islandWakeLockedReason, islandWakeState } from '@/constants/island-campaigns/wake-order';
 import { COMPANION_JOURNEY_PROFILES, JOURNEY_MEDITATION_ORDER_GLOW, JOURNEY_MEDITATION_ORDER_MINUTES } from '@/constants/companion-journey-profiles';
@@ -584,6 +587,13 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
         openingGlow: { receiptId: command.receiptId, amount, grantedAt: command.now },
       }, command.now));
     }
+    case 'payEncounterContinue': {
+      const ledger = encounterLedger(current);
+      if (ledger.receipts.includes(command.receiptId)) return unchanged(current);
+      const cost = Math.max(0, Math.floor(command.cost));
+      if (current.coins < cost) return unchanged(current, 'Clear the Mist to earn more Glow.');
+      return changed(touch({ ...current, coins: current.coins - cost, encounters: { ...ledger, receipts: [...ledger.receipts, command.receiptId].slice(-200) } }, command.now));
+    }
     case 'grantStoryGlow': {
       const ledger = encounterLedger(current);
       if (ledger.receipts.includes(command.receiptId)) return unchanged(current);
@@ -611,6 +621,8 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       return startEncounter(current, command);
     case 'abandonEncounter':
       return abandonEncounter(current, command.now);
+    case 'claimTrackMilestone':
+      return claimTrackMilestone(current, command.trackId, command.threshold, command.now);
     case 'completeEncounter':
       return completeEncounter(current, command);
     case 'ackEncounterOutcome':
@@ -1189,7 +1201,7 @@ function upgradeHavenTile(
   if (!definition) return unchanged(state, 'This environment is not ready yet.');
   const grant = economyMode === 'grant' ? Math.max(0, Math.floor(grantedCoins)) : 0;
   const coinCost = economyMode === 'free' ? 0 : definition.coinCost;
-  if (state.coins + grant < coinCost) return unchanged(state, 'Earn a few more Glow through Merge orders.');
+  if (state.coins + grant < coinCost) return unchanged(state, 'Clear the Mist to earn more Glow.');
   const revealState = characterId === 'mossprout' && requestedStage === 1 && state.haven.revealState === 'hidden'
     ? 'first_restore_complete' as const
     : state.haven.revealState;
@@ -1280,10 +1292,11 @@ function upgradeMossproutNatureIsland(
     }
   }
   const grant = economyMode === 'grant' && !paidStage ? Math.max(0, Math.floor(grantedCoins)) : 0;
-  const coinCost = economyMode === 'free' || economyMode === 'encounter' || paidStage ? 0 : definition.coinCost;
+  // Friend tiles are freed by playing, never bought: a campaign island's levels cost nothing, whatever asked for them.
+  const coinCost = economyMode === 'free' || economyMode === 'encounter' || paidStage || islandCampaignForIsland(islandId) ? 0 : definition.coinCost;
   if (paidStage) economyMode = 'free';
   if (state.coins + grant < coinCost) {
-    return unchanged(state, 'Earn a few more Glow through Merge orders.');
+    return unchanged(state, 'Clear the Mist to earn more Glow.');
   }
 
   const mossproutNatureIslands = {
@@ -1368,8 +1381,9 @@ function revealMossproutNatureIsland(
   }
   if ((state.haven.mossproutNatureIslands[command.islandId] ?? 0) !== 0) return unchanged(state, 'That island is already growing.');
   if (state.haven.mossproutNatureIslandReveals[command.islandId]) return unchanged(state, 'That mist is already clear.');
-  const cost = Math.max(0, Math.floor(command.cost));
-  if (state.coins < cost) return unchanged(state, 'Earn a few more Glow through Merge orders.');
+  // A friend's mist lifts by playing its first level; the reveal itself never charges.
+  const cost = 0;
+  if (state.coins < cost) return unchanged(state, 'Clear the Mist to earn more Glow.');
   const receipt: StoryWorldMutationReceipt = {
     id: command.receiptId,
     kind: 'haven_upgrade',
@@ -1467,8 +1481,9 @@ function activateIslandCampaignChapter(
   // A restoration chapter is paid now (the first is the friend's gift) and opens
   // its board; its order only reaches the Main Board when the board asks for it.
   const restorationBoard = asRungs ? null : chapterDefinition?.restoration ?? null;
-  const stageCost = restorationBoard && command.level > 1 ? mossproutNatureIslandLevelDefinition(command.islandId, command.level)?.coinCost ?? 0 : 0;
-  if (state.coins < stageCost) return unchanged(state, 'Earn a few more Glow through Merge orders.');
+  // Friend tiles cost nothing: a chapter's board opens free (Glow is what the Mist pays, not what a friend costs).
+  const stageCost = 0;
+  if (state.coins < stageCost) return unchanged(state, 'Clear the Mist to earn more Glow.');
   // A board chapter's request is authored data, fixed here by the answer: its id
   // is recorded now and the same order is published later, never re-derived.
   // A chapter played against the clock asks the Main Board for nothing: it records no request, so it can close on its own.
@@ -1630,7 +1645,12 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
   const firstClear = !previous;
   const perk = wispPerk(command.helperWispId);
   const glowBonus = heartwoodGardenStallGlowBonusOf(state) + (perk?.kind === 'glow' ? perk.fraction : 0);
-  const paid = encounterRewards({ difficulty: command.difficulty, base: command.base ?? null, grade: command.outcome.grade, firstClear, glowBonus });
+  // Replays on a tile pay their share for the first few each day, then a trickle (the Daily Mist is the farm).
+  const trackId = trackIdFor(command.missionId, command.campaignId);
+  const dayId = localDayId(command.now);
+  const replaysToday = ledger.replays?.dayId === dayId ? ledger.replays.byTrack[trackId] ?? 0 : 0;
+  const paid = encounterRewards({ difficulty: command.difficulty, base: command.base ?? null, grade: command.outcome.grade, firstClear, glowBonus, replaysToday });
+  const replays = firstClear ? ledger.replays : { dayId, byTrack: { ...(ledger.replays?.dayId === dayId ? ledger.replays.byTrack : {}), [trackId]: replaysToday + 1 } };
   const order: Record<EncounterGrade, number> = { cleared: 0, bright: 1, perfect: 2 };
   const bestGrade = previous && order[previous.bestGrade] >= order[command.outcome.grade] ? previous.bestGrade : command.outcome.grade;
   const clears = { ...ledger.clears, [command.missionId]: { firstClearedAt: previous?.firstClearedAt ?? command.now, clears: (previous?.clears ?? 0) + 1, bestGrade, lastKatchimeraId: command.katchimeraId } };
@@ -1646,7 +1666,7 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
     ...state,
     coins: state.coins + paid.glow,
     katchimeraProgress: katchimeraProgressNext,
-    encounters: { ...ledger, receipts, clears, active: ledger.active?.missionId === command.missionId ? null : ledger.active, daily, lastOutcome },
+    encounters: { ...ledger, receipts, clears, active: ledger.active?.missionId === command.missionId ? null : ledger.active, daily, lastOutcome, ...(replays ? { replays } : {}) },
   }, command.now);
   let islandRaised: NonNullable<MergeWorldCommandResult['encounterCleared']>['islandRaised'];
   // The last rung of a chapter grows the island to the chapter's level, as the restoration boards did.
@@ -1656,10 +1676,37 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
     const grown = upgradeMossproutNatureIsland(next, campaign.islandId, rung.chapterLevel, command.now, `${command.receiptId}:island`, 'encounter');
     if (grown.changed) { next = grown.state; islandRaised = { islandId: campaign.islandId, level: rung.chapterLevel }; }
   }
+  // A boss, first time down: the Katchimera who was there gets a friend pack (granted by the caller, on this receipt).
+  const bossPack = firstClear && command.difficulty === 'boss'
+    ? { receiptId: `friend:${packFamily(command.katchimeraId)}:boss:${command.missionId}`, familyId: packFamily(command.katchimeraId) }
+    : undefined;
   return {
     state: next, changed: true,
     message: `${paid.glow} Glow.`,
-    encounterCleared: { missionId: command.missionId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), glow: paid.glow, xp: paid.xp, grade: command.outcome.grade, firstClear, katchimeraId: command.katchimeraId, ...(islandRaised ? { islandRaised } : {}) },
+    encounterCleared: { missionId: command.missionId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), glow: paid.glow, xp: paid.xp, grade: command.outcome.grade, firstClear, katchimeraId: command.katchimeraId, ...(islandRaised ? { islandRaised } : {}), trackId, ...(bossPack ? { bossPack } : {}) },
+  };
+}
+
+/** Friend packs join a playable Katchimera's Wisp collection; anyone else's clear goes to Mossprout's. */
+const PACK_FAMILIES: readonly string[] = FRIEND_CONSTELLATIONS.map((constellation) => constellation.familyId);
+const packFamily = (familyId: string) => PACK_FAMILIES.includes(familyId) ? familyId : 'mossprout';
+
+/** A star milestone on a track: checked against the ledger's stars, paid once, recorded; the pack is the caller's to grant. */
+function claimTrackMilestone(state: MergeWorldState, trackId: string, threshold: number, now: number): MergeWorldCommandResult {
+  const ledger = encounterLedger(state);
+  const milestone = trackMilestones(trackMissionIds(trackId).length).find((candidate) => candidate.threshold === threshold);
+  if (!milestone) return unchanged(state, 'That chest is not on this track.');
+  const claimed = ledger.milestones?.[trackId] ?? [];
+  if (claimed.includes(threshold)) return unchanged(state);
+  if (trackStars(ledger.clears, trackId).stars < threshold) return unchanged(state, 'A few more stars first.');
+  const familyId = trackPackFamily(ledger.clears, trackId, PACK_FAMILIES);
+  return {
+    ...changed(touch({
+      ...state,
+      coins: Math.min(999_999, state.coins + milestone.glow),
+      encounters: { ...ledger, milestones: { ...ledger.milestones, [trackId]: [...claimed, threshold].sort((a, b) => a - b) } },
+    }, now)),
+    milestoneClaimed: { trackId, threshold, glow: milestone.glow, pack: milestone.pack, familyId, receiptId: `friend:${familyId}:track:${trackId}:${threshold}` },
   };
 }
 
@@ -1724,9 +1771,7 @@ function completeIslandCampaignChapter(
   const chapter = campaign?.chapters[String(level)];
   if (!campaign || !chapter) return unchanged(state, 'That island chapter has not started.');
   if (chapter.completedAt != null) return unchanged(state, 'That island chapter is already complete.');
-  if (!chapter.orderIds.every((id) => chapter.servedOrderIds.includes(id))) {
-    return unchanged(state, 'Finish the island request first.');
-  }
+  // The campaign pivot: a chapter's requests are gone; it closes once its levels have grown the island.
   if ((state.haven.mossproutNatureIslands[campaign.islandId] ?? 0) < level) {
     return unchanged(state, 'Restore this part of the island first.');
   }
@@ -4585,7 +4630,16 @@ function normalizeEncounters(value: unknown, now: number): EncounterLedger {
   const lastOutcome = outcome && typeof outcome.missionId === 'string' && typeof outcome.receiptId === 'string' && isEncounterGrade(outcome.grade) && character(outcome.katchimeraId)
     ? { missionId: outcome.missionId, receiptId: outcome.receiptId, grade: outcome.grade, glow: Math.max(0, finite(outcome.glow, 0)), xp: Math.max(0, finite(outcome.xp, 0)), firstClear: Boolean(outcome.firstClear), katchimeraId: character(outcome.katchimeraId)!, ackedAt: outcome.ackedAt == null ? null : finite(outcome.ackedAt, now) }
     : null;
-  return { receipts: uniqueStrings(source.receipts).slice(-ENCOUNTER_RECEIPT_LIMIT), clears, active, loadout, daily, lastOutcome };
+  const milestones: NonNullable<EncounterLedger['milestones']> = {};
+  for (const [trackId, raw] of Object.entries(source.milestones ?? {})) {
+    const thresholds = Array.isArray(raw) ? [...new Set(raw.filter((value): value is number => Number.isFinite(value) && value > 0).map(Math.floor))].sort((a, b) => a - b) : [];
+    if (trackId && thresholds.length) milestones[trackId] = thresholds;
+  }
+  const replaysSource = source.replays && typeof source.replays === 'object' && typeof source.replays.dayId === 'string' ? source.replays : null;
+  const replays = replaysSource && replaysSource.dayId === localDayId(now)
+    ? { dayId: replaysSource.dayId, byTrack: Object.fromEntries(Object.entries(replaysSource.byTrack ?? {}).filter(([, count]) => Number.isFinite(count) && count > 0).map(([id, count]) => [id, Math.floor(count)])) }
+    : null;
+  return { receipts: uniqueStrings(source.receipts).slice(-ENCOUNTER_RECEIPT_LIMIT), clears, active, loadout, daily, lastOutcome, ...(Object.keys(milestones).length ? { milestones } : {}), ...(replays ? { replays } : {}) };
 }
 
 function normalizeKatchimeraProgress(value: unknown, now: number): NonNullable<MergeWorldState['katchimeraProgress']> {

@@ -521,6 +521,10 @@ export type EncounterLedger = {
   loadout: { katchimeraId: MergeCharacterId; helperWispId: WispId | null } | null;
   daily: Record<string, { slots: Record<string, { clearedAt: number; grade: import('./encounter').EncounterGrade }> }>;
   lastOutcome: EncounterOutcomeRecord | null;
+  /** Per level track: the star milestones already opened. */
+  milestones?: Record<string, number[]>;
+  /** Today's replays per level track (only today is kept): past the first few, a replay pays a trickle. */
+  replays?: { dayId: string; byTrack: Record<string, number> };
 };
 /** A playable Katchimera's level and the experience toward the next; level-ups spend Glow. */
 export type KatchimeraProgress = { level: number; xp: number; upgradedAt: number | null };
@@ -643,6 +647,8 @@ export type MergeWorldCommand =
   | { type: 'grantOpeningGlow'; receiptId: string; amount: number; now: number }
   /** Glow the story hands over once (e.g. Steppling's mist price), keyed in the encounter ledger's receipts. */
   | { type: 'grantStoryGlow'; receiptId: string; amount: number; now: number }
+  /** Keep going on a lost level: its Glow, once per receipt; refused when the Glow is not there. */
+  | { type: 'payEncounterContinue'; receiptId: string; cost: number; now: number }
   /** `prepareStepplingGardenLesson` is the same command for Steppling, kept for callers and saves. */
   | { type: 'prepareStepplingGardenLesson'; now: number }
   | { type: 'prepareGardenLesson'; companion: MergeCharacterId; now: number }
@@ -711,6 +717,8 @@ export type MergeWorldCommand =
    * A cleared encounter pays once per receipt: Glow to the world, experience to the Katchimera, the clear to the ledger,
    * and, when the rung was the last of its chapter, the island a level up.
    */
+  /** A star milestone on a level track: its Glow once, and the friend pack the caller then grants. */
+  | { type: 'claimTrackMilestone'; trackId: string; threshold: number; now: number }
   | { type: 'completeEncounter'; receiptId: string; missionId: string; campaignId?: string; katchimeraId: MergeCharacterId; helperWispId: WispId | null; outcome: import('@/features/encounter/outcome').EncounterOutcome; difficulty: import('./encounter').EncounterDifficulty; base?: { glow: number; xp: number } | null; now: number }
   | { type: 'ackEncounterOutcome'; now: number }
   /** A Katchimera a level up, for Glow, once their experience allows; a stale expected level changes nothing. */
@@ -755,7 +763,8 @@ export type MergeWorldCommandResult = {
   natureIslandUpgrade?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; coinCost: number; completedTier: boolean };
   storyWorldMutationReceipt?: StoryWorldMutationReceipt;
   /** An encounter just paid: what it paid and to whom, for the provider's celebration, Bond and sparks. */
-  encounterCleared?: { missionId: string; campaignId?: string; glow: number; xp: number; grade: import('./encounter').EncounterGrade; firstClear: boolean; katchimeraId: MergeCharacterId; islandRaised?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel } };
+  encounterCleared?: { missionId: string; campaignId?: string; glow: number; xp: number; grade: import('./encounter').EncounterGrade; firstClear: boolean; katchimeraId: MergeCharacterId; islandRaised?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel }; trackId?: string; bossPack?: { receiptId: string; familyId: string } };
+  milestoneClaimed?: { trackId: string; threshold: number; glow: number; pack: 'gift' | 'gift-rare' | 'finale'; familyId: string; receiptId: string };
   /** A Katchimera just levelled. */
   katchimeraUpgraded?: { characterId: MergeCharacterId; level: number; cost: number };
 };

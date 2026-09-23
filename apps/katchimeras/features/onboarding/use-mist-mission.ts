@@ -8,13 +8,13 @@ import type { useOpeningGlow } from '@/components/katchadeck/world/kingdom-openi
 import { abilityFor, abilityReady, abilityTargets } from '@/features/encounter/abilities';
 import { encounterMechanicHost } from '@/features/encounter/adapt';
 import { createEncounterState } from '@/features/encounter/create-state';
-import { encounterLine, KEEP_GOING_RESOLVE, LOW_RESOLVE } from '@/features/encounter/encounter-copy';
-import { resolveLeft, type EncounterStatus } from '@/features/encounter/encounter-run';
+import { encounterLine, GATHER_LINE, KEEP_GOING_RESOLVE, LOW_RESOLVE, THREAT_LINE, WISP_ACT_LINES, WISP_ACT_ORDER } from '@/features/encounter/encounter-copy';
+import { lossReason as encounterLossReason, resolveLeft, type EncounterLossReason, type EncounterStatus } from '@/features/encounter/encounter-run';
 import { encounterOutcome, type EncounterOutcome } from '@/features/encounter/outcome';
 import { encounterRunId } from '@/features/encounter/run-id';
 import { encounterProfile } from '@/features/encounter/spawner-profile';
 import { missionPairs, missionWakes, missionWindow } from '@/features/mission-mechanics/board-window';
-import { mechanicComplete, resolveMechanic } from '@/features/mission-mechanics/mechanic';
+import { mechanicComplete, resolveMechanic, wispViews } from '@/features/mission-mechanics/mechanic';
 import { resolveEncounterForPlay, resolveMissionForPlay } from '@/features/mission-mechanics/preview';
 import { missionWispTarget } from '@/features/mission-mechanics/wisp-target';
 import { useDevMissionMechanicPreview } from '@/hooks/use-dev-mission-mechanic-preview';
@@ -32,6 +32,8 @@ export const WISP_FALL_MS = 640;
 const STALLED_MS = 3000;
 /** A stuck encounter opens its cache after this beat, so the player sees the board is spent first. */
 const CACHE_DELAY_MS = 900;
+/** How long a wisp's act is said over the board. */
+const ACT_LINE_MS = 2200;
 const NO_MISSION_STORAGE_KEY = 'katchimeras.mist-mission.none.v1';
 /** An authored encounter with no guides of its own is free from the first move. */
 const FREE_GUIDES: HatchableMissionDefinition['guides'] = { firstMerge: { eyebrow: '', title: '', body: '' }, wake: { eyebrow: '', title: '', body: '' }, merge: { eyebrow: '', title: '', body: '' }, mergeFallbackTitle: '', free: { eyebrow: '', title: '', body: '' } };
@@ -47,6 +49,15 @@ export type MistMissionDefinition = Omit<HatchableMissionDefinition, 'camera'>;
 export type EncounterDockState = {
   definition: EncounterDefinition;
   resolveLeft: number | null;
+  /**
+   * A territory battle: the Mist's cells now, the count that loses the level, and the board's cells; turns taken; why
+   * the attempt was lost. Null on a board played by Resolve.
+   */
+  territory: { mist: number; overrun: number; cells: number } | null;
+  turns: number;
+  lossReason: EncounterLossReason | null;
+  /** Keep going's price in Glow (0: free). */
+  keepGoingCost: number;
   status: EncounterStatus | null;
   outcome: EncounterOutcome | null;
   ability: { definition: CompanionAbilityDefinition; tier: CompanionAbilityTier; charge: number; ready: boolean; targets: number[] } | null;
@@ -72,7 +83,10 @@ export type EncounterDockState = {
  * Katchimera's ability, spawners, Mist, the cache, a loss the player can
  * retry or push through.
  */
-export function useMistMission({ active, mission, encounter: authored, owner, loadout, world, tileNode, boardMetrics, cameraSettled, glow, complete, onLeave }: {
+export function useMistMission({ guided = true, active, mission, encounter: authored, owner, loadout, world, tileNode, boardMetrics, cameraSettled, glow, complete, onLeave, keepGoingCost, payKeepGoing }: {
+  /** Whether the host draws the board's guidance (hand, spotlight). A board with none is free from the first move:
+   * a first-merge lesson nobody can see would refuse every other touch. */
+  guided?: boolean;
   active: boolean;
   mission: MistMissionDefinition | null;
   /** An authored encounter to play instead of the mission's own board. */
@@ -91,11 +105,14 @@ export function useMistMission({ active, mission, encounter: authored, owner, lo
   complete: () => Promise<unknown>;
   /** Puts the board away from a loss, when the board can be put away. */
   onLeave?: () => void;
+  /** Keep going's price in Glow, and the payment (resolves true once paid); absent, Keep going is free. */
+  keepGoingCost?: number;
+  payKeepGoing?: (receiptId: string) => Promise<boolean>;
 }) {
   const preview = useDevMissionMechanicPreview();
   const encounter = useMemo(() => authored ?? (mission ? resolveEncounterForPlay(mission, preview) : null), [authored, mission, preview]);
   // What the dock and the guidance read: the encounter carries every field a mission has, with guides of its own or the mission's.
-  const played = useMemo((): MistMissionDefinition | null => (encounter ? { ...encounter, guides: encounter.guides ?? mission?.guides ?? FREE_GUIDES } : mission ? resolveMissionForPlay(mission, preview) : null), [encounter, mission, preview]);
+  const played = useMemo((): MistMissionDefinition | null => (encounter ? { ...encounter, guides: guided ? encounter.guides ?? mission?.guides ?? FREE_GUIDES : FREE_GUIDES } : mission ? resolveMissionForPlay(mission, preview) : null), [encounter, guided, mission, preview]);
   const effectiveLoadout = useMemo((): EncounterLoadout | null => encounter ? loadout ?? { companionId: 'mossprout', level: 1 } : null, [encounter, loadout]);
   const profile = useMemo(() => encounterProfile(world ?? null, effectiveLoadout), [effectiveLoadout, world]);
   const window = useMemo(() => missionWindow(encounter?.rows ?? 4), [encounter?.rows]);
@@ -189,6 +206,16 @@ export function useMistMission({ active, mission, encounter: authored, owner, lo
     return () => clearTimeout(timer);
   }, [active, encounter, openCache, store.status]);
   useEffect(() => { setCacheLine(false); setEffects([]); }, [runId]);
+  // v2: what the wisps just did, said for a beat before the friend's own line comes back.
+  const [actLine, setActLine] = useState<string | null>(null);
+  useEffect(() => {
+    const kinds = new Set(effects.map((effect) => effect.kind));
+    const act = WISP_ACT_ORDER.find((kind) => kinds.has(kind));
+    if (!act) return;
+    setActLine(WISP_ACT_LINES[act]);
+    const timer = setTimeout(() => setActLine(null), ACT_LINE_MS);
+    return () => clearTimeout(timer);
+  }, [effects]);
   const ability = useMemo(() => {
     if (!encounter || !store.run || !store.state) return null;
     const found = abilityFor(effectiveLoadout);
@@ -200,18 +227,32 @@ export function useMistMission({ active, mission, encounter: authored, owner, lo
     if (!encounter || !store.run) return null;
     const facts = { remaining: resolveLeft(store.run), katchimera: effectiveLoadout?.companionId ?? null, ability: ability?.definition.name ?? null };
     if (cacheLine) return encounterLine('cacheFound', facts);
+    if (actLine && store.status === 'playing') return actLine;
+    // Territory: a wisp one turn from spreading (or ending a gather) is what the friend points at first.
+    if (store.status === 'playing' && store.run.territory && store.mechanicState && host) {
+      const threat = wispViews(resolveMechanic(host), host, store.mechanicState).find((wisp) => wisp.alive && wisp.intent && wisp.intent.countdown <= 1 && (wisp.intent.kind === 'surge' || wisp.intent.kind === 'snuff' || wisp.intent.kind === 'gather'));
+      if (threat) return threat.intent!.kind === 'gather' ? GATHER_LINE : THREAT_LINE;
+    }
     if (store.status === 'playing' && ability?.ready) return encounterLine('abilityReady', facts) || null;
     if (store.status === 'playing' && Number.isFinite(facts.remaining) && facts.remaining <= LOW_RESOLVE) return encounterLine('lowResolve', facts);
     if (store.status === 'playing' && store.run.actions === 0) return encounterLine('enter', facts);
     return null;
-  }, [ability, cacheLine, effectiveLoadout?.companionId, encounter, store.run, store.status]);
+  }, [ability, actLine, cacheLine, effectiveLoadout?.companionId, encounter, host, store.mechanicState, store.run, store.status]);
   const onRetry = useCallback(() => setAttempt((value) => value + 1), []);
-  const onKeepGoing = useCallback(() => keepGoing(KEEP_GOING_RESOLVE), [keepGoing]);
+  const continues = store.run?.resolve.continues ?? 0;
+  const onKeepGoing = useCallback(() => {
+    if (!payKeepGoing || !runId) { keepGoing(KEEP_GOING_RESOLVE); return; }
+    // Paid once per loss of this attempt: the receipt names the attempt and which continue it is.
+    void payKeepGoing(`continue:${runId}:${continues}`).then((paid) => { if (paid) keepGoing(KEEP_GOING_RESOLVE); }).catch(() => undefined);
+  }, [continues, keepGoing, payKeepGoing, runId]);
   const onUseAbility = useCallback((target: number | null) => { useAbility(target); }, [useAbility]);
+  const lossReason = useMemo(() => (encounter && store.run && store.state && store.mechanicState && host && store.status === 'failed'
+    ? encounterLossReason(encounter, host, store.mechanicState, store.run, store.state, window) : null), [encounter, host, store.mechanicState, store.run, store.state, store.status, window]);
   const encounterDock = useMemo((): EncounterDockState | null => encounter && store.run ? {
     definition: encounter, resolveLeft: store.run.resolve.budget == null ? null : resolveLeft(store.run), status: store.status, outcome, ability, speech, effects,
+    territory: store.run.territory ? { mist: store.run.territory.last, overrun: store.run.territory.overrun, cells: encounter.rows * 5 } : null, turns: store.run.merges, lossReason, keepGoingCost: payKeepGoing ? keepGoingCost ?? 0 : 0,
     onUseAbility, onKeepGoing, onRetry, onLeave: onLeave ?? null,
-  } : null, [ability, effects, encounter, onKeepGoing, onLeave, onRetry, onUseAbility, outcome, speech, store.run, store.status]);
+  } : null, [ability, effects, encounter, lossReason, onKeepGoing, onLeave, onRetry, onUseAbility, outcome, speech, store.run, store.status]);
   return {
     /** The mission as played: itself, or with the preview mechanic laid over it. */
     mission: played,

@@ -54,7 +54,7 @@ test('every island level uses the shared purchase flow in wake order, survives r
     if (!campaign) break;
     const island = mossproutNatureIslandById.get(entry.islandId)!;
     const reveal = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null).find((candidate) => candidate.id === `nature:${island.id}`)!;
-    assert.equal(reveal.transition, 'island_reveal'); assert.equal(reveal.eligible, true); assert.equal(reveal.cost, island.levels[0]!.coinCost);
+    assert.equal(reveal.transition, 'island_reveal'); assert.equal(reveal.eligible, true); assert.equal(reveal.cost, 0, 'a friend’s mist never costs Glow');
     assert.ok(WORLD_UPGRADE_FLOWS.some((flow) => flow.id === worldUpgradeRunId(reveal)));
     const revealCommand: MergeWorldCommand = { type: 'revealMossproutNatureIsland', islandId: island.id, campaignId: campaign.campaignId,
       residentSkinId: campaign.residentSkinId, cost: reveal.cost, receiptId: worldUpgradeRunId(reveal), now: NOW };
@@ -64,15 +64,15 @@ test('every island level uses the shared purchase flow in wake order, survives r
     assert.equal(reduceMergeWorld(state, revealCommand).state.coins, state.coins, 'a replayed reveal never charges twice');
     state = greetIslandFriend(state, campaign, NOW);
     for (const level of island.levels) {
-      // A chapter with a restoration board pays its stage when the board opens, so its level costs nothing here.
+      // A friend's island never costs Glow: its boards open free and its levels grow free.
       const onBeds: boolean = campaign.chapters.some((entry) => entry.level === level.level && entry.restoration != null);
       const beforeStage = state.coins;
       state = acknowledgeChapterReturn(startAndServeChapter(state, campaign, level.level, NOW), campaign, level.level, NOW);
-      if (onBeds) assert.equal(state.coins, beforeStage - (level.level === 1 ? 0 : level.coinCost), `${island.id} level ${level.level} is paid when its board opens`);
+      if (onBeds) assert.equal(state.coins, beforeStage, `${island.id} level ${level.level}'s board opens free`);
       state = completeRestoration(state, campaign, level.level, NOW);
       const offer = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null).find((candidate) => candidate.id === `nature:${island.id}`)!;
       assert.ok(offer, `${island.id} level ${level.level} has a marker`);
-      assert.equal(offer.cost, level.level === 1 || onBeds ? 0 : level.coinCost);
+      assert.equal(offer.cost, 0);
       assert.equal(offer.nextLevel, level.level);
       assert.equal(offer.eligible, true);
       assert.equal(offer.action, level.level === 1 ? 'Restore' : 'Upgrade');
@@ -221,11 +221,11 @@ test('only the next authored level is offered, preserving costs and aggregate Ha
   assert.equal(initial.find((offer) => offer.id === 'haven:mossprout')?.cost, 20);
   const offers = worldUpgradeOffers(restored());
   assert.equal(offers.some((offer) => offer.id === 'haven:mossprout'), false);
-  assert.equal(offers.find((offer) => offer.id === 'mist:steppling-home')?.cost, 40);
+  assert.equal(offers.find((offer) => offer.id === 'mist:steppling-home')?.cost, 20);
   for (const island of MOSSPROUT_NATURE_ISLANDS) {
     const offer = offers.find((item) => item.id === `nature:${island.id}`)!;
     const open = islandWakeState(restored(), island.id) === 'open';
-    assert.equal(offer.cost, island.levels[0].coinCost);
+    assert.equal(offer.cost, 0, 'a friend’s mist never costs Glow');
     assert.equal(offer.eligible, open, `${island.id} is ${open ? 'open' : 'resting'}`);
     if (open) assert.equal(offer.nextLevel, 0);
     else assert.equal(offer.sleepingSkinId, ISLAND_WAKE_ORDER.find((entry) => entry.islandId === island.id)?.residentSkinId);
@@ -237,7 +237,7 @@ test('only the next authored level is offered, preserving costs and aggregate Ha
 test('unaffordable spots remain discoverable without story or resident prerequisites', () => {
   const offers = worldUpgradeOffers({ ...restored(), coins: 3 });
   const mist = offers.find((offer) => offer.id === 'mist:steppling-home')!;
-  assert.equal(mist.eligible, true); assert.equal(mist.affordable, false); assert.equal(mist.missingGlow, 37);
+  assert.equal(mist.eligible, true); assert.equal(mist.affordable, false); assert.equal(mist.missingGlow, 17);
   const locked = worldUpgradeOffers(createInitialMergeWorldState(NOW, ['mossprout']));
   assert.ok(locked.filter((offer) => offer.sleepingSkinId == null && offer.hatchable?.state !== 'sleeping').every((offer) => offer.eligible), 'every awake spot is eligible');
   assert.equal(locked.find((offer) => offer.id === 'nature:bloom-garden')?.eligible, true);
@@ -259,8 +259,8 @@ test('Glow alone cannot wake Pond Sanctuary before its turn, and the mist purcha
   assert.equal(refused.state.haven.mossproutNatureIslands['pond-sanctuary'], 0);
   const mist = reduceMergeWorld(state, { type: 'unlockWorldTarget', targetId: 'mossprout:overgrown-trail', receiptId: 'mist:glow-only', now: NOW });
   assert.equal(mist.changed, true);
-  assert.equal(mist.state.coins, 5);
-  assert.equal(reduceMergeWorld({ ...state, coins: 39 }, { type: 'unlockWorldTarget', targetId: 'mossprout:overgrown-trail', now: NOW }).changed, false);
+  assert.equal(mist.state.coins, 25);
+  assert.equal(reduceMergeWorld({ ...state, coins: 19 }, { type: 'unlockWorldTarget', targetId: 'mossprout:overgrown-trail', now: NOW }).changed, false);
   assert.equal(reduceMergeWorld(state, { type: 'upgradeHavenTile', characterId: 'mossprout', stage: 1, now: NOW }).changed, true);
 });
 
@@ -434,12 +434,12 @@ test('the ticket is the tile’s price, paid once at the bubble; the board opens
   const initial = restored(100);
   const paid = ticketed(initial);
   assert.equal(paid.changed, true);
-  assert.equal(paid.state.coins, initial.coins - 40, 'the tile’s 40 Glow left the counter');
-  assert.deepEqual(paid.state.hatchableMissions?.steppling, { paidAt: NOW, paidCoins: 40, receiptId: 'story:glow-steppling-v1:ticket' });
+  assert.equal(paid.state.coins, initial.coins - 20, 'the tile’s 20 Glow left the counter');
+  assert.deepEqual(paid.state.hatchableMissions?.steppling, { paidAt: NOW, paidCoins: 20, receiptId: 'story:glow-steppling-v1:ticket' });
   const again = ticketed(paid.state);
   assert.equal(again.changed, false, 'a second payment for the same run is a no-op');
   assert.equal(again.message, undefined);
-  const short = ticketed({ ...initial, coins: 39 });
+  const short = ticketed({ ...initial, coins: 19 });
   assert.equal(short.changed, false);
   assert.match(short.message ?? '', /earn more Glow/);
   const asleep = reduceMergeWorld(initial, { type: 'payHatchableMission', companion: 'baristabbit', receiptId: 'story:glow-baristabbit-v1:ticket', now: NOW });
@@ -449,10 +449,10 @@ test('the ticket is the tile’s price, paid once at the bubble; the board opens
   assert.equal(revealed.state.coins, paid.state.coins, 'the reveal after the board is free');
   assert.equal(revealed.storyWorldMutationReceipt?.coinCost, 0);
   assert.equal(revealed.storyWorldMutationReceipt?.economyMode, 'free');
-  assert.equal(revealed.state.worldUnlocks?.['mossprout:overgrown-trail']?.paid, 40, 'the unlock remembers what the ticket cost');
+  assert.equal(revealed.state.worldUnlocks?.['mossprout:overgrown-trail']?.paid, 20, 'the unlock remembers what the ticket cost');
   assert.equal(ticketed(revealed.state).changed, false, 'no ticket once the tile is revealed');
   const unpaidReveal = reduceMergeWorld(initial, { type: 'unlockWorldTarget', targetId: 'mossprout:overgrown-trail', receiptId: 'old-save', now: NOW + 1 });
-  assert.equal(unpaidReveal.state.coins, initial.coins - 40, 'a save mid-board without a ticket still pays at the reveal');
+  assert.equal(unpaidReveal.state.coins, initial.coins - 20, 'a save mid-board without a ticket still pays at the reveal');
   assert.equal(unpaidReveal.storyWorldMutationReceipt?.economyMode, 'normal');
   // The ticket survives a normalize, and a free reveal receipt repairs a lost unlock like a paid one.
   const normalized = normalizeMergeWorldState(JSON.parse(JSON.stringify(paid.state)));
@@ -531,7 +531,7 @@ test('returning to mist exposes the upgrade bubble until its ticket is paid', as
     const visible = visibleWorldUpgradeOffers(offers, 'companion.meditating', { nodeId, status: 'active' });
     assert.equal(visible.length, 1);
     assert.equal(visible[0].id, 'mist:steppling-home');
-    assert.equal(visible[0].cost, 40, 'the bubble carries the price');
+    assert.equal(visible[0].cost, 20, 'the bubble carries the price');
     const { resume, commands } = mistUpgradeRuntime(nodeId);
     assert.equal(commands.length, 0, 'showing the bubble does not open or purchase automatically');
     await resume(restored());
@@ -623,10 +623,10 @@ test('legacy Garden restoration and finished mist requests enable the same paid 
     const command = { type: 'unlockWorldTarget' as const, targetId: 'mossprout:overgrown-trail', receiptId: 'clear-mist', now: NOW };
     const purchase = reduceMergeWorld(state, command);
     assert.equal(purchase.changed, true);
-    assert.equal(purchase.state.coins, 15);
+    assert.equal(purchase.state.coins, 35);
     assert.ok(purchase.state.worldUnlocks?.['mossprout:overgrown-trail']);
-    assert.equal(reduceMergeWorld(purchase.state, command).state.coins, 15);
-    const poor = reduceMergeWorld({ ...state, coins: 39 }, command);
+    assert.equal(reduceMergeWorld(purchase.state, command).state.coins, 35);
+    const poor = reduceMergeWorld({ ...state, coins: 19 }, command);
     assert.equal(poor.changed, false);
   }
   assert.equal(worldUpgradeOffers({ ...initial, coins: 55 }).find((offer) => offer.id === 'mist:steppling-home')?.eligible, true);

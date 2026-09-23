@@ -111,21 +111,17 @@ test('the grove sleeps until Petalimp is home, then plays every stage on the boa
   let state = greetIslandFriend(revealIsland({ ...world, coins: 900 }, fernip, NOW), fernip, NOW + 1);
   assert.equal(islandCampaignChapterStatus(state, fernip, 1), 'available');
   assert.equal(islandCampaignPreviousStyle(state, fernip, 2), null);
-  // Stage 1: the board opens for free, the request is the delivery, the restore is his gift.
+  // Stage 1 plays as its levels (no board, no request), and grows the island when they are done.
   state = startAndServeChapter(state, fernip, 1, NOW + 2, 2);
-  assert.equal(islandCampaignChapterStatus(state, fernip, 1), 'board_open');
-  const panel = islandCampaignUpgradePanelState(state, fernip)!;
-  assert.equal(panel.stateLabel, 'Driving off the Mist');
-  assert.equal(panel.speech, fernip.chapters[0]!.choices[2]!.returnLine, 'the return line greets the delivery on the panel');
+  assert.equal(islandCampaignChapterStatus(state, fernip, 1), 'mission_available');
   state = completeChapter(restoreIslandLevel(completeRestoration(acknowledgeChapterReturn(state, fernip, 1, NOW + 3), fernip, 1, NOW + 4), fernip, 1, NOW + 5), fernip, 1, NOW + 6);
   assert.equal(islandCampaignChapterStatus(state, fernip, 1), 'complete');
   assert.equal(islandCampaignPreviousStyle(state, fernip, 2), 'sheltered');
-  // Stage 2 costs Glow up front, asked for in his voice and never in a return line.
-  const cost = mossproutNatureIslandLevelDefinition(FERNIP_ISLAND_ID, 2)!.coinCost;
+  // A friend never asks for Glow: stage 2 opens free, and his voice says nothing about a price.
   const waiting = islandCampaignUpgradePanelState({ ...state, coins: 10 }, fernip)!;
   assert.equal(waiting.status, 'available');
-  assert.match(waiting.voicedStateLabel, new RegExp(`10 of ${cost} Glow`));
-  assert.match(islandCampaignUpgradePanelState({ ...state, coins: cost }, fernip)!.voicedStateLabel, /Whenever you feel like it/);
+  assert.equal(waiting.actionCost, 0);
+  assert.doesNotMatch(waiting.voicedStateLabel, /Glow/);
 
   const home = completeIslandCampaign({ ...world, coins: 900 }, fernip, NOW + 100);
   assert.ok(home.ownedKatchimeraCards.some((card) => card.cardId === 'fernip' && card.acquisition === 'island_campaign'), 'Fernip is home');

@@ -1,13 +1,19 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type View as ViewType } from 'react-native';
-import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeIn, FadeOut, ZoomIn, ZoomOut, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import { AppFontFamilies } from '@/constants/theme';
-import { ENCOUNTER_LOSS, gradeLabel, outcomeLine } from '@/features/encounter/encounter-copy';
-import { mechanicProgress, resolveMechanic } from '@/features/mission-mechanics/mechanic';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
+import { encounterWindow } from '@/features/encounter/create-state';
+import { pulseAim, usePulseAim } from '@/features/encounter/pulse-aim';
+import { pulseArea } from '@/features/encounter/pulse';
+import { ENCOUNTER_LOSS, ENCOUNTER_LOSS_V2, gradeLabel, outcomeLine } from '@/features/encounter/encounter-copy';
+import { mechanicProgress, resolveMechanic, wispViews } from '@/features/mission-mechanics/mechanic';
 import { mergeFtueAllowsCommand } from '@/features/onboarding/merge-ftue';
 import { createMergeBoardSession } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import { missionBoardStep } from '@/features/onboarding/steppling-mission';
@@ -57,6 +63,37 @@ type BoardOffset = { x: number; y: number };
  * ability (tap it, then a plant or a spawner when it wants one); a spent
  * budget lays the loss over the board with the ways on.
  */
+/**
+ * The Mist's hold on the board (territory battles): how many cells it covers against the line where the level is
+ * lost. When it spreads, the bar swells with a buzz; pulled back (a merge's pulse, Keep going), it settles. Reduced
+ * motion: it simply changes.
+ */
+const MistMeter = memo(function MistMeter({ mist, overrun, cells, turns, reduceMotion }: { mist: number; overrun: number; cells: number; turns: number; reduceMotion: boolean }) {
+  const swell = useSharedValue(0);
+  const was = useRef(mist);
+  useEffect(() => {
+    if (was.current === mist) return;
+    const rose = mist > was.current;
+    was.current = mist;
+    if (reduceMotion || !rose) return;
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+    swell.value = 0;
+    swell.value = withSequence(withTiming(1, { duration: 160 }), withTiming(0, { duration: 380 }));
+  }, [mist, reduceMotion, swell]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: 1 + swell.value * 0.12 }] }));
+  const close = overrun - mist <= 2;
+  const share = (value: number) => `${Math.max(0, Math.min(100, (value / Math.max(1, cells)) * 100))}%` as const;
+  return <Animated.View accessibilityRole="text" accessibilityLabel={`Mist on ${mist} of ${cells} cells. At ${overrun} it takes over. Turn ${turns}`} style={[styles.pill, styles.meterPill, close ? styles.pillLow : null, style]}>
+    <IconSymbol name="cloud.fog.fill" size={15} color={close ? '#B0567A' : '#7A6A9E'} />
+    <View style={styles.meterTrack}>
+      <View style={[styles.meterFill, close ? styles.meterFillClose : null, { width: share(mist) }]} />
+      <View style={[styles.meterLine, { left: share(overrun) }]} />
+    </View>
+    <Text style={styles.pillLabel}>{`${mist}/${overrun}`}</Text>
+    <Text style={styles.pillLabel}>{`Turn ${turns}`}</Text>
+  </Animated.View>;
+});
+
 export const HatchableMissionDock = memo(function HatchableMissionDock({ mission, state, send, merges, mechanicState, encounter, width, bottomInset, landings, onStrike, onFinale, onReveal, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: HatchableMissionDockProps) {
   const sessionRef = useRef<ReturnType<typeof createMergeBoardSession> | null>(null);
   if (!sessionRef.current) sessionRef.current = createMergeBoardSession();
@@ -121,13 +158,31 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
     setPicking(false);
   }, [encounter]);
   const reduceMotion = useReducedMotion();
+  // Territory: a piece held over its twin shows the Harmony pulse its merge would send, and rings the wisp it would strike.
+  const aimWindow = useMemo(() => (encounter ? encounterWindow(encounter.definition) : null), [encounter?.definition]);
+  const aimFromCell = useCallback((cell: number, source: number) => {
+    const board = stateRef.current.board;
+    const held = source >= 0 ? board[source]?.occupant : null;
+    const under = cell >= 0 && cell !== source ? board[cell]?.occupant : null;
+    const next = held?.kind === 'item' && under?.kind === 'item' && under.definitionId === held.definitionId ? MERGE_ITEMS_BY_ID.get(held.definitionId)?.nextItemId : null;
+    const tier = next ? MERGE_ITEMS_BY_ID.get(next)?.tier ?? null : null;
+    pulseAim.set(tier != null ? { cell, tier } : null);
+  }, []);
+  useEffect(() => () => pulseAim.set(null), []);
+  const aim = usePulseAim();
+  const pulseCells = useMemo(() => (aim && aimWindow ? pulseArea(aim.cell, aim.tier, aimWindow).cells : []), [aim, aimWindow]);
+  // What a wisp took off the board without a merge (a piece it ate) puffs away on the board, never simply vanishing.
+  const effectSeq = useRef(0);
+  const effectCells = useMemo(() => (encounter?.effects ?? []).flatMap((effect) => (effect.kind === 'ate' ? [{ id: ++effectSeq.current, cell: effect.cell, kind: 'mist-burst' as const }] : [])), [encounter?.effects]);
+  // Spores a wisp has dropped: a free cell that turns to Mist unless a piece is put on it.
+  const spores = useMemo(() => (mechanicState ? wispViews(mechanic, mission, mechanicState).flatMap((view) => view.spores ?? []) : []), [mechanic, mechanicState, mission]);
   const header = encounter ? <View pointerEvents="box-none" style={styles.header}>
     {encounter.speech ? <View style={styles.speechRow}><FriendSpeechBubble text={encounter.speech} reduceMotion={reduceMotion} tail="none" raise={false} /></View> : null}
     <View style={styles.headerRow}>
-      <View accessibilityRole="text" accessibilityLabel={encounter.resolveLeft == null ? 'No Resolve budget' : `Resolve ${encounter.resolveLeft}`} style={[styles.pill, encounter.resolveLeft != null && encounter.resolveLeft <= 3 ? styles.pillLow : null]}>
+      {encounter.territory ? <MistMeter mist={encounter.territory.mist} overrun={encounter.territory.overrun} cells={encounter.territory.cells} turns={encounter.turns} reduceMotion={reduceMotion} /> : <View accessibilityRole="text" accessibilityLabel={encounter.resolveLeft == null ? 'No Resolve budget' : `Resolve ${encounter.resolveLeft}`} style={[styles.pill, encounter.resolveLeft != null && encounter.resolveLeft <= 3 ? styles.pillLow : null]}>
         <Text style={styles.pillLabel}>Resolve</Text>
         <Text style={styles.pillValue}>{encounter.resolveLeft == null ? '∞' : encounter.resolveLeft}</Text>
-      </View>
+      </View>}
       {ability ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: !ability.ready }} accessibilityLabel={`${ability.definition.name}, ${ability.ready ? 'ready' : `${ability.charge} of ${ability.tier.chargeEvery} charged`}`}
         onPress={pressAbility} style={[styles.abilityButton, ability.ready ? styles.abilityReady : null, picking ? styles.abilityPicking : null]}>
         <Text style={styles.abilityName}>{ability.definition.name}</Text>
@@ -136,7 +191,17 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
       {encounter.outcome?.cleared ? <View style={styles.pill}><Text style={styles.pillValue}>{gradeLabel(encounter.outcome.grade)}</Text></View> : null}
     </View>
   </View> : null;
+  const cellBox = (cell: number) => {
+    const metrics = boardMetricsRef.current;
+    if (!metrics || !boardOffset) return null;
+    const { bounds } = mergeCellFrame(metrics.geometry, cell);
+    return { left: boardOffset.x + bounds.left, top: boardOffset.y + bounds.top, width: bounds.width, height: bounds.height };
+  };
   const overlay = encounter ? <>
+    {pulseCells.map((cell) => { const box = cellBox(cell); return box ? <Animated.View key={`pulse:${cell}`} entering={FadeIn.duration(reduceMotion ? 60 : 140)} exiting={FadeOut.duration(reduceMotion ? 60 : 160)} pointerEvents="none" style={[styles.pulseCell, box]} /> : null; })}
+    {spores.map((spore) => { const box = cellBox(spore.cell); return box ? <Animated.View key={`spore:${spore.cell}`} entering={reduceMotion ? undefined : ZoomIn.springify().damping(12)} exiting={reduceMotion ? undefined : ZoomOut.duration(220)} pointerEvents="none" accessible accessibilityLabel={`A spore. It turns to Mist in ${spore.turns} ${spore.turns === 1 ? 'turn' : 'turns'} unless a piece is put here`} style={[styles.sporeCell, box]}>
+      <View style={styles.sporeDot}><Text style={styles.sporeText}>{spore.turns}</Text></View>
+    </Animated.View> : null; })}
     {picking && ability && boardOffset ? ability.targets.map((cell) => {
       const metrics = boardMetricsRef.current;
       if (!metrics) return null;
@@ -148,11 +213,12 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
       <View style={styles.lossScrim} />
       <View style={styles.lossCard}>
         <Text style={styles.lossEyebrow}>{ENCOUNTER_LOSS.eyebrow}</Text>
-        <Text style={styles.lossTitle}>{ENCOUNTER_LOSS.title}</Text>
-        <Text style={styles.lossBody}>{ENCOUNTER_LOSS.body}</Text>
+        <Text style={styles.lossTitle}>{encounter.territory && encounter.lossReason && encounter.lossReason !== 'resolve' ? ENCOUNTER_LOSS_V2[encounter.lossReason].title : ENCOUNTER_LOSS.title}</Text>
+        <Text style={styles.lossBody}>{encounter.territory && encounter.lossReason && encounter.lossReason !== 'resolve' ? ENCOUNTER_LOSS_V2[encounter.lossReason].body : ENCOUNTER_LOSS.body}</Text>
         <View style={styles.lossActions}>
           <KatchaButton label={ENCOUNTER_LOSS.retry} onPress={encounter.onRetry} variant="primary" fullWidth />
-          <KatchaButton label={ENCOUNTER_LOSS.keepGoing} onPress={encounter.onKeepGoing} variant="secondary" fullWidth />
+          <KatchaButton label={encounter.territory ? ENCOUNTER_LOSS_V2.keepGoing : ENCOUNTER_LOSS.keepGoing} onPress={encounter.onKeepGoing} variant="secondary" fullWidth
+            cost={encounter.keepGoingCost ? { currency: 'coins', amount: encounter.keepGoingCost } : undefined} />
           {encounter.onLeave ? <KatchaButton label={ENCOUNTER_LOSS.leave} onPress={encounter.onLeave} variant="tertiary" fullWidth /> : null}
         </View>
         {encounter.outcome ? <Text style={styles.lossFootnote}>{outcomeLine('cleared', { continues: encounter.outcome.continues, rescued: encounter.outcome.rescued }) === 'Cleared.' ? '' : ''}</Text> : null}
@@ -165,7 +231,8 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
     interactionKey={`${mission.id}:${boardStep?.id ?? 'free'}`} sessionId={sessionId} hiddenItemIds={hiddenItemIds}
     width={width} bottomInset={bottomInset} landings={landings}
     onCommand={dispatch} onBoardMetrics={handleMetrics} onBlockedInteraction={onBlockedInteraction} onEntranceSettled={onEntranceSettled}
-    rootRef={rootRef} header={header} headerGap={encounter ? 6 : undefined} overlay={overlay} />;
+    rootRef={rootRef} header={header} headerGap={encounter ? 6 : undefined} overlay={overlay} onHoverCell={encounter?.territory ? aimFromCell : undefined}
+    animateArrivals={Boolean(encounter)} externalEffects={effectCells} />;
 });
 
 const styles = StyleSheet.create({
@@ -174,6 +241,15 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   pill: { flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF', boxShadow: '0 3px 10px rgba(20,40,60,0.14)' },
   pillLow: { backgroundColor: '#FFF0E6', borderColor: '#FFD9C2' },
+  meterPill: { alignItems: 'center' },
+  meterTrack: { width: 76, height: 8, borderRadius: 4, backgroundColor: '#E3E9F0', overflow: 'visible' },
+  meterFill: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 4, backgroundColor: '#9C86C8' },
+  meterFillClose: { backgroundColor: '#C9678F' },
+  meterLine: { position: 'absolute', top: -3, bottom: -3, width: 2, marginLeft: -1, borderRadius: 1, backgroundColor: '#5B3F86' },
+  pulseCell: { position: 'absolute', borderRadius: 10, borderWidth: 2, borderColor: 'rgba(255,210,122,0.9)', backgroundColor: 'rgba(255,226,160,0.22)' },
+  sporeCell: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  sporeDot: { minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, backgroundColor: 'rgba(122,92,170,0.85)', borderWidth: 1.5, borderColor: '#E8DDFB' },
+  sporeText: { color: '#FFFFFF', fontFamily: AppFontFamilies.fredokaBold, fontSize: 12 },
   pillLabel: { color: '#5B7390', fontFamily: AppFontFamilies.fredokaBold, fontSize: 12 },
   pillValue: { color: '#2E4A66', fontFamily: AppFontFamilies.fredokaBold, fontSize: 15 },
   abilityButton: { alignItems: 'center', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 16, backgroundColor: 'rgba(244,249,253,0.7)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)' },
