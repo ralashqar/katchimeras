@@ -148,6 +148,8 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   let changed = false;
   let moved = false;
   let hit = false;
+  let pushedBack = input.pushedBack ?? 0;
+  let lastPushAt = input.lastPushAt;
   let breached: number | null = null;
   let strikes = input.strikes;
   const alive = (index: number) => wisps[index]!.damage < mechanic.wisps[index]!.hp;
@@ -196,7 +198,18 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     while (breached == null) {
       const next = laneRowOf(row) + 1;
       if (next - 0.5 > target) { row = target; break; }
-      if (next >= window.rows) { breached = index; changed = true; effects.push({ kind: 'breached', wisp: index }); row = next - 0.5; break; }
+      if (next >= window.rows) {
+        // A forgiving level (the first battle) cannot be lost: the wisp is pushed back over the board, to try again.
+        if (mechanic.forgiving) {
+          row = -2;
+          wisp.holdUntil = clock + spec.stepMs;
+          pushedBack += 1;
+          lastPushAt = clock;
+          changed = true;
+          break;
+        }
+        breached = index; changed = true; effects.push({ kind: 'breached', wisp: index }); row = next - 0.5; break;
+      }
       const cell = next >= 0 ? laneCell(window, spec.column, next) : null;
       const piece = cell != null ? looseItem(current(), cell) : null;
       if (cell != null && piece) {
@@ -320,6 +333,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   const state: LanesState = {
     kind: 'lanes', strikes, clock, wisps, ready, shots, seq, breached: breached ?? input.breached,
     ...(spits.length ? { spits } : {}), ...(advance ? { advance } : {}), ...(nextSeedAt != null ? { nextSeedAt, seeded } : {}),
+    ...(pushedBack ? { pushedBack, ...(lastPushAt != null ? { lastPushAt } : {}) } : {}),
   };
   const next = current();
   return { state, board: nextInstance === next.nextInstance ? next : { ...next, nextInstance }, fired, effects, changed, moved, hit, spat };

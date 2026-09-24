@@ -351,8 +351,9 @@ export function buildMossproutHexNeighborhoodScene(
   const mainLayer = options.homeVeiled
     ? layerFor(mossprout.id, 'tile', { alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS, coord: MAIN.coord, sources: DREAM_MIST_LOCKED_NATURE_SOURCES }, MAIN.alphaBounds)
     : unveiledMain;
-  // Under the veil nobody stands on the tile; the sleeping marker says who is there.
-  if (!options.homeVeiled) mainLayer.residentSource = MAIN_RESIDENT_SOURCE;
+  // The Last Clearing: Mossprout stands on the tile from the first frame, veiled or not, in the same art, so the lift
+  // never swaps (and visibly rescales) him.
+  mainLayer.residentSource = MAIN_RESIDENT_SOURCE;
   mainLayer.residentAnchor = sharedResidentAnchor(mainLayer.frame);
   // The old Garden ID remains the save/tutorial target, now hosted by Heartwood.
   const gardenLayer = layerFor('structure:mossprout-hex-garden', 'structure', {

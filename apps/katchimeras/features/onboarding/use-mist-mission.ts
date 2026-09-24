@@ -94,7 +94,7 @@ export type EncounterDockState = {
  * Katchimera's ability, spawners, Mist, the cache, a loss the player can
  * retry or push through.
  */
-export function useMistMission({ guided = true, active, mission, encounter: authored, owner, loadout, world, tileNode, boardMetrics, cameraSettled, glow, complete, onLeave, keepGoingCost, payKeepGoing }: {
+export function useMistMission({ guided = true, active, mission, encounter: authored, owner, loadout, world, tileNode, boardMetrics, cameraSettled, glow, complete, onLeave, keepGoingCost, payKeepGoing, speechFor }: {
   /** Whether the host draws the board's guidance (hand, spotlight). A board with none is free from the first move:
    * a first-merge lesson nobody can see would refuse every other touch. */
   guided?: boolean;
@@ -119,6 +119,8 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
   /** Keep going's price in Glow, and the payment (resolves true once paid); absent, Keep going is free. */
   keepGoingCost?: number;
   payKeepGoing?: (receiptId: string) => Promise<boolean>;
+  /** A scripted battle's own lines over the board (the Last Clearing's first battle), from how it stands. */
+  speechFor?: (input: { mechanicState: MissionMechanicState; merges: number; board: MergeWorldState }) => string | null;
 }) {
   const preview = useDevMissionMechanicPreview();
   const encounter = useMemo(() => authored ?? (mission ? resolveEncounterForPlay(mission, preview) : null), [authored, mission, preview]);
@@ -256,7 +258,11 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     const facts = { remaining: resolveLeft(store.run), katchimera: effectiveLoadout?.companionId ?? null, ability: ability?.definition.name ?? null };
     if (cacheLine) return encounterLine('cacheFound', facts);
     if (actLine && store.status === 'playing') return actLine;
-    // Lanes: the sky over the board is where the wisps come from; nothing is said over it.
+    // A scripted battle says its own lines; otherwise a Lanes sky is where the wisps come from, and nothing is said over it.
+    if (speechFor && store.state && store.mechanicState) {
+      const line = speechFor({ mechanicState: store.mechanicState, merges: store.merges, board: store.state });
+      if (line || (host && resolveMechanic(host).kind === 'lanes')) return line;
+    }
     if (host && resolveMechanic(host).kind === 'lanes') return null;
     // Merge vs Mist: a wisp with nothing but clear ground beside it is what the friend points at first; until the
     // first merges, the rule itself.

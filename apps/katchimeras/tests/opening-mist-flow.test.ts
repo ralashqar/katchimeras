@@ -7,11 +7,15 @@ import * as migrationPolicy from '@/features/onboarding/ftue-migration-policy';
 import * as navigationPolicy from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueStep, mossproutFtueShowsWorldGarden, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
-import { COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, GUARDIAN_ACTION_ID, GUARDIAN_STEP_ID, GUARDIAN_TITLE } from '@/features/onboarding/last-clearing';
+import { COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, FIRST_BATTLE_ID, GUARDIAN_ACTION_ID, GUARDIAN_STEP_ID, GUARDIAN_TITLE, HEART_TREE_ACTION_ID, HEART_TREE_STEP_ID, SANCTUARY_ACTION_ID, SANCTUARY_STEP_ID } from '@/features/onboarding/last-clearing';
+import { FIRST_BATTLE } from '@/constants/last-clearing-battle';
 import { activeFtueNavigationPolicy, ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_OPENING_STEP_IDS, OPENING_CAMERA_ENTRY_MS, OPENING_MERGE_REQUIRED, openingMistProgress } from '@/features/onboarding/opening-mist';
 import { mossproutWorldUsesEggRenderer } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import { FTUE_HANDLER_REGISTRY } from '@/features/onboarding/ftue-action-registry';
+import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
+import { heartwoodStage } from '@/features/shared-adventure/heartwood-progression';
+import { GLOW } from '@/constants/glow';
 
 type RunShape = { stepId: string; status: string; scriptVersion: number; receipts: { actionId: string; stepId: string }[]; objectiveProgress: Record<string, number>; mergeInstalled: boolean };
 
@@ -76,11 +80,13 @@ test('the Last Clearing opens with four haven beats and no Egg: the cold open, t
   assert.equal(clear.interaction?.mode, 'none');
   assert.equal(clear.cue?.kind, 'drag');
   assert.equal(clear.spotlight?.targets.length, 2, 'the first pair is spotlit through the ordinary Merge overlay');
-  assert.deepEqual(clear.edges?.map((edge) => [edge.event.type, edge.commitActionId, edge.nextStepId, edge.requiredCount]), [['merge_completed', 'world.clear_mist', 'world.mist_lift', OPENING_MERGE_REQUIRED]]);
+  assert.deepEqual(clear.edges?.map((edge) => [edge.event.type, edge.commitActionId, edge.nextStepId, edge.requiredCount ?? 1]), [['battle_won', 'world.clear_mist', 'world.mist_lift', 1]], 'the first battle is won, not counted in merges');
   assert.equal(clear.actions[0]?.backendEvent, undefined, 'a tutorial objective needs no backend receipt');
   const lift = mossproutFtueStep('world.mist_lift')!;
   assert.equal(lift.actions[0]?.id, 'world.mist_lifted');
-  assert.equal(lift.actions[0]?.nextStepId, 'complete', 'until the Heart Tree beats are built, the first session ends as the Mist pulls back');
+  assert.equal(lift.actions[0]?.nextStepId, HEART_TREE_STEP_ID, 'the Mist pulls back, and the Heart Tree is next');
+  assert.equal(mossproutFtueStep(HEART_TREE_STEP_ID)?.actions[0]?.nextStepId, SANCTUARY_STEP_ID);
+  assert.equal(mossproutFtueStep(SANCTUARY_STEP_ID)?.actions[0]?.nextStepId, 'complete', 'until the frontier is built, the first session ends at the Sanctuary');
 
   for (const stepId of MOSSPROUT_OPENING_STEP_IDS) {
     const step = mossproutFtueStep(stepId)!;
@@ -94,8 +100,12 @@ test('the Last Clearing opens with four haven beats and no Egg: the cold open, t
   }
   const task = MOSSPROUT_FTUE_FLOW.nodes.find((node) => node.id === 'world.mist_clear');
   assert.equal(task?.kind, 'task');
-  assert.equal(task?.kind === 'task' ? task.requirements[0]?.count : null, OPENING_MERGE_REQUIRED);
+  assert.equal(task?.kind === 'task' ? task.requirements[0]?.event.type : null, 'ftue.battle_won');
   assert.equal(task?.kind === 'task' ? task.next : null, 'world.mist_lift');
+  // The first battle is a scripted Lanes battle that cannot be lost, docked in place of the old board.
+  assert.equal(FIRST_BATTLE.mechanic?.kind, 'lanes');
+  assert.ok(FIRST_BATTLE.mechanic?.kind === 'lanes' && FIRST_BATTLE.mechanic.forgiving, 'the first battle cannot be lost');
+  assert.match(kingdomScreen, /dispatchFtueEvent\(\{ type: 'battle_won', battleId: FIRST_BATTLE_ID, revision: 1 \}, FIRST_BATTLE_ID\)/);
   // Mossprout stands in its clearing under the Mist: the veiled home tile still draws its owned resident.
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   assert.match(canvas, /homeVeil !== 'none' && tile\.id === scene\.centerTile\.id && tile\.companion\.kind !== 'owned'/);
@@ -104,29 +114,27 @@ test('the Last Clearing opens with four haven beats and no Egg: the cold open, t
   assert.match(host, /ftueRun\.mergeInstalled[\s\S]*?installMossproutOnboardingMergeWorld\([\s\S]*?updateFtueRun\(\{ mergeInstalled: true \}\)/);
 });
 
-test('a fresh run walks the Last Clearing: the cold open, the guardian, the merges into the bar, the lift, and resumes at every boundary', () => {
+test('a fresh run walks the Last Clearing: the cold open, the guardian, the first battle won, the lift, and resumes at every boundary', () => {
   const { runtime, flowDispatches } = loadRuntime();
   const run = runtime.beginFtueRun({ restart: true });
   assert.equal(run.stepId, 'world.mist_open');
   assert.equal(run.mergeInstalled, false, 'the Kingdom host installs Mossprout on the first frame');
   assert.equal(runtime.commitFtueAction({ actionId: COLD_OPEN_ACTION_ID })?.stepId, GUARDIAN_STEP_ID);
   assert.equal(runtime.commitFtueAction({ actionId: GUARDIAN_ACTION_ID })?.stepId, 'world.mist_clear');
-  for (let count = 1; count < OPENING_MERGE_REQUIRED; count++) {
-    const next = runtime.dispatchFtueEvent(merge(count))!;
-    assert.equal(next.stepId, 'world.mist_clear', `merge ${count} keeps the beat`);
-    assert.equal(openingMistProgress(next as never), count, 'the bar reads the checkpoint');
-  }
-  // A relaunch here sees the same count: the runtime persists partial progress.
+  // Merges during the battle move nothing: the battle is won when every wisp is down.
+  assert.equal(runtime.dispatchFtueEvent(merge(1))?.stepId, 'world.mist_clear');
+  assert.equal(runtime.dispatchFtueEvent({ type: 'battle_won', battleId: 'someone-else', revision: 1 } as never)?.stepId, 'world.mist_clear', 'only the first battle counts');
   const resumed = loadRuntime(runtime.loadFtueRun()).runtime.loadFtueRun()!;
-  assert.equal(resumed.stepId, 'world.mist_clear');
-  assert.equal(openingMistProgress(resumed as never), OPENING_MERGE_REQUIRED - 1);
-  const lifted = runtime.dispatchFtueEvent(merge(OPENING_MERGE_REQUIRED))!;
-  assert.equal(lifted.stepId, 'world.mist_lift');
-  assert.equal(openingMistProgress(lifted as never), OPENING_MERGE_REQUIRED, 'the bar stays full while the Mist pulls back');
-  assert.equal(runtime.dispatchFtueEvent(merge(99))?.stepId, 'world.mist_lift', 'an extra merge during the lift is harmless');
-  const done = runtime.commitFtueAction({ actionId: 'world.mist_lifted', evidenceRef: 'mossprout-world:veil-lifted' })!;
+  assert.equal(resumed.stepId, 'world.mist_clear', 'a relaunch mid-battle stays in the battle');
+  const won = runtime.dispatchFtueEvent({ type: 'battle_won', battleId: FIRST_BATTLE_ID, revision: 1 } as never)!;
+  assert.equal(won.stepId, 'world.mist_lift');
+  const lifted = runtime.commitFtueAction({ actionId: 'world.mist_lifted', evidenceRef: 'mossprout-world:veil-lifted' })!;
+  assert.equal(lifted.stepId, HEART_TREE_STEP_ID);
+  assert.equal(loadRuntime(runtime.loadFtueRun()).runtime.loadFtueRun()!.stepId, HEART_TREE_STEP_ID, 'a relaunch at the Tree stays at the Tree');
+  assert.equal(runtime.commitFtueAction({ actionId: HEART_TREE_ACTION_ID, evidenceRef: 'mossprout-world:heart-tree' })?.stepId, SANCTUARY_STEP_ID);
+  const done = runtime.commitFtueAction({ actionId: SANCTUARY_ACTION_ID, evidenceRef: 'mossprout-world:sanctuary-founded' })!;
   assert.equal(done.stepId, 'complete');
-  assert.equal(flowDispatches.filter((entry) => entry === 'event:merge_completed').length, OPENING_MERGE_REQUIRED, 'the stray merge matched no edge, so the flow never heard it');
+  assert.equal(flowDispatches.filter((entry) => entry === 'event:battle_won').length, 1, 'the flow hears the one win');
   assert.equal(flowDispatches.filter((entry) => entry === `action:${COLD_OPEN_ACTION_ID}`).length, 1);
   assert.equal(flowDispatches.filter((entry) => entry === `action:${GUARDIAN_ACTION_ID}`).length, 1);
   assert.equal(flowDispatches.filter((entry) => entry === 'action:world.mist_lifted').length, 1);
@@ -149,7 +157,7 @@ test('a v48 run that never saw the Egg restarts under the Mist; anyone further a
   assert.equal(current.stepId, 'world.egg_intro', 'a current-version run parked on the Egg is left alone');
 });
 
-test('the Kingdom wires the opening: fade on the first beat, dock and finger on the second, one lift commit on the third', () => {
+test('the Kingdom wires the Last Clearing: the cold open, the first battle docked with its finger, one lift commit after it', () => {
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
   const route = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
@@ -157,7 +165,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(screen, /\{ftueStepId === OPENING_MIST_OPEN_STEP_ID \? <FtueOpeningFade \/> : null\}/);
   assert.doesNotMatch(screen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
   assert.match(screen, /<LastClearingColdOpen onDone=\{advanceOpening\} \/>/);
-  assert.match(screen, /const openingBoardActive = Boolean\(mission\.state\) && ftueStepId === OPENING_MIST_CLEAR_STEP_ID;/);
+  assert.match(screen, /const openingBoardActive = firstBattleStepActive && Boolean\(firstBattle\.store\.state\);/, 'the docked board at the clear beat is the first battle');
   // The lift beat waits for the final item: the Kingdom presents the clear beat until it has landed and burst.
   assert.match(screen, /ftueStepId: routeFtueStepId,/, 'the route step is renamed so the presented step can be held');
   assert.match(screen, /const openingFinaleHeld = openingGlow\.finaleActive \|\| openingGlow\.finaleHoldRef\.current;\s*const ftueStepId = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld \? OPENING_MIST_CLEAR_STEP_ID : routeFtueStepId;/, 'the clear beat is held while the finale flies, from the instant it launches');
@@ -186,7 +194,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(effects, /withRepeat\(withTiming\(1, \{ duration: particle\.duration \* 2\.4/, 'looping, slower than the reveal');
   assert.match(effects, /ambientEmber: \{ borderRadius: 999, position: 'absolute' \}/, 'ambient embers carry no blurred shadow');
   assert.match(route, /const openingSky = ftueRun\?\.status === 'active' && homeSoloForStep\(ftueRun\.stepId\);[\s\S]*?openingSky \? todayAtmosphereBackgroundForScene\(OPENING_SKY_SCENE_ID\)/, 'twilight sky until the hatch');
-  assert.match(screen, /<KingdomOpeningMergeDock[\s\S]*?onGlow=\{openingGlow\.launch\} onFinale=\{openingGlow\.launchFinale\}/);
+  assert.match(screen, /\{openingBoardActive && firstBattle\.mission && firstBattle\.store\.state \? <HatchableMissionDock mission=\{firstBattle\.mission\}[\s\S]*?encounter=\{firstBattle\.encounter\}/, 'the first battle docks as a real battle');
   // The finale flag goes up before the run advances: no frame ever renders the lift step (and its camera) without it.
   assert.match(dock, /const finale = openingMistProgress\(runRef\.current\) \+ 1 >= OPENING_MERGE_REQUIRED;/, 'the board counts the merge the run has not advanced on yet');
   assert.match(dock, /onBlocked: onBlockedInteraction, onBeforeAdvance: handleEvent,/, 'the dock launches Glow and the finale before the advance');
@@ -219,7 +227,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(screen, /landings=\{openingGlow\.store\}/);
   assert.match(dock, /const impactKey = useSyncExternalStore\(landings\?\.subscribe \?\? subscribeToNothing, landings\?\.getLanded \?\? noLandings, landings\?\.getLanded \?\? noLandings\);/, 'the bar flashes on its own subscription');
   assert.match(dock, /const grew = progress > previous\.current;[\s\S]*?scale\.value = withSequence\(/, 'the bar swells once per landed Glow');
-  assert.match(screen, /<MergeFtueOverlay blockedPulseNonce=\{openingBlockedNonce\}[\s\S]*?guide=\{openingBoardStep\?\.guide \?\? null\}[\s\S]*?spotlight=\{openingBoardStep\?\.spotlight \?\? null\}/);
+  assert.match(screen, /<MergeFtueOverlay blockedPulseNonce=\{openingBlockedNonce\}[\s\S]*?guide=\{openingBoardStep\?\.guide\?\.title \? openingBoardStep\.guide : null\}[\s\S]*?spotlight=\{openingBoardStep\?\.spotlight \?\? null\}/);
   // The caption uses the cleared dock space during the reveal; the camera
   // still waits until the crossblend and reading beat finish.
   assert.match(screen, /if \(presentation\.veilLift\) \{[\s\S]*?setOpeningRevealComplete\(true\)/);
@@ -243,7 +251,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(route, /if \(ftueRun\?\.status !== 'active' \|\| ftueRun\.mergeInstalled \|\| installingMossproutRef\.current\) return;/, 'the Last Clearing brings Mossprout into the world once, at the start of the run');
   assert.match(screen, /const mission = useOpeningMissionBoard\(missionRunId\);/, 'the Kingdom owns the mission board');
   assert.match(screen, /if \(ftueStepId === 'world\.egg_intro'\) clearOpeningMission\(\);/, 'the mission store goes with the mist');
-  assert.match(screen, /<KingdomOpeningMergeDock[\s\S]*?state=\{mission\.state\} send=\{mission\.send\}/, 'the dock plays the mission board, not the provider');
+  assert.match(screen, /state=\{firstBattle\.store\.state\} send=\{firstBattle\.store\.send\}/, 'the dock plays the battle’s own board, not the provider');
   assert.doesNotMatch(dock, /useMergeWorldState|useMergeWorldActions/, 'the dock has no link to the persistent board');
   const surface = readFileSync('components/katchadeck/games/merge-play-surface.tsx', 'utf8');
   assert.match(surface, /const state = override \?\? subscribed;/, 'the surface renders an explicit board over the provider one');
@@ -267,4 +275,20 @@ test('retired wisp introductions resume at question one without losing progress'
     assert.equal(resumed.status, 'active');
     assert.equal(JSON.stringify(resumed.receipts), JSON.stringify(run.receipts));
   }
+});
+
+test('the Heart Tree wakes once, with the first light, and stirs the Heartwood', () => {
+  const now = 1_000;
+  let world = createInitialMergeWorldState(now);
+  assert.equal(heartwoodStage(world), 'dormant');
+  const short = reduceMergeWorld({ ...world, coins: GLOW.firstRestorationCost - 1 }, { type: 'restoreHeartTree', receiptId: 'run:heart-tree', cost: GLOW.firstRestorationCost, now });
+  assert.equal(short.changed, false, 'short of the light, nothing is spent');
+  world = { ...world, coins: GLOW.firstRestorationCost + 5 };
+  const woken = reduceMergeWorld(world, { type: 'restoreHeartTree', receiptId: 'run:heart-tree', cost: GLOW.firstRestorationCost, now });
+  assert.equal(woken.changed, true);
+  assert.equal(woken.state.coins, 5);
+  assert.equal(heartwoodStage(woken.state), 'stirring', 'the Tree stirs once it is woken');
+  const again = reduceMergeWorld(woken.state, { type: 'restoreHeartTree', receiptId: 'run:heart-tree', cost: GLOW.firstRestorationCost, now: now + 1 });
+  assert.equal(again.changed, false, 'woken once; a relaunch pays nothing twice');
+  assert.equal(normalizeMergeWorldState(JSON.parse(JSON.stringify(woken.state)), now).heartTree?.receiptId, 'run:heart-tree', 'the woken Tree survives a reload');
 });

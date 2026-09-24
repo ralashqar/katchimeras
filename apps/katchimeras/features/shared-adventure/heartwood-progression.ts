@@ -25,7 +25,9 @@ function buildingStage(world: MergeWorldState): HeartwoodStage {
 
 export function heartwoodStage(world: MergeWorldState): HeartwoodStage {
   const [plants, buildings] = [plantStage(world), buildingStage(world)];
-  return STAGES.indexOf(buildings) > STAGES.indexOf(plants) ? buildings : plants;
+  const grown = STAGES.indexOf(buildings) > STAGES.indexOf(plants) ? buildings : plants;
+  // The Last Clearing wakes the Tree with the first light: it stirs from then on.
+  return grown === 'dormant' && world.heartTree ? 'stirring' : grown;
 }
 
 function plantStage(world: MergeWorldState): HeartwoodStage {

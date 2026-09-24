@@ -421,6 +421,7 @@ export function commitFtueAction(input: {
 
 function ftueEventMatches(matcher: FtueEventMatcher, event: FtueEvent) {
   if (matcher.type !== event.type) return false;
+  if (matcher.type === 'battle_won' && event.type === 'battle_won') return matcher.battleId == null || matcher.battleId === event.battleId;
   if (matcher.type === 'merge_completed' && event.type === 'merge_completed') {
     return (matcher.fromInstanceId == null || matcher.fromInstanceId === event.fromInstanceId)
       && (matcher.targetInstanceId == null || matcher.targetInstanceId === event.targetInstanceId)

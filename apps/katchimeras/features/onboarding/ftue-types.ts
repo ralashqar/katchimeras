@@ -157,6 +157,8 @@ export type FtueEvent =
   | { type: 'resident_dialogue_acknowledged'; discoveryId: string; revision: number }
   | { type: 'resident_card_reveal_acknowledged'; discoveryId: string; revision: number }
   | { type: 'ui_target_pressed'; target: FtueTarget; revision: number }
+  /** A scripted battle won (the Last Clearing's first battle). */
+  | { type: 'battle_won'; battleId: string; revision: number }
   | { type: 'haven_upgrade_completed'; characterId: string; stage: number; revision: number };
 
 export type FtueEventMatcher =
@@ -176,6 +178,7 @@ export type FtueEventMatcher =
   | { type: 'resident_dialogue_acknowledged'; discoveryId?: string }
   | { type: 'resident_card_reveal_acknowledged'; discoveryId?: string }
   | { type: 'ui_target_pressed'; target?: FtueTarget }
+  | { type: 'battle_won'; battleId?: string }
   | { type: 'haven_upgrade_completed'; characterId?: string; stage?: number };
 
 export type FtueCameraDirective =

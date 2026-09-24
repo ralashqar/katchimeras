@@ -380,7 +380,12 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
   // A merge-tactics battle plays on five rows.
   const boardLayout = useMemo(() => (aimWindow && aimWindow.rows === 5 ? { ...OPENING_BOARD_LAYOUT, rows: 5, cellIndices: aimWindow.cellIndices, accessibilityLabel: 'Battle board, five columns by five rows' } : undefined), [aimWindow]);
   // A Lanes battle keeps the space over the board clear: no pills, no lines; the wisps come from there.
-  const header = encounter && !encounter.lanes ? <View pointerEvents="box-none" style={styles.header}>
+  // A Lanes battle keeps the space over the board clear: no pills; only a friend's line when a scripted battle has one.
+  const header = encounter?.lanes
+    ? (encounter.speech ? <View pointerEvents="box-none" style={styles.header}>
+      <View style={styles.speechRow}><FriendSpeechBubble text={encounter.speech} reduceMotion={reduceMotion} tail="none" raise={false} /></View>
+    </View> : null)
+    : encounter ? <View pointerEvents="box-none" style={styles.header}>
     {encounter.speech ? <View style={styles.speechRow}><FriendSpeechBubble text={encounter.speech} reduceMotion={reduceMotion} tail="none" raise={false} /></View> : null}
     <View style={styles.headerRow}>
       {strip.length ? <View accessibilityRole="text" accessibilityLabel={`The wisps act in this order: ${strip.map((entry) => (entry.rest ? 'a rest' : entry.look ?? 'a wisp')).join(', ')}`} style={[styles.pill, styles.stripPill]}>

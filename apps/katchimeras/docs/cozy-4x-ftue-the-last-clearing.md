@@ -1,6 +1,14 @@
 # The Last Clearing: the cozy 4X first session
 
-Status: **step 1 built Sept 24 2026** (story graph v57, the cold open, the guardian, Mossprout from the first frame; the first session currently ends as the Mist pulls back after the opening board). Steps 2 to 6 are to come. This is the first focus of the cozy 4X direction (`cozy-4x-direction` in memory; the full game spec was handed over the same day). It replaces the companion-life first session: the Egg and its questions, the hatch meeting, the Garden planting, the first rest and meditation, and the Glow-ticket Steppling discovery.
+Status: **steps 1 to 3 built Sept 24 2026**. Step 1: story graph v57, the cold open, the guardian, and Mossprout from the first frame. Step 2: the first battle is a scripted Lanes level that cannot be lost (`constants/last-clearing-battle.ts`, `forgiving` lanes push a breaching wisp back). Mossprout speaks lines over the board, and the story moves on the `battle_won` event. Step 3 (graph v58):
+- The veil lift is the Mist's retreat, with the lines "We did it" / "We actually did it".
+- `world.heart_tree` pushes the camera in on the Heartwood, and Mossprout's two lines bring **Restore the Heart Tree**.
+- The first light flies from the counter, `restoreHeartTree` is written (once, idempotent), and the Heartwood crossblends from dormant to stirring under the field of light.
+- A **Sanctuary Founded** title card follows.
+
+Deferred from beat 9: the little structures appearing, which come with Sanctuary buildings.
+
+For now the first session ends at the title card. Steps 4 to 6 are to come. This is the first focus of the cozy 4X direction (`cozy-4x-direction` in memory; the full game spec was handed over the same day). It replaces the companion-life first session: the Egg and its questions, the hatch meeting, the Garden planting, the first rest and meditation, and the Glow-ticket Steppling discovery.
 
 It ends with the player knowing four things:
 

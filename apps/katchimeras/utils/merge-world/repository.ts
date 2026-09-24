@@ -777,9 +777,15 @@ export async function grantStoredStoryGlow(receiptId: string, amount: number, no
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantStoryGlow', receiptId, amount, now }), now);
 }
 
-export async function ensureStoredOpeningGlow(receiptId: string, amount = GLOW.firstRestorationCost, now = gameNow()) {
+export async function ensureStoredOpeningGlow(receiptId: string, amount: number = GLOW.firstRestorationCost, now = gameNow()) {
   const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantOpeningGlow', receiptId, amount, now }), now);
   return { state: result.state, granted: result.changed, amount };
+}
+
+/** Wakes the Heart Tree with the first light, once (`docs/cozy-4x-ftue-the-last-clearing.md`, beat 8). */
+export async function restoreStoredHeartTree(receiptId: string, cost: number = GLOW.firstRestorationCost, now = gameNow()) {
+  const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'restoreHeartTree', receiptId, cost, now }), now);
+  return { state: result.state, restored: Boolean(result.state.heartTree), message: result.message };
 }
 
 export function grantStoredGeneratorParcel(generatorId: string, rewardId: string, dayId: string) {

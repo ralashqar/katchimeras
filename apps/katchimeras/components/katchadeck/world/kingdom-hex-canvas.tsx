@@ -702,7 +702,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const fromNatureLevels = upgradePresentation.natureIslandId
       ? { ...mossproutNatureIslandLevels, [upgradePresentation.natureIslandId]: upgradePresentation.fromStage as MossproutNatureIslandLevel }
       : mossproutNatureIslandLevels;
-    const fromGarden = revealingHatchableTileId
+    const fromGarden = upgradePresentation.heartTree
+      ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), heartwoodStage: upgradePresentation.heartTree.from }
+      : revealingHatchableTileId
       ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), hatchableTiles: { ...mossproutGarden?.hatchableTiles, [revealingHatchableTileId]: upgradePresentation.fromStage === 0 ? 'locked' as const : 'egg' as const } }
       : revealingStoryTileId
       ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), storyTiles: { ...mossproutGarden?.storyTiles, [revealingStoryTileId]: 'misted' as const } }
@@ -778,6 +780,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const fromLayer = build(true).tileArtLayers.find((layer) => layer.id === scene.centerTile.id);
       const toLayer = build(false).tileArtLayers.find((layer) => layer.id === scene.centerTile.id);
       return fromLayer && toLayer ? { fromLayer, toLayer, tile: { id: toLayer.id, cx: scene.centerTile.cx, cy: scene.centerTile.cy } } : null;
+    }
+    if (focusedMossproutWorld && upgradePresentation.heartTree && mossproutNatureIslandLevels) {
+      // The Heart Tree waking: the Heartwood's art at one stage, then the next; nothing else changes.
+      const layerId = 'structure:mossprout-hex-garden';
+      const atStage = (stage: NonNullable<HavenTileUpgradePresentation['heartTree']>['from']) => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels,
+        { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), heartwoodStage: stage }, mossproutNatureIslandReveals);
+      const fromLayer = atStage(upgradePresentation.heartTree.from).tileArtLayers.find((layer) => layer.id === layerId);
+      const toLayer = atStage(upgradePresentation.heartTree.to).tileArtLayers.find((layer) => layer.id === layerId);
+      const footprint = toLayer?.interactionFrame ?? toLayer?.frame;
+      return fromLayer && toLayer && footprint ? { fromLayer, toLayer, tile: { id: layerId, cx: footprint.left + footprint.width / 2, cy: footprint.top + footprint.height / 2 } } : null;
     }
     if (focusedMossproutWorld && revealingHatchableTileId) {
       const layerId = `structure:${revealingHatchableTileId}`;
@@ -1845,6 +1857,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               !interactionNatureIslandId && interactionResidentId === tile.companion.creature.creatureId && interactionRewardPulseKey > 0
                 ? 1_000_000 + interactionRewardPulseKey
               : !upgradePresentation?.natureIslandId
+              // The opening's veil lift is not his restoration: he stays steady through it.
+              && !upgradePresentation?.veilLift
               && upgradePresentation?.visualTarget?.kind !== 'haven_structure'
               && upgradePresentation?.creatureId === tile.companion.creature.creatureId
               && (upgradePhase === 'react' || upgradePhase === 'complete')

@@ -211,6 +211,8 @@ export type MissionMechanicDefinition =
        * empty cell, or, by the player's luck (the Haven's Seed Nursery), a `drops[1]` (a Sprout). A full board waits.
        */
       seeds?: { everyMs: number; drops: readonly [string, string] };
+      /** A level that cannot be lost (the first battle): a wisp that would get through is pushed back over the board. */
+      forgiving?: boolean;
     };
 
 /** What a mechanic remembers between strikes; saved with the board. */
@@ -221,7 +223,7 @@ export type MissionMechanicState =
   | { kind: 'wisp-rush'; strikes: number; wisps: { id: string; hp: number; perch: number; damage: number; bornAt: number }[] }
   /** Damage on each wisp, how many actions have been spent, and the action each wisp was last struck on (-1: never). */
   /** Lanes: the level's clock (ms of play), every wisp as it stands, each piece's next shot time, the Glow in the air, and who got through. */
-  | { kind: 'lanes'; strikes: number; clock: number; wisps: LaneWispState[]; ready: Record<string, number>; shots: LaneShot[]; seq: number; breached: number | null; /** Mist spat by wisps over the board, still falling. */ spits?: LaneSpit[]; /** How far the level has skipped ahead to bring the next wisp in when none was left (ms off every later arrival). */ advance?: number; /** When the next piece arrives on its own, and how many have. */ nextSeedAt?: number; seeded?: number }
+  | { kind: 'lanes'; strikes: number; clock: number; wisps: LaneWispState[]; ready: Record<string, number>; shots: LaneShot[]; seq: number; breached: number | null; /** Mist spat by wisps over the board, still falling. */ spits?: LaneSpit[]; /** How far the level has skipped ahead to bring the next wisp in when none was left (ms off every later arrival). */ advance?: number; /** When the next piece arrives on its own, and how many have. */ nextSeedAt?: number; seeded?: number; /** A forgiving level: wisps pushed back rather than let through, and when the last was. */ pushedBack?: number; lastPushAt?: number }
   | {
       kind: 'dark-wisps'; strikes: number; actions: number; damage: number[]; struckAt: number[];
       /** v2: turns until each wisp acts, where it is in its cycle, its ward, damage taken while gathering, and whether it was called in. */

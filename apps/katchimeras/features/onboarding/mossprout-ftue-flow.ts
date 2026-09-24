@@ -60,7 +60,8 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
   // v57: the Last Clearing (`docs/cozy-4x-ftue-the-last-clearing.md`), the cozy 4X first session. The game is not
   // launched, so there is no migration of meaning: every retired beat simply ends an old run.
-  version: 57,
+  // v58: step 3, the Heart Tree woken and the Sanctuary founded after the Mist pulls back.
+  version: 58,
   entryNodeId: 'world.mist_open',
   metadata: {
     kind: 'ftue' as const,
@@ -74,11 +75,16 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     // The guardian: Mossprout meets the Wayfinder.
     scene('world.guardian', 'haven', [{ id: 'world.meet_guardian', next: 'world.mist_clear' }]),
     // "They found us": the first battle.
-    task('world.mist_clear', 'haven', { id: 'world.clear_mist', event: ftueEvent('merge_completed'), count: 7, next: 'world.mist_lift' }),
+    task('world.mist_clear', 'haven', { id: 'world.clear_mist', event: ftueEvent('battle_won'), count: 1, next: 'world.mist_lift' }),
     // The Mist pulls back from the clearing.
     scene('world.mist_lift', 'haven', [{ id: 'world.mist_lifted', next: 'effect.haven.opening_glow' }]),
     // The light that drove the wisps off stays with you: it will wake the Heart Tree.
-    story.effect({ id: 'effect.haven.opening_glow', capability: 'haven.opening_glow', next: 'complete' }),
+    story.effect({ id: 'effect.haven.opening_glow', capability: 'haven.opening_glow', next: 'world.heart_tree' }),
+    // The Heart Tree: the camera pushes in, and the first light wakes it.
+    scene('world.heart_tree', 'haven', [{ id: 'world.restore_heart_tree', next: 'effect.haven.restore_heart_tree' }]),
+    story.effect({ id: 'effect.haven.restore_heart_tree', capability: 'haven.restore_heart_tree', next: 'world.sanctuary_founded' }),
+    // SANCTUARY FOUNDED.
+    scene('world.sanctuary_founded', 'haven', [{ id: 'world.found_sanctuary', next: 'complete' }]),
     story.complete(),
   ],
   migrations: Object.fromEntries([

@@ -62,7 +62,7 @@ import { worldEventActions, worldEventConversation, type WorldEventAction, type 
 import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
-import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, ensureStoredFirstSpringLight, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat, startStoredEncounter, abandonStoredEncounter, completeStoredEncounter, upgradeStoredKatchimera } from '@/utils/merge-world/repository';
+import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, ensureStoredFirstSpringLight, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , restoreStoredHeartTree, acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat, startStoredEncounter, abandonStoredEncounter, completeStoredEncounter, upgradeStoredKatchimera } from '@/utils/merge-world/repository';
 import { katchimeraLevel, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
 import { encounterRunId } from '@/features/encounter/run-id';
 import type { EncounterLoadout } from '@/types/encounter';
@@ -98,7 +98,16 @@ import type { MissionStrike } from '@/types/mission-mechanic';
 import { MissionWisps, type CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
 import { LastClearingColdOpen } from '@/components/katchadeck/world/last-clearing-cold-open';
 import { LastClearingGuardian } from '@/components/katchadeck/world/last-clearing-guardian';
-import { GUARDIAN_STEP_ID } from '@/features/onboarding/last-clearing';
+import { FIRST_BATTLE_ID, GUARDIAN_STEP_ID, HEART_TREE_ACTION_ID, HEART_TREE_STEP_ID, SANCTUARY_ACTION_ID, SANCTUARY_LINE, SANCTUARY_STEP_ID, SANCTUARY_TITLE } from '@/features/onboarding/last-clearing';
+import { LastClearingHeartTree } from '@/components/katchadeck/world/last-clearing-heart-tree';
+import { LastClearingTitleCard } from '@/components/katchadeck/world/last-clearing-title-card';
+import { FIRST_BATTLE, firstBattleGuide, firstBattleLine } from '@/constants/last-clearing-battle';
+
+/** A first-battle hint shows once the board has asked for the same thing this long. */
+const FIRST_BATTLE_HINT_DELAY_MS = 1_200;
+
+/** The first battle is Mossprout's: level one, no helper Wisp. */
+const FIRST_BATTLE_LOADOUT = { companionId: 'mossprout' as const, level: 1 };
 import { clearMission, clearOpeningMission, useMissionBoard, useOpeningMissionBoard } from '@/features/onboarding/use-opening-mission-board';
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { worldUpgradeRunId } from '@/features/world-upgrades/world-upgrade-flows';
@@ -174,7 +183,7 @@ import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { ConversationSession } from '@/types/companion-conversation';
 import { HAVEN_ENVIRONMENTS, type HavenStage } from '@/constants/haven-catalog';
 
-import type { FtueCameraDirective, FtueCueDefinition } from '@/features/onboarding/ftue-types';
+import type { FtueCameraDirective, FtueCueDefinition, FtueStepDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
 import { IslandRestorationDock } from '@/components/katchadeck/world/island-restoration-dock';
 import { WispRushDock } from '@/components/katchadeck/world/wisp-rush-dock';
 import { WispRushSheet, type WispRushResult } from '@/components/katchadeck/world/wisp-rush-sheet';
@@ -936,14 +945,45 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // The mission is over once the mist has lifted: its store goes with it.
     if (ftueStepId === 'world.egg_intro') clearOpeningMission();
   }, [ftueStepId]);
-  const openingBoardActive = Boolean(mission.state) && ftueStepId === OPENING_MIST_CLEAR_STEP_ID;
+  // The Last Clearing's first battle (`constants/last-clearing-battle.ts`): a scripted Lanes battle docked under the
+  // clearing at `world.mist_clear`, in place of the opening's glow-strike board. Winning it moves the story on.
+  // The spotlight and finger wait for the dock to finish fading in, or they point at a board still in motion.
+  const [openingDockSettled, setOpeningDockSettled] = useState(false);
+  const firstBattleStepActive = ftueStepId === OPENING_MIST_CLEAR_STEP_ID && screenFocused;
+  const completeFirstBattle = useCallback(async () => {
+    clearMission(FIRST_BATTLE.storageKey);
+    dispatchFtueEvent({ type: 'battle_won', battleId: FIRST_BATTLE_ID, revision: 1 }, FIRST_BATTLE_ID);
+  }, []);
+  const firstBattle = useMistMission({ guided: false, active: firstBattleStepActive, mission: null, encounter: FIRST_BATTLE, owner: 'mossprout', loadout: FIRST_BATTLE_LOADOUT, world: mergeWorld, tileNode: homeTileNode,
+    boardMetrics: openingDockSettled ? openingBoardMetrics : null, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: completeFirstBattle, speechFor: firstBattleLine });
+  const openingBoardActive = firstBattleStepActive && Boolean(firstBattle.store.state);
   const openingProgress = openingMistProgress(openingRun);
   const openingStep = ftueStepId ? mossproutFtueStep(ftueStepId) ?? null : null;
   // The same beat the dock projects: spotlight and finger on the first pairs, the Basket refill, or nothing.
-  const openingBoardStep = useMemo(() => openingBoardActive ? openingMistBoardStep(openingStep, mission.state, openingProgress) : null, [mission.state, openingBoardActive, openingProgress, openingStep]);
+  // The hand on the first two Seeds, until the first merge; then the board is the player's.
+  // The first battle's finger: the first merge at once; after it, whatever the board most needs (a piece moved out of
+  // an empty lane under an uncovered wisp, else a pair to merge), once that same hint has stood a moment unanswered.
+  const firstBattleHint = useMemo(() => openingBoardActive && firstBattle.store.merges > 0 && firstBattle.store.state && firstBattle.store.mechanicState
+    ? firstBattleGuide(firstBattle.store.state, firstBattle.store.mechanicState) : null, [firstBattle.store.mechanicState, firstBattle.store.merges, firstBattle.store.state, openingBoardActive]);
+  const firstBattleHintKey = firstBattleHint ? `${firstBattleHint.kind}:${firstBattleHint.from}:${firstBattleHint.to}` : null;
+  const [shownBattleHint, setShownBattleHint] = useState<{ key: string; revision: number } | null>(null);
+  useEffect(() => {
+    setShownBattleHint(null);
+    if (!firstBattleHintKey) return;
+    const timer = setTimeout(() => setShownBattleHint((current) => ({ key: firstBattleHintKey, revision: (current?.revision ?? 0) + 1 })), FIRST_BATTLE_HINT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [firstBattleHintKey]);
+  const openingBoardStep = useMemo((): FtueStepDefinition | null => {
+    if (!openingBoardActive || !openingStep) return null;
+    if (firstBattle.store.merges === 0) return openingMistBoardStep(openingStep, firstBattle.store.state, 0);
+    if (!firstBattleHint || shownBattleHint?.key !== firstBattleHintKey) return null;
+    const from: FtueTarget = { kind: 'board_cell', cell: firstBattleHint.from };
+    const to: FtueTarget = { kind: 'board_cell', cell: firstBattleHint.to };
+    // Mossprout's line over the board already says why; the finger only shows how.
+    return { ...openingStep, id: `${openingStep.id}.hint-${firstBattleHintKey}`, surface: 'merge', interaction: { mode: 'none' }, cue: { kind: 'drag', from, to }, spotlight: undefined, guide: { eyebrow: '', title: '', body: '' } };
+  }, [firstBattle.store.merges, firstBattle.store.state, firstBattleHint, firstBattleHintKey, openingBoardActive, openingStep, shownBattleHint?.key]);
+  const openingBoardRevision = firstBattle.store.merges * 1_000 + (shownBattleHint?.revision ?? 0);
   const openingGuidanceVisible = Boolean(openingBoardStep && (openingBoardStep.cue || openingBoardStep.spotlight));
-  // The spotlight and finger wait for the dock to finish fading in, or they point at a board still in motion.
-  const [openingDockSettled, setOpeningDockSettled] = useState(false);
   useEffect(() => { if (!openingBoardActive && !stepplingMissionActive && !journeyMissionActive && !islandRestoration) setOpeningDockSettled(false); }, [islandRestoration, journeyMissionActive, openingBoardActive, stepplingMissionActive]);
   const markOpeningDockSettled = useCallback(() => setOpeningDockSettled(true), []);
   // Steppling's mist mission and a journey episode's board: each its own store under its tile, played
@@ -1260,6 +1300,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // The canvas may report completion more than once; a single story owns the ack.
     if (revealedUpgradeRef.current === presentation.nonce) return;
     revealedUpgradeRef.current = presentation.nonce;
+    if (presentation.heartTree) {
+      // The Heart Tree is awake (written before the reveal): the story moves on to the Sanctuary's title card.
+      setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
+      setDisplayedGlow(mergeWorldRef.current.coins);
+      setUpgrading(false);
+      commitFtueAction({ actionId: HEART_TREE_ACTION_ID, evidenceRef: 'mossprout-world:heart-tree' });
+      return;
+    }
     if (presentation.veilLift) {
       // Completion includes the mist crossblend; the egg approach runs alongside it.
       setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
@@ -1353,6 +1401,56 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       reactionLine: '', showCoins: false, status: 'playing', upgradeName: 'clearing', veilLift: true,
     });
   }, [activeFtueRunId, homeVeil]);
+
+  // The Last Clearing's Heart Tree (beat 8): the first light leaves the counter as coins, the Tree is written awake as
+  // they fly, and the Heartwood crossblends from grey to stirring under the field of light. A relaunch after the write
+  // finds the Tree awake and simply moves on; a failed write lets the button be pressed again.
+  const heartTreeStartedRef = useRef<string | null>(null);
+  const [heartTreeBusy, setHeartTreeBusy] = useState(false);
+  const restoreHeartTree = useCallback(async () => {
+    const runKey = activeFtueRunId ?? 'current';
+    if (heartTreeStartedRef.current === runKey) return;
+    heartTreeStartedRef.current = runKey;
+    setHeartTreeBusy(true);
+    const commit = () => commitFtueAction({ actionId: HEART_TREE_ACTION_ID, evidenceRef: 'mossprout-world:heart-tree' });
+    try {
+      if (mergeWorldRef.current.heartTree) { commit(); return; }
+      const cost = GLOW.firstRestorationCost;
+      const lit = await ensureStoredOpeningGlow(`${runKey}:opening-glow`);
+      if (lit.state.coins < cost) await ensureStoredOpeningGlow(`${runKey}:heart-tree-light`, cost - lit.state.coins);
+      const from = heartwoodStage(mergeWorldRef.current);
+      const coinOrigin = await measureGlowCurrencyOrigin();
+      const result = await restoreStoredHeartTree(`${runKey}:heart-tree`, cost);
+      if (!result.restored) throw new Error(result.message ?? 'The Heart Tree could not be woken.');
+      if (reduceMotion) { commit(); return; }
+      const homeStage = (result.state.haven.tileStages.mossprout ?? 0) as HavenStage;
+      revealedUpgradeRef.current = null;
+      setUpgrading(true);
+      setDisplayedGlow(result.state.coins + cost);
+      setUpgradePresentation({
+        cameraAlreadyFocused: true, characterId: 'mossprout', coinCost: cost, coinOrigin,
+        creatureId: 'companion:mossprout', creatureName: 'Mossprout', fromStage: homeStage, toStage: homeStage,
+        nonce: ++upgradeNonceRef.current,
+        palette: { accent: '#FFE7A8', glow: '#FFD36B', mist: 'rgba(255,240,205,0.9)', primary: '#E0A23C' },
+        reactionLine: '', showCoins: true, status: 'playing', upgradeName: 'Heart Tree',
+        heartTree: { from, to: from === 'dormant' ? 'stirring' : from },
+      });
+    } catch (error) {
+      console.warn('The Heart Tree could not be woken', error);
+      heartTreeStartedRef.current = null;
+    } finally {
+      setHeartTreeBusy(false);
+    }
+  }, [activeFtueRunId, measureGlowCurrencyOrigin, reduceMotion]);
+  // A relaunch after the Tree was written awake, but before the story moved on: move it on.
+  useEffect(() => {
+    if (ftueStepId !== HEART_TREE_STEP_ID || !screenFocused || !mergeWorld.heartTree || upgradePresentation || heartTreeStartedRef.current) return;
+    heartTreeStartedRef.current = activeFtueRunId ?? 'current';
+    commitFtueAction({ actionId: HEART_TREE_ACTION_ID, evidenceRef: 'mossprout-world:heart-tree' });
+  }, [activeFtueRunId, ftueStepId, mergeWorld.heartTree, screenFocused, upgradePresentation]);
+  const foundSanctuary = useCallback(() => {
+    commitFtueAction({ actionId: SANCTUARY_ACTION_ID, evidenceRef: 'mossprout-world:sanctuary-founded' });
+  }, []);
 
   // Upgrading a building is a small version of upgrading a tile: the Glow leaves the top bar as coins, each one rocks
   // the building as it lands and the counter counts down with them; on the last landing the upgrade is written and
@@ -2118,11 +2216,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const rushWispTarget = useMemo((): CorruptionWispTarget | null => activeRush && rushHost && screenFocused
     ? { ...missionWispTarget({ key: activeRush.runKey, host: rushHost, mechanicState: createMechanicState(resolveMechanic(rushHost)), node: activeRush.node, boardMetrics: openingBoardMetrics, settled: ftueCameraSettled }), live: rushLive }
     : null, [activeRush, ftueCameraSettled, openingBoardMetrics, rushHost, rushLive, screenFocused]);
-  const wispTarget = useMemo((): CorruptionWispTarget | null => rushWispTarget ?? hatchableMist.wispTarget ?? journeyMist.wispTarget ?? islandMist.wispTarget ?? (openingBoardActive
-    ? { key: 'opening-mist', node: homeTileNode, host: OPENING_MIST_HOST, mechanicState: { kind: 'glow-strikes', strikes: openingProgress }, lines: OPENING_WISP_LINES, settled: ftueCameraSettled }
-    : restorationBoardVisible && restorationBinding && restorationBoardRunId && restorationStore.mechanicState
+  const wispTarget = useMemo((): CorruptionWispTarget | null => rushWispTarget ?? firstBattle.wispTarget ?? hatchableMist.wispTarget ?? journeyMist.wispTarget ?? islandMist.wispTarget ?? (restorationBoardVisible && restorationBinding && restorationBoardRunId && restorationStore.mechanicState
       ? missionWispTarget({ key: restorationBoardRunId, host: restorationBinding.host, mechanicState: restorationStore.mechanicState, node: restorationTileNode, boardMetrics: openingBoardMetrics, window: restorationBinding.window, lines: restorationWispLines, settled: ftueCameraSettled })
-      : null), [rushWispTarget, ftueCameraSettled, hatchableMist.wispTarget, homeTileNode, islandMist.wispTarget, journeyMist.wispTarget, openingBoardActive, openingBoardMetrics, openingProgress, restorationBinding, restorationBoardRunId, restorationBoardVisible, restorationStore.mechanicState, restorationTileNode, restorationWispLines]);
+      : null), [rushWispTarget, ftueCameraSettled, firstBattle.wispTarget, hatchableMist.wispTarget, islandMist.wispTarget, journeyMist.wispTarget, openingBoardMetrics, restorationBinding, restorationBoardRunId, restorationBoardVisible, restorationStore.mechanicState, restorationTileNode, restorationWispLines]);
   useEffect(() => {
     // Back puts the board away; it never leaves the Kingdom from here.
     if (!restorationBoardVisible) return;
@@ -3241,15 +3337,20 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       {/* The Last Clearing (`docs/cozy-4x-ftue-the-last-clearing.md`): the cold open, then the guardian. */}
       {ftueStepId === OPENING_MIST_OPEN_STEP_ID && ftueStep && screenFocused ? <LastClearingColdOpen onDone={advanceOpening} /> : null}
       {ftueStepId === GUARDIAN_STEP_ID && ftueStep && screenFocused ? <LastClearingGuardian onContinue={advanceOpening} /> : null}
+      {/* Then, after the first battle and the Mist's retreat: the Heart Tree woken, and the Sanctuary founded. */}
+      {ftueStepId === HEART_TREE_STEP_ID && ftueStep && screenFocused && ftueCameraSettled && !heartTreeBusy && !upgradePresentation && !mergeWorld.heartTree
+        ? <LastClearingHeartTree onRestore={() => { void restoreHeartTree(); }} /> : null}
+      {ftueStepId === SANCTUARY_STEP_ID && ftueStep && screenFocused && ftueCameraSettled
+        ? <LastClearingTitleCard title={SANCTUARY_TITLE} line={SANCTUARY_LINE} onContinue={foundSanctuary} /> : null}
       {/* A docked mini board dims the Kingdom behind it, easing in and out. */}
-      <BoardSessionDim active={Boolean((openingBoardActive && ftueStep && mission.state) || (stepplingMissionActive && stepplingMission.state) || (journeyMissionActive && journeyMissionStore.state) || (activeRush && screenFocused) || (islandEncounterActive && islandMist.store.state) || (restorationBoardVisible && !chapterRush))} />
-      {openingBoardActive && ftueStep && mission.state ? <KingdomOpeningMergeDock
-        run={openingRun} step={ftueStep} state={mission.state} send={mission.send} width={window.width} bottomInset={insets.bottom}
-        landings={openingGlow.store} onGlow={openingGlow.launch} onFinale={openingGlow.launchFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
+      <BoardSessionDim active={Boolean(openingBoardActive || (stepplingMissionActive && stepplingMission.state) || (journeyMissionActive && journeyMissionStore.state) || (activeRush && screenFocused) || (islandEncounterActive && islandMist.store.state) || (restorationBoardVisible && !chapterRush))} />
+      {openingBoardActive && firstBattle.mission && firstBattle.store.state ? <HatchableMissionDock mission={firstBattle.mission}
+        state={firstBattle.store.state} send={firstBattle.store.send} merges={firstBattle.store.merges} mechanicState={firstBattle.store.mechanicState} encounter={firstBattle.encounter} width={window.width} bottomInset={insets.bottom}
+        landings={openingGlow.store} onStrike={firstBattle.onStrike} onFinale={firstBattle.onFinale} onReveal={firstBattle.bumpReveal} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} /> : null}
       {openingGuidanceVisible && ftueCameraSettled && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
-        <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={openingBoardStep?.cue ?? null} guide={openingBoardStep?.guide ?? null}
-          layoutNonce={openingProgress} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={openingBoardStep?.spotlight ?? null} state={mission.state ?? mergeWorld} targetRevision={openingProgress} />
+        <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={openingBoardStep?.cue ?? null} guide={openingBoardStep?.guide?.title ? openingBoardStep.guide : null}
+          layoutNonce={openingBoardRevision} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={openingBoardStep?.spotlight ?? null} state={firstBattle.store.state ?? mergeWorld} targetRevision={openingBoardRevision} />
       </View> : null}
       {stepplingMissionActive && stepplingMission.state ? <HatchableMissionDock mission={hatchableMist.mission ?? activeHatchable.mission}
         state={stepplingMission.state} send={stepplingMission.send} merges={stepplingMission.merges} mechanicState={stepplingMission.mechanicState} encounter={hatchableMist.encounter} width={window.width} bottomInset={insets.bottom}

@@ -121,6 +121,7 @@ const BUILT_INS: readonly StoryCapabilityDefinition[] = [
   { id: 'haven.prepare_merge_handoff', kind: 'effect', idempotent: true },
   { id: 'haven.place_first_memory', kind: 'effect', idempotent: true },
   { id: 'haven.opening_glow', kind: 'effect', idempotent: true },
+  { id: 'haven.restore_heart_tree', kind: 'effect', idempotent: true },
   { id: 'haven.grow_first_memory', kind: 'effect', idempotent: true },
   { id: 'haven.feature.upgrade', kind: 'effect', idempotent: true },
   { id: 'haven.movement_egg.reveal', kind: 'effect', idempotent: true },

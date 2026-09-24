@@ -587,6 +587,13 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
         openingGlow: { receiptId: command.receiptId, amount, grantedAt: command.now },
       }, command.now));
     }
+    case 'restoreHeartTree': {
+      // Once: the Tree wakes the first time it is paid for; any later ask (a relaunch, the story's own repair) changes nothing.
+      if (current.heartTree) return unchanged(current);
+      const cost = Math.max(0, Math.floor(command.cost));
+      if (current.coins < cost) return unchanged(current, 'Clear the Mist to earn more Glow.');
+      return changed(touch({ ...current, coins: current.coins - cost, heartTree: { receiptId: command.receiptId, restoredAt: command.now } }, command.now));
+    }
     case 'payEncounterContinue': {
       const ledger = encounterLedger(current);
       if (ledger.receipts.includes(command.receiptId)) return unchanged(current);
@@ -922,6 +929,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     companionDailyGardenVersion: source.companionDailyGardenVersion,
     ...normalizeHatchableEggs(source),
     openingGlow: normalizeOpeningGlow(source.openingGlow),
+    heartTree: normalizeHeartTree(source.heartTree),
     version: 25,
     pivot: 'campaign-v1',
     encounters: normalizeEncounters(source.encounters, now),
@@ -4321,6 +4329,12 @@ function finite(value: unknown, fallback: number) {
 
 function uniqueStrings(value: unknown): string[] {
   return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === 'string'))] : [];
+}
+
+function normalizeHeartTree(value: unknown): MergeWorldState['heartTree'] {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<NonNullable<MergeWorldState['heartTree']>>;
+  return typeof candidate.receiptId === 'string' ? { receiptId: candidate.receiptId, restoredAt: finite(candidate.restoredAt, 0) } : null;
 }
 
 function normalizeOpeningGlow(value: unknown): MergeWorldState['openingGlow'] {

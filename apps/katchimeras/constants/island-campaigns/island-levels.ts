@@ -60,6 +60,8 @@ export type IslandLevelSpec = {
   pod?: { cell: number; charges: number; every: number };
   /** Lanes: a Seed arrives on its own every `every` seconds, on a random empty cell (by the player's luck, a Sprout). */
   seeds?: { every: number };
+  /** Lanes: a level that cannot be lost (the first battle); a wisp that would get through is pushed back. */
+  forgiving?: boolean;
   /**
    * A Spring: it makes the Water chain (Pebble, Shell, Tidepool), whose merges wash the Mist twice as hard. `under`
    * hides it under Mist of that kind at its cell: clearing that cell is how it is found.
@@ -164,7 +166,7 @@ export function islandLevel(campaignId: string, key: string, spec: IslandLevelSp
       ...(spec.spring ? [{ id: 'spring', generatorId: 'mist-spring', cell: spec.spring.cell, charges: spec.spring.charges, drops: [`${WATER_CHAIN}:1`], recharge: { kind: 'merges' as const, every: spec.spring.every, amount: 1 }, ...(spec.spring.under ? { hidden: true } : {}) }] : []),
     ],
     mechanic: lanes
-      ? { kind: 'lanes', ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const } } : {}), wisps: lanes.map((lane) => ({ id: lane.id, hp: lane.hp, column: lane.column - 1, at: Math.round(lane.at * 1_000), stepMs: Math.round(lane.step * 1_000), ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}), ...(lane.spit ? { spitEvery: Math.round(lane.spit * 1_000) } : {}) })) }
+      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const } } : {}), wisps: lanes.map((lane) => ({ id: lane.id, hp: lane.hp, column: lane.column - 1, at: Math.round(lane.at * 1_000), stepMs: Math.round(lane.step * 1_000), ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}), ...(lane.spit ? { spitEvery: Math.round(lane.spit * 1_000) } : {}) })) }
       : { kind: 'dark-wisps', wisps, damageByTier: [1, 1, 2, 3], targeting: 'adjacent', ...(tactics ? { mode: 'tactics' as const } : { rest: spec.rest ?? REST_BY_DIFFICULTY[spec.difficulty] }) },
     required: lanes ? lanes.reduce((sum, lane) => sum + lane.hp, 0) : wisps.filter((wisp) => !wisp.hidden).reduce((sum, wisp) => sum + wisp.hp, 0),
     wisps: [],

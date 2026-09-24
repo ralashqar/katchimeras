@@ -558,6 +558,8 @@ export type MergeWorldState = {
   glowDiscoveryLesson?: { preparedAt: number; servedOrderIds: string[]; spawnedAt?: number; guidedOrderIndex?: 0 | 1; layoutVersion?: 2 | 3 };
   /** The first light, earned when the last wisp fell on the opening board: what the first garden restore is paid with. */
   openingGlow?: { receiptId: string; amount: number; grantedAt: number } | null;
+  /** The Last Clearing's Heart Tree, woken with the first light (`docs/cozy-4x-ftue-the-last-clearing.md`, beat 8). */
+  heartTree?: { receiptId: string; restoredAt: number } | null;
   /** Kept for saves written before `gardenLessons`; mirrors `gardenLessons.steppling`. */
   stepplingGardenLesson?: { preparedAt: number; servedAt?: number };
   /** Each hatchable companion's garden lesson (parcel, grow, serve): prepared once, served once. */
@@ -645,6 +647,7 @@ export type MergeWorldCommand =
   | { type: 'prepareGlowDiscoveryLesson'; now: number }
   /** The first light: the Glow that drove the opening's wisps off stays with you, once per run. */
   | { type: 'grantOpeningGlow'; receiptId: string; amount: number; now: number }
+  | { type: 'restoreHeartTree'; receiptId: string; cost: number; now: number }
   /** Glow the story hands over once (e.g. Steppling's mist price), keyed in the encounter ledger's receipts. */
   | { type: 'grantStoryGlow'; receiptId: string; amount: number; now: number }
   /** Keep going on a lost level: its Glow, once per receipt; refused when the Glow is not there. */

@@ -16,7 +16,8 @@ import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
-import { applyStoredGlowDiscovery, grantStoredGeneratorParcel, reconcileStoredHavenStory, activateStoredResidentCardDiscovery, ensureStoredFirstSpringBuilt, wakeStoredFirstSpring, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget, ensureStoredOpeningGlow } from '@/utils/merge-world/repository';
+import { applyStoredGlowDiscovery, grantStoredGeneratorParcel, reconcileStoredHavenStory, activateStoredResidentCardDiscovery, ensureStoredFirstSpringBuilt, wakeStoredFirstSpring, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget, ensureStoredOpeningGlow, restoreStoredHeartTree } from '@/utils/merge-world/repository';
+import { GLOW } from '@/constants/glow';
 import { heartwoodBuildingById } from '@/constants/heartwood-buildings';
 import { FIRST_SEED_BUILDING_ID } from '@/features/heartwood-buildings/buildings-world';
 import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
@@ -196,6 +197,18 @@ export function bootstrapContentFlowCatalog() {
     const result = await ensureStoredOpeningGlow(`${sourceId}:opening-glow`);
     if (!result.state.openingGlow) throw new Error('The first light could not be kept');
     return { effectKey, amount: result.state.openingGlow.amount, receiptId: result.state.openingGlow.receiptId };
+  });
+  // The Kingdom wakes the Tree with its coins and light before the story moves on; this is the story's own guarantee
+  // (a relaunch between the two): the first light kept, a short profile topped up once, and the Tree restored.
+  registerContentFlowEffect('haven.restore_heart_tree', async ({ run, effectKey }) => {
+    const sourceId = typeof run.variables.ftueRunId === 'string' ? run.variables.ftueRunId : run.runId;
+    const lit = await ensureStoredOpeningGlow(`${sourceId}:opening-glow`);
+    if (!lit.state.heartTree && lit.state.coins < GLOW.firstRestorationCost) {
+      await ensureStoredOpeningGlow(`${sourceId}:heart-tree-light`, GLOW.firstRestorationCost - lit.state.coins);
+    }
+    const result = await restoreStoredHeartTree(`${sourceId}:heart-tree`);
+    if (!result.restored) throw new Error(result.message ?? 'The Heart Tree could not be woken');
+    return { effectKey, receiptId: result.state.heartTree!.receiptId };
   });
   registerContentFlowEffect('haven.place_first_memory', async ({ effectKey }) => {
     const built = await ensureStoredFirstSpringBuilt();

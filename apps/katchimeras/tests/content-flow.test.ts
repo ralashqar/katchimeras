@@ -103,7 +103,7 @@ test('the Last Clearing resumes at every boundary: cold open, guardian, first ba
     } else assert.fail(`Unhandled FTUE node ${node.id}`);
   }
   assert.equal(run.status, 'completed');
-  assert.equal(events.filter((type) => type === 'ftue.merge_completed').length, 7, 'the opening counts seven merges: two chains and the one that joins them');
+  assert.equal(events.filter((type) => type === 'ftue.battle_won').length, 1, 'the first battle is won once');
   assert.equal(events.filter((type) => type === 'ftue.item_spawned').length, 0);
   for (const beat of ['world.mist_open', 'world.guardian', 'world.mist_clear', 'world.mist_lift', 'effect.haven.opening_glow'] as const) assert.ok(visited.has(beat), beat);
   // The Egg, the hatch meeting, the Garden and the first rest are retired: never visited, and an old run ends.
@@ -248,7 +248,7 @@ test('the shipping FTUE is the Last Clearing, a direct data-driven Content Flow 
   assert.equal(flow.metadata.authoring, 'content-flow');
   assert.equal(flow.entryNodeId, MOSSPROUT_FTUE_SCRIPT.entryStepId);
   assert.equal(flow.nodes.find((node) => node.id === MOSSPROUT_FTUE_SCRIPT.terminalStepId)?.kind, 'complete');
-  assert.deepEqual(flow.nodes.map((node) => node.id), ['world.mist_open', 'world.guardian', 'world.mist_clear', 'world.mist_lift', 'effect.haven.opening_glow', 'complete']);
+  assert.deepEqual(flow.nodes.map((node) => node.id), ['world.mist_open', 'world.guardian', 'world.mist_clear', 'world.mist_lift', 'effect.haven.opening_glow', 'world.heart_tree', 'effect.haven.restore_heart_tree', 'world.sanctuary_founded', 'complete']);
   assert.equal(flow.nodes.some((node) => node.id.startsWith('egg.')), false, 'no Egg: Mossprout is there from the first frame');
 });
 

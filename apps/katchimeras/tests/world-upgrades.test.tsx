@@ -126,7 +126,7 @@ for (const compiler of ['typescript', 'babel'] as const) test(`mist islands are 
   assert.deepEqual(home(veiled).residentAnchor, home(baseline).residentAnchor);
   assert.notEqual(home(veiled).source, home(baseline).source, 'the veiled home tile paints mist');
   assert.deepEqual(garden(veiled).frame, garden(baseline).frame, 'the combined Tree remains behind the opening Mist');
-  assert.equal(home(veiled).residentSource, undefined, 'nobody stands on the veiled tile');
+  assert.equal(home(veiled).residentSource, home(baseline).residentSource, 'the Last Clearing: Mossprout stands on the veiled tile in the same art, so the lift never rescales him');
   assert.ok(home(baseline).residentSource, 'unveiled, Mossprout stands on the tile as before');
   assert.ok(home(baseline).depth > garden(baseline).depth, 'the home is in front of the central Tree');
   const solo = module.buildMossproutHexNeighborhoodScene([], levels, undefined, {}, { homeSolo: true }) as KingdomHexScene;

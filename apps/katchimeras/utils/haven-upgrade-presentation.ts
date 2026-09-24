@@ -25,6 +25,11 @@ export type HavenTileUpgradePresentation = {
    * finish path must not touch story resolvers, Glow or the tutorial nonce.
    */
   veilLift?: boolean;
+  /**
+   * The Last Clearing's Heart Tree waking: the Heartwood crossblends between these two stages, with the coins and the
+   * field of light of any restoration. The world is written alongside; the finish path hands the story on.
+   */
+  heartTree?: { from: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage; to: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage };
   status: HavenUpgradePresentationStatus;
   storyPresentationKey?: string;
   toStage: HavenStage;

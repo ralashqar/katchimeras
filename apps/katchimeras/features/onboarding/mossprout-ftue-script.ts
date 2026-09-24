@@ -7,11 +7,11 @@ import type { FtueScriptDefinition } from './ftue-types';
 import { STEPPLING_DISCOVERY_ID } from '@/constants/companion-discovery-catalog';
 import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_PROMPT, MOSSPROUT_SUPPORT_STYLE_OPTIONS } from './mossprout-bond-share';
 import { MOSSPROUT_FTUE_COPY as COPY } from './mossprout-ftue-copy';
-import { COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, COLD_OPEN_STEP_ID, FIRST_BATTLE_BODY, FIRST_BATTLE_EYEBROW, FIRST_BATTLE_TITLE, GUARDIAN_ACTION_ID, GUARDIAN_CONTINUE, GUARDIAN_LINES, GUARDIAN_STEP_ID, GUARDIAN_TITLE, MIST_RETREATS_TITLE } from './last-clearing';
+import { FIRST_BATTLE_ID, COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, COLD_OPEN_STEP_ID, FIRST_BATTLE_BODY, FIRST_BATTLE_EYEBROW, FIRST_BATTLE_TITLE, GUARDIAN_ACTION_ID, GUARDIAN_CONTINUE, GUARDIAN_LINES, GUARDIAN_STEP_ID, GUARDIAN_TITLE, HEART_TREE_ACTION_ID, HEART_TREE_LINES, HEART_TREE_RESTORE, HEART_TREE_STEP_ID, HEART_TREE_TITLE, MIST_RETREAT_LINES, SANCTUARY_ACTION_ID, SANCTUARY_LINE, SANCTUARY_STEP_ID, SANCTUARY_TITLE } from './last-clearing';
 import { OPENING_CAMERA_ANCHOR_Y, OPENING_CAMERA_ENTRY_MS, OPENING_CAMERA_ZOOM, OPENING_MERGE_REQUIRED } from './opening-mist';
 
 // Start just wider than the original close-up and pull back with each answer.
-import { sharedEggZoom, SHARED_EGG_CLOSE_ZOOM, SHARED_EGG_REST_ZOOM, SHARED_EGG_ENTRY_ZOOM } from '@/components/katchadeck/world/shared-resident-presentation';
+import { sharedEggZoom, SHARED_EGG_CLOSE_ZOOM, SHARED_EGG_REST_ZOOM, SHARED_EGG_ENTRY_ZOOM, SHARED_RESIDENT_SCREEN_ANCHOR_Y } from '@/components/katchadeck/world/shared-resident-presentation';
 export const MOSSPROUT_WORLD_EGG_REST_ZOOM = SHARED_EGG_REST_ZOOM;
 export const MOSSPROUT_WORLD_EGG_CLOSE_ZOOM = SHARED_EGG_CLOSE_ZOOM;
 export const MOSSPROUT_WORLD_EGG_ENTRY_ZOOM = SHARED_EGG_ENTRY_ZOOM;
@@ -128,7 +128,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 55,
+  version: 56,
   entryStepId: 'world.mist_open',
   terminalStepId: 'complete',
   steps: [
@@ -152,23 +152,40 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       id: 'world.mist_clear', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: FIRST_BATTLE_EYEBROW, title: FIRST_BATTLE_TITLE, body: FIRST_BATTLE_BODY },
-      actions: [{ id: 'world.clear_mist', title: 'Drive off the Mist', description: 'Every merge strikes a wisp. Fell all three.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', nextStepId: 'world.mist_lift' }],
+      actions: [{ id: 'world.clear_mist', title: 'Drive them back', description: 'Merge plants that shoot. Bring down every wisp.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', nextStepId: 'world.mist_lift' }],
       // A tutorial objective, not a receipt the backend needs: no Glow, no sync.
       // The docked board is free; the spotlight and finger show the first pairs
       // through the ordinary Merge overlay, then step aside.
       interaction: { mode: 'none' },
       cue: { kind: 'drag', from: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, to: { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 } },
       spotlight: { targets: [{ kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 0 }, { kind: 'board_items', definitionId: 'nature:garden:1', occurrence: 1 }], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.64 },
-      edges: [{ event: { type: 'merge_completed' }, commitActionId: 'world.clear_mist', nextStepId: 'world.mist_lift', requiredCount: OPENING_MERGE_REQUIRED }],
+      // The Last Clearing's first battle (`last-clearing.ts`): won when every wisp is down.
+      edges: [{ event: { type: 'battle_won', battleId: FIRST_BATTLE_ID }, commitActionId: 'world.clear_mist', nextStepId: 'world.mist_lift' }],
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: OPENING_CAMERA_ZOOM, anchorY: OPENING_CAMERA_ANCHOR_Y, durationMs: 520 },
     },
     {
       id: 'world.mist_lift', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: '', title: MIST_RETREATS_TITLE, body: '' },
-      // Committed by the Kingdom when the veil crossblend completes. The Heart Tree and the frontier come next
-      // (Last Clearing steps 3 and 4); until they are built, the first session ends here.
-      actions: [{ id: 'world.mist_lifted', title: 'Continue', description: 'The Mist pulls back from the clearing.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete' }],
-      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM, anchorY: 0.5, durationMs: 1400 },
+      // The Mist retreats (beat 7): Mossprout's lines under the veil lift.
+      guide: { eyebrow: '', title: MIST_RETREAT_LINES[0]!, body: MIST_RETREAT_LINES[1]! },
+      // Committed by the Kingdom when the veil crossblend completes.
+      actions: [{ id: 'world.mist_lifted', title: 'Continue', description: 'The Mist pulls back from the clearing.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: HEART_TREE_STEP_ID }],
+      // Mossprout's ordinary interaction framing (the one a tap on him uses), not the old Egg close-up.
+      camera: { kind: 'focus_target', target: { kind: 'haven_resident', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_REST_ZOOM, anchorY: SHARED_RESIDENT_SCREEN_ANCHOR_Y, durationMs: 1400 },
+    },
+    {
+      // The Heart Tree (beat 8): the camera pushes in on it, Mossprout asks, and the first light wakes it.
+      id: HEART_TREE_STEP_ID, surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
+      guide: { eyebrow: '', title: HEART_TREE_TITLE, body: HEART_TREE_LINES[0]! },
+      actions: [{ id: HEART_TREE_ACTION_ID, title: HEART_TREE_RESTORE, description: 'Spend the first light to wake the Heart Tree.', icon: 'sparkles', presentation: 'cta_action', handlerId: 'acknowledgement', nextStepId: SANCTUARY_STEP_ID }],
+      camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.5, durationMs: 1600 },
+    },
+    {
+      // The Sanctuary (beat 9): the title card. The frontier comes next (Last Clearing step 4); until it is built, the
+      // first session ends here.
+      id: SANCTUARY_STEP_ID, surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
+      guide: { eyebrow: '', title: SANCTUARY_TITLE, body: SANCTUARY_LINE },
+      actions: [{ id: SANCTUARY_ACTION_ID, title: 'Continue', description: 'The first Sanctuary in a very long time.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete' }],
+      camera: { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.28, anchorY: 0.5, durationMs: 900 },
     },
     {
       id: 'world.egg_intro', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
@@ -781,7 +798,7 @@ const stepsById = new Map(MOSSPROUT_FTUE_SCRIPT.steps.map((step) => [step.id, st
 // first-session route grows the First Bloom, then returns after one order.
 // The Last Clearing (`docs/cozy-4x-ftue-the-last-clearing.md`) retires the Egg, the hatch meeting, the Garden and
 // the first rest: every step it no longer reaches is kept for old fixtures, not played.
-const LAST_CLEARING_LIVE_STEP_IDS = new Set([COLD_OPEN_STEP_ID, GUARDIAN_STEP_ID, 'world.mist_clear', 'world.mist_lift', 'complete']);
+const LAST_CLEARING_LIVE_STEP_IDS = new Set([COLD_OPEN_STEP_ID, GUARDIAN_STEP_ID, 'world.mist_clear', 'world.mist_lift', HEART_TREE_STEP_ID, SANCTUARY_STEP_ID, 'complete']);
 const retiredFirstSessionStepIds = new Set(MOSSPROUT_FTUE_SCRIPT.steps
   .filter((step) => !LAST_CLEARING_LIVE_STEP_IDS.has(step.id) || ['companion.day_one_action', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.garden_intro', 'companion.water_together', 'companion.first_grow', 'companion.first_notice', 'companion.notice_bond_spotlight', 'companion.water_response', 'companion.first_insight', 'egg.context', 'egg.mind', 'egg.nature_theme', 'egg.companion_identity', 'companion.nickname', 'companion.bond_intro', 'companion.bond_spotlight', 'companion.resident_affinity', 'companion.resident_parcel_ready', 'companion.resident_match_result'].includes(step.id)
     || step.id.startsWith('merge.plant.')

@@ -13,6 +13,9 @@ const PRE_MOSSPROUT_CONVERSATION_STEPS = new Set([
   'world.guardian',
   'world.mist_clear',
   'world.mist_lift',
+  // The Last Clearing's Heart Tree and Sanctuary Founded beats.
+  'world.heart_tree',
+  'world.sanctuary_founded',
   'world.egg_intro',
   'egg.nature_theme',
   'egg.companion_identity',
