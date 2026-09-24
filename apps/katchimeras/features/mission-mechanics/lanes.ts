@@ -1,6 +1,6 @@
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { MergeItemDefinition, MergeWorldState } from '@/types/merge-world';
-import type { LaneShot, LaneWispState, MechanicEffect, MissionMechanicDefinition, MissionMechanicState, MissionWispView } from '@/types/mission-mechanic';
+import type { LaneShot, LaneSpit, LaneWispState, MechanicEffect, MissionMechanicDefinition, MissionMechanicState, MissionWispView } from '@/types/mission-mechanic';
 import type { MissionWindow } from './board-window';
 
 /**
@@ -10,6 +10,8 @@ import type { MissionWindow } from './board-window';
  *   leaves Mist on the free cell it has just left.
  * - Every piece of Sprout size or bigger fires Glow straight up its own column on its own beat, at the lowest wisp
  *   over it or, with none, off the top of the board; bigger pieces fire faster and hit harder. A merged piece fires at once. Moving pieces is how the player aims.
+ * - A wisp still over the board spits Mist down its column now and then (`spitEvery`): the top-most free cell there
+ *   mists over (it never lands on a piece; reaching one is what puts it under Mist).
  * - A wisp that reaches a piece puts it under Mist (it stops firing until its Mist is cleared) and holds for a beat.
  *   A wisp that drifts past the bottom row gets through: the level is lost.
  * - Every wisp down is the win.
@@ -38,6 +40,8 @@ export const LANE_MERGE_SHOT_MS = 120;
 export const LANE_START_ROW = 4;
 /** A shot with nothing over it flies this many rows over the board, fading. */
 export const LANE_MISS_ROW = 5;
+/** A wisp's spat Mist lands this long after it is spat: when the board's bolt strikes (`MIST_BOLT_MS` x `MIST_BOLT_REACH`). */
+export const LANE_SPIT_MS = 130;
 /** Keep going: every wisp still standing is pushed back up this many rows. */
 export const LANE_KEEP_GOING_ROWS = 3;
 
@@ -106,6 +110,8 @@ export type LanesTickResult = {
   changed: boolean;
   /** A wisp moved or arrived: only the wisps need drawing again. */
   moved: boolean;
+  /** Mist wisps spat this tick, for the board to strike. */
+  spat: LaneSpit[];
 };
 
 /** The board row a wisp is over: the cell its centre is in. */
@@ -117,7 +123,7 @@ export const laneRowOf = (row: number) => Math.floor(row + 0.5);
  * due to fire fires, at the lowest wisp over it or, with none, off the top of the board. Pure.
  */
 export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: MergeWorldState, dt: number, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): LanesTickResult {
-  if (input.breached != null || lanesComplete(mechanic, input)) return { state: input, board, fired: [], effects: [], changed: false, moved: false };
+  if (input.breached != null || lanesComplete(mechanic, input)) return { state: input, board, fired: [], effects: [], changed: false, moved: false, spat: [] };
   const from = input.clock;
   const clock = from + Math.max(0, dt);
   const wisps: LaneWispState[] = input.wisps.map((wisp) => ({ ...wisp }));
@@ -140,6 +146,18 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     changed = true;
     wisp.damage = Math.min(mechanic.wisps[shot.wisp]!.hp, wisp.damage + shot.damage);
     strikes += 1;
+  }
+
+  // Spat Mist that has fallen: a cell still free mists over; one taken meanwhile (a piece put there) is left alone.
+  const spits: LaneSpit[] = [];
+  for (const spit of input.spits ?? []) {
+    if (spit.landsAt > clock) { spits.push(spit); continue; }
+    if (isFree(current(), spit.cell)) {
+      cells ??= [...board.board];
+      cells[spit.cell] = { ...cells[spit.cell]!, locked: true, blocker: null, occupant: null, mist: { kind: 'encounter', type: 'light', hp: 1 } };
+      effects.push({ kind: 'corrupted', wisp: spit.wisp, cell: spit.cell });
+      changed = true;
+    }
   }
 
   // Wisps drift down, a row every `stepMs`, from the moment they arrive; a hold after reaching a piece pauses them.
@@ -185,10 +203,33 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     wisp.row = row;
   }
 
+  // Wisps still over the board spit Mist down their column now and then: onto its top-most free cell (never a piece).
+  const spat: LaneSpit[] = [];
+  let seq = input.seq;
+  if (breached == null) {
+    for (let index = 0; index < mechanic.wisps.length; index += 1) {
+      const spec = mechanic.wisps[index]!;
+      const wisp = wisps[index]!;
+      if (!spec.spitEvery || !arrived(index) || !alive(index) || wisp.row >= -0.5) continue;
+      const due = wisp.spitAt ?? spec.at + spec.spitEvery;
+      if (due > clock) { wisp.spitAt = due; continue; }
+      wisp.spitAt = clock + spec.spitEvery;
+      let cell: number | null = null;
+      for (let row = 0; row < window.rows && cell == null; row += 1) {
+        const candidate = laneCell(window, spec.column, row);
+        if (candidate == null) continue;
+        if (isFree(current(), candidate)) cell = candidate;
+      }
+      if (cell == null) continue;
+      const spit: LaneSpit = { id: ++seq, wisp: index, cell, firedAt: clock, landsAt: clock + LANE_SPIT_MS };
+      spits.push(spit);
+      spat.push(spit);
+    }
+  }
+
   // Every piece due to fire fires: up its column at the lowest wisp over it, or off the top with nothing there.
   const ready: Record<string, number> = {};
   const fired: LaneShot[] = [];
-  let seq = input.seq;
   if (breached == null) {
     const boardNow = current();
     for (const cell of window.cellIndices) {
@@ -216,8 +257,8 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     }
   }
 
-  const state: LanesState = { kind: 'lanes', strikes, clock, wisps, ready, shots, seq, breached: breached ?? input.breached };
-  return { state, board: current(), fired, effects, changed, moved };
+  const state: LanesState = { kind: 'lanes', strikes, clock, wisps, ready, shots, seq, breached: breached ?? input.breached, ...(spits.length ? { spits } : {}) };
+  return { state, board: current(), fired, effects, changed, moved, spat };
 }
 
 const isFree = (board: MergeWorldState, cell: number) => { const entry = board.board[cell]; return Boolean(entry) && !entry!.locked && !entry!.mist && !entry!.occupant; };
@@ -264,12 +305,13 @@ export function normalizeLanesState(mechanic: LanesMechanic, value: unknown, str
   if (typeof value !== 'object') return null;
   const raw = value as Partial<LanesState>;
   if (!Array.isArray(raw.wisps) || raw.wisps.length !== mechanic.wisps.length || !Number.isFinite(raw.clock)) return null;
-  const wisps = raw.wisps.map((wisp) => ({ row: Number(wisp?.row) || 0, damage: Math.max(0, Number(wisp?.damage) || 0), holdUntil: Number(wisp?.holdUntil) || 0, cells: Math.max(0, Math.floor(Number(wisp?.cells) || 0)) }));
+  const wisps = raw.wisps.map((wisp) => ({ row: Number(wisp?.row) || 0, damage: Math.max(0, Number(wisp?.damage) || 0), holdUntil: Number(wisp?.holdUntil) || 0, cells: Math.max(0, Math.floor(Number(wisp?.cells) || 0)), ...(Number.isFinite(wisp?.spitAt) ? { spitAt: Number(wisp!.spitAt) } : {}) }));
   return {
     kind: 'lanes', strikes: Math.max(0, Math.floor(Number(raw.strikes) || strikes)), clock: Number(raw.clock), wisps,
     ready: raw.ready && typeof raw.ready === 'object' ? { ...raw.ready } : {},
     shots: Array.isArray(raw.shots) ? raw.shots.filter((shot) => shot && Number.isFinite(shot.landsAt)).map((shot) => ({ ...shot })) : [],
     seq: Math.max(0, Math.floor(Number(raw.seq) || 0)),
     breached: raw.breached == null ? null : Math.floor(Number(raw.breached)),
+    ...(Array.isArray(raw.spits) ? { spits: raw.spits.filter((spit) => spit && Number.isFinite(spit.landsAt)).map((spit) => ({ ...spit })) } : {}),
   };
 }

@@ -29,6 +29,7 @@ import Animated, {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { MergeBoardEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
+import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightning, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
 import { canReuseSpawnSprites, createMergeBoardEffects, type MergeBoardEffectKind } from '@/utils/merge-world/board-effects';
 import { mergeWorldGeneratorArt, mergeWorldItemArt, mossproutRootRewardArt, RESIDENT_CARD_ART } from '@/constants/merge-world-art';
 import { MERGE_CHARACTER_NAMES, MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS, MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
@@ -301,9 +302,15 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   const motionsRef = useRef(motions);
   const [invalidFeedback, setInvalidFeedback] = useState<{ id: number; cell: number } | null>(null);
   const [boardEffects] = useState(createMergeBoardEffects);
+  const retireRevealBolt = useCallback((id: number) => setRevealBolts((current) => current.filter((bolt) => bolt.id !== id)), []);
   const effectsActivity = useSharedValue(0);
   const [cellFeedback, setCellFeedback] = useState<MergeCellFeedback[]>([]);
   const [mistDissipations, setMistDissipations] = useState<DreamMistDissipationRecord[]>([]);
+  // A sleeper woken beside full Mist opens it to half Mist: lightning strikes from the woken piece to each such cell,
+  // and the full Mist holds until its bolt lands, then puffs away onto the sleeper it was hiding.
+  const [revealBolts, setRevealBolts] = useState<readonly MistBolt[]>([]);
+  const [revealHeld, setRevealHeld] = useState<Readonly<Record<number, MergeWorldState['board'][number]['mist']>>>({});
+  const revealBoltSequence = useRef(0);
   const operationSequence = useRef(0);
   const motionSequence = useRef(0);
   const invalidFeedbackSequence = useRef(0);
@@ -745,10 +752,26 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         timers.schedule(() => setMistDissipations((current) => current.filter((entry) => entry.id !== dissipation.id)), reduceMotion ? 220 : 560);
       }
       emitBoardEffect(to, 'merge');
-      // The Mist beside the woken sleeper lets go a beat later: cause, then effect, one cell at a time.
-      (predicted.revealedMistCells ?? []).forEach((cell, index) => {
-        timers.schedule(() => emitBoardEffect(cell, 'mist-burst'), reduceMotion ? 0 : 140 + index * 90);
-      });
+      // The Mist beside the woken sleeper is struck open: lightning from the woken piece to each cell, one after
+      // another; each cell's full Mist holds until its bolt lands, then puffs away to the half Mist over its sleeper.
+      const revealed = predicted.revealedMistCells ?? [];
+      if (reduceMotion) revealed.forEach((cell) => emitBoardEffect(cell, 'mist-burst'));
+      else if (revealed.length) {
+        const shown = presentationRef.current.board;
+        setRevealHeld((current) => ({ ...current, ...Object.fromEntries(revealed.map((cell) => [cell, shown[cell]?.mist ?? null])) }));
+        const box = (cell: number) => mergeCellFrame(geometry, cell).bounds;
+        const release = (cell: number) => setRevealHeld((current) => {
+          if (!(cell in current)) return current;
+          const { [cell]: _gone, ...rest } = current;
+          return rest;
+        });
+        setRevealBolts((current) => [...current, ...revealed.map((cell, index): MistBolt => ({
+          id: ++revealBoltSequence.current, from: box(to), to: box(cell), delay: MIST_BOLT_LEAD_MS + 60 + index * MIST_BOLT_STAGGER_MS,
+          onImpact: () => { release(cell); emitBoardEffect(cell, 'mist-burst'); },
+        }))]);
+        // Never left held: a bolt torn down mid-strike still lets its cell go.
+        timers.schedule(() => revealed.forEach(release), 3_000);
+      }
     } else if (residentCardReveal) {
       nextSprites = currentSprites.filter((entry) => spriteId(entry) !== instanceId);
       nextMotions[instanceId] = { kind: 'merge-source', startX: sourceOrigin.x + dx, startY: sourceOrigin.y + dy };
@@ -1220,7 +1243,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         if (!cell) return null;
         const frame = cellFrames[index];
         // Mist a Glow shot is still flying at: drawn as it was until the shot lands.
-        const held = heldMist?.[index];
+        const held = heldMist?.[index] ?? revealHeld[index];
         const occupant = cell.occupant;
         const item = occupant?.kind === 'item' ? occupant : null;
         const generator = occupant?.kind === 'generator' ? MERGE_GENERATORS_BY_ID.get(occupant.generatorId) : null;
@@ -1283,6 +1306,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     </View>
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <MergeBoardEffectsLayer controller={boardEffects} activity={effectsActivity} geometry={geometry} reduceMotion={reduceMotion} size={cellSize} />
+      {revealBolts.map((bolt) => <MistLightning key={bolt.id} bolt={bolt} reduceMotion={reduceMotion} onDone={retireRevealBolt} />)}
       {sprites.filter((sprite) => visibleCellSet.has(sprite.cell) && !hiddenItemInstanceIds?.has(spriteId(sprite))).map((sprite) => {
         const frame = cellFrames[sprite.cell];
         const id = spriteId(sprite);

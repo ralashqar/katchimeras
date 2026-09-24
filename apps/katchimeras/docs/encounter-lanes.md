@@ -20,12 +20,16 @@ Status: **built Sept 24 2026, uncommitted, device test pending.** Every Petalimp
    | Tier 5 and up | 1.3 s | 5 |
 
    Moving pieces is free and is how the player aims. A merged piece fires 120 ms after it is made.
-4. **A wisp that reaches a piece puts it under Mist.**
+4. **Wisps spit Mist while still over the board** (`spitEvery`, from Petalimp 1-2 on): a violet bolt down the wisp's column. It lands 130 ms later on the top-most free cell there, never on a piece, and that cell mists over with the board's puff.
+5. **Boards start as the first boards' chain** (Lift the Mist and chapters 1–2). Level specs take `sleepers` (pieces asleep under half Mist) and `veiled` (full Mist over a sleeper). Bring a sleeper its twin and it wakes a tier up; the full Mist beside it opens to half Mist.
+   - The merge board itself strikes each opened cell with lightning from the woken piece (`MistLightning`, shared in `components/katchadeck/games/mist-lightning.tsx`). The full Mist holds until its bolt lands, then puffs away.
+   - This happens on every board, the first Mossprout and Steppling boards included.
+6. **A wisp that reaches a piece puts it under Mist.**
    - The piece is bound, not lost; merging beside it frees it.
    - The wisp holds at that cell's edge for a beat, then drifts on through the Mist.
    - A piece put where a wisp already is goes under Mist at once.
-5. **Merges still clear Mist with Glow.** A merge's Glow flies at the nearest Mist, reaching farther by tier (`glowShots`, as in Merge vs Mist). The Mist holds until each shot lands.
-6. **Win:** every wisp down. **Lose:** a wisp comes down past the bottom row.
+7. **Merges still clear Mist with Glow.** A merge's Glow flies at the nearest Mist, reaching farther by tier (`glowShots`, as in Merge vs Mist). The Mist holds until each shot lands.
+8. **Win:** every wisp down. **Lose:** a wisp comes down past the bottom row.
    - **Keep going** pushes every standing wisp back up 3 rows.
    - The rescue brings pieces whenever the board runs dry.
 

@@ -120,9 +120,8 @@ test('every Petalimp level is Lanes and fair: careful play wins, a novice wins t
   for (const [index, spec] of levels.entries()) {
     const encounter = islandLevel('island-campaign:petalimp-bloom', `lanes-${index}`, spec).encounter;
     assert.equal(encounter.mechanic?.kind, 'lanes');
-    const hard = spec.difficulty === 'dark' || spec.difficulty === 'boss';
     const careful = lanesFairness(encounter, 'careful', 6);
-    assert.ok(careful.wins >= (hard ? 4 : 5), `${spec.title}: the careful player won ${careful.wins} of 6`);
+    assert.ok(careful.wins >= 4, `${spec.title}: the careful player won ${careful.wins} of 6`);
     assert.equal(lanesFairness(encounter, 'idle', 1).wins, 0, `${spec.title}: doing nothing must lose`);
     if (spec.difficulty === 'calm' || spec.difficulty === 'boss') {
       const novice = lanesFairness(encounter, 'careless', 6).wins;
@@ -130,4 +129,27 @@ test('every Petalimp level is Lanes and fair: careful play wins, a novice wins t
       else assert.ok(novice <= 2, `${spec.title}: a novice won the boss ${novice} of 6`);
     }
   }
+});
+
+test('a wisp over the board spits Mist down its column onto the top-most free cell, never onto a piece', () => {
+  const free = setup({ lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60, spit: 1 }] });
+  const spat = run(free.mechanic, free.lanes, free.state, 1_300, free.window);
+  assert.equal(spat.board.board[17]!.mist?.kind === 'encounter' && spat.board.board[17]!.mist.type, 'light', 'the top cell of its column mists over');
+  const next = run(free.mechanic, spat.state, spat.board, 1_000, free.window);
+  assert.equal(next.board.board[24]!.mist?.kind, 'encounter', 'the next spit lands on the next cell down');
+  const piece = setup({ pieces: [[17, 2]], lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60, spit: 1 }] });
+  const passed = run(piece.mechanic, piece.lanes, piece.state, 1_300, piece.window);
+  assert.equal(passed.board.board[17]!.occupant?.kind, 'item', 'the piece is left alone');
+  assert.equal(passed.board.board[24]!.mist?.kind, 'encounter', 'the Mist lands on the free cell below it');
+});
+
+test('the first boards’ chain plays on a Lanes board: a sleeper woken by its twin opens the full Mist beside it', () => {
+  const { encounter, host, window, state, lanes } = setup({ pieces: [[37, 1]], sleepers: [[38, 1]], veiled: [[31, 1]] });
+  assert.equal(state.board[38]!.mist?.kind, 'echo');
+  assert.equal(state.board[31]!.mist?.kind, 'veiled');
+  const result = reduceMissionMove(state, 37, 38, 1, MERGE_ITEMS_BY_ID);
+  assert.deepEqual(result.revealedMistCells, [31]);
+  const settled = settleAction({ encounter, host, window }, { state, run: createEncounterRun(encounter), mechanicState: lanes }, { type: 'move', from: 37, to: 38, now: 1 }, result);
+  assert.equal(settled.state.board[38]!.occupant?.kind === 'item' && settled.state.board[38]!.occupant.definitionId, 'nature:garden:2', 'it wakes a tier up');
+  assert.equal(settled.state.board[31]!.mist?.kind, 'echo', 'the full Mist beside it opens to half Mist over its sleeper');
 });

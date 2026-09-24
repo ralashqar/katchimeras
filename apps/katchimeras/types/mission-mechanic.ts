@@ -38,12 +38,18 @@ export type ColumnShotWisp = { id: string; column: number; row: number; hp: numb
  * down a row every `stepMs`. Every `dropEvery` steps it leaves Mist on the free cell it steps off (0: never). It
  * starts `startRow` rows over the board (default 2).
  */
-export type LaneWisp = { id: string; hp: number; column: number; at: number; stepMs: number; dropEvery?: number; startRow?: number; look?: string };
+export type LaneWisp = {
+  id: string; hp: number; column: number; at: number; stepMs: number; dropEvery?: number; startRow?: number; look?: string;
+  /** While still over the board, it spits Mist down its column every this many ms (absent: it never does). */
+  spitEvery?: number;
+};
+/** Mist a wisp spat down its column: at which cell, and when it lands (ms of level time). */
+export type LaneSpit = { id: number; wisp: number; cell: number; firedAt: number; landsAt: number };
 /**
  * A lane wisp as the level stands: its board row as it drifts (fractional; below 0 over the board; its cell is the
  * one its centre is in), damage taken, the level time it holds until (after reaching a piece), and cells entered.
  */
-export type LaneWispState = { row: number; damage: number; holdUntil: number; cells: number };
+export type LaneWispState = { row: number; damage: number; holdUntil: number; cells: number; /** When it spits Mist next (level time). */ spitAt?: number };
 /** Glow a piece fired up its column: from which cell, at which wisp (-1: nothing over it), for how much, and when it lands (ms of level time). */
 export type LaneShot = { id: number; fromCell: number; wisp: number; damage: number; firedAt: number; landsAt: number };
 
@@ -210,7 +216,7 @@ export type MissionMechanicState =
   | { kind: 'wisp-rush'; strikes: number; wisps: { id: string; hp: number; perch: number; damage: number; bornAt: number }[] }
   /** Damage on each wisp, how many actions have been spent, and the action each wisp was last struck on (-1: never). */
   /** Lanes: the level's clock (ms of play), every wisp as it stands, each piece's next shot time, the Glow in the air, and who got through. */
-  | { kind: 'lanes'; strikes: number; clock: number; wisps: LaneWispState[]; ready: Record<string, number>; shots: LaneShot[]; seq: number; breached: number | null }
+  | { kind: 'lanes'; strikes: number; clock: number; wisps: LaneWispState[]; ready: Record<string, number>; shots: LaneShot[]; seq: number; breached: number | null; /** Mist spat by wisps over the board, still falling. */ spits?: LaneSpit[] }
   | {
       kind: 'dark-wisps'; strikes: number; actions: number; damage: number[]; struckAt: number[];
       /** v2: turns until each wisp acts, where it is in its cycle, its ward, damage taken while gathering, and whether it was called in. */

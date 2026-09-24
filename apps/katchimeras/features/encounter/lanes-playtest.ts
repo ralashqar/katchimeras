@@ -92,13 +92,16 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
   const act = (from: SettleBefore): SettleBefore | null => {
     const cells = window.cellIndices;
     const rows = threats(from);
-    const pairs: { a: number; b: number; tier: number }[] = [];
+    const pairs: { a: number; b: number; tier: number; wake?: boolean }[] = [];
     for (const a of cells) {
       const pa = loose(from.state, a);
       if (!pa) continue;
       for (const b of cells) {
         const pb = a === b ? null : loose(from.state, b);
         if (pb && pb.definitionId === pa.definitionId && items.get(pa.definitionId)?.nextItemId) pairs.push({ a, b, tier: tierOf(pa.definitionId) + 1 });
+        // A sleeper under half Mist wakes when its twin is brought to it (and opens the full Mist beside it).
+        const sleeper = from.state.board[b]?.mist;
+        if (sleeper?.kind === 'echo' && sleeper.definitionId === pa.definitionId) pairs.push({ a, b, tier: tierOf(pa.definitionId) + 1, wake: true });
       }
     }
     const room = cells.filter((cell) => isFree(from.state, cell)).length;
@@ -110,7 +113,7 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
       const place = laneOf(window, pair.b)!;
       const row = rows[place.column];
       const under = row != null && place.row > row;
-      choices.push({ score: pair.tier * 10 + (under ? 30 + (5 - covered[place.column]! * 1_000) : 0) - (safe(from, pair.b) ? 0 : 100), run: () => move(from, pair.a, pair.b) });
+      choices.push({ score: pair.tier * 10 + (pair.wake ? 20 : 0) + (under ? 30 + (5 - covered[place.column]! * 1_000) : 0) - (safe(from, pair.b) ? 0 : 100), run: () => move(from, pair.a, pair.b) });
     }
     // The column most in danger that has the least cover: bring a firing piece from a column nobody is coming down.
     const danger = rows.map((row, column) => (row == null ? -1 : row + 3 - covered[column]! * 1_500)).map((score, column) => ({ score, column })).filter((entry) => entry.score >= 0).sort((x, y) => y.score - x.score)[0];

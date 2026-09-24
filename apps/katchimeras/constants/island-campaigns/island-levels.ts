@@ -47,7 +47,7 @@ export type IslandWispSpec = {
  * Lanes (`docs/encounter-lanes.md`): a wisp arriving over a board column (1-5) `at` seconds in, coming down a row every
  * `step` seconds, leaving Mist on the free cell it steps off every `drop` steps.
  */
-export type IslandLaneSpec = { id: string; column: number; at: number; hp: number; step: number; drop?: number; look?: string };
+export type IslandLaneSpec = { id: string; column: number; at: number; hp: number; step: number; drop?: number; look?: string; /** While over the board, it spits Mist down its column every this many seconds. */ spit?: number };
 
 export type IslandLevelSpec = {
   title: string;
@@ -79,6 +79,13 @@ export type IslandLevelSpec = {
   rest?: number;
   /** Pieces caught in the Mist at the start: [cell, tier] of the level's chain. A pulse frees them, or their twin merged in. */
   bound?: readonly (readonly [number, number])[];
+  /**
+   * The first boards' chain (the Mossprout and Steppling Mist boards): sleepers are pieces asleep under half Mist,
+   * [cell, tier]; bring their twin and they wake one tier up. Veiled cells hide a sleeper under full Mist, [cell, tier];
+   * it opens to half Mist when a sleeper beside it wakes. So each wake opens the next.
+   */
+  sleepers?: readonly (readonly [number, number])[];
+  veiled?: readonly (readonly [number, number])[];
   /** Board rows: a merge-tactics level plays on five (cells 43-47 under the usual four). */
   rows?: 4 | 5;
   chain?: string;
@@ -113,7 +120,7 @@ export function islandLevel(campaignId: string, key: string, spec: IslandLevelSp
   const rows = spec.rows ?? (tactics || lanes ? 5 : 4);
   const WINDOW = rows === 5 ? WINDOW_5 : WINDOW_4;
   const tier = (value: number, water?: 'water') => `${water ? WATER_CHAIN : chain}:${value}`;
-  for (const [cell] of spec.pieces) if (!WINDOW.has(cell)) throw new Error(`${campaignId}:${key}: piece outside the board at ${cell}`);
+  for (const [cell] of [...spec.pieces, ...(spec.sleepers ?? []), ...(spec.veiled ?? [])]) if (!WINDOW.has(cell)) throw new Error(`${campaignId}:${key}: piece outside the board at ${cell}`);
   for (const wisp of spec.wisps) if (wisp.sky == null && !WINDOW.has(wisp.cell)) throw new Error(`${campaignId}:${key}: wisp ${wisp.id} nests outside the board at ${wisp.cell}`);
   const wisps: DarkWisp[] = spec.wisps.map((wisp) => ({
     id: wisp.id, hp: wisp.hp, placement: wisp.sky != null ? { kind: 'sky' as const, column: wisp.sky, size: wisp.size ?? 0.2 } : nestPlacement(wisp.cell, wisp.size ?? 0.9),
@@ -125,7 +132,7 @@ export function islandLevel(campaignId: string, key: string, spec: IslandLevelSp
   const id = `${campaignId}:${key}`;
   // Each shown wisp's nest ringed with Mist on the cells nothing else uses.
   const ringType = spec.ring ?? (tactics || lanes ? false : RING_BY_DIFFICULTY[spec.difficulty]);
-  const used = new Set<number>([...spec.pieces.map(([cell]) => cell), ...spec.mist.map((mist) => mist.cell), ...(spec.bound ?? []).map(([cell]) => cell), spec.pod.cell, ...(spec.spring ? [spec.spring.cell] : []), ...spec.wisps.filter((wisp) => !wisp.hidden && wisp.sky == null).map((wisp) => wisp.cell)]);
+  const used = new Set<number>([...spec.pieces.map(([cell]) => cell), ...spec.mist.map((mist) => mist.cell), ...(spec.bound ?? []).map(([cell]) => cell), ...(spec.sleepers ?? []).map(([cell]) => cell), ...(spec.veiled ?? []).map(([cell]) => cell), spec.pod.cell, ...(spec.spring ? [spec.spring.cell] : []), ...spec.wisps.filter((wisp) => !wisp.hidden && wisp.sky == null).map((wisp) => wisp.cell)]);
   const ring: EncounterMistCell[] = [];
   if (ringType) {
     for (const wisp of spec.wisps) {
@@ -141,17 +148,21 @@ export function islandLevel(campaignId: string, key: string, spec: IslandLevelSp
   const mist = [...spec.mist, ...bound, ...ring];
   const encounter: EncounterDefinition = {
     id,
-    storageKey: `katchimeras.encounter.${campaignId.replace(/:/g, '.')}.${key}.${lanes ? 'lanes2' : tactics ? 'v6' : 'v5'}`,
+    storageKey: `katchimeras.encounter.${campaignId.replace(/:/g, '.')}.${key}.${lanes ? 'lanes3' : tactics ? 'v6' : 'v5'}`,
     rows,
     difficulty: spec.difficulty,
-    seed: { items: spec.pieces.map(([cell, value, water]) => ({ cell, definitionId: tier(value, water) })), echoes: [], veiled: [] },
+    seed: {
+      items: spec.pieces.map(([cell, value, water]) => ({ cell, definitionId: tier(value, water) })),
+      echoes: (spec.sleepers ?? []).map(([cell, value], index) => ({ cell, id: `${id}:sleeper-${index + 1}`, definitionId: tier(value) })),
+      veiled: (spec.veiled ?? []).map(([cell, value], index) => ({ cell, id: `${id}:veiled-${index + 1}`, definitionId: tier(value) })),
+    },
     mist: spec.spring?.under ? [...mist, { cell: spec.spring.cell, type: spec.spring.under, holds: { kind: 'spawner', spawnerId: 'spring' } }] : mist,
     spawners: [
       { id: 'pod', generatorId: 'wild-garden', cell: spec.pod.cell, charges: spec.pod.charges, drops: [tier(1)], recharge: { kind: 'merges', every: spec.pod.every, amount: 1 } },
       ...(spec.spring ? [{ id: 'spring', generatorId: 'mist-spring', cell: spec.spring.cell, charges: spec.spring.charges, drops: [`${WATER_CHAIN}:1`], recharge: { kind: 'merges' as const, every: spec.spring.every, amount: 1 }, ...(spec.spring.under ? { hidden: true } : {}) }] : []),
     ],
     mechanic: lanes
-      ? { kind: 'lanes', wisps: lanes.map((lane) => ({ id: lane.id, hp: lane.hp, column: lane.column - 1, at: Math.round(lane.at * 1_000), stepMs: Math.round(lane.step * 1_000), ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}) })) }
+      ? { kind: 'lanes', wisps: lanes.map((lane) => ({ id: lane.id, hp: lane.hp, column: lane.column - 1, at: Math.round(lane.at * 1_000), stepMs: Math.round(lane.step * 1_000), ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}), ...(lane.spit ? { spitEvery: Math.round(lane.spit * 1_000) } : {}) })) }
       : { kind: 'dark-wisps', wisps, damageByTier: [1, 1, 2, 3], targeting: 'adjacent', ...(tactics ? { mode: 'tactics' as const } : { rest: spec.rest ?? REST_BY_DIFFICULTY[spec.difficulty] }) },
     required: lanes ? lanes.reduce((sum, lane) => sum + lane.hp, 0) : wisps.filter((wisp) => !wisp.hidden).reduce((sum, wisp) => sum + wisp.hp, 0),
     wisps: [],
@@ -193,13 +204,19 @@ function stream(prefix: string, columns: readonly number[], first: number, every
   return columns.map((column, index) => ({ id: `${prefix}${index + 1}`, column, at: first + index * every, hp: column === 3 ? Math.max(3, Math.round(hp * 0.7)) : hp, step, ...(drop ? { drop } : {}) }));
 }
 
+/** Lanes: these wisps spit Mist down their column every `seconds` while they are still over the board. */
+const spitting = (lanes: readonly IslandLaneSpec[], seconds: number): IslandLaneSpec[] => lanes.map((lane) => ({ ...lane, spit: seconds }));
+
 /**
  * Lift the Mist: every friend's first level, and the first Lanes board anyone plays (`docs/encounter-lanes.md`).
  * Three wisps, one at a time, down the middle and either side.
  */
 export const MIST_LEVEL_SPEC: IslandLevelSpec = {
-  title: 'Lift the Mist', objective: 'Wisps are coming down. Merge Seeds into Sprouts under them: every piece shoots Glow up its column.', difficulty: 'calm',
-  pieces: SEEDS, mist: [light(23), light(25)], pod: POD, wisps: [],
+  title: 'Lift the Mist', objective: 'Wisps are coming down. Wake what sleeps under the Mist and merge Sprouts under the wisps: every piece shoots Glow up its column.', difficulty: 'calm',
+  // The first boards' chain: bring a Seed to the sleeper in the middle; it wakes as a Sprout and opens the Mist above it.
+  pieces: [[36, 1], [37, 1], [39, 1], [40, 1], [44, 1], [46, 1]], sleepers: [[38, 1]],
+  veiled: [[31, 1], [30, 1], [32, 1], [24, 2], [23, 1], [25, 1], [29, 2], [33, 2], [17, 2]],
+  mist: [], pod: POD, wisps: [],
   lanes: stream('wisp', [3, 2, 4], 2, 9, 5, 4),
 };
 
@@ -208,53 +225,63 @@ export const PETALIMP_LEVEL_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Islan
   1: [
     {
       title: 'Seeds Under the Mist', objective: 'They come down every column now. Move your pieces under them: a piece only shoots up its own column.', difficulty: 'calm',
-      pieces: SEEDS, mist: [light(22), light(26)], pod: POD, wisps: [],
+      // Two sleepers, and the Mist over them opens outward from each.
+      pieces: [[36, 1], [38, 1], [40, 1], [43, 1], [44, 1], [46, 1], [47, 1]], sleepers: [[37, 1], [39, 1]],
+      veiled: [[30, 1], [32, 1], [29, 1], [33, 1], [31, 2], [23, 2], [25, 2], [22, 1], [26, 1]],
+      mist: [], pod: POD, wisps: [],
       lanes: stream('wisp', [2, 4, 3, 1, 5], 2, 9, 4, 5, 3),
     },
     {
-      title: 'The First Bed', objective: 'Bigger pieces shoot harder and faster. A wisp that reaches a piece hides it in Mist: merge beside it to free it.', difficulty: 'calm',
-      pieces: [[36, 2], [40, 2], [37, 1], [39, 1], [44, 1], [46, 1]], mist: [light(23), light(25)], pod: POD, wisps: [],
-      lanes: stream('wisp', [1, 3, 5, 2, 4, 3], 2, 7, 6, 4.2, 2),
+      title: 'The First Bed', objective: 'Bigger pieces shoot harder and faster. Now the wisps spit Mist down while they are still high: keep merging beside it.', difficulty: 'calm',
+      pieces: [[36, 2], [40, 2], [37, 1], [39, 1], [44, 1], [46, 1]], sleepers: [[38, 1]],
+      veiled: [[31, 2], [30, 1], [32, 1], [29, 2], [33, 2], [24, 1], [23, 2], [25, 2]],
+      mist: [], pod: POD, wisps: [],
+      // The chain climbs the middle column, so the wisps come down either side of it.
+      lanes: spitting(stream('wisp', [1, 4, 5, 2, 4, 2], 2, 7, 6, 4.2, 2), 9),
     },
   ],
   2: [
     {
       title: 'Colour in the Rows', objective: 'They come faster now, and leave Mist behind them. Keep a strong piece under each one.', difficulty: 'thick',
-      pieces: SEEDS, mist: [light(22), dense(24), light(26)], pod: POD, wisps: [],
-      lanes: [...stream('wisp', [2, 4, 3, 1, 5], 2, 6.5, 8, 4, 2), { id: 'last', column: 3, at: 34, hp: 7, step: 3.8, drop: 2 }],
+      pieces: [[36, 1], [37, 1], [38, 1], [39, 1], [44, 1], [46, 1]], sleepers: [[31, 1]],
+      veiled: [[24, 2], [30, 1], [32, 1], [23, 1], [25, 1], [29, 2], [33, 2]],
+      mist: [], pod: POD, wisps: [],
+      lanes: spitting([...stream('wisp', [2, 4, 3, 1, 5], 2, 6.5, 8, 4, 2), { id: 'last', column: 3, at: 34, hp: 7, step: 3.8, drop: 2 }], 6),
     },
     {
       title: 'Pollinators', objective: 'A big one comes down among the rest. Merge big where it matters most.', difficulty: 'thick',
-      pieces: [[36, 1], [37, 1], [38, 2], [39, 1], [44, 1], [46, 1]], mist: [light(22), light(26)], pod: POD, wisps: [],
-      lanes: [...stream('wisp', [1, 5, 2, 4, 1, 5], 2, 7, 7, 3.8, 2), { id: 'big', column: 2, at: 16, hp: 12, step: 4.5, drop: 2, look: 'warden' }],
+      pieces: [[36, 1], [38, 2], [40, 1], [43, 1], [44, 1], [46, 1]], sleepers: [[37, 1], [39, 1]],
+      veiled: [[30, 1], [32, 1], [29, 2], [33, 2], [31, 2], [22, 1], [26, 1]],
+      mist: [], pod: POD, wisps: [],
+      lanes: spitting([...stream('wisp', [1, 5, 2, 4, 1, 5], 2, 7, 7, 3.8, 2), { id: 'big', column: 2, at: 16, hp: 12, step: 4.5, drop: 2, look: 'warden' }], 6),
     },
   ],
   3: [
     {
       title: 'The Trellis', objective: 'These drop Mist on every cell they pass. Merge beside the Mist to clear it, and keep room to merge.', difficulty: 'thick',
       pieces: SEEDS, mist: [light(22), dense(24), light(26), light(30), light(32)], pod: POD, wisps: [],
-      lanes: stream('wisp', [2, 4, 1, 5, 3, 2], 2, 6, 9, 3.8, 1),
+      lanes: spitting(stream('wisp', [2, 4, 1, 5, 3, 2], 2, 6, 9, 3.8, 1), 6),
     },
     {
       title: 'They Came Back at Night', objective: 'Quick ones, one after another, down every column. Keep every column covered.', difficulty: 'dark',
       pieces: [[36, 2], [37, 1], [38, 2], [39, 1], [44, 1], [46, 1]], mist: [light(22), light(26)], pod: POD, wisps: [],
-      lanes: stream('wisp', [1, 5, 3, 2, 4, 1, 5], 2, 5.5, 6, 3.3, 2),
+      lanes: spitting(stream('wisp', [1, 5, 3, 2, 4, 1, 5], 2, 5.5, 6, 3.3, 2), 8),
     },
   ],
   4: [
     {
       title: 'The Long Border', objective: 'Two slow, tough ones hold the middle while fast ones run the edges. Split your pieces.', difficulty: 'dark',
       pieces: [[36, 2], [37, 1], [38, 1], [39, 1], [40, 2], [44, 1]], mist: [light(23), light(25)], pod: POD, wisps: [],
-      lanes: [
+      lanes: spitting([
         { id: 'wall-left', column: 2, at: 2, hp: 14, step: 5, drop: 2, look: 'warden' },
         { id: 'wall-right', column: 4, at: 8, hp: 14, step: 5, drop: 2, look: 'warden' },
         ...stream('fast', [1, 5, 3, 1, 5], 14, 6, 4, 3),
-      ],
+      ], 6),
     },
     {
       title: 'The Colour Thief', objective: 'It took the colour first. It comes down the middle, slow and strong, dropping Mist all the way, and it does not come alone.', difficulty: 'boss',
       pieces: [[36, 1], [37, 1], [38, 2], [39, 1], [40, 1], [44, 1]], mist: [light(22), dense(24), light(26)], pod: POD, wisps: [],
-      lanes: [{ id: 'thief', column: 3, at: 3, hp: 24, step: 6, drop: 1, look: 'thief' }, ...stream('escort', [1, 5, 2, 4, 1, 5], 8, 8, 7, 3.5, 2)],
+      lanes: spitting([{ id: 'thief', column: 3, at: 3, hp: 24, step: 6, drop: 1, look: 'thief' }, ...stream('escort', [1, 5, 2, 4, 1, 5], 8, 8, 7, 3.5, 2)], 5),
       rewards: { glow: 50, xp: 30 },
     },
   ],
