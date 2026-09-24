@@ -30,6 +30,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { MergeBoardEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
 import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightning, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
+import { RECOIL_SQUASH_MS, spriteRecoil } from '@/components/katchadeck/games/sprite-recoil';
 import { canReuseSpawnSprites, createMergeBoardEffects, type MergeBoardEffectKind } from '@/utils/merge-world/board-effects';
 import { mergeWorldGeneratorArt, mergeWorldItemArt, mossproutRootRewardArt, RESIDENT_CARD_ART } from '@/constants/merge-world-art';
 import { MERGE_CHARACTER_NAMES, MERGE_GENERATORS_BY_ID, MERGE_HYBRID_RECIPES, MERGE_ITEMS_BY_ID, MERGE_WORLD_COLUMNS, MERGE_WORLD_ROWS, MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
@@ -1721,6 +1722,18 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   const matchHintOffsetX = matchHint?.x ?? 0;
   const matchHintOffsetY = matchHint?.y ?? 0;
   const artBaseSize = occupant.kind === 'generator' ? cellSize : cellSize - 4;
+  // Lanes: when this piece shoots, it squashes down and fattens, then stretches up as the shot leaves its mouth, and
+  // springs back (`spriteRecoil`). Anchored at its soil, so it never lifts off the cell.
+  const recoil = useSharedValue(0);
+  useEffect(() => spriteRecoil.subscribe(instanceId, () => {
+    if (reduceMotion) return;
+    cancelAnimation(recoil);
+    recoil.value = withSequence(
+      withTiming(1, { duration: RECOIL_SQUASH_MS, easing: Easing.out(Easing.quad) }),
+      withTiming(-1, { duration: 90, easing: Easing.out(Easing.quad) }),
+      withSpring(0, { damping: 9, stiffness: 260, mass: 0.5 }),
+    );
+  }), [instanceId, recoil, reduceMotion]);
 
   useEffect(() => {
     if (entranceDelay == null) return;
@@ -1901,9 +1914,21 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   }, [animating, authoredFrame, cellSize, entranceProgress, matchHintProgress, progress, projection, projectionGridHeight, projectionInset, scale, targetY, y]);
 
   const nativeArtSize = artBaseSize * MERGE_SPRITE_SURFACE_SCALE;
-  const artLayoutStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: visualScale.value / MERGE_SPRITE_SURFACE_SCALE }],
-  }));
+  const artLayoutStyle = useAnimatedStyle(() => {
+    const squash = Math.max(0, recoil.value);
+    const stretch = Math.max(0, -recoil.value);
+    const scaleX = 1 + squash * 0.16 - stretch * 0.08;
+    const scaleY = 1 - squash * 0.2 + stretch * 0.14;
+    return {
+      transform: [
+        // Kept on its soil: the art's foot stays put as it squashes and stretches.
+        { translateY: (1 - scaleY) * cellSize * 0.42 },
+        { scale: visualScale.value / MERGE_SPRITE_SURFACE_SCALE },
+        { scaleX },
+        { scaleY },
+      ],
+    };
+  });
 
   // Reanimated captures dependencies even in untaken branches. Keep the global
   // drag subscription in this cheap selector: unchanged null does not notify

@@ -45,7 +45,7 @@ const BAR_FILL_COLOR = '#6A46C9';
 const BAR_TRACK_COLOR = 'rgba(84,66,128,0.24)';
 
 export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint; art?: ArtSource; size?: number; count?: number; group?: number; key?: number; /** A Merge vs Mist Glow shot: always bursts where it lands, as a strike. */ shot?: boolean;
-  /** Lanes: a bolt straight up its column, flown for exactly this long (the level lands its damage on the same clock). */ direct?: number };
+  /** Lanes: a bolt straight up its column, flown for exactly this long (the level lands its damage on the same clock), after `delay` ms. */ direct?: number; delay?: number };
 /** One Glow shot of a merge's volley (Merge vs Mist), in window space. */
 export type GlowVolleyShot = { from: RewardFlightPoint; to: RewardFlightPoint };
 
@@ -489,12 +489,12 @@ const GlowBolt = memo(function GlowBolt({ flight, origin, onArrive }: { flight: 
   onArriveRef.current = onArrive;
   const land = useCallback((id: number) => onArriveRef.current(id), []);
   useEffect(() => {
-    progress.value = withTiming(1, { duration: flight.direct ?? 300, easing: flight.key == null ? Easing.out(Easing.quad) : Easing.in(Easing.quad) }, (finished) => { if (finished) runOnJS(land)(flight.id); });
+    progress.value = withDelay(flight.delay ?? 0, withTiming(1, { duration: flight.direct ?? 300, easing: flight.key == null ? Easing.out(Easing.quad) : Easing.in(Easing.quad) }, (finished) => { if (finished) runOnJS(land)(flight.id); }));
     return () => cancelAnimation(progress);
   // Once per bolt.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flight.id]);
-  const size = GLOW_SIZE * 0.8;
+  const size = flight.size ?? GLOW_SIZE * 0.8;
   const fromX = flight.from.x - origin.x;
   const fromY = flight.from.y - origin.y;
   const toX = flight.to.x - origin.x;
@@ -504,10 +504,10 @@ const GlowBolt = memo(function GlowBolt({ flight, origin, onArrive }: { flight: 
     const p = progress.value;
     // A miss thins out over the last third of its climb: it hit nothing and is gone.
     const fade = miss && p > 0.66 ? Math.max(0, 1 - (p - 0.66) / 0.34) : 1;
-    return { opacity: (p < 0.04 ? p / 0.04 : 1) * fade, transform: [{ translateX: fromX + (toX - fromX) * p - size / 2 }, { translateY: fromY + (toY - fromY) * p - size / 2 }, { scale: 0.75 + p * 0.35 }] };
+    return { opacity: (p <= 0 ? 0 : p < 0.04 ? p / 0.04 : 1) * fade, transform: [{ translateX: fromX + (toX - fromX) * p - size / 2 }, { translateY: fromY + (toY - fromY) * p - size / 2 }, { scale: 0.75 + p * 0.35 }] };
   });
   return <Animated.View pointerEvents="none" style={[styles.token, { width: size, height: size }, style]}>
-    <GlowTokenArt size={size} />
+    <GlowTokenArt art={flight.art} size={size} />
   </Animated.View>;
 });
 
@@ -781,7 +781,7 @@ export type OpeningGlowStore = GlowLandingSource & {
   /** Merge vs Mist: one Glow token per shot, each flying at its own Mist cell; `onLand` hears each landing by the shot's index. */
   launchVolley: (shots: readonly GlowVolleyShot[], onLand: (index: number) => void) => void;
   /** Lanes: one Glow token per shot, straight from its piece at the wisp it is aimed at (or, with none, to `to`, fading), flown for `durationMs`. */
-  launchBolts: (bolts: readonly { from: RewardFlightPoint; wisp: number; to?: RewardFlightPoint; durationMs: number }[]) => void;
+  launchBolts: (bolts: readonly { from: RewardFlightPoint; wisp: number; to?: RewardFlightPoint; durationMs: number; delayMs?: number; art?: ArtSource; size?: number }[]) => void;
   /** The final merge's item, large and alone, straight up into the mist. */
   launchFinale: (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null) => number;
   arrive: (id: number) => void;
@@ -921,14 +921,14 @@ function createOpeningGlowStore(): OpeningGlowStore {
     });
     setFlights((current) => [...current, ...made]);
   };
-  const launchBolts = (bolts: readonly { from: RewardFlightPoint; wisp: number; to?: RewardFlightPoint; durationMs: number }[]) => {
+  const launchBolts = (bolts: readonly { from: RewardFlightPoint; wisp: number; to?: RewardFlightPoint; durationMs: number; delayMs?: number; art?: ArtSource; size?: number }[]) => {
     const made: OpeningGlowFlight[] = [];
     for (const bolt of bolts) {
       const aimed = bolt.wisp >= 0 ? sinkRef.current?.pointOf?.(bolt.wisp) ?? null : null;
       const to = aimed ?? bolt.to;
       if (!to) continue;
       // Each its own group: a bolt at a wisp flinches it and bursts where it lands; a miss fades out on its way up.
-      made.push({ id: ++nextId.current, index: 0, count: 1, from: bolt.from, to, group: ++groupSeq.current, ...(aimed ? { key: bolt.wisp } : {}), direct: Math.max(80, bolt.durationMs) });
+      made.push({ id: ++nextId.current, index: 0, count: 1, from: bolt.from, to, group: ++groupSeq.current, ...(aimed ? { key: bolt.wisp } : {}), direct: Math.max(80, bolt.durationMs), ...(bolt.delayMs ? { delay: bolt.delayMs } : {}), ...(bolt.art ? { art: bolt.art } : {}), ...(bolt.size ? { size: bolt.size } : {}) });
     }
     if (made.length) setFlights((current) => [...current, ...made]);
   };

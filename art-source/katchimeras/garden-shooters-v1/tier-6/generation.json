@@ -1,0 +1,8 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "matte": "BiRefNet_lite",
+  "prompt": "Use the FIRST image only for its art style, scale, lighting and camera: the same chunky, soft, glossy clay-toy 3D merge item for a cozy merge game, the same three-quarter top-down view, the same round brown soil mound base with a couple of small grey pebbles, warm soft lighting, rounded forms, simple readable shapes. Use the SECOND image, a sheet of nine plant designs, only for the design idea named below. Draw ONE plant that plainly shoots: its mouth is a clearly open round hole at the very top, facing up, dark inside, like a little cannon, so it reads at a glance as a plant that fires things upward. Centred and large, the whole object inside the canvas with clear padding. Perfectly flat uniform light grey #D9D9D9 background for background removal. No floor, no cast shadow, no second object, no projectile, no text, no letters, no border, no UI, no watermark. The design: the MIDDLE-RIGHT design: a magical violet plant with three tube mouths, a tall one in the middle and a shorter one either side, all open at the top, on broad green leaves.",
+  "sourceSha256": "32772ffcda1ccd78db7c6597a38c32f7f47799390b889fd42972c2e904745866",
+  "referenceSha256": "9aac6071baa7756a8e50ba3099bc4ccbc89c64c68763063a80acf8e03414db33",
+  "guideSha256": "1a001e3ff80230f8c50a42a631cdece584ebae6048b8ade1c792b2039d42aa15"
+}

@@ -1,0 +1,7 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "matte": "BiRefNet_lite",
+  "prompt": "Use the FIRST image only for its art style and lighting (the chunky, soft, glossy clay-toy 3D style of a cozy merge game). Draw ONE small round Glow seed, a projectile: a perfect sphere of warm golden-cream light, glossy, with a bright soft white highlight near the top and a gentle inner glow, the edge crisp and round. Nothing else: no soil, no leaves, no stem. Centred, filling most of the canvas with clear padding. Perfectly flat uniform light grey #D9D9D9 background for background removal. No floor, no cast shadow, no text, no border, no watermark.",
+  "sourceSha256": "12f38565a8dcba2556fc1d3fbc7152938d2b40109ac784e82fddc115dfb35fb3",
+  "referenceSha256": "40fd3cdbe5f690e07a82fcc1c5adcac54531831ee445e924d54af21026eebe76"
+}

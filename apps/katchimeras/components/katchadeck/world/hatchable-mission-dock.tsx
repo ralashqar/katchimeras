@@ -37,6 +37,11 @@ import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightning, type MistBolt }
 import { MistMissionDock, type GlowLandingSource, type OpeningGlowStore } from './kingdom-opening-merge-dock';
 import { laneWispPoint } from './corruption-wisp-layer';
 import { LANE_MISS_ROW, laneOf } from '@/features/mission-mechanics/lanes';
+import { RECOIL_SQUASH_MS, spriteRecoil } from '@/components/katchadeck/games/sprite-recoil';
+
+/** Lanes: the round Glow seed a shooter plant fires, and where its mouth is (a fraction down its cell). */
+const GLOW_SEED_BULLET = require('@incubator/art-merge-world/items/glow-seed-bullet.webp');
+const LANE_MOUTH_Y = 0.24;
 
 type HatchableMissionDockProps = {
   /** Whose mission: the board's seed, bar, guidance and mechanic come from the definition (a friend's, or a journey tile's without a camera). */
@@ -301,12 +306,22 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
       }
       if (!result?.fired.length || !metrics || !landings?.launchBolts) return;
       const window = aimWindowRef.current;
+      const board = stateRef.current.board;
       landings.launchBolts(result.fired.map((shot) => {
-        const center = mergeCellCenter(metrics.geometry, shot.fromCell);
+        const frame = mergeCellFrame(metrics.geometry, shot.fromCell).bounds;
         const lane = window ? laneOf(window, shot.fromCell) : null;
         // A miss climbs its column past the top of the board.
         const to = lane && window ? laneWispPoint(metrics, window, lane.column, -LANE_MISS_ROW) : undefined;
-        return { from: { x: metrics.x + center.x, y: metrics.y + center.y }, wisp: shot.wisp, ...(to ? { to } : {}), durationMs: shot.landsAt - shot.firedAt };
+        // The plant squashes, then stretches as the Glow seed leaves its mouth; the seed still lands on the level's
+        // clock, so its flight is that much shorter.
+        const shooter = board[shot.fromCell]?.occupant;
+        if (shooter?.kind === 'item') spriteRecoil.emit(shooter.instanceId);
+        const flight = shot.landsAt - shot.firedAt;
+        return {
+          from: { x: metrics.x + frame.left + frame.width / 2, y: metrics.y + frame.top + frame.height * LANE_MOUTH_Y },
+          wisp: shot.wisp, ...(to ? { to } : {}), delayMs: RECOIL_SQUASH_MS, durationMs: Math.max(80, flight - RECOIL_SQUASH_MS),
+          art: GLOW_SEED_BULLET, size: Math.max(14, frame.width * 0.34),
+        };
       }));
     }, LANE_TICK_MS);
     return () => clearInterval(timer);

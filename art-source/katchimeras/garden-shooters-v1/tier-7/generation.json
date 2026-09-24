@@ -1,0 +1,8 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "matte": "BiRefNet_lite",
+  "prompt": "Use the FIRST image only for its art style, scale, lighting and camera: the same chunky, soft, glossy clay-toy 3D merge item for a cozy merge game, the same three-quarter top-down view, the same round brown soil mound base with a couple of small grey pebbles, warm soft lighting, rounded forms, simple readable shapes. Use the SECOND image, a sheet of nine plant designs, only for the design idea named below. Draw ONE plant that plainly shoots: its mouth is a clearly open round hole at the very top, facing up, dark inside, like a little cannon, so it reads at a glance as a plant that fires things upward. Centred and large, the whole object inside the canvas with clear padding. Perfectly flat uniform light grey #D9D9D9 background for background removal. No floor, no cast shadow, no second object, no projectile, no text, no letters, no border, no UI, no watermark. The design: the BOTTOM-RIGHT design made into an ANCIENT TREE: a short stout gnarled mossy tree trunk whose top opens into a wide hollow mouth, crowned with glowing crystal-blue and violet crystal petals like the crystal lotus, a small glowing violet pearl of light deep in the mouth. The grandest of all.",
+  "sourceSha256": "bbad1e671ae20ea04aee650c62c4dcae5a049b060fe7d46c2dd16f7b68a2f820",
+  "referenceSha256": "4dfde421544b1d6386d6fd61bcee934855097d77dc0b2598e9af3ee8541ab014",
+  "guideSha256": "1a001e3ff80230f8c50a42a631cdece584ebae6048b8ade1c792b2039d42aa15"
+}
