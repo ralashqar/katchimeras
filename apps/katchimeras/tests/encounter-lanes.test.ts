@@ -44,11 +44,12 @@ const run = (mechanic: LanesMechanic, lanes: LanesState, board: MergeWorldState,
 
 test('a wisp arrives high over its column and drifts down a row every beat; past the bottom row it gets through and the level is lost', () => {
   const { encounter, host, mechanic, window, state, lanes } = setup();
-  const early = run(mechanic, lanes, state, 900, window);
+  // The sky starts empty, so it is brought in half a second from the start (it was authored for 1 s).
+  const early = run(mechanic, lanes, state, 400, window);
   assert.equal(early.state.wisps[0]!.row, -4, 'waiting four rows over the board until it arrives');
-  const later = run(mechanic, lanes, state, 6_000, window);
+  const later = run(mechanic, lanes, state, 5_500, window);
   assert.ok(Math.abs(later.state.wisps[0]!.row - -3) < 0.05, `one row down one beat after it arrived (${later.state.wisps[0]!.row})`);
-  const half = run(mechanic, lanes, state, 3_500, window);
+  const half = run(mechanic, lanes, state, 3_000, window);
   assert.ok(half.state.wisps[0]!.row > -3.6 && half.state.wisps[0]!.row < -3.4, 'it drifts, it does not jump');
   // From four rows up, a row every 5 s: its centre leaves the bottom row 8.5 rows later.
   const through = run(mechanic, lanes, state, 50_000, window);
@@ -152,4 +153,13 @@ test('the first boards’ chain plays on a Lanes board: a sleeper woken by its t
   const settled = settleAction({ encounter, host, window }, { state, run: createEncounterRun(encounter), mechanicState: lanes }, { type: 'move', from: 37, to: 38, now: 1 }, result);
   assert.equal(settled.state.board[38]!.occupant?.kind === 'item' && settled.state.board[38]!.occupant.definitionId, 'nature:garden:2', 'it wakes a tier up');
   assert.equal(settled.state.board[31]!.mist?.kind, 'echo', 'the full Mist beside it opens to half Mist over its sleeper');
+});
+
+test('an empty sky never waits: with no wisp standing, the next arrives at once and every later one as much sooner', () => {
+  const { mechanic, window, state, lanes } = setup({ pieces: [[38, 4]], lanes: [{ id: 'a', column: 3, at: 0, hp: 1, step: 5 }, { id: 'b', column: 3, at: 30, hp: 50, step: 5 }, { id: 'c', column: 2, at: 40, hp: 50, step: 5 }] });
+  const played = run(mechanic, lanes, state, 6_000, window);
+  assert.ok(played.state.wisps[0]!.damage >= 1, 'the first falls to the Flower under it');
+  assert.ok((played.state.advance ?? 0) > 20_000, 'the rest were brought forward');
+  assert.ok(played.state.clock >= 30_000 - (played.state.advance ?? 0), 'the second has arrived well before 30 s');
+  assert.equal(40_000 - (played.state.advance ?? 0) - (30_000 - (played.state.advance ?? 0)), 10_000, 'the spacing after it is kept');
 });

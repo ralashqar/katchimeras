@@ -334,10 +334,16 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
 /** Window-space, above the map and under the Glow flights: the wisps themselves. */
 export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, screenRef }: { wisps: CorruptionWisps; screenRef: RefObject<ViewType | null> }) {
   const [origin, setOrigin] = useState<RewardFlightPoint>({ x: 0, y: 0 });
-  useEffect(() => {
-    screenRef.current?.measureInWindow((x, y) => setOrigin({ x, y }));
-  }, [screenRef, wisps.layout]);
   const layout = wisps.layout;
+  // Measured again only when the frame the wisps are laid out in moves, not on every place update (a drifting Lanes
+  // wisp updates several times a second), and a measurement that has not changed does not render the layer again.
+  const frameX = layout?.frame.x ?? 0;
+  const frameY = layout?.frame.y ?? 0;
+  const frameWidth = layout?.frame.width ?? 0;
+  const frameHeight = layout?.frame.height ?? 0;
+  useEffect(() => {
+    screenRef.current?.measureInWindow((x, y) => setOrigin((current) => (current.x === x && current.y === y ? current : { x, y })));
+  }, [frameHeight, frameWidth, frameX, frameY, screenRef]);
   // Territory: the wisp a held piece would strike where it is over, rung while it is held.
   const aim = usePulseAim();
   const aimedIndex = aim && wisps.aimTarget ? wisps.aimTarget(aim.cell, aim.tier) : null;

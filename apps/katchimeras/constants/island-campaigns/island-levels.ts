@@ -204,6 +204,24 @@ function stream(prefix: string, columns: readonly number[], first: number, every
   return columns.map((column, index) => ({ id: `${prefix}${index + 1}`, column, at: first + index * every, hp: column === 3 ? Math.max(3, Math.round(hp * 0.7)) : hp, step, ...(drop ? { drop } : {}) }));
 }
 
+/**
+ * Lanes: a level as waves that build. Wave i (from 0) arrives `first + i * gap` seconds in, its wisps down the columns
+ * it lists (1-5) a moment apart, each `grow` hit points tougher than the wave before: the first waves are single wisps
+ * while the board is still Seeds, the later ones come two and three at once down different columns, when the player
+ * has plants to cover them. A wave cleared early brings the next straight in (`LANE_REFILL_MS`).
+ */
+function waves(prefix: string, input: { first: number; gap: number; hp: number; step: number; grow?: number; drop?: number; spit?: number }, list: readonly (readonly number[])[]): IslandLaneSpec[] {
+  return list.flatMap((columns, wave) => columns.map((column, index): IslandLaneSpec => {
+    const hp = input.hp + (input.grow ?? 0) * wave;
+    return {
+      id: `${prefix}${wave + 1}-${index + 1}`, column, at: input.first + wave * input.gap + index * 0.6,
+      // The middle column has the Pod in its bottom cell, one row less to defend from: its wisps are a little weaker.
+      hp: column === 3 ? Math.max(3, Math.round(hp * 0.7)) : hp, step: input.step,
+      ...(input.drop ? { drop: input.drop } : {}), ...(input.spit ? { spit: input.spit } : {}),
+    };
+  }));
+}
+
 /** Lanes: these wisps spit Mist down their column every `seconds` while they are still over the board. */
 const spitting = (lanes: readonly IslandLaneSpec[], seconds: number): IslandLaneSpec[] => lanes.map((lane) => ({ ...lane, spit: seconds }));
 

@@ -29,6 +29,8 @@ import { useMissionBoard, type MissionCommandResult } from './use-opening-missio
 
 /** After a finale lands: the struck wisp's fall (shrink, burst) before the mission is declared over. */
 export const WISP_FALL_MS = 640;
+/** Lanes: plain drifting reaches the wisp layer at most this often (hits and falls go at once). */
+const LANE_DRIFT_PUBLISH_MS = 200;
 /** A docked board with no state for this long is a save that could not be read: offer a fresh one. */
 const STALLED_MS = 3000;
 /** A stuck encounter opens its cache after this beat, so the player sees the board is spent first. */
@@ -195,14 +197,19 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
   // Lanes move on their own clock between commits: the ref is the newest state, not the last one rendered.
   liveRef.current = store.mechanicState?.kind === 'lanes' ? store.mechanicStateRef.current ?? store.mechanicState : store.mechanicState;
   useEffect(() => { for (const listener of [...liveListeners.current]) listener(); }, [store.mechanicState]);
-  // Lanes: every tick in which a wisp drifted reaches the wisp layer alone; the screen re-renders only on a commit.
+  // Lanes: what the wisps do between commits reaches the wisp layer alone; the screen re-renders only on a commit.
+  // A hit, a fall or a board change goes at once; plain drifting at most every LANE_DRIFT_PUBLISH_MS (each wisp
+  // glides on its own between updates, aiming ahead at its own speed, so fewer updates look the same).
   const storeTick = store.tick;
+  const lastDriftRef = useRef(0);
   const laneTick = useCallback((dt: number) => {
     const result = storeTick(dt);
-    if (result && (result.moved || result.changed)) {
-      liveRef.current = result.state;
-      for (const listener of [...liveListeners.current]) listener();
-    }
+    if (!result || !(result.moved || result.changed)) return result;
+    const now = Date.now();
+    if (!result.changed && !result.hit && now - lastDriftRef.current < LANE_DRIFT_PUBLISH_MS) return result;
+    lastDriftRef.current = now;
+    liveRef.current = result.state;
+    for (const listener of [...liveListeners.current]) listener();
     return result;
   }, [storeTick]);
   const live = useMemo((): MissionMechanicLive => ({

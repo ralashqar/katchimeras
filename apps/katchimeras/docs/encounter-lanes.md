@@ -70,4 +70,10 @@ Status: **built Sept 24 2026, uncommitted, device test pending.** Every Petalimp
 
 - Move Fernip, the Grove and the Daily Mist over, and give bosses something of their own (a wisp that splits, one that speeds up).
 - A countdown ring on each wisp for its next step.
-- Measure frame rate on device: every tick with an event commits the store, which re-renders the Kingdom screen (a few times a second at most).
+- **Performance pass (Sept 24):**
+  - Hits no longer commit the store: only a wisp falling, a board change or a breach does, so over a modelled 60 s of the boss the Kingdom screen re-renders 14 times, down from 52+.
+  - Plain drifting reaches the wisp layer every 200 ms (225 updates, down from 600); hits still go at once.
+  - The wisp layer measures only when its frame moves.
+  - Bullet views are pooled (16 slots).
+  - No haptic per bolt landing.
+  - Measure frame rate on device next.

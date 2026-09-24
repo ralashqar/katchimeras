@@ -215,7 +215,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(dock, /export const OPENING_GLOWS_PER_MERGE = 4;/, 'a burst of Glow per merge');
   assert.match(dock, /Array\.from\(\{ length: OPENING_GLOWS_PER_MERGE \}, \(_, index\) => \(\{ id: \+\+nextId\.current, index, from, to, group, key: aimed\?\.key \}\)\)/, 'the burst peels off one Glow per index, all at the wisp the sink named');
   assert.match(dock, /count=\{flight\.count \?\? OPENING_GLOWS_PER_MERGE\} index=\{flight\.index\}/, 'the flight staggers by index');
-  assert.match(dock, /setLanded\(\(count\) => count \+ 1\);[\s\S]*?if \(process\.env\.EXPO_OS === 'ios' && \(finale \|\| landed\?\.index === 0\)\) void Haptics\.impactAsync/, 'every impact flashes the bar; the phone taps once per burst and once for the finale');
+  assert.match(dock, /setLanded\(\(count\) => count \+ 1\);[\s\S]*?if \(process\.env\.EXPO_OS === 'ios' && !landed\?\.direct && \(finale \|\| landed\?\.index === 0\)\) void Haptics\.impactAsync/, 'every impact flashes the bar; the phone taps once per burst and once for the finale (never for a Lanes bolt)');
   assert.match(screen, /landings=\{openingGlow\.store\}/);
   assert.match(dock, /const impactKey = useSyncExternalStore\(landings\?\.subscribe \?\? subscribeToNothing, landings\?\.getLanded \?\? noLandings, landings\?\.getLanded \?\? noLandings\);/, 'the bar flashes on its own subscription');
   assert.match(dock, /const grew = progress > previous\.current;[\s\S]*?scale\.value = withSequence\(/, 'the bar swells once per landed Glow');

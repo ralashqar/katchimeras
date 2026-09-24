@@ -54,7 +54,14 @@ export function createLanesState(mechanic: LanesMechanic): LanesState {
   };
 }
 
-export const laneArrived = (mechanic: LanesMechanic, state: LanesState, index: number) => state.clock >= (mechanic.wisps[index]?.at ?? 0);
+/**
+ * When a wisp arrives, in level time: its authored `at`, brought forward by however much the level has skipped ahead
+ * (`state.advance`): whenever the board is left with no wisp, the next one comes at once rather than after a gap.
+ */
+export const laneArrivalAt = (mechanic: LanesMechanic, state: Pick<LanesState, 'advance'>, index: number) => (mechanic.wisps[index]?.at ?? 0) - (state.advance ?? 0);
+export const laneArrived = (mechanic: LanesMechanic, state: LanesState, index: number) => state.clock >= laneArrivalAt(mechanic, state, index);
+/** The board left with no wisp: the next one arrives this soon (and every later one as much sooner). */
+export const LANE_REFILL_MS = 500;
 export const laneAlive = (mechanic: LanesMechanic, state: LanesState, index: number) => (state.wisps[index]?.damage ?? 0) < (mechanic.wisps[index]?.hp ?? 0);
 
 export const lanesTotalHp = (mechanic: LanesMechanic) => mechanic.wisps.reduce((sum, wisp) => sum + wisp.hp, 0);
@@ -106,10 +113,12 @@ export type LanesTickResult = {
   /** Glow fired this tick, for the board to fly; `wisp` -1 is a shot with nothing over it, flying off the top. */
   fired: LaneShot[];
   effects: MechanicEffect[];
-  /** Something the board or the level's outcome depends on happened (a hit landed, a piece went under Mist, Mist fell, a wisp got through). */
+  /** Something the board or the level's outcome depends on happened (a wisp fell, a piece went under Mist, Mist fell, a wisp got through): the store commits. */
   changed: boolean;
-  /** A wisp moved or arrived: only the wisps need drawing again. */
+  /** A wisp moved, arrived or was hit: only the wisps need drawing again. */
   moved: boolean;
+  /** A hit landed this tick: the wisps show it at once rather than on their next movement update. */
+  hit: boolean;
   /** Mist wisps spat this tick, for the board to strike. */
   spat: LaneSpit[];
 };
@@ -123,7 +132,7 @@ export const laneRowOf = (row: number) => Math.floor(row + 0.5);
  * due to fire fires, at the lowest wisp over it or, with none, off the top of the board. Pure.
  */
 export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: MergeWorldState, dt: number, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): LanesTickResult {
-  if (input.breached != null || lanesComplete(mechanic, input)) return { state: input, board, fired: [], effects: [], changed: false, moved: false, spat: [] };
+  if (input.breached != null || lanesComplete(mechanic, input)) return { state: input, board, fired: [], effects: [], changed: false, moved: false, hit: false, spat: [] };
   const from = input.clock;
   const clock = from + Math.max(0, dt);
   const wisps: LaneWispState[] = input.wisps.map((wisp) => ({ ...wisp }));
@@ -132,10 +141,13 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   const effects: MechanicEffect[] = [];
   let changed = false;
   let moved = false;
+  let hit = false;
   let breached: number | null = null;
   let strikes = input.strikes;
   const alive = (index: number) => wisps[index]!.damage < mechanic.wisps[index]!.hp;
-  const arrived = (index: number) => clock >= mechanic.wisps[index]!.at;
+  let advance = input.advance ?? 0;
+  const arrivalAt = (index: number) => mechanic.wisps[index]!.at - advance;
+  const arrived = (index: number) => clock >= arrivalAt(index);
 
   // Glow that has landed.
   const shots: LaneShot[] = [];
@@ -143,8 +155,11 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     if (shot.landsAt > clock) { shots.push(shot); continue; }
     const wisp = wisps[shot.wisp];
     if (!wisp || !alive(shot.wisp)) continue;
-    changed = true;
+    // A hit is the wisps' own business (only they show it); the one that brings a wisp down changes the level.
+    moved = true;
+    hit = true;
     wisp.damage = Math.min(mechanic.wisps[shot.wisp]!.hp, wisp.damage + shot.damage);
+    if (!alive(shot.wisp)) changed = true;
     strikes += 1;
   }
 
@@ -165,8 +180,8 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     const spec = mechanic.wisps[index]!;
     const wisp = wisps[index]!;
     if (!arrived(index) || !alive(index)) continue;
-    if (from < spec.at) moved = true;
-    const start = Math.max(from, spec.at, wisp.holdUntil);
+    if (from < arrivalAt(index)) moved = true;
+    const start = Math.max(from, arrivalAt(index), wisp.holdUntil);
     if (clock <= start) continue;
     const target = wisp.row + (clock - start) / Math.max(250, spec.stepMs);
     moved = true;
@@ -211,7 +226,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       const spec = mechanic.wisps[index]!;
       const wisp = wisps[index]!;
       if (!spec.spitEvery || !arrived(index) || !alive(index) || wisp.row >= -0.5) continue;
-      const due = wisp.spitAt ?? spec.at + spec.spitEvery;
+      const due = wisp.spitAt ?? arrivalAt(index) + spec.spitEvery;
       if (due > clock) { wisp.spitAt = due; continue; }
       wisp.spitAt = clock + spec.spitEvery;
       let cell: number | null = null;
@@ -257,8 +272,19 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     }
   }
 
-  const state: LanesState = { kind: 'lanes', strikes, clock, wisps, ready, shots, seq, breached: breached ?? input.breached, ...(spits.length ? { spits } : {}) };
-  return { state, board: current(), fired, effects, changed, moved, spat };
+  // No wisp standing but more to come: the next arrives almost at once, and every later one as much sooner, so the
+  // player never waits on an empty sky (a strong board simply wins faster).
+  if (breached == null) {
+    const standing = mechanic.wisps.some((_, index) => arrived(index) && alive(index));
+    const pending = mechanic.wisps.flatMap((_, index) => (!arrived(index) && alive(index) ? [arrivalAt(index)] : []));
+    const next = pending.length ? Math.min(...pending) : null;
+    if (!standing && next != null && next > clock + LANE_REFILL_MS) {
+      advance += next - (clock + LANE_REFILL_MS);
+      changed = true;
+    }
+  }
+  const state: LanesState = { kind: 'lanes', strikes, clock, wisps, ready, shots, seq, breached: breached ?? input.breached, ...(spits.length ? { spits } : {}), ...(advance ? { advance } : {}) };
+  return { state, board: current(), fired, effects, changed, moved, hit, spat };
 }
 
 const isFree = (board: MergeWorldState, cell: number) => { const entry = board.board[cell]; return Boolean(entry) && !entry!.locked && !entry!.mist && !entry!.occupant; };
@@ -312,6 +338,7 @@ export function normalizeLanesState(mechanic: LanesMechanic, value: unknown, str
     shots: Array.isArray(raw.shots) ? raw.shots.filter((shot) => shot && Number.isFinite(shot.landsAt)).map((shot) => ({ ...shot })) : [],
     seq: Math.max(0, Math.floor(Number(raw.seq) || 0)),
     breached: raw.breached == null ? null : Math.floor(Number(raw.breached)),
+    ...(Number.isFinite(raw.advance) && Number(raw.advance) > 0 ? { advance: Number(raw.advance) } : {}),
     ...(Array.isArray(raw.spits) ? { spits: raw.spits.filter((spit) => spit && Number.isFinite(spit.landsAt)).map((spit) => ({ ...spit })) } : {}),
   };
 }

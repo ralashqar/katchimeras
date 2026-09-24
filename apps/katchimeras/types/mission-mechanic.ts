@@ -216,7 +216,7 @@ export type MissionMechanicState =
   | { kind: 'wisp-rush'; strikes: number; wisps: { id: string; hp: number; perch: number; damage: number; bornAt: number }[] }
   /** Damage on each wisp, how many actions have been spent, and the action each wisp was last struck on (-1: never). */
   /** Lanes: the level's clock (ms of play), every wisp as it stands, each piece's next shot time, the Glow in the air, and who got through. */
-  | { kind: 'lanes'; strikes: number; clock: number; wisps: LaneWispState[]; ready: Record<string, number>; shots: LaneShot[]; seq: number; breached: number | null; /** Mist spat by wisps over the board, still falling. */ spits?: LaneSpit[] }
+  | { kind: 'lanes'; strikes: number; clock: number; wisps: LaneWispState[]; ready: Record<string, number>; shots: LaneShot[]; seq: number; breached: number | null; /** Mist spat by wisps over the board, still falling. */ spits?: LaneSpit[]; /** How far the level has skipped ahead to bring the next wisp in when none was left (ms off every later arrival). */ advance?: number }
   | {
       kind: 'dark-wisps'; strikes: number; actions: number; damage: number[]; struckAt: number[];
       /** v2: turns until each wisp acts, where it is in its cycle, its ward, damage taken while gathering, and whether it was called in. */

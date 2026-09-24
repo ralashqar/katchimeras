@@ -77,6 +77,8 @@ const STRIKE_EMBER_DEEP = '#3B1657';
 const STRIKE_PARTICLES = 10;
 /** Glow tokens kept mounted from merge to merge: three merges' Glow in the air at once. Past that, a flight is mounted fresh. */
 const GLOW_TOKEN_POOL = 16;
+/** Lanes bolts kept mounted: every plant on a full board firing at once, with room to spare. Past that, a bolt is mounted fresh. */
+const GLOW_BOLT_POOL = 16;
 /** Bursts alive at once, a pool each. A landing past the cap still counts and still strikes; it only bursts nowhere. */
 const STRIKE_BURST_POOL = 6;
 const IMPACT_BURST_POOL = 4;
@@ -428,6 +430,7 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
   const pooled = useMemo(() => flights.filter((flight) => !flight.direct), [flights]);
   const bolts = useMemo(() => flights.filter((flight) => flight.direct), [flights]);
   const tokens = usePoolSlots(pooled, GLOW_TOKEN_POOL);
+  const boltSlots = usePoolSlots(bolts, GLOW_BOLT_POOL);
   const strikes = useMemo(() => impacts.filter((impact) => impact.wisp), [impacts]);
   const plain = useMemo(() => impacts.filter((impact) => !impact.wisp), [impacts]);
   const strikeSlots = usePoolSlots(strikes, STRIKE_BURST_POOL);
@@ -439,7 +442,8 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
       onArrive={() => onArrive(flight.id)}>
       <GlowTokenArt art={flight.art} size={flight.size} />
     </RewardTokenFlight>)}
-    {bolts.map((flight) => <GlowBolt key={flight.id} flight={flight} origin={origin} onArrive={onArrive} />)}
+    {boltSlots.slots.map((flight, slot) => <GlowBolt key={`bolt-slot-${slot}`} flight={flight} origin={origin} onArrive={onArrive} />)}
+    {boltSlots.overflow.map((flight) => <GlowBolt key={flight.id} flight={flight} origin={origin} onArrive={onArrive} />)}
     {strikeSlots.slots.map((impact, slot) => <WispStrikeBurst key={slot} impact={impact} origin={origin} onDone={onImpactDone} />)}
     {impactSlots.slots.map((impact, slot) => <ImpactBurst key={slot} impact={impact} origin={origin} onDone={onImpactDone} />)}
   </View>;
@@ -483,31 +487,56 @@ const GlowTokenArt = memo(function GlowTokenArt({ art, size }: { art?: ArtSource
 });
 
 /** Lanes: one Glow token straight from its piece to the wisp it is aimed at, landing exactly when the level lands it. */
-const GlowBolt = memo(function GlowBolt({ flight, origin, onArrive }: { flight: OpeningGlowFlight; origin: RewardFlightPoint; onArrive: (id: number) => void }) {
+const GlowBolt = memo(function GlowBolt({ flight, origin, onArrive }: { flight: OpeningGlowFlight | null; origin: RewardFlightPoint; onArrive: (id: number) => void }) {
+  // Pooled: a slot keeps its view and worklets from one bolt to the next; a new bolt only moves it and restarts its
+  // clock. Between bolts it is hidden where it landed. (Mounting a view per shot, several a second, was the cost.)
   const progress = useSharedValue(0);
+  const fromX = useSharedValue(0);
+  const fromY = useSharedValue(0);
+  const toX = useSharedValue(0);
+  const toY = useSharedValue(0);
+  const half = useSharedValue(0);
+  const miss = useSharedValue(0);
+  const shown = useSharedValue(0);
   const onArriveRef = useRef(onArrive);
   onArriveRef.current = onArrive;
   const land = useCallback((id: number) => onArriveRef.current(id), []);
+  // The last bolt's art and size stay on the hidden slot, so it never swaps its image for nothing.
+  const lastRef = useRef(flight);
+  if (flight) lastRef.current = flight;
+  const drawn = flight ?? lastRef.current;
+  const size = drawn?.size ?? GLOW_SIZE * 0.8;
+  const flightId = flight?.id ?? null;
+  const flightRef = useRef(flight);
+  flightRef.current = flight;
   useEffect(() => {
-    progress.value = withDelay(flight.delay ?? 0, withTiming(1, { duration: flight.direct ?? 300, easing: flight.key == null ? Easing.out(Easing.quad) : Easing.in(Easing.quad) }, (finished) => { if (finished) runOnJS(land)(flight.id); }));
+    const current = flightRef.current;
+    cancelAnimation(progress);
+    if (flightId == null || !current) { shown.value = 0; return; }
+    fromX.value = current.from.x - origin.x;
+    fromY.value = current.from.y - origin.y;
+    toX.value = current.to.x - origin.x;
+    toY.value = current.to.y - origin.y;
+    half.value = (current.size ?? GLOW_SIZE * 0.8) / 2;
+    miss.value = current.key == null ? 1 : 0;
+    progress.value = 0;
+    shown.value = 1;
+    progress.value = withDelay(current.delay ?? 0, withTiming(1, { duration: current.direct ?? 300, easing: current.key == null ? Easing.out(Easing.quad) : Easing.in(Easing.quad) }, (finished) => { if (finished) runOnJS(land)(flightId); }));
     return () => cancelAnimation(progress);
-  // Once per bolt.
+  // Once per bolt; its geometry is read when it starts.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flight.id]);
-  const size = flight.size ?? GLOW_SIZE * 0.8;
-  const fromX = flight.from.x - origin.x;
-  const fromY = flight.from.y - origin.y;
-  const toX = flight.to.x - origin.x;
-  const toY = flight.to.y - origin.y;
-  const miss = flight.key == null;
+  }, [flightId]);
   const style = useAnimatedStyle(() => {
     const p = progress.value;
     // A miss thins out over the last third of its climb: it hit nothing and is gone.
-    const fade = miss && p > 0.66 ? Math.max(0, 1 - (p - 0.66) / 0.34) : 1;
-    return { opacity: (p <= 0 ? 0 : p < 0.04 ? p / 0.04 : 1) * fade, transform: [{ translateX: fromX + (toX - fromX) * p - size / 2 }, { translateY: fromY + (toY - fromY) * p - size / 2 }, { scale: 0.75 + p * 0.35 }] };
+    const fade = miss.value && p > 0.66 ? Math.max(0, 1 - (p - 0.66) / 0.34) : 1;
+    return {
+      opacity: shown.value * (p <= 0 ? 0 : p < 0.04 ? p / 0.04 : 1) * fade,
+      transform: [{ translateX: fromX.value + (toX.value - fromX.value) * p - half.value }, { translateY: fromY.value + (toY.value - fromY.value) * p - half.value }, { scale: 0.75 + p * 0.35 }],
+    };
   });
   return <Animated.View pointerEvents="none" style={[styles.token, { width: size, height: size }, style]}>
-    <GlowTokenArt art={flight.art} size={size} />
+    <GlowTokenArt art={drawn?.art} size={size} />
   </Animated.View>;
 });
 
@@ -888,7 +917,8 @@ function createOpeningGlowStore(): OpeningGlowStore {
     setFlights((current) => current.filter((flight) => flight.id !== id));
     setLanded((count) => count + 1);
     // One haptic per burst of Glow (its first token) and one for the finale, not one per token.
-    if (process.env.EXPO_OS === 'ios' && (finale || landed?.index === 0)) void Haptics.impactAsync(finale ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
+    // Never for a Lanes bolt: plants fire several a second, and a buzz on each was both noise and a native call per shot.
+    if (process.env.EXPO_OS === 'ios' && !landed?.direct && (finale || landed?.index === 0)) void Haptics.impactAsync(finale ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
   });
   const impactDone = (id: number) => {
     setImpacts((current) => current.filter((impact) => impact.id !== id));
