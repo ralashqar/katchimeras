@@ -42,7 +42,11 @@ export function cacheEntries(encounter: EncounterDefinition, board: MergeWorldSt
   return cells.map((cell, index) => ({ cell, definitionId: wanted[index]! }));
 }
 
-export const canOpenCache = (status: EncounterStatus, run: EncounterRunState): boolean => status === 'stuck' && !run.cacheOpened;
+/**
+ * The rescue opens on a stuck board once an attempt; in a tactics battle every time the board runs dry, so a level is
+ * lost to the Mist, never to running out of pieces (each rescue still caps the grade).
+ */
+export const canOpenCache = (status: EncounterStatus, run: EncounterRunState): boolean => status === 'stuck' && (!run.cacheOpened || Boolean(run.tactics));
 
 /** The cache opened: its pieces on the board, the attempt remembering it. */
 export function openCache(encounter: EncounterDefinition, board: MergeWorldState, window: MissionWindow, run: EncounterRunState, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): { board: MergeWorldState; run: EncounterRunState; placed: { cell: number; definitionId: string }[] } {

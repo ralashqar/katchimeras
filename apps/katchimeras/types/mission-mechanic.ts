@@ -18,9 +18,34 @@ export type WispPlacement =
   /** `row` 0 is the row just above the board's top row; `size` is a fraction of a board cell (default 0.9). */
   | { kind: 'board'; column: number; row: number; size?: number }
   /** Territory: on a board cell, its nest (`size` a fraction of a board cell, default 0.9). */
-  | { kind: 'cell'; cell: number; size?: number };
+  | { kind: 'cell'; cell: number; size?: number }
+  /**
+   * Territory: a sky wisp, floating over the island tile above one of the board's five columns (1-5); struck by a
+   * pulse that reaches past the board's top row in that column. `fx`/`fy`/`size` as a tile wisp's, read off the
+   * column when absent.
+   */
+  | { kind: 'sky'; column: number; fx?: number; fy?: number; size?: number }
+  /**
+   * Lanes (`docs/encounter-lanes.md`): a wisp coming down a board column (0 the left one). `row` is the board row it is
+   * on (0 the top row); below 0 it is still floating over the board, that many rows up.
+   */
+  | { kind: 'lane'; column: number; row: number; size?: number };
 
 export type ColumnShotWisp = { id: string; column: number; row: number; hp: number; size?: number };
+
+/**
+ * Lanes (`docs/encounter-lanes.md`): a wisp that arrives over one board column at `at` ms into the level, then comes
+ * down a row every `stepMs`. Every `dropEvery` steps it leaves Mist on the free cell it steps off (0: never). It
+ * starts `startRow` rows over the board (default 2).
+ */
+export type LaneWisp = { id: string; hp: number; column: number; at: number; stepMs: number; dropEvery?: number; startRow?: number; look?: string };
+/**
+ * A lane wisp as the level stands: its board row as it drifts (fractional; below 0 over the board; its cell is the
+ * one its centre is in), damage taken, the level time it holds until (after reaching a piece), and cells entered.
+ */
+export type LaneWispState = { row: number; damage: number; holdUntil: number; cells: number };
+/** Glow a piece fired up its column: from which cell, at which wisp (-1: nothing over it), for how much, and when it lands (ms of level time). */
+export type LaneShot = { id: number; fromCell: number; wisp: number; damage: number; firedAt: number; landsAt: number };
 
 /**
  * How a Dark Wisp fights back, every `every` actions the player spends: a
@@ -43,7 +68,19 @@ export type DarkWispBehaviour =
  * `spores` marks a free cell that turns to Mist unless a piece is put on it; `gather` (a boss) is a heavy surge that
  * enough damage while it gathers staggers. `snuff` is the old Light-era intent, read as a surge of one.
  */
-export type WispIntentKind = 'surge' | 'shroud' | 'root' | 'devour' | 'ward' | 'mend' | 'call' | 'gather' | 'burrow' | 'spores' | 'snuff';
+export type WispIntentKind = 'surge' | 'shroud' | 'root' | 'devour' | 'ward' | 'mend' | 'call' | 'gather' | 'burrow' | 'spores' | 'snuff'
+  /** Sky wisps (`docs/encounter-turns-sky-bound.md`): Mist falls into the top of its column; it binds a piece in its column; it wards a nest wisp. */
+  | 'rain' | 'bind' | 'shield'
+  /** Merge vs Mist (`docs/encounter-tactics.md`): a wisp Mists the cells it showed, drifts a cell through its Mist, or has nowhere to go. */
+  | 'corrupt' | 'move' | 'rest';
+
+/**
+ * Merge vs Mist: a Dark Wisp's kind, each one sentence (`features/encounter/wisp-ai.ts`). A Creeper Mists one free cell
+ * beside its Mist after every merge; a Spore Wisp two on every third; a Root Wisp's Mist is Thick; a Snare Wisp reaches
+ * for a piece first, which stays locked until that Mist is cleared; a Drifter drifts a cell through its Mist away
+ * from the player's pieces, leaving Mist where it was.
+ */
+export type DarkWispKind = 'creeper' | 'spore' | 'root' | 'snare' | 'drifter';
 export type WispIntent = { kind: WispIntentKind; every: number; amount?: number };
 
 export type DarkWisp = {
@@ -56,6 +93,12 @@ export type DarkWisp = {
   lane?: number;
   /** Territory: a hidden wisp that breaks off when this one is struck to half its health or below. */
   splitsInto?: string;
+  /** The turn strip: how many places it takes (a boss acts twice a round). Default 1. */
+  slots?: number;
+  /** A sky wisp that cannot be hurt while any of these nest wisps stand. */
+  guardedBy?: readonly string[];
+  /** Merge vs Mist: it spreads its Mist after every merge, as its kind says. */
+  kind?: DarkWispKind;
   /** Not on the board until a caller calls it. */
   hidden?: boolean;
   /** Its art (`constants/dark-wisp-looks.ts`); absent, read off its first intent (a plain wisp keeps the corruption wisp). */
@@ -79,7 +122,21 @@ export type MechanicEffect =
   | { kind: 'burrowed'; wisp: number; from: number; to: number }
   | { kind: 'spored'; wisp: number; cell: number }
   | { kind: 'spore_bloomed'; wisp: number; cell: number }
-  | { kind: 'split'; wisp: number; twin: number; cell: number };
+  | { kind: 'split'; wisp: number; twin: number; cell: number }
+  /** A planned cell held its ground (a Plant or bigger stood there). */
+  | { kind: 'held'; wisp: number; cell: number }
+  /** The Mist closed over a piece: it is bound, not lost. */
+  | { kind: 'bound'; wisp: number; cell: number; definitionId: string }
+  | { kind: 'rained'; wisp: number; cell: number }
+  | { kind: 'shielded'; wisp: number; target: number; amount: number }
+  /** A Rest in the turn strip: nothing acted. */
+  | { kind: 'rested' }
+  /** Merge vs Mist: it Misted a free cell; a Drifter drifted from one cell to another, leaving Mist behind. */
+  | { kind: 'corrupted'; wisp: number; cell: number }
+  | { kind: 'drifted'; wisp: number; from: number; to: number }
+  /** Lanes: a wisp came down a row; it reached a piece and put it under Mist; it got past the bottom of the board. */
+  | { kind: 'stepped'; wisp: number; row: number }
+  | { kind: 'breached'; wisp: number };
 
 export type MissionMechanicDefinition =
   | {
@@ -125,8 +182,24 @@ export type MissionMechanicDefinition =
        * over its column.
        */
       targeting?: 'in-order' | 'weakest' | 'lane' | 'adjacent';
+      /** Territory: Rest turns in the turn strip (a calm level's breathing room). */
+      rest?: number;
+      /**
+       * `tactics`, Merge vs Mist (`docs/encounter-tactics.md`): only a merge is a turn; after it every wisp spreads its Mist
+       * onto the cells it showed; a merge clears Mist by its tier and cleanses a wisp once the cells beside it are clear.
+       */
+      mode?: 'tactics';
       /** Damage a gathering wisp must take to be staggered (default 3). */
       stagger?: number;
+    }
+  | {
+      /**
+       * Lanes (`docs/encounter-lanes.md`), a real-time battle: wisps come down the board's columns on a beat; every piece
+       * of Sprout size or bigger fires Glow up its own column at the lowest wisp over it, harder and faster by tier; a
+       * wisp that reaches a piece puts it under Mist; one that gets past the bottom row loses the level.
+       */
+      kind: 'lanes';
+      wisps: readonly LaneWisp[];
     };
 
 /** What a mechanic remembers between strikes; saved with the board. */
@@ -136,6 +209,8 @@ export type MissionMechanicState =
   /** Every wisp that has appeared, in order; the list only grows. `bornAt` 0 marks the ones the board opened with. */
   | { kind: 'wisp-rush'; strikes: number; wisps: { id: string; hp: number; perch: number; damage: number; bornAt: number }[] }
   /** Damage on each wisp, how many actions have been spent, and the action each wisp was last struck on (-1: never). */
+  /** Lanes: the level's clock (ms of play), every wisp as it stands, each piece's next shot time, the Glow in the air, and who got through. */
+  | { kind: 'lanes'; strikes: number; clock: number; wisps: LaneWispState[]; ready: Record<string, number>; shots: LaneShot[]; seq: number; breached: number | null }
   | {
       kind: 'dark-wisps'; strikes: number; actions: number; damage: number[]; struckAt: number[];
       /** v2: turns until each wisp acts, where it is in its cycle, its ward, damage taken while gathering, and whether it was called in. */
@@ -144,7 +219,17 @@ export type MissionMechanicState =
       knocked?: boolean[];
       /** Territory: each wisp's nest cell (-1 before a hidden one arrives), whether it has split, and its spores. */
       nest?: number[]; split?: boolean[]; spores?: { cell: number; turns: number; wisp: number }[];
+      /** Territory: the turn strip (wisp indices, -1 a Rest), the front entry's locked plan, and who was pushed back this turn. */
+      order?: number[]; plan?: WispPlan | null; pushed?: boolean[];
+      /** Merge vs Mist: every wisp's locked plan for after the player's next merge. */
+      plans?: (WispPlan | null)[];
     };
+
+/**
+ * What the wisp at the front of the turn strip will do after the player's next merge, worked out and shown before
+ * it happens (`docs/encounter-turns-sky-bound.md`): the cells it takes, the piece it eats, the wisp it wards.
+ */
+export type WispPlan = { wisp: number; kind: WispIntentKind; amount?: number; cells: number[]; piece?: { cell: number; instanceId: string }; target?: number };
 
 /** A board whose state moves on its own (a rush's wisps appear over time) publishes it here; the wisp layer subscribes. */
 export type MissionMechanicLive = { get: () => MissionMechanicState; subscribe: (listener: () => void) => () => void };
@@ -176,6 +261,12 @@ export type MissionWispView = {
   weakTo?: 'growth' | 'water';
   /** Territory: cells it has marked, and turns until each turns to Mist. */
   spores?: readonly { cell: number; turns: number }[];
+  /** A sky wisp that cannot be hurt yet: its guards still stand. */
+  guarded?: boolean;
+  /** It acts after the player's next merge. */
+  acting?: boolean;
+  /** Lanes: how fast it is drifting down right now, in board rows per ms (0 while it holds). */
+  drift?: number;
 };
 
 /** The move a mechanic points the finger at. */

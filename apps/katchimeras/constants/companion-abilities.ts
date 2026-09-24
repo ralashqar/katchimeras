@@ -2,13 +2,14 @@ import type { CompanionAbilityDefinition, CompanionAbilityTier } from '@/types/c
 import type { MergeCharacterId } from '@/types/merge-world';
 
 /**
- * The three playable Katchimeras' abilities. A tier is reached at its level
- * and holds until the next; level 1 is always authored.
+ * The playable Katchimeras' abilities (`docs/encounter-tactics.md`): each bends the one rule (merge beside Mist to
+ * clear it), never plain damage. Using one is not a merge, so the wisps never get a turn for it. A tier is reached at
+ * its level and holds until the next; level 1 is always authored.
  */
 export const COMPANION_ABILITIES: readonly CompanionAbilityDefinition[] = [
   {
     id: 'bloom', companion: 'mossprout', name: 'Bloom', targeting: 'item',
-    description: 'Raise one plant a step, the way only Mossprout can.',
+    description: 'Raise one plant a step: a bigger piece clears more Mist when it merges.',
     tiers: [
       { level: 1, chargeEvery: 8, maxTier: 2 },
       { level: 2, chargeEvery: 7, maxTier: 2 },
@@ -20,29 +21,48 @@ export const COMPANION_ABILITIES: readonly CompanionAbilityDefinition[] = [
     ],
   },
   {
-    id: 'trailfinder', companion: 'steppling', name: 'Trailfinder', targeting: 'none',
-    description: 'Steppling knows where the Mist is thin.',
+    id: 'clear-path', companion: 'steppling', name: 'Clear Path', targeting: 'mist',
+    description: 'Steppling clears one Mist cell, whatever it is.',
     tiers: [
-      { level: 1, chargeEvery: 6, cells: 1 },
-      { level: 2, chargeEvery: 5, cells: 2 },
-      { level: 3, chargeEvery: 5, cells: 2 },
-      { level: 4, chargeEvery: 4, cells: 3 },
-      { level: 5, chargeEvery: 4, cells: 3 },
-      { level: 7, chargeEvery: 3, cells: 4 },
-      { level: 10, chargeEvery: 3, cells: 5 },
+      { level: 1, chargeEvery: 6 },
+      { level: 2, chargeEvery: 5 },
+      { level: 4, chargeEvery: 4 },
+      { level: 7, chargeEvery: 3 },
+      { level: 10, chargeEvery: 3 },
     ],
   },
   {
-    id: 'focus', companion: 'baristabbit', name: 'Focus', targeting: 'spawner',
-    description: 'One spawner, tended properly: more in it, and better.',
+    id: 'focus', companion: 'baristabbit', name: 'Focus', targeting: 'none',
+    description: 'The next merge clears as if it were one step bigger.',
     tiers: [
-      { level: 1, chargeEvery: 8, charges: 1, tierTwoChance: 0.3, taps: 3 },
-      { level: 2, chargeEvery: 7, charges: 2, tierTwoChance: 0.3, taps: 3 },
-      { level: 3, chargeEvery: 7, charges: 2, tierTwoChance: 0.4, taps: 3 },
-      { level: 4, chargeEvery: 6, charges: 3, tierTwoChance: 0.4, taps: 3 },
-      { level: 5, chargeEvery: 6, charges: 3, tierTwoChance: 0.5, taps: 4 },
-      { level: 7, chargeEvery: 5, charges: 4, tierTwoChance: 0.5, taps: 4 },
-      { level: 10, chargeEvery: 4, charges: 4, tierTwoChance: 0.6, taps: 5 },
+      { level: 1, chargeEvery: 7, boost: 1 },
+      { level: 2, chargeEvery: 6, boost: 1 },
+      { level: 4, chargeEvery: 5, boost: 1 },
+      { level: 5, chargeEvery: 5, boost: 2 },
+      { level: 7, chargeEvery: 4, boost: 2 },
+      { level: 10, chargeEvery: 4, boost: 2 },
+    ],
+  },
+  {
+    id: 'ripple', companion: 'shellio', name: 'Ripple', targeting: 'none',
+    description: 'The next Water merge clears more Mist around it.',
+    tiers: [
+      { level: 1, chargeEvery: 6, boost: 1 },
+      { level: 3, chargeEvery: 5, boost: 1 },
+      { level: 4, chargeEvery: 5, boost: 2 },
+      { level: 7, chargeEvery: 4, boost: 2 },
+      { level: 10, chargeEvery: 3, boost: 2 },
+    ],
+  },
+  {
+    id: 'scout', companion: 'voyagle', name: 'Scout', targeting: 'none',
+    description: 'Voyagle looks under the Mist: what a few hidden cells are holding.',
+    tiers: [
+      { level: 1, chargeEvery: 6, cells: 2 },
+      { level: 3, chargeEvery: 5, cells: 3 },
+      { level: 5, chargeEvery: 5, cells: 4 },
+      { level: 7, chargeEvery: 4, cells: 5 },
+      { level: 10, chargeEvery: 4, cells: 6 },
     ],
   },
 ];

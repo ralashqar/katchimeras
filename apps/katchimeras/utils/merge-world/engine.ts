@@ -2691,6 +2691,17 @@ function moveItem(state: MergeWorldState, from: number, to: number, now: number,
       message: `${MERGE_ITEMS_BY_ID.get(resultId)?.name ?? 'New item'} woke from the Dream Mist.`,
     };
   }
+  // A territory battle's bound piece: its twin dropped onto it frees it and merges on the spot.
+  const caught = state.board[to].mist;
+  if (caught?.kind === 'encounter' && caught.type === 'bound' && caught.holds?.kind === 'item') {
+    if (source.kind !== 'item' || source.definitionId !== caught.holds.definitionId) return unchanged(state, 'Find its twin, or free it with a pulse.', 'wrong_echo_match');
+    const resultId = items.get(caught.holds.definitionId)?.nextItemId ?? null;
+    if (!resultId) return unchanged(state, 'This piece cannot grow any further.');
+    const board = [...state.board];
+    board[from] = { ...board[from], occupant: null };
+    board[to] = { ...board[to], locked: false, blocker: null, mist: null, occupant: { kind: 'item', instanceId: `merge-item:${state.nextInstance}`, definitionId: resultId } };
+    return { state: touch({ ...state, board, nextInstance: state.nextInstance + 1 }, now), changed: true, mergedCell: to, clearedMistCells: [to], message: `${MERGE_ITEMS_BY_ID.get(resultId)?.name ?? 'New item'} broke free of the Mist.` };
+  }
   if (state.board[to].locked) return unchanged(state, 'Choose an open board space.', 'locked_cell');
   const board = [...state.board];
   if (!target) {
@@ -4576,7 +4587,7 @@ function normalizeDreamMist(value: unknown, legacyLocked: boolean, index: number
 
 const ENCOUNTER_RECEIPT_LIMIT = 200;
 const ENCOUNTER_DAILY_DAYS_KEPT = 7;
-const ENCOUNTER_MIST_TYPES = new Set(['light', 'dense', 'root', 'wisp-bound']);
+const ENCOUNTER_MIST_TYPES = new Set(['light', 'dense', 'root', 'wisp-bound', 'bound']);
 const isEncounterGrade = (value: unknown): value is EncounterGrade => value === 'cleared' || value === 'bright' || value === 'perfect';
 
 /** An encounter's own Mist survives a reload: its type, hits left and what it holds; anything unreadable is plain locked mist. */

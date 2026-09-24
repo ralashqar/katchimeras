@@ -48,7 +48,8 @@ test('the extra rungs sit after their chapter’s own board, so the chapter stil
 
 test('every island level is a territory battle won by the careful player on nine seeds of ten; the bosses beat careless play (a board with a clock keeps its own rules)', () => {
   for (const campaign of ISLAND_CAMPAIGNS) for (const rung of regionLadder(campaign)) {
-    if (rung.mission.rush || rung.mission.encounter.territory == null) continue;
+    // Lanes play on their clock and have their own record (`tests/encounter-lanes.test.ts`).
+    if (rung.mission.rush || rung.mission.encounter.territory == null || rung.mission.encounter.mechanic?.kind === 'lanes') continue;
     const record = fairness(rung.mission.encounter, 'careful', 10);
     assert.ok(record.wins >= 9, `${rung.mission.id}: the careful player won ${record.wins} of 10 (${JSON.stringify(record.losses)})`);
     // A boss asks for reading it: merging next to it whenever possible usually loses.

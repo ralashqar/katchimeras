@@ -5,8 +5,12 @@ import type { MissionMechanicMove } from '@/types/mission-mechanic';
 /** The window of the canonical grid a docked board shows: how many columns, how many rows, which cells. */
 export type MissionWindow = { columns: number; rows: number; cellIndices: readonly number[] };
 
-/** The docked board's window: the opening's five columns, three or four rows from the top. */
-export function missionWindow(rows: 3 | 4 = 4): MissionWindow {
+/** A merge-tactics board's fifth row: the canonical board's row under the opening window. */
+const FIFTH_ROW: readonly number[] = [43, 44, 45, 46, 47];
+
+/** The docked board's window: the opening's five columns, three or four rows from the top; five for a tactics battle. */
+export function missionWindow(rows: 3 | 4 | 5 = 4): MissionWindow {
+  if (rows === 5) return { columns: OPENING_MERGE_WINDOW_COLUMNS, rows, cellIndices: [...OPENING_MERGE_WINDOW_CELLS, ...FIFTH_ROW] };
   return { columns: OPENING_MERGE_WINDOW_COLUMNS, rows, cellIndices: OPENING_MERGE_WINDOW_CELLS.slice(0, OPENING_MERGE_WINDOW_COLUMNS * rows) };
 }
 

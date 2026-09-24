@@ -59,7 +59,7 @@ function rung(input: RungInput): RegionMissionDefinition {
   const required = input.wisps.reduce((sum, wisp) => sum + wisp.hp, 0);
   const encounter: EncounterDefinition = {
     id: GROVE_MISSION_ID(input.rung),
-    storageKey: `katchimeras.encounter.sleeping-grove.${input.rung}.v4`,
+    storageKey: `katchimeras.encounter.sleeping-grove.${input.rung}.v5`,
     rows: input.rows ?? 4,
     difficulty: input.difficulty,
     seed: { items: input.items, echoes: input.echoes ?? [], veiled: input.veiled ?? [] },
@@ -158,7 +158,7 @@ export const SLEEPING_GROVE_RUNGS: readonly GroveRung[] = [
     items: [{ cell: 36, definitionId: S }, { cell: 37, definitionId: S }, { cell: 38, definitionId: S }, { cell: 29, definitionId: SP }, { cell: 33, definitionId: SP }],
     echoes: [{ cell: 31, id: 'grove-8-sprout', definitionId: SP }],
     mist: [{ cell: 23, type: 'dense', holds: { kind: 'item', definitionId: SP } }, { cell: 24, type: 'wisp-bound', wispId: 'grove-keeper', holds: { kind: 'item', definitionId: P } }, { cell: 16, type: 'light' }, { cell: 18, type: 'light' }, { cell: 25, type: 'light' }],
-    spawners: [pod(40, 6, 3), { id: 'bundle', generatorId: 'memory-nursery', cell: 39, charges: 2, drops: [SP] }],
+    spawners: [pod(40, 8, 2), { id: 'bundle', generatorId: 'memory-nursery', cell: 39, charges: 2, drops: [SP] }],
     wisps: wisps([[2, 15]], [{ id: 'grove-keeper', hp: 8, cell: 17, size: 1, behaviour: { kind: 'shrouder', every: 3 }, look: 'keeper', intents: [{ kind: 'ward', every: 3, amount: 2 }, { kind: 'gather', every: 3, amount: 3 }] }, { id: 'grove-root', hp: 3, cell: 19, behaviour: { kind: 'mender', every: 3 } }]),
     objective_: { kind: 'dark-wisp', wispId: 'grove-keeper' },
     rewards: { glow: 40, xp: 30 },

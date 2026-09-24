@@ -44,7 +44,10 @@ const GLOW_COLOR = '#8FD3FF';
 const BAR_FILL_COLOR = '#6A46C9';
 const BAR_TRACK_COLOR = 'rgba(84,66,128,0.24)';
 
-export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint; art?: ArtSource; size?: number; count?: number; group?: number; key?: number };
+export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint; art?: ArtSource; size?: number; count?: number; group?: number; key?: number; /** A Merge vs Mist Glow shot: always bursts where it lands, as a strike. */ shot?: boolean;
+  /** Lanes: a bolt straight up its column, flown for exactly this long (the level lands its damage on the same clock). */ direct?: number };
+/** One Glow shot of a merge's volley (Merge vs Mist), in window space. */
+export type GlowVolleyShot = { from: RewardFlightPoint; to: RewardFlightPoint };
 
 /**
  * Something over the mist that takes the Glow instead of the tile (the
@@ -54,6 +57,8 @@ export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightP
  * lands its hits; one without (the opening's) is dealt by the sink itself.
  */
 export type GlowSink = {
+  /** Where a wisp is drawn right now (Lanes: a shot flies straight at it). */
+  pointOf?: (key: number) => RewardFlightPoint | null;
   aim: (kind: 'glow' | 'finale', strike?: MissionStrike | null) => { point: RewardFlightPoint; key: number } | null;
   struck: (key: number) => void;
   landed: (key: number, kind: 'glow' | 'finale') => void;
@@ -184,11 +189,15 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
 /** How far the header's bottom edge sits under the top of the bar. */
 const HEADER_TUCK = 24;
 
-export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, landings, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, headerGap, overlay, rootRef, animateArrivals, onHoverCell, externalEffects }: {
+export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, landings, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, headerGap, overlay, rootRef, animateArrivals, onHoverCell, externalEffects, heldMist, hideBar = false }: {
   /** The cell a held piece is over (-1 when none). */
   onHoverCell?: (cell: number, source: number) => void;
   /** Effects the owner asks the board to play on cells (a piece a wisp ate puffs away). */
   externalEffects?: readonly { id: number; cell: number; kind: MergeBoardEffectKind }[];
+  /** Leaves the progress bar out (Lanes: the space over the board is where the wisps come from). */
+  hideBar?: boolean;
+  /** Merge vs Mist: Mist still drawn on cells whose Glow shot is in the air (the board's `heldMist`). */
+  heldMist?: Readonly<Record<number, MergeWorldState['board'][number]['mist']>>;
   state: MergeWorldState;
   /** Pieces that arrive on their own (a time trial's dealer) pop in the way the board's pieces do. */
   animateArrivals?: boolean;
@@ -314,7 +323,7 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
       <View pointerEvents="box-none" style={{ width: boardWidth }}>{header}</View>
     </Animated.View> : null}
     <View pointerEvents="box-none" onLayout={(event) => setBarTop(Math.round(event.nativeEvent.layout.y))}>
-      <ClearTheMistBar progress={shownProgress} total={required} width={boardWidth} landings={landings} title={barTitle} />
+      {hideBar ? null : <ClearTheMistBar progress={shownProgress} total={required} width={boardWidth} landings={landings} title={barTitle} />}
     </View>
     <MergePlaySurface
       animateEntrance={false}
@@ -340,6 +349,7 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
       onScreenMetrics={handleMetrics}
       onHoverCell={onHoverCell}
       externalEffects={externalEffects}
+      heldMist={heldMist}
       onSelect={setSelectedCell}
       onServe={() => false}
       onUseGrovelight={() => {}}
@@ -414,7 +424,10 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
   // next; a new flight only moves it and restarts its clock. Mounting four tokens per merge and
   // fifteen animated views per burst, then tearing them down a moment later, was the cost that
   // grew with every fast merge in a streak.
-  const tokens = usePoolSlots(flights, GLOW_TOKEN_POOL);
+  // Lane bolts fly straight on their own clock; every other flight rises, hovers and homes in, from the pool.
+  const pooled = useMemo(() => flights.filter((flight) => !flight.direct), [flights]);
+  const bolts = useMemo(() => flights.filter((flight) => flight.direct), [flights]);
+  const tokens = usePoolSlots(pooled, GLOW_TOKEN_POOL);
   const strikes = useMemo(() => impacts.filter((impact) => impact.wisp), [impacts]);
   const plain = useMemo(() => impacts.filter((impact) => !impact.wisp), [impacts]);
   const strikeSlots = usePoolSlots(strikes, STRIKE_BURST_POOL);
@@ -426,6 +439,7 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
       onArrive={() => onArrive(flight.id)}>
       <GlowTokenArt art={flight.art} size={flight.size} />
     </RewardTokenFlight>)}
+    {bolts.map((flight) => <GlowBolt key={flight.id} flight={flight} origin={origin} onArrive={onArrive} />)}
     {strikeSlots.slots.map((impact, slot) => <WispStrikeBurst key={slot} impact={impact} origin={origin} onDone={onImpactDone} />)}
     {impactSlots.slots.map((impact, slot) => <ImpactBurst key={slot} impact={impact} origin={origin} onDone={onImpactDone} />)}
   </View>;
@@ -466,6 +480,35 @@ const GlowTokenArt = memo(function GlowTokenArt({ art, size }: { art?: ArtSource
   return <View style={[styles.glow, box]}>
     <Image source={art ?? GAME_CURRENCY_ART.coins} contentFit="contain" style={[styles.glowArt, box]} accessible={false} />
   </View>;
+});
+
+/** Lanes: one Glow token straight from its piece to the wisp it is aimed at, landing exactly when the level lands it. */
+const GlowBolt = memo(function GlowBolt({ flight, origin, onArrive }: { flight: OpeningGlowFlight; origin: RewardFlightPoint; onArrive: (id: number) => void }) {
+  const progress = useSharedValue(0);
+  const onArriveRef = useRef(onArrive);
+  onArriveRef.current = onArrive;
+  const land = useCallback((id: number) => onArriveRef.current(id), []);
+  useEffect(() => {
+    progress.value = withTiming(1, { duration: flight.direct ?? 300, easing: flight.key == null ? Easing.out(Easing.quad) : Easing.in(Easing.quad) }, (finished) => { if (finished) runOnJS(land)(flight.id); });
+    return () => cancelAnimation(progress);
+  // Once per bolt.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flight.id]);
+  const size = GLOW_SIZE * 0.8;
+  const fromX = flight.from.x - origin.x;
+  const fromY = flight.from.y - origin.y;
+  const toX = flight.to.x - origin.x;
+  const toY = flight.to.y - origin.y;
+  const miss = flight.key == null;
+  const style = useAnimatedStyle(() => {
+    const p = progress.value;
+    // A miss thins out over the last third of its climb: it hit nothing and is gone.
+    const fade = miss && p > 0.66 ? Math.max(0, 1 - (p - 0.66) / 0.34) : 1;
+    return { opacity: (p < 0.04 ? p / 0.04 : 1) * fade, transform: [{ translateX: fromX + (toX - fromX) * p - size / 2 }, { translateY: fromY + (toY - fromY) * p - size / 2 }, { scale: 0.75 + p * 0.35 }] };
+  });
+  return <Animated.View pointerEvents="none" style={[styles.token, { width: size, height: size }, style]}>
+    <GlowTokenArt size={size} />
+  </Animated.View>;
 });
 
 /** The reward flight's burst directions, one per token of a merge. */
@@ -735,6 +778,10 @@ export type OpeningGlowStore = GlowLandingSource & {
   launchItem: (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null) => void;
   /** A column shot: the item a merge made, straight up its column into the wisp the strike names; a wasted one rises and fades over the board. */
   launchShot: (from: RewardFlightPoint, strike: MissionStrike) => void;
+  /** Merge vs Mist: one Glow token per shot, each flying at its own Mist cell; `onLand` hears each landing by the shot's index. */
+  launchVolley: (shots: readonly GlowVolleyShot[], onLand: (index: number) => void) => void;
+  /** Lanes: one Glow token per shot, straight from its piece at the wisp it is aimed at (or, with none, to `to`, fading), flown for `durationMs`. */
+  launchBolts: (bolts: readonly { from: RewardFlightPoint; wisp: number; to?: RewardFlightPoint; durationMs: number }[]) => void;
   /** The final merge's item, large and alone, straight up into the mist. */
   launchFinale: (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null) => number;
   arrive: (id: number) => void;
@@ -792,6 +839,7 @@ function createOpeningGlowStore(): OpeningGlowStore {
   const targetRef = { current: null as ViewType | null };
   const sinkRef = { current: null as GlowSink | null };
   const landedGroups = { current: new Set<number>() };
+  const shotLandings = new Map<number, () => void>();
 
   const launch = (from: RewardFlightPoint, targetNode?: ViewType | null, strike?: MissionStrike | null) => {
     const group = ++groupSeq.current;
@@ -807,6 +855,8 @@ function createOpeningGlowStore(): OpeningGlowStore {
   };
   const arrive = (id: number) => batch(() => {
     const finale = id === finaleIdRef.current;
+    const onShotLand = shotLandings.get(id);
+    if (onShotLand) { shotLandings.delete(id); onShotLand(); }
     // A token that struck a wisp: the wisp flinches on every token and takes one hit per burst.
     const struck = state.flights.find((flight) => flight.id === id);
     if (struck?.key != null) {
@@ -826,11 +876,14 @@ function createOpeningGlowStore(): OpeningGlowStore {
     // Every other landing bursts (the first and third of four): half the particle
     // views for the same read, since the impacts land 65 ms apart. The finale always bursts.
     // Past the pool, a burst is skipped rather than mounted fresh: a streak stays at its cap.
-    if (landed && (finale || landed.index % 2 === 0)) setImpacts((bursts) => {
-      const wisp = landed.key != null;
+    // A Glow shot (and a lane bolt) always bursts, as the strike on a wisp does: light meeting the Mist.
+    const miss = Boolean(landed?.direct) && landed?.key == null;
+    if (landed && !miss && (finale || landed.shot || landed.direct || landed.index % 2 === 0)) setImpacts((bursts) => {
+      const wisp = landed.key != null || Boolean(landed.shot);
       const live = bursts.reduce((count, burst) => count + (Boolean(burst.wisp) === wisp ? 1 : 0), 0);
       if (!finale && live >= (wisp ? STRIKE_BURST_POOL : IMPACT_BURST_POOL)) return bursts;
-      return [...bursts, { id, wisp, at: { x: landed.to.x + (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 10, y: landed.to.y } }];
+      const spread = landed.shot ? 0 : (landed.index - (OPENING_GLOWS_PER_MERGE - 1) / 2) * 10;
+      return [...bursts, { id, wisp, at: { x: landed.to.x + spread, y: landed.to.y } }];
     });
     setFlights((current) => current.filter((flight) => flight.id !== id));
     setLanded((count) => count + 1);
@@ -858,6 +911,27 @@ function createOpeningGlowStore(): OpeningGlowStore {
     const to = aimed?.point ?? { x: from.x, y: from.y - 220 };
     setFlights((current) => [...current, { id, index: 0, count: 1, from, to, art, size: 44, group: ++groupSeq.current, key: aimed?.key }]);
   };
+  const launchVolley = (shots: readonly GlowVolleyShot[], onLand: (index: number) => void) => {
+    const group = ++groupSeq.current;
+    const made = shots.map((shot, index): OpeningGlowFlight => {
+      const id = ++nextId.current;
+      shotLandings.set(id, () => onLand(index));
+      // The burst's own rise and staggered flight in: one Glow token per shot.
+      return { id, index: Math.min(index, 4), count: Math.max(1, shots.length), from: shot.from, to: shot.to, group, shot: true };
+    });
+    setFlights((current) => [...current, ...made]);
+  };
+  const launchBolts = (bolts: readonly { from: RewardFlightPoint; wisp: number; to?: RewardFlightPoint; durationMs: number }[]) => {
+    const made: OpeningGlowFlight[] = [];
+    for (const bolt of bolts) {
+      const aimed = bolt.wisp >= 0 ? sinkRef.current?.pointOf?.(bolt.wisp) ?? null : null;
+      const to = aimed ?? bolt.to;
+      if (!to) continue;
+      // Each its own group: a bolt at a wisp flinches it and bursts where it lands; a miss fades out on its way up.
+      made.push({ id: ++nextId.current, index: 0, count: 1, from: bolt.from, to, group: ++groupSeq.current, ...(aimed ? { key: bolt.wisp } : {}), direct: Math.max(80, bolt.durationMs) });
+    }
+    if (made.length) setFlights((current) => [...current, ...made]);
+  };
   const launchFinale = (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null): number => {
     const id = ++nextId.current;
     finaleIdRef.current = id;
@@ -880,7 +954,7 @@ function createOpeningGlowStore(): OpeningGlowStore {
     getFlights: () => flightsSnapshot,
     getFinale: () => finaleSnapshot,
     finaleHoldRef, sinkRef, targetRef,
-    launch, launchItem, launchShot, launchFinale, arrive, impactDone,
+    launch, launchItem, launchShot, launchVolley, launchBolts, launchFinale, arrive, impactDone,
   };
 }
 

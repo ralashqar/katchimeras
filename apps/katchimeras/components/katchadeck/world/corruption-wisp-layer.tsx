@@ -71,6 +71,8 @@ export type CorruptionWispTarget = {
 };
 /** A board opening asks the camera to frame its tile; this is how long to give it to start moving before a measurement is trusted. */
 const SETTLE_GRACE_MS = 200;
+/** Lanes: a drifting wisp aims this far ahead of its latest place (its place arrives every 100 ms tick), so it never stops between them. */
+const DRIFT_LEAD_MS = 350;
 /** How long a wisp line stays under the tile. */
 const CAPTION_MS = 1_700;
 /** After the strike that burst the mist open: when its line is said. */
@@ -83,7 +85,7 @@ const TILE_SKY_WISP_SIZE = 0.18;
 
 type WispFrame = { x: number; y: number; width: number; height: number };
 /** Where every wisp is drawn, window-space, and where the line under them goes. */
-export type WispLayout = { frame: WispFrame; wisps: readonly { x: number; y: number; size: number }[]; captionTop: number };
+export type WispLayout = { frame: WispFrame; wisps: readonly { x: number; y: number; size: number; /** Lanes: drifting down this many px per ms. */ vy?: number }[]; captionTop: number };
 
 export type CorruptionWisps = {
   visible: boolean;
@@ -101,6 +103,19 @@ export type CorruptionWisps = {
   caption: { id: number; text: string } | null;
 };
 
+/**
+ * Lanes: the window-space centre of a column at a board row, the rows above the board continuing at the board's own
+ * pitch (row -1 is a row over the top row).
+ */
+export function laneWispPoint(metrics: MergeBoardScreenMetrics, window: MissionWindow, column: number, row: number): { x: number; y: number } {
+  const top = window.cellIndices[Math.max(0, Math.min(window.columns - 1, column))]!;
+  const below = window.cellIndices[window.columns + Math.max(0, Math.min(window.columns - 1, column))] ?? top;
+  const a = mergeCellCenter(metrics.geometry, top);
+  const b = mergeCellCenter(metrics.geometry, below);
+  const pitch = below === top ? mergeCellFrame(metrics.geometry, top).bounds.height : b.y - a.y;
+  return { x: metrics.x + a.x, y: metrics.y + a.y + row * pitch };
+}
+
 /** Every wisp's place on screen: over the tile by its fractions, on the sky grid above the board, or on its nest cell. */
 export function wispLayout(target: CorruptionWispTarget, views: readonly MissionWispView[], tileFrame: WispFrame | null): WispLayout | null {
   const mechanic = resolveMechanic(target.host);
@@ -113,6 +128,19 @@ export function wispLayout(target: CorruptionWispTarget, views: readonly Mission
     if (!columns.length) return null;
     const first = mergeCellFrame(geometry, columns[0]!).bounds;
     const last = mergeCellFrame(geometry, columns[columns.length - 1]!).bounds;
+    // Lanes: each wisp over its column, on the board's own rows (above the top row while it is still coming).
+    if (views.some((view) => view.placement.kind === 'lane')) {
+      const bottom = mergeCellFrame(geometry, anchor.window.cellIndices[anchor.window.cellIndices.length - 1]!).bounds;
+      const frame = { x: metrics.x + first.left, y: metrics.y + first.top, width: last.left + last.width - first.left, height: bottom.top + bottom.height - first.top };
+      const wisps = views.map((view) => {
+        const column = view.placement.kind === 'lane' ? view.placement.column : 0;
+        const row = view.placement.kind === 'lane' ? view.placement.row : -1;
+        const point = laneWispPoint(metrics, anchor.window, column, row);
+        const pitch = laneWispPoint(metrics, anchor.window, column, row + 1).y - point.y;
+        return { x: point.x, y: point.y, size: Math.max(36, first.width * (view.placement.kind === 'lane' ? view.placement.size ?? 0.9 : 0.9)), vy: (view.drift ?? 0) * pitch };
+      });
+      return { frame, wisps, captionTop: frame.y - 34 };
+    }
     // A territory battle: each wisp sits on its nest, a cell of the board; no tile to measure.
     if (views.some((view) => view.placement.kind === 'cell')) {
       const bottom = mergeCellFrame(geometry, anchor.window.cellIndices[anchor.window.cellIndices.length - 1]!).bounds;
@@ -281,6 +309,7 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
         const point = layout.wisps[resolved.target]!;
         return { point: { x: point.x, y: point.y }, key: resolved.target };
       },
+      pointOf: (index) => { const point = layout.wisps[index]; return point ? { x: point.x, y: point.y } : null; },
       struck: (index) => setStrikes((current) => ({ ...current, [index]: (current[index] ?? 0) + 1 })),
       landed: (index) => {
         const strike = queuedRef.current.get(index)?.shift() ?? null;
@@ -294,7 +323,8 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
     leaving: !target && leaving,
     layout: shownLayout,
     views,
-    ...(mechanic?.kind === 'dark-wisps' && state?.kind === 'dark-wisps' && target?.anchor ? { aimTarget: (cell: number, tier: number) => pulseTarget(mechanic, state, cell, tier, target.anchor!.window) } : {}),
+    // Merge vs Mist shows its Glow's targets on the board instead; the ring is a territory battle's.
+    ...(mechanic?.kind === 'dark-wisps' && state?.kind === 'dark-wisps' && target?.anchor && mechanic.mode !== 'tactics' ? { aimTarget: (cell: number, tier: number) => pulseTarget(mechanic, state, cell, tier, target.anchor!.window) } : {}),
     strikes,
     sink,
     caption,
@@ -312,11 +342,11 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
   const aim = usePulseAim();
   const aimedIndex = aim && wisps.aimTarget ? wisps.aimTarget(aim.cell, aim.tier) : null;
   if (!layout) return null;
-  // Territory wisps sit on the board's own cells, so they are drawn over the docked board rather than under it.
-  const onBoard = wisps.views.some((view) => view.placement.kind === 'cell');
+  // Territory wisps sit on the board's own cells, and lane wisps come down its columns: both are drawn over the docked board.
+  const onBoard = wisps.views.some((view) => view.placement.kind === 'cell' || view.placement.kind === 'lane');
   return <View pointerEvents="none" style={[StyleSheet.absoluteFill, onBoard ? styles.layerOnBoard : styles.layer]}>
     {wisps.views.map((view, index) => <CorruptionWisp
-      key={view.id} index={index} enterDelayMs={view.enterDelayMs}
+      key={view.id} index={index} enterDelayMs={view.enterDelayMs} drift={view.placement.kind === 'lane'} vy={layout.wisps[index]?.vy ?? 0}
       x={(layout.wisps[index]?.x ?? layout.frame.x) - origin.x} y={(layout.wisps[index]?.y ?? layout.frame.y) - origin.y}
       size={layout.wisps[index]?.size ?? 48}
       pip={view.hp > 1 ? `${Math.max(0, view.hp - view.damage)}` : null}
@@ -348,7 +378,7 @@ export const MissionWisps = memo(function MissionWisps({ target, glow, screenRef
 });
 
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */
-const CorruptionWisp = memo(function CorruptionWisp({ index, enterDelayMs, x, y, size, pip, intent, aimed = false, look = null, weakTo = null, alive, leaving, strikeNonce }: { /** v2: the chain it is weak to. */ weakTo?: 'growth' | 'water' | null; /** v2: its Dark Wisp art, when it has one. */ look?: string | null; /** v2: the wisp a held piece would hit. */ aimed?: boolean; index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; /** v2: what it will do next, and in how many turns. */ intent: MissionWispView['intent'] | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
+const CorruptionWisp = memo(function CorruptionWisp({ drift = false, vy = 0, index, enterDelayMs, x, y, size, pip, intent, aimed = false, look = null, weakTo = null, alive, leaving, strikeNonce }: { /** Lanes: it drifts down steadily; its place arrives every tick, and it moves between them on its own at its speed. */ drift?: boolean; /** Lanes: its drift, px per ms (0 while it holds). */ vy?: number; /** v2: the chain it is weak to. */ weakTo?: 'growth' | 'water' | null; /** v2: its Dark Wisp art, when it has one. */ look?: string | null; /** v2: the wisp a held piece would hit. */ aimed?: boolean; index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; /** v2: what it will do next, and in how many turns. */ intent: MissionWispView['intent'] | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
   const reduceMotion = useReducedMotion();
   const hover = useSharedValue(0);
   const shake = useSharedValue(0);
@@ -447,15 +477,33 @@ const CorruptionWisp = memo(function CorruptionWisp({ index, enterDelayMs, x, y,
     transform: [{ scale: (1.55 + pulse.value * 0.12 + death.value * 0.5) * Math.max(0.2, Math.min(1, entrance.value)) }],
   }));
   // Its place: where it first appears it simply is; a move after that (a burrow, the board settling) glides there.
+  // It is laid out once at that first place and only ever moved by transform on the UI thread, so a new place never
+  // jumps it for a frame before the glide catches up.
+  const [base] = useState(() => ({ x, y }));
   const placeX = useSharedValue(x);
   const placeY = useSharedValue(y);
   useEffect(() => {
-    placeX.value = reduceMotion ? x : withTiming(x, { duration: 420, easing: Easing.inOut(Easing.cubic) });
-    placeY.value = reduceMotion ? y : withTiming(y, { duration: 420, easing: Easing.inOut(Easing.cubic) });
-  }, [placeX, placeY, reduceMotion, x, y]);
-  const placeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: placeX.value - x }, { translateY: placeY.value - y }] }));
+    if (reduceMotion) { placeX.value = x; placeY.value = y; return; }
+    if (drift && vy > 0) {
+      // Drifting: aim a little ahead of where the level says it is and move there at its own speed. The next place
+      // arrives before it gets there, so the motion never stops or changes pace; a small lag or lead corrects itself.
+      placeX.value = x;
+      const ahead = y + vy * DRIFT_LEAD_MS;
+      const distance = ahead - placeY.value;
+      if (distance > 0 && Math.abs(placeY.value - y) < vy * DRIFT_LEAD_MS * 2) {
+        placeY.value = withTiming(ahead, { duration: distance / vy, easing: Easing.linear });
+        return;
+      }
+      placeY.value = withTiming(y, { duration: 220, easing: Easing.out(Easing.quad) });
+      return;
+    }
+    const glide = drift ? { duration: 220, easing: Easing.out(Easing.quad) } : { duration: 420, easing: Easing.inOut(Easing.cubic) };
+    placeX.value = withTiming(x, glide);
+    placeY.value = withTiming(y, glide);
+  }, [drift, placeX, placeY, reduceMotion, vy, x, y]);
+  const placeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: placeX.value - base.x }, { translateY: placeY.value - base.y }] }));
   if (gone) return null;
-  return <Animated.View pointerEvents="none" style={[styles.wisp, { left: x - size / 2, top: y - size / 2, width: size, height: size }, placeStyle]}>
+  return <Animated.View pointerEvents="none" style={[styles.wisp, { left: base.x - size / 2, top: base.y - size / 2, width: size, height: size }, placeStyle]}>
     <Animated.View style={[StyleSheet.absoluteFill, styles.rim, rimStyle]}>
       <Image accessibilityIgnoresInvertColors contentFit="contain" source={SOFT_GLOW} style={StyleSheet.absoluteFill} tintColor={RIM} transition={0} />
     </Animated.View>
@@ -479,9 +527,11 @@ const CorruptionWisp = memo(function CorruptionWisp({ index, enterDelayMs, x, y,
 const INTENT_ICON: Readonly<Record<NonNullable<MissionWispView['intent']>['kind'], IconSymbolName>> = {
   surge: 'cloud.fog.fill', snuff: 'cloud.fog.fill', shroud: 'cloud.fill', root: 'leaf.fill', devour: 'exclamationmark.triangle.fill',
   ward: 'shield.fill', mend: 'heart.fill', call: 'sparkles', gather: 'bolt.fill', burrow: 'chevron.down', spores: 'circle.grid.2x2.fill',
+  rain: 'cloud.rain.fill', bind: 'lock.fill', shield: 'shield.fill',
+  rest: 'moon.stars.fill', corrupt: 'cloud.fog.fill', move: 'arrow.right',
 };
 /** Intents that take ground: the chip turns warm while one is coming. */
-const SPREADING: ReadonlySet<string> = new Set(['surge', 'snuff', 'gather', 'shroud', 'root', 'spores']);
+const SPREADING: ReadonlySet<string> = new Set(['surge', 'snuff', 'gather', 'shroud', 'root', 'spores', 'rain', 'bind', 'devour', 'corrupt']);
 
 /** v2: over the wisp, what it will do next and in how many turns; its ward beside it; a gather's stagger bar under it. */
 const IntentChip = memo(function IntentChip({ intent, size }: { intent: NonNullable<MissionWispView['intent']>; size: number }) {

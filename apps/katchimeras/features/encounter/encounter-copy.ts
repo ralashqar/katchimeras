@@ -22,6 +22,7 @@ export const ENCOUNTER_LOSS_V2 = {
   overrun: { title: 'The Mist has taken over.', body: 'It held too much of the ground this time. Let\u2019s try another way.' },
   choked: { title: 'The Mist has closed in.', body: 'There was no room left to merge. Let\u2019s try another way.' },
   spent: { title: 'Nothing left to merge.', body: 'The pieces ran out before the wisps did. Let\u2019s try another way.' },
+  breached: { title: 'A wisp got through.', body: 'It reached the bottom of the board. Line your pieces up under the wisps and merge them bigger.' },
   keepGoing: 'Keep going \u00b7 push the Mist back',
 } as const;
 
@@ -30,11 +31,16 @@ export const INTENT_WORDS: Readonly<Record<import('@/types/mission-mechanic').Wi
   surge: 'spreads its Mist', snuff: 'spreads its Mist', shroud: 'lays thick Mist', root: 'roots a cell', devour: 'eats a small piece',
   ward: 'raises a ward', mend: 'mends', call: 'calls another wisp', gather: 'gathers a heavy surge',
   burrow: 'burrows deeper', spores: 'drops a spore',
+  rain: 'lets Mist fall', bind: 'binds a piece', shield: 'shields another',
+  rest: 'has nowhere to spread', corrupt: 'spreads its Mist', move: 'drifts through its Mist',
 };
 
 /** Territory: the friend's warning when a wisp is one turn from spreading (no exclamation near the Mist). */
 export const THREAT_LINE = 'It is about to spread. Clear around it first.';
 export const GATHER_LINE = 'It is gathering. Hit it hard now and it will lose its hold.';
+/** Merge vs Mist: the first lines a friend says in a battle (`docs/encounter-tactics.md`). */
+export const SPREAD_LINE = 'Every time we merge, it spreads too. We have to push it back.';
+export const EXPOSED_WISP_LINE = 'It is open. Merge right beside it.';
 /** Territory: said when a wisp's nest first has an open cell beside it. */
 export const EXPOSED_LINE = 'It is open. Merge right beside it.';
 
@@ -42,7 +48,12 @@ export const EXPOSED_LINE = 'It is open. Merge right beside it.';
  * v2: what is said when a wisp acts, over the board, for a beat. The Mist's voice: no exclamation near the Mist,
  * the Mist always capitalised, the wisps never named here (a line is about what happened, not who).
  */
-export const WISP_ACT_LINES: Readonly<Record<'surged' | 'spore_bloomed' | 'split' | 'staggered' | 'called' | 'burrowed' | 'warded' | 'ate' | 'root_mist' | 'shrouded' | 'spored' | 'mended', string>> = {
+export const WISP_ACT_LINES: Readonly<Record<'drifted' | 'bound' | 'held' | 'rained' | 'shielded' | 'surged' | 'spore_bloomed' | 'split' | 'staggered' | 'called' | 'burrowed' | 'warded' | 'ate' | 'root_mist' | 'shrouded' | 'spored' | 'mended', string>> = {
+  drifted: 'It slipped away through the Mist. Clear around it and it has nowhere to go.',
+  bound: 'The Mist closed over a piece. Glow on it frees it.',
+  held: 'It held its ground. The Mist could not take it.',
+  rained: 'Mist falls from above.',
+  shielded: 'It shields another from above.',
   surged: 'The Mist spreads. It wants the ground back.',
   spore_bloomed: 'A spore opened into Mist.',
   split: 'It broke in two. The small one hides in the Mist.',
@@ -57,7 +68,7 @@ export const WISP_ACT_LINES: Readonly<Record<'surged' | 'spore_bloomed' | 'split
   mended: 'It knits itself back together.',
 };
 /** Which act is said when several happen on one turn: the one that matters most to the player. */
-export const WISP_ACT_ORDER: readonly (keyof typeof WISP_ACT_LINES)[] = ['surged', 'spore_bloomed', 'split', 'staggered', 'called', 'burrowed', 'warded', 'ate', 'root_mist', 'shrouded', 'spored', 'mended'];
+export const WISP_ACT_ORDER: readonly (keyof typeof WISP_ACT_LINES)[] = ['drifted', 'bound', 'held', 'rained', 'shielded', 'surged', 'spore_bloomed', 'split', 'staggered', 'called', 'burrowed', 'warded', 'ate', 'root_mist', 'shrouded', 'spored', 'mended'];
 
 export const CACHE_FOUND_LINE = 'Wait! I think there’s something underneath here.';
 
@@ -89,7 +100,7 @@ const MOSSPROUT_LINES: Readonly<Record<EncounterLineEvent, string>> = {
 const STEPPLING_LINES: Readonly<Record<EncounterLineEvent, string>> = {
   enter: 'I know where it’s thin. Follow me.',
   lowResolve: '{{remaining}} left. Pick the sure ones.',
-  abilityReady: 'I can show you where the Mist is thin.',
+  abilityReady: 'I can clear a path through the Mist. Point me at it.',
   cacheFound: CACHE_FOUND_LINE,
   spawnerEmpty: 'Locker’s empty. Merge, and it fills a little.',
   stuck: 'Nothing left to merge. Let me look.',

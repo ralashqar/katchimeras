@@ -56,3 +56,31 @@ export function windowDistance(a: number, b: number, window: MissionWindow): num
   if (ia < 0 || ib < 0) return Number.POSITIVE_INFINITY;
   return Math.abs((ia % window.columns) - (ib % window.columns)) + Math.abs(Math.floor(ia / window.columns) - Math.floor(ib / window.columns));
 }
+
+/**
+ * The columns (1-5) of the sky over the board a pulse reaches (`docs/encounter-turns-sky-bound.md`): the space above
+ * the top row counts as one more row, so a merge on the top row reaches the sky over its column (a Plant's ring the
+ * columns either side too), and a tier 5+ diamond reaches it from the second row.
+ */
+export function pulseReachesSky(cell: number, tier: number, window: MissionWindow): number[] {
+  const index = window.cellIndices.indexOf(cell);
+  if (index < 0) return [];
+  const column = index % window.columns;
+  const row = Math.floor(index / window.columns);
+  const pulse = pulseFor(tier);
+  const radius = pulse.reach === 'diamond' ? 2 : 1;
+  const out: number[] = [];
+  for (let dx = -radius; dx <= radius; dx += 1) {
+    const dy = row + 1;
+    const manhattan = Math.abs(dx) + dy;
+    const reaches = pulse.reach === 'cross' ? manhattan === 1 : pulse.reach === 'ring' ? dy === 1 && Math.abs(dx) <= 1 : manhattan <= 2;
+    if (reaches && column + dx >= 0 && column + dx < window.columns) out.push(column + dx + 1);
+  }
+  return out;
+}
+
+/** The window cells of a board column (1-5), top row first. */
+export function columnCells(column: number, window: MissionWindow): number[] {
+  if (column < 1 || column > window.columns) return [];
+  return Array.from({ length: window.rows }, (_, row) => window.cellIndices[row * window.columns + column - 1]!);
+}

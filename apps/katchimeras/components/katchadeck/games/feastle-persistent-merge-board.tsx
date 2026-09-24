@@ -173,7 +173,7 @@ function isInterruptibleMotion(motion?: SpriteMotion) {
   return motion == null || motion.kind === 'move' || motion.kind === 'swap' || motion.kind === 'return' || motion.kind === 'spawn' || motion.kind === 'merge-result';
 }
 
-export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onBoardRelease, onScreenMetrics, screenMetricsRevision = 0, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true, animateArrivals = false, layout = DEFAULT_MERGE_BOARD_LAYOUT, onHoverCell, externalEffects }: {
+export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeBoard({ state, width, maxHeight, selectedCell, onSelect, onCommand, onCommandSettled, onInteractionGateCommitted, onBoardRelease, onScreenMetrics, screenMetricsRevision = 0, onVisualReady, onBlockedInteraction, onInspectMist, onInspectRootbound, onHiddenItemsRetired, interactionGate = { kind: 'open' }, interactionSessionKey = 'open', sessionId, hiddenItemInstanceIds, animateEntrance = true, animateArrivals = false, layout = DEFAULT_MERGE_BOARD_LAYOUT, onHoverCell, externalEffects, heldMist }: {
   state: MergeWorldState;
   width: number;
   animateEntrance?: boolean;
@@ -204,6 +204,11 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   onHoverCell?: (cell: number, source: number) => void;
   /** Effects the board's owner asks for on cells (a piece a wisp ate puffs away); each id plays once. */
   externalEffects?: readonly { id: number; cell: number; kind: MergeBoardEffectKind }[];
+  /**
+   * Merge vs Mist: Mist the board keeps drawing on these cells although the state has already cleared (or worn) it,
+   * because the Glow shot at it is still in the air. The owner drops a cell when its shot lands, and the Mist lets go then.
+   */
+  heldMist?: Readonly<Record<number, MergeWorldState['board'][number]['mist']>>;
 }) {
   recordMergeRender('board');
   const foreground = useAppForeground();
@@ -360,16 +365,18 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     return () => clearTimeout(timer);
   }, [reduceMotion]);
   const mistBoardRef = useRef<MergeWorldState['board'] | null>(null);
+  const heldMistRef = useRef<typeof heldMist>(undefined);
   useEffect(() => {
     const previous = mistBoardRef.current;
+    const previousHeld = heldMistRef.current;
     mistBoardRef.current = presentation.board;
-    if (!previous || previous === presentation.board || !mistMotion) return;
-    // An encounter's Mist cleared by a pulse, or spread by a wisp: a puff of motes on the cell, one after another.
+    heldMistRef.current = heldMist;
+    if (!previous || (previous === presentation.board && previousHeld === heldMist) || !mistMotion) return;
+    // An encounter's Mist cleared (the Glow shot at it has landed), or spread by a wisp: a puff of motes on the cell, one after another.
+    const encounterAt = (board: MergeWorldState['board'], held: typeof heldMist, index: number) => (held?.[index] ?? board[index]?.mist)?.kind === 'encounter';
     const changed: number[] = [];
     for (const index of renderedCellIndices) {
-      const was = previous[index]?.mist?.kind === 'encounter';
-      const is = presentation.board[index]?.mist?.kind === 'encounter';
-      if (was !== is) changed.push(index);
+      if (encounterAt(previous, previousHeld, index) !== encounterAt(presentation.board, heldMist, index)) changed.push(index);
     }
     changed.forEach((cell, order) => {
       if (order === 0 || reduceMotion) emitBoardEffect(cell, 'mist-burst');
@@ -377,7 +384,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     });
   // Only when the board shown changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presentation.board]);
+  }, [presentation.board, heldMist]);
   const playedEffectsRef = useRef(new Set<number>());
   useEffect(() => {
     for (const effect of externalEffects ?? []) {
@@ -672,7 +679,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       return;
     }
     const targetCell = current.board[to];
-    if (!targetCell || (targetCell.locked && targetCell.mist?.kind !== 'echo' && targetCell.mist?.kind !== 'rootbound_echo' && targetCell.mist?.kind !== 'dreambound_item' && targetCell.mist?.kind !== 'resident_card')) {
+    const caughtPiece = targetCell?.mist?.kind === 'encounter' && targetCell.mist.type === 'bound';
+    if (!targetCell || (targetCell.locked && !caughtPiece && targetCell.mist?.kind !== 'echo' && targetCell.mist?.kind !== 'rootbound_echo' && targetCell.mist?.kind !== 'dreambound_item' && targetCell.mist?.kind !== 'resident_card')) {
       if (targetCell?.locked) {
         showCellFeedback(to, 'locked_cell');
         returnHome();
@@ -723,6 +731,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       nextMotions[spriteId(result)] = { kind: 'merge-result', startX: targetOrigin.x, startY: targetOrigin.y };
       const mistDefinitionId = targetCell.mist?.kind === 'echo'
         ? targetCell.mist.definitionId
+        : targetCell.mist?.kind === 'encounter' && targetCell.mist.holds?.kind === 'item' ? targetCell.mist.holds.definitionId
         : targetCell.mist?.kind === 'rootbound_echo' ? targetCell.mist.definitionId
         : targetCell.mist?.kind === 'dreambound_item' ? targetCell.mist.boundDefinitionId : null;
       if (mistDefinitionId) {
@@ -970,7 +979,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         && cell.mist.definitionId === selectedDefinitionId
         && (!selectedProgressionGateId || cell.mist.gateId === selectedProgressionGateId);
       const dreamboundMatch = cell.mist?.kind === 'dreambound_item' && cell.mist.active && cell.mist.boundDefinitionId === selectedDefinitionId;
-      return itemMatch || echoMatch || rootboundMatch || dreamboundMatch ? [index] : [];
+      const caughtMatch = cell.mist?.kind === 'encounter' && cell.mist.type === 'bound' && cell.mist.holds?.kind === 'item' && cell.mist.holds.definitionId === selectedDefinitionId;
+      return itemMatch || echoMatch || rootboundMatch || dreamboundMatch || caughtMatch ? [index] : [];
     });
   }, [presentation.board, selectedCell, selectedDefinitionId, selectedProgressionGateId, visibleCellSet]);
   const matchingCellsKey = matchingCells.join(':');
@@ -1209,6 +1219,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
         const cell = presentation.board[index];
         if (!cell) return null;
         const frame = cellFrames[index];
+        // Mist a Glow shot is still flying at: drawn as it was until the shot lands.
+        const held = heldMist?.[index];
         const occupant = cell.occupant;
         const item = occupant?.kind === 'item' ? occupant : null;
         const generator = occupant?.kind === 'generator' ? MERGE_GENERATORS_BY_ID.get(occupant.generatorId) : null;
@@ -1240,7 +1252,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
                       ? `A path to ${dormantNames.join(' or ')}. Meet them to open this space.`
                       : 'A future Katchimera story will open this space.'
                 : cell.mist?.kind === 'veiled' ? 'Thick mist. Wake the sleeping cell beside it and it lets go.'
-                : cell.mist?.kind === 'encounter' ? cell.mist.type === 'wisp-bound' ? 'A Dark Wisp’s nest. It opens when the wisp falls.' : cell.mist.type === 'root' ? 'Root Mist. Only a Growth merge’s pulse cuts it.' : `${cell.mist.type === 'dense' ? 'Thick' : 'Light'} Mist. ${cell.mist.hp} ${cell.mist.hp === 1 ? 'hit' : 'hits'} from a merge’s pulse and it clears.`
+                : cell.mist?.kind === 'encounter' ? cell.mist.type === 'bound' ? 'A piece caught in the Mist. A merge’s pulse beside it frees it, or merge its twin into it.' : cell.mist.type === 'wisp-bound' ? 'A Dark Wisp.' : cell.mist.type === 'root' ? 'Root Mist. Only a Growth merge’s pulse cuts it.' : `${cell.mist.type === 'dense' ? 'Thick' : 'Light'} Mist. ${cell.mist.hp} ${cell.mist.hp === 1 ? 'hit' : 'hits'} from a merge’s pulse and it clears.`
                 : cell.mist ? 'Something is hidden in the Dream Mist.' : 'Empty board space';
         return <BoardCell
           accessibilityActionLabel={gateKind === 'drag' && index === gateFromCell
@@ -1249,7 +1261,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
               : cell.mist || cell.locked ? 'Show details' : 'Select or move item'}
           accessibilityDisabled={gateKind === 'locked' || (gateKind === 'drag' && index !== gateFromCell) || (gateKind === 'generator' && index !== gateGeneratorCell)}
           accessibilityLabel={label}
-          blocked={cell.locked && !occupant}
+          blocked={held ? held.kind !== 'encounter' || held.type !== 'bound' : cell.locked && !occupant}
           checkerboardColor={layout.checkerboardCellColor && (
             (Math.floor(visualIndex / layout.columns) + visualIndex % layout.columns) % 2 === 1
           ) ? layout.checkerboardCellColor : null}
@@ -1259,7 +1271,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           key={index}
           left={frame.bounds.left}
           onActivate={accessibleAction}
-          mist={cell.mist}
+          mist={held ?? cell.mist}
           mistMotion={mistMotion}
           matchHint={matchHintForCell(index)}
           top={frame.bounds.top}
@@ -1338,9 +1350,10 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   const checkerboardRadius = Math.max(6, Math.min(width, height) * (14 / 128));
   const rootbound = mist?.kind === 'rootbound_echo' ? mist : null;
   const residentCard = mist?.kind === 'resident_card' ? mist : null;
+  const caught = mist?.kind === 'encounter' && mist.type === 'bound' && mist.holds?.kind === 'item' ? mist.holds.definitionId : null;
   const lockedDefinitionId = mist?.kind === 'echo'
     ? mist.definitionId
-    : mist?.kind === 'dreambound_item' ? mist.boundDefinitionId : null;
+    : mist?.kind === 'dreambound_item' ? mist.boundDefinitionId : caught;
   return <View style={[styles.cell, { height, left, top, width }]}>
     <View
       accessible
@@ -1371,7 +1384,7 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
       </View> : null}
       {rootbound ? <RootboundRewardArt gateId={rootbound.gateId} matchHint={matchHint} ready={rootbound.ready} size={Math.min(width, height) - 4} /> : null}
       {residentCard ? <View pointerEvents="none" style={styles.echoItem}><MergeMatchHint active={matchHint != null} offsetX={matchHint?.x ?? 0} offsetY={matchHint?.y ?? 0}><Image accessibilityIgnoresInvertColors contentFit="contain" source={RESIDENT_CARD_ART} style={{ height: Math.min(width, height) - 8, opacity: residentCard.ready ? 1 : 0.72, width: Math.min(width, height) - 8 }} transition={0} /></MergeMatchHint></View> : null}
-      {lockedDefinitionId || rootbound || residentCard ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" pointerEvents="none" recyclingKey="merge-dream-mist-lower" source={DREAM_MIST_LOWER} style={[styles.lockedOverlay, styles.lowerMistOverlay]} transition={0} /> : null}
+      {caught ? <CaughtMistOverlay animate={mistMotion} /> : lockedDefinitionId || rootbound || residentCard ? <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" pointerEvents="none" recyclingKey="merge-dream-mist-lower" source={DREAM_MIST_LOWER} style={[styles.lockedOverlay, styles.lowerMistOverlay]} transition={0} /> : null}
       {mist?.kind === 'discovery_dormant' ? <View pointerEvents="none" style={styles.mistCategoryArt}><IconSymbol color="#F4D795" name="sparkles" size={Math.max(17, Math.min(width, height) * 0.38)} /></View> : null}
       {blocked && !lockedDefinitionId && !rootbound && !residentCard ? <FullMistOverlay animate={mistMotion} worn={mist?.kind === 'encounter' && mist.type === 'dense' && mist.hp <= 1} /> : null}
       {mist?.kind === 'discovery_fork' ? <View pointerEvents="none" style={styles.discoveryClue}>
@@ -1393,6 +1406,25 @@ const MIST_OUT = new Keyframe({
   35: { opacity: 0.9, transform: [{ scale: 1.14 }] },
   100: { opacity: 0, transform: [{ scale: 1.45 }] },
 }).duration(420);
+
+/** The Mist rising over a caught piece, and sinking away as it is freed. */
+const CAUGHT_IN = new Keyframe({
+  0: { opacity: 0, transform: [{ translateY: 14 }, { scale: 0.9 }] },
+  100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] },
+}).duration(380);
+const CAUGHT_OUT = new Keyframe({
+  0: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] },
+  100: { opacity: 0, transform: [{ translateY: 16 }, { scale: 1.15 }] },
+}).duration(360);
+
+/** A caught piece's low Mist (the first boards' half-Mist): it rises over the piece and sinks away when the piece is freed. */
+const CaughtMistOverlay = memo(function CaughtMistOverlay({ animate }: { animate: boolean }) {
+  const reduceMotion = useReducedMotion();
+  const motion = animate && !reduceMotion;
+  return <Animated.View entering={motion ? CAUGHT_IN : undefined} exiting={motion ? CAUGHT_OUT : undefined} pointerEvents="none" style={[styles.lockedOverlay, styles.lowerMistOverlay]}>
+    <Image accessibilityIgnoresInvertColors allowDownscaling cachePolicy="memory" contentFit="fill" recyclingKey="merge-dream-mist-lower" source={DREAM_MIST_LOWER} style={styles.lockedOverlay} transition={0} />
+  </Animated.View>;
+});
 
 /** A cell's full Mist. After the board opens it scales in and puffs out; thick Mist worn by a hit thins a little. */
 const FullMistOverlay = memo(function FullMistOverlay({ animate, worn }: { animate: boolean; worn: boolean }) {

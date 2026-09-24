@@ -41,13 +41,13 @@ export const EXTRA_RUNGS: Readonly<Record<string, Partial<Record<number, readonl
     4: [islandLevel('island-campaign:fernip-wildgrowth', 'boss', {
       title: 'The Overgrowth', objective: 'Roots that were never the forest\u2019s own. It burrows from you; when it gathers, cut it back hard.', difficulty: 'boss',
       pieces: [[36, 1], [37, 1], [38, 1], [39, 1], [29, 2]], mist: [{ cell: 16, type: 'dense' }, { cell: 18, type: 'dense' }, { cell: 24, type: 'root' }, { cell: 22, type: 'light' }],
-      pod: { cell: 40, charges: 7, every: 3 }, spring: { cell: 33, charges: 5, every: 3, under: 'dense' },
+      pod: { cell: 40, charges: 9, every: 2 }, spring: { cell: 33, charges: 5, every: 3, under: 'dense' },
       wisps: [
-        { id: 'overgrowth', hp: 18, cell: 17, size: 1, look: 'overgrowth', weakTo: 'growth', intents: [{ kind: 'ward', every: 2, amount: 3 }, { kind: 'burrow', every: 3 }, { kind: 'gather', every: 3, amount: 3 }] },
+        { id: 'overgrowth', hp: 18, cell: 17, size: 1, look: 'overgrowth', weakTo: 'growth', slots: 2, intents: [{ kind: 'ward', every: 2, amount: 3 }, { kind: 'burrow', every: 3 }, { kind: 'gather', every: 3, amount: 3 }] },
         { id: 'surge', hp: 4, cell: 15, intents: [{ kind: 'surge', every: 2 }] },
         { id: 'creep', hp: 4, cell: 19, intents: [{ kind: 'root', every: 2 }] },
       ],
-      target: 'overgrowth', rewards: { glow: 50, xp: 30 },
+      target: 'overgrowth', overrun: 0.45, rewards: { glow: 50, xp: 30 },
     })],
   },
 };

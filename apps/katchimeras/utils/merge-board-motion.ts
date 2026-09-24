@@ -15,7 +15,7 @@ export function isMistMergeTransition(
 ) {
   return hasResultOccupant
     && mergedCell === targetCell
-    && (targetMistKind === 'echo' || targetMistKind === 'rootbound_echo' || targetMistKind === 'dreambound_item');
+    && (targetMistKind === 'echo' || targetMistKind === 'rootbound_echo' || targetMistKind === 'dreambound_item' || targetMistKind === 'encounter');
 }
 
 export function mergeMotionPiecewise(progress: number, stops: readonly number[], values: readonly number[]) {

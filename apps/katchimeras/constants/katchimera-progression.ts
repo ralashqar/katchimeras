@@ -10,7 +10,7 @@ export const KATCHIMERA_MAX_LEVEL = 10;
 export const KATCHIMERA_LEVEL_XP: readonly number[] = [0, 40, 100, 180, 280, 400, 540, 700, 880, 1080];
 /** Glow to go from a level to the next (index = level - 1). */
 export const KATCHIMERA_LEVEL_GLOW: readonly number[] = [15, 30, 50, 80, 120, 170, 230, 300, 380];
-export const PLAYABLE_KATCHIMERAS: readonly MergeCharacterId[] = ['mossprout', 'steppling', 'baristabbit'];
+export const PLAYABLE_KATCHIMERAS: readonly MergeCharacterId[] = ['mossprout', 'steppling', 'baristabbit', 'shellio', 'voyagle'];
 
 export const isPlayableKatchimera = (id: string): id is MergeCharacterId => (PLAYABLE_KATCHIMERAS as readonly string[]).includes(id);
 

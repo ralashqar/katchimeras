@@ -174,8 +174,10 @@ export function lanternUpgradeModel(progress: LanternWorldProgress | undefined):
 export function abilityTierSummary(ability: CompanionAbilityDefinition, tier: CompanionAbilityTier): string {
   const every = `every ${tier.chargeEvery} merges`;
   if (ability.id === 'bloom') return `Bloom ${every} · raises a plant up to tier ${tier.maxTier ?? 2}${tier.clearsAdjacentLight ? ' · clears light Mist beside it' : ''}${tier.twoTargets ? ' · first use raises two' : ''}`;
-  if (ability.id === 'trailfinder') return `Trailfinder ${every} · reveals ${tier.cells ?? 1} Mist cell${(tier.cells ?? 1) === 1 ? '' : 's'}`;
-  return `Focus ${every} · +${tier.charges ?? 1} charge${(tier.charges ?? 1) === 1 ? '' : 's'}, better drops for ${tier.taps ?? 3} taps`;
+  if (ability.id === 'clear-path') return `Clear Path ${every} · clears one Mist cell`;
+  if (ability.id === 'ripple') return `Ripple ${every} · the next Water merge clears as if ${tier.boost ?? 1} bigger`;
+  if (ability.id === 'scout') return `Scout ${every} · shows what ${tier.cells ?? 2} hidden cells hold`;
+  return `Focus ${every} · the next merge clears as if ${tier.boost ?? 1} bigger`;
 }
 
 /**
@@ -209,8 +211,8 @@ export function companionUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'ka
     benefits: ability && tierNow && tierNext ? [
       { id: 'charge', label: 'Charges every', icon: 'bolt.fill', tint: '#2FA9C4', from: `${tierNow.chargeEvery}`, to: `${tierNext.chargeEvery}`, delta: tierNow.chargeEvery === tierNext.chargeEvery ? undefined : `-${tierNow.chargeEvery - tierNext.chargeEvery}` },
       ...(ability.id === 'bloom' ? [{ id: 'reach', label: 'Raises up to tier', icon: 'sparkles' as const, tint: '#8A63C9', from: `${tierNow.maxTier ?? 2}`, to: `${tierNext.maxTier ?? 2}`, delta: (tierNow.maxTier ?? 2) === (tierNext.maxTier ?? 2) ? undefined : `+${(tierNext.maxTier ?? 2) - (tierNow.maxTier ?? 2)}` }] : []),
-      ...(ability.id === 'trailfinder' ? [{ id: 'cells', label: 'Cells revealed', icon: 'sparkles' as const, tint: '#8A63C9', from: `${tierNow.cells ?? 1}`, to: `${tierNext.cells ?? 1}`, delta: (tierNow.cells ?? 1) === (tierNext.cells ?? 1) ? undefined : `+${(tierNext.cells ?? 1) - (tierNow.cells ?? 1)}` }] : []),
-      ...(ability.id === 'focus' ? [{ id: 'charges', label: 'Charges added', icon: 'star.fill' as const, tint: '#D98A1F', from: `${tierNow.charges ?? 1}`, to: `${tierNext.charges ?? 1}`, delta: (tierNow.charges ?? 1) === (tierNext.charges ?? 1) ? undefined : `+${(tierNext.charges ?? 1) - (tierNow.charges ?? 1)}` }] : []),
+      ...(ability.id === 'scout' ? [{ id: 'cells', label: 'Cells shown', icon: 'sparkles' as const, tint: '#8A63C9', from: `${tierNow.cells ?? 2}`, to: `${tierNext.cells ?? 2}`, delta: (tierNow.cells ?? 2) === (tierNext.cells ?? 2) ? undefined : `+${(tierNext.cells ?? 2) - (tierNow.cells ?? 2)}` }] : []),
+      ...(ability.id === 'focus' || ability.id === 'ripple' ? [{ id: 'boost', label: 'Steps stronger', icon: 'star.fill' as const, tint: '#D98A1F', from: `${tierNow.boost ?? 1}`, to: `${tierNext.boost ?? 1}`, delta: (tierNow.boost ?? 1) === (tierNext.boost ?? 1) ? undefined : `+${(tierNext.boost ?? 1) - (tierNow.boost ?? 1)}` }] : []),
     ] : [],
     requirements: next == null || cost == null || needed == null ? [] : [
       { id: 'xp', label: 'Experience', detail: 'Earned in the Mist together.', met: progress.xp >= needed, current: Math.min(progress.xp, needed), total: needed, action: progress.xp >= needed ? undefined : { id: 'mist', label: 'Enter the Mist' } },

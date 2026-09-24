@@ -18,8 +18,11 @@ import type { FtueCameraDirective } from '@/features/onboarding/ftue-types';
 export type EncounterDifficulty = 'calm' | 'thick' | 'dark' | 'boss';
 export type EncounterGrade = 'cleared' | 'bright' | 'perfect';
 
-/** Mist a merge wears down: light (one hit), dense (two), root (plant merges only), wisp-bound (falls with its wisp). */
-export type EncounterMistType = 'light' | 'dense' | 'root' | 'wisp-bound';
+/**
+ * Mist a merge wears down: light (one hit), dense (two), root (plant merges only), wisp-bound (falls with its wisp),
+ * bound (a piece caught in the Mist: a pulse frees it, or its twin merged into it).
+ */
+export type EncounterMistType = 'light' | 'dense' | 'root' | 'wisp-bound' | 'bound';
 export type EncounterMistHolds = { kind: 'item'; definitionId: string } | { kind: 'spawner'; spawnerId: string };
 export type EncounterMistCell = {
   cell: number;
@@ -75,7 +78,7 @@ export type EncounterRewards = { glow: number; xp: number; firstClear?: { wispId
 export type EncounterDefinition = {
   id: string;
   storageKey: string;
-  rows: 3 | 4;
+  rows: 3 | 4 | 5;
   difficulty: EncounterDifficulty;
   seed: HatchableMissionSeed;
   mist: readonly EncounterMistCell[];
@@ -116,6 +119,6 @@ export const TERRITORY_DEFAULT_STARS: readonly [number, number] = [0.25, 0.45];
 /** What the player brings in: the Katchimera and its level, and one helper Wisp. */
 export type EncounterLoadout = { companionId: MergeCharacterId; level: number; wispId?: WispId };
 
-export const ENCOUNTER_MIST_DEFAULT_HP: Readonly<Record<EncounterMistType, number>> = { light: 1, dense: 2, root: 1, 'wisp-bound': 1 };
+export const ENCOUNTER_MIST_DEFAULT_HP: Readonly<Record<EncounterMistType, number>> = { light: 1, dense: 2, root: 1, 'wisp-bound': 1, bound: 1 };
 export const ENCOUNTER_DEFAULT_GRADES: EncounterDefinition['grades'] = { bright: 5, perfect: 10 };
 export const ENCOUNTER_DEFAULT_SAFETY_MARGIN = 2;

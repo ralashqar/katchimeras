@@ -1,4 +1,4 @@
-import type { DarkWisp, WispIntentKind } from '@/types/mission-mechanic';
+import type { DarkWisp, DarkWispKind, WispIntentKind } from '@/types/mission-mechanic';
 
 /**
  * What a Dark Wisp looks like (encounter v2): its own silhouette and one prop, so the kind reads at a glance. The
@@ -12,13 +12,18 @@ export type DarkWispLook = (typeof DARK_WISP_LOOKS)[number];
 /** The look a wisp wears when its data names none: a called one is a Mistling, else its first intent's kind. */
 const LOOK_BY_INTENT: Readonly<Record<WispIntentKind, DarkWispLook>> = {
   surge: 'snuffer', snuff: 'snuffer', shroud: 'shrouder', devour: 'nibbler', root: 'creeper', ward: 'warden', mend: 'mender', call: 'caller', gather: 'keeper',
-  burrow: 'creeper', spores: 'caller',
+  burrow: 'creeper', spores: 'caller', rain: 'shrouder', bind: 'creeper', shield: 'warden',
+  rest: 'mistling', corrupt: 'creeper', move: 'snuffer',
 };
+
+/** Merge tactics: each walking personality's look. */
+const LOOK_BY_KIND: Readonly<Record<DarkWispKind, DarkWispLook>> = { creeper: 'creeper', spore: 'caller', root: 'shrouder', snare: 'nibbler', drifter: 'snuffer' };
 
 export const isDarkWispLook = (value: unknown): value is DarkWispLook => typeof value === 'string' && (DARK_WISP_LOOKS as readonly string[]).includes(value);
 
-export function darkWispLook(wisp: Pick<DarkWisp, 'look' | 'hidden'>, firstIntent: WispIntentKind | null): DarkWispLook | null {
+export function darkWispLook(wisp: Pick<DarkWisp, 'look' | 'hidden' | 'kind'>, firstIntent: WispIntentKind | null): DarkWispLook | null {
   if (isDarkWispLook(wisp.look)) return wisp.look;
+  if (wisp.kind) return LOOK_BY_KIND[wisp.kind];
   if (wisp.hidden) return 'mistling';
   return firstIntent ? LOOK_BY_INTENT[firstIntent] : null;
 }

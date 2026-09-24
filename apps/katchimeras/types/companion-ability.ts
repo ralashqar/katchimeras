@@ -6,7 +6,7 @@ import type { MergeCharacterId } from './merge-world';
  * number: a later tier reaches higher pieces, clears Mist beside its target,
  * or touches two things at once. Every number is data on a tier.
  */
-export type CompanionAbilityId = 'bloom' | 'trailfinder' | 'focus';
+export type CompanionAbilityId = 'bloom' | 'clear-path' | 'focus' | 'ripple' | 'scout';
 
 export type CompanionAbilityTier = {
   /** The Katchimera level this tier is reached at. */
@@ -15,11 +15,13 @@ export type CompanionAbilityTier = {
   chargeEvery: number;
   /** Bloom: the highest tier of plant it can raise. */
   maxTier?: number;
-  /** Bloom: its Mist beside the target clears too. */
+  /** Bloom: the light Mist beside the target clears too, and a piece caught beside it is freed. */
   clearsAdjacentLight?: boolean;
   /** Bloom: the first use each board raises two pieces. */
   twoTargets?: boolean;
-  /** Trailfinder: Mist cells revealed. */
+  /** Focus / Ripple: tiers the next merge (the next Water merge) clears as if stronger. */
+  boost?: number;
+  /** Scout: Mist cells whose hidden contents it shows. */
   cells?: number;
   /** Focus: charges added to the spawner, and the better odds for its next taps. */
   charges?: number;
@@ -32,6 +34,7 @@ export type CompanionAbilityDefinition = {
   companion: MergeCharacterId;
   name: string;
   description: string;
-  targeting: 'item' | 'none' | 'spawner';
+  /** `mist`: a Mist cell (Clear Path). */
+  targeting: 'item' | 'none' | 'spawner' | 'mist';
   tiers: readonly CompanionAbilityTier[];
 };

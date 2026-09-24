@@ -5,12 +5,12 @@ import { COMPANION_ABILITIES, abilityForCompanion, abilityTier } from '@/constan
 import { PERK_BY_RARITY, SIGNATURE_PERK, perkLabel, wispPerk } from '@/constants/helper-wisps';
 import { abilityFor, abilityReady, abilityTargets, applyAbility } from '@/features/encounter/abilities';
 import { encounterWindow } from '@/features/encounter/create-state';
-import { encounterProfile, dropProfileFor } from '@/features/encounter/spawner-profile';
+import { encounterProfile } from '@/features/encounter/spawner-profile';
 import { createInitialMergeWorldState } from '@/utils/merge-world/engine';
 import { NOW, PLANT, SEED, SPROUT, itemAt, makeEncounter, mistAt, move, play, startPlay } from './helpers/encounter';
 
 test('every playable Katchimera has one ability whose tiers climb with the level and hold between them', () => {
-  assert.deepEqual(COMPANION_ABILITIES.map((ability) => [ability.companion, ability.id]), [['mossprout', 'bloom'], ['steppling', 'trailfinder'], ['baristabbit', 'focus']]);
+  assert.deepEqual(COMPANION_ABILITIES.map((ability) => [ability.companion, ability.id]), [['mossprout', 'bloom'], ['steppling', 'clear-path'], ['baristabbit', 'focus'], ['shellio', 'ripple'], ['voyagle', 'scout']]);
   for (const ability of COMPANION_ABILITIES) {
     assert.equal(ability.tiers[0]!.level, 1, `${ability.id}: level 1 is authored`);
     for (let index = 1; index < ability.tiers.length; index += 1) {
@@ -63,34 +63,35 @@ test('Bloom charges one per merge, raises one plant a step within its tier, and 
   assert.equal(itemAt(twice.board, 38), SPROUT);
 });
 
-test('Trailfinder reveals the thinnest Mist first and needs no target; Focus tends one spawner', () => {
+test('Clear Path lifts one Mist cell (never the wisp’s own); Focus and Ripple make the next merge stronger; Scout looks under the Mist', () => {
   const encounter = makeEncounter({
     resolve: 20, required: 6,
-    seed: { items: [{ cell: 36, definitionId: SEED }, { cell: 37, definitionId: SEED }], echoes: [], veiled: [{ cell: 15, id: 'v', definitionId: SEED }] },
+    seed: { items: [{ cell: 36, definitionId: SEED }, { cell: 37, definitionId: SEED }], echoes: [], veiled: [] },
     mist: [{ cell: 31, type: 'dense' }, { cell: 32, type: 'light', holds: { kind: 'item', definitionId: SPROUT } }, { cell: 33, type: 'wisp-bound', wispId: 'wisp-left' }],
     spawners: [{ id: 'pod', generatorId: 'wild-garden', cell: 40, charges: 1, drops: [SEED] }],
   });
   const window = encounterWindow(encounter);
   const steppling = startPlay(encounter, { loadout: { companionId: 'steppling', level: 2 }, ability: true });
-  const trail = abilityFor(steppling.run.loadout)!;
-  assert.equal(trail.definition.targeting, 'none');
-  assert.deepEqual(abilityTargets(trail.definition, trail.tier, steppling.state, window), []);
-  const revealed = applyAbility(trail.definition, trail.tier, steppling.state, window, { ...steppling.run, ability: { charge: 5, uses: 0 } }, null)!;
-  assert.equal(revealed.effects[0]?.kind, 'revealed');
-  assert.deepEqual((revealed.effects[0] as { opened: { cell: number }[] }).opened.map((entry) => entry.cell), [32, 31], 'two cells at level two: the light one, then the dense one; never the wisp-bound');
-  assert.equal(itemAt(revealed.board, 32), SPROUT);
-  assert.deepEqual(mistAt(revealed.board, 33)?.kind, 'encounter');
-  const three = applyAbility(trail.definition, abilityTier(trail.definition, 4), steppling.state, window, { ...steppling.run, ability: { charge: 5, uses: 0 } }, null)!;
-  assert.equal(mistAt(three.board, 15)?.kind, 'echo', 'with the Mist gone, full mist bursts open into its sleeper');
+  const path = abilityFor(steppling.run.loadout)!;
+  assert.equal(path.definition.id, 'clear-path');
+  assert.deepEqual(abilityTargets(path.definition, path.tier, steppling.state, window), [31, 32]);
+  const cleared = applyAbility(path.definition, path.tier, steppling.state, window, { ...steppling.run, ability: { charge: 5, uses: 0 } }, 31)!;
+  assert.equal(mistAt(cleared.board, 31), null, 'Thick Mist, gone in one');
+  assert.equal(applyAbility(path.definition, path.tier, steppling.state, window, { ...steppling.run, ability: { charge: 5, uses: 0 } }, 33), null, 'never the wisp’s own cell');
 
-  const baristabbit = startPlay(encounter, { loadout: { companionId: 'baristabbit', level: 1 }, ability: true });
-  const focus = abilityFor(baristabbit.run.loadout)!;
-  assert.deepEqual(abilityTargets(focus.definition, focus.tier, baristabbit.state, window), [40]);
-  const focused = applyAbility(focus.definition, focus.tier, baristabbit.state, window, { ...baristabbit.run, ability: { charge: 8, uses: 0 } }, 40)!;
-  assert.equal(focused.board.generators['wild-garden']?.charges, 2);
-  assert.deepEqual(focused.run.focus, { generatorId: 'wild-garden', taps: 3, tierTwoChance: 0.3 });
-  assert.deepEqual(dropProfileFor(focused.run, 'wild-garden', { startingResolve: 0, extraCharges: 0, tierTwoChance: 0.06, tierThreeChance: 0, openCells: 0, delay: 0, glowBonus: 0 }), { tierTwoChance: 0.36, tierThreeChance: 0 });
-  assert.deepEqual(dropProfileFor(focused.run, 'ritual-bar', { startingResolve: 0, extraCharges: 0, tierTwoChance: 0.06, tierThreeChance: 0, openCells: 0, delay: 0, glowBonus: 0 }), { tierTwoChance: 0.06, tierThreeChance: 0 }, 'only the tended spawner');
+  const barista = startPlay(encounter, { loadout: { companionId: 'baristabbit', level: 1 }, ability: true });
+  const focus = abilityFor(barista.run.loadout)!;
+  const focused = applyAbility(focus.definition, focus.tier, barista.state, window, { ...barista.run, ability: { charge: 7, uses: 0 } }, null)!;
+  assert.deepEqual(focused.run.boost, { next: 1, water: 0 });
+
+  const shellio = startPlay(encounter, { loadout: { companionId: 'shellio', level: 1 }, ability: true });
+  const ripple = abilityFor(shellio.run.loadout)!;
+  assert.deepEqual(applyAbility(ripple.definition, ripple.tier, shellio.state, window, { ...shellio.run, ability: { charge: 6, uses: 0 } }, null)!.run.boost, { next: 0, water: 1 });
+
+  const voyagle = startPlay(encounter, { loadout: { companionId: 'voyagle', level: 1 }, ability: true });
+  const scout = abilityFor(voyagle.run.loadout)!;
+  const seen = applyAbility(scout.definition, scout.tier, voyagle.state, window, { ...voyagle.run, ability: { charge: 6, uses: 0 } }, null)!;
+  assert.deepEqual(seen.run.revealed, [32], 'the one cell hiding something');
 });
 
 test('a helper Wisp is one light perk by rarity, a friend’s signature pays in Glow, and the Haven’s buildings shape the profile', () => {

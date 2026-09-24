@@ -3,6 +3,7 @@ import { mechanicComplete, mechanicMove, resolveMechanic, wispViews, type Missio
 import type { EncounterDefinition, EncounterLoadout } from '@/types/encounter';
 import type { MergeWorldState } from '@/types/merge-world';
 import type { MissionMechanicState } from '@/types/mission-mechanic';
+import { cacheEntries } from './cache';
 import { encounterMistLeft, pullBackMist, type MistOpened } from './mist';
 import { hashSeed } from './seed';
 
@@ -42,6 +43,12 @@ export type EncounterRunState = {
    * after the last turn and at most. Null on a board played by Resolve.
    */
   territory: { overrun: number; last: number; peak: number } | null;
+  /** Merge tactics (`docs/encounter-tactics.md`): the rescue comes back every time the board runs dry. */
+  tactics?: boolean;
+  /** Focus / Ripple: the next merge (the next Water merge) clears as if this many tiers stronger. */
+  boost?: { next: number; water: number };
+  /** Scout: Mist cells whose hidden contents are shown. */
+  revealed?: number[];
   spawners: Record<string, { sinceRecharge: number }>;
   ability: { charge: number; uses: number } | null;
   /** A spawner under Focus: taps left with better odds. */
@@ -69,6 +76,7 @@ export function createEncounterRun(encounter: EncounterDefinition, input: { load
     // A territory battle has no Resolve budget at all.
     resolve: { budget: encounter.territory != null || encounter.resolve == null ? null : Math.max(1, Math.floor(encounter.resolve + profile.startingResolve)), spent: 0, extra: 0, continues: 0 },
     territory: encounter.territory ? { overrun: territoryOverrun(encounter), last: 0, peak: 0 } : null,
+    ...((encounter.mechanic?.kind === 'dark-wisps' && encounter.mechanic.mode === 'tactics') || encounter.mechanic?.kind === 'lanes' ? { tactics: true } : {}),
     spawners: Object.fromEntries(encounter.spawners.map((spawner) => [spawner.id, { sinceRecharge: 0 }])),
     ability: input.ability ? { charge: 0, uses: 0 } : null,
     focus: null,
@@ -182,14 +190,18 @@ const freeCells = (board: MergeWorldState, window: MissionWindow) => window.cell
  * Why a territory attempt is lost, or null while it is not: the Mist holds too much of the board (overrun); it closed
  * in (no free cell and no merge); or the board is spent (no merge, no Pod charge) with its one rescue already used.
  */
-export type EncounterLossReason = 'overrun' | 'choked' | 'spent' | 'resolve';
+export type EncounterLossReason = 'overrun' | 'choked' | 'spent' | 'resolve' | 'breached';
 export function lossReason(encounter: EncounterDefinition, host: MissionMechanicHost, mechanicState: MissionMechanicState, run: EncounterRunState, board: MergeWorldState, window: MissionWindow): EncounterLossReason | null {
   if (objectiveMet(encounter, host, mechanicState, run)) return null;
   if (!run.territory) return resolveLeft(run) <= 0 ? 'resolve' : null;
+  // Lanes: lost only when a wisp gets past the bottom row (a dry board brings the rescue, again and again).
+  if (mechanicState.kind === 'lanes') return mechanicState.breached != null ? 'breached' : null;
   if (encounterMistLeft(board, window) >= run.territory.overrun) return 'overrun';
   if (hasMerge(host, mechanicState, board, window)) return null;
   if (freeCells(board, window) === 0) return 'choked';
   if (chargedSpawners(board, window).length) return null;
+  // A tactics battle's rescue comes back every time the board runs dry: lost only when it has nothing to bring.
+  if (run.tactics) return cacheEntries(encounter, board, window).length ? null : 'spent';
   return run.cacheOpened ? 'spent' : null;
 }
 

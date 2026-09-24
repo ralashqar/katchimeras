@@ -72,6 +72,52 @@ export function harmonyPulse(board: MergeWorldState, mergedCell: number, resultD
   return { board: next, opened, worn };
 }
 
+/** One glow shot: from the merged piece to the Mist it hit, and whether that cell opened. */
+export type GlowShot = { from: number; to: number; opened: boolean };
+
+/** How many shots a merge fires and how far they reach (steps along the board), by the result's tier. */
+export function glowVolley(tier: number): { shots: number; reach: number } {
+  if (tier >= 5) return { shots: 5, reach: Number.POSITIVE_INFINITY };
+  if (tier >= 4) return { shots: 3, reach: 3 };
+  if (tier >= 3) return { shots: 2, reach: 2 };
+  return { shots: 1, reach: 1 };
+}
+
+/**
+ * Merge vs Mist (`docs/encounter-tactics.md`): the merged piece fires Glow at the nearest Mist. A Sprout fires one
+ * shot at a cell beside it; a Plant two, reaching two steps; a Flower three, reaching three; anything bigger five,
+ * anywhere. Each shot picks the nearest Mist in reach as the board stands after the shot before it (so a second shot
+ * finishes Thick Mist the first wore), the Mist walling in a wisp first on a tie. A shot is one hit (Water hits twice
+ * on light and Thick Mist; only Growth cuts roots); a locked piece is freed when its Mist opens. The Mist a wisp
+ * stands on is never a target. Pure: the shots are returned for the board to fly.
+ */
+export function glowShots(board: MergeWorldState, mergedCell: number, resultDefinitionId: string, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID, options: { boost?: number; toward?: readonly number[] } = {}): { board: MergeWorldState; opened: MistOpened[]; worn: number[]; shots: GlowShot[] } {
+  const role = chainRole(resultDefinitionId, items);
+  const plant = role ? role === 'growth' : isPlantItem(resultDefinitionId, items);
+  const wash = role === 'water' ? WATER_WASH : 1;
+  const tier = Math.max(2, Math.floor(items.get(resultDefinitionId)?.tier ?? 2)) + Math.max(0, Math.floor(options.boost ?? 0));
+  const volley = glowVolley(tier);
+  const toward = options.toward ?? [];
+  const walling = (cell: number) => toward.some((nest) => windowDistance(cell, nest, window) === 1);
+  const nearWisp = (cell: number) => (toward.length ? Math.min(...toward.map((nest) => windowDistance(cell, nest, window))) : 0);
+  let next = board;
+  const opened: MistOpened[] = [];
+  const worn = new Set<number>();
+  const shots: GlowShot[] = [];
+  for (let shot = 0; shot < volley.shots; shot += 1) {
+    const target = window.cellIndices
+      .filter((cell) => { const mist = encounterMist(next.board[cell]); return Boolean(mist) && mist!.type !== 'wisp-bound' && (mist!.type !== 'root' || plant) && windowDistance(cell, mergedCell, window) <= volley.reach; })
+      .sort((a, b) => windowDistance(a, mergedCell, window) - windowDistance(b, mergedCell, window) || Number(walling(b)) - Number(walling(a)) || nearWisp(a) - nearWisp(b) || a - b)[0];
+    if (target == null) break;
+    const mist = encounterMist(next.board[target])!;
+    const result = wear(next, target, mist.type === 'root' ? 1 : wash);
+    next = result.board;
+    if (result.opened) { opened.push(result.opened); worn.delete(target); } else worn.add(target);
+    shots.push({ from: mergedCell, to: target, opened: Boolean(result.opened) });
+  }
+  return { board: next, opened, worn: [...worn], shots };
+}
+
 /** Wisp-bound Mist whose wisps have fallen lets go. */
 export function clearBoundMist(board: MergeWorldState, wispIds: readonly string[], window: MissionWindow): { board: MergeWorldState; opened: MistOpened[] } {
   if (!wispIds.length) return { board, opened: [] };

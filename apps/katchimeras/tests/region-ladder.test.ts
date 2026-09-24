@@ -40,8 +40,8 @@ test('an island plays authored levels (Petalimp), the pattern when it has none, 
   assert.equal(first.length, 2);
   assert.equal(first[0]!.id, `${petalimp.campaignId}:c1-1`);
   assert.ok(first.every((mission) => mission.encounter.spawners.length === 1 && !mission.encounter.cache), 'a Seed Pod, and nothing that arrives by itself');
-  assert.ok(first.every((mission) => mission.encounter.resolve == null && mission.encounter.territory?.overrun === 0.7), 'a territory battle: lost at 70% Mist on a calm level');
-  assert.ok(first.every((mission) => mission.encounter.mechanic?.kind === 'dark-wisps' && mission.encounter.mechanic.wisps.every((wisp) => wisp.placement.kind === 'cell')), 'every wisp nests on the board');
+  assert.ok(first.every((mission) => mission.encounter.resolve == null && mission.encounter.rows === 5), 'no Resolve, five rows');
+  assert.ok(first.every((mission) => mission.encounter.mechanic?.kind === 'lanes' && mission.encounter.mechanic.wisps.length >= 2), 'Lanes: wisps come down the columns');
   const bare = ISLAND_CAMPAIGNS.find((campaign) => campaign.chapters.every((chapter) => !chapter.restoration && !chapter.missions))!;
   assert.ok(bare, 'an island with panel-only chapters');
   const pattern = chapterMissions(bare, bare.chapters[2]!);

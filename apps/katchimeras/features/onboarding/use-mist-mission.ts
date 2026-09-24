@@ -8,13 +8,14 @@ import type { useOpeningGlow } from '@/components/katchadeck/world/kingdom-openi
 import { abilityFor, abilityReady, abilityTargets } from '@/features/encounter/abilities';
 import { encounterMechanicHost } from '@/features/encounter/adapt';
 import { createEncounterState } from '@/features/encounter/create-state';
-import { encounterLine, GATHER_LINE, KEEP_GOING_RESOLVE, LOW_RESOLVE, THREAT_LINE, WISP_ACT_LINES, WISP_ACT_ORDER } from '@/features/encounter/encounter-copy';
+import { encounterLine, EXPOSED_WISP_LINE, GATHER_LINE, SPREAD_LINE, KEEP_GOING_RESOLVE, LOW_RESOLVE, THREAT_LINE, WISP_ACT_LINES, WISP_ACT_ORDER } from '@/features/encounter/encounter-copy';
 import { lossReason as encounterLossReason, resolveLeft, type EncounterLossReason, type EncounterStatus } from '@/features/encounter/encounter-run';
 import { encounterOutcome, type EncounterOutcome } from '@/features/encounter/outcome';
 import { encounterRunId } from '@/features/encounter/run-id';
 import { encounterProfile } from '@/features/encounter/spawner-profile';
 import { missionPairs, missionWakes, missionWindow } from '@/features/mission-mechanics/board-window';
-import { mechanicComplete, resolveMechanic, wispViews } from '@/features/mission-mechanics/mechanic';
+import { mechanicComplete, mechanicIsTactics, resolveMechanic, wispViews } from '@/features/mission-mechanics/mechanic';
+import { wispExposed } from '@/features/mission-mechanics/dark-wisps';
 import { resolveEncounterForPlay, resolveMissionForPlay } from '@/features/mission-mechanics/preview';
 import { missionWispTarget } from '@/features/mission-mechanics/wisp-target';
 import { useDevMissionMechanicPreview } from '@/hooks/use-dev-mission-mechanic-preview';
@@ -54,6 +55,10 @@ export type EncounterDockState = {
    * the attempt was lost. Null on a board played by Resolve.
    */
   territory: { mist: number; overrun: number; cells: number } | null;
+  /** Lanes (`docs/encounter-lanes.md`): the wisps still to bring down (those yet to arrive too). */
+  lanes?: { left: number } | null;
+  /** Lanes: moves the level's clock on (the dock calls it while the level is up). */
+  tick?: ((dt: number) => import('@/features/mission-mechanics/lanes').LanesTickResult | null) | null;
   turns: number;
   lossReason: EncounterLossReason | null;
   /** Keep going's price in Glow (0: free). */
@@ -65,6 +70,10 @@ export type EncounterDockState = {
   speech: string | null;
   effects: MechanicEffect[];
   onUseAbility: (target: number | null) => void;
+  /** Focus / Ripple: the next merge (the next Water merge) clears as if this many steps bigger. */
+  boost: { next: number; water: number };
+  /** Scout: Mist cells whose hidden contents are shown. */
+  revealed: number[];
   onKeepGoing: () => void;
   onRetry: () => void;
   onLeave: (() => void) | null;
@@ -140,7 +149,8 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
   const finaleIdRef = useRef<number | null>(null);
   const finaleLanded = finaleIdRef.current != null && glow.finaleLandedId === finaleIdRef.current;
   // An objective other than every wisp down (a named wisp, the cache) has no finale flight to wait for.
-  const landed = encounter && encounter.objective.kind !== 'wisps' ? true : finaleLanded;
+  // Lanes: the last wisp falls to the pieces' own Glow on the level's clock; there is no finale flight to wait for.
+  const landed = encounter && (encounter.objective.kind !== 'wisps' || mechanic?.kind === 'lanes') ? true : finaleLanded;
   const { launch, launchItem, launchShot, launchFinale } = glow;
   const onFinale = useCallback((from: RewardFlightPoint, definitionId: string, strike: MissionStrike) => {
     finaleIdRef.current = launchFinale(from, definitionId, strike);
@@ -182,14 +192,25 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
   // Dark Wisps mend and act between strikes: the wisp layer's own copy follows the board's state through a live store.
   const liveRef = useRef<MissionMechanicState | null>(null);
   const liveListeners = useRef(new Set<() => void>());
-  liveRef.current = store.mechanicState;
+  // Lanes move on their own clock between commits: the ref is the newest state, not the last one rendered.
+  liveRef.current = store.mechanicState?.kind === 'lanes' ? store.mechanicStateRef.current ?? store.mechanicState : store.mechanicState;
   useEffect(() => { for (const listener of [...liveListeners.current]) listener(); }, [store.mechanicState]);
+  // Lanes: every tick in which a wisp drifted reaches the wisp layer alone; the screen re-renders only on a commit.
+  const storeTick = store.tick;
+  const laneTick = useCallback((dt: number) => {
+    const result = storeTick(dt);
+    if (result && (result.moved || result.changed)) {
+      liveRef.current = result.state;
+      for (const listener of [...liveListeners.current]) listener();
+    }
+    return result;
+  }, [storeTick]);
   const live = useMemo((): MissionMechanicLive => ({
     get: () => liveRef.current ?? { kind: 'glow-strikes', strikes: 0 },
     subscribe: (listener) => { liveListeners.current.add(listener); return () => { liveListeners.current.delete(listener); }; },
   }), []);
   const wispTarget = useMemo((): CorruptionWispTarget | null => active && played && host && store.mechanicState
-    ? missionWispTarget({ key: encounter ? `${encounter.id}:${attempt}` : played.id, host, mechanicState: store.mechanicState, node: tileNode, boardMetrics, window, lines: played.lines, settled: cameraSettled, revealNonce, ...(mechanic?.kind === 'dark-wisps' ? { live } : {}) })
+    ? missionWispTarget({ key: encounter ? `${encounter.id}:${attempt}` : played.id, host, mechanicState: store.mechanicState, node: tileNode, boardMetrics, window, lines: played.lines, settled: cameraSettled, revealNonce, ...(mechanic?.kind === 'dark-wisps' || mechanic?.kind === 'lanes' ? { live } : {}) })
     : null, [active, attempt, boardMetrics, cameraSettled, encounter, host, live, mechanic?.kind, played, revealNonce, store.mechanicState, tileNode, window]);
   // The encounter's own beats: what the last command did to the board, the cache opening on a spent board, the friend's line.
   const [effects, setEffects] = useState<MechanicEffect[]>([]);
@@ -228,6 +249,16 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     const facts = { remaining: resolveLeft(store.run), katchimera: effectiveLoadout?.companionId ?? null, ability: ability?.definition.name ?? null };
     if (cacheLine) return encounterLine('cacheFound', facts);
     if (actLine && store.status === 'playing') return actLine;
+    // Lanes: the sky over the board is where the wisps come from; nothing is said over it.
+    if (host && resolveMechanic(host).kind === 'lanes') return null;
+    // Merge vs Mist: a wisp with nothing but clear ground beside it is what the friend points at first; until the
+    // first merges, the rule itself.
+    if (store.status === 'playing' && store.state && host && mechanicIsTactics(resolveMechanic(host))) {
+      const board = store.state;
+      const exposed = wispViews(resolveMechanic(host), host, store.mechanicState ?? { kind: 'glow-strikes', strikes: 0 }).some((wisp) => wisp.alive && wisp.placement.kind === 'cell' && wispExposed(board, wisp.placement.cell, window));
+      if (exposed) return EXPOSED_WISP_LINE;
+      if (store.run.merges > 0 && store.run.merges <= 2) return SPREAD_LINE;
+    }
     // Territory: a wisp one turn from spreading (or ending a gather) is what the friend points at first.
     if (store.status === 'playing' && store.run.territory && store.mechanicState && host) {
       const threat = wispViews(resolveMechanic(host), host, store.mechanicState).find((wisp) => wisp.alive && wisp.intent && wisp.intent.countdown <= 1 && (wisp.intent.kind === 'surge' || wisp.intent.kind === 'snuff' || wisp.intent.kind === 'gather'));
@@ -248,11 +279,18 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
   const onUseAbility = useCallback((target: number | null) => { useAbility(target); }, [useAbility]);
   const lossReason = useMemo(() => (encounter && store.run && store.state && store.mechanicState && host && store.status === 'failed'
     ? encounterLossReason(encounter, host, store.mechanicState, store.run, store.state, window) : null), [encounter, host, store.mechanicState, store.run, store.state, store.status, window]);
+  const lanes = mechanic?.kind === 'lanes' ? mechanic : null;
   const encounterDock = useMemo((): EncounterDockState | null => encounter && store.run ? {
     definition: encounter, resolveLeft: store.run.resolve.budget == null ? null : resolveLeft(store.run), status: store.status, outcome, ability, speech, effects,
-    territory: store.run.territory ? { mist: store.run.territory.last, overrun: store.run.territory.overrun, cells: encounter.rows * 5 } : null, turns: store.run.merges, lossReason, keepGoingCost: payKeepGoing ? keepGoingCost ?? 0 : 0,
+    // Lanes are never lost to the Mist's hold: no meter.
+    territory: store.run.territory && !lanes ? { mist: store.run.territory.last, overrun: store.run.territory.overrun, cells: encounter.rows * 5 } : null,
+    lanes: lanes && store.mechanicState?.kind === 'lanes' ? { left: wispViews(lanes, host!, store.mechanicState).filter((wisp) => wisp.damage < wisp.hp).length } : null,
+    tick: lanes ? laneTick : null,
+    // Merge tactics: every action is a turn.
+    turns: host && mechanicIsTactics(resolveMechanic(host)) ? store.run.actions : store.run.merges, lossReason, keepGoingCost: payKeepGoing ? keepGoingCost ?? 0 : 0,
+    boost: store.run.boost ?? { next: 0, water: 0 }, revealed: store.run.revealed ?? [],
     onUseAbility, onKeepGoing, onRetry, onLeave: onLeave ?? null,
-  } : null, [ability, effects, encounter, lossReason, onKeepGoing, onLeave, onRetry, onUseAbility, outcome, speech, store.run, store.status]);
+  } : null, [ability, effects, encounter, host, lanes, lossReason, onKeepGoing, onLeave, onRetry, onUseAbility, outcome, speech, laneTick, store.mechanicState, store.run, store.status]);
   return {
     /** The mission as played: itself, or with the preview mechanic laid over it. */
     mission: played,

@@ -6,7 +6,7 @@ import { useSyncExternalStore } from 'react';
  * and the wisp layer rings the wisp that merge would strike. Null when nothing is held over a twin. One at a time:
  * only one board is docked.
  */
-export type PulseAim = { cell: number; tier: number };
+export type PulseAim = { cell: number; tier: number; /** What the merge would make (Merge vs Mist: whose Glow is previewed). */ definitionId?: string };
 
 let current: PulseAim | null = null;
 const listeners = new Set<() => void>();
@@ -14,7 +14,7 @@ const listeners = new Set<() => void>();
 export const pulseAim = {
   get: (): PulseAim | null => current,
   set(next: PulseAim | null) {
-    if (next === current || (next && current && next.cell === current.cell && next.tier === current.tier)) return;
+    if (next === current || (next && current && next.cell === current.cell && next.tier === current.tier && next.definitionId === current.definitionId)) return;
     current = next;
     for (const listener of [...listeners]) listener();
   },

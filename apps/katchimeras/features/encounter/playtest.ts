@@ -111,8 +111,9 @@ export function playtest(encounter: EncounterDefinition, input: { style: Playtes
       if (!result.changed || result.spawnedCell == null) continue;
       const settled = settleAction(binding, from, command, result);
       if (settled.refused) continue;
-      // A tap is not a turn: keep the tap count apart so a seed's next drop differs.
-      return { state: settled.state, run: { ...settled.run, actions: settled.run.actions + 1 }, mechanicState: settled.mechanicState };
+      // Where a tap is not a turn, count it anyway so a seed's next drop differs (in merge tactics it already is one).
+      const counted = settled.run.actions > from.run.actions ? settled.run : { ...settled.run, actions: settled.run.actions + 1 };
+      return { state: settled.state, run: counted, mechanicState: settled.mechanicState };
     }
     return null;
   };

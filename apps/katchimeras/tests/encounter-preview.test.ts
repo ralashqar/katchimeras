@@ -39,7 +39,7 @@ test('the copy keeps the lore’s voice: the loss is the Mist being thick, the g
   assert.deepEqual(['cleared', 'bright', 'perfect'].map((grade) => gradeLabel(grade as never)), ['Cleared', 'Bright clear', 'Perfect clear']);
   assert.equal(outcomeLine('perfect', { continues: 1, rescued: false }), 'Cleared, eventually. It held on. So did you.');
   assert.equal(encounterLine('lowResolve', { remaining: 2, katchimera: 'mossprout', ability: 'Bloom' }), '2 left. Make them count.');
-  assert.equal(encounterLine('abilityReady', { remaining: 9, katchimera: 'steppling', ability: 'Trailfinder' }), 'I can show you where the Mist is thin.');
+  assert.equal(encounterLine('abilityReady', { remaining: 9, katchimera: 'steppling', ability: 'Clear Path' }), 'I can clear a path through the Mist. Point me at it.');
   assert.equal(encounterLine('abilityReady', { remaining: 9, katchimera: null, ability: null }), '', 'the Mist has no ability to speak of');
   for (const katchimera of [null, 'mossprout', 'steppling', 'baristabbit'] as const) {
     for (const event of ['enter', 'lowResolve', 'spawnerEmpty', 'stuck'] as const) {
@@ -58,10 +58,11 @@ test('the Haven’s profile reaches the run and the dock reads the encounter sta
   assert.match(hook, /const encounter = useMemo\(\(\) => authored \?\? \(mission \? resolveEncounterForPlay\(mission, preview\) : null\)/, 'an authored encounter, or the preview laid over the mission');
   assert.match(hook, /encounterRunId\(encounter, attempt, effectiveLoadout\)/, 'a new attempt is a new run');
   assert.match(hook, /if \(!active \|\| !encounter \|\| store\.status !== 'stuck'\) return;[\s\S]*?openCache\(\)/, 'a spent board opens its cache on its own');
-  assert.match(hook, /\.\.\.\(mechanic\?\.kind === 'dark-wisps' \? \{ live \} : \{\}\)/, 'Dark Wisps reach the layer through a live store');
+  assert.match(hook, /\.\.\.\(mechanic\?\.kind === 'dark-wisps' \|\| mechanic\?\.kind === 'lanes' \? \{ live \} : \{\}\)/, 'Dark Wisps and Lanes reach the layer through a live store');
   assert.match(dock, /encounter\.status === 'failed' \?/, 'the loss lies over the board');
   assert.match(dock, /ENCOUNTER_LOSS\.retry[\s\S]*?ENCOUNTER_LOSS\.keepGoing/, 'with the ways on');
-  assert.match(dock, /ability\.targets\.map\(\(cell\) =>/, 'a pick lights the ability’s targets');
+  assert.match(dock, /const pickCells = picking && ability \? ability\.targets : \[\];/, 'a pick lights the ability’s targets');
+  assert.match(dock, /pickCells\.map\(\(cell\) =>/);
   assert.match(dock, /accessibilityLabel=\{encounter\.resolveLeft == null \? 'No Resolve budget' : `Resolve \$\{encounter\.resolveLeft\}`\}/, 'the Resolve pill is read out');
   assert.match(screen, /encounter=\{hatchableMist\.encounter\}/);
   assert.match(screen, /encounter=\{journeyMist\.encounter\}/);

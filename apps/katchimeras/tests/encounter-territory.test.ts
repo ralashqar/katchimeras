@@ -10,14 +10,14 @@ import { encounterMistLeft, harmonyPulse } from '@/features/encounter/mist';
 import { encounterGrade } from '@/features/encounter/outcome';
 import { pulseArea } from '@/features/encounter/pulse';
 import { settleAction, tapSeed } from '@/features/encounter/settle';
-import { createDarkWispsState, darkWispsAfterAction, darkWispsStrike, darkWispsViews, pulseTarget, pushBackDarkWisps, SPORE_TURNS, type DarkWispsDefinition, type DarkWispsState } from '@/features/mission-mechanics/dark-wisps';
+import { createDarkWispsState, darkWispsAfterAction, darkWispsPrepare, darkWispsStrike, darkWispsTurnStrip, darkWispsViews, planWispTurn, pulseTarget, pushBackDarkWisps, REST, SPORE_TURNS, type DarkWispsDefinition, type DarkWispsState } from '@/features/mission-mechanics/dark-wisps';
 import { createMechanicState, resolveMechanic } from '@/features/mission-mechanics/mechanic';
 import type { MergeWorldState } from '@/types/merge-world';
 import { reduceMergeWorld, reduceMissionMove } from '@/utils/merge-world/engine';
 
 // The window: cells 15-19, 22-26, 29-33, 36-40 (five columns, four rows).
 const base: IslandLevelSpec = {
-  title: 'Test', objective: 'Test.', difficulty: 'thick', ring: false,
+  title: 'Test', objective: 'Test.', difficulty: 'thick', ring: false, rest: 0,
   pieces: [[36, 1], [37, 1], [38, 1], [39, 1]], mist: [],
   pod: { cell: 40, charges: 3, every: 3 },
   wisps: [{ id: 'surger', hp: 9, cell: 17, intents: [{ kind: 'surge', every: 3 }] }],
@@ -51,15 +51,20 @@ test('a wisp nests on its cell: wisp-bound Mist the pulse never wears, opened wh
   assert.equal(step.state.board[24]!.mist, null, 'its nest lets go');
 });
 
-test('a turn is a merge: the Pod costs nothing and gives the wisps no turn', () => {
+test('a turn is a merge: the Pod costs nothing and gives the wisps no turn; after a merge the front of the strip acts, as planned', () => {
   const ctx = setup();
   assert.equal(ctx.node.run.territory?.overrun, 13, 'a thick level is lost at 65% of twenty cells');
   const command = { type: 'tapGenerator' as const, generatorId: 'wild-garden', now: 0, seed: tapSeed(ctx.node.run), spendEnergy: false as const, enforceCharges: true as const };
   const afterTap = settleAction({ encounter: ctx.encounter, host: ctx.host, window: ctx.window }, ctx.node, command, reduceMergeWorld(ctx.node.state, command));
   assert.equal(afterTap.refused, undefined);
-  assert.equal((afterTap.mechanicState as DarkWispsState).countdown![0], 3, 'no turn passed');
+  assert.deepEqual(afterTap.effects, [], 'no turn passed');
+  const mechanic = ctx.encounter.mechanic as DarkWispsDefinition;
+  const plan = planWispTurn(mechanic, ctx.node.mechanicState as DarkWispsState, ctx.node.state, ctx.window)!;
+  assert.equal(plan.kind, 'surge');
+  assert.equal(plan.cells.length, 1);
   const step = merge(ctx, ctx.node, 36, 37);
-  assert.equal((step.mechanicState as DarkWispsState).countdown![0], 2, 'a merge is a turn');
+  assert.deepEqual(step.effects, [{ kind: 'surged', wisp: 0, cell: plan.cells[0] }], 'what it showed is what it did');
+  assert.ok((step.mechanicState as DarkWispsState).plan, 'and the next turn is planned for the player to see');
 });
 
 test('the Harmony pulse grows with what was made: a Sprout the four beside it, a Plant the eight, a Flower twice, then two cells out', () => {
@@ -78,27 +83,30 @@ test('the Harmony pulse grows with what was made: a Sprout the four beside it, a
   assert.ok(!isMist(flower.board, 23) && !isMist(flower.board, 16), 'a Flower opens thick Mist in one and reaches the diagonal');
 });
 
-test('where a merge lands decides what it strikes: only a nest inside its pulse, the one about to act first', () => {
+test('where a merge lands decides what it strikes: only a nest inside its pulse, the one acting soonest first', () => {
   const window = encounterWindow(level());
-  const mechanic = mechanicOf({ wisps: [{ id: 'slow', hp: 5, cell: 16, intents: [{ kind: 'surge', every: 4 }] }, { id: 'soon', hp: 5, cell: 18, intents: [{ kind: 'surge', every: 2 }] }] });
+  const mechanic = mechanicOf({ wisps: [{ id: 'soon', hp: 5, cell: 16, intents: [{ kind: 'surge', every: 1 }] }, { id: 'later', hp: 5, cell: 18, intents: [{ kind: 'surge', every: 1 }] }] });
   const state = createDarkWispsState(mechanic);
-  assert.equal(pulseTarget(mechanic, state, 23, 2, window), 0, 'a Sprout below the left one');
+  assert.deepEqual(state.order, [0, 1]);
+  assert.equal(pulseTarget(mechanic, state, 25, 2, window), 1, 'a Sprout below the right one');
   assert.equal(pulseTarget(mechanic, state, 38, 2, window), null, 'nothing in reach at the bottom');
-  assert.equal(pulseTarget(mechanic, state, 24, 3, window), 1, 'a Plant between them strikes the one acting sooner');
+  assert.equal(pulseTarget(mechanic, state, 24, 3, window), 0, 'a Plant between them strikes the one acting sooner');
   assert.equal(darkWispsStrike(mechanic, state, { type: 'merge_completed', resultCell: 38, resultDefinitionId: 'nature:garden:2' }, undefined, window).strike, null);
 });
 
-test('a Surge spreads its Mist into the free cells nearest its nest; walled in, it swallows the smallest piece it touches', () => {
+test('a Surge spreads its Mist into the free cells nearest its nest; walled in, it binds the smallest piece it touches', () => {
   const window = encounterWindow(level());
   const open = level();
   const mechanic = open.mechanic as DarkWispsDefinition;
-  const spread = darkWispsAfterAction(mechanic, { ...createDarkWispsState(mechanic), countdown: [1] }, createEncounterState(open, 'mossprout', 0), window, rng);
+  const spread = darkWispsAfterAction(mechanic, createDarkWispsState(mechanic), createEncounterState(open, 'mossprout', 0), window, rng);
   const surged = spread.effects.find((effect) => effect.kind === 'surged');
   assert.ok(surged && surged.kind === 'surged' && [16, 18, 24].includes(surged.cell), 'beside its nest');
   assert.ok(isMist(spread.board, surged.cell));
   const walled = level({ pieces: [[16, 1], [18, 2], [24, 2], [36, 1], [37, 1]] });
-  const swallowed = darkWispsAfterAction(mechanic, { ...createDarkWispsState(mechanic), countdown: [1] }, createEncounterState(walled, 'mossprout', 0), window, rng);
-  assert.deepEqual(swallowed.effects.find((effect) => effect.kind === 'surged'), { kind: 'surged', wisp: 0, cell: 16, swallowed: 'nature:garden:1' });
+  const bound = darkWispsAfterAction(mechanic, createDarkWispsState(mechanic), createEncounterState(walled, 'mossprout', 0), window, rng);
+  assert.deepEqual(bound.effects, [{ kind: 'bound', wisp: 0, cell: 16, definitionId: 'nature:garden:1' }]);
+  const caught = bound.board.board[16]!.mist;
+  assert.equal(caught?.kind === 'encounter' && caught.type === 'bound' && caught.holds?.kind === 'item' && caught.holds.definitionId === 'nature:garden:1', true, 'caught in the Mist, not lost');
 });
 
 test('a Burrow moves the nest deeper into its Mist; its old nest stays misted', () => {
@@ -114,7 +122,7 @@ test('a Burrow moves the nest deeper into its Mist; its old nest stays misted', 
 });
 
 test('Spores turn an empty cell to Mist after two turns; a piece put on it ends the spore', () => {
-  const encounter = level({ wisps: [{ id: 'spore', hp: 5, cell: 17, intents: [{ kind: 'spores', every: 1 }, { kind: 'mend', every: 9 }] }] });
+  const encounter = level({ rest: 2, wisps: [{ id: 'spore', hp: 5, cell: 17, intents: [{ kind: 'spores', every: 1 }] }] });
   const mechanic = encounter.mechanic as DarkWispsDefinition;
   const window = encounterWindow(encounter);
   const board = createEncounterState(encounter, 'mossprout', 0);
@@ -204,22 +212,94 @@ test('a ward takes the hit first; a gather surges three unless it is staggered b
   const hit = darkWispsStrike(mechanic, state, plant, undefined, window);
   assert.equal(hit.next.damage[0], 0, 'the ward took it');
   state = hit.next;
-  const ignored = darkWispsAfterAction(mechanic, darkWispsAfterAction(mechanic, state, board, window, rng).state, board, window, rng);
+  const ignored = darkWispsAfterAction(mechanic, state, board, window, rng);
   assert.equal(ignored.effects.filter((effect) => effect.kind === 'surged').length, 3);
   let hard = darkWispsStrike(mechanic, state, { ...plant, resultDefinitionId: 'nature:garden:4' }, undefined, window).next;
   hard = darkWispsStrike(mechanic, hard, { ...plant, resultDefinitionId: 'nature:garden:2' }, undefined, window).next;
-  const staggered = darkWispsAfterAction(mechanic, darkWispsAfterAction(mechanic, hard, board, window, rng).state, board, window, rng);
+  const staggered = darkWispsAfterAction(mechanic, hard, board, window, rng);
   assert.ok(staggered.effects.some((effect) => effect.kind === 'staggered'));
   assert.ok(!staggered.effects.some((effect) => effect.kind === 'surged'));
 });
 
-test('Trailfinder sets every wisp’s next move a turn further off, never past where it started', () => {
+test('Trailfinder puts a Rest at the front of the strip: the next turn passes quietly', () => {
   const mechanic = mechanicOf({});
   const board = createEncounterState(level(), 'mossprout', 0);
-  const counted = darkWispsAfterAction(mechanic, createDarkWispsState(mechanic), board, encounterWindow(level()), rng).state;
-  assert.equal(counted.countdown![0], 2);
-  assert.equal(pushBackDarkWisps(mechanic, counted).countdown![0], 3);
-  assert.equal(pushBackDarkWisps(mechanic, pushBackDarkWisps(mechanic, counted)).countdown![0], 3);
+  const pushed = pushBackDarkWisps(mechanic, createDarkWispsState(mechanic));
+  assert.deepEqual(pushed.order, [REST, 0]);
+  const turn = darkWispsAfterAction(mechanic, pushed, board, encounterWindow(level()), rng);
+  assert.deepEqual(turn.effects, [{ kind: 'rested' }]);
+});
+
+test('one entry of the strip acts a turn: a boss takes two places, Rests are spaced between, a struck wisp waiting is pushed back once', () => {
+  const window = encounterWindow(level());
+  const mechanic = mechanicOf({ rest: 1, wisps: [{ id: 'boss', hp: 9, cell: 16, slots: 2, intents: [{ kind: 'ward', every: 1 }] }, { id: 'small', hp: 4, cell: 18, intents: [{ kind: 'surge', every: 1 }] }] });
+  const state = createDarkWispsState(mechanic);
+  assert.deepEqual(state.order, [0, 1, 0, REST]);
+  assert.deepEqual(darkWispsTurnStrip(mechanic, state, 4), [0, 1, 0, REST]);
+  const struck = darkWispsStrike(mechanic, state, { type: 'merge_completed', resultCell: 25, resultDefinitionId: 'nature:garden:2' }, undefined, window).next;
+  assert.deepEqual(struck.order, [0, 0, 1, REST], 'the small one, waiting, went back a place');
+  const again = darkWispsStrike(mechanic, struck, { type: 'merge_completed', resultCell: 25, resultDefinitionId: 'nature:garden:2' }, undefined, window).next;
+  assert.deepEqual(again.order, [0, 0, 1, REST], 'once a turn');
+  const views = darkWispsViews(mechanic, state);
+  assert.equal(views[0]!.acting, true);
+  assert.equal(views[1]!.intent?.countdown, 2, 'turns until it acts: its place in the strip');
+});
+
+test('the plan is locked: a Plant on a targeted cell holds its ground; a piece moved off a Devour target goes uneaten; felled before its turn, it does not act', () => {
+  const window = encounterWindow(level());
+  const encounter = level({ pieces: [[16, 3], [18, 3], [24, 3], [36, 1], [37, 1]] });
+  const mechanic = encounter.mechanic as DarkWispsDefinition;
+  const board = createEncounterState(encounter, 'mossprout', 0);
+  const prepared = darkWispsPrepare(mechanic, createDarkWispsState(mechanic), board, window) as DarkWispsState;
+  assert.ok(prepared.plan && prepared.plan.cells.length === 1, 'walled in by Plants, it plans to bind one');
+  const turn = darkWispsAfterAction(mechanic, prepared, board, window, rng);
+  assert.deepEqual(turn.effects, [{ kind: 'held', wisp: 0, cell: prepared.plan.cells[0] }]);
+
+  const hungry = level({ pieces: [[16, 1], [36, 1], [37, 1]], wisps: [{ id: 'nibble', hp: 5, cell: 17, intents: [{ kind: 'devour', every: 1 }] }] });
+  const eater = hungry.mechanic as DarkWispsDefinition;
+  const start = createEncounterState(hungry, 'mossprout', 0);
+  const plan = darkWispsPrepare(eater, createDarkWispsState(eater), start, window) as DarkWispsState;
+  assert.equal(plan.plan?.piece?.cell, 16);
+  const moved = reduceMissionMove(start, 16, 22, 0, MERGE_ITEMS_BY_ID).state;
+  assert.deepEqual(darkWispsAfterAction(eater, plan, moved, window, rng).effects, [], 'it goes hungry');
+  const felled = { ...plan, damage: [5] };
+  assert.deepEqual(darkWispsAfterAction(eater, felled, start, window, rng).effects, []);
+});
+
+test('a bound piece: a pulse frees it, or its twin merged into it frees and merges it on the spot', () => {
+  const encounter = level({ bound: [[31, 2]], pieces: [[36, 2], [30, 1], [37, 1]] });
+  const window = encounterWindow(encounter);
+  const board = createEncounterState(encounter, 'mossprout', 0);
+  const caught = board.board[31]!.mist;
+  assert.equal(caught?.kind === 'encounter' && caught.type === 'bound', true);
+  const freed = harmonyPulse(board, 30, 'nature:garden:2', window);
+  assert.equal(freed.board.board[31]!.mist, null);
+  assert.equal(freed.board.board[31]!.occupant?.kind === 'item' && freed.board.board[31]!.occupant.definitionId, 'nature:garden:2', 'the piece is loose where it was caught');
+  const woke = reduceMissionMove(board, 36, 31, 0, MERGE_ITEMS_BY_ID);
+  assert.equal(woke.changed && woke.mergedCell, 31);
+  assert.equal(woke.state.board[31]!.occupant?.kind === 'item' && woke.state.board[31]!.occupant.definitionId, 'nature:garden:3');
+  assert.equal(reduceMissionMove(board, 37, 31, 0, MERGE_ITEMS_BY_ID).changed, false, 'only its twin');
+});
+
+test('a sky wisp floats over a column: struck only from the top row (a Plant reaches the columns beside), shielded while its guards stand; its Rain falls into its column', async () => {
+  const { pulseReachesSky } = await import('@/features/encounter/pulse');
+  const window = encounterWindow(level());
+  assert.deepEqual(pulseReachesSky(17, 2, window), [3]);
+  assert.deepEqual(pulseReachesSky(17, 3, window), [2, 3, 4]);
+  assert.deepEqual(pulseReachesSky(24, 3, window), [], 'the second row cannot reach it');
+  assert.deepEqual(pulseReachesSky(24, 5, window), [3], 'unless tier five or more');
+  const encounter = level({ wisps: [{ id: 'guard', hp: 2, cell: 22 }, { id: 'sky', hp: 6, cell: 0, sky: 4, guardedBy: ['guard'], intents: [{ kind: 'rain', every: 1, amount: 2 }] }] });
+  const mechanic = encounter.mechanic as DarkWispsDefinition;
+  const state = createDarkWispsState(mechanic);
+  assert.equal(darkWispsViews(mechanic, state)[1]!.guarded, true);
+  assert.equal(darkWispsViews(mechanic, state)[1]!.placement.kind, 'tile', 'drawn over the tile');
+  assert.equal(pulseTarget(mechanic, state, 18, 2, window), null, 'shielded');
+  const unguarded = { ...state, damage: [2, 0] };
+  assert.equal(pulseTarget(mechanic, unguarded, 18, 2, window), 1);
+  assert.equal(pulseTarget(mechanic, unguarded, 25, 2, window), null);
+  const board = createEncounterState(encounter, 'mossprout', 0);
+  const turn = darkWispsAfterAction(mechanic, state, board, window, rng);
+  assert.deepEqual(turn.effects, [{ kind: 'rained', wisp: 1, cell: 18 }, { kind: 'rained', wisp: 1, cell: 25 }], 'down its column from the top');
 });
 
 test('chains are tools: Water washes light and dense Mist twice as hard, only Growth cuts roots, a weakness hits for one more', async () => {

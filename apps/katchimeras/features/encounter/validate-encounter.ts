@@ -5,9 +5,10 @@ import type { EncounterDefinition } from '@/types/encounter';
 import type { MergeItemDefinition } from '@/types/merge-world';
 import { encounterSolvabilityIssues, solveEncounter } from './solvability';
 import { fairness } from './playtest';
+import { lanesFairness } from './lanes-playtest';
 import { isDarkWispLook } from '@/constants/dark-wisp-looks';
 
-const INTENT_KINDS = new Set(['surge', 'snuff', 'shroud', 'root', 'devour', 'ward', 'mend', 'call', 'gather', 'burrow', 'spores']);
+const INTENT_KINDS = new Set(['surge', 'snuff', 'shroud', 'root', 'devour', 'ward', 'mend', 'call', 'gather', 'burrow', 'spores', 'rain', 'bind', 'shield', 'corrupt', 'move', 'rest']);
 
 const MIST_TYPES = new Set(['light', 'dense', 'root', 'wisp-bound']);
 
@@ -25,8 +26,8 @@ export function isEncounterDefinition(mission: Omit<HatchableMissionDefinition, 
 export function validateEncounterDefinition(encounter: EncounterDefinition, boardIssues: string[] = [], items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): string[] {
   const issues = [...boardIssues];
   const id = encounter.id;
-  if (encounter.rows !== 3 && encounter.rows !== 4) issues.push(`${id}: rows must be 3 or 4`);
-  const window = missionWindow(encounter.rows === 3 ? 3 : 4);
+  if (encounter.rows !== 3 && encounter.rows !== 4 && encounter.rows !== 5) issues.push(`${id}: rows must be 3, 4 or 5`);
+  const window = missionWindow(encounter.rows === 3 ? 3 : encounter.rows === 5 ? 5 : 4);
   const cells = new Set(window.cellIndices);
   const used = new Set<number>([...encounter.seed.items, ...encounter.seed.echoes, ...encounter.seed.veiled].map((entry) => entry.cell));
   const claim = (cell: number, what: string) => {
@@ -42,6 +43,7 @@ export function validateEncounterDefinition(encounter: EncounterDefinition, boar
     if (!MIST_TYPES.has(mist.type)) issues.push(`${id}: ${mist.type} is not a kind of Mist`);
     if (mist.hp != null && (!Number.isInteger(mist.hp) || mist.hp <= 0)) issues.push(`${id}: mist at cell ${mist.cell} needs positive hits`);
     if (mist.type === 'wisp-bound' && (!mist.wispId || !wispIds.has(mist.wispId))) issues.push(`${id}: wisp-bound mist at cell ${mist.cell} names no wisp on the board`);
+    if (mist.type === 'bound' && (mist.holds?.kind !== 'item' || !items.get(mist.holds.definitionId)?.nextItemId)) issues.push(`${id}: a bound piece at cell ${mist.cell} must hold a known piece that can still merge`);
     if (mist.holds?.kind === 'item' && !items.has(mist.holds.definitionId)) issues.push(`${id}: mist at cell ${mist.cell} holds ${mist.holds.definitionId}, not a known item`);
     if (mist.holds?.kind === 'spawner' && !spawnerIds.has(mist.holds.spawnerId)) issues.push(`${id}: mist at cell ${mist.cell} holds spawner ${mist.holds.spawnerId}, which the board does not have`);
   }
@@ -67,6 +69,8 @@ export function validateEncounterDefinition(encounter: EncounterDefinition, boar
     const wispById = new Map(encounter.mechanic.wisps.map((wisp) => [wisp.id, wisp]));
     for (const wisp of encounter.mechanic.wisps) {
       if (wisp.placement.kind === 'cell' && !wisp.hidden) claim(wisp.placement.cell, `wisp ${wisp.id}'s nest`);
+      if (wisp.placement.kind === 'sky' && (!Number.isInteger(wisp.placement.column) || wisp.placement.column < 1 || wisp.placement.column > 5)) issues.push(`${id}: sky wisp ${wisp.id} floats over column ${wisp.placement.column}; columns are 1 to 5`);
+      for (const guard of wisp.guardedBy ?? []) if (!wispById.get(guard) || wispById.get(guard)!.placement.kind === 'sky') issues.push(`${id}: wisp ${wisp.id} is guarded by ${guard}, which must be a nest wisp on the board`);
       if (wisp.splitsInto != null && !wispById.get(wisp.splitsInto)?.hidden) issues.push(`${id}: wisp ${wisp.id} splits into ${wisp.splitsInto}, which must be a hidden wisp on the board`);
       if (wisp.weakTo != null && wisp.weakTo !== 'growth' && wisp.weakTo !== 'water') issues.push(`${id}: wisp ${wisp.id} is weak to ${wisp.weakTo}; only growth or water`);
       if (wisp.look != null && !isDarkWispLook(wisp.look)) issues.push(`${id}: wisp ${wisp.id} wears an unknown look ${wisp.look}`);
@@ -85,6 +89,11 @@ export function validateEncounterDefinition(encounter: EncounterDefinition, boar
     if (start >= Math.ceil(territory.overrun * cellsOnBoard - 1e-9)) issues.push(`${id}: the Mist starts on ${start} cells, already enough to lose`);
   }
   if (issues.length) return issues;
+  // Lanes are checked on their clock by the lanes player (`docs/encounter-lanes.md`): the careful one wins four of five.
+  if (encounter.mechanic?.kind === 'lanes') {
+    const record = lanesFairness(encounter, 'careful', 5);
+    return record.wins >= 4 ? [] : [`${id}: the careful player won ${record.wins} of 5 on the clock; it must win at least 4`];
+  }
   // A territory battle is checked by playing it (the careful player wins on at least four of five seeds).
   if (territory) {
     const record = fairness(encounter, 'careful', 5);

@@ -1,5 +1,6 @@
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import { missionWindow, type MissionWindow } from '@/features/mission-mechanics/board-window';
+import { OPENING_MERGE_WINDOW_CELLS } from '@/features/onboarding/opening-mist';
 import { createMissionState } from '@/features/onboarding/steppling-mission';
 import { ENCOUNTER_MIST_DEFAULT_HP, type EncounterDefinition, type EncounterSpawner } from '@/types/encounter';
 import type { MergeBoardCell, MergeCharacterId, MergeGeneratorState, MergeWorldState } from '@/types/merge-world';
@@ -46,8 +47,13 @@ export function createEncounterState(encounter: EncounterDefinition, owner: Merg
   const window = encounterWindow(encounter);
   const inside = new Set(window.cellIndices);
   const base = createMissionState(encounter.seed, owner, now);
-  // A three-row board seals its fourth row too.
-  const cells: MergeBoardCell[] = base.board.map((cell, index) => (inside.has(index) || cell.locked ? cell : { ...cell, locked: true, blocker: null, mist: cell.mist ?? { kind: 'dormant' as const }, occupant: null }));
+  // A three-row board seals its fourth row too. A five-row board opens the row under the opening's window as plain
+  // ground: whatever the Haven's own board keeps there is not the level's, only what its seed placed.
+  const seeded = new Set([...encounter.seed.echoes, ...encounter.seed.veiled].map((entry) => entry.cell));
+  const opening = new Set(OPENING_MERGE_WINDOW_CELLS);
+  const cells: MergeBoardCell[] = base.board.map((cell, index) => (inside.has(index)
+    ? (!opening.has(index) && !seeded.has(index) ? { ...cell, locked: false, blocker: null, mist: null } : cell)
+    : cell.locked ? cell : { ...cell, locked: true, blocker: null, mist: cell.mist ?? { kind: 'dormant' as const }, occupant: null }));
   for (const mist of encounter.mist) {
     if (!inside.has(mist.cell)) continue;
     cells[mist.cell] = {

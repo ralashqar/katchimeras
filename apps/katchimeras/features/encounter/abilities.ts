@@ -6,7 +6,7 @@ import type { CompanionAbilityDefinition, CompanionAbilityTier } from '@/types/c
 import type { EncounterLoadout } from '@/types/encounter';
 import type { MergeItemDefinition, MergeWorldState } from '@/types/merge-world';
 import type { EncounterRunState } from './encounter-run';
-import { openMistCell, revealMistCells, windowNeighbours, type MistOpened } from './mist';
+import { openMistCell, windowNeighbours, type MistOpened } from './mist';
 
 /** The ability the loadout brings, at the Katchimera's level. */
 export function abilityFor(loadout: EncounterLoadout | null): { definition: CompanionAbilityDefinition; tier: CompanionAbilityTier } | null {
@@ -19,13 +19,24 @@ export const abilityReady = (run: EncounterRunState, tier: CompanionAbilityTier)
 
 export type AbilityEffect =
   | { kind: 'bloomed'; cell: number; definitionId: string }
-  | { kind: 'revealed'; opened: MistOpened[] }
-  /** v2 (Trailfinder): every wisp's next move a turn further off. */
-  | { kind: 'pushed_back' }
-  | { kind: 'focused'; generatorId: string; charges: number };
+  /** Clear Path: one Mist cell cleared outright (what it held comes out). */
+  | { kind: 'cleared'; opened: MistOpened }
+  /** Focus / Ripple: the next merge (the next Water merge) clears as if this many steps bigger. */
+  | { kind: 'boosted'; steps: number; water: boolean }
+  /** Scout: the Mist cells whose hidden contents are now shown. */
+  | { kind: 'scouted'; cells: number[] };
 
-/** Cells the ability may be used on: plants Bloom can raise, spawners Focus can tend; none for Trailfinder. */
+const encounterMistAt = (board: MergeWorldState, cell: number) => { const mist = board.board[cell]?.mist; return mist?.kind === 'encounter' ? mist : null; };
+
+/** Mist cells Clear Path can lift: any encounter Mist but the cell a wisp stands on. */
+const clearableMist = (board: MergeWorldState, window: MissionWindow) => window.cellIndices.filter((cell) => { const mist = encounterMistAt(board, cell); return Boolean(mist) && mist!.type !== 'wisp-bound'; });
+
+/** Hidden cells Scout can look under: Mist holding a piece or a spawner, not yet shown. */
+const hiddenCells = (board: MergeWorldState, window: MissionWindow, shown: readonly number[]) => window.cellIndices.filter((cell) => Boolean(encounterMistAt(board, cell)?.holds) && !shown.includes(cell));
+
+/** Cells the ability may be used on: plants Bloom can raise, Mist Clear Path can lift; none for the rest. */
 export function abilityTargets(definition: CompanionAbilityDefinition, tier: CompanionAbilityTier, board: MergeWorldState, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): number[] {
+  if (definition.targeting === 'mist') return clearableMist(board, window);
   if (definition.targeting === 'item') {
     return windowItems(board, window.cellIndices).filter((item) => {
       const entry = items.get(item.definitionId);
@@ -37,34 +48,32 @@ export function abilityTargets(definition: CompanionAbilityDefinition, tier: Com
 }
 
 /**
- * The ability used: the board and the attempt after it, and what to show.
- * Null when it cannot be used (not charged, no target where one is needed).
+ * The ability used: the board and the attempt after it, and what to show. Null when it cannot be used (not charged,
+ * no target where one is needed, nothing hidden to look under). Using one is not a merge: the wisps get no turn.
  */
 export function applyAbility(definition: CompanionAbilityDefinition, tier: CompanionAbilityTier, board: MergeWorldState, window: MissionWindow, run: EncounterRunState, target: number | null, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): { board: MergeWorldState; run: EncounterRunState; effects: AbilityEffect[] } | null {
   if (!abilityReady(run, tier)) return null;
   const spent: EncounterRunState = { ...run, ability: { charge: 0, uses: run.ability!.uses + 1 } };
-  const effects: AbilityEffect[] = [];
-  if (definition.targeting === 'none') {
-    const revealed = revealMistCells(board, window, tier.cells ?? 1);
-    // Trailfinder also sets every wisp's next move a turn further off, so in a territory battle it is never wasted.
-    if (!revealed.opened.length && !run.territory) return null;
-    if (revealed.opened.length) effects.push({ kind: 'revealed', opened: revealed.opened });
-    if (run.territory) effects.push({ kind: 'pushed_back' });
-    return { board: revealed.board, run: spent, effects };
+  if (definition.id === 'focus' || definition.id === 'ripple') {
+    const steps = Math.max(1, Math.floor(tier.boost ?? 1));
+    const water = definition.id === 'ripple';
+    const boost = run.boost ?? { next: 0, water: 0 };
+    return { board, run: { ...spent, boost: water ? { ...boost, water: Math.max(boost.water, steps) } : { ...boost, next: Math.max(boost.next, steps) } }, effects: [{ kind: 'boosted', steps, water }] };
+  }
+  if (definition.id === 'scout') {
+    const shown = run.revealed ?? [];
+    const cells = hiddenCells(board, window, shown).slice(0, Math.max(1, Math.floor(tier.cells ?? 2)));
+    if (!cells.length) return null;
+    return { board, run: { ...spent, revealed: [...shown, ...cells] }, effects: [{ kind: 'scouted', cells }] };
   }
   const targets = abilityTargets(definition, tier, board, window, items);
   if (target == null || !targets.includes(target)) return null;
-  if (definition.targeting === 'spawner') {
-    const occupant = board.board[target]!.occupant;
-    if (occupant?.kind !== 'generator') return null;
-    const generator = board.generators[occupant.generatorId];
-    if (!generator) return null;
-    const charges = Math.max(0, Math.floor(tier.charges ?? 1));
-    const next: MergeWorldState = { ...board, generators: { ...board.generators, [occupant.generatorId]: { ...generator, charges: generator.charges + charges, capacity: Math.max(generator.capacity, generator.charges + charges) } }, revision: board.revision + 1 };
-    effects.push({ kind: 'focused', generatorId: occupant.generatorId, charges });
-    return { board: next, run: { ...spent, focus: { generatorId: occupant.generatorId, taps: Math.max(1, Math.floor(tier.taps ?? 3)), tierTwoChance: tier.tierTwoChance ?? 0.3 } }, effects };
+  if (definition.targeting === 'mist') {
+    const cleared = openMistCell(board, target);
+    return { board: cleared.board, run: spent, effects: [{ kind: 'cleared', opened: cleared.opened }] };
   }
   // Bloom: the target a step up; the first use each board may raise the next-highest plant too.
+  const effects: AbilityEffect[] = [];
   let next = board;
   const raise = (cell: number) => {
     const occupant = next.board[cell]?.occupant;
@@ -76,9 +85,10 @@ export function applyAbility(definition: CompanionAbilityDefinition, tier: Compa
     next = { ...next, board: cells, revision: next.revision + 1 };
     effects.push({ kind: 'bloomed', cell, definitionId: nextId });
     if (tier.clearsAdjacentLight) {
+      // From level four the light Mist beside it clears, and a piece locked beside it is freed.
       for (const neighbour of windowNeighbours(cell, window)) {
         const mist = next.board[neighbour]?.mist;
-        if (mist?.kind === 'encounter' && mist.type === 'light') next = openMistCell(next, neighbour).board;
+        if (mist?.kind === 'encounter' && (mist.type === 'light' || mist.type === 'bound')) next = openMistCell(next, neighbour).board;
       }
     }
   };

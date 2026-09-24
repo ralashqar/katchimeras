@@ -29,6 +29,6 @@ export function missionWispTarget(input: {
   const mechanic = resolveMechanic(input.host);
   const base: CorruptionWispTarget = { key: input.key, node: input.node, host: input.host, mechanicState: input.mechanicState, lines: input.lines, settled: input.settled, revealNonce: input.revealNonce, ...(input.live ? { live: input.live } : {}) };
   const onCells = mechanic.kind === 'dark-wisps' && mechanic.wisps.some((wisp) => wisp.placement.kind === 'cell');
-  if (mechanic.kind !== 'column-shot' && !onCells) return base;
+  if (mechanic.kind !== 'column-shot' && mechanic.kind !== 'lanes' && !onCells) return base;
   return { ...base, anchor: { kind: 'board', metrics: input.boardMetrics, window: input.window ?? missionWindow() } };
 }

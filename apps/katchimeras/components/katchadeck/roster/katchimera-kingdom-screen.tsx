@@ -79,6 +79,7 @@ import { companionHasPage } from '@/features/companion/companion-page-policy';
 import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { HATCHABLE_LESSON_FINALE_NODE_IDS, hatchableDiscoveryScene } from '@/features/onboarding/hatchable-flows';
 import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_MERGE_REQUIRED, OPENING_CAMERA_ENTRY_ZOOM, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
+import { BoardSessionDim } from '@/components/katchadeck/world/board-session-dim';
 import { KingdomOpeningMergeDock, MissionGlowLayer, OPENING_GLOW_FLIGHT_MS, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
 import { HatchableMissionDock } from '@/components/katchadeck/world/hatchable-mission-dock';
 import { completeJourneyMission, useJourneyConsequenceRuns } from '@/features/companion/journey-consequences';
@@ -131,6 +132,7 @@ import { useRouter } from 'expo-router';
 import Animated, {
   Easing,
   FadeIn,
+  FadeOut,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -1902,6 +1904,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const restorationStore = useMissionBoard(islandRestoration ? previewMissionStorageKey(restorationStorageKey(islandRestoration.campaign.campaignId, islandRestoration.level), mechanicPreview) : 'katchimeras.mist-mission.none.v1', restorationBoardRunId, createRestorationBoard, repairRestorationBoard, restorationBinding);
   const restorationChapterProgress = islandRestoration ? mergeWorld.islandCampaigns?.[islandRestoration.campaign.campaignId]?.chapters[String(islandRestoration.level)] ?? null : null;
   const islandEncounterActive = Boolean(islandEncounterRung) && screenFocused && !upgradePresentation && !interactionCreatureId && !pendingIslandCampaign && !stepplingMissionActive && !journeyMissionActive && !openingBoardActive;
+  // A Lanes battle (`docs/encounter-lanes.md`) on the island: the screen's own chrome stays out of its way.
+  const laneBattleActive = islandEncounterActive && islandEncounterRung?.mission.encounter?.mechanic?.kind === 'lanes';
   // A battle's dock fades in afresh: its wisps wait for it to settle (below), so each level starts unsettled.
   const islandEncounterMissionId = islandEncounterActive ? islandEncounterRung?.mission.id ?? null : null;
   useEffect(() => { setOpeningDockSettled(false); }, [islandEncounterMissionId]);
@@ -1914,17 +1918,35 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     setIslandEncounter(null);
   }, []);
   const islandMistOutcomeRef = useRef<{ outcome: import('@/features/encounter/outcome').EncounterOutcome | null; runId: string | null }>({ outcome: null, runId: null });
+  /**
+   * The island's lift, from the win that starts it until its upgrade sequence has played out. The friend's discovery
+   * reveal waits for all of it: the lift is queued a beat after the win and its sequence builds a few frames after
+   * that, and the reveal used to slip into those gaps, get cut off by the sequence, then come back after it.
+   */
+  const [islandLiftHold, setIslandLiftHold] = useState(false);
+  const liftSequenceSeenRef = useRef(false);
+  useEffect(() => {
+    if (!islandLiftHold) { liftSequenceSeenRef.current = false; return; }
+    if (upgradeHandoffPending || upgradePresentation || requiredUpgradeStory) { liftSequenceSeenRef.current = true; return; }
+    // The sequence has been and gone: the reveal may come.
+    if (liftSequenceSeenRef.current) { setIslandLiftHold(false); return; }
+    // Never seen at all (the lift did not queue a sequence): let go after a while rather than hold the reveal forever.
+    const timer = setTimeout(() => setIslandLiftHold(false), ISLAND_LIFT_HOLD_MAX_MS);
+    return () => clearTimeout(timer);
+  }, [islandLiftHold, requiredUpgradeStory, upgradeHandoffPending, upgradePresentation]);
   /** A friend's first level won: the Mist lifts through the same reveal (and its presentation) a paid reveal used to run, free. */
   const liftIslandMist = useStableCallback(async (campaignId: string) => {
     const campaign = islandCampaignById.get(campaignId);
     if (!campaign) return;
     const offer = worldUpgradeOffers(mergeWorldRef.current).find((candidate) => candidate.id === `nature:${campaign.islandId}` && candidate.transition === 'island_reveal');
     if (!offer) return;
+    setIslandLiftHold(true);
     try {
       const run = await purchaseWorldUpgrade(offer, { beforeValidation: flushMergeWorld });
-      if (run?.status === 'failed_recoverable') setTrackNotice('The Mist did not lift yet. Tap Lift the Mist to try again.');
+      if (run?.status === 'failed_recoverable') { setIslandLiftHold(false); setTrackNotice('The Mist did not lift yet. Tap Lift the Mist to try again.'); }
     } catch (error) {
       console.warn('The Mist could not lift', error);
+      setIslandLiftHold(false);
       setTrackNotice('The Mist did not lift yet. Tap Lift the Mist to try again.');
     }
   });
@@ -1943,13 +1965,16 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       katchimeraId: focus.loadout.companionId, helperWispId: focus.loadout.wispId ?? null,
       outcome, difficulty: found.mission.difficulty, base: found.mission.rewards,
     });
+    // The won board is done with: its save goes, so a replay (or the level again after a reset) starts a fresh board
+    // instead of loading a won one and clearing on arrival.
+    if (found.mission.encounter?.storageKey) clearMission(found.mission.encounter.storageKey);
     // The friend who was there remembers it: Bond, and the day's sparks toward their pouch.
     recordEncounterBond(result);
     const cleared = result.encounterCleared;
     if (cleared?.bossPack) grantTrackPack({ ...cleared.bossPack, kind: 'bright' });
     setIslandEncounter(null);
     // A friend's first level lifts their island's Mist, and the discovery that always followed it plays.
-    if (focus.campaignId && isMistLevel(focus.mission.id) && cleared?.firstClear) { void liftIslandMist(focus.campaignId); return; }
+    if (focus.campaignId && isMistLevel(focus.mission.id) && cleared?.firstClear) { setIslandLiftHold(true); void liftIslandMist(focus.campaignId); return; }
     // A chapter's last level grows the island and its closing conversation opens on its own; that story brings the
     // track back when it ends. Any other level lands straight back on its tile's levels.
     if (cleared?.islandRaised) return;
@@ -2947,11 +2972,17 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           onEnergyTokenArrive={stepplingEncounter.feedController.handleEnergyTokenArrive}
         />
       </View>
-      {ftueGardenUpgradeActive || seedPlantingFtueActive || Boolean(selectedUpgrade) || Boolean(upgradePresentation && !upgradePresentation.veilLift)
+      {/* A Lanes battle keeps only Back in the top bar: the Glow count and the friends pill step out while it is played. */}
+      {laneBattleActive || ftueGardenUpgradeActive || seedPlantingFtueActive || Boolean(selectedUpgrade) || Boolean(upgradePresentation && !upgradePresentation.veilLift)
         || (!upgradePresentation && (!ftueStepId || ftueStepId === 'companion.meditating')) ? (
-        <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 360)} pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }, ftueGardenUpgradeActive && { zIndex: 90 }]}>
+        <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 360)} exiting={FadeOut.duration(reduceMotion ? 80 : 260)} pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }, ftueGardenUpgradeActive && { zIndex: 90 }]}>
           <GameHudBar
-            leading={ftueGardenUpgradeActive || seedPlantingFtueActive || upgradePresentation || kingdomGoalGuideActive || restorationHandoff
+            leading={laneBattleActive ? <KatchimeraBackButton
+              accessibilityHint="Puts the battle away; it is here to come back to"
+              accessibilityLabel="Leave the battle"
+              compact
+              onPress={leaveIslandEncounter}
+            /> : ftueGardenUpgradeActive || seedPlantingFtueActive || upgradePresentation || kingdomGoalGuideActive || restorationHandoff
               // The lesson owns Back only while it has a surface up. Hiding it
               // for an active run with nothing on screen strands the player.
               || (stepplingLesson.active && Boolean(interactionCreatureId))
@@ -2963,10 +2994,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
               disabled={stepplingEncounter.busy || stepplingEncounter.hatching || interactionExiting}
               onPress={stepplingEncounter.open ? stepplingEncounter.close : restorationBoardVisible ? closeRestoration : () => requestResidentInteractionExit()}
             />}
-            content={kingdomGoal?.introducedAt && !kingdomGoalGuideActive && !ftueStepId && !stepplingLesson.active && !upgradePresentation && !restorationHandoff && !interactionCreatureId && !stepplingEncounter.open
+            content={!laneBattleActive && kingdomGoal?.introducedAt && !kingdomGoalGuideActive && !ftueStepId && !stepplingLesson.active && !upgradePresentation && !restorationHandoff && !interactionCreatureId && !stepplingEncounter.open
               ? <View style={styles.progressPill}><KingdomProgressPill progress={progressSummary} onPress={() => setProgressSheetOpen(true)} /></View>
               : <View />}
-            trailing={<GameCurrencyHud balances={[{
+            trailing={laneBattleActive ? <View /> : <GameCurrencyHud balances={[{
               animateValue: Boolean(upgradePresentation?.showCoins && upgradePresentation.coinCost > 0) || Boolean(glowSpend?.counting),
               art: GAME_CURRENCY_ART.coins,
               artTargetRef: glowCurrencyArtRef,
@@ -3066,7 +3097,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       {screenFocused && requiredUpgradeStory ? <WorldUpgradeNarrative key={requiredUpgradeStory.presentation.storyPresentationKey ?? requiredUpgradeStory.presentation.nonce}
         offer={requiredUpgradeStory.offer} world={mergeWorld} required saveRead={saveUpgradeStoryRead}
         onClose={() => finishUpgradePresentation(requiredUpgradeStory.presentation)} /> : null}
-      {screenFocused && pendingIslandDiscovery && !activeInteractionResidentId && !sharedUpgrade && !upgradePresentation && !requiredUpgradeStory ? <KatchimeraFriendDiscoveryReveal
+      {/* A friend's reveal comes after the island's lift has played out in full, never over the battle or between its beats. */}
+      {screenFocused && pendingIslandDiscovery && !activeInteractionResidentId && !sharedUpgrade && !upgradePresentation && !requiredUpgradeStory
+        && !upgradeHandoffPending && !islandLiftHold && !islandEncounter ? <KatchimeraFriendDiscoveryReveal
         actionLabel={pendingIslandDiscovery.campaign.copy.discoveryActionLabel}
         dialogue={pendingIslandDiscovery.campaign.copy.discoveryDialogue}
         onContinue={() => { void continueFromIslandDiscovery(pendingIslandDiscovery.campaign); }}
@@ -3205,6 +3238,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       ) : null}
       {ftueStepId === OPENING_MIST_OPEN_STEP_ID && ftueStep && screenFocused ? <KingdomOpeningCaption
         step={ftueStep} bottomInset={insets.bottom} onLookCloser={advanceOpening} /> : null}
+      {/* A docked mini board dims the Kingdom behind it, easing in and out. */}
+      <BoardSessionDim active={Boolean((openingBoardActive && ftueStep && mission.state) || (stepplingMissionActive && stepplingMission.state) || (journeyMissionActive && journeyMissionStore.state) || (activeRush && screenFocused) || (islandEncounterActive && islandMist.store.state) || (restorationBoardVisible && !chapterRush))} />
       {openingBoardActive && ftueStep && mission.state ? <KingdomOpeningMergeDock
         run={openingRun} step={ftueStep} state={mission.state} send={mission.send} width={window.width} bottomInset={insets.bottom}
         landings={openingGlow.store} onGlow={openingGlow.launch} onFinale={openingGlow.launchFinale} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
@@ -3325,6 +3360,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     </View>
   );
 });
+
+/** The longest the friend's reveal waits for an island lift that never shows its sequence. */
+const ISLAND_LIFT_HOLD_MAX_MS = 12_000;
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#55A9E2', flex: 1 },
