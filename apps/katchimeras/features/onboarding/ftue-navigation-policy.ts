@@ -9,6 +9,8 @@ export type ActiveFtueNavigationPolicy = FtueNavigationDirective & {
 
 const PRE_MOSSPROUT_CONVERSATION_STEPS = new Set([
   'world.mist_open',
+  // The Last Clearing's guardian beat (`last-clearing.ts`).
+  'world.guardian',
   'world.mist_clear',
   'world.mist_lift',
   'world.egg_intro',

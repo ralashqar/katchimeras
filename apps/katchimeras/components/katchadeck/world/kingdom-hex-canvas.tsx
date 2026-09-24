@@ -1800,8 +1800,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       if (tile.kind !== 'companion' || !tile.companion) continue;
       const artLayer = artLayerById.get(tile.id);
       const focusScale = tileFocusScale(tile.id);
-      // Under the opening's veil the home tile is mist: no locked friend, no resident.
-      if (homeVeil !== 'none' && tile.id === scene.centerTile.id) continue;
+      // Under the opening's veil the home tile is mist: no locked friend there, but Mossprout stands in it, holding it.
+      if (homeVeil !== 'none' && tile.id === scene.centerTile.id && tile.companion.kind !== 'owned') continue;
       if (tile.companion.kind === 'locked') {
         const lockedFamilyId = tile.companion.familyId;
         items.push({

@@ -69,7 +69,7 @@ test('compiler rejects unreachable nodes, dead ends, bad targets, and empty task
   assert.ok(issues.some((issue) => issue.message.includes('at least one requirement')));
 });
 
-test('streamlined introduction resumes at every boundary and hands off to the separate discovery chapter', () => {
+test('the Last Clearing resumes at every boundary: cold open, guardian, first battle, the Mist pulls back', () => {
   const flow = MOSSPROUT_FTUE_FLOW;
   let run = createContentFlowRun(flow, { runId: 'streamlined-ftue', now: 1 });
   const visited = new Set<string>();
@@ -105,9 +105,9 @@ test('streamlined introduction resumes at every boundary and hands off to the se
   assert.equal(run.status, 'completed');
   assert.equal(events.filter((type) => type === 'ftue.merge_completed').length, 7, 'the opening counts seven merges: two chains and the one that joins them');
   assert.equal(events.filter((type) => type === 'ftue.item_spawned').length, 0);
-  assert.ok(visited.has('effect.haven.start_glow_discovery'));
-  assert.ok(visited.has('world.first_seed_grew'));
-  for (const removed of ['companion.day_one_action', 'companion.bond_spotlight', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.water_response', 'companion.first_insight', 'merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom'] as const) {
+  for (const beat of ['world.mist_open', 'world.guardian', 'world.mist_clear', 'world.mist_lift', 'effect.haven.opening_glow'] as const) assert.ok(visited.has(beat), beat);
+  // The Egg, the hatch meeting, the Garden and the first rest are retired: never visited, and an old run ends.
+  for (const removed of ['egg.opening', 'egg.ready', 'companion.first_meeting', 'world.garden_arrival', 'world.first_seed_grew', 'companion.meditating', 'effect.haven.start_glow_discovery', 'merge.seed_drag'] as const) {
     assert.equal(visited.has(removed), false);
     assert.ok(flow.migrations?.[removed]);
   }
@@ -242,58 +242,14 @@ test('all Mossprout Journey days compile as executable, terminal graphs', () => 
   assert.equal(dayTwo.migrations?.[legacyResidentNode], 'mossprout:journey:quiet-patch:pond-knock:wisp');
 });
 
-test('the shipping FTUE is a direct data-driven Content Flow manifest', () => {
+test('the shipping FTUE is the Last Clearing, a direct data-driven Content Flow manifest', () => {
   const flow = MOSSPROUT_FTUE_FLOW;
   assert.deepEqual(validateContentFlowDefinition(flow), []);
   assert.equal(flow.metadata.authoring, 'content-flow');
   assert.equal(flow.entryNodeId, MOSSPROUT_FTUE_SCRIPT.entryStepId);
   assert.equal(flow.nodes.find((node) => node.id === MOSSPROUT_FTUE_SCRIPT.terminalStepId)?.kind, 'complete');
-  const dayOneEffect = flow.nodes.find((node) => node.kind === 'effect' && node.effectType === 'relationship.complete_day_one_lesson');
-  assert.ok(dayOneEffect);
-  const dayOneScene = flow.nodes.find((node) => node.kind === 'scene' && node.actions.some((action) => action.id === 'companion.complete_first_meeting'));
-  assert.equal(dayOneScene?.kind === 'scene'
-    ? dayOneScene.actions.find((action) => action.id === 'companion.complete_first_meeting')?.next
-    : null, dayOneEffect.id);
-  const opening = flow.nodes.find((node) => node.id === 'egg.opening');
-  assert.equal(opening?.kind, 'scene');
-  if (opening?.kind === 'scene') {
-    assert.deepEqual(new Set(opening.actions.map((action) => action.next)), new Set(['egg.context']));
-  }
-  const context = flow.nodes.find((node) => node.id === 'egg.context');
-  assert.equal(context?.kind === 'scene' ? context.actions[0]?.next : null, 'egg.ready');
-  assert.equal(flow.nodes.some((node) => node.id === 'egg.nature_theme'), false);
-});
-
-test('Day 1 Content Flow completion durably crosses the relationship effect before Garden', () => {
-  const flow = MOSSPROUT_FTUE_FLOW;
-  const base = createContentFlowRun(flow, { runId: 'ftue-day-one', now: 1 });
-  const atLesson = { ...base, nodeId: 'companion.first_meeting', phase: 'awaiting_input' as const };
-  const effect = reduceContentFlow(flow, atLesson, { type: 'submit_scene', actionId: 'companion.complete_first_meeting', now: 2 });
-  assert.equal(effect.run.phase, 'awaiting_effect');
-  assert.equal(effect.pendingWork.kind, 'effect');
-  if (effect.pendingWork.kind !== 'effect') return;
-  assert.equal(effect.pendingWork.effectType, 'relationship.complete_day_one_lesson');
-  const seeded = reduceContentFlow(flow, effect.run, { type: 'effect_completed', effectKey: effect.pendingWork.key, now: 3 });
-  assert.equal(seeded.run.nodeId, 'effect.haven.grant_first_memory');
-  assert.equal(seeded.pendingWork.kind, 'effect');
-  if (seeded.pendingWork.kind !== 'effect') return;
-  assert.equal(seeded.pendingWork.effectType, 'haven.grant_first_memory');
-  const advanced = reduceContentFlow(flow, seeded.run, { type: 'effect_completed', effectKey: seeded.pendingWork.key, now: 4 });
-  assert.equal(advanced.run.nodeId, 'garden.first-visit.focus', 'straight to the soil: no Heartwood sheet between the meeting and the planting');
-  assert.equal(Object.keys(advanced.run.effectReceipts).length, 2);
-});
-
-test('the first memory is planted by its own world action and growth remains visible before companion return', () => {
-  const flow = MOSSPROUT_FTUE_FLOW;
-  const base = createContentFlowRun(flow, { runId: 'ftue-first-seed', now: 1 });
-  const arrival = { ...base, nodeId: 'world.garden_arrival', phase: 'awaiting_input' as const };
-  const placing = reduceContentFlow(flow, arrival, { type: 'submit_scene', actionId: 'world.plant_first_seed', now: 2 });
-  assert.equal(placing.run.nodeId, 'effect.haven.place_first_memory');
-  assert.equal(placing.pendingWork.kind, 'effect');
-  if (placing.pendingWork.kind !== 'effect') return;
-  assert.equal(placing.pendingWork.effectType, 'haven.place_first_memory');
-  const planted = reduceContentFlow(flow, placing.run, { type: 'effect_completed', effectKey: placing.pendingWork.key, now: 3 });
-  assert.equal(planted.run.nodeId, 'world.first_seed_grew', 'the Spring is the first session’s one build: its effect leads straight to the bud');
+  assert.deepEqual(flow.nodes.map((node) => node.id), ['world.mist_open', 'world.guardian', 'world.mist_clear', 'world.mist_lift', 'effect.haven.opening_glow', 'complete']);
+  assert.equal(flow.nodes.some((node) => node.id.startsWith('egg.')), false, 'no Egg: Mossprout is there from the first frame');
 });
 
 test('world upgrade recipes expand into focus, atomic commit, and receipt-backed reveal', () => {

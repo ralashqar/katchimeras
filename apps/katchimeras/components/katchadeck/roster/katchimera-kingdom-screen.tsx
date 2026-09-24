@@ -96,7 +96,9 @@ import { previewMissionStorageKey, resolveRestorationForPlay } from '@/features/
 import { useDevMissionMechanicPreview } from '@/hooks/use-dev-mission-mechanic-preview';
 import type { MissionStrike } from '@/types/mission-mechanic';
 import { MissionWisps, type CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
-import { KingdomOpeningCaption } from '@/components/katchadeck/world/kingdom-opening-caption';
+import { LastClearingColdOpen } from '@/components/katchadeck/world/last-clearing-cold-open';
+import { LastClearingGuardian } from '@/components/katchadeck/world/last-clearing-guardian';
+import { GUARDIAN_STEP_ID } from '@/features/onboarding/last-clearing';
 import { clearMission, clearOpeningMission, useMissionBoard, useOpeningMissionBoard } from '@/features/onboarding/use-opening-mission-board';
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { worldUpgradeRunId } from '@/features/world-upgrades/world-upgrade-flows';
@@ -3184,7 +3186,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         </KatchaSheet>
       ) : null}
       {(havenOpeningActive || ftueStepId === 'egg.opening') && ftueStep && !activeInteractionResidentId && ftueStepId !== 'world.first_bloom_restore'
-        && ftueStepId !== OPENING_MIST_OPEN_STEP_ID && ftueStepId !== OPENING_MIST_CLEAR_STEP_ID
+        && ftueStepId !== OPENING_MIST_OPEN_STEP_ID && ftueStepId !== GUARDIAN_STEP_ID && ftueStepId !== OPENING_MIST_CLEAR_STEP_ID
         && (ftueStepId !== OPENING_MIST_LIFT_STEP_ID || liftCaptionVisible)
         && (ftueStepId !== 'world.seed_planted' || firstSeedPlacementFailed) ? (
         <View
@@ -3236,8 +3238,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           </View> : null}
         </View>
       ) : null}
-      {ftueStepId === OPENING_MIST_OPEN_STEP_ID && ftueStep && screenFocused ? <KingdomOpeningCaption
-        step={ftueStep} bottomInset={insets.bottom} onLookCloser={advanceOpening} /> : null}
+      {/* The Last Clearing (`docs/cozy-4x-ftue-the-last-clearing.md`): the cold open, then the guardian. */}
+      {ftueStepId === OPENING_MIST_OPEN_STEP_ID && ftueStep && screenFocused ? <LastClearingColdOpen onDone={advanceOpening} /> : null}
+      {ftueStepId === GUARDIAN_STEP_ID && ftueStep && screenFocused ? <LastClearingGuardian onContinue={advanceOpening} /> : null}
       {/* A docked mini board dims the Kingdom behind it, easing in and out. */}
       <BoardSessionDim active={Boolean((openingBoardActive && ftueStep && mission.state) || (stepplingMissionActive && stepplingMission.state) || (journeyMissionActive && journeyMissionStore.state) || (activeRush && screenFocused) || (islandEncounterActive && islandMist.store.state) || (restorationBoardVisible && !chapterRush))} />
       {openingBoardActive && ftueStep && mission.state ? <KingdomOpeningMergeDock

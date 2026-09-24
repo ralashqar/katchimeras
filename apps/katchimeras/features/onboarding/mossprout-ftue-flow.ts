@@ -58,113 +58,47 @@ const MOSSPROUT_GARDEN_FOCUS_CAMERA = {
  */
 export const MOSSPROUT_FTUE_FLOW = defineStory({
   id: 'mossprout-first-session',
-  // Independent from the legacy FTUE schema version. Bumping this lets v39
-  // journal runs migrate onto the direct manifest without mutating a release.
-  version: 56,
+  // v57: the Last Clearing (`docs/cozy-4x-ftue-the-last-clearing.md`), the cozy 4X first session. The game is not
+  // launched, so there is no migration of meaning: every retired beat simply ends an old run.
+  version: 57,
   entryNodeId: 'world.mist_open',
   metadata: {
     kind: 'ftue' as const,
     authoring: 'content-flow',
     projection: 'legacy-ftue-view-model',
-    variantId: 'first-bloom',
+    variantId: 'last-clearing',
   },
   nodes: [
-    scene('world.mist_open', 'haven', [{ id: 'world.look_closer', next: 'world.mist_clear' }]),
+    // The cold open: black, the lore, the sink through the Mist to the last lit clearing.
+    scene('world.mist_open', 'haven', [{ id: 'world.look_closer', next: 'world.guardian' }]),
+    // The guardian: Mossprout meets the Wayfinder.
+    scene('world.guardian', 'haven', [{ id: 'world.meet_guardian', next: 'world.mist_clear' }]),
+    // "They found us": the first battle.
     task('world.mist_clear', 'haven', { id: 'world.clear_mist', event: ftueEvent('merge_completed'), count: 7, next: 'world.mist_lift' }),
+    // The Mist pulls back from the clearing.
     scene('world.mist_lift', 'haven', [{ id: 'world.mist_lifted', next: 'effect.haven.opening_glow' }]),
-    // The first light: the Glow that drove the wisps off stays with you, and pays the first restore.
-    story.effect({ id: 'effect.haven.opening_glow', capability: 'haven.opening_glow', next: 'world.egg_intro' }),
-    scene('world.egg_intro', 'haven', [{ id: 'world.inspect_mossprout_egg', next: 'egg.opening' }]),
-    scene('egg.opening', 'haven', [{ id: 'egg.day_texture', next: 'egg.context' }]),
-    scene('egg.context', 'haven', [{ id: 'egg.desired_help', next: 'egg.ready' }]),
-    scene('egg.ready', 'haven', [{ id: 'egg.hatch', next: 'companion.first_meeting' }]),
-    scene('companion.first_meeting', 'haven', [{ id: 'companion.complete_first_meeting', next: 'effect.relationship.complete_day_one_lesson' }]),
-    story.effect({
-      id: 'effect.relationship.complete_day_one_lesson',
-      capability: 'relationship.complete_day_one_lesson',
-      next: 'effect.haven.grant_first_memory',
-    }),
-    story.effect({
-      id: 'effect.haven.grant_first_memory',
-      capability: 'haven.grant_first_memory',
-      next: 'garden.first-visit.focus',
-    }),
-    storyOperations.focusCamera({
-      id: 'garden.first-visit.focus',
-      target: MOSSPROUT_GARDEN_FOCUS_TARGET,
-      next: 'world.garden_arrival',
-      ...MOSSPROUT_GARDEN_FOCUS_CAMERA,
-    }),
-    scene('world.garden_arrival', 'haven', [{ id: 'world.plant_first_seed', next: 'effect.haven.place_first_memory' }]),
-    // Planting the Dew Spring is the first session's one build: the light that drove the wisps off pays for it, the
-    // coins fly into the patch, and Heartwood wakes with it (its tile's first stage comes with the Spring, never as
-    // an upgrade of its own). The Garden board is introduced later, when Steppling's trail needs light.
-    story.effect({
-      id: 'effect.haven.place_first_memory',
-      capability: 'haven.place_first_memory',
-      next: 'world.first_seed_grew',
-    }),
-    scene('world.first_seed_grew', 'haven', [{ id: 'world.acknowledge_first_seed_growth', next: 'effect.relationship.first_bloom_bond' }]),
-    story.effect({
-      id: 'effect.relationship.first_bloom_bond',
-      capability: 'relationship.first_bloom_bond',
-      next: 'companion.first_rest',
-    }),
-    scene('companion.first_rest', 'companion', [{ id: 'companion.begin_rest', next: 'effect.relationship.begin_meditation' }]),
-    story.effect({
-      id: 'effect.relationship.begin_meditation',
-      capability: 'relationship.begin_meditation',
-      payload: { familyId: 'mossprout', durationMs: MOSSPROUT_FTUE_REST_MS, reason: 'journey_rest' },
-      next: 'companion.meditating',
-    }),
-    scene('companion.meditating', 'companion', [{ id: 'companion.tend_garden', next: 'effect.haven.start_glow_discovery' }]),
-    story.effect({ id: 'effect.haven.start_glow_discovery', capability: 'haven.start_glow_discovery', next: 'complete' }),
+    // The light that drove the wisps off stays with you: it will wake the Heart Tree.
+    story.effect({ id: 'effect.haven.opening_glow', capability: 'haven.opening_glow', next: 'complete' }),
     story.complete(),
   ],
-  migrations: {
-    'egg.wisps': 'egg.opening',
-    'egg.listening': 'egg.opening',
-    // v51: merging is taught by the opening, so the guided drags are gone; v52: the first restore is paid with granted light, so the request is too.
-    'merge.seed_drag': 'world.first_seed_grew',
-    'merge.second_seed_drag': 'world.first_seed_grew',
-    'merge.first_bloom': 'world.first_seed_grew',
-    'merge.serve_sprout': 'world.first_seed_grew',
-    // v53: the first session builds the Dew Spring and nothing else; Heartwood's first stage comes with it. A run
-    // parked anywhere between the planting and the bud continues at the bud (the world is repaired on arrival).
-    'world.seed_planted': 'world.first_seed_grew',
-    'garden.first-bloom-offer.focus': 'world.first_seed_grew',
-    'world.first_bloom_offer': 'world.first_seed_grew',
-    'world.first_bloom_restore': 'world.first_seed_grew',
-    'garden.first-bloom.focus': 'world.first_seed_grew',
-    'garden.first-bloom.commit': 'world.first_seed_grew',
-    'garden.first-bloom.reveal': 'world.first_seed_grew',
-    'effect.haven.grow_first_memory': 'world.first_seed_grew',
-    'effect.haven.prepare_merge_handoff': 'effect.haven.start_glow_discovery',
-    'merge.handoff.spawn': 'effect.haven.start_glow_discovery',
-    'merge.handoff.merge': 'effect.haven.start_glow_discovery',
-    'world.complete': 'companion.meditating',
-    'haven.first_bloom': 'world.first_seed_grew',
-    'effect.haven.seed_first_memory': 'effect.haven.grant_first_memory',
-    'companion.day_one_action': 'effect.relationship.complete_day_one_lesson',
-    'companion.bond_spotlight': 'garden.first-visit.focus',
-    'companion.order_preview': 'garden.first-visit.focus',
-    'world.garden_handoff': 'world.first_seed_grew',
-    'companion.chapter_zero_return': 'companion.first_rest',
-    // v56: the first session is the merges, the Egg, one meeting, the planting and the rest. The Heartwood
-    // modal before the planting and the chat after it are gone; a run parked on them continues at the next real beat.
-    'companion.garden_intro': 'garden.first-visit.focus',
-    'companion.water_together': 'companion.first_rest',
-    'companion.first_grow': 'companion.first_rest',
-    'companion.first_notice': 'companion.first_rest',
-    'companion.notice_bond_spotlight': 'companion.first_rest',
-    'companion.water_response': 'companion.first_rest',
-    'companion.first_insight': 'companion.first_rest',
-  },
+  migrations: Object.fromEntries([
+    'world.egg_intro', 'egg.opening', 'egg.context', 'egg.ready', 'companion.first_meeting',
+    'effect.relationship.complete_day_one_lesson', 'effect.haven.grant_first_memory', 'garden.first-visit.focus',
+    'world.garden_arrival', 'effect.haven.place_first_memory', 'world.first_seed_grew', 'effect.relationship.first_bloom_bond',
+    'companion.first_rest', 'effect.relationship.begin_meditation', 'companion.meditating', 'effect.haven.start_glow_discovery',
+    'egg.wisps', 'egg.listening', 'merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom', 'merge.serve_sprout',
+    'world.seed_planted', 'garden.first-bloom-offer.focus', 'world.first_bloom_offer', 'world.first_bloom_restore',
+    'garden.first-bloom.focus', 'garden.first-bloom.commit', 'garden.first-bloom.reveal', 'effect.haven.grow_first_memory',
+    'effect.haven.prepare_merge_handoff', 'merge.handoff.spawn', 'merge.handoff.merge', 'world.complete', 'haven.first_bloom',
+    'effect.haven.seed_first_memory', 'companion.day_one_action', 'companion.bond_spotlight', 'companion.order_preview',
+    'world.garden_handoff', 'companion.chapter_zero_return', 'companion.garden_intro', 'companion.water_together',
+    'companion.first_grow', 'companion.first_notice', 'companion.notice_bond_spotlight', 'companion.water_response', 'companion.first_insight',
+  ].map((id) => [id, 'complete'])),
 });
 
 /** Add experimental manifests here; each variant must use a distinct version. */
 export const MOSSPROUT_FTUE_VARIANTS = defineStoryVariants({
   id: 'mossprout-ftue',
-  defaultVariantId: 'first-bloom',
-  variants: [{ id: 'first-bloom', label: 'First Bloom', definition: MOSSPROUT_FTUE_FLOW }],
+  defaultVariantId: 'last-clearing',
+  variants: [{ id: 'last-clearing', label: 'The Last Clearing', definition: MOSSPROUT_FTUE_FLOW }],
 });

@@ -29,8 +29,8 @@ export function worldEggReadyEffectsVisible(
 
 /** Shared by the interaction host and world actor, including every Egg narrative beat. */
 export function mossproutFtueUsesEggStage(stepId: string | null | undefined) {
-  return stepId === 'world.mist_lift'
-    || stepId === 'world.egg_intro'
+  // The Last Clearing has no Egg: Mossprout is there from the first frame, and the lift reveals the clearing it held.
+  return stepId === 'world.egg_intro'
     || Boolean(stepId?.startsWith('egg.'));
 }
 

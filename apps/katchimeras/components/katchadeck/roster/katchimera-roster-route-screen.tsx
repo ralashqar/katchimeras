@@ -29,7 +29,10 @@ import { kingdomCompanionHexSlots, type KingdomHexCompanionSlot } from '@/utils/
 import { useGameScreenTransition, useGameSurfaceReadiness } from '@/features/navigation/game-screen-transition';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { MergeWorldProvider, useMergeWorldState } from '@/features/merge-world/merge-world-provider';
-import { advanceFtueActionDurably, commitFtueAction, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { advanceFtueActionDurably, commitFtueAction, ftueWispForRun, updateFtueRun, useFtueRun } from '@/features/onboarding/ftue-runtime';
+import { GUARDIAN_ACTION_ID, GUARDIAN_STEP_ID } from '@/features/onboarding/last-clearing';
+import { installMossproutOnboardingMergeWorld } from '@/utils/merge-world/repository';
+import { gameNow } from '@/utils/game-clock';
 import { homeSoloForStep, OPENING_SKY_SCENE_ID } from '@/features/onboarding/opening-mist';
 import { useHavenTileStages } from '@/hooks/use-haven-tile-stages';
 import { ftueLocksSurfaceNavigation } from '@/features/onboarding/ftue-navigation-policy';
@@ -178,6 +181,17 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
 }) {
   const router = useRouter();
   const ftueRun = useFtueRun();
+  // The Last Clearing has no Egg: Mossprout has been holding the clearing all along, so its record is in the world
+  // from the first frame of a fresh session (once per run; the flag is the run's own).
+  const installingMossproutRef = useRef(false);
+  useEffect(() => {
+    if (ftueRun?.status !== 'active' || ftueRun.mergeInstalled || installingMossproutRef.current) return;
+    installingMossproutRef.current = true;
+    void installMossproutOnboardingMergeWorld(gameNow(), ftueWispForRun(ftueRun), { preserveHaven: true, basketParcel: true })
+      .then(() => updateFtueRun({ mergeInstalled: true }))
+      .catch((error) => console.warn('Could not bring Mossprout into the clearing', error))
+      .finally(() => { installingMossproutRef.current = false; });
+  }, [ftueRun]);
   // Any hatchable companion's live discovery or garden lesson keeps the shared world on screen.
   const hatchableRuns = useHatchableRuns();
   const glowReady = hatchableRuns.ready;
@@ -327,6 +341,8 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
     const stepId = ftueRun?.status === 'active' ? ftueRun.stepId : null;
     if (stepId === 'world.mist_open') {
       commitFtueAction({ actionId: 'world.look_closer', evidenceRef: 'mossprout-world:look-closer' });
+    } else if (stepId === GUARDIAN_STEP_ID) {
+      commitFtueAction({ actionId: GUARDIAN_ACTION_ID, evidenceRef: 'mossprout-world:guardian-met' });
     } else if (stepId === 'world.egg_intro') {
       commitFtueAction({ actionId: 'world.inspect_mossprout_egg', evidenceRef: 'mossprout-world:egg-intro-seen' });
     } else if (stepId === 'world.seed_planted') {

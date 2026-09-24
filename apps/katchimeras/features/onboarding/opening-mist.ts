@@ -14,7 +14,9 @@ export const OPENING_MIST_CLEAR_STEP_ID = 'world.mist_clear';
 export const OPENING_MIST_LIFT_STEP_ID = 'world.mist_lift';
 export const OPENING_CLEAR_ACTION_ID = 'world.clear_mist';
 export const OPENING_LIFTED_ACTION_ID = 'world.mist_lifted';
-export const MOSSPROUT_OPENING_STEP_IDS: readonly string[] = [OPENING_MIST_OPEN_STEP_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID];
+/** The Last Clearing's guardian beat, between the cold open and the first battle (`last-clearing.ts`). */
+export const OPENING_GUARDIAN_STEP_ID = 'world.guardian';
+export const MOSSPROUT_OPENING_STEP_IDS: readonly string[] = [OPENING_MIST_OPEN_STEP_ID, OPENING_GUARDIAN_STEP_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID];
 
 /** Merges that fill the bar: two chains of three, then the one merge that joins them. The board ends empty. */
 export const OPENING_MERGE_REQUIRED = 7;
@@ -67,7 +69,7 @@ export type HomeVeilState = 'veiled' | 'lifting' | 'none';
 
 /** Mossprout's tile stays under mist until the bar is full; the lift beat crossblends it away. */
 export function homeVeilForStep(stepId: string | null | undefined): HomeVeilState {
-  if (stepId === OPENING_MIST_OPEN_STEP_ID || stepId === OPENING_MIST_CLEAR_STEP_ID) return 'veiled';
+  if (stepId === OPENING_MIST_OPEN_STEP_ID || stepId === OPENING_GUARDIAN_STEP_ID || stepId === OPENING_MIST_CLEAR_STEP_ID) return 'veiled';
   if (stepId === OPENING_MIST_LIFT_STEP_ID) return 'lifting';
   return 'none';
 }

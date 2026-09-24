@@ -7,6 +7,7 @@ import * as migrationPolicy from '@/features/onboarding/ftue-migration-policy';
 import * as navigationPolicy from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueStep, mossproutFtueShowsWorldGarden, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
+import { COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, GUARDIAN_ACTION_ID, GUARDIAN_STEP_ID, GUARDIAN_TITLE } from '@/features/onboarding/last-clearing';
 import { activeFtueNavigationPolicy, ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_OPENING_STEP_IDS, OPENING_CAMERA_ENTRY_MS, OPENING_MERGE_REQUIRED, openingMistProgress } from '@/features/onboarding/opening-mist';
 import { mossproutWorldUsesEggRenderer } from '@/components/katchadeck/world/world-ftue-subject-presentation';
@@ -49,26 +50,27 @@ function loadRuntime(stored?: unknown) {
 
 const merge = (revision: number) => ({ type: 'merge_completed', fromInstanceId: `a${revision}`, targetInstanceId: `b${revision}`, resultDefinitionId: 'nature:garden:2', resultCell: 16 + revision, revision });
 
-test('the opening is three haven beats before the Egg: look closer, clear the Mist, the veil lifts', () => {
+test('the Last Clearing opens with four haven beats and no Egg: the cold open, the guardian, the first battle, the Mist pulling back', () => {
   const kingdomScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   assert.doesNotMatch(kingdomScreen, /hideWorldTiles=/, 'dialogue must not hide the island supporting Mossprout');
-  assert.match(kingdomScreen, /OPENING_EGG_APPROACH_DELAY_MS = REVEAL_CAPTION_DELAY_MS \+ 1000/, 'one second for the bottom caption before zooming');
-  assert.match(kingdomScreen, /egg-camera-settled/, 'questions open automatically after the camera settles');
+  assert.match(kingdomScreen, /ftueStepId === OPENING_MIST_OPEN_STEP_ID && ftueStep && screenFocused \? <LastClearingColdOpen onDone=\{advanceOpening\} \/>/, 'the cold open plays over the misted world');
+  assert.match(kingdomScreen, /ftueStepId === GUARDIAN_STEP_ID && ftueStep && screenFocused \? <LastClearingGuardian onContinue=\{advanceOpening\} \/>/, 'then the guardian');
   const reward = kingdomScreen.slice(kingdomScreen.indexOf('// Keep the earned Glow'), kingdomScreen.indexOf('// The repair:'));
   assert.match(reward, /ensureStoredOpeningGlow/);
-  assert.doesNotMatch(reward, /openingGlow.launch|setGlowSpend/, 'grant the earned reward without a distracting flight');
-  assert.doesNotMatch(kingdomScreen, /Help the egg/);
-  assert.match(kingdomScreen, /!\['egg.opening', 'world.mist_lift', 'world.egg_intro'/, 'no CTA during the reveal or approach');
   assert.deepEqual(validateMossproutFtueScript(), []);
   assert.equal(MOSSPROUT_FTUE_SCRIPT.entryStepId, 'world.mist_open');
   assert.equal(MOSSPROUT_FTUE_FLOW.entryNodeId, MOSSPROUT_FTUE_SCRIPT.entryStepId);
   const open = mossproutFtueStep('world.mist_open')!;
   assert.equal(open.surface, 'haven');
-  assert.equal(open.camera?.kind === 'focus_target' ? open.camera.durationMs : null, OPENING_CAMERA_ENTRY_MS, 'the glide runs for the length of the captions');
-  assert.equal(open.actions[0]?.id, 'world.look_closer');
-  assert.equal(open.actions[0]?.nextStepId, 'world.mist_clear');
-  assert.equal(open.guide.title, 'Once, every path led home. Then the lights went out.');
-  assert.equal(open.guide.body, '', 'one line: the button arrives on the beat the second line used to');
+  assert.equal(open.camera?.kind === 'focus_target' ? open.camera.durationMs : null, OPENING_CAMERA_ENTRY_MS, 'the camera sinks toward the clearing under the lore');
+  assert.equal(open.actions[0]?.id, COLD_OPEN_ACTION_ID);
+  assert.equal(open.actions[0]?.nextStepId, GUARDIAN_STEP_ID);
+  assert.equal(open.guide.title, COLD_OPEN_LINES[0]);
+  const guardian = mossproutFtueStep(GUARDIAN_STEP_ID)!;
+  assert.equal(guardian.surface, 'haven');
+  assert.equal(guardian.guide.title, GUARDIAN_TITLE);
+  assert.equal(guardian.actions[0]?.id, GUARDIAN_ACTION_ID);
+  assert.equal(guardian.actions[0]?.nextStepId, 'world.mist_clear');
   const clear = mossproutFtueStep('world.mist_clear')!;
   assert.equal(clear.surface, 'haven', 'a haven step keeps the docked board ungated and resumes to the Kingdom');
   assert.equal(clear.interaction?.mode, 'none');
@@ -78,15 +80,7 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
   assert.equal(clear.actions[0]?.backendEvent, undefined, 'a tutorial objective needs no backend receipt');
   const lift = mossproutFtueStep('world.mist_lift')!;
   assert.equal(lift.actions[0]?.id, 'world.mist_lifted');
-  assert.equal(lift.actions[0]?.nextStepId, 'world.egg_intro');
-  assert.equal(lift.guide.title, 'The Mist lets go.');
-  assert.equal(mossproutFtueStep('world.egg_intro')?.guide.title, 'The Mist lets go.');
-  assert.equal(mossproutFtueStep('world.egg_intro')?.actions[0]?.nextStepId, 'egg.opening');
-  assert.deepEqual(lift.guide, mossproutFtueStep('world.egg_intro')?.guide, 'the reveal caption stays unchanged during the approach');
-  assert.deepEqual(lift.camera, mossproutFtueStep('world.egg_intro')?.camera, 'the intro must not restart the approach with a different camera directive');
-  const firstQuestion = mossproutFtueStep('egg.opening')!;
-  assert.equal(firstQuestion.guide.title, 'Share a little of your light. Help it wake.');
-  assert.equal(firstQuestion.actions[0].options?.length, 3);
+  assert.equal(lift.actions[0]?.nextStepId, 'complete', 'until the Heart Tree beats are built, the first session ends as the Mist pulls back');
 
   for (const stepId of MOSSPROUT_OPENING_STEP_IDS) {
     const step = mossproutFtueStep(stepId)!;
@@ -96,21 +90,27 @@ test('the opening is three haven beats before the Egg: look closer, clear the Mi
     assert.equal(ftueOwnsOpeningHome({ status: 'active', stepId }), true, `${stepId} is part of the opening`);
     assert.equal(activeFtueNavigationPolicy({ status: 'active', stepId })?.resume?.kind, 'haven');
     for (const action of step.actions) assert.ok(FTUE_HANDLER_REGISTRY[action.handlerId]);
+    assert.equal(mossproutWorldUsesEggRenderer(stepId, null), false, `${stepId}: no Egg, Mossprout is there`);
   }
   const task = MOSSPROUT_FTUE_FLOW.nodes.find((node) => node.id === 'world.mist_clear');
   assert.equal(task?.kind, 'task');
   assert.equal(task?.kind === 'task' ? task.requirements[0]?.count : null, OPENING_MERGE_REQUIRED);
   assert.equal(task?.kind === 'task' ? task.next : null, 'world.mist_lift');
-  assert.equal(mossproutWorldUsesEggRenderer('world.mist_clear', null), false, 'no Egg under the veil');
-  assert.equal(mossproutWorldUsesEggRenderer('world.mist_lift', null), true, 'the lift reveals the Egg');
+  // Mossprout stands in its clearing under the Mist: the veiled home tile still draws its owned resident.
+  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
+  assert.match(canvas, /homeVeil !== 'none' && tile\.id === scene\.centerTile\.id && tile\.companion\.kind !== 'owned'/);
+  // And its record is in the world from the first frame of a fresh session.
+  const host = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
+  assert.match(host, /ftueRun\.mergeInstalled[\s\S]*?installMossproutOnboardingMergeWorld\([\s\S]*?updateFtueRun\(\{ mergeInstalled: true \}\)/);
 });
 
-test('a fresh run counts the opening merges into the bar, lifts, and resumes at every boundary', () => {
+test('a fresh run walks the Last Clearing: the cold open, the guardian, the merges into the bar, the lift, and resumes at every boundary', () => {
   const { runtime, flowDispatches } = loadRuntime();
   const run = runtime.beginFtueRun({ restart: true });
   assert.equal(run.stepId, 'world.mist_open');
-  assert.equal(run.mergeInstalled, false, 'the persistent board is installed later, at the first meeting, as before');
-  assert.equal(runtime.commitFtueAction({ actionId: 'world.look_closer' })?.stepId, 'world.mist_clear');
+  assert.equal(run.mergeInstalled, false, 'the Kingdom host installs Mossprout on the first frame');
+  assert.equal(runtime.commitFtueAction({ actionId: COLD_OPEN_ACTION_ID })?.stepId, GUARDIAN_STEP_ID);
+  assert.equal(runtime.commitFtueAction({ actionId: GUARDIAN_ACTION_ID })?.stepId, 'world.mist_clear');
   for (let count = 1; count < OPENING_MERGE_REQUIRED; count++) {
     const next = runtime.dispatchFtueEvent(merge(count))!;
     assert.equal(next.stepId, 'world.mist_clear', `merge ${count} keeps the beat`);
@@ -122,13 +122,13 @@ test('a fresh run counts the opening merges into the bar, lifts, and resumes at 
   assert.equal(openingMistProgress(resumed as never), OPENING_MERGE_REQUIRED - 1);
   const lifted = runtime.dispatchFtueEvent(merge(OPENING_MERGE_REQUIRED))!;
   assert.equal(lifted.stepId, 'world.mist_lift');
-  assert.equal(openingMistProgress(lifted as never), OPENING_MERGE_REQUIRED, 'the bar stays full while the veil lifts');
+  assert.equal(openingMistProgress(lifted as never), OPENING_MERGE_REQUIRED, 'the bar stays full while the Mist pulls back');
   assert.equal(runtime.dispatchFtueEvent(merge(99))?.stepId, 'world.mist_lift', 'an extra merge during the lift is harmless');
-  assert.equal(runtime.commitFtueAction({ actionId: 'world.mist_lifted', evidenceRef: 'mossprout-world:veil-lifted' })?.stepId, 'world.egg_intro');
-  assert.equal(runtime.commitFtueAction({ actionId: 'world.mist_lifted' })?.stepId, 'world.egg_intro', 'a second lift commit is a no-op');
-  assert.equal(runtime.commitFtueAction({ actionId: 'world.inspect_mossprout_egg' })?.stepId, 'egg.opening');
+  const done = runtime.commitFtueAction({ actionId: 'world.mist_lifted', evidenceRef: 'mossprout-world:veil-lifted' })!;
+  assert.equal(done.stepId, 'complete');
   assert.equal(flowDispatches.filter((entry) => entry === 'event:merge_completed').length, OPENING_MERGE_REQUIRED, 'the stray merge matched no edge, so the flow never heard it');
-  assert.equal(flowDispatches.filter((entry) => entry === 'action:world.look_closer').length, 1);
+  assert.equal(flowDispatches.filter((entry) => entry === `action:${COLD_OPEN_ACTION_ID}`).length, 1);
+  assert.equal(flowDispatches.filter((entry) => entry === `action:${GUARDIAN_ACTION_ID}`).length, 1);
   assert.equal(flowDispatches.filter((entry) => entry === 'action:world.mist_lifted').length, 1);
 });
 
@@ -156,7 +156,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   const dock = readFileSync('components/katchadeck/world/kingdom-opening-merge-dock.tsx', 'utf8');
   assert.match(screen, /\{ftueStepId === OPENING_MIST_OPEN_STEP_ID \? <FtueOpeningFade \/> : null\}/);
   assert.doesNotMatch(screen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
-  assert.match(screen, /<KingdomOpeningCaption[\s\S]*?onLookCloser=\{advanceOpening\}/);
+  assert.match(screen, /<LastClearingColdOpen onDone=\{advanceOpening\} \/>/);
   assert.match(screen, /const openingBoardActive = Boolean\(mission\.state\) && ftueStepId === OPENING_MIST_CLEAR_STEP_ID;/);
   // The lift beat waits for the final item: the Kingdom presents the clear beat until it has landed and burst.
   assert.match(screen, /ftueStepId: routeFtueStepId,/, 'the route step is renamed so the presented step can be held');
@@ -240,7 +240,7 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   assert.match(canvas, /const revealingVeiledHome = Boolean\(upgradePresentation\?\.veilLift\);\s*const homeVeilProgress = useSharedValue\(0\);/, 'the lift owns one reveal clock, like the Steppling reveal');
   assert.match(canvas, /transitionLayers\.toLayer\.id === scene\.centerTile\.id && \(upgradeOwnsLayer \? revealingVeiledHome : settlingUpgrade\?\.nonce === veilLiftNonceRef\.current\)\s*\? homeVeilProgress : undefined/, 'the mist crossblend drives that clock');
   assert.match(canvas, /eggSkinId=\{revealedEggProjection\.eggSkinId\}\s*revealProgress=\{homeVeil !== 'none' \|\| settlingUpgrade\?\.nonce === veilLiftNonceRef\.current \? homeVeilProgress : undefined\}/, 'the Egg fades in with the tile, never ahead of it');
-  assert.doesNotMatch(route, /installMossproutOnboardingMergeWorld/, 'the opening never touches the persistent board');
+  assert.match(route, /if \(ftueRun\?\.status !== 'active' \|\| ftueRun\.mergeInstalled \|\| installingMossproutRef\.current\) return;/, 'the Last Clearing brings Mossprout into the world once, at the start of the run');
   assert.match(screen, /const mission = useOpeningMissionBoard\(missionRunId\);/, 'the Kingdom owns the mission board');
   assert.match(screen, /if \(ftueStepId === 'world\.egg_intro'\) clearOpeningMission\(\);/, 'the mission store goes with the mist');
   assert.match(screen, /<KingdomOpeningMergeDock[\s\S]*?state=\{mission\.state\} send=\{mission\.send\}/, 'the dock plays the mission board, not the provider');
@@ -255,32 +255,6 @@ test('the Kingdom wires the opening: fade on the first beat, dock and finger on 
   const caption = readFileSync('components/katchadeck/world/kingdom-opening-caption.tsx', 'utf8');
   assert.match(caption, /setTimeout\(\(\) => setPage\(1\), reduceMotion \? 1_200 : OPENING_CAPTION_PAGE_MS\)/);
   assert.match(caption, /disabled=\{page === 1 \|\| single\}[\s\S]*?onPress=\{\(\) => setPage\(1\)\}/, 'a two-line caption can be tapped through; a one-line one has nothing to skip');
-});
-
-
-test('the stuck wisp checkpoint resumes through both questions and waits for the Hatch CTA', () => {
-  let { runtime } = loadRuntime();
-  runtime.beginFtueRun({ restart: true });
-  runtime.commitFtueAction({ actionId: 'world.look_closer' });
-  for (let i = 1; i <= OPENING_MERGE_REQUIRED; i++) runtime.dispatchFtueEvent(merge(i));
-  runtime.commitFtueAction({ actionId: 'world.mist_lifted' });
-  runtime.commitFtueAction({ actionId: 'world.inspect_mossprout_egg' });
-  const beats = [
-    ['egg.opening', 'egg.day_texture'],
-    ['egg.context', 'egg.desired_help'],
-    ['egg.ready', 'egg.hatch'],
-  ];
-  for (const [stepId, actionId] of beats) {
-    runtime = loadRuntime(runtime.loadFtueRun()).runtime;
-    assert.equal(runtime.loadFtueRun()?.stepId, stepId, 'relaunch preserves the unanswered beat');
-    assert.equal(mossproutWorldUsesEggRenderer(stepId, null), true, 'Egg remains visible before host layout');
-    assert.equal(runtime.commitFtueAction({ actionId: 'world.inspect_mossprout_egg' })?.stepId, stepId, 'late camera callback cannot skip this beat');
-    if (stepId !== 'egg.ready') {
-      assert.equal(runtime.commitFtueAction({ actionId: 'egg.hatch' })?.stepId, stepId, 'hatch is unavailable before questions');
-    }
-    runtime.commitFtueAction({ actionId });
-  }
-  assert.equal(runtime.loadFtueRun()?.stepId, 'companion.first_meeting');
 });
 
 

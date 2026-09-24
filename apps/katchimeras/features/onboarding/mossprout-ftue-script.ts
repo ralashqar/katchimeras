@@ -7,6 +7,7 @@ import type { FtueScriptDefinition } from './ftue-types';
 import { STEPPLING_DISCOVERY_ID } from '@/constants/companion-discovery-catalog';
 import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_PROMPT, MOSSPROUT_SUPPORT_STYLE_OPTIONS } from './mossprout-bond-share';
 import { MOSSPROUT_FTUE_COPY as COPY } from './mossprout-ftue-copy';
+import { COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, COLD_OPEN_STEP_ID, FIRST_BATTLE_BODY, FIRST_BATTLE_EYEBROW, FIRST_BATTLE_TITLE, GUARDIAN_ACTION_ID, GUARDIAN_CONTINUE, GUARDIAN_LINES, GUARDIAN_STEP_ID, GUARDIAN_TITLE, MIST_RETREATS_TITLE } from './last-clearing';
 import { OPENING_CAMERA_ANCHOR_Y, OPENING_CAMERA_ENTRY_MS, OPENING_CAMERA_ZOOM, OPENING_MERGE_REQUIRED } from './opening-mist';
 
 // Start just wider than the original close-up and pull back with each answer.
@@ -127,7 +128,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 54,
+  version: 55,
   entryStepId: 'world.mist_open',
   terminalStepId: 'complete',
   steps: [
@@ -135,14 +136,22 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     // Mossprout's tile, and merges lifting the veil before the Egg is met.
     {
       id: 'world.mist_open', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'The Mist', title: COPY.openingNoticed, body: COPY.openingArrived },
-      actions: [{ id: 'world.look_closer', title: COPY.lookCloser, description: 'See what the Mist is hiding.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.mist_clear' }],
+      // The Last Clearing's cold open (`docs/cozy-4x-ftue-the-last-clearing.md`): its lines are COLD_OPEN_LINES.
+      guide: { eyebrow: '', title: COLD_OPEN_LINES[0]!, body: COLD_OPEN_LINES[COLD_OPEN_LINES.length - 1]! },
+      actions: [{ id: COLD_OPEN_ACTION_ID, title: 'Continue', description: 'The dark lifts off the last lit clearing.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: GUARDIAN_STEP_ID }],
       // Mounted a little further out; this glide runs while the two captions play.
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: OPENING_CAMERA_ZOOM, anchorY: OPENING_CAMERA_ANCHOR_Y, durationMs: OPENING_CAMERA_ENTRY_MS },
     },
     {
+      // The guardian: Mossprout meets the Wayfinder at the last lit clearing.
+      id: GUARDIAN_STEP_ID, surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
+      guide: { eyebrow: '', title: GUARDIAN_TITLE, body: GUARDIAN_LINES[0]! },
+      actions: [{ id: GUARDIAN_ACTION_ID, title: GUARDIAN_CONTINUE, description: 'Stand with Mossprout against the Mist.', icon: 'leaf.fill', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.mist_clear' }],
+      camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: OPENING_CAMERA_ZOOM, anchorY: OPENING_CAMERA_ANCHOR_Y, durationMs: 900 },
+    },
+    {
       id: 'world.mist_clear', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Something is holding it', title: COPY.mistClearTitle, body: COPY.mistClearBody },
+      guide: { eyebrow: FIRST_BATTLE_EYEBROW, title: FIRST_BATTLE_TITLE, body: FIRST_BATTLE_BODY },
       actions: [{ id: 'world.clear_mist', title: 'Drive off the Mist', description: 'Every merge strikes a wisp. Fell all three.', icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', nextStepId: 'world.mist_lift' }],
       // A tutorial objective, not a receipt the backend needs: no Glow, no sync.
       // The docked board is free; the spotlight and finger show the first pairs
@@ -155,9 +164,10 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     },
     {
       id: 'world.mist_lift', surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: 'Two wisps remain', title: COPY.mistThins, body: '' },
-      // Committed by the Kingdom when the veil crossblend completes.
-      actions: [{ id: 'world.mist_lifted', title: 'Continue', description: 'The Mist lifts from the clearing.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'world.egg_intro' }],
+      guide: { eyebrow: '', title: MIST_RETREATS_TITLE, body: '' },
+      // Committed by the Kingdom when the veil crossblend completes. The Heart Tree and the frontier come next
+      // (Last Clearing steps 3 and 4); until they are built, the first session ends here.
+      actions: [{ id: 'world.mist_lifted', title: 'Continue', description: 'The Mist pulls back from the clearing.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: 'complete' }],
       camera: { kind: 'focus_target', target: { kind: 'haven_tile', characterId: 'mossprout' }, zoom: MOSSPROUT_WORLD_EGG_CLOSE_ZOOM, anchorY: 0.5, durationMs: 1400 },
     },
     {
@@ -769,8 +779,11 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
 const stepsById = new Map(MOSSPROUT_FTUE_SCRIPT.steps.map((step) => [step.id, step]));
 // These authored beats remain available to old local/debug fixtures. The live
 // first-session route grows the First Bloom, then returns after one order.
+// The Last Clearing (`docs/cozy-4x-ftue-the-last-clearing.md`) retires the Egg, the hatch meeting, the Garden and
+// the first rest: every step it no longer reaches is kept for old fixtures, not played.
+const LAST_CLEARING_LIVE_STEP_IDS = new Set([COLD_OPEN_STEP_ID, GUARDIAN_STEP_ID, 'world.mist_clear', 'world.mist_lift', 'complete']);
 const retiredFirstSessionStepIds = new Set(MOSSPROUT_FTUE_SCRIPT.steps
-  .filter((step) => ['companion.day_one_action', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.garden_intro', 'companion.water_together', 'companion.first_grow', 'companion.first_notice', 'companion.notice_bond_spotlight', 'companion.water_response', 'companion.first_insight', 'egg.context', 'egg.mind', 'egg.nature_theme', 'egg.companion_identity', 'companion.nickname', 'companion.bond_intro', 'companion.bond_spotlight', 'companion.resident_affinity', 'companion.resident_parcel_ready', 'companion.resident_match_result'].includes(step.id)
+  .filter((step) => !LAST_CLEARING_LIVE_STEP_IDS.has(step.id) || ['companion.day_one_action', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.garden_intro', 'companion.water_together', 'companion.first_grow', 'companion.first_notice', 'companion.notice_bond_spotlight', 'companion.water_response', 'companion.first_insight', 'egg.context', 'egg.mind', 'egg.nature_theme', 'egg.companion_identity', 'companion.nickname', 'companion.bond_intro', 'companion.bond_spotlight', 'companion.resident_affinity', 'companion.resident_parcel_ready', 'companion.resident_match_result'].includes(step.id)
     || step.id.startsWith('merge.plant.')
     || step.id.startsWith('merge.energy')
     || step.id.startsWith('energy.')

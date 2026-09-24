@@ -1,6 +1,6 @@
 # The Last Clearing: the cozy 4X first session
 
-Status: **script and plan, Sept 24 2026. Not built.** This is the first focus of the cozy 4X direction (`cozy-4x-direction` in memory; the full game spec was handed over the same day). It replaces the companion-life first session: the Egg and its questions, the hatch meeting, the Garden planting, the first rest and meditation, and the Glow-ticket Steppling discovery.
+Status: **step 1 built Sept 24 2026** (story graph v57, the cold open, the guardian, Mossprout from the first frame; the first session currently ends as the Mist pulls back after the opening board). Steps 2 to 6 are to come. This is the first focus of the cozy 4X direction (`cozy-4x-direction` in memory; the full game spec was handed over the same day). It replaces the companion-life first session: the Egg and its questions, the hatch meeting, the Garden planting, the first rest and meditation, and the Glow-ticket Steppling discovery.
 
 It ends with the player knowing four things:
 

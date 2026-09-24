@@ -103,13 +103,6 @@ test('hero copy fits three lines without captions and Haven spotlight retries na
   assert.doesNotMatch(screen, /cameraSettleRevisionRef.current \+= 1/);
 });
 
-test('planting leads straight to the bud: nothing stands between the Spring and Heartwood waking', () => {
-  assert.equal(mossproutFtueAction('world.garden_arrival', 'world.plant_first_seed')?.nextStepId, 'world.first_seed_grew');
-  for (const retired of ['world.seed_planted', 'world.first_bloom_offer', 'world.first_bloom_restore']) assert.equal(mossproutFtueStep(retired), null, `${retired} is retired`);
-  assert.match(readFileSync('features/onboarding/mossprout-ftue-flow.ts', 'utf8'), /id: 'effect\.haven\.place_first_memory',\s*capability: 'haven\.place_first_memory',\s*next: 'world\.first_seed_grew',/, 'the Spring’s effect leads to the bud');
-  assert.equal(MOSSPROUT_FTUE_FLOW.nodes.some((node: { id: string }) => node.id.startsWith('garden.first-bloom')), false, 'Heartwood’s tile is never upgraded as a beat of its own');
-});
-
 test('the spotlight cutout and the Garden handoff keep their shape without the obsolete plant-order tray', () => {
   const holes = [{ x: 20, y: 30, width: 280, height: 130 }, { x: 180, y: 480, width: 160, height: 240 }];
   const mask = roundedMultiCutoutSegments(holes, 16, { width: 360, height: 780 });
