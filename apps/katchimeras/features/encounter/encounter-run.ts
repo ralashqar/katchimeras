@@ -175,6 +175,8 @@ export function encounterStatus(encounter: EncounterDefinition, host: MissionMec
   if (objectiveMet(encounter, host, mechanicState, run)) return 'cleared';
   if (run.territory) {
     const reason = lossReason(encounter, host, mechanicState, run, board, window);
+    // Lanes: pieces keep arriving on their own, so a board with nothing to merge is only waiting, never stuck.
+    if (mechanicState.kind === 'lanes') return reason ? 'failed' : 'playing';
     return reason ? 'failed' : (hasMerge(host, mechanicState, board, window) || (chargedSpawners(board, window).length && freeCells(board, window) > 0)) ? 'playing' : 'stuck';
   }
   if (resolveLeft(run) <= 0) return 'failed';

@@ -39,7 +39,7 @@ test('an island plays authored levels (Petalimp), the pattern when it has none, 
   const first = chapterMissions(petalimp, petalimp.chapters[0]!);
   assert.equal(first.length, 2);
   assert.equal(first[0]!.id, `${petalimp.campaignId}:c1-1`);
-  assert.ok(first.every((mission) => mission.encounter.spawners.length === 1 && !mission.encounter.cache), 'a Seed Pod, and nothing that arrives by itself');
+  assert.ok(first.every((mission) => mission.encounter.spawners.length === 0 && mission.encounter.mechanic?.kind === 'lanes' && Boolean(mission.encounter.mechanic.seeds)), 'no Pod: Seeds arrive on their own');
   assert.ok(first.every((mission) => mission.encounter.resolve == null && mission.encounter.rows === 5), 'no Resolve, five rows');
   assert.ok(first.every((mission) => mission.encounter.mechanic?.kind === 'lanes' && mission.encounter.mechanic.wisps.length >= 2), 'Lanes: wisps come down the columns');
   const bare = ISLAND_CAMPAIGNS.find((campaign) => campaign.chapters.every((chapter) => !chapter.restoration && !chapter.missions))!;

@@ -347,13 +347,13 @@ test('Petalimp speaks in the Mist’s voice rules: no exclamation near the Mist,
   assert.ok(copy.wispLines && copy.wispLines.fell.length >= 3, 'four wisps need three falling lines before the last');
 });
 
-test('Petalimp\u2019s island is played as authored levels: two a chapter, each with its Seed Pod, the Colour Thief last', async () => {
+test('Petalimp\u2019s island is played as authored levels: two a chapter, Seeds arriving on their own, the Colour Thief last', async () => {
   const { regionLadder } = await import('@/constants/island-campaigns/ladder');
   const ladder = regionLadder(PETALIMP_BLOOM_CAMPAIGN);
   assert.equal(ladder[0]!.mission.title, 'Lift the Mist');
   for (const level of [1, 2, 3, 4]) assert.equal(ladder.filter((rung) => rung.chapterLevel === level).length, 2, `chapter ${level} has two levels`);
-  assert.ok(ladder.every((rung) => rung.mission.encounter.spawners.some((spawner) => spawner.id === 'pod')), 'every level has its Seed Pod');
-  assert.ok(ladder.every((rung) => !rung.mission.encounter.cache), 'no piece ever arrives by itself');
+  assert.ok(ladder.every((rung) => rung.mission.encounter.spawners.length === 0 && rung.mission.encounter.mechanic?.kind === 'lanes' && Boolean(rung.mission.encounter.mechanic.seeds)), 'no Pod: every level has Seeds arriving on their own');
+  assert.ok(ladder.every((rung) => !rung.mission.encounter.cache), 'no rescue cache');
   assert.equal(ladder.at(-1)!.mission.title, 'The Colour Thief');
   assert.equal(ladder.at(-1)!.boss, true);
 });

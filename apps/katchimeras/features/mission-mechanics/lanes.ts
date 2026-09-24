@@ -2,6 +2,7 @@ import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
 import type { MergeItemDefinition, MergeWorldState } from '@/types/merge-world';
 import type { LaneShot, LaneSpit, LaneWispState, MechanicEffect, MissionMechanicDefinition, MissionMechanicState, MissionWispView } from '@/types/mission-mechanic';
 import type { MissionWindow } from './board-window';
+import { seededUnit } from '@/features/encounter/seed';
 
 /**
  * Lanes (`docs/encounter-lanes.md`): a real-time battle on the docked board.
@@ -10,6 +11,8 @@ import type { MissionWindow } from './board-window';
  *   leaves Mist on the free cell it has just left.
  * - Every piece of Sprout size or bigger fires Glow straight up its own column on its own beat, at the lowest wisp
  *   over it or, with none, off the top of the board; bigger pieces fire faster and hit harder. A merged piece fires at once. Moving pieces is how the player aims.
+ * - Pieces arrive on their own (`seeds`): every few seconds a Seed lands on a random empty cell (by the player's luck,
+ *   a Sprout). There is nothing to tap: the player only moves and merges.
  * - A wisp still over the board spits Mist down its column now and then (`spitEvery`): the top-most free cell there
  *   mists over (it never lands on a piece; reaching one is what puts it under Mist).
  * - A wisp that reaches a piece puts it under Mist (it stops firing until its Mist is cleared) and holds for a beat.
@@ -131,7 +134,10 @@ export const laneRowOf = (row: number) => Math.floor(row + 0.5);
  * puts it under Mist and holds for a beat; one whose centre leaves the bottom row gets through), and every piece
  * due to fire fires, at the lowest wisp over it or, with none, off the top of the board. Pure.
  */
-export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: MergeWorldState, dt: number, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID): LanesTickResult {
+/** What the player brings to the level: the chance a piece that arrives on its own is the better one (the Seed Nursery). */
+export type LanesLuck = { tierTwoChance?: number };
+
+export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: MergeWorldState, dt: number, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID, luck: LanesLuck = {}): LanesTickResult {
   if (input.breached != null || lanesComplete(mechanic, input)) return { state: input, board, fired: [], effects: [], changed: false, moved: false, hit: false, spat: [] };
   const from = input.clock;
   const clock = from + Math.max(0, dt);
@@ -242,6 +248,34 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     }
   }
 
+  // Pieces arrive on their own: every so often one lands on a random empty cell (never the one a wisp is on). A
+  // full board waits and the piece lands the moment a cell is free.
+  let nextSeedAt = input.nextSeedAt;
+  let seeded = input.seeded ?? 0;
+  let nextInstance = board.nextInstance;
+  const seeds = mechanic.seeds;
+  if (seeds && breached == null) {
+    nextSeedAt ??= seeds.everyMs;
+    if (clock >= nextSeedAt) {
+      const occupied = new Set(mechanic.wisps.flatMap((spec, index) => {
+        if (!arrived(index) || !alive(index)) return [];
+        const cell = laneCell(window, spec.column, laneRowOf(wisps[index]!.row));
+        return cell == null ? [] : [cell];
+      }));
+      const free = window.cellIndices.filter((cell) => isFree(current(), cell) && !occupied.has(cell));
+      if (free.length) {
+        const cell = free[Math.min(free.length - 1, Math.floor(seededUnit(`lanes-seed:${seeded}:${Math.round(nextSeedAt)}`) * free.length))]!;
+        const lucky = seededUnit(`lanes-luck:${seeded}`) < Math.max(0, Math.min(1, luck.tierTwoChance ?? 0));
+        cells ??= [...board.board];
+        cells[cell] = { ...cells[cell]!, occupant: { kind: 'item', instanceId: `merge-item:${nextInstance}`, definitionId: lucky ? seeds.drops[1] : seeds.drops[0] } };
+        nextInstance += 1;
+        seeded += 1;
+        nextSeedAt = clock + seeds.everyMs;
+        changed = true;
+      }
+    }
+  }
+
   // Every piece due to fire fires: up its column at the lowest wisp over it, or off the top with nothing there.
   const ready: Record<string, number> = {};
   const fired: LaneShot[] = [];
@@ -283,8 +317,12 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       changed = true;
     }
   }
-  const state: LanesState = { kind: 'lanes', strikes, clock, wisps, ready, shots, seq, breached: breached ?? input.breached, ...(spits.length ? { spits } : {}), ...(advance ? { advance } : {}) };
-  return { state, board: current(), fired, effects, changed, moved, hit, spat };
+  const state: LanesState = {
+    kind: 'lanes', strikes, clock, wisps, ready, shots, seq, breached: breached ?? input.breached,
+    ...(spits.length ? { spits } : {}), ...(advance ? { advance } : {}), ...(nextSeedAt != null ? { nextSeedAt, seeded } : {}),
+  };
+  const next = current();
+  return { state, board: nextInstance === next.nextInstance ? next : { ...next, nextInstance }, fired, effects, changed, moved, hit, spat };
 }
 
 const isFree = (board: MergeWorldState, cell: number) => { const entry = board.board[cell]; return Boolean(entry) && !entry!.locked && !entry!.mist && !entry!.occupant; };
@@ -339,6 +377,7 @@ export function normalizeLanesState(mechanic: LanesMechanic, value: unknown, str
     seq: Math.max(0, Math.floor(Number(raw.seq) || 0)),
     breached: raw.breached == null ? null : Math.floor(Number(raw.breached)),
     ...(Number.isFinite(raw.advance) && Number(raw.advance) > 0 ? { advance: Number(raw.advance) } : {}),
+    ...(Number.isFinite(raw.nextSeedAt) ? { nextSeedAt: Number(raw.nextSeedAt), seeded: Math.max(0, Math.floor(Number(raw.seeded) || 0)) } : {}),
     ...(Array.isArray(raw.spits) ? { spits: raw.spits.filter((spit) => spit && Number.isFinite(spit.landsAt)).map((spit) => ({ ...spit })) } : {}),
   };
 }

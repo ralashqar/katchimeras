@@ -9,7 +9,9 @@ Status: **built Sept 24 2026, uncommitted, device test pending.** Every Petalimp
    - Each wisp arrives four rows over one board column at its time, and new ones keep arriving through the level.
    - It drifts down steadily, a row every `stepMs` (its row is fractional; its cell is the one its centre is in).
    - Every few cells (`dropEvery`) it leaves light Mist on the free cell it has just left.
-3. **Pieces shoot up their own column, always,** on their own beat: at the lowest wisp over them, or, with none, straight off the top of the board, fading. A Seed does not fire:
+3. **Pieces arrive on their own; there is nothing to tap** (`seeds`, Sept 24 2026). Every few seconds (3 s on calm levels, 4 s on dark ones) a Seed lands on a random empty cell, never the cell a wisp is on; a full board waits. The Haven's Seed Nursery (`profile.tierTwoChance`) is the chance it arrives as a Sprout. The player only moves and merges. With no Pod, the middle column is no longer short a defensive cell, and its wisps are no longer weakened.
+4. **Levels build as waves** (`waves()`): single wisps first, then two and three at once down different columns, each wave a little tougher. With no wisp standing, the next wave comes at once (`advance`).
+5. **Pieces shoot up their own column, always,** on their own beat: at the lowest wisp over them, or, with none, straight off the top of the board, fading. A Seed does not fire:
 
    | Piece | Fires every | Damage |
    |---|---|---|

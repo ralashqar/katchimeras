@@ -163,3 +163,19 @@ test('an empty sky never waits: with no wisp standing, the next arrives at once 
   assert.ok(played.state.clock >= 30_000 - (played.state.advance ?? 0), 'the second has arrived well before 30 s');
   assert.equal(40_000 - (played.state.advance ?? 0) - (30_000 - (played.state.advance ?? 0)), 10_000, 'the spacing after it is kept');
 });
+
+test('pieces arrive on their own: a Seed on a random empty cell every beat (never under a wisp), a Sprout by the player’s luck, and a full board waits', () => {
+  const seeded = setup({ pod: undefined, seeds: { every: 1 }, lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] });
+  assert.equal(seeded.encounter.spawners.length, 0, 'no Pod to tap');
+  const board = run(seeded.mechanic, seeded.lanes, seeded.state, 3_050, seeded.window).board;
+  const items = seeded.window.cellIndices.filter((cell) => board.board[cell]?.occupant?.kind === 'item');
+  assert.equal(items.length, 3, 'one a second');
+  assert.ok(items.every((cell) => board.board[cell]!.occupant?.kind === 'item' && board.board[cell]!.occupant.definitionId === 'nature:garden:1'), 'Seeds');
+  const lucky = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 900 }, seeded.state, 200, seeded.window, MERGE_ITEMS_BY_ID, { tierTwoChance: 1 });
+  const sprout = seeded.window.cellIndices.find((cell) => lucky.board.board[cell]?.occupant?.kind === 'item');
+  assert.ok(sprout != null && lucky.board.board[sprout]!.occupant?.kind === 'item' && lucky.board.board[sprout]!.occupant.definitionId === 'nature:garden:2', 'the Seed Nursery’s luck makes it a Sprout');
+  // A board with no empty cell: the piece waits, and lands the moment one frees.
+  const full = { ...seeded.state, board: seeded.state.board.map((cell, index) => (seeded.window.cellIndices.includes(index) ? { ...cell, locked: true, mist: { kind: 'encounter' as const, type: 'light' as const, hp: 1 } } : cell)) };
+  const waited = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 900 }, full, 200, seeded.window);
+  assert.ok(!waited.changed && (waited.state.nextSeedAt ?? 0) <= waited.state.clock, 'nothing lands, and it is still due');
+});
