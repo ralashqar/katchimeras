@@ -6,6 +6,7 @@ import { bootstrapStreakSystem, flushStreakOutbox, pullStreakSnapshot, trackStre
 import { supabase } from '@/utils/supabase';
 import { streakRepository } from '@/storage/repositories/streak-repository';
 import { syncStreakReminder } from '@/utils/streak-notification';
+import { LIFE_INPUT_ENABLED } from '@/constants/product-scope';
 
 export function StreakBootstrap() {
   useEffect(() => {
@@ -18,13 +19,15 @@ export function StreakBootstrap() {
       if (code) await supabase.auth.exchangeCodeForSession(code);
       else if (accessToken && refreshToken) await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
     };
-    void bootstrapStreakSystem(homeRepository.load());
+    // Sign-in links are the game's too; streaks and their reminder are the companion product's (`constants/product-scope.ts`).
     void Linking.getInitialURL().then((url) => url ? handleAuthUrl(url) : undefined);
+    const urlListener = Linking.addEventListener('url', ({ url }) => { void handleAuthUrl(url); });
+    if (!LIFE_INPUT_ENABLED) return () => { urlListener.remove(); };
+    void bootstrapStreakSystem(homeRepository.load());
     void syncStreakReminder(streakRepository.snapshot());
     const unsubscribeStreak = streakRepository.subscribe(() => {
       void syncStreakReminder(streakRepository.snapshot());
     });
-    const urlListener = Linking.addEventListener('url', ({ url }) => { void handleAuthUrl(url); });
     const { data: authListener } = supabase.auth.onAuthStateChange(() => {
       void flushStreakOutbox().then(() => pullStreakSnapshot());
     });

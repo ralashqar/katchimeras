@@ -20,12 +20,13 @@ import { markPhotoProcessed } from '@/utils/processed-photos';
 import { resolvePhotoLocation } from '@/utils/photo-location';
 import { resolvePhotoPlace } from '@/utils/photo-place-resolution';
 import type { PhotoPlaceResolution } from '@/types/photo-place';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
 // "This photo meant something" → opens the chosen photo full, reads its essence
 // on-device, asks what it meant (essence-based options), then feeds the day with
 // the photo's vision + the meaning's energy and marks it the day's hero photo.
 // Reuses the exact EssenceReview experience the camera capture uses.
-export default function PhotoEssenceRoute() {
+function PhotoEssenceRoute() {
   const router = useRouter();
   const params = useLocalSearchParams<{
     assetId?: string;
@@ -196,3 +197,6 @@ export default function PhotoEssenceRoute() {
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#06040D', flex: 1 },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(PhotoEssenceRoute);

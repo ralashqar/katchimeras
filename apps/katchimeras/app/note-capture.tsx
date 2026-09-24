@@ -25,6 +25,7 @@ import type { DayInputTarget, JournalRouteProposal, StudioMediaType } from '@/ty
 import { extractStudioTitle } from '@/utils/studio-detect';
 import { noteAnalysis, noteSuggestedSpecific } from '@/utils/journal-input-adapters';
 import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
 const MAX_SECONDS = 30;
 const MEANING_TINT: Record<string, string> = {
@@ -45,7 +46,7 @@ const BIG_MOMENT_EMOJI: Record<string, string> = {
 
 // Write or speak a note → interpret (transcribe + infer meaning) → confirm what it
 // means (incl. a Big Moment) → fold into today and fly into the Memory Vault.
-export default function NoteCaptureScreen() {
+function NoteCaptureScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ target?: string; input?: string }>();
   const insets = useSafeAreaInsets();
@@ -522,3 +523,6 @@ const styles = StyleSheet.create({
   semanticOptionOn: { borderColor: Lantern.ember300, backgroundColor: 'rgba(255,195,107,0.12)' },
   semanticOptionText: { fontSize: 13, fontWeight: '700' },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(NoteCaptureScreen);

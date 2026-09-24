@@ -32,6 +32,7 @@ import { COMPANION_BOND_REWARDS, recordCompanionBondEvent } from '@/utils/compan
 import { loadCompanionBondState, saveCompanionBondState } from '@/utils/companion-bond-storage';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
 import { registerJourneyConsequenceFlows, resumeJourneyConsequences, startJourneyConsequence } from '@/features/companion/journey-consequences';
+import { LIFE_INPUT_ENABLED } from '@/constants/product-scope';
 
 /**
  * The journey service, generic over a friend's chapter: it brings a save
@@ -375,7 +376,7 @@ export async function reconcileCompanionMeditation(familyId: string) {
   if (!cycle) return;
   const world = await loadMergeWorldState();
   // A walker's rest listens to steps: the day's aggregates, and the pedometer window since the rest began.
-  const tracksSteps = COMPANION_JOURNEY_PROFILES[cycle.familyId]?.tracker === 'steps';
+  const tracksSteps = LIFE_INPUT_ENABLED && COMPANION_JOURNEY_PROFILES[cycle.familyId]?.tracker === 'steps';
   let windowSteps: number | null = null;
   if (tracksSteps && cycle.returnedAt == null && !journeyCycleReady(repository.load(), cycle, gameNow()) && gameNow() - (lastStepQuery.get(cycle.id) ?? 0) >= 30000) {
     lastStepQuery.set(cycle.id, gameNow());

@@ -40,6 +40,7 @@ import { dayState, localDateId } from '@/utils/streak-engine';
 import { streakRepository } from '@/storage/repositories/streak-repository';
 import { loadMergeWorldState } from '@/utils/merge-world/repository';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
 type CollectionView = 'cards' | 'calendar' | 'species' | 'wisps' | 'scenes';
 type CardFilters = { year: string; species: string; rarity: string; trait: string };
@@ -63,7 +64,7 @@ const RARITY_COLOR: Record<HomeRarityTier, string> = {
   legendary: '#FFC36B',
 };
 
-export default function CollectionScreen() {
+function CollectionScreen() {
   const router = useRouter();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const [state, setState] = useState<StoredHomeState | null>(null);
@@ -386,3 +387,6 @@ const styles = StyleSheet.create({
   albumReward: { alignItems: 'center', borderTopColor: 'rgba(255,255,255,0.08)', borderTopWidth: 1, flexDirection: 'row', gap: 8, paddingTop: 12 },
   albumRewardText: { flex: 1, fontSize: 11.5, fontWeight: '700' },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(CollectionScreen);

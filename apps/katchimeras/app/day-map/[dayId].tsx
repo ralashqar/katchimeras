@@ -16,8 +16,9 @@ import { useDayMapPhotoRefresh } from '@/hooks/use-day-map-photo-refresh';
 import { buildDayMapContent, type DayMapPhotoItem } from '@/utils/day-map-content';
 import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 import { safeGoBack } from '@/utils/safe-navigation';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
-export default function DayMapRoute() {
+function DayMapRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
@@ -175,3 +176,6 @@ const styles = StyleSheet.create({
   missingBody: { fontSize: 13.5, fontWeight: '600', lineHeight: 20, textAlign: 'center' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(DayMapRoute);

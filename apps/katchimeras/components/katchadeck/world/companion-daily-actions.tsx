@@ -9,6 +9,7 @@ import type { DayActionSourceRect } from '@/components/katchadeck/ui/day-action-
 import type { CompanionBondAwardReceipt } from '@/utils/companion-bond';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { type CompanionMergeRequest } from './companion-merge-request-tray';
+import { LIFE_INPUT_ENABLED } from '@/constants/product-scope';
 
 /**
  * A hatchable friend's daily cards, all from their definition's daily
@@ -37,8 +38,8 @@ export function CompanionDailyActions({ definition, onReaction, onOpenConversati
   // The campaign pivot: the Garden card and its Merge requests are gone; the day's cards stand on their own.
   void onOpenMerge; void requests; void setGardenOpen;
   return <View style={{ gap: 7 }}>
-      {daily?.goal ? <CompanionStepGoal companion={companion} config={daily.goal} onReaction={onReaction} onBondRewardRequest={onBondRewardRequest} externalGesture={externalGesture} /> : null}
-      {daily && hasLife ? <CompanionLifeActivityCard companion={companion} config={daily} onNarration={onReaction} onOpenChange={setLifeOpen}
+      {LIFE_INPUT_ENABLED && daily?.goal ? <CompanionStepGoal companion={companion} config={daily.goal} onReaction={onReaction} onBondRewardRequest={onBondRewardRequest} externalGesture={externalGesture} /> : null}
+      {LIFE_INPUT_ENABLED && daily && hasLife ? <CompanionLifeActivityCard companion={companion} config={daily} onNarration={onReaction} onOpenChange={setLifeOpen}
         onBondRewardRequest={onBondRewardRequest} externalGesture={externalGesture} /> : null}
       {daily ? <CompanionDailyQuestionSlot companion={companion} polls={daily.polls} subtitle={daily.questionSubtitle} active={active}
         onOpenConversation={onOpenConversation} onBondRewardRequest={onBondRewardRequest} externalGesture={externalGesture} /> : null}

@@ -9,8 +9,9 @@ import { ThemedText } from '@/components/themed-text';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import type { DailyCardFace } from '@/utils/daily-card-flip';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
-export default function CardDetailRoute() {
+function CardDetailRoute() {
   const { cardId } = useLocalSearchParams<{ cardId?: string }>();
   const { days } = useAllDays();
   const decodedId = cardId ? decodeURIComponent(cardId) : '';
@@ -83,3 +84,6 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', gap: 8, paddingVertical: 80 },
   emptyText: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(CardDetailRoute);

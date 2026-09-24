@@ -112,6 +112,7 @@ import {
   kingdomHexTileSourceForLod,
   worldAssetSource,
 } from '@/utils/world-visuals';
+import { LIFE_INPUT_ENABLED } from '@/constants/product-scope';
 const {KingdomTileArt,HavenUpgradeTileArt,TileFocusTransform,havenUpgradeLayerArtChanges}=createHexTileRenderer<KingdomTileArtLayer,KingdomHexTileLod>({SeamlessWorldImage,sourceForLod:kingdomHexTileSourceForLod,overlayForLod:kingdomHexTileOverlaySourceForLod});
 
 
@@ -3059,7 +3060,7 @@ const ProjectedResidentCreature = memo(function ProjectedResidentCreature({
               />
             </Animated.View>
           ) : null}
-          {creature.visualKey === 'steppling' ? <CompanionStepsValue /> : null}
+          {LIFE_INPUT_ENABLED && creature.visualKey === 'steppling' ? <CompanionStepsValue /> : null}
         </Animated.View>
       </Animated.View>
     </Animated.View>

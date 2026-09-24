@@ -43,6 +43,7 @@ import { saveOnboardingRecap } from '@/utils/onboarding-recap';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision, buildVisionSignals, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
 type Phase = 'questions' | 'capture' | 'hatching' | 'reveal' | 'empty';
 
@@ -77,7 +78,7 @@ const EGG_STAGE_HEIGHT = 258;
 // even when the scan finishes quickly.
 const MIN_SHAKE_MS = 1400;
 
-export default function HatchYourPastRoute() {
+function HatchYourPastRoute() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>('questions');
@@ -865,3 +866,6 @@ const styles = StyleSheet.create({
     width: 52,
   },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(HatchYourPastRoute);

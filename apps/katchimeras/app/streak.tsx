@@ -19,12 +19,13 @@ import { useStreak } from '@/hooks/use-streak';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { StreakDayState } from '@/types/streak';
 import { trackStreakEvent } from '@/utils/streak-sync';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
 const GOLD = '#E5BE6A';
 const GOLD_DEEP = '#75450A';
 const INK = '#173D57';
 
-export default function StreakStoryScreen() {
+function StreakStoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
@@ -181,3 +182,6 @@ const styles = StyleSheet.create({
   syncNote: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.16)', borderRadius: 14, flexDirection: 'row', gap: 8, padding: 10 },
   syncText: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '800' },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(StreakStoryScreen);

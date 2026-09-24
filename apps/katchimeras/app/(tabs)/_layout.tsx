@@ -65,7 +65,7 @@ export default function TabLayout() {
           options={{
             // The focus boundary tears down the world and its worklets on blur.
             freezeOnBlur: false,
-            title: 'Haven',
+            title: 'Sanctuary',
           }}
         />
         <Tabs.Screen

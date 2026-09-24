@@ -36,13 +36,14 @@ import { evaluatePhotoForQuest } from '@/utils/quests/photo-evaluation';
 import { safeDismissModal, safeGoBack } from '@/utils/safe-navigation';
 import { resolvePhotoPlace } from '@/utils/photo-place-resolution';
 import type { PhotoPlaceResolution } from '@/types/photo-place';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
 // live → capturing (shutter + flash, no particles) → captured (the shared
 // EssenceReview reads the photo, shows its essence, asks what it meant, then
 // streams the tags into the day and exits).
 type CaptureState = 'live' | 'capturing' | 'captured' | 'evaluating';
 
-export default function MomentCaptureScreen() {
+function MomentCaptureScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ target?: string; questId?: string; questCreatureId?: string; questRunId?: string; companionActivityId?: string; companionActivityFor?: string; companionReturnTo?: string; photoCaptureId?: string; photoCategory?: string; photoFor?: string; photoName?: string }>();
   const insets = useSafeAreaInsets();
@@ -494,3 +495,6 @@ const styles = StyleSheet.create({
   shutterInner: { backgroundColor: Lantern.moon50, borderRadius: 999, height: 60, width: 60 },
   questCheckScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(20,12,8,0.56)' },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(MomentCaptureScreen);

@@ -11,10 +11,11 @@ import { homeRepository } from '@/storage/repositories/home-repository';
 import { buildLifeMap, type LifeMapPin } from '@/utils/life-map-engine';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
 import { safeGoBack } from '@/utils/safe-navigation';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
 type NativeMapsModule = typeof import('react-native-maps');
 
-export default function LifeMapRoute() {
+function LifeMapRoute() {
   const router = useRouter();
   const [nativeMaps, setNativeMaps] = useState<NativeMapsModule | null>(null);
 
@@ -237,3 +238,6 @@ const styles = StyleSheet.create({
     width: 9,
   },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(LifeMapRoute);

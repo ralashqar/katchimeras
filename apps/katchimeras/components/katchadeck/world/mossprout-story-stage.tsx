@@ -69,6 +69,7 @@ import { RESIDENT_CARD_DEFINITION_ID } from '@/constants/resident-card-discovery
 import { KatchimeraBottomDock } from './katchimera-bottom-dock';
 import { KatchimeraJourneyStatusPlaque } from './katchimera-journey-status-plaque';
 import { MossproutJourneyRequestPanel } from './mossprout-journey-request-panel';
+import { LIFE_INPUT_ENABLED } from '@/constants/product-scope';
 
 const MAX_ORDER_ART_ITEMS = 3;
 const MAX_VISIBLE_ACTIONS = 3;
@@ -794,7 +795,7 @@ export function MossproutStoryStage({
       onOpenMerge(id);
     }} storyRequests={journeyRequestPreviews}>
     {(gardenCard) => <View style={{ gap: 8 }}>
-    <CompanionLifeActivityCard companion="mossprout" config={MOSSPROUT_DAILY} onBondRewardRequest={onBondRewardRequest} onOpenChange={setLifeOpen} onNarration={onActionNarration} />
+    {LIFE_INPUT_ENABLED ? <CompanionLifeActivityCard companion="mossprout" config={MOSSPROUT_DAILY} onBondRewardRequest={onBondRewardRequest} onOpenChange={setLifeOpen} onNarration={onActionNarration} /> : null}
     {gardenCard}
     {presentationAction && displayedPresentation ? <DayActionCompletedRow animateLayout={false}
       artwork={<MossproutActionArtwork action={presentationAction} />} enteringEnabled={false}

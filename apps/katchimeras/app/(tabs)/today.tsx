@@ -213,6 +213,7 @@ import {
   cancelSemanticNoteQuestCapture,
   completeSemanticNoteQuestCapture,
 } from '@/utils/quests/semantic-note-capture';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
@@ -257,7 +258,7 @@ const QUICK_PROMPT_CATEGORIES: {
 
 // Today is retired as a top-level destination. The Mossprout FTUE owns its
 // environment and only reuses the proven Egg presentation components.
-export default function TodayRouteScreen() {
+function TodayRouteScreen() {
   return <Redirect href="/katchimeras" />;
 }
 
@@ -3635,3 +3636,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(TodayRouteScreen);

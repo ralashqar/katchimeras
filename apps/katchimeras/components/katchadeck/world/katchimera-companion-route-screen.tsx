@@ -66,6 +66,7 @@ import { useStoryPresentationOperation } from '@/features/content-flow/use-story
 import { contentFlowEffectResult } from '@/features/content-flow/story-world-operations';
 import { acknowledgeStoredJourneyWispReward } from '@/utils/wisp-storage';
 import { useWisps } from '@/features/wisps/wisp-provider';
+import { LIFE_INPUT_ENABLED } from '@/constants/product-scope';
 
 type JourneyWispPresentation = {
   receipt: JourneyWispRewardReceipt;
@@ -418,7 +419,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, worldEventAction, s
           nextStepId: 'companion.meditating',
         });
         if (result.run?.stepId !== 'companion.meditating') throw new Error('Mossprout did not enter meditation');
-        void scheduleMossproutJourneyDayReminder(
+        if (LIFE_INPUT_ENABLED) void scheduleMossproutJourneyDayReminder(
           localDayId(new Date(now)),
           new Date(now),
           new Date(now + MOSSPROUT_FTUE_REST_MS),
@@ -606,7 +607,7 @@ export function KatchimeraCompanionRouteScreen({ creatureId, worldEventAction, s
     void seedStoredMossproutGardenAfterFtue(completedDayId, completedAt).catch((error) => {
       console.warn('Could not prepare Mossprout\'s next Garden orders', error);
     });
-    void scheduleMossproutJourneyDayReminder(completedDayId).catch(() => {});
+    if (LIFE_INPUT_ENABLED) void scheduleMossproutJourneyDayReminder(completedDayId).catch(() => {});
   }, []);
   const acknowledgeFtueBond = useCallback(async () => {
     const run = loadFtueRun();

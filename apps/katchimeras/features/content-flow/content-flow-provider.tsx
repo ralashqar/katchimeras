@@ -12,6 +12,7 @@ import { isAppForeground } from '@/hooks/use-app-foreground';
 import { relationshipProgressionRepository } from '@/storage/repositories/relationship-progression-repository';
 import { syncCompanionJourneyReminders } from '@/utils/mossprout-journey-notification';
 import { resumeCompanionJourneys } from '@/features/companion/companion-journey-service';
+import { LIFE_INPUT_ENABLED } from '@/constants/product-scope';
 
 async function resumeStoryFlows(isActive: () => boolean) {
   reconcilePendingActionRewards();
@@ -34,7 +35,7 @@ async function resumeStoryFlows(isActive: () => boolean) {
 export function ContentFlowProvider({ children }: { children: ReactNode }) {
   bootstrapContentFlowCatalog();
   useEffect(() => {
-    const syncReminders = () => { void syncCompanionJourneyReminders().catch((error) => console.warn('Could not update Journey reminder', error)); };
+    const syncReminders = () => { if (LIFE_INPUT_ENABLED) void syncCompanionJourneyReminders().catch((error) => console.warn('Could not update Journey reminder', error)); };
     const unsubscribeReminders = relationshipProgressionRepository.subscribe(syncReminders);
     syncReminders();
     const resume = createForegroundTask(resumeStoryFlows, {

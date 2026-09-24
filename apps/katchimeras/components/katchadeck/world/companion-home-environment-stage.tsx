@@ -15,6 +15,7 @@ import { resolveCreatureMeditationArtSource } from '@/utils/creature-art';
 
 import { CreatureAnimatedArt } from './creature-animated-art';
 import { CompanionStepsValue } from './companion-steps-value';
+import { LIFE_INPUT_ENABLED } from '@/constants/product-scope';
 
 const REWARD_GLOW_NATIVE_SURFACE_SCALE = 2;
 
@@ -193,7 +194,7 @@ export const CompanionHomeEnvironmentStage = memo(
                 />
               </Animated.View>
             ) : null}
-            {visualKey === 'steppling' ? <CompanionStepsValue /> : null}
+            {LIFE_INPUT_ENABLED && visualKey === 'steppling' ? <CompanionStepsValue /> : null}
           </Animated.View>
         </Animated.View> : null}
       </View>

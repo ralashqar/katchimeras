@@ -21,10 +21,11 @@ import {
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
 import { todayGrowthSummary } from '@/utils/today-growth';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
 const YOU_AVATAR_RELATIVE_Y_OFFSET = 18;
 
-export default function YouScreen() {
+function YouScreen() {
   const router = useRouter();
   const focused = useIsFocused();
   const insets = useSafeAreaInsets();
@@ -162,3 +163,6 @@ const styles = StyleSheet.create({
   },
   backButtonPressed: { opacity: 0.82, transform: [{ scale: 0.96 }] },
 });
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(YouScreen);

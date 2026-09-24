@@ -14,8 +14,9 @@ import {
   runPhotoPlaceBackfill,
   type PhotoPlaceBackfillProgress,
 } from '@/utils/photo-place-backfill';
+import { lifeInputRoute } from '@/components/product/life-input-route';
 
-export default function LocationPrivacyScreen() {
+function LocationPrivacyScreen() {
   const [settings, setSettings] = useState<PhotoPlaceSettings>({
     enabled: true,
     historicalBackfillEnabled: false,
@@ -135,3 +136,6 @@ export default function LocationPrivacyScreen() {
     </>
   );
 }
+
+// A life-input screen, kept but out of the game (`constants/product-scope.ts`).
+export default lifeInputRoute(LocationPrivacyScreen);
