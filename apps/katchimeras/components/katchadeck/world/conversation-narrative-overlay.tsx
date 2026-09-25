@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import Animated, { Easing, FadeIn, FadeOut, cancelAnimation, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { AppFontFamilies } from '@/constants/theme';
+import { KatchaUI } from '@/constants/katcha-ui';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { getCreatureVisual } from '@/game/days/visuals';
 import type { ConversationTranscriptEntry } from '@/types/companion-conversation';
@@ -240,10 +240,11 @@ const styles = StyleSheet.create({
   },
   tagLeft: { left: 20 },
   tagRight: { right: 20 },
-  tagText: { color: '#FFFFFF', fontFamily: AppFontFamilies.fredokaBold, fontSize: 18, letterSpacing: 1, textTransform: 'uppercase', transform: [{ skewX: '8deg' }] },
+  // The dialogue's own type, as the old narrative cards had it: the companion display face for lines, the card title for names.
+  tagText: { ...KatchaUI.type.companionCardTitle, color: '#FFFFFF', fontSize: 18, lineHeight: 23, letterSpacing: 1, textTransform: 'uppercase', transform: [{ skewX: '8deg' }] },
   close: { position: 'absolute', top: 6, right: 12, zIndex: 2 },
   closeText: { color: '#8C8576', fontSize: 24, fontWeight: '700' },
-  text: { color: INK, fontFamily: AppFontFamilies.manrope, fontSize: 20, lineHeight: 29, fontWeight: '600' },
+  text: { ...KatchaUI.type.companionDisplay, color: INK, fontSize: 20, lineHeight: 27, letterSpacing: 0 },
   controls: { marginTop: 16, gap: 10 },
   chevron: { position: 'absolute', right: 18, bottom: 10, alignItems: 'center' },
   error: { color: '#C4513B', fontSize: 14, marginTop: 8, textAlign: 'center' },

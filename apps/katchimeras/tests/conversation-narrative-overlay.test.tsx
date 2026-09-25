@@ -27,7 +27,7 @@ function loadOverlay(timers: Map<number, () => void>) {
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 12 }) },
     'expo-image': { Image: host('Figure') },
     '@/components/ui/icon-symbol': { IconSymbol: host('Icon') },
-    '@/constants/theme': { AppFontFamilies: { fredokaBold: 'F', manrope: 'M' } },
+    '@/constants/katcha-ui': { KatchaUI: { type: { companionCardTitle: {}, companionDisplay: {} } } },
     '@/constants/katchimera-skins': { katchimeraSkinById: new Map([['mossprout', { displayName: 'Mossprout', visualKey: 'mossprout' }], ['steppling', { displayName: 'Steppling', visualKey: 'steppling' }]]) },
     '@/game/days/visuals': { getCreatureVisual: (key: string) => ({ source: key }) },
   }, { setTimeout: (fn: () => void) => { timers.set(++serial, fn); return serial; }, clearTimeout: (id: number) => timers.delete(id) });
