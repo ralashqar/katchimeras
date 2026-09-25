@@ -893,6 +893,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // A chapter's opening scene (The Signal) frames the island the signal comes from.
   // Where a chapter's opening points the camera: a friend's island, or a friend's misted tile (the lit window).
   const [chapterOpeningPlace, setChapterOpeningPlace] = useState<{ islandId?: MossproutNatureIslandId; tileId?: string } | null>(null);
+  // A chapter opening on a friend's tile (the lit window) ends on a tap on that tile (`finishChapterOpening`).
+  const [openingTileTap, setOpeningTileTap] = useState<string | null>(null);
   const chapterOpeningCamera = useMemo((): FtueCameraDirective | null => chapterOpeningPlace?.islandId
     ? { kind: 'focus_target', target: { kind: 'haven_nature_island', islandId: chapterOpeningPlace.islandId }, zoom: 1.05, anchorY: 0.5, durationMs: 1_800 }
     : chapterOpeningPlace?.tileId
@@ -1177,6 +1179,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const hatchableRescueGradeRef = useRef<string | undefined>(undefined);
   // The friend whose tile is clearing after their rescue battle: the board is put away while it plays.
   const [rescueRevealing, setRescueRevealing] = useState<string | null>(null);
+  // Then their arrival scene (who they are, what they bring), before the goal widget comes back.
+  const [arrivalTalk, setArrivalTalk] = useState<NonNullable<NonNullable<HatchableCompanionDefinition['mission']['rescue']>['arrival']> & { companion: string } | null>(null);
   const completeActiveHatchable = useCallback(async () => {
     const encounter = activeHatchable.mission.encounter;
     if (!encounter) return completeHatchableMission(activeHatchable);
@@ -1189,6 +1193,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         // In order: the board steps away, the tile clears with the friend fading in on it, then the story moves on.
         setRescueRevealing(definition.companion);
         void playFriendReveal(definition, () => rescueStoredWorldFriend(definition.tile.unlockId), () => {
+          const arrival = definition.mission.rescue?.arrival;
+          if (arrival) setArrivalTalk({ ...arrival, companion: definition.companion });
           void completeHatchableMission(definition).catch((error) => console.warn('The rescue could not finish', error))
             .finally(() => setRescueRevealing(null));
         }, definition.discoveryFlow.runId);
@@ -3168,11 +3174,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const sanctuarySurfaceFree = !ftueStepId && screenFocused && !rushSheetOpen && !wispLanternOpen && !adventureOpen && !friendWispsFamilyId && !lockedHintFamilyId && !detailCreatureId
     && !pendingIslandDiscovery && !revealedFriendCardId && !wakeHandoffCampaign && !requiredUpgradeStory && !stepplingEncounter.open && !supplyRunOpen && !missionBoardDocked && !upgradePresentation && !buildingPanelId && !katchimeraPanelId && !heroBuildingPanelId && !heroRosterOpen && !heartTreePanelOpen
     && !activeInteractionResidentId && !interactionCreatureId && !trackOpen && !islandEncounter && !battleReward && !selectedUpgrade && !progressSheetOpen && !pendingIslandCampaign;
-  const chapterSurfaceFree = Boolean(chapterState) && sanctuarySurfaceFree;
+  const chapterSurfaceFree = Boolean(chapterState) && sanctuarySurfaceFree && !openingTileTap && !arrivalTalk && !rescueRevealing;
   // The first goal after the first session: a finger on the card, once, so the player knows where "next" lives.
   const goalCardRef = useRef<View>(null);
   const firstGoalCoach = chapterSurfaceFree && Boolean(chapterState) && !chapterState!.complete && !chapterState!.openingPending
-    && chapterState!.chapter.number === 1 && chapterState!.done === 0 && !mergeWorld.chapterOpeningsSeen?.includes(FIRST_GOAL_COACH_ID);
+    && chapterState!.chapter.number === 1 && chapterState!.done === 1 && !mergeWorld.chapterOpeningsSeen?.includes(FIRST_GOAL_COACH_ID);
   // What the Explorer's Lodge has made while you were away: a bubble over its tile, rechecked every minute.
   const [lodgeNow, setLodgeNow] = useState(() => Date.now());
   useEffect(() => {
@@ -3317,12 +3323,21 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const timer = setTimeout(() => setChapterOpeningPhase('talk'), CHAPTER_SIGNAL_FLARE_MS);
     return () => clearTimeout(timer);
   }, [chapterOpeningPhase]);
+  // A chapter opening on a friend's tile (the lit window) leaves the camera there, and the one thing to do is tap it:
+  // a finger under their silhouette, nothing else takes a touch. The goal widget comes later.
   const finishChapterOpening = useCallback(() => {
     const chapter = chapterState?.chapter;
     setChapterOpeningPhase(null);
-    setChapterOpeningPlace(null);
+    const tileId = chapter?.opening?.tileId;
+    if (tileId && chapterState?.goal?.action.kind === 'world_offer' && chapterState.goal.action.offerId === `mist:${tileId}`) setOpeningTileTap(tileId);
+    else setChapterOpeningPlace(null);
     if (chapter) void markStoredChapterOpened(chapter.id).catch(() => undefined);
-  }, [chapterState?.chapter]);
+  }, [chapterState?.chapter, chapterState?.goal]);
+  const tapOpeningTile = useCallback(() => {
+    setOpeningTileTap(null);
+    setChapterOpeningPlace(null);
+    followChapterGoalRef.current?.();
+  }, []);
   // The Heart Tree up a level: Glow leaves the counter, and when it grows into its next stage the Heartwood
   // crossblends (the same reveal the first session wakes it with).
   const upgradeHeartTreeWithFx = useCallback(async (expectedLevel: number) => {
@@ -3561,7 +3576,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         background={background}
         cameraLocked={lanternSurfaceOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(upgradeStageSubject) || Boolean(requiredUpgradeStory) || restorationBoardVisible || rushSheetOpen || Boolean(rushSpec) || islandEncounterActive
           // The Café holds the camera on its tile: nothing behind the board moves it.
-          || supplyRunOpen}
+          || supplyRunOpen
+          // A chapter's opening scene and its tile tap hold the camera: no touch cancels the move.
+          || Boolean(chapterOpeningPhase) || Boolean(openingTileTap)}
         discoveredEggInteraction={stepplingEncounter.open}
         gatewayTileId={activeHatchable.tile.id}
         discoveredEggPresentation={stepplingEncounter.presentation}
@@ -4068,6 +4085,18 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         <ConversationNarrativeOverlay title={chapterOpening.title} entries={chapterOpening.lines.map((line, index) => ({ id: `chapter-opening:${chapterState!.chapter.id}:${index}`, speaker: line.speaker, text: line.text }))}
           checkpoint={`chapter-opening:${chapterState!.chapter.id}`} required paced onClose={() => undefined}>
           {(perform) => <KatchaButton fullWidth glow pill label={chapterOpening.answer ?? 'Answer the signal'} onPress={() => perform(() => setChapterOpeningPhase('title'), true)} />}
+        </ConversationNarrativeOverlay>
+      ) : null}
+      {openingTileTap && screenFocused && ftueCameraSettled ? <>
+        <Pressable accessibilityElementsHidden importantForAccessibility="no-hide-descendants" onPress={() => undefined} style={[StyleSheet.absoluteFill, { zIndex: 998 }]} />
+        <HavenFtueOverlay cue={{ kind: 'tap', target: { kind: 'haven_structure', structureId: openingTileTap }, offset: { y: 34 } }} fingerPlacement="center" screenRef={screenRef}
+          spotlight={{ targets: [{ kind: 'haven_structure', structureId: openingTileTap }], grouping: 'bounding_rect', padding: 8, radius: 26, dimOpacity: 0.5 }} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision} />
+        <LostTrailTapTarget node={gatewayTileNode} onPress={tapOpeningTile} />
+      </> : null}
+      {arrivalTalk && screenFocused && !battleReward ? (
+        <ConversationNarrativeOverlay title={arrivalTalk.title} entries={arrivalTalk.lines.map((line, index) => ({ id: `arrival:${arrivalTalk.companion}:${index}`, speaker: line.speaker, text: line.text }))}
+          checkpoint={`arrival:${arrivalTalk.companion}`} required paced onClose={() => undefined}>
+          {(perform) => <KatchaButton fullWidth glow pill label={arrivalTalk.answer} onPress={() => perform(() => setArrivalTalk(null), true)} />}
         </ConversationNarrativeOverlay>
       ) : null}
       {chapterOpening && chapterOpeningPhase === 'title' && chapterState ? (

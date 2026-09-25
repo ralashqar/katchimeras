@@ -45,4 +45,16 @@ export const BARISTABBIT_RESCUE_COPY: RescueBattleCopy = {
   light: 'Is that… light? Keep it coming.',
   almost: 'Nearly through. Right by the window.',
   steer: 'Merge beside the thick Mist by the window. Burn it off him.',
+  arrival: {
+    title: 'The Lit Window', answer: 'Open the Caf\u00e9',
+    lines: [
+      { speaker: 'baristabbit', text: 'You walked through that? For me?' },
+      { speaker: 'baristabbit', text: 'I kept the lamp lit every night. I hoped someone would see it.' },
+      { speaker: 'mossprout', text: 'We saw it. You\u2019re safe now.' },
+      { speaker: 'baristabbit', text: 'Then let me be useful. Your crew looks half-starved.' },
+      { speaker: 'steppling', text: 'We might have skipped a few breakfasts.' },
+      { speaker: 'baristabbit', text: 'Heroes fight on full bellies. Bring me what they order, and I\u2019ll turn it into Meals.' },
+      { speaker: 'baristabbit', text: 'Meals make heroes stronger. Come on. The Caf\u00e9 is open.' },
+    ],
+  },
 };

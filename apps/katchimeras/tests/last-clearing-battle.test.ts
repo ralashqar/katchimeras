@@ -119,7 +119,9 @@ test('FTUE v2: Baristabbit is rescued in a Lanes battle, winnable by a careful p
   assert.ok(careful.wins >= 3, `careful wins the lit window (${careful.wins}/${careful.seeds}, ${careful.seconds}s)`);
   const idle = lanesFairness(BARISTABBIT_RESCUE_BATTLE, 'idle', 2);
   assert.equal(idle.wins, 0, 'doing nothing loses: it is a real battle');
-  const { intro, ...said } = BARISTABBIT_RESCUE_COPY;
+  // In the battle (the Mist's presence) no "!"; once he is home, his arrival scene may.
+  const { intro, arrival, ...said } = BARISTABBIT_RESCUE_COPY;
   for (const line of [...Object.values(said), intro?.title ?? '', intro?.line ?? '']) assert.ok(!/!/.test(line), `no "!" in the Mist's presence: ${line}`);
+  assert.ok((arrival?.lines.length ?? 0) >= 3, 'home, he says who he is and what the Café is for before the goal widget comes back');
   assert.ok(intro, 'the rescue opens with its story card before the wisps come');
 });

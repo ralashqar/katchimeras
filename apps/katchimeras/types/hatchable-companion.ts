@@ -110,6 +110,8 @@ export type RescueBattleCopy = {
   guard?: string;
   /** The lead's steer toward the trapped cell. */
   steer: string;
+  /** Said once they are home, before anything else opens: who they are and what they bring (a short scene). */
+  arrival?: { title: string; answer: string; lines: readonly { speaker: string; text: string }[] };
 };
 
 export type HatchableFlowCopy = { guide: FtueGuide; actionLabel: string };

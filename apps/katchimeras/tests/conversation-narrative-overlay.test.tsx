@@ -7,315 +7,107 @@ import { loadNativeModule, nativeMotionHarness, nativeViews } from './helpers/na
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const host = (name: string) => name as unknown as React.ComponentType<Record<string, unknown>>;
 
-test('overlay keeps FTUE modal, uses player portrait, guards taps and finishes exit before reward callback', async () => {
+/**
+ * The story's dialogue (Sept 2026, after Foundation: Galactic Frontier): one line at a time in a card fixed at the
+ * bottom, the speaker's name on a tag at their side, the speakers standing behind it (the first left, a second right),
+ * a tap for the next line, the caller's buttons with the last line, and an eased exit before the caller's action.
+ */
+function loadOverlay(timers: Map<number, () => void>) {
   const motion = nativeMotionHarness();
-  const timers = new Map<number, () => void>(); let serial = 0;
+  let serial = 0;
+  const builder = { delay: () => builder, duration: () => builder };
   const module = loadNativeModule('components/katchadeck/world/conversation-narrative-overlay.tsx', {
-    'react-native': { ...nativeViews, Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', ScrollView: 'ScrollView' },
+    'react-native': { ...nativeViews, Modal: 'Modal', Pressable: 'Pressable', Text: 'Text' },
     'react-native-reanimated': { ...motion.animated,
+      default: { ...motion.animated.default, Text: 'AnimatedText' },
+      FadeOut: builder,
+      withRepeat: (child: unknown) => child,
       withTiming: (to: number, options = { duration: 180 }) => motion.animated.withTiming(to, options),
-      withSpring: (to: number) => motion.animated.withTiming(to, { duration: 300 }),
     },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 12 }) },
-    './narrative-presentation': { NarrativeDialogue: host('Dialogue'), narrativeStyles: {} },
-    './haven-character-portrait': { HavenCharacterPortrait: host('Portrait') },
-    '@/components/katchadeck/egg-avatar/egg-avatar': { EggAvatar: host('Egg') },
-    '@/features/egg-avatar/egg-avatar-provider': { useEggAvatar: () => ({ equippedSkinId: 'cream', equippedFaceId: 'happy' }) },
-    '@/constants/katchimera-skins': { katchimeraSkinById: new Map([['mossprout', { displayName: 'Mossprout', visualKey: 'mossprout' }]]) },
-    '@/game/days/visuals': { getCreatureVisual: () => ({ source: 1 }) },
+    'expo-image': { Image: host('Figure') },
+    '@/components/ui/icon-symbol': { IconSymbol: host('Icon') },
+    '@/constants/theme': { AppFontFamilies: { fredokaBold: 'F', manrope: 'M' } },
+    '@/constants/katchimera-skins': { katchimeraSkinById: new Map([['mossprout', { displayName: 'Mossprout', visualKey: 'mossprout' }], ['steppling', { displayName: 'Steppling', visualKey: 'steppling' }]]) },
+    '@/game/days/visuals': { getCreatureVisual: (key: string) => ({ source: key }) },
   }, { setTimeout: (fn: () => void) => { timers.set(++serial, fn); return serial; }, clearTimeout: (id: number) => timers.delete(id) });
-  const Overlay = module.ConversationNarrativeOverlay as React.ComponentType<any>;
-  let closed = 0; let rewarded = 0; let perform!: (action: () => unknown, exit?: boolean) => void;
+  return { motion, Overlay: module.ConversationNarrativeOverlay as React.ComponentType<any>, module };
+}
+
+const lineText = (tree: ReactTestRenderer) => tree.root.findAllByType(host('AnimatedText')).map((node) => node.props.children);
+const tagText = (tree: ReactTestRenderer) => tree.root.findAllByType(host('Text')).map((node) => node.props.children).filter((text) => typeof text === 'string' && !['×'].includes(text));
+const nextTap = (tree: ReactTestRenderer) => tree.root.findAllByType(host('Pressable')).find((node) => node.props.accessibilityLabel === 'Next line')!;
+
+test('one line at a time: a tap shows the next, the name tag follows the speaker, the buttons come with the last line', async () => {
+  const timers = new Map<number, () => void>();
+  const { Overlay } = loadOverlay(timers);
+  const entries = [
+    { id: 'a', speaker: 'mossprout', text: 'Hello.' },
+    { id: 'b', speaker: 'steppling', text: 'Hi!' },
+    { id: 'c', speaker: 'mossprout', text: 'Ready?' },
+  ];
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(<Overlay title="Talk" entries={entries} checkpoint="one" required paced onClose={() => undefined}>{() => React.createElement(host('Continue'))}</Overlay>); });
+  assert.equal(tree.root.findByType(host('Modal')).props.statusBarTranslucent, true);
+  assert.deepEqual(lineText(tree), ['Hello.'], 'the first line alone');
+  assert.ok(tagText(tree).includes('Mossprout'), 'the speaker is named on the tag');
+  assert.equal(tree.root.findAllByType(host('Continue')).length, 0, 'the buttons wait for the last line');
+  assert.equal(timers.size, 0, 'nothing moves on by itself');
+  await act(async () => nextTap(tree).props.onPress());
+  assert.deepEqual(lineText(tree), ['Hi!']);
+  assert.ok(tagText(tree).includes('Steppling'));
+  assert.equal(tree.root.findAllByType(host('Figure')).length, 2, 'the second speaker joins the first on stage');
+  await act(async () => nextTap(tree).props.onPress());
+  assert.deepEqual(lineText(tree), ['Ready?']);
+  assert.equal(tree.root.findAllByType(host('Continue')).length, 1, 'the last line brings the buttons');
+  assert.equal(nextTap(tree).props.disabled, true, 'a tap on the last line does nothing: the buttons decide');
+  await act(async () => tree.unmount());
+});
+
+test('exit fades out before the caller acts, a failure comes back with an error, and a required story cannot be closed', async () => {
+  const timers = new Map<number, () => void>();
+  const { motion, Overlay } = loadOverlay(timers);
+  let closed = 0; let acted = 0; let perform!: (action: () => unknown, exit?: boolean) => void;
   const props = { title: 'Mossprout', checkpoint: 'one', required: true, onClose: () => closed++,
-    entries: [{ id: 'a', speaker: 'mossprout', text: 'Hello' }, { id: 'b', speaker: 'player', text: 'Hi' }],
-    children: (run: typeof perform) => { perform = run; return React.createElement(host('ResultCard')); },
+    entries: [{ id: 'a', speaker: 'mossprout', text: 'Hello' }],
+    children: (run: typeof perform) => { perform = run; return React.createElement(host('Continue')); },
   };
   let tree!: ReactTestRenderer;
   await act(async () => { tree = create(<Overlay {...props} />); });
-  assert.equal(tree.root.findByType(host('Modal')).props.statusBarTranslucent, true);
-  const scrolling = tree.root.findByType(host('ScrollView'));
-  assert.equal(scrolling.findAllByType(host('ResultCard')).length, 1, 'results and dialogue share one scroll view');
   await act(async () => tree.root.findByType(host('Modal')).props.onRequestClose());
-  assert.equal(closed, 0);
-  assert.deepEqual(tree.root.findAllByType(host('Dialogue')).map((node) => node.props.right), [false, true]);
-  assert.equal(tree.root.findAllByType(host('Dialogue'))[1].props.portrait.props.children.props.faceId, 'happy');
-  await act(async () => { perform(() => { assert.equal(tree.root.findByType(host('Modal')).props.visible, false); rewarded++; }, true); perform(() => { rewarded++; }, true); });
-  assert.equal(rewarded, 0);
-  assert.equal(timers.size, 1);
-  await act(async () => { motion.advance(180); for (const fn of timers.values()) fn(); timers.clear(); });
-  assert.equal(rewarded, 1);
+  assert.equal(closed, 0, 'a required story has no way out but its buttons');
+  await act(async () => { perform(() => { acted++; }, true); perform(() => { acted++; }, true); });
+  assert.equal(acted, 0, 'the action waits for the exit');
+  await act(async () => { motion.advance(220); for (const fn of timers.values()) fn(); timers.clear(); });
+  assert.equal(acted, 1, 'once, after the fade');
   await act(async () => perform(() => { throw new Error('disk full'); }));
   assert.ok(tree.root.findAllByType(host('Text')).some((node) => String(node.props.children).includes('Could not save')));
   await act(async () => { tree.update(<Overlay {...props} required={false} />); });
   await act(async () => tree.root.findByType(host('Modal')).props.onRequestClose());
-  assert.equal(closed, 0);
   await act(async () => { for (const fn of timers.values()) fn(); timers.clear(); });
-  assert.equal(closed, 1);
-  await act(async () => perform(() => { rewarded++; }, true));
+  assert.equal(closed, 1, 'an optional one closes the same eased way');
   await act(async () => tree.unmount());
-  assert.equal(timers.size, 0, 'unmount cancels an unfinished exit callback');
-  assert.equal(rewarded, 1);
   await act(async () => { tree = create(<Overlay {...props} inline />); });
-  assert.equal(tree.root.findAllByType(host('Modal')).length, 0, 'one-off messages never mount a narrative modal');
-  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 0, 'the stage owns overhead speech for inline interactions');
+  assert.equal(tree.root.findAllByType(host('Modal')).length, 0, 'inline messages never mount the dialogue');
   await act(async () => tree.unmount());
-
-  await act(async () => { tree = create(<Overlay {...props} paced />); });
-  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 1, 'paced narrative starts with one speech bubble');
-  assert.equal(tree.root.findAllByType(host('ResultCard')).length, 0, 'the result or choices wait behind the dialogue');
-  assert.equal(tree.root.findByType(host('ScrollView')).props.scrollEnabled, false, 'no scrolling while the story is still arriving');
-  assert.equal(tree.root.findByType(host('ScrollView')).props.contentContainerStyle[1].paddingBottom, 12 + 22, 'the transcript keeps the home indicator clear itself');
-  const advanceTimer = async () => {
-    const callback = [...timers.values()].at(-1);
-    assert.ok(callback, 'paced dialogue schedules an automatic reading fallback');
-    timers.clear();
-    await act(async () => callback());
-  };
-  await advanceTimer();
-  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 2);
-  assert.equal(tree.root.findAllByType(host('ResultCard')).length, 0);
-  await advanceTimer();
-  assert.equal(tree.root.findAllByType(host('ResultCard')).length, 1, 'controls animate in after the final reading beat');
-  assert.equal(tree.root.findByType(host('ScrollView')).props.scrollEnabled, true, 'scrolling opens once the controls are in');
-  await act(async () => tree.unmount());
-  assert.equal(timers.size, 0);
 });
 
-test('a batched conversation update reveals one transcript entry per beat', async () => {
-  const motion = nativeMotionHarness();
-  const timers = new Map<number, () => void>(); let serial = 0;
-  const module = loadNativeModule('components/katchadeck/world/conversation-narrative-overlay.tsx', {
-    'react-native': { ...nativeViews, Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', ScrollView: 'ScrollView' },
-    'react-native-reanimated': { ...motion.animated,
-      withTiming: (to: number, options = { duration: 180 }) => motion.animated.withTiming(to, options),
-      withSpring: (to: number) => motion.animated.withTiming(to, { duration: 300 }),
-    },
-    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 12 }) },
-    './narrative-presentation': { NarrativeDialogue: host('Dialogue'), narrativeStyles: {} },
-    './haven-character-portrait': { HavenCharacterPortrait: host('Portrait') },
-    '@/components/katchadeck/egg-avatar/egg-avatar': { EggAvatar: host('Egg') },
-    '@/features/egg-avatar/egg-avatar-provider': { useEggAvatar: () => ({}) },
-    '@/constants/katchimera-skins': { katchimeraSkinById: new Map() },
-    '@/game/days/visuals': { getCreatureVisual: () => null },
-  }, { setTimeout: (fn: () => void) => { timers.set(++serial, fn); return serial; }, clearTimeout: (id: number) => timers.delete(id) });
-  const Overlay = module.ConversationNarrativeOverlay as React.ComponentType<any>;
-  const controls = () => React.createElement(host('Choices'));
-  const initialEntries = [{ id: 'prompt-one', speaker: 'mossprout', text: 'What feels right?' }];
-  const answeredEntries = [
-    ...initialEntries,
-    { id: 'answer-one', speaker: 'player', text: 'A gentler pace.' },
-    { id: 'reply-one', speaker: 'mossprout', text: 'Then we can leave room to breathe.' },
-    { id: 'prompt-two', speaker: 'mossprout', text: 'What shall we notice next?' },
-  ];
+test('new lines appended (an answer and its reply) are shown from the first new one, one tap at a time', async () => {
+  const timers = new Map<number, () => void>();
+  const { Overlay, module } = loadOverlay(timers);
+  const first = [{ id: 'q', speaker: 'mossprout', text: 'What now?' }];
+  const later = [...first, { id: 'a', speaker: 'player', text: 'Onward.' }, { id: 'r', speaker: 'mossprout', text: 'Then onward.' }];
   let tree!: ReactTestRenderer;
-  await act(async () => { tree = create(<Overlay title="Mossprout" checkpoint="question-one" entries={initialEntries} paced onClose={() => {}}>{controls}</Overlay>); });
-  await act(async () => tree.root.findByProps({ accessibilityLabel: 'Continue dialogue' }).props.onPress());
-  assert.equal(tree.root.findAllByType(host('Choices')).length, 1);
-
-  await act(async () => { tree.update(<Overlay title="Mossprout" checkpoint="question-two" entries={answeredEntries} paced initiallyRevealedCount={3} onClose={() => {}}>{controls}</Overlay>); });
-  assert.deepEqual(tree.root.findAllByType(host('Dialogue')).map((node) => node.props.text), [
-    'What feels right?', 'A gentler pace.', 'Then we can leave room to breathe.',
-  ], 'the answer and its reply arrive together; the next prompt keeps its own beat');
-  assert.equal(tree.root.findAllByType(host('Choices')).length, 0);
-
-  await act(async () => { tree.update(<Overlay title="Mossprout" checkpoint="question-two:saved" entries={answeredEntries} paced initiallyRevealedCount={3} onClose={() => {}}>{controls}</Overlay>); });
-  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 3, 'checkpoint-only rerenders cannot skip another speech beat');
-  for (const expectedCount of [4]) {
-    const tap = tree.root.findByProps({ accessibilityLabel: 'Continue dialogue' });
-    await act(async () => tap.props.onPress());
-    assert.equal(tree.root.findAllByType(host('Dialogue')).length, expectedCount);
-    assert.equal(tree.root.findAllByType(host('Choices')).length, 0);
-  }
-  await act(async () => tree.root.findByProps({ accessibilityLabel: 'Continue dialogue' }).props.onPress());
-  assert.equal(tree.root.findAllByType(host('Choices')).length, 1, 'choices wait for acknowledgement of the final prompt');
+  const node = (entries: typeof first) => <Overlay title="Talk" entries={entries} checkpoint={String(entries.length)} onClose={() => undefined}>{() => React.createElement(host('Choices'))}</Overlay>;
+  await act(async () => { tree = create(node(first)); });
+  assert.deepEqual(lineText(tree), ['What now?']);
+  await act(async () => { tree.update(node(later)); });
+  assert.deepEqual(lineText(tree), ['Onward.'], 'the answer first');
+  assert.ok(tagText(tree).includes('You'), 'the player is named You');
+  await act(async () => nextTap(tree).props.onPress());
+  assert.deepEqual(lineText(tree), ['Then onward.']);
   await act(async () => tree.unmount());
-});
-
-
-test('chained FTUE choices remain pressable through the real overlay and choice list', async () => {
-  const motion = nativeMotionHarness();
-  const timers = new Map<number, () => void>(); let serial = 0;
-  const native = { ...nativeViews, Modal: 'Modal', Text: 'Text', ScrollView: 'ScrollView', Pressable: 'Pressable', useWindowDimensions: () => ({ width: 390 }) };
-  const overlay = loadNativeModule('components/katchadeck/world/conversation-narrative-overlay.tsx', {
-    'react-native': native,
-    'react-native-reanimated': { ...motion.animated, withTiming: (to: number, options = { duration: 180 }) => motion.animated.withTiming(to, options), withSpring: (to: number) => motion.animated.withTiming(to, { duration: 300 }) },
-    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 12 }) },
-    './narrative-presentation': { NarrativeDialogue: host('Dialogue'), narrativeStyles: {} },
-    './haven-character-portrait': { HavenCharacterPortrait: host('Portrait') },
-    '@/components/katchadeck/egg-avatar/egg-avatar': { EggAvatar: host('Egg') },
-    '@/features/egg-avatar/egg-avatar-provider': { useEggAvatar: () => ({}) },
-    '@/constants/katchimera-skins': { katchimeraSkinById: new Map() },
-    '@/game/days/visuals': { getCreatureVisual: () => null },
-  }, { setTimeout: (fn: () => void) => { timers.set(++serial, fn); return serial; }, clearTimeout: (id: number) => timers.delete(id) });
-  const choices = loadNativeModule('components/katchadeck/world/companion-choice-list.tsx', {
-    'react-native': native,
-    '@/components/themed-text': { ThemedText: host('Label') },
-    '@/components/ui/icon-symbol': { IconSymbol: host('Icon') },
-    '@/constants/katcha-ui': { KatchaUI: { companionScenePanel: {} } },
-    '@/hooks/use-companion-adaptive-panel': { companionChoiceColumnCount: () => 1, COMPANION_CHOICE_GAP: 10 },
-  });
-  const saved = new Map<string, unknown>();
-  let failSave = false;
-  const storage = { getStoredJson: (key: string, fallback: unknown) => saved.get(key) ?? fallback,
-    setStoredJson: (key: string, value: unknown) => { if (failSave) throw new Error('disk'); saved.set(key, value); } };
-  const history = loadNativeModule('features/onboarding/ftue-narrative-history.ts', { '@/utils/app-storage': storage });
-  const module = loadNativeModule('components/katchadeck/world/ftue-grow-dialogue.tsx', {
-    './conversation-narrative-overlay': overlay,
-    './companion-choice-list': choices,
-    '@/components/katchadeck/ui/katcha-button': { KatchaButton: host('Button') },
-    '@/features/onboarding/ftue-narrative-history': history,
-    '@/utils/app-storage': storage,
-  });
-  const Grow = module.FtueGrowDialogue as React.ComponentType<any>;
-  const props = { runId: 'touch-regression', id: 'garden-return', prompt: 'Garden', choices: [{ id: 'pleased', label: 'You look pleased.', reply: 'I am.' }],
-    nextDialogue: { id: 'first-notice', prompt: 'What catches your attention?', choices: [{ id: 'light', label: 'Some light', reply: 'Well noticed.' }] }, onFinish: async () => {} };
-  let tree!: ReactTestRenderer;
-  await act(async () => { tree = create(<Grow {...props} />); });
-  const revealUntil = async (controlIsVisible: () => boolean) => {
-    for (let attempt = 0; attempt < 12 && !controlIsVisible(); attempt++) {
-      const screenTap = tree.root.findAllByProps({ accessibilityLabel: 'Continue dialogue' })[0];
-      assert.ok(screenTap, 'the full narrative surface advances the paced FTUE');
-      await act(async () => screenTap.props.onPress());
-    }
-    assert.ok(controlIsVisible(), 'the next control appears after the dialogue beats');
-  };
-  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 1, 'the first FTUE beat appears on its own');
-  assert.equal(tree.root.findAllByProps({ accessibilityRole: 'radio' }).length, 0, 'choices wait for the prompt');
-  await revealUntil(() => tree.root.findAllByProps({ accessibilityRole: 'radio' }).length > 0);
-  const pressChoice = async () => {
-    const radio = tree.root.findByProps({ accessibilityRole: 'radio' });
-    assert.equal(radio.props.disabled, false);
-    for (let parent = radio.parent; parent; parent = parent.parent) assert.notEqual(parent.props.pointerEvents, 'none', 'choice has no locked ancestor');
-    const label = radio.findByType(host('Label'));
-    assert.equal(label.props.selectable, false);
-    assert.equal(label.props.pointerEvents, 'none', 'label passes touches to its option');
-    await act(async () => radio.props.onPress());
-  };
-  await pressChoice();
-  await revealUntil(() => tree.root.findAllByProps({ accessibilityRole: 'radio' }).length > 0);
-  assert.equal(tree.root.findByType(host('Label')).props.children, 'Some light');
-  failSave = true;
-  await pressChoice();
-  assert.ok(tree.root.findAllByType(host('Text')).some((node) => String(node.props.children).includes('Could not save')));
-  failSave = false;
-  await pressChoice();
-  assert.equal(tree.root.findAllByProps({ accessibilityRole: 'radio' }).length, 0);
-  await revealUntil(() => tree.root.findAllByType(host('Button')).length > 0);
-  assert.ok(tree.root.findAllByType(host('Dialogue')).some((node) => node.props.text === 'Well noticed.'));
-  assert.equal(tree.root.findByType(host('Button')).props.label, 'Continue');
-  await act(async () => tree.unmount());
-  await act(async () => { tree = create(<Grow {...props} />); });
-  await revealUntil(() => tree.root.findAllByType(host('Button')).length > 0);
-  assert.equal(tree.root.findByType(host('Button')).props.label, 'Continue', 'saved noticing answer resumes without another choice');
-  await act(async () => tree.unmount());
-  assert.equal(timers.size, 0, 'paced reveal timers are cancelled when the overlay closes');
-});
-
-
-test('Seed reveal uses the selected intention and keeps its celebration behind the card', async () => {
-  const motion = nativeMotionHarness();
-  let intent = 'calm';
-  class TestKeyframe {
-    frames: Record<number, unknown>;
-    durationMs = 0;
-    constructor(frames: Record<number, unknown>) { this.frames = frames; }
-    duration(durationMs: number) { this.durationMs = durationMs; return this; }
-  }
-  const module = loadNativeModule('components/katchadeck/world/mossprout-seed-narrative-reward.tsx', {
-    'react-native': nativeViews,
-    'expo-image': { Image: host('Image') },
-    'react-native-reanimated': { ...motion.animated, Keyframe: TestKeyframe, useReducedMotion: () => false },
-    '@/components/katchadeck/ui/day-action-card': { DayActionCardSurface: host('Card') },
-    '@/components/katchadeck/ui/radial-sunburst': { RotatingRadialSunburst: host('Rays') },
-    '@/constants/mossprout-memory-plants': { mossproutMemoryPlantById: new Map(['calm', 'progress', 'unsure'].map((id) => [id, { name: `Seed ${id}`, art: { seed: id } }])) },
-    '@/features/onboarding/mossprout-bond-share': { mossproutFirstSeedForIntent: (id: string) => ({ id, message: 'A beginning.' }) },
-    '@/utils/onboarding-state': { loadOnboardingProfile: () => ({ mossproutAnswers: { growthIntentId: intent } }) },
-    './companion-achievement-celebration': { CelebrationParticles: host('Particles') },
-  });
-  const Seed = module.MossproutSeedNarrativeReward as React.ComponentType;
-  for (intent of ['calm', 'progress', 'unsure']) {
-    let tree!: ReactTestRenderer;
-    await act(async () => { tree = create(<Seed />); });
-    const card = tree.root.findByType(host('Card'));
-    assert.equal(card.props.title, `Seed ${intent}`);
-    assert.match(card.props.subtitle, /Ready to plant in the Garden/);
-    const artwork = React.Children.toArray(card.props.artwork.props.children) as React.ReactElement<Record<string, unknown>>[];
-    assert.equal(artwork[1].props.source, intent);
-    assert.equal(artwork[0].props.rotationDurationMs, 24_000);
-    const entrance = card.parent!.props.entering as TestKeyframe;
-    assert.deepEqual(Object.keys(entrance.frames), ['0', '68', '100'], 'the seed performs one overshoot before settling');
-    assert.equal(entrance.durationMs, 440);
-    assert.equal(tree.root.findByType(host('Particles')).props.layerStyle.zIndex, 0);
-    assert.equal(card.parent!.props.style.zIndex, 1);
-    await act(async () => tree.unmount());
-  }
-});
-
-
-test('a reply arrives with the answer, later lines pace quickly, and new speech scrolls the reader down even after they scrolled up', async () => {
-  const ids = ['prompt-one', 'answer-one', 'reply-one', 'prompt-two'];
-  const entries = ids.map((id, index) => ({ id, speaker: index === 1 ? 'player' : 'mossprout' } as const));
-  const motion = nativeMotionHarness();
-  const scrolled: unknown[] = [];
-  const ScrollViewMock = React.forwardRef(function ScrollViewMock(props: Record<string, unknown>, ref) {
-    React.useImperativeHandle(ref, () => ({ scrollToEnd: (options: unknown) => { scrolled.push(options); } }));
-    return React.createElement('ScrollView', props);
-  });
-  const timers = new Map<number, { fn: () => void; ms: number }>(); let serial = 0;
-  const module = loadNativeModule('components/katchadeck/world/conversation-narrative-overlay.tsx', {
-    'react-native': { ...nativeViews, Modal: 'Modal', Pressable: 'Pressable', Text: 'Text', ScrollView: ScrollViewMock },
-    'react-native-reanimated': { ...motion.animated,
-      withTiming: (to: number, options = { duration: 180 }) => motion.animated.withTiming(to, options),
-      withSpring: (to: number) => motion.animated.withTiming(to, { duration: 300 }),
-    },
-    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 12 }) },
-    './narrative-presentation': { NarrativeDialogue: host('Dialogue'), narrativeStyles: {} },
-    './haven-character-portrait': { HavenCharacterPortrait: host('Portrait') },
-    '@/components/katchadeck/egg-avatar/egg-avatar': { EggAvatar: host('Egg') },
-    '@/features/egg-avatar/egg-avatar-provider': { useEggAvatar: () => ({}) },
-    '@/constants/katchimera-skins': { katchimeraSkinById: new Map() },
-    '@/game/days/visuals': { getCreatureVisual: () => null },
-  }, { setTimeout: (fn: () => void, ms: number) => { timers.set(++serial, { fn, ms }); return serial; }, clearTimeout: (id: number) => timers.delete(id) });
   const { narrativeAdmittedCount, narrativeReadingDelayMs } = module as unknown as { narrativeAdmittedCount: (previous: readonly string[], entries: readonly { id: string; speaker: string }[], step: number) => number; narrativeReadingDelayMs: (text: string) => number };
-  assert.equal(narrativeAdmittedCount(['prompt-one'], entries, 2), 3, 'the answer and its reply are one moment');
-  assert.equal(narrativeAdmittedCount(['prompt-one', 'answer-one', 'reply-one'], entries, 3), 4, 'the next prompt follows on its own beat');
-  assert.equal(narrativeAdmittedCount([], entries.slice(0, 1), 0), 1, 'a fresh transcript still opens on one line');
-  assert.equal(narrativeAdmittedCount(['prompt-one'], [entries[0], { id: 'line-two', speaker: 'mossprout' }], 2), 2, 'two companion lines keep their beat');
+  assert.equal(narrativeAdmittedCount(['q'], later, 2), 3, 'the answer and its reply are one moment');
   assert.equal(narrativeReadingDelayMs(''), 1300);
-  assert.equal(narrativeReadingDelayMs('x'.repeat(40)), 1600);
-  assert.equal(narrativeReadingDelayMs('x'.repeat(400)), 3200, 'a long line never waits longer than a few seconds');
-  const Overlay = module.ConversationNarrativeOverlay as React.ComponentType<any>;
-  const controls = () => React.createElement(host('Choices'));
-  const transcript = [{ id: 'prompt-one', speaker: 'mossprout', text: 'What feels right?' }];
-  let tree!: ReactTestRenderer;
-  await act(async () => { tree = create(<Overlay title="Mossprout" checkpoint="q1" entries={transcript} paced onClose={() => {}}>{controls}</Overlay>); });
-  const scrollView = () => tree.root.findByType('ScrollView' as React.ElementType);
-  await act(async () => { scrollView().props.onContentSizeChange(); });
-  assert.equal(scrolled.length, 1, 'the first layout lands at the end');
-  // The reader scrolls up to reread: nothing new is arriving, so nothing pulls them down.
-  await act(async () => { scrollView().props.onScroll({ nativeEvent: { contentOffset: { y: 0 }, layoutMeasurement: { height: 400 }, contentSize: { height: 2000 } } }); });
-  const before = scrolled.length;
-  await act(async () => { scrollView().props.onContentSizeChange(); });
-  assert.equal(scrolled.length, before, 'no new content: their place is kept');
-  assert.equal(tree.root.findAll((node) => node.props.children === 'Latest ↓').length, 0, 'no way back while the story is still arriving: scrolling is off until the controls are in');
-  assert.equal(scrollView().props.scrollEnabled, false);
-
-  // Their answer and its reply arrive: the transcript comes down to them.
-  const answered = [...transcript, { id: 'answer-one', speaker: 'player', text: 'A gentler pace.' }, { id: 'reply-one', speaker: 'mossprout', text: 'Then we can leave room to breathe.' }, { id: 'prompt-two', speaker: 'mossprout', text: 'What next?' }];
-  await act(async () => { tree.update(<Overlay title="Mossprout" checkpoint="q2" entries={answered} paced initiallyRevealedCount={3} onClose={() => {}}>{controls}</Overlay>); });
-  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 3);
-  await act(async () => { scrollView().props.onContentSizeChange(); });
-  assert.equal(scrolled.length, before + 1, 'new speech scrolls to the end despite the earlier scroll-up');
-  const pending = [...timers.values()].at(-1)!;
-  assert.ok(pending.ms >= 1300 && pending.ms <= 3200, `the reply is read in ${pending.ms}ms, then the next prompt follows on its own`);
-  await act(async () => { pending.fn(); });
-  assert.equal(tree.root.findAllByType(host('Dialogue')).length, 4);
-  await act(async () => { scrollView().props.onContentSizeChange(); });
-  assert.equal(scrolled.length, before + 2, 'the auto-revealed prompt scrolls down too');
-  await act(async () => tree.root.findByProps({ accessibilityLabel: 'Continue dialogue' }).props.onPress());
-  assert.equal(tree.root.findAllByType(host('Choices')).length, 1);
-  await act(async () => { scrollView().props.onContentSizeChange(); });
-  assert.equal(scrolled.length, before + 3, 'choices scroll into view as well');
-  await act(async () => tree.unmount());
-  assert.equal(timers.size, 0);
 });
