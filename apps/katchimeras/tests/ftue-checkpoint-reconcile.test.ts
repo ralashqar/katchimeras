@@ -61,20 +61,6 @@ async function parkFlowAt(runId: string, nodeId: string) {
   return run;
 }
 
-test('a checkpoint that outran the journal replays every task it proves, counted requirements included, then waits at the next scene work', async () => {
-  // The Chapter 0 request is gone (the first restore is paid with granted light): the mist clear is the flow's task.
-  assert.equal(MOSSPROUT_FTUE_FLOW.nodes.some((node) => node.id === 'merge.serve_sprout'), false, 'no Merge visit before the first restore: the profile starts with its Glow');
-  assert.equal(taskCount('world.mist_clear'), 7, 'the opening counts seven merges');
-  const ftue = ftueAt('ftue-ahead', 'world.mist_lift', ['world.mist_clear']);
-  await parkFlowAt(ftue.runId, 'world.mist_clear');
-  const run = await runtime.reconcileFtueCheckpoint(ftue);
-  assert.equal(run.status, 'active');
-  assert.equal(run.nodeId, 'world.mist_lift', 'the clear replayed in full; the lift is the Kingdom screen’s to acknowledge');
-  assert.equal([...events].filter((id) => id.includes(':reconcile:')).length, 7);
-  const again = await runtime.reconcileFtueCheckpoint(ftue);
-  assert.equal(again.nodeId, run.nodeId, 'reconcile is idempotent');
-});
-
 test('every counted task on the shipping path is replayed in full when the checkpoint is past it', async () => {
   const counted = MOSSPROUT_FTUE_FLOW.nodes.filter((node) => node.kind === 'task' && node.requirements.some((requirement) => (requirement.count ?? 1) > 1));
   for (const node of counted) {

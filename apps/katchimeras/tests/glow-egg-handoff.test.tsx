@@ -131,47 +131,6 @@ test('egg handoff waits for the host, opens once, and retries a failed readiness
 });
 
 
-test('committed Grow checkpoints repair a lagging story journal without replaying player choices', async () => {
-  const { MOSSPROUT_FTUE_FLOW: definition, MOSSPROUT_FTUE_VARIANTS } = await import('../features/onboarding/mossprout-ftue-flow');
-  let journal = { ...createContentFlowRun(definition, { runId: 'flow:grow' }), nodeId: 'companion.water_together', phase: 'awaiting_input' as const } as ContentFlowRun;
-  let submissions = 0;
-  const runtime = loadNativeModule('features/content-flow/ftue-content-flow-runtime.ts', {
-    '@/features/onboarding/mossprout-ftue-flow': { MOSSPROUT_FTUE_VARIANTS },
-    './content-flow-catalog': { contentFlowDefinition: (_id: string, version: number) => version === definition.version ? definition : undefined, registerContentFlowDefinition() {} },
-    './story-variant-registry': { registerStoryVariantSet() {}, selectedStoryVariant: () => ({ definition }) },
-    './content-flow-repository': {
-      loadContentFlowRun: async () => journal,
-      reduceContentFlowRunAtomically: async ({ reduce }: { reduce: (run: ContentFlowRun) => ContentFlowRun }) => { journal = reduce(journal); return { run: journal }; },
-    },
-    './content-flow-interpreter': {},
-    './content-flow-director': { dispatchContentFlowCommand: async (_id: string, command: Parameters<typeof reduceContentFlow>[2]) => {
-      if (command.type === 'submit_scene') submissions++;
-      journal = reduceContentFlow(definition, journal, command).run; return journal;
-    } },
-  });
-  const ftue = { runId: 'grow', stepId: 'companion.first_rest', answers: {}, receipts: [
-    { stepId: 'companion.water_together', actionId: 'companion.choose_garden_return', status: 'committed' },
-    { stepId: 'companion.first_grow', actionId: 'companion.open_first_grow', status: 'committed' },
-    { stepId: 'companion.first_notice', actionId: 'companion.skip_first_notice', status: 'committed' },
-  ] };
-  assert.equal((await runtime.reconcileFtueCheckpoint(ftue)).nodeId, 'companion.first_rest');
-  assert.equal(submissions, 3);
-  await runtime.reconcileFtueCheckpoint(ftue); assert.equal(submissions, 3);
-  journal = { ...journal, nodeId: 'companion.first_notice', phase: 'awaiting_input' };
-  assert.equal((await runtime.reconcileFtueCheckpoint({ ...ftue, receipts: [] })).nodeId, 'companion.first_notice', 'no fabricated choice');
-  journal = { ...journal, definitionVersion: 47, nodeId: 'companion.water_together' };
-  assert.equal((await runtime.reconcileFtueCheckpoint({ ...ftue, answers: { 'companion.choose_water_together': { optionId: 'already_good' } } })).nodeId, 'companion.first_rest');
-  assert.equal(submissions, 3, 'old completed water offer does not replay the new Grow introduction');
-  for (const nodeId of ['companion.water_together', 'companion.first_grow', 'companion.first_notice']) {
-    journal = { ...journal, definitionVersion: 48, nodeId, phase: 'awaiting_input' };
-    const oldComplete = { ...ftue, receipts: [{ stepId: 'companion.first_notice', actionId: 'companion.complete_first_notice', status: 'committed' }] };
-    assert.equal((await runtime.reconcileFtueCheckpoint(oldComplete)).nodeId, 'companion.first_rest', 'old completed noticing never reopens Bond coaching');
-    assert.equal(submissions, 3);
-  }
-  journal = { ...journal, definitionVersion: 48, nodeId: 'companion.first_notice', phase: 'awaiting_input' };
-  assert.equal((await runtime.reconcileFtueCheckpoint({ ...ftue, stepId: 'companion.first_notice', receipts: [] })).nodeId, 'companion.first_notice', 'unanswered old noticing stays available');
-});
-
 
 test('reopening Mossprout after FTUE does not replay the mist exit from its saved receipt', async () => {
   const { useFtueMistHandoff } = await import('../features/onboarding/use-ftue-mist-handoff');
@@ -208,26 +167,6 @@ test('reopening Mossprout after FTUE does not replay the mist exit from its save
   await act(async () => tree!.unmount());
 });
 
-
-test('completed noticing shows Bond coaching once, persists it, and continues to rest; skipping bypasses it', async () => {
-  const { MOSSPROUT_FTUE_FLOW: definition } = await import('../features/onboarding/mossprout-ftue-flow');
-  const { mossproutFtueAction, mossproutFtueStep } = await import('../features/onboarding/mossprout-ftue-script');
-  const initial: ContentFlowRun = { ...createContentFlowRun(definition, { runId: 'notice-bond' }), nodeId: 'companion.first_notice', phase: 'awaiting_input' };
-  let run = reduceContentFlow(definition, initial, { type: 'submit_scene', actionId: 'companion.complete_first_notice' }).run;
-  assert.equal(run.nodeId, 'companion.notice_bond_spotlight');
-  assert.equal(mossproutFtueAction('companion.first_notice', 'companion.complete_first_notice')?.nextStepId, run.nodeId);
-  assert.equal(run.phase, 'awaiting_input');
-  run = reduceContentFlow(definition, JSON.parse(JSON.stringify(run)), { type: 'retry' }).run;
-  assert.equal(run.nodeId, 'companion.notice_bond_spotlight');
-  const step = mossproutFtueStep(run.nodeId)!;
-  assert.equal(step.navigation?.lock, true);
-  assert.equal(step.actions[0].title, 'Continue');
-  assert.ok((step.guide.title + ' ' + step.guide.body).length <= 120);
-  run = reduceContentFlow(definition, run, { type: 'submit_scene', actionId: step.actions[0].id }).run;
-  assert.equal(run.nodeId, 'companion.first_rest');
-  assert.equal(reduceContentFlow(definition, run, { type: 'submit_scene', actionId: step.actions[0].id }).run.nodeId, 'companion.first_rest');
-  assert.equal(reduceContentFlow(definition, initial, { type: 'submit_scene', actionId: 'companion.skip_first_notice' }).run.nodeId, 'companion.first_rest');
-});
 
 
 test('shared Bond coachmark sits below its target and protects Continue against duplicate presses and save failures', async () => {

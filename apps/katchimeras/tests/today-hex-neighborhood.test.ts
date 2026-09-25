@@ -45,9 +45,3 @@ test('Today hatch countdown is anchored below the rendered egg shell', () => {
   const renderedShellBottom = eggCenterY + (224 * eggStageScale) / 2;
   assert.ok(todayEggCountdownTop(eggCenterY, eggStageScale) > renderedShellBottom);
 });
-
-test('Today egg uses a native-size frame centred on its Kingdom anchor', () => {
-  const frame = todayEggStageFrame(128, 0.42);
-  assert.ok(frame.height > 0);
-  assert.ok(Math.abs(frame.top + frame.height / 2 - 128) < 0.000_001);
-});

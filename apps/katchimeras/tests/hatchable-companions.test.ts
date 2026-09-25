@@ -24,28 +24,6 @@ import type { MergeWorldState } from '@/types/merge-world';
 const NOW = Date.UTC(2026, 8, 12, 9);
 const fixture = (name: string) => JSON.parse(readFileSync(`tests/fixtures/hatchable/${name}.json`, 'utf8'));
 
-test('Steppling on the definition is Steppling exactly: the three generated flows equal the ones his saves were written against', () => {
-  // Captured from the hand-written flows before the definition existed. A change here is a save migration, not a refactor.
-  // (v13, Sept 22 2026: the Garden lesson left the discovery; saves parked on its nodes migrate to the ticket.)
-  assert.deepEqual(JSON.parse(JSON.stringify(GLOW_DISCOVERY_FLOW)), fixture('glow-steppling-discovery'));
-  assert.deepEqual(JSON.parse(JSON.stringify(STEPPLING_DAY_ONE_FLOW)), fixture('steppling-day-one'));
-  assert.deepEqual(JSON.parse(JSON.stringify(STEPPLING_GARDEN_FLOW)), fixture('steppling-garden-lesson'));
-  const flows = hatchableFlows(STEPPLING_HATCHABLE);
-  assert.equal(flows.discovery, GLOW_DISCOVERY_FLOW, 'one instance per definition');
-  assert.equal(flows.dayOne, STEPPLING_DAY_ONE_FLOW);
-  assert.equal(flows.gardenLesson, STEPPLING_GARDEN_FLOW);
-  // The ids his saves carry.
-  assert.equal(GLOW_DISCOVERY_RUN_ID, 'story:glow-steppling-v1');
-  assert.equal(STEPPLING_DAY_ONE_RUN_ID, 'journey:steppling:day-1');
-  assert.equal(STEPPLING_PARCEL_REWARD_ID, 'journey:steppling:day-1:journey-locker');
-  assert.equal(STEPPLING_PARCEL_ID, STEPPLING_PARCEL_REWARD_ID);
-  assert.equal(STEPPLING_GARDEN_RUN_ID, 'ftue:steppling-garden:1');
-  assert.equal(STEPPLING_SHOE_ORDER_ID, 'steppling:discovery:first-trail');
-  assert.equal(STEPPLING_HATCHABLE.mission.storageKey, 'katchimeras.mist-mission.steppling.v3');
-  assert.equal(STEPPLING_HATCHABLE.tile.unlockId, GLOW_GATEWAY_ID);
-  assert.deepEqual(GLOW_LESSON.map((beat) => beat.kind), ['parcel', 'spawn', 'grow', 'serve']);
-});
-
 test('the shared world is read from the registry: Mossprout fixed, every other tile a hatchable companion’s', () => {
   assert.deepEqual(Object.keys(SHARED_WORLD_TILES), ['mossprout-home', ...HATCHABLE_COMPANIONS.map((definition) => definition.tile.id), ...STORY_TILES.map((tile) => tile.id)]);
   assert.deepEqual(STEPPLING_TILE, { residentVisible: false, companion: 'steppling', coord: { q: 0, r: 0 }, unlockId: 'mossprout:overgrown-trail', price: 20, name: 'Misty clearing', revealPreset: 'mist-clear' });

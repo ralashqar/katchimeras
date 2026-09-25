@@ -20,7 +20,8 @@ test('right after onboarding only Mossprout is home and the first island is the 
   assert.equal(progress.friends.home, 1);
   assert.equal(progress.friends.met, 1);
   assert.deepEqual(progress.friends.entries.map((friend) => friend.skinId), [...MOSSPROUT_RESIDENT_IDS], 'roster order is stable');
-  assert.equal(progress.places.total, 7);
+  // The garden, the six islands and the bundled pack islands (the Wanderling Trail, the Rush Track).
+  assert.equal(progress.places.total, 9);
   assert.equal(progress.places.restored, 1);
   assert.equal(progress.places.entries[0]?.id, 'mossprout-garden');
   const first = ISLAND_WAKE_ORDER[0]!;
@@ -43,7 +44,8 @@ test('meeting a friend moves them to helping and the next step follows the chapt
   assert.equal(progress.next.kind, 'talk');
   state = startAndServeChapter(state, campaign, 1, NOW + 2);
   progress = kingdomProgress(state);
-  assert.equal(progress.next.kind, 'talk');
+  // The campaign pivot: the next chapter opens with its battle in the Mist.
+  assert.equal(progress.next.kind, 'mist');
   assert.equal(progress.next.campaignId, campaign.campaignId);
   assert.equal(progress.places.entries.find((place) => place.id === campaign.islandId)?.status, 'growing');
 });

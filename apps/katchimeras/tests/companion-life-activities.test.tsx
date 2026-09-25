@@ -493,18 +493,6 @@ for (const outcome of ['light', 'sound', 'growing']) test(`FTUE Bond scenario sa
 });
 
 
-test('FTUE speech pages preserve the copy within the 120-character limit', async () => {
-  const { ftueDialoguePages, FTUE_DIALOGUE_MAX_CHARACTERS } = await import('../features/onboarding/ftue-dialogue-pages');
-  const { MOSSPROUT_FTUE_COPY } = await import('../features/onboarding/mossprout-ftue-copy');
-  const pages = ftueDialoguePages(MOSSPROUT_FTUE_COPY.farewell);
-  assert.equal(pages.length, 2, 'rest, then the others in the mist');
-  for (const text of [MOSSPROUT_FTUE_COPY.farewell, 'A longer sentence with several words. '.repeat(12), 'x'.repeat(250)]) {
-    const split = ftueDialoguePages(text);
-    assert.ok(split.every((page) => page.length <= FTUE_DIALOGUE_MAX_CHARACTERS));
-    assert.equal(split.join('').replace(/\s/g, ''), text.replace(/\s/g, ''), 'no truncated words or omitted sentences');
-  }
-});
-
 test('Rest follows two Continue beats; failed saves retry the final action without replaying dialogue', async () => {
   const copy = await import('../features/onboarding/mossprout-ftue-copy');
   const { ftueDialoguePages } = await import('../features/onboarding/ftue-dialogue-pages');

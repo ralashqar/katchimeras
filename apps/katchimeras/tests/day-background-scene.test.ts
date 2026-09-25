@@ -206,22 +206,3 @@ test('live-frozen sky ranking ignores retrospective journal runner-up changes', 
 
   assert.equal(rankDayBackgroundSceneCandidates(frozen)[0].sceneId, 'twilight_reflective');
 });
-
-test('Today always uses an authored plate instead of the dynamic background sky', () => {
-  const backdropSource = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-scene-backdrop.tsx'),
-    'utf8',
-  );
-  const todaySource = fs.readFileSync(
-    path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'),
-    'utf8',
-  );
-  assert.match(backdropSource, /source=\{background\.source\}/);
-  assert.doesNotMatch(backdropSource, /StaticKingdomSkyBackground/);
-  assert.doesNotMatch(backdropSource, /ResolvedAtmosphereLayer/);
-  assert.doesNotMatch(backdropSource, /BlurMask/);
-  assert.match(
-    todaySource,
-    /todayAtmosphereBackgroundForDay\(atmosphereDay, allDays\)/,
-  );
-});

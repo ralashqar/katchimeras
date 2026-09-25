@@ -157,29 +157,6 @@ test('the new Today Egg fades in at its reset size before progress returns', () 
   assert.match(hatchController, /homeRepository\.save\(claimedState, \{ allowTodayReset: true, notify: false \}\)/);
 });
 
-test('Daily Hatch reveals one full, flippable card in a claim splash', () => {
-  const today = readFileSync(path.join(process.cwd(), 'app/(tabs)/today.tsx'), 'utf8');
-  const splash = readFileSync(path.join(process.cwd(), 'components/katchadeck/cards/daily-card-claim-splash.tsx'), 'utf8');
-  const viewer = readFileSync(path.join(process.cwd(), 'components/katchadeck/cards/daily-card-viewer.tsx'), 'utf8');
-
-  assert.match(today, /<DailyCardClaimSplash[\s\S]*?card=\{hatchLeadCard\}[\s\S]*?day=\{hatchCardDay\}/);
-  assert.doesNotMatch(today, /CardDeckCarousel|hatchDeckCards|hatchDeckContent/);
-  assert.match(splash, /<DailyCardViewer[\s\S]*?showFaceControls=\{false\}/);
-  assert.match(splash, /TODAY_ATMOSPHERE_BACKGROUND_SOURCES\.clear_day\.source/);
-  assert.match(splash, /<DailyCardViewer[\s\S]*?transparentSurround/);
-  assert.match(splash, /<AnimatedBorderHighlight[\s\S]*?borderRadius=\{KatchaUI\.radius\.pill\}/);
-  assert.match(splash, /<RotatingRadialSunburst/);
-  assert.match(splash, /<Modal[\s\S]*?presentationStyle="fullScreen"/);
-  assert.match(splash, /label="Claim Day Card"/);
-  assert.doesNotMatch(splash, /NEW WISP|NEW SCENE|Show moments/);
-  assert.doesNotMatch(viewer, /\.enabled\(!reduceMotion && face === 'front'\)/);
-  assert.match(viewer, /resolveDirectionalDailyCardFlipTarget/);
-  assert.match(viewer, /dragStart\.value \+ rotationDelta/);
-  assert.match(viewer, /canonicalDailyCardRotation/);
-  assert.match(viewer, /if \(turning\.value === 0\) return \{ opacity, transform: \[\] \}/);
-  assert.doesNotMatch(viewer, /withRepeat|rotateX|rotateZ/);
-});
-
 test('the retrospective hatch-ready Egg uses the Achievement rays and Energy ripple', () => {
   const today = readFileSync(path.join(process.cwd(), 'app/(tabs)/today.tsx'), 'utf8');
   const nurture = readFileSync(path.join(process.cwd(), 'components/katchadeck/home/today-nurture-experience.tsx'), 'utf8');

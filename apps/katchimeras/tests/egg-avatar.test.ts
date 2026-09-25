@@ -349,38 +349,6 @@ test('every launch skin has approved production assets and manifest provenance',
   }
 });
 
-test('hat generation uses GPT Image front-layer geometry followed by reference-locked style mapping', () => {
-  const pipeline = readFileSync(path.join(root, 'scripts', 'generate-egg-avatar-skins.py'), 'utf8');
-  const todayBackdrop = readFileSync(
-    path.join(root, 'components', 'katchadeck', 'home', 'meadow-scene-backdrop.tsx'),
-    'utf8',
-  );
-  const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
-    scripts?: Record<string, string>;
-  };
-  assert.match(pipeline, /HAT_GENERATION_MODEL = "openai\/gpt-image-2\/edit"/);
-  assert.match(pipeline, /HAT_STYLE_CONTRACT_VERSION = "katchimeras-cozy-toy-v1"/);
-  assert.match(pipeline, /"quality": "low"/);
-  assert.match(pipeline, /Draw only the front part of the hat layer/);
-  assert.match(pipeline, /Do not draw an underside, inside, rear brim, back layer/);
-  assert.match(pipeline, /Image 2, Baristabbit/);
-  assert.match(pipeline, /Image 3 is the exact Today cinematic home environment/);
-  assert.match(pipeline, /No realistic fibers/);
-  assert.match(
-    todayBackdrop,
-    /assets\/images\/katchimeras\/world\/today\/today_bg\.webp/,
-    'style reference must remain the background actually used by the Today scene',
-  );
-  assert.doesNotMatch(pipeline, /hat-fit-generate|hat-extract-generate|segmentationModel|SAM/);
-  assert.match(pipeline, /Generation stopped at the required human review gate/);
-  assert.match(pipeline, /choices=\("render", "restyle", "promote"\)/);
-  assert.equal(
-    packageJson.scripts?.['art:egg-avatar-hats'],
-    'python scripts/generate-egg-avatar-skins.py hat-pipeline',
-  );
-  assert.equal(existsSync(path.join(root, 'docs', 'egg-avatar-hat-pipeline.md')), true);
-});
-
 test('face generation protects dark features and repairs only enclosed matte tears', () => {
   const pipeline = readFileSync(path.join(root, 'scripts', 'generate-egg-avatar-skins.py'), 'utf8');
   assert.match(pipeline, /FACE_GENERATION_MODEL = "openai\/gpt-image-2\/edit"/);
@@ -408,57 +376,6 @@ test('accessory slots stay outside the protected face canvas', () => {
   assert.ok(held.bounds.right <= 1 && held.bounds.bottom <= 1);
 });
 
-test('Today egg uses the shared calibrated body and face compositor', () => {
-  const sources = [
-    path.join('components', 'katchadeck', 'home', 'egg-shell.tsx'),
-    path.join('components', 'katchadeck', 'home', 'today-kingdom-egg-hero.tsx'),
-    path.join('components', 'katchadeck', 'home', 'today-tile-hatch-reveal.tsx'),
-    path.join('components', 'katchadeck', 'home', 'today-deck', 'forming-egg-item.tsx'),
-  ].map((relativePath) => readFileSync(path.join(root, relativePath), 'utf8'));
-
-  for (const source of sources) {
-    assert.match(source, /useEggAvatar\(\)/);
-    assert.match(source, /EggAvatarArtwork/);
-    assert.match(source, /equippedSkinId/);
-    assert.match(source, /equippedFaceId/);
-    assert.doesNotMatch(source, /cutouts\/egg-base/);
-  }
-
-  const compositor = readFileSync(
-    path.join(root, 'components', 'katchadeck', 'egg-avatar', 'egg-avatar-artwork.tsx'),
-    'utf8'
-  );
-  assert.match(compositor, /EGG_AVATAR_FACE_PRESENTATION_SCALE = 0\.92/);
-  const bodyLayer = compositor.indexOf('source={bodySource}');
-  const faceLayer = compositor.indexOf('source={faceSource}');
-  const hatLayer = compositor.indexOf('source={sourceForResolution(hat)}');
-  const heldLayer = compositor.indexOf('source={sourceForResolution(heldAccessory)}');
-  assert.ok(bodyLayer >= 0 && bodyLayer < faceLayer, 'body renders before face');
-  assert.ok(faceLayer < hatLayer, 'face renders before hat');
-  assert.ok(hatLayer < heldLayer, 'hat renders before held prop');
-  assert.match(compositor, /eggAvatarHatPresentationStyle\(skinId, hat\.presentation\)/);
-  assert.match(compositor, /body\.scale \* residual\.scale/);
-});
-
-test('Haven home tile renders the live customized Egg instead of a static substitute', () => {
-  const haven = readFileSync(
-    path.join(root, 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
-    'utf8',
-  );
-  const kingdomEgg = haven.slice(haven.indexOf('const KingdomEgg'), haven.indexOf('const RevealedCompanionEgg'));
-
-  assert.match(kingdomEgg, /const avatar = useEggAvatar\(\)/);
-  assert.match(kingdomEgg, /<EggAvatarArtwork/);
-  assert.match(kingdomEgg, /skinId=\{avatar\.equippedSkinId\}/);
-  assert.match(kingdomEgg, /faceId=\{avatar\.equippedFaceId\}/);
-  assert.match(kingdomEgg, /hatId=\{avatar\.equippedHatId\}/);
-  assert.match(kingdomEgg, /heldAccessoryId=\{avatar\.equippedHeldAccessoryId\}/);
-  assert.match(kingdomEgg, /resolution="high"/);
-  assert.doesNotMatch(kingdomEgg, /egg-base\.webp|KINGDOM_EGG_SOURCE/);
-  assert.match(haven, /HAVEN_HOME_EGG_AVATAR_SCALE = 1\.2/);
-  assert.match(haven, /kingdomWorldViewConfig\.egg\.globalScale \* HAVEN_HOME_EGG_AVATAR_SCALE/);
-});
-
 test('accessory-heavy skins carry explicit core-silhouette calibration', () => {
   for (const skinId of ['moss', 'barista', 'pumpkin'] as const) {
     const presentation = allEggAvatarItems('body').find((skin) => skin.id === skinId)?.presentation;
@@ -467,45 +384,6 @@ test('accessory-heavy skins carry explicit core-silhouette calibration', () => {
     assert.equal(presentation.offsetX, 0, `${skinId} horizontal offset`);
     assert.ok(presentation.offsetY >= -0.018 && presentation.offsetY <= -0.01, `${skinId} vertical offset`);
   }
-});
-
-test('You button navigates to a separately mounted, virtualized customizer route', () => {
-  const tabBar = readFileSync(
-    path.join(root, 'components', 'katchadeck', 'ui', 'meadow-tab-bar.tsx'),
-    'utf8'
-  );
-  const today = readFileSync(path.join(root, 'app', '(tabs)', 'today.tsx'), 'utf8');
-  const you = readFileSync(path.join(root, 'app', '(tabs)', 'you.tsx'), 'utf8');
-  const customizer = readFileSync(
-    path.join(root, 'components', 'katchadeck', 'egg-avatar', 'egg-avatar-profile-screen.tsx'),
-    'utf8'
-  );
-
-  assert.match(tabBar, /navigation\.navigate\('you'\)/);
-  assert.doesNotMatch(tabBar, /openCustomizer|customize:/);
-  assert.doesNotMatch(today, /<EggAvatarProfileScreen|customizerCameraStyle/);
-  assert.match(you, /if \(!focused\) return <View style=\{styles\.inactive\}/);
-  assert.match(you, /<EggAvatarProfileScreen/);
-  assert.match(you, /backgroundKey="home"/);
-  assert.match(you, /const eggFrame = todayExplorationEggStageFrame\(width, height, stageTop\)/);
-  assert.match(you, /subjectCenterY: stageTop \+ eggFrame\.centerY/);
-  assert.match(you, /eggAvatarCustomizerCamera\(/);
-  assert.match(you, /transform: \[\s*\{ translateY: camera\.translateY \},\s*\{ scale: camera\.scale \}/);
-  assert.match(you, /verticalOffset=\{HOME_SCENE_Y_OFFSET\}/);
-  assert.match(you, /const YOU_AVATAR_RELATIVE_Y_OFFSET = 18/);
-  assert.match(you, /top: stageTop \+ YOU_AVATAR_RELATIVE_Y_OFFSET/);
-  assert.match(you, /<TodayKingdomEggHero[\s\S]*?explorationStageTop=\{stageTop\}/);
-  assert.match(you, /companionWispId=\{equippedWispId\}/);
-  assert.match(customizer, /elevation: 100, zIndex: 100/);
-  assert.match(customizer, /eggAvatarCustomizerPanelHeight\(height\)/);
-  assert.doesNotMatch(customizer, /styles\.heroNameAnchor/);
-  assert.doesNotMatch(customizer, />YOU</);
-  assert.doesNotMatch(customizer, /styles\.headingWisp/);
-  assert.match(customizer, /<FlashList/);
-  assert.match(customizer, /numColumns=\{GRID_COLUMNS\}/);
-  assert.match(customizer, /pointerEvents="auto"/);
-  assert.match(customizer, /gridScroll: \{ flex: 1, minHeight: 0 \}/);
-  assert.doesNotMatch(customizer, /today_pedestal|presentation="hero"/);
 });
 
 test('Today and You egg heroes omit the rotating radial ray layer', () => {

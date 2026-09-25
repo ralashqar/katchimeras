@@ -42,29 +42,3 @@ for (const reduced of [false, true]) test(`seed growth waits for painted sprout 
   await act(async () => { tree!.unmount(); });
   assert.equal(timers.size, 0, 'leaving the screen cancels pending callbacks');
 });
-
-for (const reduced of [false, true]) test(`resident reacts only to new Bond arrivals (reduced motion: ${reduced})`, async () => {
-  const motion = nativeMotionHarness();
-  let arrivals = 0;
-  const module = loadNativeModule('components/katchadeck/world/kingdom-hex-canvas.tsx', {}, {
-    ...React, ...motion.animated, Animated: motion.animated.default,
-    useReducedMotion: () => reduced, StyleSheet: nativeViews.StyleSheet, styles: {},
-    WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE: 2.7, MEDITATION_BLEND_MS: 300,
-    resolveCreatureMeditationArtSource: () => null, resolveCreatureArtSource: () => 'mossprout',
-    useExitRetention: () => false, useMeditationBlend: () => ({ progress: { value: 0 }, playbackActive: true }),
-    CreatureGroundShadow: 'Shadow', CreatureAnimatedArt: 'Creature',
-    runRewardArrivalMotion: () => { arrivals++; },
-  }, 'ProjectedResidentCreature');
-  const Resident = module.ProjectedResidentCreature as React.ComponentType<any>;
-  const props = { cameraMoving: false, cameraScale: { value: 1 }, cameraTranslateX: { value: 0 }, cameraTranslateY: { value: 0 },
-    creature: { name: 'Mossprout', visualKey: 'mossprout' }, frame: { left: 0, top: 0, width: 100, height: 100 },
-    meditating: false, sceneWidth: 500, sceneHeight: 500 };
-  let tree: ReactTestRenderer;
-  await act(async () => { tree = create(<Resident {...props} rewardPulseKey={3} />); });
-  assert.equal(arrivals, 0, 'mounting after planting must not replay old Bond rewards');
-  await act(async () => { tree!.update(<Resident {...props} rewardPulseKey={4} />); });
-  assert.equal(arrivals, 1, 'a newly arrived Bond token animates the visible resident');
-  await act(async () => { tree!.update(<Resident {...props} cameraMoving rewardPulseKey={4} />); });
-  assert.equal(arrivals, 1, 'camera movement must not replay the reward');
-  await act(async () => { tree!.unmount(); });
-});

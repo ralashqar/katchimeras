@@ -77,7 +77,7 @@ test('the Kingdom opens a friend’s island on its level track, and one sheet se
   assert.match(screen, /setTrackOpen\(\{ kind: 'island', campaignId: offerCampaignId \}\)/);
   assert.match(screen, /<LevelTrackSheet /);
   assert.doesNotMatch(screen, /GroveSheet|DailyMistSheet/);
-  assert.match(screen, /isMistLevel\(focus\.mission\.id\) && cleared\?\.firstClear\) \{ void liftIslandMist/);
+  assert.match(screen, /isMistLevel\(focus\.mission\.id\) && cleared\?\.firstClear\) \{ setIslandLiftHold\(true\); void liftIslandMist/);
   // Nothing of the world's comes back over a level: the goal's guide is done when its island is tapped, and it,
   // the goal popup and shared adventures all stand down while a level or a track is up.
   assert.match(screen, /&& !islandEncounter && !trackOpen\);\s*const goalFocusStartedRef/);
@@ -89,7 +89,7 @@ test('the Kingdom opens a friend’s island on its level track, and one sheet se
   assert.match(screen, /\(islandEncounter \|\| trackOpen \? islandEncounterCamera : null\) \?\? \(mistResumeCamera/);
   // A level holds the world like every docked board (no markers, no tile taps, the camera still), and its board,
   // which draws no lesson, is free from the first move.
-  assert.match(screen, /const missionBoardDocked = [^\n]*\|\| islandEncounterActive;/);
+  assert.match(screen, /const missionBoardDocked = [^\n]*\|\| islandEncounterActive[^\n]*;/);
   assert.match(screen, /\|\| Boolean\(rushSpec\) \|\| islandEncounterActive\}/);
   assert.match(screen, /useMistMission\(\{ guided: false, [^\n]*active: islandEncounterActive/);
   // After a level or a story beat the game goes on: a chapter played as levels closes its opening conversation

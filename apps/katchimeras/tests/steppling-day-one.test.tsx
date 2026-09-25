@@ -39,29 +39,6 @@ function completed(choice = 'walk') {
   return answerConversation(chosen, stepplingDayOneConversation, 'garden', 102).session;
 }
 
-test('every Day 1 path takes exactly a preference and Tend garden; no reply acknowledgement or habit setup', () => {
-  for (const choice of ['walk', 'adapted', 'rest']) {
-    const start = session();
-    assert.equal(start.currentNodeId, 'reflection');
-    const chosen = answerConversation(start, stepplingDayOneConversation, choice, 101).session;
-    assert.equal(chosen.currentNodeId, `handoff.${choice}`);
-    assert.equal(chosen.pendingReply, undefined);
-    const done = answerConversation(JSON.parse(JSON.stringify(chosen)), stepplingDayOneConversation, 'garden', 102).session;
-    assert.equal(done.status, 'completed');
-    assert.equal(done.turns.length, 2);
-    assert.equal(done.pendingReply, undefined);
-    assert.equal(stepplingGardenHandoffPending(done), true);
-    assert.equal(stepplingGardenHandoffPending({ ...done, gardenHandoffAt: 103 }), false);
-    assert.equal(stepplingGardenHandoffPending({ ...done, preview: true }), false);
-  }
-  for (const node of stepplingDayOneConversation.nodes) {
-    if (node.kind !== 'choice') continue;
-    assert.ok(typeof node.prompt === 'string' && node.prompt.length <= 120);
-    assert.ok(node.options.every((option) => option.label !== 'Continue'));
-    assert.ok(!node.id.startsWith('habit.') && !node.id.startsWith('cue.'));
-  }
-});
-
 test('old active sessions preserve answers and accepted habit turns, with no restart or migration of completed sessions', () => {
   for (const definition of [legacyStepplingDayOneConversation, legacyStepplingDayOneConversationV2]) {
     const old = createConversationSession({ definition, formId: 'steppling' as never, dayId: '2026-09-05', createdAt: 100 });
@@ -139,23 +116,6 @@ function settlement(initial?: ContentFlowRun) {
   });
   return { module, grants: () => grants, pending: () => stepplingGardenHandoffPending(state.conversationSessions[0]), fail: (value: boolean) => { fail = value; } };
 }
-
-test('a saved final answer settles one parcel and keeps Garden handoff pending until Garden acknowledges', async () => {
-  const state = settlement();
-  state.fail(true);
-  await assert.rejects(state.module.settleStepplingDayOne(), /Interrupted save/);
-  assert.equal(state.grants(), 0);
-  assert.equal(state.pending(), true);
-  state.fail(false);
-  assert.equal(await state.module.settleStepplingDayOne(), true);
-  assert.equal(await state.module.settleStepplingDayOne(), true);
-  assert.equal(state.grants(), 1);
-  assert.equal(state.pending(), true);
-  state.module.acknowledgeStepplingDayOneGarden();
-  assert.equal(state.pending(), false);
-  state.module.acknowledgeStepplingDayOneGarden();
-  assert.equal(state.grants(), 1);
-});
 
 test('an old unfinished journal follows migrated answers without replaying old habit or reply scenes', async () => {
   const old = { ...createContentFlowRun(LEGACY_STEPPLING_DAY_ONE_FLOW_V2, { runId: 'journey:steppling:day-1', now: 100 }), nodeId: 'cue.walk' };

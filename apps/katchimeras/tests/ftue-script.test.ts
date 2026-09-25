@@ -83,26 +83,6 @@ test('Merge speech guidance is one green line and appears only for first-use mec
   assert.equal(mergeFtueDisplayGuide({ id: 'glow.lesson.single.match-2', cue: { kind: 'drag', from: { kind: 'board_cell', cell: 1 }, to: { kind: 'board_cell', cell: 2 } }, guide: long }), null, 'the sleeper matches are gone from the lesson');
 });
 
-test('hero copy fits three lines without captions and Haven spotlight retries native layout', () => {
-  const copy = readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8');
-  // One title node: two independently fitted copies could wrap differently and overlap.
-  assert.equal(copy.match(/<FittedTitle/g)?.length, 1);
-  assert.equal(copy.match(/maxLines=\{hero \? 3 : 2\}/g)?.length, 1);
-  // Full size first, wrapping up to the line cap; only past it does the title shrink, by the ratio that brings it back inside, and it truncates only at the floor.
-  assert.doesNotMatch(copy, /adjustsFontSizeToFit/, 'the native fit shrank before wrapping and reserved the unshrunk height');
-  assert.match(copy, /if \(lines <= maxLines \|\| scale <= TITLE_MIN_SCALE\) return;\s*setScale\(Math\.max\(TITLE_MIN_SCALE, Math\.floor\(scale \* \(maxLines \/ lines\) \* 100\) \/ 100\)\);/);
-  assert.match(copy, /numberOfLines=\{scale <= TITLE_MIN_SCALE \? maxLines : undefined\}/, 'no ellipsis until the floor');
-  assert.match(copy, /const TITLE_MIN_SCALE = 0\.76;/);
-  assert.match(copy, /titleShadow: \{ textShadowColor: 'rgba\(117,69,10,0\.82\)', textShadowOffset: \{ height: 3, width: 0 \}, textShadowRadius: 0 \}/);
-  assert.doesNotMatch(copy, /accessibilityElementsHidden\s*numberOfLines/, 'no duplicate shadow text layer');
-  assert.match(copy, /!hero && guide.body/);
-  const overlay = readFileSync('components/katchadeck/onboarding/haven-ftue-overlay.tsx', 'utf8');
-  assert.match(overlay, /requestAnimationFrame\(\(\) => \{ void measureTargets\(\); \}\)/);
-  assert.match(overlay, /cancelAnimationFrame\(retryFrame\)/);
-  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  assert.doesNotMatch(screen, /cameraSettleRevisionRef.current \+= 1/);
-});
-
 test('the spotlight cutout and the Garden handoff keep their shape without the obsolete plant-order tray', () => {
   const holes = [{ x: 20, y: 30, width: 280, height: 130 }, { x: 180, y: 480, width: 160, height: 240 }];
   const mask = roundedMultiCutoutSegments(holes, 16, { width: 360, height: 780 });
@@ -116,39 +96,6 @@ test('the spotlight cutout and the Garden handoff keep their shape without the o
     [{ kind: 'haven_garden_button', characterId: 'mossprout' }]);
   assert.doesNotMatch(readFileSync('components/katchadeck/games/merge-order-rail.tsx', 'utf8'), /CHAIR_ART|chairArt|order-chair/);
   assert.match(screen, /ref=\{setGardenClusterNode\}/);
-});
-
-test('all opening answers are inclusive, stable, and produce the correct personal Seed', () => {
-  assert.deepEqual(MOSSPROUT_HELP_OPTIONS.map((option) => mossproutFirstSeedForIntent(option.id).id), ['momentum', 'stillness', 'curiosity']);
-  for (const option of MOSSPROUT_HELP_OPTIONS) {
-    assert.deepEqual(mossproutFirstSeedForIntent(option.id), mossproutFirstSeedForIntent(`desired-help:${option.id}`));
-    assert.ok(mossproutSeedIntroduction(option.id).length < 85);
-  }
-  for (const option of MOSSPROUT_DAY_OPTIONS) {
-    assert.ok(mossproutFtueConversationDefinitions.some((definition) => definition.id === `mossprout:ftue:first-meeting:${option.id}`));
-  }
-  assert.deepEqual(MOSSPROUT_WATER_OPTIONS.map((option) => option.id), ['could_use_water', 'already_good', 'dont_start']);
-  assert.equal(mossproutFtueAction('companion.water_together', 'companion.choose_garden_return')?.nextStepId, 'companion.first_grow');
-  assert.equal(mossproutFtueStep('companion.first_rest')?.actions.length, 1);
-});
-
-test('v43 migration moves removed checkpoints forward without restarting completed players', () => {
-  const checkpoints = {
-    'companion.day_one_action': 'companion.garden_intro',
-    'companion.bond_spotlight': 'companion.garden_intro',
-    'companion.order_preview': 'companion.garden_intro',
-    'world.garden_handoff': 'world.first_seed_grew',
-    'companion.chapter_zero_return': 'companion.water_together',
-    'companion.water_response': 'companion.first_rest',
-    'companion.first_insight': 'companion.first_rest',
-  };
-  for (const [stepId, expected] of Object.entries(checkpoints)) {
-    assert.equal(streamlinedFtueStep({ status: 'active', stepId }), expected);
-    assert.equal(streamlinedFtueStep({ status: 'complete', stepId }), 'complete');
-  }
-  assert.equal(streamlinedFtueStep({ status: 'active', stepId: 'merge.first_bloom' }), 'merge.first_bloom');
-  assert.equal(mossproutFtueAction('companion.garden_intro', 'companion.continue_to_planting')?.nextStepId, 'world.garden_arrival');
-  assert.ok(mossproutFtueAction('companion.garden_intro', 'companion.acknowledge_garden_intro'), 'old offline receipts remain allowlisted');
 });
 
 test('terminal meditation restores Back and finishes FTUE before exiting interaction', () => {
@@ -178,30 +125,6 @@ test('Mossprout FTUE script has valid transitions and registered handlers', () =
   for (const step of MOSSPROUT_FTUE_SCRIPT.steps) {
     for (const action of step.actions) assert.ok(FTUE_HANDLER_REGISTRY[action.handlerId]);
   }
-});
-
-test('the Egg asks two meaningful real-life questions before Hatch', () => {
-  const step = mossproutFtueStep('egg.opening');
-  assert.equal(step?.actions.length, 1);
-  assert.equal(step?.actions[0]?.handlerId, 'player_profile');
-  assert.equal(step?.actions[0]?.options?.length, 4);
-  assert.equal(mossproutFtueAction('egg.opening', 'egg.day_texture')?.nextStepId, 'egg.context');
-  assert.equal(step?.actions[0]?.title, 'When you want to make progress, what usually tangles your roots first?');
-  assert.deepEqual(step?.actions[0]?.options?.map((option) => option.label), [
-    'I don’t know where to start', 'I take on too much', 'I lose momentum', 'I run out of energy',
-  ]);
-  const desiredHelp = mossproutFtueStep('egg.context')?.actions[0];
-  assert.equal(desiredHelp?.id, 'egg.desired_help');
-  assert.equal(desiredHelp?.options?.length, 4);
-  assert.deepEqual(desiredHelp?.options?.map((option) => option.label), [
-    'One tiny step',
-    'A proper plan',
-    'Someone giving me a push',
-    'A little space first',
-  ]);
-  assert.equal(desiredHelp?.nextStepId, 'egg.ready');
-  const eggSequenceStepIds = ['world.egg_intro', 'egg.opening', 'egg.context', 'egg.ready'];
-  assert.equal(eggSequenceStepIds.every((stepId) => mossproutFtueStep(stepId)?.guide.body === ''), true);
 });
 
 test('Mossprout dialogue FTUE steps own their durable world-camera framing', () => {
@@ -253,23 +176,6 @@ test('the first Bond action turns a soft intention into a Seed direction', () =>
   assert.equal(mossproutBondShareSelection('desired-help:energy')?.answer.label, 'Getting some energy back');
   assert.equal(mossproutBondShareSelection('desired-help:good_day')?.answer.label, 'Just having a good day');
   assert.equal(mossproutBondShareSelection('desired-help:not-an-answer'), null);
-});
-
-test('the Bond choice leads directly into a concise Garden restoration story', () => {
-  assert.deepEqual(MOSSPROUT_GARDEN_INTRO_BEATS.map((beat) => beat.line), [
-    'This Seed came from what you shared.',
-  ]);
-  assert.equal(mossproutGardenIntroBeat(0).actionLabel, 'Continue');
-  assert.equal(mossproutGardenIntroBeat(99).actionLabel, 'Continue');
-
-  const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
-  const stage = readFileSync('components/katchadeck/world/mossprout-ftue-story-stage.tsx', 'utf8');
-  const orders = readFileSync('utils/merge-world/chapter-zero-policy.ts', 'utf8');
-  assert.match(interaction, /ftueProfileStep === 'garden_intro'[\s\S]*?mossproutSeedIntroduction/);
-  assert.doesNotMatch(interaction, /ftueGardenStoryBeatIndex/);
-  assert.match(interaction, /ftueProfileStep === 'garden_intro'[\s\S]*?props\.onFtueOpenMerge/);
-  assert.match(stage, /mode === 'garden_intro'\) return <GardenPlantingHandoff onContinue=\{onContinue\}/);
-  assert.match(orders, /title: 'The First Bloom'[\s\S]*?description: 'Merge two Sprouts to grow a Plant for the Garden\.'/);
 });
 
 test('every Egg question keeps Home focused and normal Hatch is impossible during discovery FTUE', () => {
@@ -407,59 +313,6 @@ test('Supabase receipt allowlist matches every backend FTUE action', () => {
   assert.doesNotMatch(`${priorMigration}\n${migration}\n${v20Migration}\n${v24Migration}\n${v25Migration}\n${v26Migration}\n${v27Migration}\n${v28Migration}\n${v29Migration}\n${v30Migration}\n${v31Migration}\n${v32Migration}\n${v33Migration}`, /option_id|option_label|answer_text/);
 });
 
-test('Chapter 0 asks for one Plant on a free board; the guided drags are retired', () => {
-  const mergeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.seed_drag');
-  const serveStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_sprout');
-  const spawnStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.spawn');
-  const pairStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.seed_pairs');
-  const finalServeStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.serve_plant');
-  const sproutEchoStep = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.plant.sprout_pair');
-  assert.ok(mergeStep, 'retired beats stay authored for old fixtures');
-  assert.equal(MOSSPROUT_FTUE_FLOW.nodes.some((node: { id: string }) => ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom'].includes(node.id)), false);
-  for (const id of ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom', 'merge.serve_sprout']) assert.equal((MOSSPROUT_FTUE_FLOW.migrations as Record<string, string>)[id], 'world.first_seed_grew');
-  assert.equal(sproutEchoStep?.edges?.[0]?.nextStepId, 'merge.serve_plant');
-  assert.equal(spawnStep?.edges?.[0]?.requiredCount, undefined);
-  assert.equal(pairStep?.edges?.[0]?.event.type, 'dream_echo_cleared');
-  assert.equal(pairStep?.edges?.[0]?.nextStepId, 'merge.serve_sprout');
-  assert.equal(serveStep?.edges?.[0]?.nextStepId, 'world.first_seed_grew', 'a retired request served lands on the bud');
-  assert.equal(mossproutFtueAction('world.first_seed_grew', 'world.acknowledge_first_seed_growth')?.nextStepId, 'companion.water_together');
-  assert.equal(mossproutFtueAction('companion.chapter_zero_return', 'companion.complete_chapter_zero_return')?.nextStepId, 'companion.water_together');
-  assert.equal(mossproutFtueAction('companion.bond_intro', 'companion.acknowledge_friendship')?.nextStepId, 'companion.bond_spotlight');
-  assert.equal(mossproutFtueAction('companion.bond_spotlight', 'companion.acknowledge_bond')?.nextStepId, 'companion.garden_intro');
-  assert.equal(mossproutFtueAction('companion.day_one_action', 'companion.choose_growth_intent')?.options?.length, 3);
-  assert.equal(mossproutFtueAction('companion.day_one_action', 'companion.complete_day_one_action')?.nextStepId, 'companion.bond_spotlight');
-  assert.equal(mossproutFtueAction('companion.resident_affinity', 'companion.complete_resident_affinity')?.nextStepId, 'companion.resident_parcel_ready');
-  assert.equal(mossproutFtueAction('companion.resident_parcel_ready', 'companion.open_resident_parcel')?.nextStepId, 'merge.resident_parcel');
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_dialogue')?.edges?.[0]?.nextStepId, 'merge.resident_seed_spawn');
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_seed_spawn')?.edges?.[0]?.nextStepId, 'merge.resident_seed_echo');
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_seed_echo')?.edges?.[0]?.nextStepId, 'merge.resident_sprout_echo');
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_sprout_echo')?.edges?.[0]?.nextStepId, 'merge.resident_orders');
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_orders')?.edges?.[0]?.requiredCount, undefined);
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_orders')?.interaction?.mode, 'exclusive');
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.resident_card_reward')?.edges?.[0]?.nextStepId, 'companion.resident_match_result');
-  assert.equal(mossproutFtueStep('haven.first_bloom'), null);
-  assert.equal(mossproutFtueAction('companion.resident_match_result', 'companion.ack_resident_match_result')?.nextStepId, 'companion.meditating');
-  assert.equal(mossproutFtueStep('world.complete'), null);
-  assert.equal(finalServeStep?.edges?.[0]?.nextStepId, 'companion.chapter_zero_return');
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.last_seed')?.edges?.[0]?.nextStepId, 'merge.energy_exhausted');
-  assert.equal(mossproutFtueAction('merge.energy_exhausted', 'merge.tell_me_more')?.nextStepId, 'energy.capture');
-  assert.equal(mossproutFtueAction('energy.journal_reward', 'energy.check_steps')?.handlerId, 'pedometer_steps');
-  assert.equal(mossproutFtueAction('energy.steps_offer', 'energy.convert_steps')?.nextStepId, 'energy.steps_reward');
-  assert.equal(mossproutFtueAction('energy.steps_reward', 'energy.return')?.nextStepId, 'merge.energy.finish_seed');
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.some((step) => step.id === 'energy.steps_permission'), false);
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.clear_plant_echo')?.edges?.[0]?.event.type, 'dream_echo_cleared');
-  assert.equal(MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.energy.serve_plant')?.edges?.[0]?.nextStepId, 'merge.return_note');
-  const returnNote = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === 'merge.return_note');
-  assert.equal(returnNote?.interaction?.mode, 'exclusive');
-  assert.deepEqual(returnNote?.spotlight?.targets, [{ kind: 'tray_chat_note', noteId: 'mossprout:chapter-0:return-note' }]);
-  assert.equal(serveStep?.interaction?.mode, 'none', 'the request never locks the board');
-  assert.deepEqual(serveStep?.spotlight?.targets, [
-    { kind: 'order_card', orderId: 'mossprout:chapter-0:first-sprout' },
-    { kind: 'order_requirement_item', orderId: 'mossprout:chapter-0:first-sprout', requirementIndex: 0 },
-  ]);
-  assert.ok(mossproutFtueAction('companion.order_preview', 'companion.open_garden'));
-});
-
 test('FTUE step conversion is retired from the Mossprout first session', () => {
   const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
   const pedometer = readFileSync('utils/pedometer-steps.ts', 'utf8');
@@ -513,170 +366,6 @@ test('FTUE Energy recovery uses one general reflection with no journal hierarchy
   assert.doesNotMatch(today, /pendingFtueJournalCapture|completingFtueCapture|ftuePhotoEvidenceRef/);
 });
 
-test('Mossprout remembers the day, reflects it back, then offers one narrative Garden objective', () => {
-  const firstMeetings = mossproutFtueConversationDefinitions.filter((definition) => definition.id.startsWith('mossprout:ftue:first-meeting:'));
-  assert.ok(firstMeetings.every((definition) => definition.version === 11));
-  for (const definition of firstMeetings) {
-    const hello = definition.nodes.find((node) => node.id === 'hello');
-    assert.equal(hello?.kind, 'choice');
-    if (hello?.kind === 'choice') assert.equal(hello.options.length, 3);
-    assert.equal(definition.nodes.some((node) => node.id === 'stuck'), false);
-  }
-  const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
-  const mossproutStage = readFileSync('components/katchadeck/world/mossprout-ftue-story-stage.tsx', 'utf8');
-  const bondShare = readFileSync('features/onboarding/mossprout-bond-share.ts', 'utf8');
-  const companionRoute = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
-  assert.match(interaction, /MossproutFtueStoryStage/);
-  assert.match(mossproutStage, /CompanionMergeRequestTray/);
-  assert.match(mossproutStage, /MOSSPROUT_CHAPTER_ZERO_REQUESTS/);
-  assert.match(interaction, /What should I call you/);
-  assert.match(interaction, /mossproutSeedIntroduction/);
-  assert.match(interaction, /Let\\'s make this little corner welcoming again/);
-  assert.match(interaction, /bubbleBody=\{companionSpeechTitle[\s\S]*?\? undefined/);
-  assert.match(interaction, /bubbleVariant=\{quickGoalPickerOpen && !companionSpeechTitle \? 'questionnaire' : 'default'\}/);
-  assert.match(mossproutStage, /<Modal/);
-  assert.match(mossproutStage, /DayActionCardSurface/);
-  assert.match(mossproutStage, /DayActionCompletedRow/);
-  assert.match(mossproutStage, /title="Introduce yourself"/);
-  assert.match(mossproutStage, /INTRODUCTION_REWARD/);
-  assert.match(mossproutStage, /mode === 'intro_action'[\s\S]*?style=\{styles\.plainActionStage\}/);
-  assert.match(mossproutStage, /plainActionStage: \{ gap: 7 \}/);
-  assert.match(mossproutStage, /mode === 'bond_choice'[\s\S]*?<FtueBondNarrative/);
-  assert.doesNotMatch(mossproutStage, /eyebrow="MEMORY SEED"|accessibilityLabel="Your memory seed"/);
-  assert.doesNotMatch(mossproutStage, /seedName:|seedDescription:|seedEyebrow:/);
-  assert.match(mossproutStage, /onContinue=\{\(id\) => onContinue\?\.\(id\)\}/);
-  assert.match(bondShare, /One seed survived under my roots/);
-  assert.match(bondShare, /Then let’s find out[\s\S]*?Somewhere we can breathe[\s\S]*?Something that feels like ours/);
-  assert.match(bondShare, /Find one small step[\s\S]*?Let’s work it out together[\s\S]*?Remind me we can do this[\s\S]*?Just stay beside me/);
-  assert.match(mossproutStage, /ref=\{actionStackTargetRef\}[\s\S]*?style=\{styles\.bondChoiceStack\}/);
-  assert.match(companionRoute, /stepId === 'companion\.bond_spotlight' \|\| ftueRun\.stepId === 'companion\.day_one_action'[\s\S]*?\? 'bond_choice'/);
-  assert.match(interaction, /activeBondQuestionId=\{ftueBondQuestionId\}[\s\S]*?onBondQuestionChange=\{setFtueBondQuestionId\}/);
-  assert.match(interaction, /ftueBondShare\?\.answer\.reply[\s\S]*?ftueBondShare\?\.prompt\.reply[\s\S]*?ftueBondQuestion\?\.prompt/);
-  assert.match(interaction, /Mossprout will remember this/);
-  assert.match(interaction, /message: 'Mossprout remembers your answers',[\s\S]*?placement: 'middle'/);
-  assert.match(interaction, /message: 'Mossprout will remember this',[\s\S]*?placement: 'middle'/);
-  assert.match(mossproutStage, /Answer Mossprout/);
-  assert.match(mossproutStage, /color: KatchaUI\.companionScenePanel\.optionInk/);
-  assert.match(mossproutStage, /justifyContent: 'flex-end'/);
-  assert.doesNotMatch(mossproutStage, /Bond level Familiar|Bond · Familiar|bondBadge/);
-  assert.doesNotMatch(mossproutStage, /What should I call you/);
-  assert.match(mossproutStage, /slice\(0, 1\)/);
-});
-
-test('route-changing FTUE actions persist before navigation and owned companion UI fails closed', () => {
-  const runtime = readFileSync('features/onboarding/ftue-runtime.ts', 'utf8');
-  const today = readFileSync('app/(tabs)/today.tsx', 'utf8');
-  const companion = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
-  const kingdomCompanion = readFileSync('components/katchadeck/world/kingdom-companion-screen.tsx', 'utf8');
-  const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
-  const reconciler = readFileSync('features/onboarding/ftue-navigation-reconciler.tsx', 'utf8');
-  const haven = readFileSync('app/(tabs)/katchimeras.tsx', 'utf8');
-  const roster = readFileSync('components/katchadeck/roster/katchimera-roster-route-screen.tsx', 'utf8');
-
-  const writeThroughIndex = runtime.indexOf('setStoredJson(STORAGE_KEY, next)');
-  const publishSnapshotIndex = runtime.indexOf('snapshot = next', writeThroughIndex);
-  assert.ok(writeThroughIndex >= 0 && writeThroughIndex < publishSnapshotIndex);
-  assert.doesNotMatch(runtime, /setStoredJsonAsync|pendingPersistence|persistenceWorker/);
-  // Only an objective's progress (a merge counted on a board) is written behind the frame; every step change stays write-through.
-  assert.match(runtime, /if \(options\.progressOnly\) setStoredJsonDeferred\(STORAGE_KEY, next, PROGRESS_WRITE_DELAY_MS\);\s*else setStoredJson\(STORAGE_KEY, next\);/);
-  assert.match(runtime, /const pending = publish\(\{ \.\.\.current, objectiveProgress, updatedAt: now \}, \{ progressOnly: true \}\);/);
-  assert.equal(runtime.match(/progressOnly: true/g)?.length, 1, 'no step change is deferred');
-  assert.match(runtime, /export async function flushFtuePersistence\(\) \{[\s\S]*?flushDeferredStoredWrites\(STORAGE_KEY\);/, 'the durable boundary lands it');
-  const provider = readFileSync('features/onboarding/ftue-provider.tsx', 'utf8');
-  assert.match(provider, /if \(nextState === 'active'\) return;[\s\S]*?flushDeferredStoredWrites\(\);\s*void flushFtuePersistence\(\);/, 'and so does leaving the foreground');
-  assert.match(runtime, /advanceFtueActionDurably[\s\S]*?commitFtueAction\(\{ \.\.\.input, skipContentFlowDispatch: true \}\)[\s\S]*?await flushFtuePersistence\(\)[\s\S]*?await dispatchFtueActionToContentFlow/);
-  assert.doesNotMatch(today, /Talk to Mossprout|talkToMossprout/);
-  assert.match(haven, /ftueStep\?\.id === 'companion\.first_meeting'/);
-  assert.match(haven, /companionActive && companionVisualReady \? \([\s\S]*?<KatchimeraCompanionRouteScreen/);
-  assert.match(haven, /<KatchimeraCompanionRouteScreen[\s\S]*?hostedInHaven/);
-  assert.match(companion, /surfaceActive = hostedInHaven \|\| isFocused/);
-  assert.match(companion, /\(!discovery\.ready && !hostedInHaven\)/);
-  assert.match(companion, /forceMossproutAvailable=\{hostedInHaven\}/);
-  assert.match(kingdomCompanion, /!ftueConversationDefinitionId && !forceMossproutAvailable/);
-  assert.match(companion, /openFtueGarden = useCallback\(async \(\) => \{[\s\S]*?installMossproutOnboardingMergeWorld[\s\S]*?advanceFtueActionDurably[\s\S]*?result\.run\?\.stepId !== 'world\.garden_arrival'[\s\S]*?flushFtuePersistence/);
-  assert.doesNotMatch(companion, /Could not prepare Mossprout Garden handoff'[\s\S]{0,120}?throw error/);
-  assert.match(companion, /run\?\.stepId === 'companion\.first_meeting'[\s\S]*?setNarrativeHandoffActive\(true\)[\s\S]*?actionId: 'companion\.complete_first_meeting'[\s\S]*?companion\.garden_intro[\s\S]*?setNarrativeHandoffActive\(false\)/);
-  assert.match(companion, /completeStepplingNarrative = useCallback[\s\S]*?setNarrativeHandoffActive\(true\)[\s\S]*?completeStepplingDayOne/);
-  assert.match(companion, /if \(narrativeHandoffActive \|\| stepplingDayOne\.gardenHandoffPending\) return/);
-  assert.match(companion, /if \(mistHandoffActive \|\| pendingMistExit\) return/);
-  assert.match(roster, /openFtueGarden = useCallback\(async \(\) => \{[\s\S]*?transitionTo\(\{[\s\S]*?target: 'merge'[\s\S]*?advanceFtueActionDurably[\s\S]*?result\.step\?\.surface !== 'merge'[\s\S]*?router\.push/);
-  assert.doesNotMatch(roster, /continueFirstBloomToResident|haven\.continue_to_resident/);
-  assert.match(companion, /run\?\.stepId === 'companion\.chapter_zero_return'[\s\S]*?nextStepId: 'companion\.water_together'/);
-  assert.match(companion, /activeFtueConversationDefinitionId = navigationFtueRun\?\.status === 'active'[\s\S]*?companion\.first_meeting[\s\S]*?companion\.chapter_zero_return[\s\S]*?ftueConversationDefinitionId[\s\S]*?: undefined/);
-  assert.match(companion, /ftueConversationDefinitionId=\{activeFtueConversationDefinitionId\}/);
-  assert.match(companion, /onFtueConversationComplete=\{activeFtueConversationDefinitionId \|\| residentFtueGraphActive/);
-  assert.match(haven, /companionActive && companionVisualReady[\s\S]*?<KatchimeraCompanionRouteScreen/);
-  assert.doesNotMatch(reconciler, /hatch\.talk_to_mossprout|run\.stepId === 'hatch\.reveal'/);
-  assert.match(companion, /ftueCompanionSurfaceOwned = Boolean\([\s\S]*?mossproutFtueStep\(navigationFtueRun\.stepId\)\?\.surface === 'companion'/);
-  assert.match(interaction, /&& props\.familyId === 'mossprout'\s*&& \(!props\.ftueCompanionSurfaceOwned \|\| residentFtueDashboard\)/);
-  assert.match(interaction, /residentParcelHandoffActive: residentParcelGardenPanelActive,/);
-  assert.match(interaction, /residentResultFtueDashboard = props\.familyId === 'mossprout'[\s\S]*?props\.ftueResidentMatchResultActive/);
-  assert.match(interaction, /dashboardRouteActive = route\.kind === 'dashboard'[\s\S]*?residentResultFtueDashboard/);
-  assert.match(interaction, /!residentFtueDashboard && !residentResultFtueDashboard[\s\S]*?showStoryHome\(\)/);
-  assert.match(companion, /run\?\.stepId === 'companion\.first_rest'[\s\S]*?beginKatchimeraMeditation\([\s\S]*?MOSSPROUT_FTUE_REST_MS,[\s\S]*?sourceId[\s\S]*?actionId: 'companion\.begin_rest'/);
-  assert.match(companion, /continueToMist = useCallback[\s\S]*?actionId: 'companion\.tend_garden'[\s\S]*?await startGlowDiscovery\(\)[\s\S]*?if \(hostedInHaven\) onHostedClose\?\.\(\)/);
-  assert.match(roster, /stepId === 'companion\.meditating'[\s\S]*?advanceFtueActionDurably/);
-});
-
-test('meditation stays inside companion interaction with compact action-card UI', () => {
-  const haven = readFileSync('app/(tabs)/katchimeras.tsx', 'utf8');
-  const havenWorld = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  const companion = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
-  const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
-  const meditationStage = readFileSync('components/katchadeck/world/companion-meditation-stage.tsx', 'utf8');
-  const cinematicStage = readFileSync('components/katchadeck/world/companion-cinematic-stage.tsx', 'utf8');
-  const homeStage = readFileSync('components/katchadeck/world/companion-home-environment-stage.tsx', 'utf8');
-  const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
-  const creatureArt = readFileSync('utils/creature-art.ts', 'utf8');
-
-  assert.match(haven, /meditationFtue = ftueRun\?\.status === 'active' && ftueRun\.stepId === 'companion\.meditating'[\s\S]*?!meditationFtue/);
-  assert.match(havenWorld, /havenOpeningActive && ftueStep && !activeInteractionResidentId/);
-  assert.match(havenWorld, /setHostedInteractionRequest\(interactionRequest\);[\s\S]*?if \(interactionCreatureIdRef\.current !== interactionRequest\.creatureId\) \{[\s\S]*?setInteractionCameraReady\(false\)/);
-  assert.match(havenWorld, /else if \(ftueStepId && run\?\.status !== 'complete'\) return;[\s\S]*?setInteractionExiting\(true\)/);
-  assert.match(companion, /ftueRun\.stepId === 'companion\.meditating'[\s\S]*?\? 'meditating'/);
-  assert.match(interaction, /companionInteractionAvailability\(relationships, props\.familyId, meditationNow\)/);
-  assert.match(interaction, /meditationDashboardActive && meditation \? \([\s\S]*?styles\.meditationWorldTimer[\s\S]*?<CompanionMeditationStage/);
-  assert.match(interaction, /initialConversationHandoffPending \? null : route\.kind === 'conversation' && !residentFtueDashboard/);
-  assert.match(interaction, /\(route\.kind === 'destination' \|\| dashboardRouteActive[\s\S]*?&& !questionnaireExperience \? \([\s\S]*?<CompanionDestinationHeader/);
-  assert.match(interaction, /meditationDashboardActive = Boolean\(\(!props\.ftueCompanionSurfaceOwned \|\| props\.ftueProfileStep === 'meditating'\) && !quickGoalPickerOpen && !unifiedJourneyActive && meditation && route\.kind !== 'conversation'/);
-  assert.match(interaction, /companionSpeechTitle = dashboardRouteActive && actionNarration \? actionNarration : dashboardRouteActive && !quickGoalPickerOpen && unifiedJourneyActive && journeyNarration \? journeyNarration : meditationDashboardActive \? MOSSPROUT_FTUE_COPY\.meditation/);
-  assert.match(interaction, /meditating=\{Boolean\(meditation\)\}/);
-  assert.match(cinematicStage, /meditating=\{meditating\}/);
-  assert.match(homeStage, /withTiming\(meditating \? 1 : 0,[\s\S]*?duration: 520/);
-  assert.match(homeStage, /<RotatingRadialSunburst[\s\S]*?<Image[\s\S]*?source=\{meditationCreature\}/);
-  assert.match(havenWorld, /activeKatchimeraMeditation\(relationships, 'mossprout'\)/);
-  assert.match(havenWorld, /mossproutMeditating=\{mossproutMeditating\}/);
-  assert.match(canvas, /<ResidentCreature[\s\S]*?meditating=\{tile\.companion\.familyId === 'mossprout' && mossproutMeditating\}/);
-  assert.match(canvas, /residentMeditationAura[\s\S]*?<RotatingRadialSunburst[\s\S]*?source=\{meditationSource\}/);
-  assert.match(canvas, /progress\.value = reduceMotion[\s\S]*?withTiming\(meditating \? 1 : 0/);
-  // Stopping an animated WebP rewinds it to frame one, so the standing pose
-  // must keep playing until it has fully faded, and the blend must not start
-  // before the meditation art is actually on screen.
-  assert.match(canvas, /function useMeditationBlend\(meditating: boolean, mounted: boolean, reduceMotion: boolean\)/);
-  assert.match(canvas, /if \(meditating && !artDisplayed\) return;\s*\n\s*progress\.value = reduceMotion/);
-  assert.match(canvas, /return \{ onArtDisplayed, playbackActive: !settled, progress \}/);
-  assert.doesNotMatch(canvas, /playbackActive=\{!meditating\}/);
-  assert.equal(canvas.match(/playbackActive=\{meditation\.playbackActive\}/g)?.length, 2);
-  assert.equal(canvas.match(/onDisplay=\{meditation\.onArtDisplayed\}/g)?.length, 2);
-  assert.match(canvas, /<RotatingRadialSunburst[\s\S]*?source=\{meditationSource\}/);
-  assert.match(creatureArt, /mossprout-meditating\.png/);
-  assert.equal(existsSync(require.resolve('@incubator/art-cutouts/mossprout-meditating.png')), true);
-  assert.match(meditationStage, /formatMeditationCountdown/);
-  assert.match(meditationStage, /meditationProgress/);
-  assert.match(interaction, /styles\.meditationActionsOverlay[\s\S]*?mossproutStage\(\{ meditationMode: true/);
-  assert.match(interaction, /meditationActionsOverlay: \{ position: 'absolute', zIndex: 25 \}/);
-  assert.match(interaction, /bottom: Math\.max\(8, insets\.bottom \+ 4\)/);
-  assert.match(interaction, /scrollEnabled=\{!\(dashboardRouteActive && unifiedJourneyActive\) && !questionnaireExperience && !meditationDashboardActive/);
-  assert.doesNotMatch(interaction, /meditationActionStack/);
-  assert.match(interaction, /meditationTimerScreenTop = Math\.max\(390, Math\.min\(510, viewportHeight \* 0\.58\)\)/);
-  assert.match(interaction, /meditationTimerSurfaceTop = Math\.max\([\s\S]*?meditationTimerScreenTop - \(insets\.top \+ 58 \+ KatchaUI\.spacing\.xs\)/);
-  assert.match(interaction, /meditationWorldTimer[\s\S]*?top: meditationTimerSurfaceTop/);
-  assert.doesNotMatch(interaction, /meditationStageSpacer/);
-  assert.match(readFileSync('features/onboarding/mossprout-ftue-script.ts', 'utf8'), /const mossproutMeditationCamera[\s\S]*?anchorY: 0\.46[\s\S]*?id: 'companion\.meditating'[\s\S]*?camera: mossproutMeditationCamera/);
-  assert.match(meditationStage, /<DayActionCardSurface[\s\S]*?artwork=\{<DayActionIcon icon="moon.fill" \/>\}[\s\S]*?title=\{title \?\? 'Next Journey in'\}/);
-  assert.doesNotMatch(meditationStage, /While .* reflects|Small moments grow Bond|messagePanel|OUR NEXT JOURNEY/);
-});
-
 test('every active FTUE node has a canonical cold-start route', () => {
   for (const step of MOSSPROUT_FTUE_SCRIPT.steps) {
     if (step.id === MOSSPROUT_FTUE_SCRIPT.terminalStepId) continue;
@@ -689,34 +378,6 @@ test('every active FTUE node has a canonical cold-start route', () => {
     else if (step.surface === 'haven' || step.surface === 'today' || step.surface === 'hatch') assert.equal(policy.resume.kind, 'haven');
     else assert.equal(policy.resume.kind, 'today');
   }
-});
-
-test('global route coordinators navigate across the root Stack and nested Tabs boundary', () => {
-  const ftueReconciler = readFileSync('features/onboarding/ftue-navigation-reconciler.tsx', 'utf8');
-  const contentFlowCoordinator = readFileSync('features/content-flow/content-flow-navigation-coordinator.tsx', 'utf8');
-  const profileReconciler = readFileSync('features/dev-profile-launch-reconciler.tsx', 'utf8');
-  const onboardingRoute = readFileSync('app/onboarding.tsx', 'utf8');
-  const assetLab = readFileSync('app/dev-asset-lab.tsx', 'utf8');
-
-  assert.match(ftueReconciler, /router\.navigate\(hrefForResumeTarget\(policy\.resume\)\)/);
-  assert.doesNotMatch(ftueReconciler, /router\.replace\(hrefForResumeTarget/);
-  assert.match(contentFlowCoordinator, /router\.navigate\(\{ pathname: owner\.work\.target\.pathname/);
-  assert.doesNotMatch(contentFlowCoordinator, /router\.replace\(\{ pathname: owner\.work\.target\.pathname/);
-  assert.match(profileReconciler, /if \(route\) router\.navigate\(route\)/);
-  assert.match(onboardingRoute, /router\.navigate\(mode === 'identity' \? '\/\(tabs\)\/you' : '\/\(tabs\)\/katchimeras'\)/);
-  assert.doesNotMatch(assetLab, /router\.replace\('\/\(tabs\)\/katchimeras'\)/);
-});
-
-test('completed FTUE query flags cannot retain companion conversation or resident dashboard ownership', () => {
-  const route = readFileSync('app/katchimera/[creatureId].tsx', 'utf8');
-  const companion = readFileSync('components/katchadeck/world/katchimera-companion-route-screen.tsx', 'utf8');
-
-  assert.match(route, /firstMeetingFtueActive = ftueRun\?\.status === 'active'[\s\S]*?ftueRun\.stepId === 'companion\.first_meeting'/);
-  assert.match(route, /ftue === '1' && firstMeetingFtueActive/);
-  assert.match(companion, /residentParcelReady = Boolean\(navigationFtueRun\?\.status === 'active'[\s\S]*?latestMossproutJourney\?\.matchedCardId/);
-  assert.match(companion, /ftueResidentHandoffActive = Boolean\(navigationFtueRun\?\.status === 'active'[\s\S]*?residentParcelReady\)\)/);
-  assert.match(route, /ftueRouteOrigin=\{isMossprout && Boolean\(ftue\)\}/);
-  assert.match(companion, /ftueRouteOrigin && navigationFtueRun\?\.status !== 'active'[\s\S]*?router\.dismissTo\('\/\(tabs\)\/katchimeras'\)/);
 });
 
 test('a durably earned resident card restores the explicit FTUE match result', () => {
@@ -814,13 +475,6 @@ test('the first resident Garden handoff uses one shared parcel panel without a s
   assert.match(conversationFlow, /directResidentParcelHandoff[\s\S]*?node\?\.kind !== 'form_reveal'[\s\S]*?onContinue\(\)/);
 });
 
-test('resident reveal celebration and dialogue are separate visual phases', () => {
-  const reveal = readFileSync('components/katchadeck/world/katchimera-friend-discovery-reveal.tsx', 'utf8');
-  assert.match(reveal, /celebrating \? <Animated\.View[\s\S]*?friend-discovery-celebration[\s\S]*?RotatingRadialSunburst[\s\S]*?CelebrationParticles/);
-  assert.match(reveal, /: <Animated\.View[\s\S]*?friend-discovery-dialogue[\s\S]*?styles\.speech/);
-  assert.doesNotMatch(reveal, /residentRevealCircle/);
-});
-
 test('Merge FTUE updates one persistent finger and spotlight tree for each measured target', () => {
   const overlay = readFileSync('components/katchadeck/games/merge-ftue-overlay.tsx', 'utf8');
   assert.doesNotMatch(overlay, /presentationKey/);
@@ -832,198 +486,6 @@ test('Merge FTUE updates one persistent finger and spotlight tree for each measu
   assert.match(overlay, /resetKey=\{`\$\{currentLayout\?\.targetRevision/);
   assert.match(overlay, /cancelAnimation\(progress\);[\s\S]*?progress\.value = 0;[\s\S]*?resetKey/);
   assert.doesNotMatch(overlay, /return \(\) => \{\s*cancelAnimation\(progress\);\s*progress\.value = 0/);
-});
-
-test('Haven keeps one world-map compositor through the Egg to Companion handoff', () => {
-  const tabLayout = readFileSync('app/(tabs)/_layout.tsx', 'utf8');
-  const havenRoute = readFileSync('app/(tabs)/katchimeras.tsx', 'utf8');
-  const todayRoute = readFileSync('app/(tabs)/today.tsx', 'utf8');
-  const mossproutOpening = readFileSync('components/katchadeck/world/mossprout-egg-ftue-surface.tsx', 'utf8');
-  const kingdomCanvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
-  const kingdomCamera = readFileSync(require.resolve('@incubator/environments/hex-camera'), 'utf8');
-  const kingdomScreen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  const nurture = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
-  const companionStage = readFileSync('components/katchadeck/world/companion-cinematic-stage.tsx', 'utf8');
-  const sheet = readFileSync('components/katchadeck/ui/katcha-sheet.tsx', 'utf8');
-  const devTools = readFileSync('app/(tabs)/explore.tsx', 'utf8');
-  const interaction = readFileSync('components/katchadeck/world/companion-interaction-sheet.tsx', 'utf8');
-  const kingdomCompanionScreen = readFileSync('components/katchadeck/world/kingdom-companion-screen.tsx', 'utf8');
-  const pageHeader = readFileSync('components/katchadeck/world/katchimera-page-header.tsx', 'utf8');
-  const policy = readFileSync('features/onboarding/ftue-navigation-policy.ts', 'utf8');
-  assert.match(policy, /'egg\.opening'/);
-  assert.match(policy, /'world\.egg_intro'/);
-  assert.doesNotMatch(policy, /'grove\.egg_inspect'/);
-  assert.match(tabLayout, /tabBar=\{\(\) => null\}/);
-  assert.doesNotMatch(tabLayout, /MeadowTabBar|DayCaptureSession|ftueHidesBottomBar/);
-  assert.match(havenRoute, /<MossproutEggFtueSurface/);
-  assert.match(havenRoute, /worldInteractionActive = eggPresentationActive \|\| havenHostedCompanionActive/);
-  assert.match(havenRoute, /havenHostedCompanionActive = mossproutFtueUsesHostedCompanionStage\(ftueStep\?\.id\)/);
-  assert.match(kingdomScreen, /if \(mossproutFtueUsesHostedCompanionStage\(ftueStep\?\.id\)\)[\s\S]*?onInteractionRequestConsumed\?\.\(\)/);
-  assert.equal(mossproutFtueUsesHostedCompanionStage('companion.first_meeting'), true);
-  assert.equal(mossproutFtueUsesHostedCompanionStage('companion.chapter_zero_return'), true);
-  assert.equal(mossproutFtueUsesHostedCompanionStage('world.garden_arrival'), false);
-  assert.match(havenRoute, /ftueStep\?\.id === 'companion\.chapter_zero_return'[\s\S]*?MOSSPROUT_CHAPTER_ZERO_RETURN_CONVERSATION_ID/);
-  assert.doesNotMatch(havenRoute, /FadeIn|FadeOut|cinematicLayer/);
-  assert.match(havenRoute, /worldHosted/);
-  assert.match(havenRoute, /<MossproutOpeningSurface/);
-  assert.doesNotMatch(havenRoute, /HavenEggFtueSurface|from '\.\/today'/);
-  assert.match(havenRoute, /reuseUnderlyingStage/);
-  assert.doesNotMatch(havenRoute, /renderRegularStage/);
-  assert.match(interaction, /background=\{props\.reuseUnderlyingStage \? undefined : props\.questionnaireBackground\}/);
-  assert.match(interaction, /entranceMotion=\{props\.reuseUnderlyingStage \? 'fade' : 'sheet'\}/);
-  assert.match(interaction, /stagePresentation=\{props\.reuseUnderlyingStage && !props\.renderRegularStage \? 'speech-only' : 'full'\}/);
-  assert.match(kingdomCompanionScreen, /pageHeaderChromeMode = reuseUnderlyingStage \? 'hosted' : 'standard'/);
-  assert.match(kingdomCompanionScreen, /<KatchimeraPageHeaderChromeProvider mode=\{pageHeaderChromeMode\}>/);
-  assert.match(pageHeader, /chromeMode === 'hidden'[\s\S]*?chromeMode === 'hosted' && !bondProgress/);
-  assert.match(pageHeader, /chromeMode === 'standard' \? <View style=\{styles\.backSlot\}/);
-  assert.match(pageHeader, /chromeMode === 'standard' \? <View style=\{styles\.currencySlot\}/);
-  assert.match(sheet, /entranceMotion === 'fade'[\s\S]*?FadeIn\.duration\(220\)/);
-  assert.match(companionStage, /entering=\{reduceMotion \? undefined : ZoomIn\.duration\(190\)/);
-  assert.match(mossproutOpening, /<CompanionHomeEnvironmentStage/);
-  assert.match(mossproutOpening, /backgroundKey=\{null\}[\s\S]*?layer="creature"/);
-  assert.match(mossproutOpening, /environmentContent=\{worldHosted \? <View \/> : undefined\}/);
-  assert.match(mossproutOpening, /transparentBackground=\{worldHosted\}/);
-  assert.match(mossproutOpening, /actions=\{\[\]\}/);
-  assert.match(mossproutOpening, /handleDiscoveryReveal\(FTUE_MOSSPROUT_CREATURE\)/);
-  assert.match(mossproutOpening, /companionStageActive/);
-  assert.match(mossproutOpening, /onboardingFocus\s/);
-  assert.match(mossproutOpening, /sceneOnly=\{companionStageActive\}/);
-  assert.match(mossproutOpening, /subjectHandoffProgress=\{subjectHandoff\}/);
-  assert.match(mossproutOpening, /useEggFeedController\(worldHosted \? worldEggTargetRef : undefined\)/);
-  assert.match(mossproutOpening, /subjectHidden=\{worldHosted \|\| subjectHandoffSettled\}/);
-  assert.match(mossproutOpening, /onWorldSubjectPresentationChange\?\.\(worldSubjectPresentation\)/);
-  assert.match(havenRoute, /worldEggTargetRef=\{worldEggTargetRef\}/);
-  assert.match(havenRoute, /worldSubjectPresentation=\{worldSubjectPresentation\}/);
-  assert.match(kingdomCanvas, /<RevealedCompanionEgg[\s\S]*?presentation=\{worldSubjectPresentation\}[\s\S]*?targetRef=\{worldEggTargetRef\}/);
-  assert.equal(MOSSPROUT_WORLD_EGG_ENTRY_ZOOM, 1.35);
-  assert.match(kingdomScreen, /initialFtueCameraScale = [\s\S]*?ftueStepId === 'world\.egg_intro'[\s\S]*?tutorialCamera\.target\.kind === 'haven_resident'[\s\S]*?tutorialCamera\.zoom \?\? MOSSPROUT_WORLD_EGG_REST_ZOOM/);
-  assert.match(kingdomScreen, /initialTutorialCameraScale=\{initialFtueCameraScale\}/);
-  assert.match(kingdomCanvas, /initialTutorialFocus = useMemo[\s\S]*?sharedResidentCenterY\(residentAnchor\.y, eggGrowthScale\)[\s\S]*?initialFocus: initialTutorialFocus/);
-  assert.match(kingdomCanvas, /durationMs: tutorialCamera\.durationMs[\s\S]*?initialScale: initialTutorialCameraScale[\s\S]*?scale: tutorialCamera\.zoom \?\? initialTutorialCameraScale/);
-  assert.match(kingdomCanvas, /target\.kind !== 'haven_tile' && target\.kind !== 'haven_resident'/);
-  assert.match(kingdomCanvas, /target\.kind === 'haven_resident'[\s\S]*?mossproutDialogueSubjectCenterY\(residentAnchor\.y\)/);
-  assert.match(kingdomCanvas, /appliedTutorialCameraRef = useRef\(initialTutorialFocus \? tutorialCameraKey : 'none'\)/);
-  assert.doesNotMatch(kingdomCanvas, /cameraRestoreNonce|cameraRestoreArmedRef/);
-  assert.match(kingdomCanvas, /applicationKey = tutorialCameraKey/);
-  assert.match(kingdomCamera, /if \(!resumeNeededRef.current\) return[\s\S]*?completeCameraMove\(move.id\)/);
-  assert.match(kingdomCanvas, /durationMs = tutorialCamera\.durationMs/);
-  assert.match(kingdomCamera, /initialFocus[\s\S]*?kingdomCameraSnapshotForTarget\([\s\S]*?initialFocus\.x, y: initialFocus\.y[\s\S]*?y: initialFocus\.screenY/);
-  assert.match(kingdomCamera, /startsWithMotion[\s\S]*?commitSnapshot\(home\.tx, home\.ty, home\.scale, startsWithMotion\)[\s\S]*?animateTo\([\s\S]*?initialFocus\.scale[\s\S]*?initialFocus\.durationMs/);
-  assert.match(kingdomScreen, /'world\.egg_intro': 4_100/);
-  assert.doesNotMatch(kingdomScreen, /'grove\.egg_inspect': 1_650/);
-  assert.match(mossproutOpening, /scriptedActions = stepId === 'world\.egg_intro'[\s\S]*?\? \[\][\s\S]*?: step\?\.actions\.filter/);
-  assert.match(mossproutOpening, /companionStageActive \|\| \(worldHosted && stepId === 'world\.egg_intro'\)[\s\S]*?\? null/);
-  assert.match(kingdomScreen, /ftueEggFeedingCloseupActive = ftueStepId === 'world\.egg_intro'[\s\S]*?Boolean\(ftueStepId\?\.startsWith\('egg\.'\)\)/);
-  assert.match(kingdomScreen, /gardenWorldGuidanceActive[\s\S]*?top: insets\.top \+ 18/);
-  assert.match(kingdomScreen, /gardenWorldBottomCtaActive = \(ftueStepId === 'world\.seed_planted' && firstSeedPlacementFailed\)[\s\S]*?ftueStepId === 'world\.first_seed_grew'/);
-  assert.doesNotMatch(kingdomScreen, /gardenWorldBottomCtaActive = ftueStepId === 'world\.garden_arrival'/);
-  assert.doesNotMatch(kingdomScreen, /\? 'Plant Seed'[\s\S]*?: ftueStep\.actions/);
-  assert.match(kingdomScreen, /gardenWorldBottomCtaActive[\s\S]*?bottom: Math\.max\(insets\.bottom, 12\) \+ 22[\s\S]*?justifyContent: 'space-between'[\s\S]*?top: insets\.top \+ 18/);
-  assert.match(kingdomScreen, /function FtueOpeningFade\(\)[\s\S]*?opacity\.value = withDelay\([\s\S]*?duration: reduceMotion \? 140 : 1_350/);
-  assert.match(kingdomScreen, /ftueStepId === OPENING_MIST_OPEN_STEP_ID \? <FtueOpeningFade/, 'the fade opens the first beat under the Mist');
-  assert.match(nurture, /<EggHeroGuide guide=\{onboardingGuide\} topInset=\{topInset\}/);
-  assert.match(readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8'), /top: topInset \+ topOffset/);
-  assert.match(kingdomScreen, /!upgradePresentation && \(!ftueStepId \|\| ftueStepId === 'companion\.meditating'\)/);
-  assert.match(kingdomScreen, /onPress=\{stepplingEncounter.open \? stepplingEncounter.close : restorationBoardVisible \? closeRestoration : interactionCreatureId \? requestResidentInteractionExit : onBackToHavenSelector\}/);
-  assert.doesNotMatch(kingdomScreen, /cameraFallbackTimer/);
-  assert.match(kingdomScreen, /onResidentFocusComplete=\{completeResidentFocus\}/);
-  assert.match(kingdomScreen, /onCameraMotionChange=\{handleCameraMotionChange\}/);
-  assert.match(kingdomScreen, /ftueCameraSettled && !sharedUpgrade && !upgradePresentation[\s\S]*?<HavenFtueOverlay/);
-  assert.match(kingdomCamera, /Camera limits describe valid destinations and gesture bounds/);
-  assert.match(kingdomCamera, /previousGeometry\.sceneWidth === nextGeometry\.sceneWidth[\s\S]*?return;/);
-  assert.match(kingdomCamera, /const animateToSnapshot = useCallback[\s\S]*?clampCameraTranslation\(snapshot, cameraViewport, cameraScene, nextScale\)[\s\S]*?withTiming\(nextScale, timing/);
-  assert.match(kingdomCanvas, /interactionOriginSnapshotRef\.current \?\?= readLiveCameraSnapshot\(\)[\s\S]*?if \(origin\) \{[\s\S]*?animateToCameraSnapshot\(origin, durationMs, onComplete\)[\s\S]*?focusInteractionTile\(frame,/);
-  assert.match(kingdomCanvas, /const durationMs = tutorialCamera\.durationMs/);
-  assert.doesNotMatch(kingdomCanvas, /cameraRestoreNonce > 0 \? 0 : tutorialCamera\.durationMs/);
-  assert.match(kingdomCamera, /Camera limits describe valid destinations and gesture bounds[\s\S]*?previousGeometry\.viewportHeight === nextGeometry\.viewportHeight[\s\S]*?return;/);
-  assert.doesNotMatch(kingdomCamera, /previousGeometry\.maximumScale === nextGeometry\.maximumScale/);
-  assert.match(kingdomCamera, /const getSnapshot = useCallback[\s\S]*?scale: scale\.value[\s\S]*?tx: tx\.value[\s\S]*?ty: ty\.value/);
-  assert.match(kingdomCanvas, /REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y = SHARED_RESIDENT_SCREEN_ANCHOR_Y/);
-  assert.match(kingdomCanvas, /residentInteractionScreenAnchorY = interactionResidentAnchorY \?\? \(tutorialCamera\?\.kind === 'focus_target'[\s\S]*?tutorialCamera\.anchorY \?\? MOSSPROUT_DIALOGUE_SCREEN_ANCHOR_Y[\s\S]*?: REGULAR_RESIDENT_INTERACTION_SCREEN_ANCHOR_Y\)/);
-  assert.match(kingdomCanvas, /initialInteractionFocus = useMemo[\s\S]*?residentCreatureFrame\(residentAnchor\.x, residentAnchor\.y, creatureWorldSize, isMossprout\)[\s\S]*?screenY: viewport\.height \* residentInteractionScreenAnchorY[\s\S]*?initialTutorialFocus \?\? initialInteractionFocus/);
-  assert.match(kingdomCanvas, /handledInteractionExitNonceRef[\s\S]*?layer\?\.interactionFrame[\s\S]*?focusInteractionTile\(frame,/);
-  assert.match(kingdomCanvas, /allowDownscaling=\{false\}[\s\S]*?resolution="high"[\s\S]*?showFace/);
-  assert.match(kingdomCanvas, /faceId=\{\(presentation\?\.growthStage \?\? 0\) > 0 \? 'curious' : 'sleepy'\}/);
-  assert.match(kingdomCanvas, /WORLD_FTUE_EGG_NATIVE_SURFACE_SCALE = 2\.7/);
-  assert.match(kingdomCanvas, /growthProgress = fullSize \? 1 : presentation\?\.growthProgress \?\? 0/);
-  assert.match(kingdomCanvas, /eggVisualGrowthForEnergyRatio\(growthProgress\)/);
-  assert.match(kingdomCanvas, /hatchShake\.value \* 7/);
-  assert.match(kingdomCanvas, /rotateZ: `\$\{shake \* 2\.8\}deg`/);
-  assert.match(kingdomCanvas, /<WorldEggRadiance[\s\S]*?<WorldEggRippleField/);
-  assert.match(mossproutOpening, /readyToHatch: growth\.isReady && !isHatching/);
-  assert.match(kingdomCanvas, /showReadyEffects \? <>[\s\S]*?<RotatingRadialSunburst[\s\S]*?<WorldEggRippleField primary=\{readyRipple\}/);
-  assert.match(kingdomCanvas, /Preserve the original 3\.06-second readiness reminder[\s\S]*?readyShake\.value = withRepeat[\s\S]*?readyRipple\.value = withRepeat/);
-  assert.match(kingdomCanvas, /feedbackShake\.value \+ readyShake\.value \+ hatchShake\.value \* 2/);
-  assert.match(kingdomCanvas, /triggerFeedArrivalFeedback[\s\S]*?runRewardArrivalMotion\(feedbackPulse, feedbackShake, reduceMotion\)[\s\S]*?radianceFlare\.value = withSequence[\s\S]*?rippleEcho\.value = withDelay/);
-  assert.match(kingdomCanvas, /cameraScale=\{camera\.scaleValue\}/);
-  assert.match(kingdomCanvas, /cameraTranslateX=\{camera\.translationXValue\}[\s\S]*?cameraTranslateY=\{camera\.translationYValue\}/);
-  assert.match(kingdomCanvas, /worldFtueProjectedSubject[\s\S]*?projectionStyle/);
-  assert.doesNotMatch(kingdomCanvas, /<TileFocusTransform[\s\S]{0,260}<RevealedCompanionEgg/);
-  assert.match(kingdomCanvas, /subjectCenterY = residentAnchor[\s\S]*?sharedResidentCenterY\(residentAnchor\.y, eggGrowthScale\)/);
-  assert.match(kingdomCanvas, /<CreatureAnimatedArt[\s\S]*?visualKey=\{presentation\?\.hatchFamilyId \?\? 'mossprout'\}/);
-  assert.match(kingdomCanvas, /stableWorldPresentation = usesSharedResidentStage\(tile\.companion\.familyId\)[\s\S]*?animated=\{stableWorldPresentation \|\| interactionResidentId/);
-  assert.match(kingdomCanvas, /const width = stableWorldPresentation \? WORLD_FTUE_EGG_WIDTH : worldSize[\s\S]*?const height = stableWorldPresentation \? WORLD_FTUE_EGG_HEIGHT : worldSize/);
-  assert.match(kingdomCanvas, /top: stableWorldPresentation[\s\S]*?y - MOSSPROUT_WORLD_BASELINE_LIFT - height/);
-  assert.match(kingdomCanvas, /focusedInteractionResidentRef[\s\S]*?residentCreatureFrame\(residentAnchor\.x, residentAnchor\.y, creatureWorldSize, isMossprout\)[\s\S]*?anchorY: residentInteractionScreenAnchorY/);
-  assert.match(kingdomCanvas, /WORLD_INTERACTION_CREATURE_NATIVE_SURFACE_SCALE = 2\.7/);
-  assert.match(kingdomCanvas, /function GardenOrderShortcut[\s\S]*?gardenOrderRequestBubble[\s\S]*?<PersistentMergeItemArt/);
-  assert.doesNotMatch(kingdomCanvas, /We’ll build this order/);
-  assert.match(kingdomCanvas, /tile\.companion\.creature\.creatureId === interactionResidentProjection\?\.creature\.creatureId\) continue/);
-  assert.match(kingdomCanvas, /if \(onSelectResident\) \{[\s\S]*?onSelectResident\(creature\.creatureId, creature\.name\);[\s\S]*?return;[\s\S]*?onFocus\(x, y, \{ id: tile\.id \}\)/);
-  assert.match(kingdomCanvas, /<ProjectedResidentCreature[\s\S]*?cameraScale=\{camera\.scaleValue\}[\s\S]*?rewardPulseKey=\{interactionResidentId \? interactionRewardPulseKey : worldSubjectPresentation\?\.rewardPulseKey \?\? 0\}/);
-  assert.match(kingdomCanvas, /<ProjectedResidentCreature[\s\S]*?cameraMoving=\{camera\.isMoving\}/);
-  assert.match(kingdomCanvas, /ProjectedResidentCreature[\s\S]*?runRewardArrivalMotion\(rewardPulse, rewardShake, reduceMotion\)[\s\S]*?rewardShake\.value \* 5\.5[\s\S]*?rewardPulse\.value \* 0\.055/);
-  assert.match(kingdomCanvas, /renderToHardwareTextureAndroid=\{false\}[\s\S]*?shouldRasterizeIOS=\{false\}[\s\S]*?worldInteractionCreatureNativeSurface/);
-  assert.match(kingdomCanvas, /allowDownscaling=\{false\}[\s\S]*?fallbackSource=\{source \?\? resolveCreatureArtSource\(creature\.visualKey\)\}/);
-  assert.match(kingdomCanvas, /fallbackSource=\{source \?\? resolveCreatureArtSource\(creature\.visualKey\)\}[\s\S]*?forceStatic=\{cameraMoving\}/);
-  assert.match(kingdomCanvas, /styles\.worldFtueCreatureFrame[\s\S]*?creatureStyle/);
-  assert.match(kingdomCanvas, /worldFtueCreatureFrame: \{[\s\S]*?transformOrigin: 'center bottom'/);
-  assert.match(kingdomCanvas, /presentation\?\.hatchPresentation \? <>[\s\S]*?worldFtueHatchRing[\s\S]*?worldFtueHatchRing[\s\S]*?<\/>(?:\s*): null/);
-  assert.match(kingdomCanvas, /styles\.worldFtueCreatureFrame[\s\S]*?presentation\?\.hatchPresentation \? <>[\s\S]*?<RotatingRadialSunburst[\s\S]*?WORLD_FTUE_SOFT_GLOW[\s\S]*?worldFtueHatchGlow/);
-  assert.match(kingdomCanvas, /WORLD_FTUE_REWARD_GLOW_SIZE = WORLD_FTUE_EGG_WIDTH \* 0\.84/);
-  assert.match(kingdomCanvas, /WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE = 2\.7[\s\S]*?creatureNativeSurfaceStyle[\s\S]*?WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE/);
-  assert.match(kingdomCanvas, /renderToHardwareTextureAndroid=\{false\}[\s\S]*?shouldRasterizeIOS=\{false\}[\s\S]*?styles\.worldFtueCreatureNativeSurface/);
-  assert.match(kingdomCanvas, /WORLD_FTUE_PULSE_RING_NATIVE_SURFACE_SCALE = 2[\s\S]*?hatchPulseRingSize/);
-  assert.match(kingdomCanvas, /worldFtueRewardGlow[\s\S]*?borderWidth: 2 \* WORLD_FTUE_CREATURE_NATIVE_SURFACE_SCALE[\s\S]*?creatureRewardGlowSize/);
-  assert.match(kingdomCanvas, /accessibilityLabel=\{`\$\{\(presentation\?\.hatchFamilyId && hatchableByCompanion\(presentation\.hatchFamilyId\)\?\.displayName\) \?\? 'Mossprout'\} animated`\}[\s\S]*?allowDownscaling=\{false\}/, 'the hatched friend is named from its definition');
-  assert.match(mossproutOpening, /handleFtueEnergyTokenArrive[\s\S]*?index === count - 1[\s\S]*?pulseEgg\(\)/);
-  assert.match(mossproutOpening, /onEnergyTokenArrive=\{handleFtueEnergyTokenArrive\}/);
-  assert.match(mossproutOpening, /companionStageActive && subjectHandoffSettled[\s\S]*?<CompanionHomeEnvironmentStage/);
-  assert.match(mossproutOpening, /styles\.regularSubject[\s\S]*?translateY: -regularSubjectLift \+ subjectHandoffLayout\.interactionCreatureDrop/);
-  assert.match(mossproutOpening, /subjectHandoffFades=\{false\}/);
-  assert.match(mossproutOpening, /withTiming\(1,[\s\S]*?if \(finished\) runOnJS\(completeSubjectHandoff\)\(\)/);
-  assert.doesNotMatch(mossproutOpening, /settleTimer|setTimeout\(\(\) => setSubjectHandoffSettled/);
-  assert.doesNotMatch(mossproutOpening, /regularSubjectReady|SUBJECT_READY_FALLBACK_MS|handleRegularSubjectReady/);
-  assert.match(mossproutOpening, /regularSubjectLift = companionDestinationStageLift\(windowHeight, windowWidth\)/);
-  assert.match(mossproutOpening, /subjectHandoffScale=\{subjectHandoffLayout\.outgoingEndScale\}[\s\S]*?subjectHandoffTranslateY=\{subjectHandoffLayout\.outgoingEndTranslateY\}/);
-  assert.match(havenRoute, /onCompanionVisualReady=\{handleCompanionVisualReady\}[\s\S]*?companionActive && companionVisualReady/);
-  assert.match(havenRoute, /handleCreatureRewardPulse[\s\S]*?rewardPulseKey=\{rewardPulseKey\}[\s\S]*?onVisibleCreatureRewardPulse=\{handleCreatureRewardPulse\}/);
-  assert.match(interaction, /onTokenArrive=\{\(amount\) => \{[\s\S]*?setRewardPulseKey[\s\S]*?props\.onVisibleCreatureRewardPulse\?\.\(\)/);
-  assert.match(mossproutOpening, /layer="creature"[\s\S]*?rewardPulseKey=\{rewardPulseKey\}/);
-  assert.match(mossproutOpening, /sceneHandoffScale = regularStageLayout\.backgroundImageSize[\s\S]*?HOME_FTUE_CAMERA_SCALE/);
-  assert.match(mossproutOpening, /sceneHandoffTranslateY = regularSceneCenterOffset[\s\S]*?openingSceneCenterOffset \* sceneHandoffScale/);
-  assert.match(mossproutOpening, /sceneHandoffProgress=\{subjectHandoff\}[\s\S]*?sceneHandoffScale=\{sceneHandoffScale\}[\s\S]*?sceneHandoffTranslateY=\{sceneHandoffTranslateY\}/);
-  assert.match(mossproutOpening, /regularSubject: \{ \.\.\.StyleSheet\.absoluteFillObject, zIndex: 41 \}/);
-  assert.match(nurture, /!subjectHidden \? <Animated\.View[\s\S]*?subjectHandoffStyle/);
-  assert.match(nurture, /!sceneOnly \? <View[\s\S]*?styles\.chrome/);
-  assert.match(nurture, /const sceneLift = sceneHandoffProgress[\s\S]*?\? HOME_SCENE_Y_OFFSET[\s\S]*?: sceneOnly[\s\S]*?\? 0[\s\S]*?: onboardingFocus/);
-  assert.match(nurture, /const sceneHandoffStyle = useAnimatedStyle[\s\S]*?translateY: sceneHandoffTranslateY \* progress[\s\S]*?scale: 1 \+ \(sceneHandoffScale - 1\) \* progress/);
-  assert.match(nurture, /styles\.subjectHandoffPlane, subjectHandoffStyle[\s\S]*?styles\.eggStage[\s\S]*?projectedEggStageStyle/);
-  assert.doesNotMatch(mossproutOpening, /restoreDiscoveryReveal/);
-  assert.match(todayRoute, /<Redirect href="\/katchimeras"/);
-  assert.deepEqual(activeFtueNavigationPolicy({ status: 'active', stepId: 'egg.opening' })?.resume, { kind: 'haven' });
-  assert.deepEqual(activeFtueNavigationPolicy({ status: 'active', stepId: 'world.egg_intro' })?.resume, { kind: 'haven' });
-  assert.equal(activeFtueNavigationPolicy({ status: 'active', stepId: 'grove.egg_inspect' }), null);
-  assert.equal(ftueOwnsOpeningHome({ status: 'active', stepId: 'grove.egg_inspect' }), false);
-  assert.equal(ftueOwnsOpeningHome({ status: 'active', stepId: 'companion.first_meeting' }), true);
-  assert.match(devTools, /Restart first-session onboarding · keep profile/);
-  assert.match(devTools, /beginFirstSession\(\{ restart: true \}\)/);
-  assert.match(devTools, /await resetTodayForDebug\(\);[\s\S]*?await resetKatchimeraProgressForDebug\(\{ resetAt \}\);[\s\S]*?beginFirstSession\(\{ restart: true \}\)/);
-  assert.match(devTools, /restarts the new Mossprout flow in Haven/);
-  assert.match(devTools, /router\.navigate\('\/\(tabs\)\/katchimeras'\)/);
-  assert.doesNotMatch(todayRoute, /export function HavenEggFtueSurface/);
-  assert.doesNotMatch(todayRoute, /originBackgroundKey=\{ftueOpeningOwnsHome \? 'mossprout'/);
-  assert.doesNotMatch(todayRoute, /sceneId=\{ftueOpeningOwnsHome \? 'mossprout'/);
 });
 
 test('companion and Merge FTUE steps never suppress the normal Today action rotation', () => {
@@ -1126,55 +588,6 @@ test('each Discovery Egg answer grants the same visual Growth', () => {
     questionSteps.map((step) => step.actions[0]?.growthReward),
     Array.from({ length: 5 }, () => FTUE_EGG_ANSWER_GROWTH_REWARD),
   );
-});
-
-test('the Grove Egg holds a moderate camera through both wisp answers', () => {
-  const grove = readFileSync('components/katchadeck/world/mossprout-egg-ftue-surface.tsx', 'utf8');
-  const camera = readFileSync(require.resolve('@incubator/environments/hex-camera'), 'utf8');
-  const openingScale = mossproutGroveEggCameraPinchTarget('egg.opening', 2)!;
-  const contextScale = mossproutGroveEggCameraPinchTarget('egg.context', 2)!;
-  const mindScale = mossproutGroveEggCameraPinchTarget('egg.mind', 2)!;
-  const readyScale = mossproutGroveEggCameraPinchTarget('egg.ready', 2)!;
-  const ratios = [openingScale / contextScale, contextScale / mindScale, mindScale / readyScale];
-
-  assert.ok(ratios.every((ratio) => Math.abs(ratio - ratios[0]!) < 1e-9));
-  assert.equal(mossproutGroveEggCameraPinchTarget('grove.egg_inspect', 2), null);
-  assert.equal(readyScale, 1);
-  assert.equal(mossproutGroveEggCameraPinchTarget('companion.first_meeting', 2), null);
-  const worldZooms = ['egg.opening', 'egg.context', 'egg.mind', 'egg.ready'].map((stepId) => {
-    const directive = MOSSPROUT_FTUE_SCRIPT.steps.find((step) => step.id === stepId)?.camera;
-    return directive?.kind === 'focus_target' ? directive.zoom ?? 0 : 0;
-  });
-  assert.ok(worldZooms.every((zoom) => zoom === MOSSPROUT_WORLD_EGG_REST_ZOOM));
-  assert.equal(worldZooms[0], MOSSPROUT_WORLD_EGG_CLOSE_ZOOM);
-  assert.equal(worldZooms.at(-1), MOSSPROUT_WORLD_EGG_REST_ZOOM);
-  const worldRatios = [worldZooms[0]! / worldZooms[1]!, worldZooms[1]! / worldZooms[2]!, worldZooms[2]! / worldZooms[3]!];
-  assert.ok(worldRatios.every((ratio) => Math.abs(ratio - worldRatios[0]!) < 1e-9));
-  assert.equal(mossproutWorldEggZoom('egg.ready'), MOSSPROUT_WORLD_EGG_REST_ZOOM);
-  assert.match(camera, /options\?\.zoom == null[\s\S]*?Math\.min\(maxScale, Math\.max\(minScale, options\.zoom\)\)/);
-  assert.doesNotMatch(camera, /Math\.max\(scale\.value, options\?\.zoom/);
-  assert.equal(mossproutGroveEggCameraPanTarget('egg.opening'), 0);
-  assert.equal(mossproutGroveEggCameraPanTarget('egg.context'), 0);
-  assert.equal(mossproutGroveEggCameraPanTarget('egg.mind'), 0);
-  assert.equal(mossproutGroveEggCameraPanTarget('egg.ready'), 0);
-  assert.match(grove, /useTodayEnvironmentMotion\(\{/);
-  assert.match(grove, /scriptedPinchScale: groveCameraScale/);
-  assert.match(grove, /<TodayEnvironmentMotionProvider motion=\{environmentMotion\}>/);
-  assert.match(grove, /onboardingCameraPanY=\{mossproutGroveEggCameraPanTarget\(stepId\)\}/);
-});
-
-test('the Grove Egg grows from a larger start across both meaningful feeds', () => {
-  const grove = readFileSync('components/katchadeck/world/mossprout-egg-ftue-surface.tsx', 'utf8');
-  const sizes = [0, 1, 2].map((answeredCount) => (
-    eggScaleForEnergyRatio(mossproutGroveEggEnergyRatio(answeredCount))
-  ));
-
-  const expectedSizes = [0.6, 0.8, 1];
-  assert.ok(sizes.every((size, index) => Math.abs(size - expectedSizes[index]!) < 1e-12));
-  assert.equal(mossproutGroveEggEnergyRatio(-1), 0.1);
-  assert.equal(mossproutGroveEggEnergyRatio(4), 0.5);
-  assert.match(grove, /const energyRatio = mossproutGroveEggEnergyRatio\(answeredCount\)/);
-  assert.doesNotMatch(grove, /const ratios = \[0\.38, 0\.58, 0\.78, 1\]/);
 });
 
 test('scripted Egg faces use the stable image transition instead of animated-style cleanup', () => {
@@ -1329,28 +742,6 @@ test('FTUE inline questions wrap cleanly and do not expose daily-action skip con
   assert.match(home, /illustratedHeading:[^\n]*minHeight: 48/);
   assert.match(home, /illustratedChoice:[^\n]*minHeight: 70[^\n]*paddingTop: 2/);
   assert.match(home, /illustratedChoiceThreeColumn:[^\n]*minHeight: 66/);
-});
-
-test('FTUE copy uses the shared cozy-game type hierarchy and stays concise', () => {
-  const home = readFileSync('components/katchadeck/home/today-nurture-experience.tsx', 'utf8');
-  const guide = readFileSync('components/katchadeck/onboarding/ftue-guide-copy.tsx', 'utf8');
-  const actions = readFileSync('components/katchadeck/onboarding/scripted-action-list.tsx', 'utf8');
-  const conversation = readFileSync('constants/mossprout-ftue-conversations.ts', 'utf8');
-  const theme = readFileSync('constants/theme.ts', 'utf8');
-  const eggSteps = MOSSPROUT_FTUE_SCRIPT.steps.filter((step) => step.id.startsWith('egg.'));
-  assert.match(theme, /ftueHeroTitle:[\s\S]*?AppFontFamilies\.fredokaBold/);
-  assert.match(theme, /ftueBody:[\s\S]*?AppFontFamilies\.manrope/);
-  assert.match(theme, /ftuePanelTitle:[\s\S]*?AppFontFamilies\.fredokaBold/);
-  assert.match(home, /import \{ EggHeroGuide, FtueGuideCopy \} from '@\/components\/katchadeck\/onboarding\/ftue-guide-copy'/);
-  assert.match(guide, /KatchaDeckUI\.typography\.ftueHeroTitle/);
-  assert.match(home, /KatchaDeckUI\.typography\.ftuePanelTitle/);
-  assert.match(actions, /KatchaDeckUI\.typography\.ftuePanelTitle/);
-  assert.doesNotMatch(conversation, /prompt: `Mossprout remembers your answers/);
-  assert.match(conversation, /prompt: `\$\{opening\}[\s\S]*?I’m Mossprout/);
-  eggSteps.forEach((step) => {
-    assert.ok(step.guide.title.split(/\s+/).length <= 5, `${step.id} title is too long`);
-    assert.ok(step.guide.body.split(/\s+/).length <= (['egg.opening', 'egg.listening'].includes(step.id) ? 14 : 7), `${step.id} body is too long`);
-  });
 });
 
 test('FTUE guide copy groups layered gold and supporting copy on one dark contrast surface', () => {

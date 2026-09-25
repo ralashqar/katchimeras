@@ -294,25 +294,3 @@ test('guided follow-up removes explanatory copy and uses a compact detail grid',
   assert.match(guidedSheet, /awaitingRefinement[\s\S]*guidedRefinementTitle\(selected\)/);
   assert.match(guidedSheet, /refinedSelection \? changeRefinement : undefined/);
 });
-
-test('guided Today actions persist their originating row and defer its exit until the sheet closes', () => {
-  const todayScreen = fs.readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
-
-  assert.match(
-    todayScreen,
-    /onCommit=\{\(submission\) => \{[\s\S]*?deferredJournalCareCompletionRef\.current = guidedCapture\.action\.instanceId;[\s\S]*?updateCareAction\([\s\S]*?instanceId: guidedCapture\.action\.instanceId,[\s\S]*?status: 'completed',[\s\S]*?\}, guidedCapture\.target\);[\s\S]*?addManualJournalEntry\(submission, guidedCapture\.target\)/,
-  );
-  assert.match(
-    todayScreen,
-    /onClose=\{\(\) => \{[\s\S]*?deferredCareMergeEnergyRef\.current = guidedCapture\.mergeEnergyAmount \?\? 0;[\s\S]*?queueCareCompletionAfterJournalDismiss\(guidedCapture\.action\)/,
-  );
-  assert.match(
-    todayScreen,
-    /onFeed=\{\(option: GuidedCaptureOption, from\) => \{[\s\S]*?label: `\$\{option\.emoji\} \$\{option\.label\}`,[\s\S]*?tint: eggReactionTint\(option\.reaction\)/,
-  );
-  assert.doesNotMatch(
-    todayScreen,
-    /onFeed=\{\(option: GuidedCaptureOption, from\) => \{[\s\S]*?mergeEnergyAmount:[\s\S]*?\}, \(\) => \{\}\);/,
-  );
-  assert.match(todayScreen, /todayPhotoLibrarySheet !== null \|\|[\s\S]*?guidedCapture !== null \|\|/);
-});

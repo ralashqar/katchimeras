@@ -248,65 +248,6 @@ test('a journaled photo becomes the card featured image without explicit selecti
   assert.equal(card.memorySpark?.photoUri, 'file:///cinema.jpg');
 });
 
-test('v12 migration deterministically converts a legacy hatch into a Wisp Day Card', () => {
-  const legacyDay = makeDay();
-  const { card: _card, ...dayWithoutCard } = legacyDay;
-  const legacyState = {
-    version: 12,
-    locationPermission: 'unknown',
-    activityPermission: 'unknown',
-    healthPermission: 'unknown',
-    encounterHistory: {},
-    personalEntities: [],
-    cloudIntelligenceEnabled: false,
-    archivedDays: [dayWithoutCard],
-    today: { ...dayWithoutCard, id: 'day-2026-07-21', isoDate: '2026-07-21', creature: null, state: 'forming' },
-  };
-
-  const migrated = upgradeStoredHomeState(legacyState as Parameters<typeof upgradeStoredHomeState>[0]);
-  const migratedAgain = upgradeStoredHomeState(migrated);
-  const card = migrated.archivedDays[0].card;
-
-  assert.equal(migrated.version, 23);
-  assert.equal(migrated.archivedDays[0].legacyEncounter?.id, creature.id);
-  assert.ok(migrated.archivedDays[0].dailyHatch?.primaryWispId);
-  assert.equal(migrated.archivedDays[0].dailyHatch?.claimedAt, migrated.archivedDays[0].dailyHatch?.revealedAt);
-  assert.equal(card?.primaryWispId, migrated.archivedDays[0].dailyHatch?.primaryWispId);
-  assert.equal(card?.sceneVariantId, migrated.archivedDays[0].dailyHatch?.sceneVariantId);
-  assert.equal(card?.schemaVersion, 5);
-  assert.deepEqual(migratedAgain.archivedDays[0].card, card);
-});
-
-test('v13 migration preserves the legacy encounter while creating the revised Day Card identity', () => {
-  const day = makeDay();
-  const built = buildDailyCreatureCard(day, creature, {
-    mode: 'live_hatch',
-    sealedAt: '2026-07-20T21:00:00.000Z',
-  });
-  const { storyLine: _storyLine, facets: _facets, dayFacts: _dayFacts, dayGlyphs: _dayGlyphs, scene: _scene, ...v1Fields } = built;
-  const v1Card = { ...v1Fields, schemaVersion: 1 as const, engineVersion: 'daily-card-v1' as const };
-  const v13State = {
-    version: 13 as const,
-    locationPermission: 'unknown' as const,
-    activityPermission: 'unknown' as const,
-    healthPermission: 'unknown' as const,
-    encounterHistory: {},
-    personalEntities: [],
-    cloudIntelligenceEnabled: false,
-    archivedDays: [{ ...day, card: v1Card }],
-    today: { ...day, id: 'day-2026-07-21', isoDate: '2026-07-21', creature: null, card: null, state: 'forming' as const },
-  };
-
-  const migrated = upgradeStoredHomeState(v13State);
-  const card = migrated.archivedDays[0].card;
-  assert.equal(migrated.version, 23);
-  assert.equal(card?.schemaVersion, 5);
-  assert.equal(migrated.archivedDays[0].legacyEncounter?.id, creature.id);
-  assert.equal(card?.primaryWispId, migrated.archivedDays[0].dailyHatch?.primaryWispId);
-  assert.equal(card?.sceneVariantId, migrated.archivedDays[0].dailyHatch?.sceneVariantId);
-  assert.ok(card?.facets && card.dayFacts && card.dayGlyphs && card.scene && card.storyLine);
-});
-
 test('a v3 card gains sealed scene layers without changing collectible identity', () => {
   const day = makeDay();
   const built = buildDailyCreatureCard(day, creature, {

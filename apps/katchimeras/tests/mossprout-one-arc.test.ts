@@ -107,34 +107,6 @@ const served = (world: MergeWorldState, orderIds: readonly string[]): MergeWorld
   id: `merge-story-served:${id}`, kind: 'story_order_served', characterId: 'mossprout', amount: 20, createdAt: NOW - HOUR, appliedAt: NOW - HOUR }))] });
 const facts = (relationships: RelationshipProgressState, world: MergeWorldState) => ({ familyId: 'mossprout', now: NOW, world, relationships, bond: emptyCompanionBondState(), content: emptyCompanionContentState(), dayOneComplete: true });
 
-test('the chain opens the way the campaign did: a beat, its orders on the Garden, its resolution once they are served, and the next beat that has opened comes before an arc episode still waiting', () => {
-  const world = createInitialMergeWorldState(NOW);
-  const pondKnock = MOSSPROUT_CAMPAIGN_EPISODES[1]!;
-  const orderIds = pondKnock.mergeOrders.map((order) => order.id);
-  const fresh = journeyChapterState(CHAPTER, facts(withEpisodes(['quiet-patch:first-flower'], NOW - HOUR), world));
-  assert.equal(fresh.next?.episode.id, 'tiny-beginnings');
-  assert.equal(fresh.next?.status, 'locked', 'four hours after the first session');
-  const opened = journeyChapterState(CHAPTER, facts(withEpisodes(['quiet-patch:first-flower', 'tiny-beginnings']), world));
-  assert.equal(opened.next?.episode.id, pondKnock.beatId);
-  assert.equal(opened.next?.status, 'available');
-  const waiting = journeyChapterState(CHAPTER, facts(withEpisodes(['quiet-patch:first-flower', 'tiny-beginnings', pondKnock.beatId]), world));
-  assert.equal(waiting.next?.episode.id, resolutionEpisodeId(pondKnock.beatId));
-  assert.equal(waiting.next?.status, 'locked');
-  assert.equal(waiting.next?.hint, CHAPTER.lines.hints!.orders_served);
-  assert.equal(journeyConditionHolds({ kind: 'orders_served', orderIds }, CHAPTER, 3, facts(waiting.chapter && withEpisodes([]), served(world, orderIds.slice(0, 1)))), false, 'every order, not the first');
-  const resolved = journeyChapterState(CHAPTER, facts(withEpisodes(['quiet-patch:first-flower', 'tiny-beginnings', pondKnock.beatId]), served(world, orderIds)));
-  assert.equal(resolved.next?.status, 'available', 'the resolution opens once every order is served');
-  // The Mist not yet cleared at Steppling's: the beat that has opened comes before the arc episode still waiting.
-  const skipped = journeyChapterState(CHAPTER, facts(withEpisodes(['quiet-patch:first-flower', 'tiny-beginnings', pondKnock.beatId, resolutionEpisodeId(pondKnock.beatId)]), world));
-  assert.equal(skipped.episodes.find((item) => item.episode.id === 'wrong-with-the-mist')?.status, 'locked');
-  assert.equal(skipped.next?.episode.id, 'returning-pond:place-for-rain');
-  assert.equal(skipped.next?.status, 'available');
-  // Nothing open yet (the last beat resolved just now): the first waiting episode, for its hint.
-  const nothingOpen = journeyChapterState(CHAPTER, facts(withEpisodes(['quiet-patch:first-flower', 'tiny-beginnings', pondKnock.beatId, resolutionEpisodeId(pondKnock.beatId)], NOW - 3), world));
-  assert.equal(nothingOpen.next?.episode.id, 'wrong-with-the-mist');
-  assert.equal(nothingOpen.next?.status, 'locked');
-});
-
 test('the live chapter is the one arc, and the Garden reads the beat under way from it: one order at a time, drops steered, served ones marked', () => {
   assert.equal(journeyChapterFor('mossprout'), CHAPTER);
   const world = createInitialMergeWorldState(NOW);

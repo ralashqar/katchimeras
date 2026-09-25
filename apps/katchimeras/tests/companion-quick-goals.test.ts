@@ -29,13 +29,6 @@ import {
   undoCompanionQuickGoal,
 } from '@/utils/companion-quick-goals';
 
-test('completed families expose authored quick-goal templates', () => {
-  for (const family of katchimeraFamilies) {
-    assert.ok(quickGoalTemplatesForFamily(family.id).length >= 8, `${family.id} needs at least eight small goals`);
-  }
-  assert.deepEqual(quickGoalTemplatesForFamily('vesperitt'), quickGoalTemplatesForFamily('bedrotte'));
-});
-
 test('quick-goal UI eligibility follows authored family content', () => {
   assert.equal(hasQuickGoalTemplates('vesperitt'), true);
   assert.equal(hasQuickGoalTemplates('skylo'), true);

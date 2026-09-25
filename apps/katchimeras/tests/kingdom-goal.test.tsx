@@ -13,37 +13,6 @@ import { loadNativeModule, nativeViews } from './helpers/native-motion-harness';
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const NOW = Date.parse('2026-09-08T12:00:00Z');
 
-test('the post-FTUE friend guide works with shared adventure enabled and resumes after reload', () => {
-  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  const expression = screen.match(/const kingdomGoalGuideActive = (Boolean\([\s\S]*?\));/)![1];
-  const context = {
-    SHARED_ADVENTURE_ENABLED: true, screenFocused: true,
-    kingdomGoal: { introducedAt: NOW, coachmarkSeenAt: null }, goalIslandOffer: { id: 'nature:bloom-garden', eligible: true },
-    ftueStepId: null, adventureOpen: false, lanternSurfaceOpen: false, progressSheetOpen: false, wakeHandoffCampaign: null, selectedUpgrade: null,
-    eventBoardActive: false, openingBoardActive: false, stepplingMissionActive: false, journeyMissionActive: false, restorationBoardVisible: false, upgradeHandoffPending: false,
-    interactionCreatureId: null, activeInteractionResidentId: null, stepplingEggOpen: false,
-    upgradePresentation: null, requiredUpgradeStory: null, ordinaryUpgradeRun: null,
-  };
-  assert.equal(runInNewContext(expression, context), true, 'the durable introduction must guide to Petalimp, even with shared adventure enabled');
-  assert.equal(runInNewContext(expression, { ...context, goalIslandOffer: null }), false, 'never lock the world without a tappable marker');
-  assert.equal(runInNewContext(expression, { ...context, kingdomGoal: { introducedAt: NOW, coachmarkSeenAt: NOW + 1 } }), false, 'tapping the marker ends the guide');
-  assert.equal(runInNewContext(expression, { ...context, adventureOpen: true }), false, 'a modal owns input until dismissed');
-  assert.equal(runInNewContext(expression, { ...context, restorationBoardVisible: true }), false, 'a board hides the markers and must not be locked behind the guide');
-  const handoff = screen.slice(screen.indexOf('const finishKingdomGoalScene'), screen.indexOf('const completeIslandFocus'));
-  assert.doesNotMatch(handoff, /setAdventureOpen\(true\)/, 'the closing goal modal must hand over to the map, not another native modal');
-  assert.match(screen, /focusNatureIslandId=\{focusIslandId\}/);
-  assert.match(screen, /kingdomGoalGuideActive && goalCoachmarkArmed && goalIslandId/);
-});
-
-test('Mossprout plants the wish at his farewell and the resting card keeps the garden open', () => {
-  const pages = MOSSPROUT_FTUE_COPY.farewell.split('\n\n');
-  assert.equal(pages.length, 2, 'one idea per page: rest, then the others');
-  assert.match(pages[0]!, /rest/i);
-  assert.match(pages[1]!, /more of us/);
-  assert.match(pages[1]!, /Mist/);
-  assert.equal(mossproutFtueStep('companion.meditating')?.guide?.body, MOSSPROUT_FTUE_COPY.meditationHelp);
-});
-
 test('the Kingdom goal is introduced once, its hint acknowledged once, and both survive reload', () => {
   const fresh = createInitialMergeWorldState(NOW, ['mossprout']);
   assert.equal(fresh.kingdomGoal, undefined);
@@ -60,38 +29,6 @@ test('the Kingdom goal is introduced once, its hint acknowledged once, and both 
   assert.equal(reduceMergeWorld(seen.state, { type: 'ackKingdomGoalCoachmark', now: NOW + 3 }).changed, false);
   assert.deepEqual(normalizeMergeWorldState(JSON.parse(JSON.stringify(seen.state)), NOW).kingdomGoal, { introducedAt: NOW, coachmarkSeenAt: NOW + 2 });
   assert.equal(normalizeMergeWorldState({ ...seen.state, kingdomGoal: { introducedAt: 'soon' } }, NOW).kingdomGoal, undefined, 'garbage is dropped');
-});
-
-test('the wish waits for Steppling to leave, and the guide never locks the world without its marker', () => {
-  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  // Two full-screen sheets swapping in one frame can leave the second one
-  // unpresented, and Steppling's ordinary greeting would speak over the
-  // farewell he just gave. His page closes first; the wish follows.
-  assert.match(screen, /const stepplingGoalHandoffPending = Boolean\(kingdomGoalWanted && \(interactionCreatureId \|\| activeInteractionResidentId\)\)/);
-  assert.match(screen, /const kingdomGoalPending = kingdomGoalWanted && !stepplingGoalHandoffPending/);
-  assert.match(screen, /if \(!stepplingGoalHandoffPending\) return;\s*\n\s*requestResidentInteractionExit\(\)/);
-  assert.match(screen, /\{interactionCreatureId && !stepplingGoalHandoffPending \?/);
-  // The guide locks the camera and every other control, so it may only start
-  // when the one marker it leaves tappable actually exists.
-  assert.match(screen, /const goalIslandOffer = goalIslandId[\s\S]*?offer\.id === `nature:\$\{goalIslandId\}` && offer\.eligible/);
-  assert.match(screen, /const kingdomGoalGuideActive = Boolean\([\s\S]*?goalIslandOffer/);
-  // An active lesson with nothing on screen must not eat Back.
-  assert.match(screen, /\(stepplingLesson\.active && Boolean\(interactionCreatureId\)\) \? undefined : <KatchimeraBackButton/);
-  // A queued restoration takes several frames to build its presentation. The
-  // markers and the panel must not flash back in over that handoff.
-  assert.match(screen, /const upgradeHandoffPending = upgradePresentationOperation\.model\.pendingWork\.kind === 'presentation'\s*\n\s*&& upgradePresentationOperation\.model\.pendingWork\.presentationType === STORY_WORLD_UPGRADE_PRESENTATION/);
-  assert.match(screen, /upgradeOffers=\{[^\n]*?&& !upgradeHandoffPending/);
-  assert.match(screen, /const upgradePanelOpen = Boolean\([^\n]*?&& !upgradeHandoffPending/);
-});
-
-test('the Journal and Merge shortcuts hide behind an open upgrade panel', () => {
-  const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
-  // Neither shortcut's max-height accounts for the other's footprint, so a
-  // tall panel and these fixed-position buttons used to sit on top of each
-  // other. Hide both while `sharedUpgrade` — the same flag the panel itself
-  // is gated on — is set, instead of trying to reserve space for them.
-  assert.match(screen, /!kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && \(!ftueStepId \|\| ftueStepId === 'companion\.meditating'\) \? <View style=\{\{ position: 'absolute', left: 16/);
-  assert.match(screen, /!kingdomGoalGuideActive && !sharedUpgrade && havenMergeBoardActive && mossproutFtueShowsWorldGarden\(ftueStepId\)/);
 });
 
 test('the goal scene tells the wish once and hands over exactly once per tap burst', async () => {

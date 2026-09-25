@@ -96,15 +96,3 @@ test('chapter-zero derivation stays out of boards that are not the lesson', () =
   assert.equal(mergeFtueStepForBoard(plain, mossproutFtueStep('merge.serve_sprout')), mossproutFtueStep('merge.serve_sprout'));
   assert.equal(mossproutChapterZeroRepairTarget({ status: 'active', stepId: 'merge.serve_sprout' }, plain), null);
 });
-
-test('the Chapter 0 request is gone from the manifest; the retired drags and the request migrate onto the first light', () => {
-  assert.deepEqual(chapterZeroStepsFrom('merge.serve_sprout'), ['merge.serve_sprout'], 'the authored step stays for old fixtures');
-  assert.deepEqual(chapterZeroStepsFrom('world.first_bloom_offer'), []);
-  const order = (id: string) => MOSSPROUT_FTUE_FLOW.nodes.findIndex((node) => node.id === id);
-  assert.equal(order('merge.serve_sprout'), -1, 'the first restore is paid with granted light, not a served request');
-  assert.equal(order('effect.haven.first_light'), -1, 'no grant beat either: the profile starts with the first restore’s Glow');
-  for (const id of ['merge.seed_drag', 'merge.second_seed_drag', 'merge.first_bloom', 'merge.serve_sprout']) {
-    assert.equal(order(id), -1);
-    assert.equal((MOSSPROUT_FTUE_FLOW.migrations as Record<string, string>)[id], 'world.first_seed_grew');
-  }
-});

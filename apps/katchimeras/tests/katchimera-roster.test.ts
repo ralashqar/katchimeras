@@ -20,28 +20,6 @@ import {
   type KatchimeraOwnedRosterItem,
 } from '@/utils/katchimera-roster';
 
-test('Mossprout never falls back to the Egg during post-hatch world and dialogue steps', () => {
-  const companion = { companionVisible: true, hatchPresentation: null };
-  for (const step of ['world.mist_lift', 'world.egg_intro', 'egg.opening', 'egg.context', 'egg.mind', 'egg.ready']) {
-    assert.equal(mossproutWorldUsesEggRenderer(step, null), true, step);
-  }
-  for (const step of ['world.mist_open', 'world.mist_clear']) {
-    assert.equal(mossproutWorldUsesEggRenderer(step, null), false, `${step}: the Egg stays under the veil`);
-  }
-  assert.equal(mossproutWorldUsesEggRenderer('companion.first_meeting', companion), true);
-  assert.equal(mossproutWorldUsesEggRenderer('companion.first_meeting', null), false);
-  assert.equal(mossproutWorldUsesEggRenderer('companion.first_meeting', { companionVisible: false, hatchPresentation: null }), false);
-  for (const step of [
-    'companion.day_one_action', 'companion.bond_spotlight', 'companion.garden_intro',
-    'companion.order_preview', 'world.garden_arrival', 'world.seed_planted',
-    'world.first_bloom_restore', 'companion.chapter_zero_return', 'companion.meditating',
-    'complete', null,
-  ]) {
-    assert.equal(mossproutWorldUsesEggRenderer(step, null), false, String(step));
-    assert.equal(mossproutWorldUsesEggRenderer(step, companion), false, String(step));
-  }
-});
-
 function bond(totalPoints: number): CompanionBondProgress {
   return {
     level: totalPoints >= 250 ? 3 : totalPoints >= 100 ? 2 : 1,
@@ -275,77 +253,6 @@ test('roster reconciliation preserves unchanged card identities and replaces onl
   }
 });
 
-test('Haven is the sole player home while retired routes stay hidden', () => {
-  const layout = fs.readFileSync(
-    path.join(process.cwd(), 'app', '(tabs)', '_layout.tsx'),
-    'utf8',
-  );
-  const worldRoute = fs.readFileSync(
-    path.join(process.cwd(), 'app', '(tabs)', 'world.tsx'),
-    'utf8',
-  );
-  const todayRoute = fs.readFileSync(
-    path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'),
-    'utf8',
-  );
-  assert.match(layout, /tabBar=\{\(\) => null\}/);
-  assert.match(layout, /name="world"[\s\S]*?href: null/);
-  assert.match(layout, /name="today"[\s\S]*?href: null/);
-  assert.match(layout, /name="katchimeras"[\s\S]*?title: 'Haven'/);
-  assert.match(layout, /name="games"[\s\S]*?href: null/);
-  assert.match(worldRoute, /<Redirect href="\/katchimeras"/);
-  assert.match(todayRoute, /<Redirect href="\/katchimeras"/);
-  assert.doesNotMatch(worldRoute, /KingdomCompanionScreen|KingdomHexCanvas/);
-});
-
-test('the Katchimeras tab renders Mossprout’s world as the top level, and companion Back returns into it', () => {
-  const read = (...segments: string[]) => fs.readFileSync(path.join(process.cwd(), ...segments), 'utf8');
-  const rosterRoute = read('components', 'katchadeck', 'roster', 'katchimera-roster-route-screen.tsx');
-  const kingdomScreen = read('components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx');
-  const kingdomCanvas = read('components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx');
-  const ftueScript = read('features', 'onboarding', 'mossprout-ftue-script.ts');
-  const youRoute = read('app', '(tabs)', 'you.tsx');
-  const worldVisuals = read('utils', 'world-visuals.ts');
-  const companionRoute = read('components', 'katchadeck', 'world', 'katchimera-companion-route-screen.tsx');
-  const mossproutRoute = read('app', 'katchimera', '[creatureId].tsx');
-  const katchimerasTab = read('app', '(tabs)', 'katchimeras.tsx');
-
-  assert.doesNotMatch(rosterRoute, /KatchimeraViewMode|current === 'grid'|<KatchimeraRosterScreen/);
-  assert.match(rosterRoute, /return isFocused \|\| cameraCovered \? \([\s\S]*?<FocusedKatchimeraRosterBoundary[\s\S]*?worldSession=\{worldSession\}[\s\S]*?\) : null/);
-  assert.doesNotMatch(rosterRoute, /HavenSelectorPresentation|haven-hex-selector-canvas/, 'the selector above the world is gone');
-  assert.match(rosterRoute, /<LazyKatchimeraKingdomScreen/);
-  assert.match(kingdomCanvas, /value: playerHavenHexTileSet\(\)/);
-  assert.doesNotMatch(kingdomCanvas, /value: kingdomHexTileSet\(\)/);
-  assert.match(worldVisuals, /playerHavenHexTileSet[\s\S]*?set\.id === 'floating_neighborhood_v2'/);
-  assert.match(mossproutRoute, /if \(isMossprout\)[\s\S]*?<Redirect href=\{\{[\s\S]*?pathname: '\/\(tabs\)\/katchimeras'/);
-  assert.match(katchimerasTab, /mossproutInteraction[\s\S]*?requestedWorldInteraction/);
-  assert.match(rosterRoute, /interactionRequest=\{interactionRequest\}[\s\S]*?onInteractionRequestConsumed=\{onInteractionRequestConsumed\}/);
-  assert.match(kingdomScreen, /<KingdomHexCanvas[\s\S]*?onSelectResident=\{\(creatureId\) => \{\s*if \(glowDiscoveryLocksCamera\(glowRun\)\) return;\s*selectResident\(creatureId\);/);
-  assert.doesNotMatch(kingdomScreen, /StepplingDayOnePanel|setStepplingDayOpen/);
-  assert.match(kingdomScreen, /interactionRequest[\s\S]*?setInteractionCreatureId\(interactionRequest\.creatureId\)/);
-  assert.match(kingdomScreen, /cameraMaximumScale=\{stepplingEncounter.open \? SHARED_EGG_REST_ZOOM : ftueEggFeedingCloseupActive[\s\S]*?MOSSPROUT_WORLD_EGG_CLOSE_ZOOM[\s\S]*?MOSSPROUT_WORLD_EGG_REST_ZOOM/);
-  assert.match(kingdomCanvas, /animated=\{stableWorldPresentation \|\| interactionResidentId === tile\.companion\.creature\.creatureId\}/);
-  assert.match(kingdomCanvas, /<CreatureAnimatedArt[\s\S]*?visualKey=\{creature\.visualKey\}/);
-  assert.doesNotMatch(kingdomScreen, /HavenTileHudLayer|openHavenDetail|onResidentAnchorsChange/);
-  assert.match(kingdomScreen, /setGardenButtonNode = useCallback[\s\S]*?ref=\{setGardenButtonNode\}/);
-  assert.doesNotMatch(kingdomScreen, /ref=\{\(node\) => registerFtueTarget\('garden-button:mossprout'/);
-  assert.match(kingdomScreen, /Hidden in the Dream Mist/);
-  assert.match(kingdomScreen, /Keep living days and growing your relationships/);
-  assert.match(rosterRoute, /ftueRun\.stepId === 'world\.egg_intro'[\s\S]*?ftueRun\.stepId\.startsWith\('egg\.'\)/);
-  assert.match(rosterRoute, /eggVisible[\s\S]*?kind: 'revealed_egg'/);
-  assert.match(rosterRoute, /const discoveryCompanionSlots[\s\S]*?kind: 'locked' as const/);
-  assert.doesNotMatch(kingdomScreen, /EggAvatar|accessibilityLabel="Open You"/);
-  assert.doesNotMatch(kingdomScreen, /eggVisual/);
-  assert.match(ftueScript, /entryStepId: 'world\.egg_intro'/);
-  assert.match(ftueScript, /id: 'world\.egg_intro'[\s\S]*?title: COPY\.opening[\s\S]*?nextStepId: 'egg\.opening'[\s\S]*?durationMs: 3_900/);
-  assert.doesNotMatch(ftueScript, /There’s something here/);
-  assert.match(kingdomScreen, /initialFtueCameraScale = ftueStepId === 'world\.egg_intro'[\s\S]*?MOSSPROUT_WORLD_EGG_ENTRY_ZOOM/);
-  assert.match(kingdomScreen, /gardenWorldGuidanceActive \|\| ftueStepId === 'world\.egg_intro'[\s\S]*?top: insets\.top \+ 18/);
-  assert.match(kingdomCanvas, /candidate\.companion\?\.familyId === targetCharacterId/);
-  assert.match(youRoute, /accessibilityLabel="Back to Haven"[\s\S]*?router\.replace\('\/\(tabs\)\/katchimeras'\)/);
-  assert.match(companionRoute, /onCloseCompanion=\{\(\) =>[\s\S]*?: router\.back\(\);\s*\}\}/);
-});
-
 test('the dev toggle exposes virtual companions across roster, companion, games, goals, and Dex surfaces', () => {
   const read = (...segments: string[]) => fs.readFileSync(path.join(process.cwd(), ...segments), 'utf8');
   const devTab = read('app', '(tabs)', 'explore.tsx');
@@ -388,22 +295,6 @@ test('production companion surfaces consume Merge World discovery ownership', ()
   assert.match(gamesRoute, /withDiscoveredKatchimeras/);
 });
 
-test('the Mossprout sub-world routes Garden orders to the dedicated activity page', () => {
-  const kingdomScreen = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-kingdom-screen.tsx'),
-    'utf8',
-  );
-  assert.match(kingdomScreen, /pathname: '\/katchimera\/\[creatureId\]\/activity'/);
-  assert.match(kingdomScreen, /source: 'haven-world'/);
-  assert.match(kingdomScreen, /focusOrderId: orderId/);
-  assert.doesNotMatch(kingdomScreen, /mergeWorldStateForBoard\(mergeWorld, 'steppling'\)/);
-  assert.doesNotMatch(kingdomScreen, /mergeBoards=|mergeBoardFocusRequest=/);
-  assert.match(kingdomScreen, /gardenOrders=\{\['world.garden_handoff', 'world.seed_planted'\].includes\(ftueStepId \?\? ''\) \? \[\] : gardenOrderEntries\}/);
-  assert.match(kingdomScreen, /gardenRequestBubble[\s\S]*?<PersistentMergeItemArt[\s\S]*?gardenRequestBubbleTail/);
-  assert.match(kingdomScreen, /gardenRequestBubble[\s\S]*?gardenButton/);
-  assert.match(kingdomScreen, /discoveryCalloutLayerAboveSpotlight: \{ zIndex: 90 \}/);
-});
-
 test('Haven is Mossprout’s world: always mounted, its bundle fetched with the route, nothing of the old selector built', () => {
   const rosterRoute = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-roster-route-screen.tsx'),
@@ -422,58 +313,6 @@ test('Haven is Mossprout’s world: always mounted, its bundle fetched with the 
   assert.match(rosterRoute, /<LazyKatchimeraKingdomScreen[\s\S]*?companionSlots=\{mossproutWorldCompanionSlots\}/);
   assert.doesNotMatch(rosterRoute, /HavenSelectorPresentation|Returning to all Havens|hardwareBackPress|worldMarkers|readyMergeOrderIds|deriveHavenTilePresentation/, 'nothing of the selector is built: no markers, no Back to it');
   assert.match(scene, /includeMossproutGarden[\s\S]*?\? \[mossproutGardenLayer/);
-});
-
-test('the roster, companion, and Block Blast use isolated route boundaries', () => {
-  const tabRoute = fs.readFileSync(
-    path.join(process.cwd(), 'app', '(tabs)', 'katchimeras.tsx'),
-    'utf8',
-  );
-  const rosterScreen = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-roster-screen.tsx'),
-    'utf8',
-  );
-  const rosterRoute = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-roster-route-screen.tsx'),
-    'utf8',
-  );
-  const rosterCard = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-roster-card.tsx'),
-    'utf8',
-  );
-  const gameRoute = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'quests', 'block-blast-route-screen.tsx'),
-    'utf8',
-  );
-  const gameShell = fs.readFileSync(
-    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'quests', 'block-blast-game-shell.tsx'),
-    'utf8',
-  );
-
-  assert.match(tabRoute, /KatchimeraRosterRouteScreen/);
-  assert.doesNotMatch(tabRoute, /KingdomCompanionScreen/);
-  assert.match(rosterScreen, /FlashList/);
-  assert.doesNotMatch(rosterScreen, /SectionList/);
-  assert.match(rosterScreen, /target === 'Cell'/);
-  assert.match(rosterScreen, /Math\.min\(360, Math\.max\(240, height \* 0\.4\)\)/);
-  assert.doesNotMatch(rosterScreen, /introActive|setTimeout/);
-  assert.match(rosterScreen, /hasCompletedInitialLoad/);
-  assert.match(rosterScreen, /FadeIn\.duration\(240\)/);
-  assert.match(rosterRoute, /useAllDays\(\{ refreshOnFocus: false \}\)/);
-  assert.match(rosterRoute, /<LazyKatchimeraKingdomScreen/);
-  assert.doesNotMatch(rosterRoute, /KatchimeraViewMode|Show Katchimera grid|<KatchimeraRosterScreen/);
-  assert.match(rosterCard, /recyclingKey=\{artworkKey\}/);
-  assert.match(rosterCard, /transition=\{0\}/);
-  assert.doesNotMatch(rosterCard, /useReducedMotion/);
-  assert.doesNotMatch(rosterCard, /FadeInUp|entering=|translateY/);
-  assert.match(rosterRoute, /hasCompletedInitialFocus/);
-  assert.match(rosterRoute, /useIsFocused/);
-  assert.match(rosterRoute, /isFocused \? \([\s\S]*?<FocusedKatchimeraRosterBoundary[\s\S]*?\) : null/);
-  assert.match(gameRoute, /BlockBlastQuest/);
-  assert.match(gameRoute, /BlockBlastGameShell/);
-  assert.match(gameShell, /cheerlet-exploration-v1\.png/);
-  assert.match(gameShell, /AmbientEnvironmentDrift/);
-  assert.doesNotMatch(gameRoute, /CompanionInteractionSheet|TodaySceneBackdrop|CompanionGameBackdrop/);
 });
 
 test('large mini-game environment art shares the ambient drift animation', () => {

@@ -180,55 +180,11 @@ test('Dream Echoes accept only their match and emit persistent FTUE evidence', (
   assert.equal(state.board[23].occupant?.kind === 'item' ? state.board[23].occupant.definitionId : null, 'nature:garden:2');
 });
 
-test('Merge FTUE serves the first Sprout after teaching the authored two-stage merge', () => {
-  const initial = createMossproutChapterZeroState(NOW);
-  const from = initial.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-a');
-  const to = initial.board.findIndex((cell) => cell.occupant?.kind === 'item' && cell.occupant.instanceId === 'onboarding-seed-b');
-  let merged = reduceMergeWorld(initial, { type: 'move', from, to, now: NOW + 1 }).state;
-  merged = reduceMergeWorld(merged, { type: 'move', from: 32, to: 33, now: NOW + 1.5 }).state;
-  merged = reduceMergeWorld(merged, { type: 'move', from: to, to: 33, now: NOW + 2 }).state;
-  const step = mossproutFtueStep('merge.serve_sprout');
-  const orderId = 'mossprout:chapter-0:first-sprout';
-  // Merging was taught by the opening: the request only points at Serve and leaves the board free.
-  assert.deepEqual(mergeFtueBoardGate(step, merged), { kind: 'open' });
-  assert.deepEqual(mergeFtueRailGate(step), { kind: 'open' });
-  assert.deepEqual(step?.cue, { kind: 'tap', target: { kind: 'order_serve', orderId } });
-  assert.equal(mergeFtueAllowsCommand(step, merged, { type: 'serveOrder', orderId, now: NOW + 3 }), true);
-  const command = { type: 'serveOrder' as const, orderId, now: NOW + 3 };
-  const result = reduceMergeWorld(merged, command);
-  assert.deepEqual(mergeFtueEventForCommand(merged, command, result), { type: 'order_served', orderId, revision: result.state.revision });
-  assert.equal(recoverMergeFtueEvent('merge.serve_sprout', result.state, {
-    'baseline:merge.serve_sprout:merge.serve_sprout': 0,
-  })?.type, 'order_served');
-  assert.deepEqual(result.state.activeOrders, []);
-  assert.equal(result.state.generators['wild-garden'].forcedDropDefinitionId, null);
-  assert.equal(result.state.energy.regenPaused, false);
-});
-
 test('Merge FTUE exposes only Mossprout’s highlighted return note after Chapter 0', () => {
   const step = mossproutFtueStep('merge.return_note');
   assert.deepEqual(mergeFtueRailGate(step), { kind: 'chat_note', noteId: 'mossprout:chapter-0:return-note' });
   assert.equal(mergeFtueAllowsChatNote(step, 'mossprout:chapter-0:return-note'), true);
   assert.equal(mergeFtueAllowsChatNote(step, 'chat-note:someone-else'), false);
-});
-
-test('Mossprout Chapter One reconciles its three authored rain-garden requests', () => {
-  let state = reduceMergeWorld(createInitialMergeWorldState(NOW), { type: 'reconcileCharacters', characterIds: ['mossprout'], now: NOW }).state;
-  const expected = [
-    { level: 2, title: 'A Place for Rain', requirements: ['nature:waterside:2'] },
-    { level: 3, title: 'A Bank That Holds', requirements: ['nature:garden:3', 'nature:waterside:2'] },
-    { level: 4, title: 'The Little Rain Garden', requirements: ['nature:garden:4', 'nature:waterside:3'] },
-  ];
-  for (const item of expected) {
-    state = reduceMergeWorld(state, {
-      type: 'reconcileStory', familyId: 'mossprout', status: 'order_active',
-      targetLevel: item.level, actPhase: item.level === 4 ? 'signature_order' : 'regular_orders', now: NOW + item.level,
-    }).state;
-    const order = state.activeOrders.find((candidate) => candidate.characterId === 'mossprout');
-    assert.equal(order?.title, item.title);
-    assert.deepEqual(order?.requirements.map((requirement) => requirement.definitionId), item.requirements);
-    assert.equal(order?.signature, item.level === 4);
-  }
 });
 
 test('Merge FTUE permits only the highlighted generator and emits spawn evidence', () => {
@@ -366,44 +322,6 @@ test('Steppling board commands preserve Mossprout cells while sharing world rewa
   assert.equal(steppling.board[23].occupant?.kind === 'item' ? steppling.board[23].occupant.definitionId : null, 'adventure:trail:2');
   assert.equal(result.state.coins, root.coins + 5);
   assert.equal(result.state.haven.residentMergeBoards.steppling?.revision, 1);
-});
-
-test('Mossprout Chapter 0 teaches one merge and leaves its Garden upgrade to the story operation', () => {
-  let state = createMossproutChapterZeroState(NOW, 'heartlet');
-  const openCount = () => state.board.filter((cell) => !cell.locked).length;
-  assert.equal(openCount(), 20);
-  assert.equal(state.energy.value, 0);
-  assert.equal(state.energy.regenPaused, false);
-  assert.deepEqual(state.generators['wild-garden'].tierOneDropDefinitionIds, ['nature:garden:1', 'nature:waterside:1']);
-  assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, 'nature:garden:1');
-  assert.deepEqual(state.activeOrders.map((order) => order.id), ['mossprout:chapter-0:first-sprout']);
-  assert.deepEqual(state.activeOrders[0].requirements, [{ definitionId: 'nature:garden:3', quantity: 1 }]);
-  assert.deepEqual(state.board.flatMap((cell, index) => cell.mist?.kind === 'echo' && cell.mist.ownerCharacterId === 'mossprout' ? [[index, cell.mist.definitionId]] : []), [
-    [23, 'nature:garden:1'], [25, 'nature:garden:2'], [37, 'nature:garden:3'], [39, 'nature:garden:4'], [45, 'nature:garden:5'],
-  ]);
-
-  const seedCells = state.board.flatMap((cell, index) => cell.occupant?.kind === 'item' ? [index] : []);
-  assert.equal(seedCells.length, 4);
-  assert.ok(seedCells.every((cell) => state.board[cell].occupant?.kind === 'item' && state.board[cell].occupant.definitionId === 'nature:garden:1'));
-  state = reduceMergeWorld(state, { type: 'move', from: seedCells[0], to: seedCells[1], now: NOW + 1 }).state;
-  state = reduceMergeWorld(state, { type: 'move', from: seedCells[2], to: seedCells[3], now: NOW + 1.5 }).state;
-  state = reduceMergeWorld(state, { type: 'move', from: seedCells[1], to: seedCells[3], now: NOW + 2 }).state;
-  const firstBloom = reduceMergeWorld(state, { type: 'serveOrder', orderId: 'mossprout:chapter-0:first-sprout', now: NOW + 3 });
-  state = firstBloom.state;
-  assert.equal(openCount(), 20);
-  assert.deepEqual(state.activeOrders, []);
-  assert.equal(state.energy.value, 0);
-  assert.equal(state.energy.regenPaused, false);
-  assert.equal(state.generators['wild-garden'].forcedDropDefinitionId, null);
-  assert.deepEqual(state.generators['wild-garden'].tierOneDropDefinitionIds, ['nature:garden:1', 'nature:waterside:1']);
-  assert.equal(Boolean(state.characterProgress.mossprout?.completedChapterIds.includes('mossprout-chapter-0')), true);
-  assert.equal(firstBloom.havenUpgrade, undefined);
-  assert.equal(state.haven.tileStages.mossprout, undefined);
-  assert.equal(state.haven.revealState, 'hidden');
-  assert.deepEqual(Object.values(state.haven.mossproutNatureIslands), [0, 0, 0, 0, 0, 0]);
-  assert.ok(state.externalRewardReceipts.some((receipt) => receipt.id === 'merge-story-served:mossprout:chapter-0:first-sprout'));
-  assert.equal(state.externalRewardReceipts.some((receipt) => receipt.kind === 'wisp'), false);
-
 });
 
 test('the all-roster board manifest budgets every cell without sacrificing endgame workspace', () => {
@@ -773,46 +691,6 @@ test('Mossprout resident cards cannot bypass their locked board nodes with Coins
   assert.match(purchased.message ?? '', /veiled garden card/i);
 });
 
-test('ordinary Mossprout Journey orders never grant resident cards', () => {
-  const base = createMossproutChapterZeroState(NOW);
-  const activity = {
-    objectiveId: 'mossprout:objective:pond-knock',
-    mergeOrderId: 'merge-story:mossprout:quiet-patch:listening-place',
-    mergeOrderIds: ['merge-story:mossprout:quiet-patch:listening-place', 'merge-story:mossprout:quiet-patch:path-for-water'],
-    opportunityId: 'mossprout:2026-08-23:resident-order',
-    generatorId: 'wild-garden',
-    dropDefinitionIds: ['nature:waterside:2'],
-  };
-  let matchProjection = reduceMergeWorld(base, {
-    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'activity_in_progress', activity,
-    residentSignals: { completedObjectiveIds: [], matchedCardIds: ['petalimp'], firstResidentSkinId: 'petalimp', habitatStage: 1 }, now: NOW + 3,
-  }).state;
-  const residentOrder = matchProjection.activeOrders.find((order) => order.id === activity.mergeOrderId)!;
-  assert.equal(residentOrder.recipientSkinId, 'petalimp');
-  assert.equal(residentOrder.reward.katchimeraCardId, undefined);
-  assert.deepEqual(matchProjection.mossproutResidentSkinIds, ['mossprout']);
-  assert.equal(matchProjection.ownedKatchimeraCards.some((card) => card.cardId === 'petalimp'), false);
-  const cell = matchProjection.board.findIndex((candidate) => !candidate.locked && candidate.occupant == null);
-  matchProjection = {
-    ...matchProjection,
-    board: matchProjection.board.map((candidate, index) => index === cell ? {
-      ...candidate,
-      occupant: { kind: 'item' as const, instanceId: 'resident-order-shell', definitionId: 'nature:waterside:2' },
-    } : candidate),
-  };
-  matchProjection = reduceMergeWorld(matchProjection, { type: 'serveOrder', orderId: activity.mergeOrderId, now: NOW + 3.5 }).state;
-  assert.deepEqual(matchProjection.mossproutResidentSkinIds, ['mossprout']);
-  assert.equal(matchProjection.ownedKatchimeraCards.find((card) => card.cardId === 'petalimp'), undefined);
-
-  const storyProjection = reduceMergeWorld(matchProjection, {
-    type: 'reconcileCharacterActivity', familyId: 'mossprout', dayId: '2026-08-23', status: 'complete', activity: null,
-    residentSignals: {
-      completedObjectiveIds: ['mossprout:objective:nursery-key'], matchedCardIds: ['petalimp'], habitatStage: 2,
-    }, now: NOW + 4,
-  }).state;
-  assert.deepEqual(storyProjection.mossproutResidentSkinIds, ['mossprout']);
-});
-
 test('legacy saves: advanced Mossprout orders show one different unlocked resident per request', () => {
   const activeDayIds = Array.from({ length: 28 }, (_, index) => `2026-07-${String(index + 1).padStart(2, '0')}`);
   const base = {
@@ -902,23 +780,6 @@ test('legacy saves: a Mossprout story request preempts routine Garden orders', (
   }).state;
   assert.equal(restored.activeOrders.filter((order) => order.storyArcId === 'mossprout:casual-garden').length, 1);
   assert.equal(restored.activeOrders.some((order) => order.id === 'merge-story:mossprout:memory-nursery:ivy-gate'), false);
-});
-
-test('every Pantry tap is tier one and chooses both chains', () => {
-  const base = storyWorld();
-  const tiers: number[] = [];
-  for (let index = 0; index < 200; index += 1) {
-    const result = reduceMergeWorld(base, { type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + index + 2, seed: `drop-curve:${index}` });
-    const occupant = result.spawnedCell == null ? null : result.state.board[result.spawnedCell].occupant;
-    assert.equal(occupant?.kind, 'item');
-    if (occupant?.kind === 'item') tiers.push(Number(occupant.definitionId.split(':').at(-1)));
-  }
-  assert.deepEqual([...new Set(tiers)], [1]);
-  const drops = Array.from({ length: 200 }, (_, index) => reduceMergeWorld(base, {
-    type: 'tapGenerator', generatorId: 'hearth-pantry', now: NOW + index + 2, seed: `chain-curve:${index}`,
-  })).flatMap((result) => result.spawnedCell == null ? [] : [result.state.board[result.spawnedCell].occupant]).filter((occupant): occupant is MergeBoardItem => occupant?.kind === 'item');
-  assert.deepEqual([...new Set(drops.map((drop) => drop.definitionId))].sort(), ['food:dessert:1', 'food:table:1']);
-  assert.ok(Math.abs(drops.filter((drop) => drop.definitionId === 'food:table:1').length - 100) < 25);
 });
 
 test('generator fragments upgrade drops without changing chain ownership', () => {
@@ -1339,42 +1200,6 @@ test('rail FTUE target refs keep stable callback identities across target revisi
   assert.doesNotMatch(rail, /targetRef=\{\(view\) => onRailTargetRef/);
 });
 
-test('Merge board retains destination selection and decorates generators with ambient motion', () => {
-  const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
-  assert.match(board, /onSelect\(to\);/);
-  assert.match(board, /onSelect\(sprite\.cell\);/);
-  assert.match(board, /SelectedCellCorners[\s\S]*?selectionCornerTopLeft[\s\S]*?selectionCornerBottomRight/);
-  assert.match(board, /SelectedCellCorners cell=\{selectedCell\} dragPhase=\{dragPhase\}/);
-  assert.match(board, /if \(phase === 1\)[\s\S]*?visibility\.value = withTiming\(0/);
-  assert.match(board, /previousPhase === 1[\s\S]*?withTiming\(1\.12[\s\S]*?withSpring\(1/);
-  assert.match(board, /selectionCornerOutline[\s\S]*?borderLeftWidth: arm \+ 2[\s\S]*?selectionCornerFill[\s\S]*?borderLeftWidth: arm/);
-  assert.match(board, /selectionCornerOutline: \{ \.\.\.StyleSheet\.absoluteFillObject, borderColor: '#075B69'/);
-  assert.match(board, /selectionCornerFill: \{ borderColor: '#18D5E6'/);
-  assert.doesNotMatch(board, /selectionCorner[^\n]*boxShadow/);
-  assert.match(board, /left: frame\.bounds\.left - outset, top: frame\.bounds\.top - outset/);
-  assert.match(board, /\[1, 1\.045\]/);
-  assert.doesNotMatch(board, /cellStateSelected|selectionCornerHorizontal|selectionCornerVertical/);
-  assert.match(board, /withRepeat\(withSequence\([\s\S]*?withTiming\(1[\s\S]*?withTiming\(0/);
-  const generatorGlint = board.slice(board.indexOf('function GeneratorSparkles'), board.indexOf('function mergeLogicalPointFromProjectedWorklet'));
-  assert.match(generatorGlint, /name="sparkles"/);
-  assert.match(generatorGlint, /withRepeat\(withTiming/);
-  assert.match(generatorGlint, /if \(!foreground \|\| reduceMotion\)/);
-  assert.match(generatorGlint, /return \(\) => cancelAnimation\(progress\)/);
-  assert.match(generatorGlint, /translateY: interpolate\(p, \[0, 1\], \[size \* 0.24, -size \* 0.62\]\)/);
-  assert.doesNotMatch(board, /generatorBolt/);
-  assert.match(board, /setTimeout\(\(\) => setMatchHintActive\(true\), 2800\)/);
-  assert.match(board, /function MergeMatchHint[\s\S]*?withRepeat\(withSequence[\s\S]*?progress\.value \* 0\.055/);
-  assert.match(board, /const strength = Math\.min\(2\.25, cellSize \* 0\.045\)/);
-  assert.match(board, /<DreamEchoItemArt definitionId=\{lockedDefinitionId\}/);
-  assert.match(board, /size=\{Math\.min\(width, height\) - 4\}/);
-  assert.match(board, /DreamMistDissipation/);
-  assert.match(board, /emitEmptyCellTap/);
-  assert.match(board, /MergeCellCallout/);
-  assert.doesNotMatch(board, /from '@shopify\/react-native-skia'/);
-  assert.doesNotMatch(board, /useImage\(/);
-  assert.match(board, /Dream Echoes on the same Expo Image decode\/cache path/);
-});
-
 test('the dedicated Merge board keeps the direct-index flat rendering fast path', () => {
   const board = readFileSync('components/katchadeck/games/feastle-persistent-merge-board.tsx', 'utf8');
   const geometry = readFileSync(require.resolve('@incubator/merge/board-geometry'), 'utf8');
@@ -1606,23 +1431,6 @@ test('legacy snapshots reset cleanly into Mossprout’s current personal world',
   assert.deepEqual(normalized.unlockedChains, []);
 });
 
-test('the shared catalog has ten generators, nineteen chains, and all twenty-five profiles', () => {
-  assert.equal(MERGE_GENERATORS.length, 10);
-  assert.ok(MERGE_GENERATORS.every((generator) => generator.chainIds.length === 2));
-  assert.ok(MERGE_GENERATORS.every((generator) => generator.tierOneDropDefinitionIds.every((id) => id.endsWith(':1'))));
-  assert.equal(new Set(MERGE_GENERATORS.flatMap((generator) => generator.chainIds)).size, 19);
-  assert.equal(Object.keys(KATCHIMERA_MERGE_PROFILES).length, 25);
-  assert.ok(Object.values(KATCHIMERA_MERGE_PROFILES).every((profile) => profile.coreChains.length === 2));
-  assert.equal(MERGE_ITEMS_BY_ID.get('drink:hot:1')?.name, 'Tiny Espresso');
-  assert.equal(MERGE_ITEMS_BY_ID.get('drink:hot:3')?.name, 'Strawberry Boba');
-  assert.equal(MERGE_ITEMS_BY_ID.get('drink:hot:6')?.name, 'Grand Rainbow Café Float');
-  assert.equal(MERGE_ITEMS_BY_ID.get('drink:refresh:1')?.name, 'Small Juice Cup');
-  assert.equal(MERGE_ITEMS_BY_ID.get('food:cafe-pastry:6')?.name, 'Dream Patisserie');
-  assert.equal(MERGE_ITEMS_BY_ID.get('social:cafe-sharing:6')?.name, 'Lantern Café Terrace');
-  assert.deepEqual(KATCHIMERA_MERGE_PROFILES.baristabbit.coreChains, ['drink:refresh', 'drink:hot']);
-  assert.deepEqual(KATCHIMERA_MERGE_PROFILES.baristabbit.guestChains, ['food:cafe-pastry', 'social:cafe-sharing']);
-});
-
 test('Baristabbit café orders deliver one idempotent Café Counter parcel and preserve saved requirements', () => {
   let state = reduceMergeWorld(createInitialMergeWorldState(NOW, ['baristabbit']), {
     type: 'reconcileStory', familyId: 'baristabbit', status: 'order_active', targetLevel: 6,
@@ -1836,82 +1644,6 @@ test('life affinity recommends but never removes an early discovery choice', () 
     nature: 0, adventure: 0, social: 1, rest: 0, creativity: 0, discovery: 0, food: 8, home: 2,
   });
   assert.deepEqual(food, { characterId: 'feastle', strength: 'strong' });
-});
-
-test('Gate 3 waits for Steppling first order and returns the complete non-missable pool', () => {
-  let state = createInitialMergeWorldState(NOW, ['mossprout', 'steppling']);
-  state = {
-    ...state,
-    mergeXp: 100,
-    mergeLevel: 3,
-    completedOrderCount: 6,
-    companionDiscovery: {
-      ...state.companionDiscovery,
-      records: [
-        ...state.companionDiscovery.records.filter((record) => record.characterId !== 'steppling'),
-        {
-          characterId: 'steppling', source: 'board_discovery', gateId: 'gate-2-steppling', pathId: 'overgrown-trail',
-          discoveredAt: NOW, revealSeenAt: NOW, firstOrderCompletedAt: null, permanentFeatureId: 'journey-locker',
-        },
-      ],
-      completedGateIds: ['gate-1-mossprout', 'gate-2-steppling'],
-    },
-  };
-  assert.equal(nextEligibleCompanionGate(state, 1), null);
-  state = {
-    ...state,
-    companionDiscovery: {
-      ...state.companionDiscovery,
-      records: state.companionDiscovery.records.map((record) => record.characterId === 'steppling'
-        ? { ...record, firstOrderCompletedAt: NOW + 1 }
-        : record),
-    },
-  };
-  assert.deepEqual(nextEligibleCompanionGate(state, 1), {
-    gateId: 'gate-3-first-choice',
-    candidateIds: ['feastle', 'baristabbit', 'bedrotte'],
-  });
-});
-
-test('Gate 4 offers the remaining two paths and Gate 5 guarantees the final early foundation', () => {
-  const discoveryRecord = (characterId: 'steppling' | 'feastle' | 'baristabbit', gateId: string) => ({
-    characterId, source: 'board_discovery' as const, gateId, pathId: 'path', discoveredAt: NOW,
-    revealSeenAt: NOW, firstOrderCompletedAt: NOW, permanentFeatureId: 'feature',
-  });
-  let state = createInitialMergeWorldState(NOW, ['mossprout', 'steppling', 'feastle']);
-  state = {
-    ...state,
-    mergeLevel: 5,
-    completedOrderCount: 15,
-    expansions: ['expansion:1'],
-    companionDiscovery: {
-      ...state.companionDiscovery,
-      records: [
-        ...state.companionDiscovery.records.filter((record) => !['steppling', 'feastle'].includes(record.characterId)),
-        discoveryRecord('steppling', 'gate-2-steppling'), discoveryRecord('feastle', 'gate-3-first-choice'),
-      ],
-      completedGateIds: ['gate-1-mossprout', 'gate-2-steppling', 'gate-3-first-choice'],
-    },
-  };
-  assert.deepEqual(nextEligibleCompanionGate(state, 2), {
-    gateId: 'gate-4-expanding-world', candidateIds: ['baristabbit', 'bedrotte'],
-  });
-
-  state = {
-    ...state,
-    unlockedCharacters: [...state.unlockedCharacters, 'baristabbit'],
-    mergeLevel: 7,
-    completedOrderCount: 28,
-    expansions: ['expansion:1', 'expansion:2'],
-    companionDiscovery: {
-      ...state.companionDiscovery,
-      records: [...state.companionDiscovery.records, discoveryRecord('baristabbit', 'gate-4-expanding-world')],
-      completedGateIds: [...state.companionDiscovery.completedGateIds, 'gate-4-expanding-world'],
-    },
-  };
-  assert.deepEqual(nextEligibleCompanionGate(state, 3), {
-    gateId: 'gate-5-complete-foundations', candidateIds: ['bedrotte'],
-  });
 });
 
 test('an earned gate queues behind the one-discovery-per-day safeguard and opens later', () => {

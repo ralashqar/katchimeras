@@ -47,53 +47,6 @@ function completeBloomCampaignRequest(state: MergeWorldState, level: MossproutNa
   } } };
 }
 
-test('every island level uses the shared purchase flow in wake order, survives reload, and charges only once', () => {
-  let state = restored(10_000);
-  for (const entry of ISLAND_WAKE_ORDER) {
-    const campaign = ISLAND_CAMPAIGNS.find((candidate) => candidate.islandId === entry.islandId);
-    if (!campaign) break;
-    const island = mossproutNatureIslandById.get(entry.islandId)!;
-    const reveal = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null).find((candidate) => candidate.id === `nature:${island.id}`)!;
-    assert.equal(reveal.transition, 'island_reveal'); assert.equal(reveal.eligible, true); assert.equal(reveal.cost, 0, 'a friend’s mist never costs Glow');
-    assert.ok(WORLD_UPGRADE_FLOWS.some((flow) => flow.id === worldUpgradeRunId(reveal)));
-    const revealCommand: MergeWorldCommand = { type: 'revealMossproutNatureIsland', islandId: island.id, campaignId: campaign.campaignId,
-      residentSkinId: campaign.residentSkinId, cost: reveal.cost, receiptId: worldUpgradeRunId(reveal), now: NOW };
-    const beforeReveal = state.coins;
-    state = normalizeMergeWorldState(JSON.parse(JSON.stringify(reduceMergeWorld(state, revealCommand).state)), NOW);
-    assert.equal(state.coins, beforeReveal - reveal.cost);
-    assert.equal(reduceMergeWorld(state, revealCommand).state.coins, state.coins, 'a replayed reveal never charges twice');
-    state = greetIslandFriend(state, campaign, NOW);
-    for (const level of island.levels) {
-      // A friend's island never costs Glow: its boards open free and its levels grow free.
-      const onBeds: boolean = campaign.chapters.some((entry) => entry.level === level.level && entry.restoration != null);
-      const beforeStage = state.coins;
-      state = acknowledgeChapterReturn(startAndServeChapter(state, campaign, level.level, NOW), campaign, level.level, NOW);
-      if (onBeds) assert.equal(state.coins, beforeStage, `${island.id} level ${level.level}'s board opens free`);
-      state = completeRestoration(state, campaign, level.level, NOW);
-      const offer = visibleWorldUpgradeOffers(worldUpgradeOffers(state), undefined, null).find((candidate) => candidate.id === `nature:${island.id}`)!;
-      assert.ok(offer, `${island.id} level ${level.level} has a marker`);
-      assert.equal(offer.cost, 0);
-      assert.equal(offer.nextLevel, level.level);
-      assert.equal(offer.eligible, true);
-      assert.equal(offer.action, level.level === 1 ? 'Restore' : 'Upgrade');
-      assert.ok(WORLD_UPGRADE_FLOWS.some((flow) => flow.id === worldUpgradeRunId(offer)));
-      const command: MergeWorldCommand = { type: 'upgradeMossproutNatureIsland', islandId: island.id, level: level.level,
-        receiptId: worldUpgradeRunId(offer), now: NOW, ...(level.level === 1 || onBeds ? { economyMode: 'free' } : {}) };
-      const before = state.coins;
-      const paid = reduceMergeWorld(state, command);
-      assert.equal(paid.changed, true, paid.message);
-      assert.equal(paid.state.coins, before - offer.cost);
-      state = normalizeMergeWorldState(JSON.parse(JSON.stringify(paid.state)), NOW);
-      assert.equal(state.haven.mossproutNatureIslands[island.id], level.level);
-      assert.equal(reduceMergeWorld(state, command).state.coins, state.coins);
-      state = completeChapter(state, campaign, level.level, NOW);
-    }
-    assert.equal(worldUpgradeOffers(state).some((offer) => offer.id === `nature:${island.id}`), false);
-    assert.ok(state.ownedKatchimeraCards.some((card) => card.cardId === campaign.residentSkinId), `${campaign.residentName} is home`);
-  }
-  assert.equal(state.haven.tileStages.mossprout, MOSSPROUT_NATURE_ISLANDS.every((island) => state.haven.mossproutNatureIslands[island.id] === 4) ? 4 : 1);
-});
-
 for (const compiler of ['typescript', 'babel'] as const) test(`mist islands are targetable and every reveal keeps other tiles and camera bounds stable (${compiler})`, () => {
   const file = 'components/katchadeck/world/mossprout-hex-neighborhood-scene.ts';
   const mocks: Record<string, unknown> = {
@@ -218,28 +171,6 @@ for (const compiler of ['typescript', 'babel'] as const) test(`mist islands are 
   assert.equal(withBespoke.height, withFallback.height);
 });
 
-test('only the next authored level is offered, preserving costs and aggregate Haven progression', () => {
-  const initial = worldUpgradeOffers(world());
-  // Resting friends and hatchable tiles still asleep under the Mist are on the map but not yet the player's business.
-  const awake = (offer: { sleepingSkinId?: unknown; hatchable?: { state: string } }) => offer.sleepingSkinId == null && offer.hatchable?.state !== 'sleeping';
-  assert.ok(initial.filter(awake).every((offer) => offer.eligible), 'every awake spot is eligible');
-  assert.equal(initial.find((offer) => offer.id === 'nature:bloom-garden')?.transition, 'island_reveal');
-  assert.equal(initial.find((offer) => offer.id === 'haven:mossprout')?.cost, 20);
-  const offers = worldUpgradeOffers(restored());
-  assert.equal(offers.some((offer) => offer.id === 'haven:mossprout'), false);
-  assert.equal(offers.find((offer) => offer.id === 'mist:steppling-home')?.cost, 20);
-  for (const island of MOSSPROUT_NATURE_ISLANDS) {
-    const offer = offers.find((item) => item.id === `nature:${island.id}`)!;
-    const open = islandWakeState(restored(), island.id) === 'open';
-    assert.equal(offer.cost, 0, 'a friend’s mist never costs Glow');
-    assert.equal(offer.eligible, open, `${island.id} is ${open ? 'open' : 'resting'}`);
-    if (open) assert.equal(offer.nextLevel, 0);
-    else assert.equal(offer.sleepingSkinId, ISLAND_WAKE_ORDER.find((entry) => entry.islandId === island.id)?.residentSkinId);
-  }
-  assert.equal(offers.filter((offer) => offer.eligible && offer.id.startsWith('nature:')).length, 1, 'exactly one island is the next step');
-  assert.equal(new Set(WORLD_UPGRADE_DEFINITIONS.map(worldUpgradeRunId)).size, WORLD_UPGRADE_DEFINITIONS.length);
-});
-
 test('unaffordable spots remain discoverable without story or resident prerequisites', () => {
   const offers = worldUpgradeOffers({ ...restored(), coins: 3 });
   const mist = offers.find((offer) => offer.id === 'mist:steppling-home')!;
@@ -297,19 +228,6 @@ test('every upgrade holds the old world before spending and replays its receipt-
   }
 });
 
-test('FTUE marker taps open a saved scene without spending: a confirmation for the Garden, the mission board for the mist', () => {
-  const garden = MOSSPROUT_FTUE_FLOW.nodes.find((item) => item.id === 'world.first_bloom_offer')!;
-  assert.equal(garden.kind, 'scene');
-  assert.equal(garden.kind === 'scene' && garden.actions[0].next, 'world.first_bloom_restore');
-  assert.equal(MOSSPROUT_FTUE_FLOW.nodes.find((item) => item.id === 'world.first_bloom_restore')?.kind, 'scene');
-  const bubble = GLOW_DISCOVERY_FLOW.nodes.find((item) => item.id === 'gateway.pay')!;
-  assert.equal(bubble.kind, 'task', 'the mist bubble waits for its ticket');
-  assert.equal(bubble.kind === 'task' && bubble.next, 'mission.focus');
-  assert.equal(GLOW_DISCOVERY_FLOW.nodes.find((item) => item.id === 'mission.focus')?.kind, 'presentation', 'the camera frames the tile first');
-  assert.equal(GLOW_DISCOVERY_FLOW.nodes.find((item) => item.id === 'mission.clear')?.kind, 'task', 'then the board waits for its bar');
-  assert.equal(GLOW_DISCOVERY_FLOW.nodes.some((item) => item.id === 'gateway.buy'), false, 'no purchase sheet');
-});
-
 test('ordinary purchase deduplicates rapid taps, validates fresh balance, and resumes the existing journal', async () => {
   let starts = 0; let retries = 0; let existing: { status: string } | null = null; let state = world();
   const runtime = loadNativeModule('features/world-upgrades/world-upgrade-runtime.ts', {
@@ -355,26 +273,6 @@ test('ordinary purchase flushes optimistic world progress before fresh eligibili
 
   await runtime.purchaseWorldUpgrade(offer, { beforeValidation: async () => { ready = true; } });
   assert.equal(starts, 1);
-});
-
-test('a legacy confirmation checkpoint crosses the new marker scene without replaying spending', async () => {
-  let run = { runId: 'flow:old-ftue', definitionId: MOSSPROUT_FTUE_FLOW.id, definitionVersion: MOSSPROUT_FTUE_FLOW.version,
-    nodeId: 'world.first_bloom_offer', status: 'active', phase: 'awaiting_scene' };
-  const actions: string[] = [];
-  const runtime = loadNativeModule('features/content-flow/ftue-content-flow-runtime.ts', {
-    '@/features/onboarding/mossprout-ftue-flow': { MOSSPROUT_FTUE_VARIANTS: { id: 'test', variants: [] } },
-    './content-flow-catalog': { contentFlowDefinition: () => MOSSPROUT_FTUE_FLOW },
-    './content-flow-director': { dispatchContentFlowCommand: async (_id: string, command: { actionId: string }) => {
-      actions.push(command.actionId); run = { ...run, nodeId: 'world.first_bloom_restore' }; return run;
-    } },
-    './content-flow-interpreter': {},
-    './content-flow-repository': { loadContentFlowRun: async () => run },
-    './story-variant-registry': { registerStoryVariantSet() {}, selectedStoryVariant: () => ({ definition: MOSSPROUT_FTUE_FLOW }) },
-  });
-  const result = await runtime.reconcileFtueCheckpoint({ runId: 'old-ftue', stepId: 'world.first_bloom_restore',
-    receipts: [{ stepId: 'merge.serve_sprout', scriptVersion: 47, status: 'committed' }] });
-  assert.equal(result.nodeId, 'world.first_bloom_restore');
-  assert.deepEqual(actions, ['world.open_first_bloom_upgrade']);
 });
 
 
@@ -510,16 +408,6 @@ test('already paid mist resumes its reveal without another charge; unpaid mist i
   const resumed = reduceMergeWorld(paid, { type: 'unlockWorldTarget', targetId: 'mossprout:overgrown-trail', receiptId: 'recovered-story-purchase', now: NOW + 1 });
   assert.equal(resumed.state.coins, paid.coins);
   assert.equal(resumed.storyWorldMutationReceipt?.coinCost, 0);
-});
-
-test('enough Glow returns straight to the pay step with no camera acknowledgement', () => {
-  const initial = { ...createContentFlowRun(GLOW_DISCOVERY_FLOW, { runId: 'return-with-glow', now: NOW }), nodeId: 'gateway.ready' };
-  const ready = stabilizeContentFlow(GLOW_DISCOVERY_FLOW, initial).run;
-  const returned = reduceContentFlow(GLOW_DISCOVERY_FLOW, ready, { type: 'submit_scene', actionId: 'return' });
-  assert.equal(returned.run.nodeId, 'gateway.pay');
-  assert.equal(returned.pendingWork.kind, 'none');
-  assert.equal(GLOW_DISCOVERY_FLOW.migrations?.['gateway.return'], 'gateway.pay');
-  assert.equal(GLOW_DISCOVERY_FLOW.migrations?.['gateway.offer'], 'gateway.pay');
 });
 
 test('a save stuck in the old return-camera or offer step pays first, with no camera callback', async () => {

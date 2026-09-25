@@ -112,7 +112,9 @@ test('a complete campaign earns the friend card once and reports through the gen
   assert.equal(activeIslandCampaign(state)?.status, 'available');
   assert.equal(islandCampaignPanelPresentation(state, campaign)?.actionLabel, campaign.copy.actionLabels.start_story);
   state = startAndServeChapter(state, campaign, 1, NOW + 2);
-  assert.deepEqual(activeIslandCampaignReturn(state), { campaign, level: 1 });
+  // The campaign pivot: a served chapter moves straight on to the next chapter's battle; there is no return beat.
+  assert.equal(activeIslandCampaignReturn(state), null);
+  assert.equal(activeIslandCampaign(state)?.status, 'mission_available');
   state = completeIslandCampaign({ ...createInitialMergeWorldState(NOW, ['mossprout']), coins: 1000 }, campaign, NOW);
   assert.equal(state.ownedKatchimeraCards.filter((card) => card.cardId === campaign.residentSkinId).length, 1);
   assert.equal(state.ownedKatchimeraCards[0]?.acquisition, 'island_campaign');

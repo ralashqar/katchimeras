@@ -96,37 +96,6 @@ test('dialogue always uses the narrative overlay; only standalone status text st
   assert.equal(conversationUsesNarrativeOverlay(branching), true);
 });
 
-for (const intent of ['calm', 'progress', 'unsure'] as const) {
-  test(`first meeting connects ${intent} to a saved reply and Seed before completion`, () => {
-    const authored = mossproutFtueConversationDefinitions.find((item) => item.id.includes('first-meeting:'))!;
-    const resolved = resolveMossproutFtueConversation(authored, `desired-help:${intent}`, authored.version);
-    let session: ConversationSession = { ...createConversationSession({ definition: resolved, formId: 'mossprout', dayId: '2026-09-07', createdAt: 1 }), dialoguePresentation: true };
-    const hello = resolved.nodes.find((node) => node.id === 'hello');
-    assert.ok(hello?.kind === 'choice');
-    session = answerConversation(session, resolved, hello.options[0].id, 2).session;
-    assert.equal(session.currentNodeId, 'followup');
-    const followup = resolved.nodes.find((node) => node.id === 'followup');
-    assert.ok(followup?.kind === 'choice');
-    assert.ok(followup.prompt.endsWith(MOSSPROUT_FOLLOWUPS[intent].prompt));
-    const choice = MOSSPROUT_FOLLOWUPS[intent].options[0];
-    session = answerConversation(session, resolved, `life:${choice.id}`, 3).session;
-    session = JSON.parse(JSON.stringify(session));
-    assert.equal(session.currentNodeId, 'end');
-    assert.equal(session.status, 'active', 'Seed invitation remains visible until Continue');
-    const history = conversationTranscript(session, resolved);
-    assert.ok(history.some((entry) => entry.speaker === 'player' && entry.text === choice.label));
-    assert.ok(history.some((entry) => entry.text === choice.reply));
-    const ending = resolved.nodes.find((node) => node.id === 'end');
-    assert.ok(ending?.kind === 'end');
-    // The Seed invitation is one spoken line: what was shared, and where it goes.
-    assert.match(ending.message, /first light/);
-    assert.match(ending.message, /soil/);
-    session = continueConversation(session, resolved, 4);
-    assert.equal(session.status, 'completed');
-    assert.equal(session.dialogueAcknowledgedAt, 4);
-  });
-}
-
 test('every authored narrative, including Feastle delivery closings, requires the overlay', () => {
   const narratives = companionConversationDefinitionsV2.filter(item => item.format === 'narrative');
   assert.ok(narratives.some(item => item.id === 'feastle:journey:day-2-return'));

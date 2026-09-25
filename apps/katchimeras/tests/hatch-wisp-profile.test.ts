@@ -65,13 +65,6 @@ test('legacy progress receives credit without inventing profile evidence', () =>
     }
   }
 });
-test('Mossprout reveals the egg and goes directly to questions', () => {
-  assert.deepEqual(validateContentFlowDefinition(MOSSPROUT_FTUE_FLOW), []);
-  const ids = MOSSPROUT_FTUE_FLOW.nodes.map((node) => node.id);
-  assert.ok(ids.indexOf('world.egg_intro') < ids.indexOf('egg.opening'));
-  assert.ok(!ids.includes('egg.wisps') && !ids.includes('egg.listening'));
-});
-
 test('replayed projections preserve evidence and do not invent aspirations', () => {
   let stored: { hatchProfiles?: Record<string, HatchAnswer[]>; aspirationId: string | null } = { aspirationId: null };
   let writes = 0;

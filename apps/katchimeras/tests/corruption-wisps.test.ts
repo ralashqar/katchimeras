@@ -48,13 +48,13 @@ test('the clearing is dealt across the wisps in order: each takes its share, the
 
 test('the Glow aims at the wisps: every burst at the first standing, the finale at the last, one hit per burst, a flinch per token', () => {
   const dock = readFileSync('components/katchadeck/world/kingdom-opening-merge-dock.tsx', 'utf8');
-  assert.match(dock, /export type GlowSink = \{\s*aim: \(kind: 'glow' \| 'finale', strike\?: MissionStrike \| null\) => \{ point: RewardFlightPoint; key: number \} \| null;\s*struck: \(key: number\) => void;\s*landed: \(key: number, kind: 'glow' \| 'finale'\) => void;\s*\};/);
+  assert.match(dock, /export type GlowSink = \{[\s\S]*?pointOf\?: \(key: number\) => RewardFlightPoint \| null;\s*aim: \(kind: 'glow' \| 'finale', strike\?: MissionStrike \| null\) => \{ point: RewardFlightPoint; key: number \} \| null;\s*struck: \(key: number\) => void;\s*landed: \(key: number, kind: 'glow' \| 'finale'\) => void;\s*\};/);
   assert.match(dock, /const aimed = targetNode \? null : sinkRef\.current\?\.aim\('glow', strike\) \?\? null;[\s\S]*?if \(aimed\) \{ push\(aimed\.point\); return; \}/, 'a burst goes to the wisp the sink names, or the wisp its strike names');
   assert.match(dock, /const aimed = sinkRef\.current\?\.aim\('finale', strike\) \?\? null;[\s\S]*?if \(aimed\) \{ push\(aimed\.point\); return id; \}/, 'the finale item strikes the last wisp');
   assert.match(dock, /const launchShot = \(from: RewardFlightPoint, strike: MissionStrike\) => \{[\s\S]*?const to = aimed\?\.point \?\? \{ x: from\.x, y: from\.y - 220 \};/, 'a column shot flies to its wisp, or up and away when wasted');
   assert.match(dock, /if \(struck\?\.key != null\) \{\s*sinkRef\.current\?\.struck\(struck\.key\);\s*if \(struck\.group != null && !landedGroups\.current\.has\(struck\.group\)\) \{\s*landedGroups\.current\.add\(struck\.group\);\s*sinkRef\.current\?\.landed\(struck\.key, finale \? 'finale' : 'glow'\);/, 'a flinch per token, a hit per burst');
   // A strike on a wisp bursts as light meeting corruption: hot core, magenta ring, a dark puff, sparks and ember shards; the mist's own burst is untouched.
-  assert.match(dock, /const wisp = landed\.key != null;[\s\S]*?\{ id, wisp, at: \{/);
+  assert.match(dock, /const wisp = landed\.key != null \|\| Boolean\(landed\.shot\);[\s\S]*?\{ id, wisp, at: \{/, 'a strike, or a Lanes shot, bursts as light on a wisp');
   assert.match(dock, /const strikes = useMemo\(\(\) => impacts\.filter\(\(impact\) => impact\.wisp\), \[impacts\]\);[\s\S]*?<WispStrikeBurst key=\{slot\} impact=\{impact\}[\s\S]*?<ImpactBurst key=\{slot\} impact=\{impact\}/, 'a strike on a wisp bursts from its own pool');
   assert.match(dock, /const WispStrikeBurst = memo\(function WispStrikeBurst\(\{ impact, origin, onDone \}: PooledBurstProps\)/);
   assert.match(dock, /const reach = 1 - Math\.pow\(1 - t\.value, 2\.2\);/, 'shards fly out with drag');
@@ -62,9 +62,8 @@ test('the Glow aims at the wisps: every burst at the first standing, the finale 
   const screen = readFileSync('components/katchadeck/roster/katchimera-kingdom-screen.tsx', 'utf8');
   const layerSource = readFileSync('components/katchadeck/world/corruption-wisp-layer.tsx', 'utf8');
   const hook = readFileSync('features/onboarding/use-mist-mission.ts', 'utf8');
-  assert.match(screen, /const wispTarget = useMemo\(\(\): CorruptionWispTarget \| null => rushWispTarget \?\? hatchableMist\.wispTarget \?\? journeyMist\.wispTarget \?\? \(openingBoardActive/, 'a docked mission\u2019s wisps come from its hook');
-  assert.match(hook, /missionWispTarget\(\{ key: played\.id, host: played, mechanicState: store\.mechanicState, node: tileNode, boardMetrics, window, lines: played\.lines, settled: cameraSettled, revealNonce \}\)/);
-  assert.match(screen, /\? \{ key: 'opening-mist', node: homeTileNode, host: OPENING_MIST_HOST, mechanicState: \{ kind: 'glow-strikes', strikes: openingProgress \}, lines: OPENING_WISP_LINES, settled: ftueCameraSettled \}/);
+  assert.match(screen, /const wispTarget = useMemo\(\(\): CorruptionWispTarget \| null => rushWispTarget \?\? firstBattle\.wispTarget \?\? trail1\.wispTarget \?\? trail2\.wispTarget \?\? trail3\.wispTarget \?\? hatchableMist\.wispTarget \?\? journeyMist\.wispTarget \?\? islandMist\.wispTarget/, 'a docked mission\u2019s wisps come from its hook');
+  assert.match(hook, /missionWispTarget\(\{ key: encounter \? `\$\{encounter\.id\}:\$\{attempt\}` : played\.id, host, mechanicState: store\.mechanicState, node: tileNode, boardMetrics, window, lines: played\.lines, settled: cameraSettled, revealNonce/);
   // The wisps own their state in their own component: a strike or a measurement re-renders it, never the screen. It hands the Glow its sink on every render.
   assert.match(layerSource, /export const MissionWisps = memo\(function MissionWisps\([\s\S]*?const wisps = useCorruptionWisps\(target\);\s*glow\.sinkRef\.current = wisps\.sink;\s*return wisps\.visible \? <CorruptionWispLayer wisps=\{wisps\} screenRef=\{screenRef\} \/> : null;/);
   assert.match(screen, /<MissionWisps target=\{wispTarget\} glow=\{openingGlow\.store\} screenRef=\{screenRef\} \/>/);
