@@ -1,5 +1,7 @@
 import { islandLevel, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
-import { FIRST_BATTLE_LINES, LOST_TRAIL_LINES, LOST_TRAIL_STONE_BATTLE_IDS } from '@/features/onboarding/last-clearing';
+import { FIRST_BATTLE_LINES, LOST_TRAIL_LINES, LOST_TRAIL_STONE_BATTLE_IDS, LOST_TRAIL_VOICE, LOST_TRAIL_VOICE_LINES } from '@/features/onboarding/last-clearing';
+import type { SpeechLine } from '@/components/katchadeck/world/friend-speech-bubble';
+import type { RescueBattleCopy } from '@/types/hatchable-companion';
 import type { EncounterDefinition } from '@/types/encounter';
 import type { MergeItemDefinition, MergeWorldState } from '@/types/merge-world';
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
@@ -124,13 +126,6 @@ export function scriptedBattleGuide(encounter: EncounterDefinition, board: Merge
     return entry && !entry.locked && !entry.mist && entry.occupant?.kind === 'item' ? entry.occupant : null;
   };
   const free = (cell: number) => { const entry = board.board[cell]; return Boolean(entry && !entry.locked && !entry.mist && !entry.occupant); };
-  const wake = firstBattleWake(board, window, loose);
-  if (wake) return wake;
-  const rescue = encounter.objective.kind === 'rescue' && board.board[encounter.objective.cell]?.mist ? encounter.objective.cell : null;
-  if (rescue != null) {
-    const toward = rescueMerge(board, window, loose, rescue);
-    if (toward) return toward;
-  }
   // Wisps here and standing, by column, with the cell each is on (a piece cannot be dropped there).
   const wispColumns = new Set<number>();
   const wispCells = new Set<number>();
@@ -150,6 +145,8 @@ export function scriptedBattleGuide(encounter: EncounterDefinition, board: Merge
   const covered = new Set(shooters.map((shooter) => shooter.column));
   const uncovered = [...wispColumns].filter((column) => !covered.has(column)).sort((a, b) => a - b);
   const wasted = shooters.filter((shooter) => !wispColumns.has(shooter.column)).sort((a, b) => b.tier - a.tier);
+  // First (the user, Sept 25 2026): a plant shooting up an empty lane goes under a wisp nothing covers, before any wake
+  // or merge. A wisp coming down an open lane is the one thing that cannot wait.
   if (uncovered.length && wasted.length) {
     const piece = wasted[0]!;
     for (const column of uncovered) {
@@ -159,8 +156,38 @@ export function scriptedBattleGuide(encounter: EncounterDefinition, board: Merge
       }
     }
   }
+  const wake = firstBattleWake(board, window, loose);
+  if (wake) return wake;
+  const rescue = encounter.objective.kind === 'rescue' && board.board[encounter.objective.cell]?.mist ? encounter.objective.cell : null;
+  if (rescue != null) {
+    const toward = rescueMerge(board, window, loose, rescue);
+    if (toward) return toward;
+  }
   const pair = closestOpeningPair(board, window.cellIndices);
   return pair ? { kind: 'merge', from: pair.from, to: pair.to } : null;
+}
+
+const GUIDE_URGENCY: Readonly<Record<FirstBattleGuide['kind'], number>> = { move: 3, wake: 2, merge: 1 };
+
+/**
+ * The finger holds still: the hint already shown stays while it is still a move the board allows, so a Seed landing
+ * (which changes the nearest pair) never restarts it. It gives way only when it can no longer be played, or to
+ * something more urgent (a wisp over an open lane).
+ */
+export function stickyBattleGuide(shown: FirstBattleGuide | null, next: FirstBattleGuide | null, board: MergeWorldState): FirstBattleGuide | null {
+  if (!shown || !next) return next;
+  if (GUIDE_URGENCY[next.kind] > GUIDE_URGENCY[shown.kind]) return next;
+  const cell = (index: number) => board.board[index];
+  const piece = cell(shown.from);
+  const item = piece && !piece.locked && !piece.mist && piece.occupant?.kind === 'item' ? piece.occupant : null;
+  if (!item) return next;
+  const target = cell(shown.to);
+  const still = shown.kind === 'merge'
+    ? Boolean(target && !target.mist && target.occupant?.kind === 'item' && target.occupant.definitionId === item.definitionId)
+    : shown.kind === 'wake'
+      ? Boolean(target?.mist?.kind === 'echo' && target.mist.definitionId === item.definitionId)
+      : Boolean(target && !target.locked && !target.mist && !target.occupant);
+  return still ? shown : next;
 }
 
 /** The next wake on the chain: the lowest sleeper with a loose twin, its twin from the same column first, else the nearest. */
@@ -210,45 +237,12 @@ function rescueMerge(board: MergeWorldState, window: MissionWindow, loose: (cell
 const TRAIL_BOTTOM_ROWS = [36, 37, 38, 39, 40, 43, 44, 45, 46, 47] as const;
 
 /**
- * The Lost Trail's three battles (`docs/cozy-4x-ftue-the-last-clearing.md`, beat 13), docked under the trail's tile,
- * each with one new thing, none of them losable in the first session:
- * - The Trail In: a quick wisp among the steady ones.
- * - Mist Rows: the trail's upper rows under light Mist, and wisps that spit more of it.
- * - Someone's in There: Steppling trapped under thick Mist at the top of the middle lane, ringed by light Mist. Won
- *   with every wisp down and that cell cleared (`rescue`).
+ * The Lost Trail's battle (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Act I), docked under Steppling's misted
+ * trailhead, and not losable in the first session: Steppling trapped under thick Mist at the top of the middle lane,
+ * ringed by light Mist. On the way, one quick wisp and one that spits. Won with every wisp down and that cell cleared
+ * (`rescue`).
  */
 const TRAIL_SPECS: readonly IslandLevelSpec[] = [
-  {
-    title: 'The Trail In', objective: 'Bring down every wisp. One of them is quick.', difficulty: 'calm',
-    pieces: [[43, 1], [44, 1], [45, 2], [46, 1], [47, 1], [37, 2], [39, 2], [36, 1], [40, 1]],
-    mist: [], wisps: [], seeds: { every: 3, area: TRAIL_BOTTOM_ROWS }, forgiving: true, rows: 5,
-    lanes: [
-      { id: 'steady-1', column: 3, at: 2, hp: 4, step: 6 },
-      { id: 'steady-2', column: 2, at: 7, hp: 4, step: 6 },
-      { id: 'steady-3', column: 4, at: 7.5, hp: 4, step: 6 },
-      { id: 'quick', column: 1, at: 14, hp: 4, step: 2.6, look: 'snuffer' },
-      { id: 'steady-4', column: 5, at: 19, hp: 5, step: 5 },
-      { id: 'close-1', column: 2, at: 25, hp: 5, step: 4.5 },
-      { id: 'close-2', column: 3, at: 25.5, hp: 5, step: 4.5 },
-      { id: 'close-3', column: 4, at: 26, hp: 5, step: 4.5 },
-    ],
-  },
-  {
-    title: 'Mist Rows', objective: 'Merge beside the Mist to burn it off. Bring down every wisp.', difficulty: 'calm',
-    pieces: [[43, 1], [44, 2], [45, 1], [46, 2], [47, 1], [36, 1], [38, 2], [40, 1]],
-    mist: [22, 23, 24, 25, 26, 29, 31, 33].map((cell) => ({ cell, type: 'light' as const })),
-    wisps: [], seeds: { every: 3, area: TRAIL_BOTTOM_ROWS }, forgiving: true, rows: 5,
-    lanes: [
-      { id: 'row-1', column: 3, at: 2, hp: 4, step: 6, spit: 5 },
-      { id: 'row-2', column: 1, at: 8, hp: 4, step: 5.5 },
-      { id: 'row-3', column: 5, at: 8.6, hp: 4, step: 5.5, spit: 6 },
-      { id: 'row-4', column: 2, at: 16, hp: 5, step: 5 },
-      { id: 'row-5', column: 4, at: 16.6, hp: 5, step: 5, spit: 6 },
-      { id: 'row-6', column: 1, at: 24, hp: 5, step: 4.5 },
-      { id: 'row-7', column: 3, at: 24.5, hp: 6, step: 4.5 },
-      { id: 'row-8', column: 5, at: 25, hp: 5, step: 4.5 },
-    ],
-  },
   {
     title: 'Someone\u2019s in There', objective: 'Bring down every wisp, and burn the thick Mist off the one trapped under it.', difficulty: 'calm',
     pieces: [[43, 1], [44, 2], [45, 2], [46, 2], [47, 1], [37, 1], [38, 2], [39, 1], [31, 2]],
@@ -258,8 +252,8 @@ const TRAIL_SPECS: readonly IslandLevelSpec[] = [
     lanes: [
       { id: 'guard-1', column: 2, at: 2, hp: 4, step: 6 },
       { id: 'guard-2', column: 4, at: 2.6, hp: 4, step: 6 },
-      { id: 'guard-3', column: 1, at: 10, hp: 5, step: 5 },
-      { id: 'guard-4', column: 5, at: 10.6, hp: 5, step: 5 },
+      { id: 'quick', column: 1, at: 9, hp: 4, step: 2.6, look: 'snuffer' },
+      { id: 'spitter', column: 5, at: 10.6, hp: 5, step: 5, spit: 6 },
       { id: 'keeper', column: 3, at: 18, hp: 8, step: 5, look: 'warden' },
       { id: 'last-1', column: 2, at: 24, hp: 5, step: 4.5 },
       { id: 'last-2', column: 4, at: 24.6, hp: 5, step: 4.5 },
@@ -267,26 +261,38 @@ const TRAIL_SPECS: readonly IslandLevelSpec[] = [
   },
 ];
 
-export const LOST_TRAIL_BATTLES: readonly EncounterDefinition[] = TRAIL_SPECS.map((spec, index) => islandLevel('last-clearing', `lost-trail-${index + 1}`, spec).encounter);
+export const LOST_TRAIL_BATTLES: readonly EncounterDefinition[] = TRAIL_SPECS.map((spec) => islandLevel('last-clearing', 'lost-trail-rescue', spec).encounter);
 /** The trapped cell of the Lost Trail's rescue. */
 export const LOST_TRAIL_RESCUE_CELL = 17;
 export const lostTrailBattleIndex = (battleId: string) => (LOST_TRAIL_STONE_BATTLE_IDS as readonly string[]).indexOf(battleId);
 
-/** A line over a Lost Trail battle: its own, then the friend trapped on the last, then what the board needs. */
-export function lostTrailLine(index: number, input: { mechanicState: MissionMechanicState; merges: number; board: MergeWorldState }): string | null {
-  const lanes = input.mechanicState.kind === 'lanes' ? input.mechanicState : null;
+/** A line over the Lost Trail's battle: the voice from the thick Mist, and Mossprout's steer toward it. */
+export function lostTrailLine(index: number, input: { mechanicState: MissionMechanicState; merges: number; board: MergeWorldState }): SpeechLine | null {
   const encounter = LOST_TRAIL_BATTLES[index];
-  const mechanic = encounter?.mechanic?.kind === 'lanes' ? encounter.mechanic : null;
-  if (!lanes || !mechanic || !encounter) return null;
+  return encounter ? rescueBattleLine(encounter, input, LOST_TRAIL_RESCUE_COPY) : null;
+}
+
+const LOST_TRAIL_RESCUE_COPY: RescueBattleCopy = { voice: LOST_TRAIL_VOICE, ...LOST_TRAIL_VOICE_LINES, steer: LOST_TRAIL_LINES.rescue };
+
+/**
+ * A line over any rescue battle (the Lost Trail's last stone, a friend's lit window), from how it stands: the voice from
+ * the thick Mist first (not yet a name), then the lead's word about the place; the voice again once some wisps are down
+ * and the biggest has not come; "almost" once every wisp is down with the Mist still on them; the steer otherwise.
+ */
+export function rescueBattleLine(encounter: EncounterDefinition, input: { mechanicState: MissionMechanicState; merges: number; board: MergeWorldState }, copy: RescueBattleCopy): SpeechLine | null {
+  const lanes = input.mechanicState.kind === 'lanes' ? input.mechanicState : null;
+  const mechanic = encounter.mechanic?.kind === 'lanes' ? encounter.mechanic : null;
+  if (!lanes || !mechanic || encounter.objective.kind !== 'rescue') return null;
   if (lanes.lastPushAt != null && lanes.clock - lanes.lastPushAt < PUSHED_LINE_MS) return LOST_TRAIL_LINES.pushed;
+  if (!input.board.board[encounter.objective.cell]?.mist) return null;
   const alive = (at: number) => (lanes.wisps[at]?.damage ?? 0) < (mechanic.wisps[at]?.hp ?? 0);
   const arrived = (at: number) => lanes.clock >= (mechanic.wisps[at]?.at ?? 0) - (lanes.advance ?? 0);
-  if (index === 0) {
-    const quick = mechanic.wisps.findIndex((wisp) => wisp.id === 'quick');
-    return quick >= 0 && arrived(quick) && alive(quick) ? LOST_TRAIL_LINES.quick : null;
-  }
-  if (index === 1) return input.merges < 3 ? LOST_TRAIL_LINES.rows : null;
-  if (encounter.objective.kind !== 'rescue' || !input.board.board[encounter.objective.cell]?.mist) return null;
-  if (lanes.clock < 4_000) return LOST_TRAIL_LINES.voice;
-  return mechanic.wisps.every((_, at) => !alive(at)) ? LOST_TRAIL_LINES.clearing : LOST_TRAIL_LINES.rescue;
+  const voice = (text: string): SpeechLine => ({ text, speaker: copy.voice, muffled: true });
+  if (lanes.clock < 4_000) return voice(copy.hello);
+  if (copy.guard && lanes.clock < 8_000) return copy.guard;
+  const down = mechanic.wisps.filter((_, at) => !alive(at)).length;
+  if (down === mechanic.wisps.length) return voice(copy.almost);
+  const biggest = mechanic.wisps.reduce((best, wisp, at) => (wisp.hp > (mechanic.wisps[best]?.hp ?? 0) ? at : best), 0);
+  if (down >= 2 && !arrived(biggest)) return voice(copy.light);
+  return copy.steer;
 }

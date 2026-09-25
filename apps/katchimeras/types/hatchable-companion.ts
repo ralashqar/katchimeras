@@ -31,6 +31,14 @@ export type HatchableTileDefinition = {
   revealPreset: 'mist-clear';
   /** The key its cleared art's alpha bounds are generated under; the art itself is in `tile-art.ts`, by tile id. */
   alphaBoundsKey: string;
+  /**
+   * The tile's own misted art (Steppling's trailhead under the Mist, its front still clear), drawn instead of the full
+   * Mist while locked and laid out on the cleared art's canvas, so the reveal crossblends in place. Its art is in
+   * `tile-art.ts` (`hatchableMistedTileArt`).
+   */
+  mistedAlphaBoundsKey?: string;
+  /** Who is lost in the tile's Mist: their silhouette breathes in it until the tile clears. */
+  lostSkinId?: string;
   markerLines: { sleeping: string };
 };
 
@@ -79,6 +87,29 @@ export type HatchableMissionDefinition = {
   mechanic?: MissionMechanicDefinition;
   /** The bar's title; absent, the mist mission's own. */
   barTitle?: string;
+  /**
+   * Cozy 4X: the friend is rescued in a Lanes battle (`objective: rescue`), played instead of the board above. The
+   * friend is trapped under the thick Mist on the rescue cell; their voice comes out of it (`rescue.voice`).
+   */
+  encounter?: import('@/types/encounter').EncounterDefinition;
+  rescue?: RescueBattleCopy;
+};
+
+/** What is said over a rescue battle: the trapped friend's voice (not yet named) and the lead's steer toward them. */
+export type RescueBattleCopy = {
+  /** The card before the battle (the story first; the wisps only start once it is read). */
+  intro?: { title: string; line: string };
+  /** Who the voice is, before anyone knows: "Someone in the Mist". */
+  voice: string;
+  hello: string;
+  /** Once some wisps are down: they can see the light coming. */
+  light: string;
+  /** Every wisp down, the Mist still on them. */
+  almost: string;
+  /** The lead, just after the voice: what this place is. */
+  guard?: string;
+  /** The lead's steer toward the trapped cell. */
+  steer: string;
 };
 
 export type HatchableFlowCopy = { guide: FtueGuide; actionLabel: string };
@@ -167,6 +198,8 @@ export type HatchableCompanionDefinition = {
   displayName: string;
   tile: HatchableTileDefinition;
   availability: HatchableAvailability;
+  /** A save from before the cozy 4X first session (no woken Heart Tree) keeps the rule it was played under. */
+  legacyAvailability?: HatchableAvailability;
   /** What the hatch records in companion discovery. */
   discovery: { gateId: string; pathId: string };
   mission: HatchableMissionDefinition;

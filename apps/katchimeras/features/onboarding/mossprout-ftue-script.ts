@@ -7,7 +7,7 @@ import type { FtueScriptDefinition, FtueStepDefinition } from './ftue-types';
 import { STEPPLING_DISCOVERY_ID } from '@/constants/companion-discovery-catalog';
 import { MOSSPROUT_BOND_SHARE_PROMPTS, MOSSPROUT_SUPPORT_PROMPT, MOSSPROUT_SUPPORT_STYLE_OPTIONS } from './mossprout-bond-share';
 import { MOSSPROUT_FTUE_COPY as COPY } from './mossprout-ftue-copy';
-import { FIRST_BATTLE_ID, COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, COLD_OPEN_STEP_ID, FIRST_BATTLE_BODY, FIRST_BATTLE_EYEBROW, FIRST_BATTLE_TITLE, GUARDIAN_ACTION_ID, GUARDIAN_CONTINUE, GUARDIAN_LINES, GUARDIAN_STEP_ID, GUARDIAN_TITLE, HEART_TREE_ACTION_ID, HEART_TREE_LINES, HEART_TREE_RESTORE, HEART_TREE_STEP_ID, HEART_TREE_TITLE, MIST_RETREAT_LINES, SANCTUARY_ACTION_ID, SANCTUARY_LINE, SANCTUARY_STEP_ID, SANCTUARY_TITLE, FRONTIER_ACTION_ID, FRONTIER_LINES, FRONTIER_STEP_ID, FRONTIER_TITLE, LOST_TRACKS_ACTION_ID, LOST_TRACKS_LINES, LOST_TRACKS_STEP_ID, LOST_TRACKS_TITLE, LOST_TRAIL_MISSION_ACTION_ID, LOST_TRAIL_MISSION_LINE, LOST_TRAIL_MISSION_STEP_ID, LOST_TRAIL_MISSION_TITLE, LOST_TRAIL_TILE_ID, LOST_TRAIL_STONE_STEP_IDS, LOST_TRAIL_STONE_BATTLE_IDS, LOST_TRAIL_STONES, LOST_TRAIL_EYEBROW, STEPPLING_RESCUED_STEP_ID, STEPPLING_RESCUED_ACTION_ID, STEPPLING_MEETS_STEP_ID, STEPPLING_MEETS_ACTION_ID, STEPPLING_MEETS_TITLE, STEPPLING_MEETS_LINES, STEPPLING_JOINED_STEP_ID, STEPPLING_JOINED_ACTION_ID, STEPPLING_JOINED_TITLE, HOME_STEP_ID, HOME_ACTION_ID, HOME_TITLE, HOME_LINES } from './last-clearing';
+import { FIRST_BATTLE_ID, COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, COLD_OPEN_STEP_ID, FIRST_BATTLE_BODY, FIRST_BATTLE_EYEBROW, FIRST_BATTLE_TITLE, GUARDIAN_ACTION_ID, GUARDIAN_CONTINUE, GUARDIAN_LINES, GUARDIAN_STEP_ID, GUARDIAN_TITLE, HEART_TREE_ACTION_ID, HEART_TREE_LINES, HEART_TREE_RESTORE, HEART_TREE_STEP_ID, HEART_TREE_TITLE, MIST_RETREAT_LINES, SANCTUARY_ACTION_ID, SANCTUARY_LINE, SANCTUARY_STEP_ID, SANCTUARY_TITLE, FRONTIER_ACTION_ID, FRONTIER_LINES, FRONTIER_STEP_ID, FRONTIER_TITLE, LOST_TRACKS_ACTION_ID, LOST_TRACKS_LINES, LOST_TRACKS_STEP_ID, LOST_TRACKS_TITLE, LOST_TRAIL_TILE_ID, LOST_TRAIL_STONE_STEP_IDS, LOST_TRAIL_STONE_BATTLE_IDS, LOST_TRAIL_STONES, LOST_TRAIL_EYEBROW, STEPPLING_RESCUED_STEP_ID, STEPPLING_RESCUED_ACTION_ID, STEPPLING_MEETS_STEP_ID, STEPPLING_MEETS_ACTION_ID, STEPPLING_MEETS_TITLE, STEPPLING_MEETS_LINES, STEPPLING_JOINED_STEP_ID, STEPPLING_JOINED_ACTION_ID, STEPPLING_JOINED_TITLE, HOME_STEP_ID, HOME_ACTION_ID, HOME_TITLE, HOME_LINES } from './last-clearing';
 import { OPENING_CAMERA_ANCHOR_Y, OPENING_CAMERA_ENTRY_MS, OPENING_CAMERA_ZOOM, OPENING_MERGE_REQUIRED } from './opening-mist';
 
 // Start just wider than the original close-up and pull back with each answer.
@@ -128,7 +128,7 @@ const openingQuestionSteps: FtueScriptDefinition['steps'] = [
 
 export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
   id: 'mossprout-first-session',
-  version: 58,
+  version: 60,
   entryStepId: 'world.mist_open',
   terminalStepId: 'complete',
   steps: [
@@ -197,22 +197,15 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
       // The tracks (beat 11): the camera drifts to the Lost Trail; Mossprout sees the footprints, then the trail is tapped.
       id: LOST_TRACKS_STEP_ID, surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
       guide: { eyebrow: '', title: LOST_TRACKS_TITLE, body: LOST_TRACKS_LINES[1]! },
-      actions: [{ id: LOST_TRACKS_ACTION_ID, title: 'Follow the tracks', description: 'Someone is still in there.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: LOST_TRAIL_MISSION_STEP_ID }],
+      actions: [{ id: LOST_TRACKS_ACTION_ID, title: 'Follow the tracks', description: 'Someone is still in there.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: LOST_TRAIL_STONE_STEP_IDS[0] }],
       cue: { kind: 'tap', target: { kind: 'haven_structure', structureId: LOST_TRAIL_TILE_ID } },
       spotlight: { targets: [{ kind: 'haven_structure', structureId: LOST_TRAIL_TILE_ID }], grouping: 'bounding_rect', padding: 8, radius: 26, dimOpacity: 0.55 },
       camera: { kind: 'focus_target', target: { kind: 'haven_structure', structureId: LOST_TRAIL_TILE_ID }, zoom: 1.35, anchorY: 0.42, durationMs: 2_200 },
     },
-    {
-      // The mission (beat 12): FOLLOW THE LOST TRAIL.
-      id: LOST_TRAIL_MISSION_STEP_ID, surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: '', title: LOST_TRAIL_MISSION_TITLE, body: LOST_TRAIL_MISSION_LINE },
-      actions: [{ id: LOST_TRAIL_MISSION_ACTION_ID, title: 'Let\u2019s go', description: 'We can\u2019t leave them out there.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: LOST_TRAIL_STONE_STEP_IDS[0] }],
-      camera: { kind: 'focus_target', target: { kind: 'haven_structure', structureId: LOST_TRAIL_TILE_ID }, zoom: 1.35, anchorY: 0.42, durationMs: 600 },
-    },
     // The Lost Trail (beat 13): three battles docked under the trail's tile, each won when its board says so.
     ...LOST_TRAIL_STONE_STEP_IDS.map((stepId, index): FtueStepDefinition => ({
       id: stepId, surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: `${LOST_TRAIL_EYEBROW} \u00b7 ${index + 1} of 3`, title: LOST_TRAIL_STONES[index]!.title, body: LOST_TRAIL_STONES[index]!.line },
+      guide: { eyebrow: LOST_TRAIL_EYEBROW, title: LOST_TRAIL_STONES[index]!.title, body: LOST_TRAIL_STONES[index]!.line },
       actions: [{ id: `world.clear_trail_${index + 1}`, title: 'Onward', description: LOST_TRAIL_STONES[index]!.line, icon: 'leaf.fill', presentation: 'observed_game_action', handlerId: 'merge_item_created', nextStepId: LOST_TRAIL_STONE_STEP_IDS[index + 1] ?? STEPPLING_RESCUED_STEP_ID }],
       interaction: { mode: 'none' },
       edges: [{ event: { type: 'battle_won', battleId: LOST_TRAIL_STONE_BATTLE_IDS[index]! }, commitActionId: `world.clear_trail_${index + 1}`, nextStepId: LOST_TRAIL_STONE_STEP_IDS[index + 1] ?? STEPPLING_RESCUED_STEP_ID }],
@@ -221,7 +214,7 @@ export const MOSSPROUT_FTUE_SCRIPT: FtueScriptDefinition = {
     {
       // The rescue (beat 14): the Mist bursts off the trail as it clears.
       id: STEPPLING_RESCUED_STEP_ID, surface: 'haven', navigation: { lock: true, resume: { kind: 'haven' } },
-      guide: { eyebrow: '', title: LOST_TRAIL_STONES[2]!.title, body: '' },
+      guide: { eyebrow: '', title: LOST_TRAIL_STONES[0]!.title, body: '' },
       actions: [{ id: STEPPLING_RESCUED_ACTION_ID, title: 'Continue', description: 'The Lost Trail is found again.', icon: 'sparkles', presentation: 'acknowledgement', handlerId: 'acknowledgement', nextStepId: STEPPLING_MEETS_STEP_ID }],
       camera: { kind: 'focus_target', target: { kind: 'haven_structure', structureId: LOST_TRAIL_TILE_ID }, zoom: 1.35, anchorY: 0.46, durationMs: 900 },
     },
@@ -857,7 +850,7 @@ const stepsById = new Map(MOSSPROUT_FTUE_SCRIPT.steps.map((step) => [step.id, st
 // first-session route grows the First Bloom, then returns after one order.
 // The Last Clearing (`docs/cozy-4x-ftue-the-last-clearing.md`) retires the Egg, the hatch meeting, the Garden and
 // the first rest: every step it no longer reaches is kept for old fixtures, not played.
-const LAST_CLEARING_LIVE_STEP_IDS = new Set<string>([COLD_OPEN_STEP_ID, GUARDIAN_STEP_ID, 'world.mist_clear', 'world.mist_lift', HEART_TREE_STEP_ID, SANCTUARY_STEP_ID, FRONTIER_STEP_ID, LOST_TRACKS_STEP_ID, LOST_TRAIL_MISSION_STEP_ID, ...LOST_TRAIL_STONE_STEP_IDS, STEPPLING_RESCUED_STEP_ID, STEPPLING_MEETS_STEP_ID, STEPPLING_JOINED_STEP_ID, HOME_STEP_ID, 'complete']);
+const LAST_CLEARING_LIVE_STEP_IDS = new Set<string>([COLD_OPEN_STEP_ID, GUARDIAN_STEP_ID, 'world.mist_clear', 'world.mist_lift', HEART_TREE_STEP_ID, SANCTUARY_STEP_ID, FRONTIER_STEP_ID, LOST_TRACKS_STEP_ID, ...LOST_TRAIL_STONE_STEP_IDS, STEPPLING_RESCUED_STEP_ID, STEPPLING_MEETS_STEP_ID, STEPPLING_JOINED_STEP_ID, HOME_STEP_ID, 'complete']);
 const retiredFirstSessionStepIds = new Set(MOSSPROUT_FTUE_SCRIPT.steps
   .filter((step) => !LAST_CLEARING_LIVE_STEP_IDS.has(step.id) || ['companion.day_one_action', 'companion.order_preview', 'world.garden_handoff', 'companion.chapter_zero_return', 'companion.garden_intro', 'companion.water_together', 'companion.first_grow', 'companion.first_notice', 'companion.notice_bond_spotlight', 'companion.water_response', 'companion.first_insight', 'egg.context', 'egg.mind', 'egg.nature_theme', 'egg.companion_identity', 'companion.nickname', 'companion.bond_intro', 'companion.bond_spotlight', 'companion.resident_affinity', 'companion.resident_parcel_ready', 'companion.resident_match_result'].includes(step.id)
     || step.id.startsWith('merge.plant.')

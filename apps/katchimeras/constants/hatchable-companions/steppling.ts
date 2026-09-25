@@ -23,6 +23,10 @@ export const STEPPLING_HATCHABLE: HatchableCompanionDefinition = {
     unlockId: 'mossprout:overgrown-trail', price: GLOW.stepplingMistCost,
     name: 'Misty clearing', revealPreset: 'mist-clear',
     alphaBoundsKey: 'shared_world_steppling_trailhead_hex_tile_v1.webp',
+    // The Last Clearing: his own trailhead under the Mist, the front still clear with paw prints going in; he is lost
+    // in it (a silhouette) until the Lost Trail's last battle clears it. There is no separate trail tile.
+    mistedAlphaBoundsKey: 'shared_world_steppling_misted_hex_tile_v1.webp',
+    lostSkinId: 'steppling',
     markerLines: { sleeping: 'Three notches on a broken marker. Steppling’s trail starts here.' },
   },
   availability: { kind: 'after_ftue' },

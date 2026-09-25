@@ -3,7 +3,6 @@ import type { HexCoord } from '@incubator/environments/hex';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { MOSSPROUT_OLD_GROVE } from './mossprout-old-grove';
-import { LOST_TRAIL } from './lost-trail';
 
 /**
  * Story tiles: places in the shared world a friend's journey chapter reveals.
@@ -43,7 +42,9 @@ export type StoryTileDefinition = {
 
 export type StoryTileState = 'misted' | 'revealed';
 
-export const STORY_TILES_BUNDLED: readonly StoryTileDefinition[] = [MOSSPROUT_OLD_GROVE, LOST_TRAIL];
+// The Lost Trail is no longer its own tile (Sept 25 2026): its battles dock under Steppling's own misted trailhead
+// (`STEPPLING_HATCHABLE.tile.mistedAlphaBoundsKey`), which clears as he is rescued. `lost-trail.ts` is kept unbundled.
+export const STORY_TILES_BUNDLED: readonly StoryTileDefinition[] = [MOSSPROUT_OLD_GROVE];
 export const STORY_TILES: readonly StoryTileDefinition[] = [...STORY_TILES_BUNDLED, ...packEntries('storyTiles')];
 markRegistryBuilt('storyTiles');
 

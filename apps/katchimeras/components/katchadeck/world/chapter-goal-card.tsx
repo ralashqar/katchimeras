@@ -9,7 +9,7 @@ import type { SanctuaryChapterState } from '@/constants/sanctuary-chapters';
  * The Sanctuary's one next thing (`constants/sanctuary-chapters.ts`): the chapter, the goal and why, and its progress.
  * A tap takes the player there. A new goal arrives with a small bounce, so the change is seen.
  */
-export function ChapterGoalCard({ state, onPress }: { state: SanctuaryChapterState; onPress: () => void }) {
+export function ChapterGoalCard({ state, need = null, onPress }: { state: SanctuaryChapterState; /** What is missing, and where it is earned. */ need?: string | null; onPress: () => void }) {
   const reduceMotion = useReducedMotion();
   const pop = useSharedValue(1);
   const goalKey = `${state.chapter.id}:${state.goal?.id ?? 'done'}`;
@@ -27,7 +27,7 @@ export function ChapterGoalCard({ state, onPress }: { state: SanctuaryChapterSta
         <Text style={styles.count}>{state.done}/{state.total}</Text>
       </View>
       <Text style={styles.title} numberOfLines={2}>{title}</Text>
-      <Text style={styles.detail} numberOfLines={2}>{detail}</Text>
+      {need ? <Text style={styles.need} numberOfLines={2}>{need}</Text> : <Text style={styles.detail} numberOfLines={2}>{detail}</Text>}
       <View style={styles.bar}><View style={[styles.fill, { width: `${Math.round((state.done / Math.max(1, state.total)) * 100)}%` }]} /></View>
     </Pressable>
   </Animated.View>;
@@ -42,6 +42,7 @@ const styles = StyleSheet.create({
   count: { ...KatchaUI.type.label, color: 'rgba(255,248,230,0.7)' },
   title: { ...KatchaUI.type.title, color: '#FFF8E6' },
   detail: { ...KatchaUI.type.body, fontSize: 12.5, lineHeight: 17, color: 'rgba(243,238,255,0.78)' },
+  need: { ...KatchaUI.type.body, fontSize: 12.5, lineHeight: 17, fontWeight: '700', color: '#FFD36B' },
   bar: { height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.14)', overflow: 'hidden', marginTop: 4 },
   fill: { height: 5, borderRadius: 3, backgroundColor: '#FFD36B' },
 });

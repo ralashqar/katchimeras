@@ -33,7 +33,8 @@ export type HavenTileUpgradePresentation = {
    * A Last Clearing reveal the story plays locally while it writes the world (the Lost Trail clearing, Steppling's tile
    * opening); the finish path hands its beat on instead of a purchase's story.
    */
-  ftueReveal?: 'lost-trail' | 'steppling-home';
+  /** A friend's tile cleared with them on it (a rescue): the tile id. */
+  ftueReveal?: string;
   /** A hero building's new look on its friend's tile: the tile crossblends from one look to the next. */
   tileLook?: { tileId: string; from: number; to: number };
   /** A friend's tile opening with them already home: no Egg is revealed with it. */

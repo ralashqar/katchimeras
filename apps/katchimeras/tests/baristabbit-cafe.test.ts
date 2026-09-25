@@ -18,7 +18,7 @@ test('Baristabbit comes home without an Egg: the board, the tile, the rescue, th
 });
 
 test('his window wakes once Steppling is home, and the rescue brings him home once', () => {
-  const fresh = createInitialMergeWorldState(1_000);
+  const fresh = { ...createInitialMergeWorldState(1_000), heartTree: { receiptId: 'ftue:heart-tree', restoredAt: 1_000 } };
   assert.equal(hatchableAvailable(fresh, BARISTABBIT_HATCHABLE), false, 'asleep in the first session');
   const steppling = reduceMergeWorld(fresh, { type: 'rescueWorldFriend', targetId: 'mossprout:overgrown-trail', now: 1_500 }).state;
   assert.equal(hatchableAvailable(steppling, BARISTABBIT_HATCHABLE), true, 'Chapter 1: the lit window');
@@ -34,7 +34,7 @@ test('Feastle comes home without an Egg once Petalimp is home, and turns the Caf
   const { SANCTUARY_CHAPTERS } = await import('@/constants/sanctuary-chapters');
   const ids = createHatchableDiscoveryFlow(FEASTLE_HATCHABLE).nodes.map((node) => node.id);
   assert.ok(ids.includes('gateway.rescue') && !ids.includes('gateway.egg'), 'no Egg');
-  const fresh = createInitialMergeWorldState(1_000);
+  const fresh = { ...createInitialMergeWorldState(1_000), heartTree: { receiptId: 'ftue:heart-tree', restoredAt: 1_000 } };
   assert.equal(hatchableAvailable(fresh, FEASTLE_HATCHABLE), false);
   const petalimp = { ...fresh, islandCampaigns: { 'island-campaign:petalimp-bloom': { residentSkinId: 'petalimp', cardEarnedAt: 1_200 } } } as never;
   assert.equal(hatchableAvailable(petalimp, FEASTLE_HATCHABLE), true, 'the warm table wakes after Petalimp');
@@ -54,4 +54,11 @@ test('Feastle comes home without an Egg once Petalimp is home, and turns the Caf
   const kitchen = SANCTUARY_CHAPTERS.find((chapter) => chapter.id === 'the-kitchen')!;
   assert.equal(kitchen.number, 4);
   assert.deepEqual(kitchen.goals[0]!.action, { kind: 'world_offer', offerId: 'mist:feastle-home' });
+});
+
+test('a save from before the new first session keeps its old rules: its friends’ tiles never close on it', () => {
+  const legacy = { ...createInitialMergeWorldState(1_000), kingdomGoal: { introducedAt: 1_100, coachmarkSeenAt: 1_100 } } as never;
+  return import('@/constants/hatchable-companions/feastle').then(({ FEASTLE_HATCHABLE }) => {
+    assert.equal(hatchableAvailable(legacy, FEASTLE_HATCHABLE), true, 'Feastle stays open where the old Kingdom goal opened it');
+  });
 });

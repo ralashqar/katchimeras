@@ -1,4 +1,4 @@
-import { buildingLevelCap, heartTreeLevel } from '@/constants/heart-tree';
+import { buildingLevelCap, heartTreeLevel, sanctuaryFounded } from '@/constants/heart-tree';
 import {
   HEARTWOOD_BUILDING_MAX_LEVEL,
   heartwoodBuildingById,
@@ -17,7 +17,7 @@ import type { MergeWorldState } from '@/types/merge-world';
 
 /** Heartwood's patches open for building once the first session is behind the player and the tree has stirred. */
 export function heartwoodBuildingsEligible(world: MergeWorldState): boolean {
-  return world.kingdomGoal?.introducedAt != null || (world.haven.tileStages.mossprout ?? 0) >= 1;
+  return sanctuaryFounded(world) || (world.haven.tileStages.mossprout ?? 0) >= 1;
 }
 
 export function canUpgradeHeartwoodBuilding(world: MergeWorldState, id: HeartwoodBuildingId): boolean {

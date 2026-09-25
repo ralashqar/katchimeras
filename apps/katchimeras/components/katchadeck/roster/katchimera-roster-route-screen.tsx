@@ -273,6 +273,7 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
     ftueRun?.status === 'active' ? ftueRun.stepId : null,
     worldSubjectPresentation,
   );
+  const homeFamilies = useMemo(() => new Set<string>(discovery.records.map((record) => record.characterId)), [discovery.records]);
   const discoveryCompanionSlots = useMemo<KingdomHexCompanionSlot[]>(() => {
     const stepId = ftueRun?.status === 'active' ? ftueRun.stepId : null;
     if (!stepId) return companionSlots;
@@ -286,9 +287,13 @@ function FocusedKatchimeraRoster({ days, interactionRequest, onInteractionReques
       if (eggVisible && slot.familyId === 'mossprout') {
         return { ...base, kind: 'revealed_egg' as const, havenStage: 0 as const, eggSkinId: 'moss' as const };
       }
-      return slot.familyId === 'mossprout' ? slot : { ...base, kind: 'locked' as const };
+      // A friend rescued during the first session (Steppling, as his tile clears) is home: they stand on their tile
+      // from that moment. Only friends not yet home stay locked, however established the profile.
+      if (slot.familyId === 'mossprout' || (slot.kind === 'owned' && homeFamilies.has(slot.familyId))) return slot;
+      return { ...base, kind: 'locked' as const };
     });
   }, [
+    homeFamilies,
     companionSlots,
     ftueRun?.status,
     ftueRun?.stepId,

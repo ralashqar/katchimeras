@@ -53,6 +53,8 @@ export type KingdomTileArtLayer = {
   overlaySource?: ImageSourcePropType;
   overlaySources?: KingdomHexTileLodSources;
   residentAnchor?: { x: number; y: number };
+  /** A misted friend's tile: where they will stand once it clears (a chapter beacon's silhouette stands there). */
+  restingAnchor?: { x: number; y: number };
   residentSource?: ImageSourcePropType;
   sourceSize: { width: number; height: number };
   source: ImageSourcePropType;

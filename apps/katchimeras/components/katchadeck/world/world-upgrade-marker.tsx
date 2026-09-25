@@ -42,6 +42,9 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   const markerPortrait = markerSkin?.visualKey ? getCreatureVisual(markerSkin.visualKey, 'grown') : null;
   const hatchable = offer.hatchable;
   const hatchableAsleep = hatchable?.state === 'sleeping';
+  // Cozy 4X v2: a friend rescued in battle (no Egg, no ticket): their shadow in the Mist, and the call to go in.
+  const rescueSkin = hatchable && !hatchableAsleep && offer.action === 'Enter the Mist' ? katchimeraSkinById.get(hatchable.companion) ?? null : null;
+  const rescuePortrait = rescueSkin?.visualKey ? getCreatureVisual(rescueSkin.visualKey, 'grown') : null;
   const trial = offer.trial;
   const track = offer.track;
   const paintedWidth = markerPortrait || sleepingPortrait || hatchable ? 78 : MARKER_SIZE;
@@ -105,12 +108,12 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
   return <Animated.View pointerEvents={hidden ? 'none' : 'box-none'} accessibilityElementsHidden={hidden} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} style={[styles.position, isHeartwood && styles.heartwoodPosition, projection]}>
       <Animated.View ref={target} collapsable={false} pointerEvents="none" accessible={false}
         onLayout={() => { onTargetChange?.(offer.id, null); if (!moving && !hidden) onTargetChange?.(offer.id, node.current); }} style={[styles.spotlightTarget, spotlightBounds]} />
-      <AnimatedPressable ref={button} collapsable={false} hitSlop={6} accessibilityRole="button" accessibilityLabel={trial ? `${offer.name}, Wisp Rush, ${trial.done ? 'every heat cleared today' : `heat ${trial.heat} of ${trial.total}`}` : track ? `${offer.name}, ${track.cleared} of ${track.total} levels cleared${track.kind === 'daily' ? ' today' : ''}` : hatchableAsleep ? `${offer.name}, still under the Mist` : hatchable?.state === 'board' ? `${offer.name}, the mist board is open` : hatchable ? `${offer.name}, an Egg under the Mist, ${offer.cost} Glow to clear` : sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
+      <AnimatedPressable ref={button} collapsable={false} hitSlop={6} accessibilityRole="button" accessibilityLabel={trial ? `${offer.name}, Wisp Rush, ${trial.done ? 'every heat cleared today' : `heat ${trial.heat} of ${trial.total}`}` : track ? `${offer.name}, ${track.cleared} of ${track.total} levels cleared${track.kind === 'daily' ? ' today' : ''}` : hatchableAsleep ? `${offer.name}, still under the Mist` : hatchable?.state === 'board' ? `${offer.name}, the mist board is open` : rescuePortrait ? `${offer.name}, someone is trapped under the Mist` : hatchable ? `${offer.name}, an Egg under the Mist, ${offer.cost} Glow to clear` : sleepingPortrait ? `${offer.name}, someone is resting here` : locked ? `${offer.name}, locked` : campaignPending ? `Continue with ${markerSkin?.displayName} at ${offer.name}` : `${offer.action} ${offer.name}, ${offer.cost} Glow`}
         accessibilityValue={trial ? { min: 0, max: trial.total, now: trial.done ? trial.total : trial.heat - 1, text: trial.done ? 'Done for today' : `${trial.heat - 1} of ${trial.total} heats cleared` } : locked || sleepingPortrait || hatchableAsleep ? undefined : { min: 0, max: glowTotal, now: glowProgress, text: offer.restorationProgress ? `${glowProgress} of ${glowTotal} beds grown` : offer.cost > 0 ? `${glowProgress} of ${offer.cost} Glow` : 'Ready to upgrade' }}
         accessibilityHint={trial ? 'Opens today\'s ladder' : track ? 'Opens the levels' : offer.lockedReason ?? (campaignPending ? 'Resumes this island story' : offer.affordable ? 'Opens upgrade details' : `${offer.missingGlow} more Glow needed. Opens upgrade details.`)}
         disabled={moving || hidden || inert} accessibilityState={{ disabled: moving || hidden || inert }} onPress={() => onPress(offer)} style={[styles.hitTarget, hitMotion]}>
       <Animated.View pointerEvents="none" onLayout={(event) => setBubbleHeight(event.nativeEvent.layout.height)}
-        style={[styles.bubble, markerPortrait || sleepingPortrait || hatchable ? styles.portraitBubble : null, sleepingPortrait || hatchableAsleep ? styles.sleepingBubble : null, bare ? styles.bareBubble : null, bubbleMotion]}>
+        style={[styles.bubble, markerPortrait || sleepingPortrait || hatchable || rescuePortrait ? styles.portraitBubble : null, sleepingPortrait || hatchableAsleep ? styles.sleepingBubble : null, bare ? styles.bareBubble : null, bubbleMotion]}>
         {/* Paint first so the seam it covers never sits above the icon/portrait
             content — it only fills the border gap, it isn't a foreground shape. */}
         {bare ? null : <View pointerEvents="none" style={styles.tail} />}
@@ -130,6 +133,13 @@ export function WorldUpgradeMarker({ offer, frame, cameraScale, cameraX, cameraY
             <ProgressBar current={track.cleared} total={Math.max(1, track.total)} minimumPercent={0} variant="egg" />
           </View>
           <Text style={styles.percent}>{track.label}</Text>
+        </>
+        : rescuePortrait ? <>
+          <View style={[styles.portraitFrame, styles.sleepingFrame]}>
+            <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory-disk" contentFit="contain"
+              source={rescuePortrait.source} style={[styles.portrait, styles.silhouette]} transition={0} accessible={false} />
+          </View>
+          <Text style={styles.percent}>Rescue</Text>
         </>
         : hatchable ? <HatchableEggFace state={hatchable.state} glowProgress={glowProgress} glowTotal={glowTotal} cost={offer.cost} missingGlow={offer.missingGlow} />
         : sleepingPortrait ? <>

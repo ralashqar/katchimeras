@@ -63,7 +63,10 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   // v58: step 3, the Heart Tree woken and the Sanctuary founded after the Mist pulls back.
   // v59: step 4, the frontier pull-out, the Lost Trail's tracks and its mission card.
   // v60: step 5, the Lost Trail's three battles, Steppling's rescue and joining, and home.
-  version: 60,
+  // v61: FTUE v2 (`docs/cozy-4x-ftue-v2-wayfinders-road.md`): the mission card folded into the tracks; the tap on the
+  // trail starts the first stone.
+  // v62: one Lost Trail battle (the rescue) instead of three.
+  version: 62,
   entryNodeId: 'world.mist_open',
   metadata: {
     kind: 'ftue' as const,
@@ -90,13 +93,9 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     // THE FIRST GROVE: the pull-out over the Mist to the Hollow Tree.
     scene('world.frontier', 'haven', [{ id: 'world.see_frontier', next: 'world.lost_tracks' }]),
     // The tracks into the Mist, and someone still in there.
-    scene('world.lost_tracks', 'haven', [{ id: 'world.follow_tracks', next: 'world.lost_trail_mission' }]),
-    // FOLLOW THE LOST TRAIL (its levels are step 5).
-    scene('world.lost_trail_mission', 'haven', [{ id: 'world.accept_lost_trail', next: 'world.trail_stone_1' }]),
+    scene('world.lost_tracks', 'haven', [{ id: 'world.follow_tracks', next: 'world.trail_stone_1' }]),
     // The Lost Trail: three battles docked under the trail, the last a rescue.
-    task('world.trail_stone_1', 'haven', { id: 'world.clear_trail_1', event: ftueEvent('battle_won'), count: 1, next: 'world.trail_stone_2' }),
-    task('world.trail_stone_2', 'haven', { id: 'world.clear_trail_2', event: ftueEvent('battle_won'), count: 1, next: 'world.trail_stone_3' }),
-    task('world.trail_stone_3', 'haven', { id: 'world.clear_trail_3', event: ftueEvent('battle_won'), count: 1, next: 'world.steppling_rescued' }),
+    task('world.trail_stone_1', 'haven', { id: 'world.clear_trail_1', event: ftueEvent('battle_won'), count: 1, next: 'world.steppling_rescued' }),
     // The Mist bursts off the trail; Steppling is free.
     scene('world.steppling_rescued', 'haven', [{ id: 'world.free_steppling', next: 'world.steppling_meets' }]),
     // Steppling home in the Sanctuary, the reveal, and his first words.
@@ -108,7 +107,11 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     scene('world.home', 'haven', [{ id: 'world.come_home', next: 'complete' }]),
     story.complete(),
   ],
-  migrations: Object.fromEntries([
+  migrations: {
+    'world.lost_trail_mission': 'world.trail_stone_1',
+    'world.trail_stone_2': 'world.trail_stone_1',
+    'world.trail_stone_3': 'world.trail_stone_1',
+    ...Object.fromEntries<string>([
     'world.egg_intro', 'egg.opening', 'egg.context', 'egg.ready', 'companion.first_meeting',
     'effect.relationship.complete_day_one_lesson', 'effect.haven.grant_first_memory', 'garden.first-visit.focus',
     'world.garden_arrival', 'effect.haven.place_first_memory', 'world.first_seed_grew', 'effect.relationship.first_bloom_bond',
@@ -121,6 +124,7 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     'world.garden_handoff', 'companion.chapter_zero_return', 'companion.garden_intro', 'companion.water_together',
     'companion.first_grow', 'companion.first_notice', 'companion.notice_bond_spotlight', 'companion.water_response', 'companion.first_insight',
   ].map((id) => [id, 'complete'])),
+  } as Readonly<Record<string, string>>,
 });
 
 /** Add experimental manifests here; each variant must use a distinct version. */

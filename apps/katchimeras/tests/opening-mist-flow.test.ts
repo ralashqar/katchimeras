@@ -7,7 +7,7 @@ import * as migrationPolicy from '@/features/onboarding/ftue-migration-policy';
 import * as navigationPolicy from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueStep, mossproutFtueShowsWorldGarden, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
-import { COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, FIRST_BATTLE_ID, GUARDIAN_ACTION_ID, GUARDIAN_STEP_ID, GUARDIAN_TITLE, HEART_TREE_ACTION_ID, HEART_TREE_STEP_ID, SANCTUARY_ACTION_ID, SANCTUARY_STEP_ID, FRONTIER_ACTION_ID, FRONTIER_STEP_ID, LOST_TRACKS_ACTION_ID, LOST_TRACKS_STEP_ID, LOST_TRAIL_MISSION_ACTION_ID, LOST_TRAIL_MISSION_STEP_ID, LOST_TRAIL_TILE_ID, LOST_TRAIL_STONE_STEP_IDS, LOST_TRAIL_STONE_BATTLE_IDS, STEPPLING_RESCUED_STEP_ID, STEPPLING_RESCUED_ACTION_ID, STEPPLING_MEETS_STEP_ID, STEPPLING_MEETS_ACTION_ID, STEPPLING_JOINED_STEP_ID, STEPPLING_JOINED_ACTION_ID, HOME_STEP_ID, HOME_ACTION_ID } from '@/features/onboarding/last-clearing';
+import { COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, FIRST_BATTLE_ID, GUARDIAN_ACTION_ID, GUARDIAN_STEP_ID, GUARDIAN_TITLE, HEART_TREE_ACTION_ID, HEART_TREE_STEP_ID, SANCTUARY_ACTION_ID, SANCTUARY_STEP_ID, FRONTIER_ACTION_ID, FRONTIER_STEP_ID, LOST_TRACKS_ACTION_ID, LOST_TRACKS_STEP_ID, LOST_TRAIL_TILE_ID, LOST_TRAIL_STONE_STEP_IDS, LOST_TRAIL_STONE_BATTLE_IDS, STEPPLING_RESCUED_STEP_ID, STEPPLING_RESCUED_ACTION_ID, STEPPLING_MEETS_STEP_ID, STEPPLING_MEETS_ACTION_ID, STEPPLING_JOINED_STEP_ID, STEPPLING_JOINED_ACTION_ID, HOME_STEP_ID, HOME_ACTION_ID } from '@/features/onboarding/last-clearing';
 import { FIRST_BATTLE } from '@/constants/last-clearing-battle';
 import { STORY_TILES } from '@/constants/story-tiles/registry';
 import { KINGDOM_HEX_TILE_ALPHA_BOUNDS } from '@/constants/kingdom-hex-tile-bounds.gen';
@@ -19,7 +19,6 @@ import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorl
 import { heartwoodStage } from '@/features/shared-adventure/heartwood-progression';
 import { GLOW } from '@/constants/glow';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
-import { LOST_TRAIL } from '@/constants/story-tiles/lost-trail';
 
 type RunShape = { stepId: string; status: string; scriptVersion: number; receipts: { actionId: string; stepId: string }[]; objectiveProgress: Record<string, number>; mergeInstalled: boolean };
 
@@ -93,7 +92,7 @@ test('the Last Clearing opens with four haven beats and no Egg: the cold open, t
   assert.equal(mossproutFtueStep(SANCTUARY_STEP_ID)?.actions[0]?.nextStepId, FRONTIER_STEP_ID);
   assert.equal(mossproutFtueStep(FRONTIER_STEP_ID)?.camera?.kind, 'fit_targets', 'the frontier pulls out over the whole world');
   assert.equal(mossproutFtueStep(LOST_TRACKS_STEP_ID)?.cue?.kind, 'tap', 'the trail itself is tapped');
-  assert.equal(mossproutFtueStep(LOST_TRAIL_MISSION_STEP_ID)?.actions[0]?.nextStepId, LOST_TRAIL_STONE_STEP_IDS[0], 'the mission card opens the Lost Trail');
+  assert.equal(mossproutFtueStep(LOST_TRACKS_STEP_ID)?.actions[0]?.nextStepId, LOST_TRAIL_STONE_STEP_IDS[0], 'the tap on the trail opens the Lost Trail (FTUE v2: no separate mission card)');
 
   for (const stepId of MOSSPROUT_OPENING_STEP_IDS) {
     const step = mossproutFtueStep(stepId)!;
@@ -142,8 +141,7 @@ test('a fresh run walks the Last Clearing: the cold open, the guardian, the firs
   assert.equal(runtime.commitFtueAction({ actionId: SANCTUARY_ACTION_ID, evidenceRef: 'mossprout-world:sanctuary-founded' })?.stepId, FRONTIER_STEP_ID);
   assert.equal(runtime.commitFtueAction({ actionId: FRONTIER_ACTION_ID, evidenceRef: 'mossprout-world:frontier-seen' })?.stepId, LOST_TRACKS_STEP_ID);
   assert.equal(loadRuntime(runtime.loadFtueRun()).runtime.loadFtueRun()!.stepId, LOST_TRACKS_STEP_ID, 'a relaunch at the tracks stays at the tracks');
-  assert.equal(runtime.commitFtueAction({ actionId: LOST_TRACKS_ACTION_ID, evidenceRef: 'shared-world:lost-trail' })?.stepId, LOST_TRAIL_MISSION_STEP_ID);
-  assert.equal(runtime.commitFtueAction({ actionId: LOST_TRAIL_MISSION_ACTION_ID, evidenceRef: 'mossprout-world:lost-trail-mission' })?.stepId, LOST_TRAIL_STONE_STEP_IDS[0]);
+  assert.equal(runtime.commitFtueAction({ actionId: LOST_TRACKS_ACTION_ID, evidenceRef: 'shared-world:lost-trail' })?.stepId, LOST_TRAIL_STONE_STEP_IDS[0]);
   // The Lost Trail: each stone is won by its own battle, and no other.
   for (const [index, stepId] of LOST_TRAIL_STONE_STEP_IDS.entries()) {
     assert.equal(runtime.dispatchFtueEvent({ type: 'battle_won', battleId: FIRST_BATTLE_ID, revision: 2 } as never)?.stepId, stepId, 'an old battle does not count');
@@ -156,7 +154,7 @@ test('a fresh run walks the Last Clearing: the cold open, the guardian, the firs
   assert.equal(runtime.commitFtueAction({ actionId: STEPPLING_JOINED_ACTION_ID, evidenceRef: 'mossprout-world:steppling-joined' })?.stepId, HOME_STEP_ID);
   const done = runtime.commitFtueAction({ actionId: HOME_ACTION_ID, evidenceRef: 'mossprout-world:home' })!;
   assert.equal(done.stepId, 'complete', 'the first session ends at home');
-  assert.equal(flowDispatches.filter((entry) => entry === 'event:battle_won').length, 4, 'the flow hears the first battle and the three stones');
+  assert.equal(flowDispatches.filter((entry) => entry === 'event:battle_won').length, 2, 'the flow hears the first battle and the Lost Trail rescue');
   assert.equal(flowDispatches.filter((entry) => entry === `action:${COLD_OPEN_ACTION_ID}`).length, 1);
   assert.equal(flowDispatches.filter((entry) => entry === `action:${GUARDIAN_ACTION_ID}`).length, 1);
   assert.equal(flowDispatches.filter((entry) => entry === 'action:world.mist_lifted').length, 1);
@@ -200,7 +198,7 @@ test('the Kingdom wires the Last Clearing: the cold open, the first battle docke
   assert.match(dock, /finaleIdRef\.current = id;\s*finaleHoldRef\.current = true;\s*setFinaleActive\(true\);/, 'the finale flag is raised synchronously at launch, before the flight is measured');
   assert.match(dock, /if \(landed && !miss && \(finale \|\| landed\.shot \|\| landed\.direct \|\| landed\.index % 2 === 0\)\)/, 'the finale always bursts (and every Glow shot or lane bolt that hits)');
   assert.match(screen, /const openingGuidanceVisible = Boolean\(openingBoardStep && \(openingBoardStep\.cue \|\| openingBoardStep\.spotlight\)\)/);
-  assert.match(screen, /const visibleUpgradeOffers = homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS : missionBoardDocked \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch, nor while a board hands off to its story');
+  assert.match(screen, /const worldOffers = homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS : missionBoardDocked \? NO_UPGRADE_OFFERS : chapterOpeningPhase \|\| rescueRevealing \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch, nor while a board hands off to its story');
   assert.doesNotMatch(screen, /MOSSPROUT_SLEEPING_OFFER/, 'the silhouette marker is gone from the opening');
   assert.match(screen, /openingWeather=\{homeVeil !== 'none'\}/, 'rain and sparkles while the veil is up');
   assert.match(screen, /openingGuidanceVisible && ftueCameraSettled && openingDockSettled \?/, 'the spotlight waits for the dock to settle');
@@ -258,7 +256,7 @@ test('the Kingdom wires the Last Clearing: the cold open, the first battle docke
   assert.match(screen, /setLiftCaptionVisible\(true\), REVEAL_CAPTION_DELAY_MS/);
   assert.match(screen, /ftueStepId !== OPENING_MIST_LIFT_STEP_ID \|\| liftCaptionVisible/);
 
-  assert.match(screen, /const LIFT_CAPTION_MIN_MS = 200;/);
+  assert.match(screen, /const LIFT_CAPTION_MIN_MS = 2_200;/, "FTUE v2: the lift breathes before the Heart Tree");
   assert.match(screen, /if \(homeVeil !== 'lifting'\) return;[\s\S]*?veilLiftKeyRef\.current = key;[\s\S]*?veilLift: true/, 'the crossblend starts when the veil enters lifting, not when the step changes');
   // The mist clears on the frame the final item strikes the tile; the camera, caption and dock still wait for the burst to settle.
   assert.match(screen, /const homeVeil = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld && !openingGlow\.finaleLanded \? 'veiled' : homeVeilForStep\(routeFtueStepId\);/);
@@ -316,13 +314,12 @@ test('the Heart Tree wakes once, with the first light, and stirs the Heartwood',
   assert.equal(normalizeMergeWorldState(JSON.parse(JSON.stringify(woken.state)), now).heartTree?.receiptId, 'run:heart-tree', 'the woken Tree survives a reload');
 });
 
-test('the Lost Trail is a story tile with its own tracks under the Mist, and Steppling lost inside', () => {
-  const trail = STORY_TILES.find((tile) => tile.id === LOST_TRAIL_TILE_ID);
-  assert.ok(trail, 'the Lost Trail is in the world');
-  assert.equal(trail?.companion, 'steppling');
-  assert.equal(trail?.lostSkinId, 'steppling', 'Steppling is the silhouette in its Mist');
-  assert.equal(trail?.mistedAlphaBoundsKey, 'shared_world_lost_trail_tracks_hex_tile_v1.webp', 'the tracks art, not the shared mist tile');
-  for (const key of [trail!.alphaBoundsKey, trail!.mistedAlphaBoundsKey!, 'shared_world_hollow_tree_hex_tile_v1.webp']) {
+test('the Lost Trail is Steppling\u2019s own tile under the Mist: its misted art, and him lost inside', () => {
+  assert.equal(LOST_TRAIL_TILE_ID, STEPPLING_HATCHABLE.tile.id, 'the trail battles dock under his own tile');
+  assert.ok(!STORY_TILES.some((tile) => tile.id === 'lost-trail'), 'no separate Lost Trail tile on the map');
+  assert.equal(STEPPLING_HATCHABLE.tile.lostSkinId, 'steppling', 'Steppling is the silhouette in its Mist');
+  assert.equal(STEPPLING_HATCHABLE.tile.mistedAlphaBoundsKey, 'shared_world_steppling_misted_hex_tile_v1.webp', 'his own misted trailhead, not the shared mist tile');
+  for (const key of [STEPPLING_HATCHABLE.tile.alphaBoundsKey, STEPPLING_HATCHABLE.tile.mistedAlphaBoundsKey!, 'mossprout_veiled_main_hex_tile_v1.webp', 'shared_world_hollow_tree_hex_tile_v1.webp']) {
     assert.ok(key in KINGDOM_HEX_TILE_ALPHA_BOUNDS, `${key} has generated bounds (the art went through the hex pipeline)`);
   }
 });
@@ -338,8 +335,4 @@ test('Steppling is rescued from the Mist, free and once: his tile open and him h
   assert.ok(rescued.state.companionDiscovery.records.some((record) => record.characterId === 'steppling'), 'Steppling is home');
   assert.ok(rescued.state.unlockedCharacters.includes('steppling'));
   assert.equal(reduceMergeWorld(rescued.state, { type: 'rescueWorldFriend', targetId: STEPPLING_HATCHABLE.tile.unlockId, now: now + 1 }).changed, false, 'once home, asking again changes nothing');
-  // The Lost Trail itself is a story tile: revealed free by its unlock.
-  const trail = reduceMergeWorld(rescued.state, { type: 'unlockWorldTarget', targetId: LOST_TRAIL.unlockId, now });
-  assert.ok(trail.state.worldUnlocks?.[LOST_TRAIL.unlockId], 'the Lost Trail is found again');
-  assert.equal(trail.state.coins, 7);
 });

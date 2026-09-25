@@ -36,5 +36,14 @@ export function heartTreeStage(level: number): HeartwoodStage {
   return level >= 1 ? 'stirring' : 'dormant';
 }
 
+/**
+ * The Sanctuary is founded: the Heart Tree is woken (the new first session), or, on a save from before it, the old
+ * Kingdom goal was told. Everything the old goal used to unlock after the first session (building on the Heartwood,
+ * the Grove's levels, a friend's misted island) opens on this instead.
+ */
+export function sanctuaryFounded(world: Pick<MergeWorldState, 'heartTree' | 'kingdomGoal'>): boolean {
+  return world.heartTree != null || world.kingdomGoal?.introducedAt != null;
+}
+
 /** The highest level any other building may reach: one past the Tree. */
 export const buildingLevelCap = (treeLevel: number) => treeLevel + 1;

@@ -82,7 +82,7 @@ test('the first battle is a chain: five guided wakes put a Sprout in every lane,
 });
 
 test('the rescue is won only with every wisp down and the trapped cell out of the Mist, and the finger merges toward it', () => {
-  const rescue = LOST_TRAIL_BATTLES[2]!;
+  const rescue = LOST_TRAIL_BATTLES[0]!;
   assert.deepEqual(rescue.objective, { kind: 'rescue', cell: LOST_TRAIL_RESCUE_CELL });
   const host = encounterMechanicHost(rescue);
   const trailWindow = encounterWindow(rescue);
@@ -106,4 +106,20 @@ test('every Lost Trail battle can be won by a careful player', () => {
     const careful = lanesFairness(encounter, 'careful', 3);
     assert.equal(careful.wins, careful.seeds, `stone ${index + 1}: careful wins every time (${careful.wins}/${careful.seeds}, ${careful.seconds}s)`);
   }
+});
+
+test('FTUE v2: Baristabbit is rescued in a Lanes battle, winnable by a careful player, with no ticket', async () => {
+  const { BARISTABBIT_RESCUE_BATTLE, BARISTABBIT_RESCUE_COPY } = await import('@/constants/rescue-battles');
+  const { BARISTABBIT_HATCHABLE } = await import('@/constants/hatchable-companions/baristabbit');
+  assert.equal(BARISTABBIT_RESCUE_BATTLE.mechanic?.kind, 'lanes');
+  assert.equal(BARISTABBIT_RESCUE_BATTLE.objective.kind, 'rescue');
+  assert.equal(BARISTABBIT_HATCHABLE.mission.encounter, BARISTABBIT_RESCUE_BATTLE, 'the window is played as the rescue battle');
+  assert.equal(BARISTABBIT_HATCHABLE.tile.price, 0, 'no ticket: the battle is the price');
+  const careful = lanesFairness(BARISTABBIT_RESCUE_BATTLE, 'careful', 4);
+  assert.ok(careful.wins >= 3, `careful wins the lit window (${careful.wins}/${careful.seeds}, ${careful.seconds}s)`);
+  const idle = lanesFairness(BARISTABBIT_RESCUE_BATTLE, 'idle', 2);
+  assert.equal(idle.wins, 0, 'doing nothing loses: it is a real battle');
+  const { intro, ...said } = BARISTABBIT_RESCUE_COPY;
+  for (const line of [...Object.values(said), intro?.title ?? '', intro?.line ?? '']) assert.ok(!/!/.test(line), `no "!" in the Mist's presence: ${line}`);
+  assert.ok(intro, 'the rescue opens with its story card before the wisps come');
 });

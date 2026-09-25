@@ -24,7 +24,7 @@ export type WorldUpgradeDefinition = {
   description: string;
   nextLevel: number;
   cost: number;
-  action: 'Clear mist' | 'Restore' | 'Upgrade' | 'Open the board';
+  action: 'Clear mist' | 'Restore' | 'Upgrade' | 'Open the board' | 'Enter the Mist';
   unlockId?: string;
   transition?: 'island_reveal';
   economyMode?: 'normal' | 'free';
@@ -144,11 +144,13 @@ export function worldUpgradeOffers(world: MergeWorldState): WorldUpgradeOffer[] 
       eligible = false;
     }
     // Ticket paid: the tile's business is the board now, and nothing here costs Glow again.
-    if (hatchable?.state === 'board') {
+    // Cozy 4X v2: a friend rescued in battle has no ticket. The battle is the price.
+    const rescueBattle = Boolean(hatchableDefinition?.mission.encounter && hatchableDefinition.tile.price === 0);
+    if (hatchable?.state === 'board' || rescueBattle) {
       cost = 0;
       economyMode = 'free';
     }
-    return [{ ...definition, ...(hatchable?.state === 'board' ? { action: 'Open the board' } : {}), cost, economyMode, currentLevel, maxLevel: worldUpgradeMaxLevel(definition), storyId: worldUpgradeStory(definition.id, definition.nextLevel)?.id, eligible, markerSkinId,
+    return [{ ...definition, ...(hatchable?.state === 'board' ? { action: 'Open the board' } : rescueBattle ? { action: 'Enter the Mist' } : {}), cost, economyMode, currentLevel, maxLevel: worldUpgradeMaxLevel(definition), storyId: worldUpgradeStory(definition.id, definition.nextLevel)?.id, eligible, markerSkinId,
       affordable: world.coins >= cost, missingGlow: Math.max(0, cost - world.coins), ...(restorationProgress ? { restorationProgress } : {}),
       ...(hatchable ? { hatchable, ...(hatchable.state === 'sleeping' ? { lockedReason: hatchable.sleepingLine, lockedLabel: 'Held' } : {}) } : {}) }];
   });

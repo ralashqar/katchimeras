@@ -50,3 +50,7 @@ python scripts/review-shared-world-discovery-art.py
 `qa-512.png` and `qa-256.png` compare the packaged images with Mossprout on cream, dark, magenta and checker backgrounds. The review script verifies provenance, exact output dimensions, alpha and transparent padding. Runtime wiring uses static sources for all three LODs in the shared neighborhood and regular world registry; older asset files remain available for rollback. Camera, character placement, unlock state and transitions are unchanged.
 
 Asset QA is not a substitute for an on-device mist-reveal/character-framing check.
+
+- **Misted own tiles (Sept 25 2026):** each is the friend's own tile under the house Mist. `dream-mist-imagegen-soft-v1` (the v4 full Mist) is the style guide, and each layout matches the cleared tile, so a reveal crossblends in place.
+  - `mossprout-veiled`: Mossprout's main tile, fully misted except the round patio where he stands. It is the Last Clearing's veiled home.
+  - `steppling-misted`: Steppling's trailhead, its rear three quarters misted, with the front strip and paw prints clear. It replaces the separate Lost Trail tile: the trail's battles dock here and the tile clears as he is rescued.

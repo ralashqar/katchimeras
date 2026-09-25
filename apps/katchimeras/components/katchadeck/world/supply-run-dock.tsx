@@ -10,7 +10,7 @@ import type { MissionCommandResult } from '@/features/onboarding/use-opening-mis
 import { SUPPLY_CRATE, type supplyOrder } from '@/features/supply-run/supply-run';
 import type { MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
 import { mergeOrderItemReadiness, mergeOrderReady } from '@/utils/merge-world/engine';
-import { FriendSpeechBubble } from './friend-speech-bubble';
+import { FriendSpeechBubble, type SpeechLine } from './friend-speech-bubble';
 import { MistMissionDock } from './kingdom-opening-merge-dock';
 
 export type SupplyRunOrder = { slot: 0 | 1; index: number; order: ReturnType<typeof supplyOrder> };
@@ -23,8 +23,17 @@ const CRATE = SUPPLY_CRATE.every;
  * Sanctuary's friends have posted, as the Merge page's own tray cards. A card's items tick off as they are made; once
  * ready, Serve sends them off the board, each into its own slot on the card (the Merge page's own serve flight, run
  * by the host over the whole screen), and the order pays out. What the first friend wants is said beside the cards.
- * Done puts the board away; it keeps everything for next time.
+ * Back (in the top bar) puts the board away; it keeps everything for next time.
  */
+/**
+ * Baristabbit teaching the Café, the first time (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Chapter 1): what it is
+ * for before the first order, then what Meals are for once the first is served. The friends' own lines after that.
+ */
+const CAFE_TEACHING_LINES: Readonly<Record<number, SpeechLine>> = {
+  0: { speaker: 'Baristabbit', text: 'Heroes fight on full bellies. Merge what they ask for, then serve it.' },
+  1: { speaker: 'Baristabbit', text: 'That’s Meals in the pantry. Meals train heroes.' },
+};
+
 export const SupplyRunDock = memo(function SupplyRunDock({
   state, send, orders, served, width, bottomInset, onServe, onBoardMetrics, onEntranceSettled, onClose, hiddenItemIds, servingOrderId, crateFull = false, title,
 }: {
@@ -57,7 +66,7 @@ export const SupplyRunDock = memo(function SupplyRunDock({
   const serve = useCallback((entry: SupplyRunOrder, itemTargets: readonly MergeScreenPoint[]) => (servingOrderId ? false : onServe(entry, itemTargets)), [onServe, servingOrderId]);
   const first = orders[0]?.order;
   const tray = <View pointerEvents="box-none" style={styles.trayPanel}>
-    {first ? <View pointerEvents="none" style={styles.bubble}><FriendSpeechBubble text={first.line} reduceMotion={reduceMotion} /></View> : null}
+    {first ? <View pointerEvents="none" style={styles.bubble}><FriendSpeechBubble text={CAFE_TEACHING_LINES[served] ?? first.line} reduceMotion={reduceMotion} /></View> : null}
     <View pointerEvents="box-none" style={styles.trayRow}>
       {orders.map((entry, index) => {
         const ready = mergeOrderReady(state, entry.order);
@@ -82,7 +91,6 @@ export const SupplyRunDock = memo(function SupplyRunDock({
     interactionKey="supply-run" sessionId={sessionRef.current.id} hiddenItemIds={hiddenItemIds ?? noneHidden}
     width={width} bottomInset={bottomInset}
     onCommand={dispatch} onBoardMetrics={onBoardMetrics} onEntranceSettled={onEntranceSettled}
-    onClose={onClose} closeLabel="Done"
     header={tray} headerGap={4} />;
 });
 

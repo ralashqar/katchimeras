@@ -58,6 +58,8 @@ export type MergeServeRewardFlight = {
   coinTargetSize: RewardIconSize;
   energyAmount: number;
   energyTo: MergeScreenPoint;
+  /** Other rewards the order pays (Timber, Meals), each flying into its own counter in the top bar. */
+  extras?: readonly { id: string; amount: number; art: number; to: MergeScreenPoint; targetSize?: RewardIconSize }[];
   items: readonly MergeServeItemFlight[];
   nonce: number;
   phase: 'items' | 'rewards';
@@ -145,7 +147,8 @@ function ParallelRewardPayout({ flight, onCoinArrive, onEnergyArrive, onFinish }
   onEnergyArrive: MergeRewardArrivalHandler;
   onFinish: () => void;
 }) {
-  const requiredGroups = Number(flight.coinAmount > 0) + Number(flight.energyAmount > 0);
+  const extras = (flight.extras ?? []).filter((extra) => extra.amount > 0);
+  const requiredGroups = Number(flight.coinAmount > 0) + Number(flight.energyAmount > 0) + extras.length;
   const completedGroupsRef = useRef(0);
   const finishGroup = useCallback(() => {
     completedGroupsRef.current += 1;
@@ -180,6 +183,18 @@ function ParallelRewardPayout({ flight, onCoinArrive, onEnergyArrive, onFinish }
       to={flight.energyTo}
       variant="energy"
     /> : null}
+    {extras.map((extra) => <RewardPayout
+      key={`${flight.nonce}:${extra.id}`}
+      amount={extra.amount}
+      art={extra.art}
+      from={flight.coinFrom}
+      nonce={`${flight.nonce}:${extra.id}`}
+      onArrive={noArrival}
+      onFinish={finishGroup}
+      to={extra.to}
+      targetSize={extra.targetSize}
+      variant="coin"
+    />)}
   </>;
 }
 
@@ -303,6 +318,8 @@ function RewardToken({ elapsed, amount, art, count, from, index, onArrive, onFin
 
   return <Animated.View style={[styles.rewardToken, motionStyle]}><Image accessibilityIgnoresInvertColors contentFit="contain" source={art} style={styles.rewardTokenArt} transition={0} /></Animated.View>;
 }
+
+const noArrival: MergeRewardArrivalHandler = () => undefined;
 
 export function mergeRewardContactWindowMs(count: number, reduceMotion: boolean) {
   return Math.max(0, count - 1) * (reduceMotion ? 25 : COIN_STAGGER_MS);

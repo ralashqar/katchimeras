@@ -14,10 +14,10 @@ import type { MergeWorldState } from '@/types/merge-world';
  * Like the Lantern's, the panel stays up across an upgrade so the next level's
  * numbers and cost are there at once.
  */
-export function HeartwoodBuildingPanel({ world, buildingId, layout, bottomInset, registerDismiss, onClose, onGarden, onUpgrade }: {
+export function HeartwoodBuildingPanel({ world, buildingId, layout, bottomInset, registerDismiss, onClose, onGarden, onSupplyRun, onUpgrade }: {
   world: MergeWorldState; buildingId: HeartwoodBuildingId; layout: UpgradeStageLayout; bottomInset: number;
   registerDismiss?: (dismiss: (() => void) | null) => void;
-  onClose: () => void; onGarden: () => void;
+  onClose: () => void; onGarden: () => void; /** Where Timber is earned (the Café). */ onSupplyRun?: () => void;
   onUpgrade: (id: HeartwoodBuildingId, expectedLevel: number) => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState(false);
@@ -49,7 +49,8 @@ export function HeartwoodBuildingPanel({ world, buildingId, layout, bottomInset,
       <UpgradeLevelSlots levels={model.levels} selected={pick.shown?.level ?? null} current={pick.current} onSelect={pick.pick} artFor={pick.slotArt} disabled={busy || motion.closing} />
     </UpgradeSection>
     {model.requirements.length ? <UpgradeSection label="Requires">
-      {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement} disabled={busy || motion.closing} onAction={() => motion.leave(onGarden)} />)}
+      {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement.id === 'timber' && !requirement.met && onSupplyRun ? { ...requirement, action: { id: 'garden', label: 'Café' } } : requirement}
+        disabled={busy || motion.closing} onAction={() => motion.leave(requirement.id === 'timber' && onSupplyRun ? onSupplyRun : onGarden)} />)}
     </UpgradeSection> : null}
   </UpgradeDock>;
 }

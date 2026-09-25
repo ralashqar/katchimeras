@@ -7,7 +7,7 @@ import { playUpgradeSequence } from '@incubator/environments/upgrade-sequence';
 import {createHexTileRenderer} from '@incubator/environments/hex-tile';
 import { WorldUpgradeMarker } from './world-upgrade-marker';
 import { HEARTWOOD_PATCH_ITEM, heartwoodPatchItemPosition } from '@/constants/heartwood-patch-item';
-import { companionIdForFamily } from '@/constants/katchimera-skins';
+import { companionIdForFamily, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { WispCompanion } from '@/components/katchadeck/wisps/wisp-companion';
 import type { WispId } from '@/types/wisp';
 import type { HomeVeilState } from '@/features/onboarding/opening-mist';
@@ -66,7 +66,7 @@ import { CompanionStepsValue } from '@/components/katchadeck/world/companion-ste
 import { worldEggReadyEffectsVisible, type WorldFtueSubjectPresentation } from '@/components/katchadeck/world/world-ftue-subject-presentation';
 import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arrival-motion';
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
-import { hatchableByCompanion, hatchableByTile } from '@/constants/hatchable-companions/registry';
+import { HATCHABLE_COMPANIONS, hatchableByCompanion, hatchableByTile } from '@/constants/hatchable-companions/registry';
 import { STORY_TILES, storyTileById } from '@/constants/story-tiles/registry';
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
@@ -236,6 +236,8 @@ type Props = {
   cameraMinimumScale?: number;
   /** Something waiting on a tile (the Lodge's Timber): a bubble over it, in the world, tapped to collect. */
   tileBubbles?: readonly { tileId: string; label: string; art?: ImageSourcePropType; onPress: () => void }[];
+  /** A light kept in the Mist on a tile (a chapter's beacon: Baristabbit's lit window), pulsing warm through its Mist. */
+  tileBeacons?: readonly { tileId: string; color: string }[];
   storyOperationsEnabled?: boolean;
   worldEggTargetRef?: RefObject<ViewType | null>;
   worldSubjectPresentation?: WorldFtueSubjectPresentation | null;
@@ -587,6 +589,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onStoryTileTargetChange,
   cameraMinimumScale,
   tileBubbles,
+  tileBeacons,
   storyOperationsEnabled = true,
   worldEggTargetRef,
   worldSubjectPresentation,
@@ -952,22 +955,32 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (onNatureIslandTargetChange) for (const islandId of MOSSPROUT_NATURE_ISLAND_IDS) refs.set(islandId, (node) => onNatureIslandTargetChange(islandId, node));
     return refs;
   }, [onNatureIslandTargetChange]);
+  // Tiles the story points at before they clear: every story tile, and a friend's own tile with someone lost in its
+  // Mist (Steppling's trailhead, where the Lost Trail's battles dock).
+  const storyTargetTiles = useMemo(() => [...STORY_TILES.map((tile) => tile.id), ...HATCHABLE_COMPANIONS.filter((definition) => definition.tile.lostSkinId).map((definition) => definition.tile.id)], []);
   const storyTileTargetRefs = useMemo(() => {
     const refs = new Map<string, (node: View | null) => void>();
-    if (onStoryTileTargetChange) for (const tile of STORY_TILES) refs.set(tile.id, (node) => onStoryTileTargetChange(tile.id, node));
+    if (onStoryTileTargetChange) for (const tileId of storyTargetTiles) refs.set(tileId, (node) => onStoryTileTargetChange(tileId, node));
     return refs;
-  }, [onStoryTileTargetChange]);
-  const storyTileFrames = useMemo(() => STORY_TILES.flatMap((tile) => {
-    const layer = scene.tileArtLayers.find((candidate) => candidate.id === `structure:${tile.id}`);
-    return layer ? [{ tileId: tile.id, frame: layer.interactionFrame ?? layer.frame }] : [];
-  }), [scene.tileArtLayers]);
-  // A friend lost in a story tile's Mist (the Lost Trail's Steppling): a dim silhouette deep in it until it clears.
-  const lostSilhouettes = useMemo(() => STORY_TILES.flatMap((tile) => {
-    if (!tile.lostSkinId || (mossproutGarden?.storyTiles?.[tile.id] ?? 'misted') !== 'misted') return [];
-    const frame = storyTileFrames.find((entry) => entry.tileId === tile.id)?.frame;
-    const source = frame ? resolveCreatureArtSource(tile.lostSkinId) : null;
-    return frame && source ? [{ tileId: tile.id, frame, source }] : [];
-  }), [mossproutGarden?.storyTiles, storyTileFrames]);
+  }, [onStoryTileTargetChange, storyTargetTiles]);
+  const storyTileFrames = useMemo(() => storyTargetTiles.flatMap((tileId) => {
+    const layer = scene.tileArtLayers.find((candidate) => candidate.id === `structure:${tileId}`);
+    return layer ? [{ tileId, frame: layer.interactionFrame ?? layer.frame }] : [];
+  }), [scene.tileArtLayers, storyTargetTiles]);
+  // A friend lost in a tile's Mist (Steppling on his trailhead): a dim silhouette deep in it until it clears.
+  const lostSilhouettes = useMemo(() => [
+    ...STORY_TILES.flatMap((tile) => (tile.lostSkinId && (mossproutGarden?.storyTiles?.[tile.id] ?? 'misted') === 'misted' ? [{ tileId: tile.id, skinId: tile.lostSkinId }] : [])),
+    ...HATCHABLE_COMPANIONS.flatMap((definition) => {
+      const state = mossproutGarden?.hatchableTiles?.[definition.tile.id] ?? (definition.companion === 'steppling' ? mossproutGarden?.gateway : undefined) ?? 'locked';
+      // Held through a rescue's reveal until the tile starts to clear (the write lands before the blend begins).
+      const clearing = revealingHatchableTileId === definition.tile.id && upgradePhase !== 'reveal' && upgradePhase !== 'react' && upgradePhase !== 'complete';
+      return definition.tile.lostSkinId && (state === 'locked' || clearing) ? [{ tileId: definition.tile.id, skinId: definition.tile.lostSkinId }] : [];
+    }),
+  ].flatMap(({ tileId, skinId }) => {
+    const frame = storyTileFrames.find((entry) => entry.tileId === tileId)?.frame;
+    const source = frame ? resolveCreatureArtSource(skinId) : null;
+    return frame && source ? [{ tileId, frame, source }] : [];
+  }), [mossproutGarden?.gateway, mossproutGarden?.hatchableTiles, mossproutGarden?.storyTiles, revealingHatchableTileId, storyTileFrames, upgradePhase]);
   const natureIslandFrames = useMemo(() => scene.tileArtLayers.flatMap((layer) => {
     if (!layer.id.startsWith('nature:mossprout:') || layer.id.endsWith(':growth') || !layer.interactionFrame) return [];
     return [{
@@ -1080,7 +1093,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       && candidate.companion.creature.creatureId === interactionResidentId
     ));
     if (!tile) return null;
-    const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === residentArtLayerId(tile.id, tile.companion?.familyId))?.residentAnchor;
+    const residentLayer = scene.tileArtLayers.find((layer) => layer.id === residentArtLayerId(tile.id, tile.companion?.familyId));
+    // A friend arriving on a tile still clearing stands where they will stay (the cleared tile's spot), never mid-tile.
+    const residentAnchor = residentLayer?.residentAnchor ?? residentLayer?.restingAnchor;
     const isMossprout = usesSharedResidentStage(tile.companion?.familyId);
     const subjectFrame = residentAnchor
       ? residentCreatureFrame(residentAnchor.x, residentAnchor.y, creatureWorldSize, isMossprout)
@@ -1530,7 +1545,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     // it is not a world view to restore. Egg handoffs already supply an origin.
     if (hadWorldCameraRef.current) interactionOriginSnapshotRef.current ??= readLiveCameraSnapshot();
     focusedInteractionResidentRef.current = interactionFocusKey;
-    const residentAnchor = scene.tileArtLayers.find((layer) => layer.id === residentArtLayerId(tile.id, tile.companion?.familyId))?.residentAnchor;
+    const residentLayer = scene.tileArtLayers.find((layer) => layer.id === residentArtLayerId(tile.id, tile.companion?.familyId));
+    // A friend arriving on a tile still clearing stands where they will stay (the cleared tile's spot), never mid-tile.
+    const residentAnchor = residentLayer?.residentAnchor ?? residentLayer?.restingAnchor;
     const isMossprout = usesSharedResidentStage(tile.companion?.familyId);
     const subjectFrame = residentAnchor
       ? residentCreatureFrame(residentAnchor.x, residentAnchor.y, creatureWorldSize, isMossprout)
@@ -1831,7 +1848,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     ));
     if (!tile || tile.companion?.kind !== 'owned') return null;
     const artLayer = artLayerById.get(tile.id);
-    const anchor = artLayer?.residentAnchor ?? kingdomWorldViewPoint(
+    const anchor = artLayer?.residentAnchor ?? artLayer?.restingAnchor ?? kingdomWorldViewPoint(
       { x: tile.cx, y: tile.cy },
       kingdomWorldViewConfig.katchimera,
     );
@@ -1882,7 +1899,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       // below. Keeping the small world copy here would both duplicate it and
       // preserve the blurry camera-scaled raster that FTUE already avoids.
       if (tile.companion.creature.creatureId === interactionResidentProjection?.creature.creatureId) continue;
-      const { x, y } = artLayer?.residentAnchor ?? kingdomWorldViewPoint(
+      const { x, y } = artLayer?.residentAnchor ?? artLayer?.restingAnchor ?? kingdomWorldViewPoint(
         { x: tile.cx, y: tile.cy },
         kingdomWorldViewConfig.katchimera
       );
@@ -1899,6 +1916,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               : !upgradePresentation?.natureIslandId
               // The opening's veil lift is not his restoration: he stays steady through it.
               && !upgradePresentation?.veilLift
+              // Nor is the Heart Tree's: the Heartwood grows under him and he stays exactly as he is.
+              && !upgradePresentation?.heartTree
               && upgradePresentation?.visualTarget?.kind !== 'haven_structure'
               && upgradePresentation?.creatureId === tile.companion.creature.creatureId
               && (upgradePhase === 'react' || upgradePhase === 'complete')
@@ -2133,6 +2152,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             {focusedMossproutWorld && onStoryTileTargetChange ? storyTileFrames.map(({ tileId, frame }) => (
               <View key={`story-tile-target-${tileId}`} ref={storyTileTargetRefs.get(tileId)} collapsable={false} pointerEvents="none" style={[styles.natureIslandHitTarget, frame]} />
             )) : null}
+            {focusedMossproutWorld && tileBeacons?.length ? tileBeacons.map((beacon) => {
+              // The friend waiting in the Mist: their silhouette where they will stand once it clears, glowing.
+              const layer = scene.tileArtLayers.find((candidate) => candidate.id === `structure:${beacon.tileId}`);
+              const anchor = layer?.restingAnchor ?? layer?.residentAnchor;
+              const companion = hatchableByTile(beacon.tileId)?.companion;
+              // Exactly their resident: the same art, frame and spot they take once home, drawn as a shadow.
+              const visualKey = companion ? katchimeraSkinById.get(companion)?.visualKey ?? companion : null;
+              const source = visualKey ? worldAssetSource(`creature:${visualKey}`, KINGDOM_RENDERING.havenImageLod) : null;
+              return anchor && source && companion ? <TileBeacon key={`tile-beacon-${beacon.tileId}`} frame={residentCreatureFrame(anchor.x, anchor.y, creatureWorldSize, usesSharedResidentStage(companion))} source={source} color={beacon.color} /> : null;
+            }) : null}
             {focusedMossproutWorld && tileBubbles?.length ? tileBubbles.map((bubble) => {
               const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${bubble.tileId}`)?.interactionFrame;
               return frame ? <TileBubble key={`tile-bubble-${bubble.tileId}`} frame={frame} label={bubble.label} art={bubble.art} onPress={bubble.onPress} /> : null;
@@ -3477,7 +3506,7 @@ const ResidentCreature = memo(function ResidentCreature({
     : null;
   const [ready, setReady] = useState(false);
   const opacity = useSharedValue(stableWorldPresentation && !entrance ? 1 : 0);
-  const lift = useSharedValue(stableWorldPresentation && !entrance ? 0 : entrance ? -22 : 12);
+  const lift = useSharedValue(stableWorldPresentation && !entrance ? 0 : entrance ? -6 : 12);
   const reactionLift = useSharedValue(0);
   const reactionRotation = useSharedValue(0);
   const reactionScale = useSharedValue(1);
@@ -3491,12 +3520,14 @@ const ResidentCreature = memo(function ResidentCreature({
 
   useEffect(() => {
     if (entrance) {
-      // A friend come home: they drop into place with a little bounce.
+      // A friend come home: they fade in as their tile clears, settling with one small overshoot at most (never a
+      // repeating spring bounce), and from nearly full size so the sprite stays crisp.
       if (reduceMotion) { opacity.value = 1; lift.value = 0; return; }
-      opacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) });
-      lift.value = withSpring(0, { damping: 11, stiffness: 190 });
-      reactionScale.value = 0.6;
-      reactionScale.value = withSpring(1, { damping: 9, stiffness: 170 });
+      // The tile's own crossblend is 480ms in-out (`hex-tile.tsx`): a friend rescued with their tile fades in on it.
+      opacity.value = withTiming(1, { duration: 480, easing: Easing.inOut(Easing.cubic) });
+      lift.value = withTiming(0, { duration: 480, easing: Easing.out(Easing.back(1.2)) });
+      reactionScale.value = 0.94;
+      reactionScale.value = withTiming(1, { duration: 480, easing: Easing.out(Easing.back(1.2)) });
       return;
     }
     if (stableWorldPresentation) {
@@ -3523,9 +3554,10 @@ const ResidentCreature = memo(function ResidentCreature({
       withTiming(-3, { duration: 90 }),
       withTiming(0, { duration: 120 }),
     );
+    // One hop and back: no spring wobble on the way down.
     reactionScale.value = withSequence(
-      withTiming(1.14, { duration: 150, easing: Easing.out(Easing.cubic) }),
-      withSpring(1, { damping: 12, stiffness: 180 }),
+      withTiming(1.08, { duration: 150, easing: Easing.out(Easing.cubic) }),
+      withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) }),
     );
   }, [celebrationNonce, reactionLift, reactionRotation, reactionScale, reduceMotion]);
 
@@ -3863,6 +3895,26 @@ const LostSilhouette = memo(function LostSilhouette({ frame, source }: { frame: 
  * Something waiting on a tile (the Explorer's Lodge's Timber): a round bubble over the tile's top, bobbing gently,
  * tapped to collect. In world space, so it moves with the camera like the tile it belongs to.
  */
+/**
+ * Someone waiting in the Mist (a chapter's beacon: Baristabbit at his lit window): their own resident sprite, in the
+ * spot and size they take once home, as a dark silhouette over the Mist, its edge glowing softly in a slow pulse (an
+ * alpha shadow on the sprite itself; no shapes behind it). Runtime, not baked.
+ */
+const TileBeacon = memo(function TileBeacon({ frame, source, color }: { frame: { left: number; top: number; width: number; height: number }; source: ImageSourcePropType; color: string }) {
+  const reduceMotion = useReducedMotion();
+  const breath = useSharedValue(0.5);
+  useEffect(() => {
+    if (reduceMotion) return;
+    breath.value = withRepeat(withSequence(withTiming(1, { duration: 1_400, easing: Easing.inOut(Easing.sin) }), withTiming(0.35, { duration: 1_700, easing: Easing.inOut(Easing.sin) })), -1, false);
+    return () => cancelAnimation(breath);
+  }, [breath, reduceMotion]);
+  const glow = useAnimatedStyle(() => ({ shadowOpacity: 0.35 + breath.value * 0.55 }));
+  return <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: frame.left, top: frame.top, width: frame.width, height: frame.height,
+    shadowColor: color, shadowOffset: { width: 0, height: 0 }, shadowRadius: Math.max(4, frame.width * 0.08) }, glow]}>
+    <Image source={source} style={{ width: frame.width, height: frame.height, tintColor: '#2E2338' }} contentFit="contain" transition={0} accessible={false} />
+  </Animated.View>;
+});
+
 const TileBubble = memo(function TileBubble({ frame, label, art, onPress }: { frame: { left: number; top: number; width: number; height: number }; label: string; art?: ImageSourcePropType; onPress: () => void }) {
   const reduceMotion = useReducedMotion();
   const bob = useSharedValue(0);

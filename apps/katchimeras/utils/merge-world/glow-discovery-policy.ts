@@ -50,7 +50,8 @@ export function glowGatewayState(state: MergeWorldState): 'egg' | 'open' | 'lock
 }
 /** Whether a hatchable tile has woken: its definition says what has to have happened first. */
 export function hatchableAvailable(state: MergeWorldState, definition: HatchableCompanionDefinition): boolean {
-  const { availability } = definition;
+  // A save from before the cozy 4X first session keeps the rule it was played under: its friend's tile never closes.
+  const availability = !state.heartTree && definition.legacyAvailability ? definition.legacyAvailability : definition.availability;
   if (availability.kind === 'event_joined') return Boolean(state.localLiveOps?.runs[availability.eventId]);
   if (availability.kind === 'after_ftue') return true;
   if (availability.kind === 'kingdom_goal_introduced') return state.kingdomGoal?.introducedAt != null;

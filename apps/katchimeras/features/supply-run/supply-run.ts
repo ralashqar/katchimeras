@@ -29,16 +29,20 @@ export type SupplyOrderSpec = {
 /** Who stands at each card, left to right. */
 export const SUPPLY_SLOT_CHARACTERS: readonly [MergeCharacterId, MergeCharacterId] = ['steppling', 'mossprout'];
 
-/** Steppling wants trail snacks and juice; Mossprout wants something warm and a biscuit under the Heart Tree. */
+/**
+ * Steppling wants trail snacks and a coffee for the road; Mossprout wants something warm and a biscuit under the Heart
+ * Tree. The Café pours one drink chain, coffee (`drink:hot`: Tiny Espresso, Caramel Latte, Strawberry Boba...), and bakes
+ * one pastry chain.
+ */
 export const SUPPLY_ORDER_POOLS: Readonly<Record<'steppling' | 'mossprout', readonly SupplyOrderSpec[]>> = {
   steppling: [
-    { title: 'Juice for the trail', wants: [['drink:refresh', 2, 1]], meals: 3, timber: 1, glow: 5, line: 'An Iced Fruit Tea for the road!' },
+    { title: 'Coffee for the trail', wants: [['drink:hot', 2, 1]], meals: 3, timber: 1, glow: 5, line: 'A Caramel Latte for the road!' },
     { title: 'Trail biscuits', wants: [['food:cafe-pastry', 2, 2]], meals: 4, timber: 1, glow: 6, line: 'Two Cookie Pairs. One for now, one for later.' },
-    { title: 'A proper picnic', wants: [['drink:refresh', 3, 1], ['food:cafe-pastry', 2, 1]], meals: 6, timber: 2, glow: 8, line: 'A Berry Smoothie and cookies. That\u2019s a real picnic.' },
+    { title: 'A proper picnic', wants: [['drink:hot', 3, 1], ['food:cafe-pastry', 2, 1]], meals: 6, timber: 2, glow: 8, line: 'A Strawberry Boba and cookies. That\u2019s a real picnic.' },
   ],
   mossprout: [
     { title: 'Something warm', wants: [['drink:hot', 2, 1]], meals: 3, timber: 1, glow: 5, line: 'A Caramel Latte. Warm paws, warm heart.' },
-    { title: 'Tea under the Tree', wants: [['drink:refresh', 2, 1], ['food:cafe-pastry', 1, 1]], meals: 4, timber: 1, glow: 6, line: 'Iced tea and a biscuit, under the Heart Tree.' },
+    { title: 'Coffee under the Tree', wants: [['drink:hot', 2, 1], ['food:cafe-pastry', 1, 1]], meals: 4, timber: 1, glow: 6, line: 'A latte and a biscuit, under the Heart Tree.' },
     { title: 'A little treat', wants: [['drink:hot', 3, 1]], meals: 6, timber: 2, glow: 8, line: 'A Strawberry Boba. Just this once.' },
   ],
 };
@@ -50,9 +54,9 @@ export const SUPPLY_ORDER_POOLS: Readonly<Record<'steppling' | 'mossprout', read
 export const KITCHEN_ORDER_POOLS: Readonly<Record<'steppling' | 'mossprout', readonly SupplyOrderSpec[]>> = {
   steppling: [
     { title: 'Trail lunch', wants: [['food:table', 3, 1]], meals: 6, timber: 1, glow: 6, line: 'A proper Dish before the climb!' },
-    { title: 'Juice for the trail', wants: [['drink:refresh', 2, 1]], meals: 3, timber: 1, glow: 5, line: 'An Iced Fruit Tea for the road!' },
+    { title: 'Coffee for the trail', wants: [['drink:hot', 2, 1]], meals: 3, timber: 1, glow: 5, line: 'A Caramel Latte for the road!' },
     { title: 'Summit cupcakes', wants: [['food:dessert', 3, 2]], meals: 9, timber: 2, glow: 8, line: 'Two Cupcakes, for the top of the hill.' },
-    { title: 'A hiker\u2019s feast', wants: [['food:table', 4, 1], ['drink:refresh', 3, 1]], meals: 14, timber: 2, glow: 12, line: 'A Meal and a Smoothie. I could walk for days on that.' },
+    { title: 'A hiker\u2019s feast', wants: [['food:table', 4, 1], ['drink:hot', 3, 1]], meals: 14, timber: 2, glow: 12, line: 'A Meal and a Boba. I could walk for days on that.' },
   ],
   mossprout: [
     { title: 'Supper for two', wants: [['food:table', 3, 1], ['drink:hot', 2, 1]], meals: 8, timber: 1, glow: 7, line: 'A warm Dish and a Latte. Like old times.' },
@@ -62,8 +66,8 @@ export const KITCHEN_ORDER_POOLS: Readonly<Record<'steppling' | 'mossprout', rea
   ],
 };
 
-/** Every this many orders fill a crate: a bonus, and the visit is done for now. */
-export const SUPPLY_CRATE = { every: 5, timber: 5, glow: 15, meals: 8 } as const;
+/** Every this many orders fill a crate: a bonus on top of the order. The visit goes on; Back ends it whenever. */
+export const SUPPLY_CRATE = { every: 5, timber: 5, glow: 25, meals: 8 } as const;
 
 /** The order a card shows: its friend's list at `index` (the list repeats, a little richer each time round). */
 export function supplyOrder(slot: 0 | 1, index: number, kitchen = false): MergeOrder & { timber: number; meals: number; line: string } {
@@ -96,18 +100,18 @@ export const kitchenOpen = (world: Pick<MergeWorldState, 'companionDiscovery'>) 
 export function createSupplyRunBoard(now: number, kitchen = false): MergeWorldState {
   const base = createMissionState({
     items: [
-      { cell: 37, definitionId: 'drink:refresh:1' }, { cell: kitchen ? 29 : 38, definitionId: 'drink:hot:1' }, { cell: 39, definitionId: 'food:cafe-pastry:1' },
-      { cell: 30, definitionId: 'drink:refresh:1' }, { cell: 33, definitionId: 'food:cafe-pastry:1' },
+      { cell: 37, definitionId: 'drink:hot:1' }, { cell: kitchen ? 29 : 38, definitionId: 'drink:hot:1' }, { cell: 39, definitionId: 'food:cafe-pastry:1' },
+      { cell: 30, definitionId: 'drink:hot:1' }, { cell: 33, definitionId: 'food:cafe-pastry:1' },
       ...(kitchen ? [{ cell: 26, definitionId: 'food:table:1' }, { cell: 22, definitionId: 'food:dessert:1' }] : []),
     ],
     echoes: [{ cell: 31, id: 'cafe:sleeper-1', definitionId: 'drink:hot:1' }],
     veiled: [
-      { cell: 24, id: 'cafe:veiled-1', definitionId: 'drink:refresh:2' },
+      { cell: 24, id: 'cafe:veiled-1', definitionId: 'drink:hot:2' },
       { cell: 32, id: 'cafe:veiled-2', definitionId: 'food:cafe-pastry:1' },
       { cell: 25, id: 'cafe:veiled-3', definitionId: 'drink:hot:2' },
     ],
   }, 'baristabbit', now);
-  const bar = placeSpawner(base, { id: 'bar', generatorId: 'ritual-bar', cell: 40, charges: 99, drops: ['drink:refresh:1', 'drink:hot:1'] }, 40);
+  const bar = placeSpawner(base, { id: 'bar', generatorId: 'ritual-bar', cell: 40, charges: 99, drops: ['drink:hot:1'] }, 40);
   const counter = placeSpawner(bar, { id: 'counter', generatorId: 'cafe-counter', cell: 36, charges: 99, drops: ['food:cafe-pastry:1'] }, 36);
   return kitchen ? placeSpawner(counter, { id: 'pantry', generatorId: 'hearth-pantry', cell: 38, charges: 99, drops: ['food:table:1', 'food:dessert:1'] }, 38) : counter;
 }

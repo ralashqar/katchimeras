@@ -24,10 +24,10 @@ function heroBuildingLevelArt(id: HeroBuildingId, level: number): ImageSourcePro
  * in the world above, this docks under it, and it stays up across an upgrade so the next level is there at once.
  * Short of Timber, the requirement's Go leads to the Supply Run.
  */
-export function HeroBuildingPanel({ world, buildingId, layout, bottomInset, registerDismiss, onClose, onSupplyRun, onUpgrade }: {
+export function HeroBuildingPanel({ world, buildingId, layout, bottomInset, registerDismiss, onClose, onSupplyRun, onMist, onUpgrade }: {
   world: MergeWorldState; buildingId: HeroBuildingId; layout: UpgradeStageLayout; bottomInset: number;
   registerDismiss?: (dismiss: (() => void) | null) => void;
-  onClose: () => void; onSupplyRun: () => void;
+  onClose: () => void; onSupplyRun: () => void; onMist?: () => void;
   onUpgrade: (id: HeroBuildingId, expectedLevel: number) => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState(false);
@@ -60,7 +60,7 @@ export function HeroBuildingPanel({ world, buildingId, layout, bottomInset, regi
     </UpgradeSection>
     {model.requirements.length ? <UpgradeSection label="Requires">
       {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement.id === 'timber' && !requirement.met ? { ...requirement, action: { id: 'garden', label: 'Café' } } : requirement}
-        disabled={busy || motion.closing} onAction={() => motion.leave(requirement.id === 'timber' ? onSupplyRun : onClose)} />)}
+        disabled={busy || motion.closing} onAction={() => motion.leave(requirement.id === 'timber' ? onSupplyRun : onMist ?? onClose)} />)}
     </UpgradeSection> : null}
   </UpgradeDock>;
 }

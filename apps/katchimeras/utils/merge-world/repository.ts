@@ -772,9 +772,9 @@ export async function payStoredEncounterContinue(receiptId: string, cost: number
   return Boolean(result.state.encounters?.receipts.includes(receiptId));
 }
 
-/** Glow the story hands over once per receipt (Steppling's mist price after the first session). */
-export async function grantStoredStoryGlow(receiptId: string, amount: number, now = gameNow()) {
-  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantStoryGlow', receiptId, amount, now }), now);
+/** Glow (and a hero's experience) the story hands over once per receipt: a scripted battle's payout. */
+export async function grantStoredStoryGlow(receiptId: string, amount: number, now = gameNow(), xp?: { katchimeraId: import('@/types/merge-world').MergeCharacterId; amount: number }) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'grantStoryGlow', receiptId, amount, now, ...(xp ? { xp } : {}) }), now);
 }
 
 export async function ensureStoredOpeningGlow(receiptId: string, amount: number = GLOW.firstRestorationCost, now = gameNow()) {

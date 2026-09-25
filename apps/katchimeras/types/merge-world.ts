@@ -674,7 +674,7 @@ export type MergeWorldCommand =
   /** A Supply Run order served: its slot moves on to the next pool index, and it pays Timber and Glow. Once per index. */
   | { type: 'completeSupplyOrder'; slot: 0 | 1; index: number; timber: number; glow: number; meals?: number; crate?: { every: number; timber: number; glow: number; meals?: number }; now: number }
   /** Glow the story hands over once (e.g. Steppling's mist price), keyed in the encounter ledger's receipts. */
-  | { type: 'grantStoryGlow'; receiptId: string; amount: number; now: number }
+  | { type: 'grantStoryGlow'; receiptId: string; amount: number; now: number; /** Experience for a hero, paid with the same receipt (a scripted battle's). */ xp?: { katchimeraId: MergeCharacterId; amount: number } }
   /** Keep going on a lost level: its Glow, once per receipt; refused when the Glow is not there. */
   | { type: 'payEncounterContinue'; receiptId: string; cost: number; now: number }
   /** `prepareStepplingGardenLesson` is the same command for Steppling, kept for callers and saves. */

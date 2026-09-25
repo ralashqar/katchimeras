@@ -24,6 +24,9 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
     "kind": "island_friend_home",
     "residentSkinId": "petalimp"
   },
+  "legacyAvailability": {
+    "kind": "kingdom_goal_introduced"
+  },
   "discovery": {
     "gateId": "gate-3-first-choice",
     "pathId": "warm-table"
@@ -155,7 +158,8 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
   "discoveryFlow": {
     "id": "glow-feastle-discovery",
     // v2: no Egg; Feastle is rescued straight home once the table is revealed.
-    "version": 2,
+    // v3: no reveal-to-Egg and no joined bubble (as Baristabbit).
+    "version": 3,
     "runId": "story:glow-feastle-v1",
     "migrations": { "gateway.egg": "gateway.rescue", "egg.enter": "gateway.rescue" },
     "arrival": "rescue",

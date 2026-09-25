@@ -12,7 +12,7 @@ import { MOSSPROUT_NATURE_ISLANDS, mossproutNatureIslandById } from '@/constants
 import { hexAlphaBounds } from '@/utils/hex-alpha-bounds';
 import { artSourceSet } from '@/utils/art-source';
 import { HATCHABLE_COMPANIONS, hatchableByCompanion } from '@/constants/hatchable-companions/registry';
-import { hatchableTileArt } from '@/constants/hatchable-companions/tile-art';
+import { hatchableMistedTileArt, hatchableTileArt } from '@/constants/hatchable-companions/tile-art';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { STORY_TILES, type StoryTileDefinition, type StoryTileState } from '@/constants/story-tiles/registry';
@@ -84,6 +84,20 @@ const DREAM_MIST_LOCKED_NATURE_SOURCES: TileSources = {
   thumb: require('@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp'),
 };
 const DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['dream_mist_locked_hex_tile_v4.webp'];
+/**
+ * Mossprout's home under the Mist (the Last Clearing's opening): his own tile buried in the house Mist, with the round
+ * patio left clear where he stands, so he stands in his clearing rather than floating on a cloud. Same canvas as his
+ * tile, so the lift crossblends in place.
+ */
+const MOSSPROUT_VEILED: ArtSpec = {
+  alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['mossprout_veiled_main_hex_tile_v1.webp'],
+  coord: SHARED_WORLD_TILES['mossprout-home'].coord,
+  sources: {
+    full: require('@incubator/art-world/hex/mossprout_veiled_main_hex_tile_v1.webp'),
+    medium: require('@incubator/art-world/hex/mossprout_veiled_main_hex_tile_v1_512.webp'),
+    thumb: require('@incubator/art-world/hex/mossprout_veiled_main_hex_tile_v1_256.webp'),
+  },
+};
 
 // Each island's existing art is the fallback for every unlocked level.
 // Add a levelArt entry with bundled LODs and measured bounds when bespoke art exists.
@@ -349,6 +363,9 @@ function shiftLayer(layer: KingdomTileArtLayer, dx: number, dy: number): Kingdom
     residentAnchor: layer.residentAnchor
       ? { x: layer.residentAnchor.x + dx, y: layer.residentAnchor.y + dy }
       : undefined,
+    restingAnchor: layer.restingAnchor
+      ? { x: layer.restingAnchor.x + dx, y: layer.restingAnchor.y + dy }
+      : undefined,
   };
 }
 
@@ -376,7 +393,7 @@ export function buildMossproutHexNeighborhoodScene(
     ?? { id: 'family:mossprout', familyId: 'mossprout', kind: 'locked' as const, coord: MAIN.coord };
   const unveiledMain = layerFor(mossprout.id, 'tile', MAIN);
   const mainLayer = options.homeVeiled
-    ? layerFor(mossprout.id, 'tile', { alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS, coord: MAIN.coord, sources: DREAM_MIST_LOCKED_NATURE_SOURCES }, MAIN.alphaBounds)
+    ? layerFor(mossprout.id, 'tile', MOSSPROUT_VEILED, MAIN.alphaBounds)
     : unveiledMain;
   // The Last Clearing: Mossprout stands on the tile from the first frame, veiled or not, in the same art, so the lift
   // never swaps (and visibly rescales) him.
@@ -422,15 +439,25 @@ export function buildMossproutHexNeighborhoodScene(
     // A friend's building grows their tile's art with it (`constants/hero-building-art.ts`).
     const look = locked ? null : heroTileLook(definition.tile.id, gardenState.heroTileLooks?.[definition.tile.id] ?? 0);
     const bounds = hexAlphaBounds(look?.alphaBoundsKey ?? definition.tile.alphaBoundsKey);
-    const layer = layerFor(`structure:${definition.tile.id}`, 'structure', {
-      coord: definition.tile.coord,
-      alphaBounds: locked ? DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS : bounds,
-      sources: locked ? DREAM_MIST_LOCKED_NATURE_SOURCES : look?.art() ?? hatchableTileArt(definition.tile.id),
-    });
+    // A tile with its own misted art (Steppling's trailhead) shows it while locked, on the cleared art's canvas.
+    const misted = locked && definition.tile.mistedAlphaBoundsKey ? hatchableMistedTileArt(definition.tile.id) : null;
+    const layer = misted
+      ? layerFor(`structure:${definition.tile.id}`, 'structure', { coord: definition.tile.coord, alphaBounds: hexAlphaBounds(definition.tile.mistedAlphaBoundsKey!), sources: misted }, bounds)
+      : layerFor(`structure:${definition.tile.id}`, 'structure', {
+        coord: definition.tile.coord,
+        alphaBounds: locked ? DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS : bounds,
+        sources: locked ? DREAM_MIST_LOCKED_NATURE_SOURCES : look?.art() ?? hatchableTileArt(definition.tile.id),
+      });
     if (!locked) layer.residentAnchor = sharedResidentAnchor(layer.frame);
     return layer;
   };
-  const hatchableLayers = HATCHABLE_COMPANIONS.map((definition) => ({ definition, locked: hatchableLayer(definition, true), revealed: hatchableLayer(definition, false) }));
+  const hatchableLayers = HATCHABLE_COMPANIONS.map((definition) => {
+    const locked = hatchableLayer(definition, true);
+    const revealed = hatchableLayer(definition, false);
+    // Where the friend will stand once the Mist lets go: a beacon on the misted tile shows them there.
+    locked.restingAnchor = revealed.residentAnchor;
+    return { definition, locked, revealed };
+  });
   // Every story tile, from its definition: full mist until its episode reveals it, its own art after. No marker; a resident only where the tile names one.
   const storyTileLayer = (tile: StoryTileDefinition, revealed: boolean) => {
     // A story tile the story shows before it is cleared (the Lost Trail's tracks) keeps its own misted art.

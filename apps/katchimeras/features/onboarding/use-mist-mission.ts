@@ -1,3 +1,4 @@
+import type { SpeechLine } from '@/components/katchadeck/world/friend-speech-bubble';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { View } from 'react-native';
 
@@ -71,7 +72,7 @@ export type EncounterDockState = {
   /** The partner's ability (the second hero slot), with who they are; null without a partner. */
   partnerAbility: { definition: CompanionAbilityDefinition; tier: CompanionAbilityTier; charge: number; ready: boolean; targets: number[]; companionId: string } | null;
   /** What the friend says right now, or nothing. */
-  speech: string | null;
+  speech: SpeechLine | null;
   effects: MechanicEffect[];
   onUseAbility: (target: number | null, slot?: 0 | 1) => void;
   /** Focus / Ripple: the next merge (the next Water merge) clears as if this many steps bigger. */
@@ -122,7 +123,7 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
   keepGoingCost?: number;
   payKeepGoing?: (receiptId: string) => Promise<boolean>;
   /** A scripted battle's own lines over the board (the Last Clearing's first battle), from how it stands. */
-  speechFor?: (input: { mechanicState: MissionMechanicState; merges: number; board: MergeWorldState }) => string | null;
+  speechFor?: (input: { mechanicState: MissionMechanicState; merges: number; board: MergeWorldState }) => SpeechLine | null;
 }) {
   const preview = useDevMissionMechanicPreview();
   const encounter = useMemo(() => authored ?? (mission ? resolveEncounterForPlay(mission, preview) : null), [authored, mission, preview]);

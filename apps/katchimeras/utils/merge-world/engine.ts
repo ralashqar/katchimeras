@@ -685,10 +685,13 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
     case 'grantStoryGlow': {
       const ledger = encounterLedger(current);
       if (ledger.receipts.includes(command.receiptId)) return unchanged(current);
+      const xp = command.xp && command.xp.amount > 0 ? command.xp : null;
+      const hero = xp ? katchimeraProgress(current, xp.katchimeraId) : null;
       return changed(touch({
         ...current,
         coins: Math.min(999_999, current.coins + Math.max(0, Math.floor(command.amount))),
         encounters: { ...ledger, receipts: [...ledger.receipts, command.receiptId] },
+        ...(xp && hero ? { katchimeraProgress: { ...current.katchimeraProgress, [xp.katchimeraId]: { ...hero, xp: hero.xp + Math.floor(xp.amount) } } } : {}),
       }, command.now));
     }
     case 'revealMovementEgg':

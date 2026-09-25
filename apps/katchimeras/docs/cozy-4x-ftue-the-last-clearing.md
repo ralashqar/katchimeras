@@ -1,5 +1,7 @@
 # The Last Clearing: the cozy 4X first session
 
+> **Superseded after Act I (Sept 25 2026):** the flow from the first battle onward, the end-of-session cliffhanger and every chapter after it now follow `cozy-4x-ftue-v2-wayfinders-road.md`. Some details below are stale: the first goal is "The Lit Window", not the Explorer's Lodge, and the trail stones play as story steps, not a level track.
+
 Status: **steps 1 to 5 built Sept 24 2026** (the whole first session, cold open to home). Step 1: story graph v57, the cold open, the guardian, and Mossprout from the first frame. Step 2: the first battle is a scripted Lanes level that cannot be lost (`constants/last-clearing-battle.ts`, `forgiving` lanes push a breaching wisp back). Mossprout speaks lines over the board, and the story moves on the `battle_won` event. First battle, reworked (Sept 24 2026, per the user) into a dense Steppling-style chain:
 - **Start:** five Seeds on the bottom row, one Seed asleep under half Mist above them, and the rest under full Mist. Seeds sit on row four, Sprouts on row three, and two Plants on row two.
 - **Waking:** each wake (a twin onto a sleeper) makes the piece one tier up and opens the full Mist beside it. The finger guides every wake (`firstBattleGuide`).

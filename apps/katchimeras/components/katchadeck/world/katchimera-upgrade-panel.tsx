@@ -14,12 +14,14 @@ import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
  * once the Mist has taught them enough, and brings their ability's next tier.
  * The panel stays up across a level so the next one's numbers are there at once.
  */
-export function KatchimeraUpgradePanel({ world, characterId, layout, bottomInset, registerDismiss, onClose, onMist, onUpgrade }: {
+export function KatchimeraUpgradePanel({ world, characterId, layout, bottomInset, registerDismiss, onClose, onMist, onSupplyRun, onUpgrade }: {
   world: MergeWorldState; characterId: MergeCharacterId; layout: UpgradeStageLayout; bottomInset: number;
   registerDismiss?: (dismiss: (() => void) | null) => void;
   onClose: () => void;
   /** Where experience comes from: the nearest region's panel. */
   onMist: () => void;
+  /** Where Meals are served (the Café). */
+  onSupplyRun?: () => void;
   onUpgrade: (id: MergeCharacterId, expectedLevel: number) => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState(false);
@@ -53,7 +55,8 @@ export function KatchimeraUpgradePanel({ world, characterId, layout, bottomInset
       <UpgradeLevelSlots levels={model.levels} selected={pick.shown?.level ?? null} current={pick.current} onSelect={pick.pick} artFor={pick.slotArt} disabled={busy || motion.closing} />
     </UpgradeSection>
     {model.requirements.length ? <UpgradeSection label="Requires">
-      {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement} disabled={busy || motion.closing} onAction={() => motion.leave(onMist)} />)}
+      {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement.id === 'meals' && !requirement.met && onSupplyRun ? { ...requirement, action: { id: 'garden', label: 'Café' } } : requirement}
+        disabled={busy || motion.closing} onAction={() => motion.leave(requirement.id === 'meals' && onSupplyRun ? onSupplyRun : onMist)} />)}
     </UpgradeSection> : null}
   </UpgradeDock>;
 }

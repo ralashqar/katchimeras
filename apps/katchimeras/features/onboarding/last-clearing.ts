@@ -33,6 +33,11 @@ export const FIRST_BATTLE_ID = 'last-clearing:first-battle';
 export const FIRST_BATTLE_EYEBROW = 'They found us';
 export const FIRST_BATTLE_TITLE = 'Quick. Wake what sleeps under the Mist: it grows into something that shines.';
 export const FIRST_BATTLE_BODY = 'Drag a Seed onto the one under the Mist.';
+/**
+ * Experience Mossprout takes from the first session's four battles: 45 in all, past the 40 that level 2 asks, so
+ * the Wayfinder comes home with a hero ready to grow (trained in Chapter 1, once the Café has Meals).
+ */
+export const FIRST_BATTLE_XP = 10;
 
 /** What Mossprout says over the first battle, as it goes. */
 export const FIRST_BATTLE_LINES = {
@@ -75,7 +80,8 @@ export const FRONTIER_LINES: readonly string[] = [
 ];
 
 /** The tracks (beat 11): a trail at the clearing's edge, footprints going in and none coming out. */
-export const LOST_TRAIL_TILE_ID = 'lost-trail';
+/** The Lost Trail is Steppling's own tile under the Mist: its battles dock there, and it clears as he is rescued. */
+export const LOST_TRAIL_TILE_ID = 'steppling-home';
 export const LOST_TRACKS_STEP_ID = 'world.lost_tracks';
 export const LOST_TRACKS_ACTION_ID = 'world.follow_tracks';
 export const LOST_TRACKS_TITLE = 'The Lost Trail';
@@ -83,35 +89,38 @@ export const LOST_TRACKS_LINES: readonly string[] = [
   'Wait.',
   'Someone came through here. Recently.',
   'Someone’s still in there.',
+  'We can’t leave them out there.',
 ];
-export const LOST_TRACKS_LOOK = 'Look closer';
+/** FTUE v2: the mission card is folded in here; the button takes you to the trail, and the tap on it starts the first stone. */
+export const LOST_TRACKS_LOOK = 'Follow the Lost Trail';
 
-/** The mission (beat 12): the Lost Trail's card. Its levels are step 5; until then the first session ends here. */
+/** The mission (beat 12): folded into the tracks in FTUE v2 (flow v61); its step id is kept only to move old runs on. */
 export const LOST_TRAIL_MISSION_STEP_ID = 'world.lost_trail_mission';
-export const LOST_TRAIL_MISSION_ACTION_ID = 'world.accept_lost_trail';
-export const LOST_TRAIL_MISSION_EYEBROW = 'New mission';
-export const LOST_TRAIL_MISSION_TITLE = 'Follow the Lost Trail';
-export const LOST_TRAIL_MISSION_LINE = 'We can’t leave them out there. Let’s go.';
 
-/** The Lost Trail (beats 12 to 13): three short battles down the trail, docked under its tile, the last a rescue. */
-export const LOST_TRAIL_STONE_STEP_IDS = ['world.trail_stone_1', 'world.trail_stone_2', 'world.trail_stone_3'] as const;
-export const LOST_TRAIL_STONE_BATTLE_IDS = ['last-clearing:lost-trail-1', 'last-clearing:lost-trail-2', 'last-clearing:lost-trail-3'] as const;
+/**
+ * The Lost Trail (beats 12 to 13): one battle under Steppling's misted trailhead, the rescue (Sept 25 2026, the user:
+ * one is enough). It keeps what the three stones each taught (a quick wisp, a spitter, the thick Mist over someone).
+ */
+export const LOST_TRAIL_STONE_STEP_IDS = ['world.trail_stone_1'] as const;
+export const LOST_TRAIL_STONE_BATTLE_IDS = ['last-clearing:lost-trail-rescue'] as const;
 export const LOST_TRAIL_EYEBROW = 'The Lost Trail';
-/** What each Lost Trail battle pays: enough, with the first light, for the Sanctuary's first building after home. */
-export const LOST_TRAIL_STONE_GLOW = [15, 20, 30] as const;
+/** What the rescue pays: what the three stones paid together (Glow for the first building, XP past Mossprout's level 2). */
+export const LOST_TRAIL_STONE_GLOW = [65] as const;
+export const LOST_TRAIL_STONE_XP = [35] as const;
 export const LOST_TRAIL_STONES = [
-  { title: 'The Trail In', line: 'Out here they move faster. Watch for the quick one.' },
-  { title: 'Mist Rows', line: 'The Mist lies in rows here. Merge beside it to burn it off.' },
-  { title: 'Someone’s in There', line: 'There, under the thick Mist. Clear the wisps, then burn it off them.' },
+  { title: 'Someone\u2019s in There', line: 'Out here they move faster. And there, under the thick Mist: someone. Clear the wisps, then burn it off them.' },
 ] as const;
-/** What is said over each trail battle as it goes. */
+/** What is said over the trail battle as it goes (Mossprout's; the trapped voice is below). */
 export const LOST_TRAIL_LINES = {
-  quick: 'That one’s fast! Get something shooting under it.',
-  rows: 'Merge right beside the Mist. The light burns it away.',
-  voice: 'Hello? Is someone out there?',
-  rescue: 'They’re right under there! Merge beside the thick Mist. Twice!',
-  clearing: 'The wisps are gone. Now the Mist. Merge next to it!',
+  rescue: 'They\u2019re right under there! Merge beside the thick Mist. Twice!',
   pushed: 'Hold on! I pushed it back. Keep going!',
+} as const;
+/** Who is trapped under the Mist, before anyone knows it is Steppling: a voice from inside it. */
+export const LOST_TRAIL_VOICE = 'Someone in the Mist';
+export const LOST_TRAIL_VOICE_LINES = {
+  hello: 'Hello? Is someone out there?',
+  light: 'I can see light. Keep going.',
+  almost: 'Almost. Burn it off. Right next to me.',
 } as const;
 
 /** The rescue (beat 14): the Mist bursts off the cell, the trail clears, and Steppling tumbles out. */

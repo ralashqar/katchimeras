@@ -4,6 +4,7 @@ import { BARISTABBIT_EGG_POLICY } from '@/constants/baristabbit-egg-copy';
 import { BARISTABBIT_SCENARIO_POLLS } from '@/constants/baristabbit-scenario-polls';
 import { STEPPLING_WISPS } from '@/features/onboarding/corruption-wisps';
 import { MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM } from '@/features/onboarding/opening-mist';
+import { BARISTABBIT_RESCUE_BATTLE, BARISTABBIT_RESCUE_COPY } from '@/constants/rescue-battles';
 
 /**
  * Baristabbit, the second friend the Mist kept: a lit window beside the
@@ -19,18 +20,24 @@ export const BARISTABBIT_HATCHABLE: HatchableCompanionDefinition = {
   displayName: 'Baristabbit',
   tile: {
     id: 'baristabbit-home', coord: { q: 1, r: -1 },
-    unlockId: 'mossprout:warm-light', price: 60,
+    // Cozy 4X v2: no ticket. The rescue battle is the price (`constants/rescue-battles.ts`).
+    unlockId: 'mossprout:warm-light', price: 0,
     name: 'A lit window', revealPreset: 'mist-clear',
     alphaBoundsKey: 'shared_world_baristabbit_window_hex_tile_v1.webp',
-    markerLines: { sleeping: 'The Mist keeps this window until Petalimp is home.' },
+    markerLines: { sleeping: 'The Mist keeps this window until Steppling is home.' },
   },
   // Cozy 4X: the window wakes once Steppling is home (the end of the first session); Baristabbit is Chapter 1's rescue,
   // and his Café is where the team's Meals come from.
   availability: { kind: 'after_companion', companion: 'steppling' },
+  legacyAvailability: { kind: 'island_friend_home', residentSkinId: 'petalimp' },
   discovery: { gateId: 'gate-3-first-choice', pathId: 'warm-light' },
   mission: {
     id: 'mission:baristabbit',
     storageKey: 'katchimeras.mist-mission.baristabbit.v1',
+    // Played: a Lanes rescue, the lamp's keepers coming down on the window (Chapter 1, The Lit Window). The board below
+    // is the retired glow-strikes one, kept for saves parked on it.
+    encounter: BARISTABBIT_RESCUE_BATTLE,
+    rescue: BARISTABBIT_RESCUE_COPY,
     /** Two merges and six wakings: eight strikes, two per wisp. */
     required: 8,
     camera: { kind: 'focus_target', target: { kind: 'haven_gateway' }, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 900 },
@@ -72,11 +79,12 @@ export const BARISTABBIT_HATCHABLE: HatchableCompanionDefinition = {
     },
   },
   discoveryFlow: {
-    id: 'glow-baristabbit-discovery', version: 3, runId: 'story:glow-baristabbit-v1',
+    // v4: no reveal-to-Egg and no joined bubble: the battle's win clears his tile with him on it.
+    id: 'glow-baristabbit-discovery', version: 4, runId: 'story:glow-baristabbit-v1',
     // v1 opened the board from the bubble; the bubble pays first now. v3: no Egg, he is rescued straight home.
     migrations: { 'gateway.offer': 'gateway.pay', 'gateway.return': 'gateway.pay', 'gateway.focus': 'gateway.pay', 'gateway.egg': 'gateway.rescue', 'egg.enter': 'gateway.rescue' },
     arrival: 'rescue',
-    joined: { guide: { eyebrow: 'Baristabbit has joined your Sanctuary', title: 'The kettle\u2019s on.', body: 'He kept that window lit the whole time. Now his Caf\u00e9 is open: friends order, you serve, and the team eats well.' }, actionLabel: 'Welcome' },
+    joined: { guide: { eyebrow: 'Baristabbit has joined your Sanctuary', title: 'You walked through that? You must be starving.', body: 'He kept that window lit the whole time, for whoever came. Now his Café is open: friends order, you merge and serve, and every order feeds the team.' }, actionLabel: 'Welcome, Baristabbit' },
     egg: { guide: { eyebrow: 'An Egg', title: 'So the window was keeping someone.', body: 'Something in there kept a kettle warm for nobody. Go on. That is you now.' }, actionLabel: 'Meet the Egg' },
   },
   dayOne: {

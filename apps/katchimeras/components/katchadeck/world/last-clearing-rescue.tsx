@@ -10,14 +10,14 @@ import type { ConversationTranscriptEntry } from '@/types/companion-conversation
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { ConversationNarrativeOverlay } from './conversation-narrative-overlay';
 
-const STEPPLING_ART = resolveCreatureArtSource('steppling');
 
 /**
- * Steppling trapped under the thick Mist on the Lost Trail's last board (`docs/cozy-4x-ftue-the-last-clearing.md`,
- * beat 13): his cut-out as a shadow in the trapped cell, breathing in and out of sight. It sits over the board cell's
+ * A friend trapped under the thick Mist on a rescue board (Steppling on the Lost Trail's last stone, Baristabbit at his
+ * lit window): their cut-out as a shadow in the trapped cell, breathing in and out of sight. It sits over the board cell's
  * screen frame and goes when the Mist does.
  */
-export function TrappedFriendSilhouette({ frame }: { frame: { x: number; y: number; width: number; height: number } }) {
+export function TrappedFriendSilhouette({ frame, companion = 'steppling' }: { frame: { x: number; y: number; width: number; height: number }; companion?: string }) {
+  const art = useMemo(() => resolveCreatureArtSource(companion), [companion]);
   const reduceMotion = useReducedMotion();
   const presence = useSharedValue(0.4);
   useEffect(() => {
@@ -31,7 +31,7 @@ export function TrappedFriendSilhouette({ frame }: { frame: { x: number; y: numb
   const style = useAnimatedStyle(() => ({ opacity: presence.value }));
   const size = frame.width * 0.78;
   return <Animated.View pointerEvents="none" style={[styles.silhouette, { left: frame.x + (frame.width - size) / 2, top: frame.y + (frame.height - size) / 2, width: size, height: size }, style]}>
-    {STEPPLING_ART ? <Image source={STEPPLING_ART} style={{ width: size, height: size, tintColor: '#2B2640' }} contentFit="contain" transition={0} accessible={false} /> : null}
+    {art ? <Image source={art} style={{ width: size, height: size, tintColor: '#2B2640' }} contentFit="contain" transition={0} accessible={false} /> : null}
   </Animated.View>;
 }
 

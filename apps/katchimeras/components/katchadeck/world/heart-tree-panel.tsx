@@ -16,10 +16,10 @@ const levelArt = (level: number): ImageSourcePropType | null => (level < 1 ? nul
  * this docks under it. Each level raises every other building's cap; every two grow it into its next stage.
  * Short of Timber, the requirement's Go leads to the Supply Run.
  */
-export function HeartTreePanel({ world, layout, bottomInset, registerDismiss, onClose, onSupplyRun, onUpgrade }: {
+export function HeartTreePanel({ world, layout, bottomInset, registerDismiss, onClose, onSupplyRun, onMist, onUpgrade }: {
   world: MergeWorldState; layout: UpgradeStageLayout; bottomInset: number;
   registerDismiss?: (dismiss: (() => void) | null) => void;
-  onClose: () => void; onSupplyRun: () => void;
+  onClose: () => void; onSupplyRun: () => void; onMist?: () => void;
   onUpgrade: (expectedLevel: number) => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState(false);
@@ -52,7 +52,7 @@ export function HeartTreePanel({ world, layout, bottomInset, registerDismiss, on
     </UpgradeSection>
     {model.requirements.length ? <UpgradeSection label="Requires">
       {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement.id === 'timber' && !requirement.met ? { ...requirement, action: { id: 'garden', label: 'Café' } } : requirement}
-        disabled={busy || motion.closing} onAction={() => motion.leave(requirement.id === 'timber' ? onSupplyRun : onClose)} />)}
+        disabled={busy || motion.closing} onAction={() => motion.leave(requirement.id === 'timber' ? onSupplyRun : onMist ?? onClose)} />)}
     </UpgradeSection> : null}
   </UpgradeDock>;
 }

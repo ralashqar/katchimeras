@@ -18,7 +18,6 @@ import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
 import { applyStoredGlowDiscovery, grantStoredGeneratorParcel, reconcileStoredHavenStory, activateStoredResidentCardDiscovery, ensureStoredFirstSpringBuilt, wakeStoredFirstSpring, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget, ensureStoredOpeningGlow, restoreStoredHeartTree, rescueStoredWorldFriend, revealStoredStoryTile } from '@/utils/merge-world/repository';
 import { GLOW } from '@/constants/glow';
-import { LOST_TRAIL } from '@/constants/story-tiles/lost-trail';
 import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 import { heartwoodBuildingById } from '@/constants/heartwood-buildings';
 import { FIRST_SEED_BUILDING_ID } from '@/features/heartwood-buildings/buildings-world';
@@ -212,10 +211,9 @@ export function bootstrapContentFlowCatalog() {
     if (!result.restored) throw new Error(result.message ?? 'The Heart Tree could not be woken');
     return { effectKey, receiptId: result.state.heartTree!.receiptId };
   });
-  // The Kingdom plays the Lost Trail clearing and Steppling's tile opening as it writes them; this is the story's own
-  // guarantee after them (a relaunch between): the trail revealed and Steppling home, both idempotent.
+  // The Kingdom plays Steppling's tile clearing (him home on it) as it writes it; this is the story's own guarantee
+  // after it (a relaunch between): Steppling home, idempotent.
   registerContentFlowEffect('haven.steppling_joins', async ({ effectKey }) => {
-    await revealStoredStoryTile(LOST_TRAIL.unlockId);
     const result = await rescueStoredWorldFriend(STEPPLING_HATCHABLE.tile.unlockId);
     if (!result.state.companionDiscovery.records.some((record) => record.characterId === 'steppling')) throw new Error(result.message ?? 'Steppling could not come home');
     return { effectKey, companion: 'steppling' };

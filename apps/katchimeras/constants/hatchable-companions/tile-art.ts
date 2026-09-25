@@ -27,6 +27,19 @@ const TILE_ART: Readonly<Record<string, () => HatchableTileArt>> = {
 
 export const HATCHABLE_TILE_ART_IDS: readonly string[] = Object.keys(TILE_ART);
 
+/** A tile's own misted art (`HatchableTileDefinition.mistedAlphaBoundsKey`), by tile id. */
+const MISTED_TILE_ART: Readonly<Record<string, () => HatchableTileArt>> = {
+  'steppling-home': () => ({
+    full: require('@incubator/art-world/hex/shared_world_steppling_misted_hex_tile_v1.webp'),
+    medium: require('@incubator/art-world/hex/shared_world_steppling_misted_hex_tile_v1_512.webp'),
+    thumb: require('@incubator/art-world/hex/shared_world_steppling_misted_hex_tile_v1_256.webp'),
+  }),
+};
+export const HATCHABLE_MISTED_TILE_ART_IDS: readonly string[] = Object.keys(MISTED_TILE_ART);
+export function hatchableMistedTileArt(tileId: string): HatchableTileArt | null {
+  return MISTED_TILE_ART[tileId]?.() ?? null;
+}
+
 /** The friend's cut-out for the garden lesson's closing scene, by companion. */
 const CUTOUT_ART: Readonly<Record<string, () => number>> = {
   feastle: () => require('@incubator/art-cutouts/feastle.png'),

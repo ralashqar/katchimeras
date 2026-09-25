@@ -13,10 +13,11 @@ test('a Café order is served off the board and pays Meals, Timber and Glow into
   assert.ok(board.board.some((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === 'cafe-counter'), 'the Café Counter bakes');
   assert.ok(!board.board.some((cell) => cell.occupant?.kind === 'item' && cell.occupant.definitionId.startsWith('nature:')), 'no plants: food and drink only');
   const order = supplyOrder(0, 0);
-  assert.deepEqual(order.requirements, [{ definitionId: 'drink:refresh:2', quantity: 1 }], 'the first order: an Iced Fruit Tea');
+  assert.deepEqual(order.requirements, [{ definitionId: 'drink:hot:2', quantity: 1 }], 'the first order: a Caramel Latte');
+  assert.ok(!board.board.some((cell) => (cell.occupant?.kind === 'item' && cell.occupant.definitionId.startsWith('drink:refresh')) || (cell.mist && 'definitionId' in cell.mist && String(cell.mist.definitionId).startsWith('drink:refresh'))), 'coffee is the one drink chain');
   assert.equal(mergeOrderReady(board, order), false, 'the board starts without one');
-  // Two Small Juice Cups make it.
-  const cups = board.board.flatMap((cell, index) => cell.occupant?.kind === 'item' && !cell.mist && cell.occupant.definitionId === 'drink:refresh:1' ? [index] : []);
+  // Two Tiny Espressos make it.
+  const cups = board.board.flatMap((cell, index) => cell.occupant?.kind === 'item' && !cell.mist && cell.occupant.definitionId === 'drink:hot:1' ? [index] : []);
   board = reduceMergeWorld(board, { type: 'move', from: cups[0]!, to: cups[1]!, now: 1_100 }).state;
   assert.equal(mergeOrderReady(board, order), true, 'ready');
   const served = reduceMergeWorld(board, { type: 'serveBoardOrder', order, now: 1_200 });

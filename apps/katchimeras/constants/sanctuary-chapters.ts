@@ -19,6 +19,8 @@ export type ChapterGoalAction =
   | { kind: 'supply_run' }
   /** Open a tile's offer on the world (a friend's misted tile: Baristabbit's lit window). */
   | { kind: 'world_offer'; offerId: string }
+  /** Open the Grove's levels (Mossprout's own track): Glow and XP, always there. */
+  | { kind: 'grove' }
   /** Open that hero's upgrade panel (level, ability, what it takes). */
   | { kind: 'hero'; characterId: MergeCharacterId }
   /** Open a friend's own building's panel (the Explorer's Lodge). */
@@ -33,6 +35,8 @@ export type ChapterGoal = {
   detail: string;
   done: (world: MergeWorldState) => boolean;
   action: ChapterGoalAction;
+  /** A light kept on a misted tile while this goal is the one to do (Baristabbit's lit window): where to look. */
+  beacon?: { tileId: string; color: string };
 };
 
 export type SanctuaryChapter = {
@@ -50,13 +54,20 @@ export type SanctuaryChapter = {
    * friends react. The story pointing at the next place, the way a crisis always does.
    */
   opening?: {
-    islandId: MossproutNatureIslandId;
-    /** The flare's colour: the friend's own. */
+    /** Where the camera goes: a friend's island, or a friend's misted tile (`tileId`, e.g. Baristabbit's window). */
+    islandId?: MossproutNatureIslandId;
+    tileId?: string;
+    /** The flare's colour: the friend's own. A tile opening shows its goal's beacon in this colour instead of a flare. */
     color: string;
     title: string;
     lines: readonly { speaker: KatchimeraSkinId; text: string }[];
+    /** The conversation's button; absent, "Answer the signal". */
+    answer?: string;
   };
 };
+
+/** The warm light Baristabbit kept lit in the Mist (Chapter 1's opening, and its first goal's beacon). */
+export const LIT_WINDOW_BEACON = { tileId: 'baristabbit-home', color: '#FFB547' } as const;
 
 const built = (buildingId: HeartwoodBuildingId) => (world: MergeWorldState) => heartwoodBuildingLevel(world, buildingId) >= 1;
 const heroLevel = (world: MergeWorldState, characterId: MergeCharacterId) => world.katchimeraProgress?.[characterId]?.level ?? 1;
@@ -84,8 +95,8 @@ function friendChapter(input: {
       ...(input.building ? [{ id: `${input.id}:building`, title: input.building.title, detail: input.building.detail, done: (world: MergeWorldState) => heroBuildingLevel(world, input.building!.id) >= 1, action: { kind: 'hero_building' as const, id: input.building.id } }] : []),
       { id: `${input.id}:tree`, title: `Grow the Heart Tree to level ${input.heartTree}`, detail: `The Mist around ${input.place} is too thick to reach until the Heart Tree is stronger.`, done: (world) => heartTreeLevel(world) >= input.heartTree || revealed(world), action: { kind: 'heart_tree' } },
       { id: `${input.id}:train`, title: `Train ${input.train.name} to level ${input.train.level}`, detail: input.train.why, done: (world) => heroLevel(world, input.train.characterId) >= input.train.level, action: { kind: 'hero', characterId: input.train.characterId } },
-      { id: `${input.id}:mist`, title: `Answer the signal: clear the Mist over ${input.place}`, detail: 'Win its first battle.', done: revealed, action: { kind: 'kingdom_next' } },
-      { id: `${input.id}:home`, title: `Bring ${input.friend} home`, detail: `${input.friend} is still out there. Keep going.`, done: (world) => world.islandCampaigns?.[input.campaignId]?.cardEarnedAt != null, action: { kind: 'kingdom_next' } },
+      { id: `${input.id}:mist`, title: `Answer the signal: clear the Mist over ${input.place}`, detail: 'Win its first battle.', done: revealed, action: { kind: 'world_offer', offerId: `nature:${input.islandId}` } },
+      { id: `${input.id}:home`, title: `Bring ${input.friend} home`, detail: `${input.friend} is still out there. Keep going.`, done: (world) => world.islandCampaigns?.[input.campaignId]?.cardEarnedAt != null, action: { kind: 'world_offer', offerId: `nature:${input.islandId}` } },
     ],
     reward: { glow: input.reward },
     closing: input.closing,
@@ -94,15 +105,25 @@ function friendChapter(input: {
 
 export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   {
-    id: 'home-for-two', number: 1, title: 'A Home for Two',
+    // Cozy 4X v2 (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Act II): the first session ends on a light in the Mist.
+    // Baristabbit is rescued in battle (no ticket), his Café teaches gathering, and the first Meals train Mossprout.
+    id: 'home-for-two', number: 1, title: 'The Lit Window',
+    opening: {
+      tileId: LIT_WINDOW_BEACON.tileId, color: LIT_WINDOW_BEACON.color, title: 'A Light in the Mist', answer: 'Go to the light',
+      lines: [
+        { speaker: 'steppling', text: 'Hey… is that a light out there?' },
+        { speaker: 'mossprout', text: 'Someone’s keeping a lamp lit.' },
+        { speaker: 'mossprout', text: 'In the Mist. On purpose.' },
+        { speaker: 'steppling', text: 'Then someone’s waiting for us.' },
+      ],
+    },
     goals: [
-      { id: 'dew-spring', title: 'Build the Dew Spring', detail: 'Every Sanctuary needs water. It keeps the Mist calm in battle.', done: built('dew-spring'), action: { kind: 'building', buildingId: 'dew-spring' } },
-      { id: 'baristabbit-home', title: 'Answer the lit window', detail: 'Someone has kept a kettle warm by that window all this time. Clear the Mist around it.', done: (world) => world.companionDiscovery.records.some((record) => record.characterId === 'baristabbit'), action: { kind: 'world_offer', offerId: 'mist:baristabbit-home' } },
-      { id: 'supply-run', title: 'Serve 3 orders at Baristabbit\u2019s Caf\u00e9', detail: 'Friends order drinks and treats. Every order pays Meals, and a little Timber.', done: (world) => (world.supplyRun?.served ?? 0) >= 3, action: { kind: 'supply_run' } },
-      { id: 'dew-spring-2', title: 'Upgrade the Dew Spring', detail: 'Glow and Timber together make it grow.', done: (world) => heartwoodBuildingLevel(world, 'dew-spring') >= 2, action: { kind: 'building', buildingId: 'dew-spring' } },
+      { id: 'baristabbit-home', title: 'Answer the lit window', detail: 'Someone has kept a lamp lit by that window all this time. The wisps are drawn to it. Get there first.', done: (world) => world.companionDiscovery.records.some((record) => record.characterId === 'baristabbit'), action: { kind: 'world_offer', offerId: 'mist:baristabbit-home' }, beacon: LIT_WINDOW_BEACON },
+      { id: 'supply-run', title: 'Serve 3 orders at Baristabbit’s Café', detail: 'Heroes fight on full bellies. Merge what friends ask for and serve it: every order pays Meals.', done: (world) => (world.supplyRun?.served ?? 0) >= 3, action: { kind: 'supply_run' } },
+      { id: 'train-mossprout', title: 'Train Mossprout to level 2', detail: 'Battles gave Mossprout experience. Meals and Glow turn it into strength.', done: (world) => heroLevel(world, 'mossprout') >= 2, action: { kind: 'hero', characterId: 'mossprout' } },
     ],
-    reward: { glow: 30 },
-    closing: 'Two of us, and a Sanctuary that feels like home. Now we can go further.',
+    reward: { glow: 50 },
+    closing: 'Three of us, and a kitchen that smells like morning. Now we can go further.',
   },
   {
     id: 'explorers-lodge', number: 2, title: 'The Explorer\u2019s Lodge',
@@ -113,7 +134,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
       { id: 'lodge-2', title: 'Upgrade the Lodge to level 2', detail: 'A bigger Lodge lets Steppling grow further, and pays more on every run.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 2, action: { kind: 'hero_building', id: 'explorers-lodge' } },
       { id: 'tree-2', title: 'Grow the Heart Tree to level 2', detail: 'Nothing in the Sanctuary grows past the Heart Tree. The Lodge’s Timber helps.', done: (world) => heartTreeLevel(world) >= 2, action: { kind: 'heart_tree' } },
     ],
-    reward: { glow: 40 },
+    reward: { glow: 60 },
     closing: 'Steppling\u2019s got a real home now. He hasn\u2019t stopped grinning.',
   },
   {
@@ -128,12 +149,12 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
       ],
     },
     goals: [
-      { id: 'bloom-mist', title: 'Answer the signal: clear the Mist over the Bloom Garden', detail: 'Win the Garden\u2019s first battle. Every battle trains the hero who fights it.', done: (world) => Boolean(world.haven.mossproutNatureIslandReveals['bloom-garden']) || (world.haven.mossproutNatureIslands['bloom-garden'] ?? 0) > 0, action: { kind: 'kingdom_next' } },
-      { id: 'train-mossprout', title: 'Train Mossprout to level 2', detail: 'Battles give heroes XP. Spend it, with Glow, to make them stronger.', done: (world) => (world.katchimeraProgress?.mossprout?.level ?? 1) >= 2, action: { kind: 'hero', characterId: 'mossprout' } },
-      { id: 'petalimp-home', title: 'Bring Petalimp home', detail: 'Whoever sent the signal is still in the Garden. Keep going.', done: (world) => world.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID]?.cardEarnedAt != null, action: { kind: 'kingdom_next' } },
+      { id: 'bloom-mist', title: 'Answer the signal: clear the Mist over the Bloom Garden', detail: 'Win the Garden\u2019s first battle. Every battle trains the hero who fights it.', done: (world) => Boolean(world.haven.mossproutNatureIslandReveals['bloom-garden']) || (world.haven.mossproutNatureIslands['bloom-garden'] ?? 0) > 0, action: { kind: 'world_offer', offerId: 'nature:bloom-garden' } },
+      { id: 'train-mossprout-3', title: 'Train Mossprout to level 3', detail: 'The Garden’s wisps are tougher. Every battle trains the hero who fights it; Meals and Glow do the rest.', done: (world) => heroLevel(world, 'mossprout') >= 3, action: { kind: 'hero', characterId: 'mossprout' } },
+      { id: 'petalimp-home', title: 'Bring Petalimp home', detail: 'Whoever sent the signal is still in the Garden. Keep going.', done: (world) => world.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID]?.cardEarnedAt != null, action: { kind: 'world_offer', offerId: 'nature:bloom-garden' } },
     ],
     reward: { glow: 50 },
-    closing: 'Three of us now. The Mist isn’t winning anymore.',
+    closing: 'Four of us now. The Mist isn’t winning anymore.',
     unlock: 'Two heroes now go into every battle.',
   },
   {
@@ -145,7 +166,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
       { id: 'bloom-house', title: 'Build Petalimp’s Bloom House', detail: 'Petalimp needs a home of her own. Hers makes Seeds come faster in every battle.', done: (world) => heroBuildingLevel(world, 'bloom-house') >= 1, action: { kind: 'hero_building', id: 'bloom-house' } },
     ],
     reward: { glow: 55 },
-    closing: 'Four friends and a Kitchen. Nobody in this Sanctuary goes hungry.',
+    closing: 'Five of us, and a Kitchen. Nobody in this Sanctuary goes hungry.',
   },
   friendChapter({
     id: 'wild-tangle', number: 5, title: 'The Wild Tangle', islandId: 'wildgrowth-grove', campaignId: 'island-campaign:fernip-wildgrowth',

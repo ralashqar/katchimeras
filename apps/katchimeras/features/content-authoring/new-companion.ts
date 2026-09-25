@@ -35,7 +35,10 @@ export function companionTemplate(character:string):HatchableCompanionDefinition
   const generator=MERGE_GENERATORS.find(g=>g.chainIds.includes(chain))!;
   const drop=`${chain}:1`,grow=`${chain}:2`,dropName=MERGE_ITEMS_BY_ID.get(drop)!.name,growName=MERGE_ITEMS_BY_ID.get(grow)!.name;
   const h=JSON.parse(JSON.stringify(BARISTABBIT_HATCHABLE).replaceAll('baristabbit',character).replaceAll('Baristabbit',name)) as HatchableCompanionDefinition;
-  h.tile={...h.tile,name:character==='feastle'?'A table in the Mist':'A shelter in the Mist',unlockId:`${character}:arrival`,alphaBoundsKey:`tile:${h.tile.id}`,markerLines:{sleeping:'There is someone beyond the Mist.'}};
+  // Baristabbit's own rescue battle (FTUE v2) is his, not the template's: a new friend starts on the authored board and a
+  // ticket, until their own rescue battle is authored.
+  delete h.mission.encounter;delete h.mission.rescue;
+  h.tile={...h.tile,price:60,name:character==='feastle'?'A table in the Mist':'A shelter in the Mist',unlockId:`${character}:arrival`,alphaBoundsKey:`tile:${h.tile.id}`,markerLines:{sleeping:'There is someone beyond the Mist.'}};
   h.discovery={gateId:'gate-3-first-choice',pathId:`${character}-arrival`};
   h.availability={kind:'after_companion',companion:'mossprout'};
   h.mission.seed=JSON.parse(JSON.stringify(h.mission.seed).replaceAll('drink:refresh',chain));

@@ -34,6 +34,11 @@ export const HATCHABLE_DISCOVERY_TASK_CAPABILITY = 'glow.discovery.task';
 export const HATCHABLE_LESSON_BEATS = ['parcel', 'grow', 'serve'] as const;
 export const HATCHABLE_LESSON_FINALE_NODE_IDS: readonly string[] = ['closing', 'summary'];
 
+/** A rescue flow saved on a node it no longer has (the Egg-era reveal, the joined bubble) moves on to the rescue. */
+const RESCUE_MIGRATIONS: Readonly<Record<string, string>> = {
+  'gateway.purchase.focus': 'gateway.rescue', 'gateway.purchase.commit': 'gateway.rescue', 'gateway.purchase.reveal': 'gateway.rescue', 'gateway.joined': 'complete',
+};
+
 export function createHatchableDiscoveryFlow(definition: HatchableCompanionDefinition, compile: typeof defineStory = defineStory) {
   const { discoveryFlow: flow } = definition;
   const target = hatchableStoryTarget(definition);
@@ -59,20 +64,20 @@ export function createHatchableDiscoveryFlow(definition: HatchableCompanionDefin
       story.task({ id: HATCHABLE_MISSION_PAY_NODE_ID, capability: HATCHABLE_DISCOVERY_TASK_CAPABILITY, surface: 'haven', taskId: HATCHABLE_MISSION_PAY_NODE_ID, requirements: [{ id: 'paid', event: { type: HATCHABLE_MISSION_PAID_EVENT } }], next: HATCHABLE_MISSION_FOCUS_NODE_ID }),
       // Paid: the opening's framing on this tile, the board beneath.
       storyOperations.focusCamera({ id: HATCHABLE_MISSION_FOCUS_NODE_ID, target, zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 900, next: HATCHABLE_MISSION_CLEAR_NODE_ID }),
-      story.task({ id: HATCHABLE_MISSION_CLEAR_NODE_ID, capability: HATCHABLE_DISCOVERY_TASK_CAPABILITY, surface: 'haven', taskId: HATCHABLE_MISSION_CLEAR_NODE_ID, requirements: [{ id: 'cleared', event: { type: HATCHABLE_MISSION_CLEARED_EVENT } }], next: 'gateway.purchase.focus' }),
-      // The reveal: the ticket was the price, so the world mutation charges nothing and shows no coins.
-      ...upgradeWorldTargetRecipe({ id: 'gateway.purchase', target, toLevel: 1, economy: { mode: 'free', reason: 'The mist mission ticket was paid at the bubble.' }, cameraAlreadyFocused: true, presentation: { preset: definition.tile.revealPreset, reactionLine: '', showCoins: false }, next: flow.arrival === 'rescue' ? 'gateway.rescue' : 'gateway.egg' }),
+      story.task({ id: HATCHABLE_MISSION_CLEAR_NODE_ID, capability: HATCHABLE_DISCOVERY_TASK_CAPABILITY, surface: 'haven', taskId: HATCHABLE_MISSION_CLEAR_NODE_ID, requirements: [{ id: 'cleared', event: { type: HATCHABLE_MISSION_CLEARED_EVENT } }], next: flow.arrival === 'rescue' ? 'gateway.rescue' : 'gateway.purchase.focus' }),
+      // The reveal: the ticket was the price, so the world mutation charges nothing and shows no coins. A rescued friend
+      // has no Egg stage: the Kingdom clears their tile with them on it as the rescue is written (below).
+      ...(flow.arrival === 'rescue' ? [] : upgradeWorldTargetRecipe({ id: 'gateway.purchase', target, toLevel: 1, economy: { mode: 'free', reason: 'The mist mission ticket was paid at the bubble.' }, cameraAlreadyFocused: true, presentation: { preset: definition.tile.revealPreset, reactionLine: '', showCoins: false }, next: 'gateway.egg' })),
       ...(flow.arrival === 'rescue' ? [
-        // Cozy 4X: no Egg. The friend is rescued straight home (the same write as Steppling's), then welcomed.
-        story.effect({ id: 'gateway.rescue', capability: 'haven.friend_joins', payload: { targetId: definition.tile.unlockId, companion: definition.companion }, next: 'gateway.joined' }),
-        worldActionScene({ id: 'gateway.joined', actionId: 'done', next: 'complete', view: { kind: 'discovery', ...(flow.joined ?? flow.egg) } }),
+        // Cozy 4X: no Egg, no card, no bubble. The friend is rescued straight home (the same write as Steppling's).
+        story.effect({ id: 'gateway.rescue', capability: 'haven.friend_joins', payload: { targetId: definition.tile.unlockId, companion: definition.companion }, next: 'complete' }),
       ] : [
         worldActionScene({ id: 'gateway.egg', actionId: 'done', next: 'egg.enter', view: { kind: 'discovery', ...flow.egg } }),
         story.task({ id: 'egg.enter', capability: HATCHABLE_DISCOVERY_TASK_CAPABILITY, surface: 'haven', taskId: 'egg.enter', requirements: [{ id: 'entered', event: { type: HATCHABLE_EGG_ENTERED_EVENT } }], next: 'complete' }),
       ]),
       story.complete(),
     ],
-    migrations: { ...lessonMigrations, ...ownMigrations },
+    migrations: { ...lessonMigrations, ...ownMigrations, ...(flow.arrival === 'rescue' ? RESCUE_MIGRATIONS : {}) },
   });
 }
 
