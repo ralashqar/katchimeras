@@ -5,4 +5,6 @@ export const GAME_CURRENCY_ART = {
   coins: require('@incubator/art-merge-world/ui/glow-swirl-v3.png'),
   // Merge energy, from the Dew Spring: cool where Glow is warm, so the two never read alike in the top bar.
   mergeEnergy: require('@incubator/art-merge-world/ui/energy-dew-v1.webp'),
+  // Timber, the Sanctuary's building material from Supply Runs (`scripts/generate-timber-icon.py`).
+  timber: require('@incubator/art-merge-world/ui/timber-v1.webp'),
 } as const;

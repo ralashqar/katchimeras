@@ -6,6 +6,11 @@ User-requested fal Nano Banana regeneration, using the existing project pipeline
 - **Baristabbit (Sept 12, 2026):** the lit window: a cream cafe kiosk with a terracotta roof and one amber-lit window at the rear, a blank sign, two lanterns, a teapot, a round table and a sage bench, on honey plank flooring over warm sandstone and terracotta cliffs. The quiet centre is reserved for the live Egg/character. Generated with the same recipe (`--tile baristabbit`), Mossprout's main hex as the geometry reference and the floating-neighborhood Baristabbit render as the identity guide.
 - **Mist:** opaque pearl/blue/lavender cloud forms covering the whole upper surface and rim. No environment props, exposed hedge ring or character silhouettes. The lower cliff remains visible to preserve the floating-hex silhouette.
 
+- **The Last Clearing, step 4 (Sept 24, 2026).** Each uses Mossprout's main hex as the geometry and style reference:
+  - `lost-trail-tracks`: the Lost Trail's misted story-tile state. The rear two thirds are under the house Mist (the `mist` source is the style guide), an ochre path runs into it with small paw prints going in, and a leaning blank trail marker stands at the edge. No character is baked in; Steppling's silhouette is drawn at runtime.
+  - `lost-trail`: the revealed trail to the sea. The Steppling palette guide supplies the sea-glass stepping stones, the shell on a sandy boulder, a pine, an upright blank marker and a lantern.
+  - `hollow-tree`: the far landmark. A fully misted hex, with one huge leafless grey hollow tree rising from it. The scene draws it at 1.6x, past the outer ring.
+
 Both use Mossprout's main hex as the camera/geometry/style reference. Steppling also uses its previous regular environment for identity and palette. Existing Mossprout images and its protected generation manifest are unchanged.
 
 ## Recipe and provenance

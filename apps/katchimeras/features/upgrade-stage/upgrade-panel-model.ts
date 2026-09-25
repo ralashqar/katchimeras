@@ -1,5 +1,6 @@
+import { HERO_BUILDING_MAX_LEVEL, heroBuildingById, heroBuildingCost, heroBuildingForCompanion, heroBuildingLevel, heroBuildingLook, heroLevelCap, lodgeCrateGlowBonus, lodgeTimberBonus, type HeroBuildingId } from '@/constants/hero-buildings';
 import { HAVEN_ENVIRONMENTS } from '@/constants/haven-catalog';
-import { HEARTWOOD_BUILDING_MAX_LEVEL, heartwoodBuildingById, heartwoodBuildingCost, heartwoodBuildingLevel, heartwoodBuildingLook, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
+import { HEARTWOOD_BUILDING_MAX_LEVEL, heartwoodBuildingById, heartwoodBuildingCost, heartwoodBuildingTimberCost, heartwoodBuildingLevel, heartwoodBuildingLook, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
 import { heartwoodBuildingsEligible } from '@/features/heartwood-buildings/buildings-world';
 import { mossproutMemoryPlantNames } from '@/constants/mossprout-memory-plant-names';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
@@ -43,8 +44,8 @@ export type UpgradeRequirement = {
   /** `current / total`, clamped so a met requirement never reads past its total. */
   current?: number;
   total?: number;
-  /** The requirement is a Glow balance: the row carries the currency art. */
-  currency?: 'coins';
+  /** The requirement is a balance (Glow, Timber): the row carries the currency art. */
+  currency?: 'coins' | 'timber';
   /** One plain line under the name: where it comes from. */
   detail?: string;
   /** Where an unmet requirement can be worked on (the row's "Go"). */
@@ -184,7 +185,7 @@ export function abilityTierSummary(ability: CompanionAbilityDefinition, tier: Co
  * A playable Katchimera's level: ten steps, each paid in Glow once the Mist has taught them enough, each carrying the
  * ability's next tier. The rows are the ability's numbers now and at the next level.
  */
-export function companionUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'katchimeraProgress'>, id: MergeCharacterId): UpgradePanelModel {
+export function companionUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'katchimeraProgress'> & Partial<Pick<MergeWorldState, 'heroBuildings'>>, id: MergeCharacterId): UpgradePanelModel {
   const progress = katchimeraProgress(world, id);
   const current = progress.level;
   const next = current >= KATCHIMERA_MAX_LEVEL ? null : current + 1;
@@ -217,6 +218,15 @@ export function companionUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'ka
     requirements: next == null || cost == null || needed == null ? [] : [
       { id: 'xp', label: 'Experience', detail: 'Earned in the Mist together.', met: progress.xp >= needed, current: Math.min(progress.xp, needed), total: needed, action: progress.xp >= needed ? undefined : { id: 'mist', label: 'Enter the Mist' } },
       { id: 'glow', label: 'Glow', detail: 'Earned in the Mist.', currency: 'coins', met: world.coins >= cost, current: Math.min(world.coins, cost), total: cost, action: world.coins >= cost ? undefined : { id: 'mist', label: 'Enter the Mist' } },
+      ...(() => {
+        // A hero grows no further than one past their own building.
+        const building = heroBuildingForCompanion(id);
+        const cap = heroLevelCap({ heroBuildings: world.heroBuildings }, id);
+        if (!building || cap == null) return [];
+        const needed = next - 1;
+        const have = heroBuildingLevel({ heroBuildings: world.heroBuildings }, building.id);
+        return [{ id: 'building', label: building.name, detail: `${name} grows as far as their home: level ${needed} of it for level ${next}.`, met: have >= needed, current: Math.min(have, needed), total: needed }];
+      })(),
     ],
     note: ability ? `${ability.name} is ${name}’s own.` : undefined,
     complete: next == null,
@@ -228,13 +238,16 @@ export function companionUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'ka
  * One of Heartwood's economy buildings. Level 0 is an empty patch: the first step builds it, every later one is an
  * upgrade, and each row of the strip is one of its numbers before and after.
  */
-export function buildingUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'heartwoodBuildings' | 'kingdomGoal' | 'haven'>, id: HeartwoodBuildingId): UpgradePanelModel {
+export function buildingUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'heartwoodBuildings' | 'kingdomGoal' | 'haven' | 'materials'>, id: HeartwoodBuildingId): UpgradePanelModel {
   const definition = heartwoodBuildingById.get(id)!;
   const current = heartwoodBuildingLevel(world, id);
   const next = current >= HEARTWOOD_BUILDING_MAX_LEVEL ? null : current + 1;
   const cost = heartwoodBuildingCost(current);
   const eligible = heartwoodBuildingsEligible(world as MergeWorldState);
-  const affordable = cost != null && world.coins >= cost;
+  const timber = heartwoodBuildingTimberCost(current);
+  const timberHeld = world.materials?.timber ?? 0;
+  const glowMet = cost != null && world.coins >= cost;
+  const affordable = glowMet && timberHeld >= timber;
   const origin = (mossproutMemoryPlantNames as Record<string, string | undefined>)[world.heartwoodBuildings?.[id]?.from ?? ''];
   const statLine = (level: number) => definition.stats.map((stat) => `${stat.label} ${stat.format(stat.value(level))}`).join(' · ');
   return {
@@ -255,13 +268,60 @@ export function buildingUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'hea
       return { id: stat.label, label: stat.label, icon: stat.icon, tint: stat.tint, from: stat.format(from), to: stat.format(to), delta: from === to ? undefined : stat.delta(from, to) };
     }),
     requirements: next == null || cost == null ? [] : [{
-      id: 'glow', label: 'Glow', detail: 'Earned in the Mist.', currency: 'coins', met: affordable,
+      id: 'glow', label: 'Glow', detail: 'Earned in the Mist.', currency: 'coins', met: glowMet,
       current: Math.min(world.coins, cost), total: cost,
-      action: affordable ? undefined : { id: 'mist', label: 'Enter the Mist' },
-    }],
+      action: glowMet ? undefined : { id: 'mist', label: 'Enter the Mist' },
+    }, ...(timber > 0 ? [{
+      id: 'timber', label: 'Timber', detail: 'Earned on Supply Runs, on the Lost Trail.', currency: 'timber' as const, met: timberHeld >= timber,
+      current: Math.min(timberHeld, timber), total: timber,
+    }] : [])],
     locked: eligible ? undefined : { label: 'Not yet', reason: 'Heartwood has to stir before anything can be built here.' },
     note: origin ? `Grown from your ${origin}.` : undefined,
     complete: next == null,
     primary: next != null && cost != null && eligible ? { label: current === 0 ? 'Build' : 'Upgrade', cost, disabled: !affordable } : null,
+  };
+}
+
+/**
+ * A friend's own building (`constants/hero-buildings.ts`), on the same stage as Heartwood's: level 0 is not built yet.
+ * Its rows are what it gives the Sanctuary, and how far its friend may grow.
+ */
+export function heroBuildingUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'heroBuildings' | 'materials' | 'companionDiscovery'>, id: HeroBuildingId): UpgradePanelModel {
+  const definition = heroBuildingById.get(id)!;
+  const current = heroBuildingLevel(world, id);
+  const next = current >= HERO_BUILDING_MAX_LEVEL ? null : current + 1;
+  const cost = heroBuildingCost(current);
+  const timberHeld = world.materials?.timber ?? 0;
+  const glowMet = cost != null && world.coins >= cost.glow;
+  const timberMet = cost != null && timberHeld >= cost.timber;
+  const home = world.companionDiscovery.records.some((record) => record.characterId === definition.companion);
+  const name = katchimeraSkinById.get(definition.companion)?.displayName ?? definition.companion;
+  const row = (label: string, icon: UpgradeBenefitIcon, tint: string, value: (level: number) => number, format: (value: number) => string) => {
+    const [from, to] = [value(current), value(next ?? current)];
+    return { id: label, label, icon, tint, from: format(from), to: format(to), delta: from === to ? undefined : `+${to - from}` };
+  };
+  return {
+    title: definition.name,
+    levelOffset: 0,
+    tagline: definition.tagline,
+    level: { current, next, max: HERO_BUILDING_MAX_LEVEL },
+    progressLabel: next == null || cost == null ? 'MAX' : `${percent(Math.min(world.coins, cost.glow) + Math.min(timberHeld, cost.timber), cost.glow + cost.timber)}%`,
+    progressFraction: next == null || cost == null ? 1 : percent(Math.min(world.coins, cost.glow) + Math.min(timberHeld, cost.timber), cost.glow + cost.timber) / 100,
+    levels: Array.from({ length: HERO_BUILDING_MAX_LEVEL }, (_, index) => {
+      const level = index + 1;
+      return { level, name: definition.lookNames[heroBuildingLook(level)], description: current === 0 && level === 1 ? definition.description : `Supply Runs +${lodgeTimberBonus(level)} Timber an order \u00b7 ${name} up to level ${level + 1}`, state: levelState(level, current, next) };
+    }),
+    benefits: [
+      row('Timber per order', 'shippingbox.fill', '#B07A3E', lodgeTimberBonus, (value) => `+${value}`),
+      row('Glow per crate', 'glow', '#D98A1F', lodgeCrateGlowBonus, (value) => `+${value}`),
+      row(`${name}\u2019s level cap`, 'star.fill', '#8A63C9', (level) => level + 1, (value) => `${value}`),
+    ],
+    requirements: next == null || cost == null ? [] : [
+      { id: 'glow', label: 'Glow', detail: 'Earned in the Mist.', currency: 'coins', met: glowMet, current: Math.min(world.coins, cost.glow), total: cost.glow, action: glowMet ? undefined : { id: 'mist', label: 'Enter the Mist' } },
+      { id: 'timber', label: 'Timber', detail: 'Earned on Supply Runs, on the Lost Trail.', currency: 'timber', met: timberMet, current: Math.min(timberHeld, cost.timber), total: cost.timber },
+    ],
+    locked: home ? undefined : { label: 'Not yet', reason: `${name} has to be home first.` },
+    complete: next == null,
+    primary: next != null && cost != null && home ? { label: current === 0 ? 'Build' : 'Upgrade', cost: cost.glow, disabled: !(glowMet && timberMet) } : null,
   };
 }

@@ -18,7 +18,8 @@ import { SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { STORY_TILES, type StoryTileDefinition, type StoryTileState } from '@/constants/story-tiles/registry';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { storyTileResidents, storyTileStructureId } from '@/utils/story-tile-residents';
-import { storyTileArt } from '@/constants/story-tiles/tile-art';
+import { storyTileArt, storyTileMistedArt } from '@/constants/story-tiles/tile-art';
+import { heroTileLook } from '@/constants/hero-building-art';
 import { mossproutMemoryPlantById, mossproutMemoryPlantStage } from '@/constants/mossprout-memory-plants';
 import type { MossproutGardenPlantSlotId, MossproutNatureIslandId, MossproutNatureIslandLevel, PlantableMemoryInstance } from '@/types/merge-world';
 import type { KingdomHexCompanionSlot } from '@/utils/katchimera-kingdom-slots';
@@ -57,6 +58,8 @@ const MAIN: ArtSpec = {
 
 export type MossproutGardenSceneState = {
   heartwoodStage?: HeartwoodStage;
+  /** A hero building's look on its friend's tile (the Explorer's Lodge on Steppling's), by tile id: 0 is the tile's own art. */
+  heroTileLooks?: Readonly<Record<string, number>>;
   /** Steppling's tile, kept for callers from before `hatchableTiles`; the map wins when both are given. */
   gateway?: 'locked' | 'egg' | 'open';
   /** Every hatchable companion's tile by tile id: misted, an Egg on it, or open with the friend home. */
@@ -285,6 +288,25 @@ function layerFor(
   };
 }
 
+/** Where the Hollow Tree stands: well past the outer ring, behind the clearing (up the screen). */
+export const HOLLOW_TREE_COORD: HexCoord = { q: 0, r: -4 };
+/** The Hollow Tree is a landmark, drawn larger than a tile. */
+const HOLLOW_TREE_SCALE = 1.6;
+const HOLLOW_TREE_ART = {
+  full: require('@incubator/art-world/hex/shared_world_hollow_tree_hex_tile_v1.webp'),
+  medium: require('@incubator/art-world/hex/shared_world_hollow_tree_hex_tile_v1_512.webp'),
+  thumb: require('@incubator/art-world/hex/shared_world_hollow_tree_hex_tile_v1_256.webp'),
+};
+
+function hollowTreeLayer(): KingdomTileArtLayer {
+  const bounds = hexAlphaBounds('shared_world_hollow_tree_hex_tile_v1.webp');
+  const layer = layerFor('structure:hollow-tree', 'structure', { coord: HOLLOW_TREE_COORD, alphaBounds: bounds, sources: HOLLOW_TREE_ART });
+  // Scaled about the bottom of its frame, so it stands on the same ground line as a tile would.
+  const { left, top, width, height } = layer.frame;
+  const scaled = { left: left + width / 2 - (width * HOLLOW_TREE_SCALE) / 2, top: top + height - height * HOLLOW_TREE_SCALE, width: width * HOLLOW_TREE_SCALE, height: height * HOLLOW_TREE_SCALE };
+  return { ...layer, frame: scaled, interactionFrame: undefined };
+}
+
 export function heartwoodWorldCoord(coord: HexCoord): HexCoord {
   return heartwoodPositions.get(coordKey(coord)) ?? coord;
 }
@@ -392,11 +414,13 @@ export function buildMossproutHexNeighborhoodScene(
   const hatchableTileState = (definition: HatchableCompanionDefinition): 'locked' | 'egg' | 'open' =>
     gardenState.hatchableTiles?.[definition.tile.id] ?? (definition.companion === 'steppling' ? gardenState.gateway : undefined) ?? 'locked';
   const hatchableLayer = (definition: HatchableCompanionDefinition, locked: boolean) => {
-    const bounds = hexAlphaBounds(definition.tile.alphaBoundsKey);
+    // A friend's building grows their tile's art with it (`constants/hero-building-art.ts`).
+    const look = locked ? null : heroTileLook(definition.tile.id, gardenState.heroTileLooks?.[definition.tile.id] ?? 0);
+    const bounds = hexAlphaBounds(look?.alphaBoundsKey ?? definition.tile.alphaBoundsKey);
     const layer = layerFor(`structure:${definition.tile.id}`, 'structure', {
       coord: definition.tile.coord,
       alphaBounds: locked ? DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS : bounds,
-      sources: locked ? DREAM_MIST_LOCKED_NATURE_SOURCES : hatchableTileArt(definition.tile.id),
+      sources: locked ? DREAM_MIST_LOCKED_NATURE_SOURCES : look?.art() ?? hatchableTileArt(definition.tile.id),
     });
     if (!locked) layer.residentAnchor = sharedResidentAnchor(layer.frame);
     return layer;
@@ -404,10 +428,12 @@ export function buildMossproutHexNeighborhoodScene(
   const hatchableLayers = HATCHABLE_COMPANIONS.map((definition) => ({ definition, locked: hatchableLayer(definition, true), revealed: hatchableLayer(definition, false) }));
   // Every story tile, from its definition: full mist until its episode reveals it, its own art after. No marker; a resident only where the tile names one.
   const storyTileLayer = (tile: StoryTileDefinition, revealed: boolean) => {
+    // A story tile the story shows before it is cleared (the Lost Trail's tracks) keeps its own misted art.
+    const mistedArt = !revealed && tile.mistedAlphaBoundsKey ? storyTileMistedArt(tile.id) : null;
     const layer = layerFor(storyTileStructureId(tile.id), 'structure', {
       coord: tile.coord,
-      alphaBounds: revealed ? hexAlphaBounds(tile.alphaBoundsKey) : DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS,
-      sources: revealed ? storyTileArt(tile.id) : DREAM_MIST_LOCKED_NATURE_SOURCES,
+      alphaBounds: revealed ? hexAlphaBounds(tile.alphaBoundsKey) : mistedArt ? hexAlphaBounds(tile.mistedAlphaBoundsKey!) : DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS,
+      sources: revealed ? storyTileArt(tile.id) : mistedArt ?? DREAM_MIST_LOCKED_NATURE_SOURCES,
     });
     if (revealed && tile.residentSkinId) layer.residentAnchor = sharedResidentAnchor(layer.frame);
     return layer;
@@ -426,10 +452,14 @@ export function buildMossproutHexNeighborhoodScene(
       Boolean(natureIslandReveals[island.id]),
     )),
   ];
+  // The Hollow Tree: the far landmark over the Mist (`docs/cozy-4x-ftue-the-last-clearing.md`, beat 10), past the
+  // outer ring and bigger than a tile. Always reserved in the envelope, so it never shifts the world when it shows.
+  const hollowTree = hollowTreeLayer();
   // Reveal Heartwood and every neighbour in the same render, sharing the tile fade.
   const rawLayers = [
     ...(solo ? [] : [gardenLayer]), mainLayer, ...(options.homeVeiled || solo ? [] : plantLayers),
     ...neighbourLayers,
+    ...(solo ? [] : [hollowTree]),
   ];
   // Reserve both art envelopes so changing mist to terrain never shifts the world.
   // Include every island's mist, fallback and authored stages in the bounds.
@@ -438,7 +468,7 @@ export function buildMossproutHexNeighborhoodScene(
     [natureLayerFor(island.id, 0), natureLayerFor(island.id, 0, true), ...island.levels.map((level) => natureLayerFor(island.id, level.level, true))]);
   const boundsLayers = [...rawLayers, ...hatchableLayers.flatMap(({ locked, revealed }) => [locked, revealed]), ...storyTileLayers.flatMap(({ misted, revealed }) => [misted, revealed]), ...natureBoundsLayers];
   // Veiled or solo scenes leave layers out; their frames still shape the envelope.
-  boundsLayers.push(unveiledMain, gardenLayer);
+  boundsLayers.push(unveiledMain, gardenLayer, hollowTree);
   const { dx, dy, width, height } = mossproutSceneEnvelope(boundsLayers.map(layer => layer.frame));
   const layers = rawLayers.map((layer) => shiftLayer(layer, dx, dy)).sort((a, b) => a.depth - b.depth);
   const mainCoord = heartwoodWorldCoord(MAIN.coord);

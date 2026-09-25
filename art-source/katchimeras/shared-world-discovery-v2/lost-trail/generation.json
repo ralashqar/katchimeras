@@ -1,0 +1,19 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "resolution": 2048,
+  "createdAt": "2026-09-24T19:01:40.795036+00:00",
+  "references": [
+    {
+      "path": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "sha256": "64b441e4c33b1d3a02e418f22fd474c4b994557243e43869a89cf8e530df0f2a"
+    },
+    {
+      "path": "design/floating-neighborhood-v2/floating-steppling-source.png",
+      "sha256": "b818fa4d6116e3534919a819ffd84974b75bef5834dfa61753ac62d78843f895"
+    }
+  ],
+  "prompt": "Use Image 1 as the authoritative camera, framing, deep tapered floating hex-island geometry and rendering reference. Preserve its six-sided top footprint, broad chunky cliff blocks, deep tapered underside, centered recessed front stairs, lighting direction and square framing. Keep the entire silhouette comfortably inside the canvas with black padding on all four sides. Perfectly flat pure-black #000000 background for BiRefNet Heavy matting; no ground plane, external drop shadow, text, numbers, UI, watermark, characters or eggs.\n\nPremium cozy 3D toy diorama matching the Mossprout reference: very low detail density, very low texture detail, broad cushiony shapes, soft rounded bevels, smooth matte clay-like surfaces, large readable color blocks, soft upper-left daylight and restrained ambient occlusion. No photographic texture, grain, tiny repeated details, speckles, cracks, grass blades, pine needles or surface noise. Every main shape must read at 256 pixels.\n\nGenerate the Lost Trail found again: a fully developed, welcoming trail tile, NOT a level-zero, empty, dormant or ruined environment. It is the old path that once went all the way to the sea. Image 2 is only the Steppling identity/palette guide and must not be copied: take from it sky-blue and muted slate-blue, warm ochre trail earth, honey timber and restrained orange accents. Replace all Mossprout-specific top-face content from Image 1: no leaf-roof cottage, garden pond, bridge, planter boxes, flower beds or surrounding fence. Use one broad smooth ochre footpath that climbs from the centred front stairs and winds to the rear edge, where it leaves the tile heading onward; one chunky honey-timber trail marker standing upright with a blank rounded arrow board pointing along the path and no writing; a short row of three large rounded sea-glass-blue stepping stones where the path crosses a small dip; one oversized simple cushiony pine tree at the rear left; one large rounded pale sandy boulder with a single chunky cream seashell resting on it, a hint of the sea the path leads to; and one small warm trail lantern on a short post. Use only these few iconic trail features, not a scatter of tiny props. Retheme the cliff blocks in coordinated slate-blue and warm sandstone while preserving their shapes. The floor is broad smooth ochre trail earth with a few broad moss cushions at the side edges; no continuous perimeter wall, ring or parapet. No character, creature or Egg.",
+  "assetKey": "shared_world_lost_trail_hex_tile_v1",
+  "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/shared-world-lost-trail-hex-tile-v1/1790276570105_grid.png",
+  "sourceSha256": "939e3538278c879eedae69f815c7ad5516303e21e9c1ddfd7333d8cd75ce0e86"
+}

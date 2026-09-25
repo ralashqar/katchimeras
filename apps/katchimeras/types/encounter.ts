@@ -69,7 +69,9 @@ export type EncounterCache = { contents: EncounterCacheContents; landOn?: readon
 export type EncounterObjective =
   | { kind: 'wisps' }
   | { kind: 'dark-wisp'; wispId: string }
-  | { kind: 'cache' };
+  | { kind: 'cache' }
+  /** A friend trapped under thick Mist on `cell` (the Lost Trail): every wisp down, and that cell's Mist cleared. */
+  | { kind: 'rescue'; cell: number };
 
 export type EncounterCompanion = { slot: 'any' | readonly MergeCharacterId[]; required?: boolean };
 

@@ -87,7 +87,8 @@ export function formatCurrencyCountdown(seconds: number): string {
 const styles = StyleSheet.create({
   row: { alignItems: 'center', flexDirection: 'row', gap: 20, paddingLeft: 22, width: '100%' },
   rowCompact: { gap: 10, paddingLeft: 12 },
-  pill: { flex: 1, flexBasis: 0, height: 30, maxWidth: 88, minWidth: 0, overflow: 'visible' },
+  // A pill never gives up the room its number needs: the bar grows for more currencies instead of squeezing them.
+  pill: { flex: 1, flexBasis: 0, height: 30, maxWidth: 88, minWidth: 72, overflow: 'visible' },
   pillCompact: { flex: 0, height: 24, minWidth: 43 },
   pillGlass: { height: 29 },
   pillSurface: { flex: 1, overflow: 'visible' },

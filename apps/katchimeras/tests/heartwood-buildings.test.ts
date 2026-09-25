@@ -114,8 +114,10 @@ test('building takes Glow and the patch; a stale or repeated request changes not
   assert.equal(planted.haven.plantableMemories[0]!.status, 'planted', 'the input world is untouched');
 
   assert.equal(upgradeHeartwoodBuilding(built, 'dew-spring', 0, NOW + 2), built, 'a second tap on Build is already done');
-  const upgraded = upgradeHeartwoodBuilding(built, 'dew-spring', 1, NOW + 3);
+  assert.throws(() => upgradeHeartwoodBuilding(built, 'dew-spring', 1, NOW + 3), /Timber/, 'from level two a building takes Timber too');
+  const upgraded = upgradeHeartwoodBuilding({ ...built, materials: { timber: 20 } }, 'dew-spring', 1, NOW + 3);
   assert.equal(upgraded.coins, 40);
+  assert.equal(upgraded.materials?.timber, 16, 'the Timber is spent');
   assert.deepEqual(upgraded.heartwoodBuildings?.['dew-spring'], { level: 2, builtAt: NOW + 1 });
   assert.throws(() => upgradeHeartwoodBuilding(upgraded, 'dew-spring', 2, NOW + 4), /more Glow/);
   assert.throws(() => upgradeHeartwoodBuilding({ ...base, haven: { ...base.haven, tileStages: { ...base.haven.tileStages, mossprout: 0 } }, kingdomGoal: undefined }, 'dew-spring', 0, NOW), /not ready/);
@@ -183,8 +185,10 @@ test('the panel model: an empty patch builds, a built one shows every number wit
   assert.equal(empty.levels.length, 10);
   assert.deepEqual(empty.levels.slice(0, 2).map((entry) => entry.state), ['next', 'ahead']);
 
-  const milestone = buildingUpgradeModel(world({ buildings: { 'dew-spring': { level: 3, builtAt: NOW } } }), 'dew-spring');
+  const milestone = buildingUpgradeModel({ ...world({ buildings: { 'dew-spring': { level: 3, builtAt: NOW } } }), materials: { timber: 50 } }, 'dew-spring');
   assert.deepEqual(milestone.primary, { label: 'Upgrade', cost: 140, disabled: false });
+  assert.deepEqual(milestone.requirements.map((row) => [row.id, row.current, row.total]), [['glow', 140, 140], ['timber', 8, 8]], 'Glow and Timber, side by side');
+  assert.equal(buildingUpgradeModel(world({ buildings: { 'dew-spring': { level: 3, builtAt: NOW } } }), 'dew-spring').primary?.disabled, true, 'short of Timber: not yet');
   assert.deepEqual(milestone.benefits.map((benefit) => [benefit.label, benefit.from, benefit.to, benefit.delta]), [['Calm before the Mist', '+1 turn', '+1 turn', undefined], ['Second wind', '+0', '+0', undefined]]);
   const secondWind = buildingUpgradeModel(world({ buildings: { 'dew-spring': { level: 6, builtAt: NOW } } }), 'dew-spring');
   assert.deepEqual(secondWind.benefits[1], { id: 'Second wind', label: 'Second wind', icon: 'timer', tint: '#4E9CC4', from: '+0', to: '+1', delta: '+1' }, 'level seven brings a step of Resolve back');
@@ -236,10 +240,10 @@ test('the first session plants the Dew Spring, free, and it stays as planted thr
 
   // After the first session it upgrades like any other building.
   const funded = { ...running, coins: 40, haven: { ...running.haven, tileStages: { mossprout: 1 } } } as MergeWorldState;
-  assert.deepEqual(buildingUpgradeModel(funded, 'dew-spring').primary, { label: 'Upgrade', cost: 40, disabled: false });
+  assert.deepEqual(buildingUpgradeModel({ ...funded, materials: { timber: 4 } }, 'dew-spring').primary, { label: 'Upgrade', cost: 40, disabled: false }, 'Glow and the Supply Run’s Timber');
   assert.equal(buildingUpgradeModel(funded, 'dew-spring').note, undefined);
   // Spending on a building that is still asleep (a story that never reached the waking beat) brings it to life.
-  const paid = upgradeHeartwoodBuilding({ ...funded, heartwoodBuildings: asleep.heartwoodBuildings }, 'dew-spring', 1, NOW + 5);
+  const paid = upgradeHeartwoodBuilding({ ...funded, materials: { timber: 4 }, heartwoodBuildings: asleep.heartwoodBuildings }, 'dew-spring', 1, NOW + 5);
   assert.deepEqual(paid.heartwoodBuildings?.['dew-spring'], { level: 2, builtAt: NOW + 1 });
 
   // A save caught mid-session by this change, with the old seed already in the patch: the Spring takes the patch.
@@ -274,7 +278,7 @@ test('a save that finished the old first session: its sprouted seed becomes a fr
   assert.deepEqual(normalizeHeartwoodBuildings(rooted.heartwoodBuildings, NOW), rooted.heartwoodBuildings);
   assert.equal(buildingUpgradeModel(rooted, 'dew-spring').note, 'Grown from your Seed of Stillness.');
   assert.equal(buildingUpgradeModel(world(), 'dew-spring').note, undefined);
-  assert.deepEqual(buildingUpgradeModel({ ...rooted, coins: 40 }, 'dew-spring').primary, { label: 'Upgrade', cost: 40, disabled: false });
+  assert.deepEqual(buildingUpgradeModel({ ...rooted, coins: 40, materials: { timber: 4 } }, 'dew-spring').primary, { label: 'Upgrade', cost: 40, disabled: false });
 
   // A Spring the player already built is left alone.
   const alreadyBuilt = withPlants([firstSeed({ slotId: 'front-left' })], world({ buildings: { 'dew-spring': { level: 2, builtAt: NOW } } }));

@@ -7,8 +7,10 @@ import * as migrationPolicy from '@/features/onboarding/ftue-migration-policy';
 import * as navigationPolicy from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_FTUE_SCRIPT, mossproutFtueStep, mossproutFtueShowsWorldGarden, validateMossproutFtueScript } from '@/features/onboarding/mossprout-ftue-script';
 import { MOSSPROUT_FTUE_FLOW } from '@/features/onboarding/mossprout-ftue-flow';
-import { COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, FIRST_BATTLE_ID, GUARDIAN_ACTION_ID, GUARDIAN_STEP_ID, GUARDIAN_TITLE, HEART_TREE_ACTION_ID, HEART_TREE_STEP_ID, SANCTUARY_ACTION_ID, SANCTUARY_STEP_ID } from '@/features/onboarding/last-clearing';
+import { COLD_OPEN_ACTION_ID, COLD_OPEN_LINES, FIRST_BATTLE_ID, GUARDIAN_ACTION_ID, GUARDIAN_STEP_ID, GUARDIAN_TITLE, HEART_TREE_ACTION_ID, HEART_TREE_STEP_ID, SANCTUARY_ACTION_ID, SANCTUARY_STEP_ID, FRONTIER_ACTION_ID, FRONTIER_STEP_ID, LOST_TRACKS_ACTION_ID, LOST_TRACKS_STEP_ID, LOST_TRAIL_MISSION_ACTION_ID, LOST_TRAIL_MISSION_STEP_ID, LOST_TRAIL_TILE_ID, LOST_TRAIL_STONE_STEP_IDS, LOST_TRAIL_STONE_BATTLE_IDS, STEPPLING_RESCUED_STEP_ID, STEPPLING_RESCUED_ACTION_ID, STEPPLING_MEETS_STEP_ID, STEPPLING_MEETS_ACTION_ID, STEPPLING_JOINED_STEP_ID, STEPPLING_JOINED_ACTION_ID, HOME_STEP_ID, HOME_ACTION_ID } from '@/features/onboarding/last-clearing';
 import { FIRST_BATTLE } from '@/constants/last-clearing-battle';
+import { STORY_TILES } from '@/constants/story-tiles/registry';
+import { KINGDOM_HEX_TILE_ALPHA_BOUNDS } from '@/constants/kingdom-hex-tile-bounds.gen';
 import { activeFtueNavigationPolicy, ftueOwnsOpeningHome } from '@/features/onboarding/ftue-navigation-policy';
 import { MOSSPROUT_OPENING_STEP_IDS, OPENING_CAMERA_ENTRY_MS, OPENING_MERGE_REQUIRED, openingMistProgress } from '@/features/onboarding/opening-mist';
 import { mossproutWorldUsesEggRenderer } from '@/components/katchadeck/world/world-ftue-subject-presentation';
@@ -16,6 +18,8 @@ import { FTUE_HANDLER_REGISTRY } from '@/features/onboarding/ftue-action-registr
 import { createInitialMergeWorldState, normalizeMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 import { heartwoodStage } from '@/features/shared-adventure/heartwood-progression';
 import { GLOW } from '@/constants/glow';
+import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
+import { LOST_TRAIL } from '@/constants/story-tiles/lost-trail';
 
 type RunShape = { stepId: string; status: string; scriptVersion: number; receipts: { actionId: string; stepId: string }[]; objectiveProgress: Record<string, number>; mergeInstalled: boolean };
 
@@ -86,7 +90,10 @@ test('the Last Clearing opens with four haven beats and no Egg: the cold open, t
   assert.equal(lift.actions[0]?.id, 'world.mist_lifted');
   assert.equal(lift.actions[0]?.nextStepId, HEART_TREE_STEP_ID, 'the Mist pulls back, and the Heart Tree is next');
   assert.equal(mossproutFtueStep(HEART_TREE_STEP_ID)?.actions[0]?.nextStepId, SANCTUARY_STEP_ID);
-  assert.equal(mossproutFtueStep(SANCTUARY_STEP_ID)?.actions[0]?.nextStepId, 'complete', 'until the frontier is built, the first session ends at the Sanctuary');
+  assert.equal(mossproutFtueStep(SANCTUARY_STEP_ID)?.actions[0]?.nextStepId, FRONTIER_STEP_ID);
+  assert.equal(mossproutFtueStep(FRONTIER_STEP_ID)?.camera?.kind, 'fit_targets', 'the frontier pulls out over the whole world');
+  assert.equal(mossproutFtueStep(LOST_TRACKS_STEP_ID)?.cue?.kind, 'tap', 'the trail itself is tapped');
+  assert.equal(mossproutFtueStep(LOST_TRAIL_MISSION_STEP_ID)?.actions[0]?.nextStepId, LOST_TRAIL_STONE_STEP_IDS[0], 'the mission card opens the Lost Trail');
 
   for (const stepId of MOSSPROUT_OPENING_STEP_IDS) {
     const step = mossproutFtueStep(stepId)!;
@@ -132,9 +139,24 @@ test('a fresh run walks the Last Clearing: the cold open, the guardian, the firs
   assert.equal(lifted.stepId, HEART_TREE_STEP_ID);
   assert.equal(loadRuntime(runtime.loadFtueRun()).runtime.loadFtueRun()!.stepId, HEART_TREE_STEP_ID, 'a relaunch at the Tree stays at the Tree');
   assert.equal(runtime.commitFtueAction({ actionId: HEART_TREE_ACTION_ID, evidenceRef: 'mossprout-world:heart-tree' })?.stepId, SANCTUARY_STEP_ID);
-  const done = runtime.commitFtueAction({ actionId: SANCTUARY_ACTION_ID, evidenceRef: 'mossprout-world:sanctuary-founded' })!;
-  assert.equal(done.stepId, 'complete');
-  assert.equal(flowDispatches.filter((entry) => entry === 'event:battle_won').length, 1, 'the flow hears the one win');
+  assert.equal(runtime.commitFtueAction({ actionId: SANCTUARY_ACTION_ID, evidenceRef: 'mossprout-world:sanctuary-founded' })?.stepId, FRONTIER_STEP_ID);
+  assert.equal(runtime.commitFtueAction({ actionId: FRONTIER_ACTION_ID, evidenceRef: 'mossprout-world:frontier-seen' })?.stepId, LOST_TRACKS_STEP_ID);
+  assert.equal(loadRuntime(runtime.loadFtueRun()).runtime.loadFtueRun()!.stepId, LOST_TRACKS_STEP_ID, 'a relaunch at the tracks stays at the tracks');
+  assert.equal(runtime.commitFtueAction({ actionId: LOST_TRACKS_ACTION_ID, evidenceRef: 'shared-world:lost-trail' })?.stepId, LOST_TRAIL_MISSION_STEP_ID);
+  assert.equal(runtime.commitFtueAction({ actionId: LOST_TRAIL_MISSION_ACTION_ID, evidenceRef: 'mossprout-world:lost-trail-mission' })?.stepId, LOST_TRAIL_STONE_STEP_IDS[0]);
+  // The Lost Trail: each stone is won by its own battle, and no other.
+  for (const [index, stepId] of LOST_TRAIL_STONE_STEP_IDS.entries()) {
+    assert.equal(runtime.dispatchFtueEvent({ type: 'battle_won', battleId: FIRST_BATTLE_ID, revision: 2 } as never)?.stepId, stepId, 'an old battle does not count');
+    const next = runtime.dispatchFtueEvent({ type: 'battle_won', battleId: LOST_TRAIL_STONE_BATTLE_IDS[index]!, revision: 1 } as never)!;
+    assert.equal(next.stepId, LOST_TRAIL_STONE_STEP_IDS[index + 1] ?? STEPPLING_RESCUED_STEP_ID);
+  }
+  assert.equal(runtime.commitFtueAction({ actionId: STEPPLING_RESCUED_ACTION_ID, evidenceRef: 'shared-world:lost-trail' })?.stepId, STEPPLING_MEETS_STEP_ID);
+  assert.equal(loadRuntime(runtime.loadFtueRun()).runtime.loadFtueRun()!.stepId, STEPPLING_MEETS_STEP_ID, 'a relaunch meeting Steppling stays there');
+  assert.equal(runtime.commitFtueAction({ actionId: STEPPLING_MEETS_ACTION_ID, evidenceRef: 'shared-world:steppling-home' })?.stepId, STEPPLING_JOINED_STEP_ID);
+  assert.equal(runtime.commitFtueAction({ actionId: STEPPLING_JOINED_ACTION_ID, evidenceRef: 'mossprout-world:steppling-joined' })?.stepId, HOME_STEP_ID);
+  const done = runtime.commitFtueAction({ actionId: HOME_ACTION_ID, evidenceRef: 'mossprout-world:home' })!;
+  assert.equal(done.stepId, 'complete', 'the first session ends at home');
+  assert.equal(flowDispatches.filter((entry) => entry === 'event:battle_won').length, 4, 'the flow hears the first battle and the three stones');
   assert.equal(flowDispatches.filter((entry) => entry === `action:${COLD_OPEN_ACTION_ID}`).length, 1);
   assert.equal(flowDispatches.filter((entry) => entry === `action:${GUARDIAN_ACTION_ID}`).length, 1);
   assert.equal(flowDispatches.filter((entry) => entry === 'action:world.mist_lifted').length, 1);
@@ -165,7 +187,8 @@ test('the Kingdom wires the Last Clearing: the cold open, the first battle docke
   assert.match(screen, /\{ftueStepId === OPENING_MIST_OPEN_STEP_ID \? <FtueOpeningFade \/> : null\}/);
   assert.doesNotMatch(screen, /ftueStepId === 'world\.egg_intro' \? <FtueOpeningFade/);
   assert.match(screen, /<LastClearingColdOpen onDone=\{advanceOpening\} \/>/);
-  assert.match(screen, /const openingBoardActive = firstBattleStepActive && Boolean\(firstBattle\.store\.state\);/, 'the docked board at the clear beat is the first battle');
+  assert.match(screen, /const battle = firstBattleStepActive \? firstBattle : trailBattle;/, 'the docked board at the clear beat is the first battle; on the Lost Trail, the stone under way');
+  assert.match(screen, /const openingBoardActive = Boolean\(battle\?\.store\.state\);/);
   // The lift beat waits for the final item: the Kingdom presents the clear beat until it has landed and burst.
   assert.match(screen, /ftueStepId: routeFtueStepId,/, 'the route step is renamed so the presented step can be held');
   assert.match(screen, /const openingFinaleHeld = openingGlow\.finaleActive \|\| openingGlow\.finaleHoldRef\.current;\s*const ftueStepId = routeFtueStepId === OPENING_MIST_LIFT_STEP_ID && openingFinaleHeld \? OPENING_MIST_CLEAR_STEP_ID : routeFtueStepId;/, 'the clear beat is held while the finale flies, from the instant it launches');
@@ -194,7 +217,7 @@ test('the Kingdom wires the Last Clearing: the cold open, the first battle docke
   assert.match(effects, /withRepeat\(withTiming\(1, \{ duration: particle\.duration \* 2\.4/, 'looping, slower than the reveal');
   assert.match(effects, /ambientEmber: \{ borderRadius: 999, position: 'absolute' \}/, 'ambient embers carry no blurred shadow');
   assert.match(route, /const openingSky = ftueRun\?\.status === 'active' && homeSoloForStep\(ftueRun\.stepId\);[\s\S]*?openingSky \? todayAtmosphereBackgroundForScene\(OPENING_SKY_SCENE_ID\)/, 'twilight sky until the hatch');
-  assert.match(screen, /\{openingBoardActive && firstBattle\.mission && firstBattle\.store\.state \? <HatchableMissionDock mission=\{firstBattle\.mission\}[\s\S]*?encounter=\{firstBattle\.encounter\}/, 'the first battle docks as a real battle');
+  assert.match(screen, /\{openingBoardActive && battle\?\.mission && battle\.store\.state \? <HatchableMissionDock key=\{`battle-dock:\$\{battleEncounter\?\.id \?\? 'none'\}`\} mission=\{battle\.mission\}[\s\S]*?encounter=\{battle\.encounter\}/, 'the scripted battle docks as a real battle');
   // The finale flag goes up before the run advances: no frame ever renders the lift step (and its camera) without it.
   assert.match(dock, /const finale = openingMistProgress\(runRef\.current\) \+ 1 >= OPENING_MERGE_REQUIRED;/, 'the board counts the merge the run has not advanced on yet');
   assert.match(dock, /onBlocked: onBlockedInteraction, onBeforeAdvance: handleEvent,/, 'the dock launches Glow and the finale before the advance');
@@ -251,7 +274,7 @@ test('the Kingdom wires the Last Clearing: the cold open, the first battle docke
   assert.match(route, /if \(ftueRun\?\.status !== 'active' \|\| ftueRun\.mergeInstalled \|\| installingMossproutRef\.current\) return;/, 'the Last Clearing brings Mossprout into the world once, at the start of the run');
   assert.match(screen, /const mission = useOpeningMissionBoard\(missionRunId\);/, 'the Kingdom owns the mission board');
   assert.match(screen, /if \(ftueStepId === 'world\.egg_intro'\) clearOpeningMission\(\);/, 'the mission store goes with the mist');
-  assert.match(screen, /state=\{firstBattle\.store\.state\} send=\{firstBattle\.store\.send\}/, 'the dock plays the battle’s own board, not the provider');
+  assert.match(screen, /state=\{battle\.store\.state\} send=\{battle\.store\.send\}/, 'the dock plays the battle’s own board, not the provider');
   assert.doesNotMatch(dock, /useMergeWorldState|useMergeWorldActions/, 'the dock has no link to the persistent board');
   const surface = readFileSync('components/katchadeck/games/merge-play-surface.tsx', 'utf8');
   assert.match(surface, /const state = override \?\? subscribed;/, 'the surface renders an explicit board over the provider one');
@@ -291,4 +314,32 @@ test('the Heart Tree wakes once, with the first light, and stirs the Heartwood',
   const again = reduceMergeWorld(woken.state, { type: 'restoreHeartTree', receiptId: 'run:heart-tree', cost: GLOW.firstRestorationCost, now: now + 1 });
   assert.equal(again.changed, false, 'woken once; a relaunch pays nothing twice');
   assert.equal(normalizeMergeWorldState(JSON.parse(JSON.stringify(woken.state)), now).heartTree?.receiptId, 'run:heart-tree', 'the woken Tree survives a reload');
+});
+
+test('the Lost Trail is a story tile with its own tracks under the Mist, and Steppling lost inside', () => {
+  const trail = STORY_TILES.find((tile) => tile.id === LOST_TRAIL_TILE_ID);
+  assert.ok(trail, 'the Lost Trail is in the world');
+  assert.equal(trail?.companion, 'steppling');
+  assert.equal(trail?.lostSkinId, 'steppling', 'Steppling is the silhouette in its Mist');
+  assert.equal(trail?.mistedAlphaBoundsKey, 'shared_world_lost_trail_tracks_hex_tile_v1.webp', 'the tracks art, not the shared mist tile');
+  for (const key of [trail!.alphaBoundsKey, trail!.mistedAlphaBoundsKey!, 'shared_world_hollow_tree_hex_tile_v1.webp']) {
+    assert.ok(key in KINGDOM_HEX_TILE_ALPHA_BOUNDS, `${key} has generated bounds (the art went through the hex pipeline)`);
+  }
+});
+
+test('Steppling is rescued from the Mist, free and once: his tile open and him home, no Egg, no ticket', () => {
+  const now = 5_000;
+  const world = { ...createInitialMergeWorldState(now), coins: 7 };
+  const rescued = reduceMergeWorld(world, { type: 'rescueWorldFriend', targetId: STEPPLING_HATCHABLE.tile.unlockId, now });
+  assert.equal(rescued.changed, true);
+  assert.equal(rescued.state.coins, 7, 'a rescue costs nothing');
+  const unlock = rescued.state.worldUnlocks?.[STEPPLING_HATCHABLE.tile.unlockId];
+  assert.ok(unlock?.transferredAt != null && unlock.hatchedAt != null, 'open, carried and hatched in one write');
+  assert.ok(rescued.state.companionDiscovery.records.some((record) => record.characterId === 'steppling'), 'Steppling is home');
+  assert.ok(rescued.state.unlockedCharacters.includes('steppling'));
+  assert.equal(reduceMergeWorld(rescued.state, { type: 'rescueWorldFriend', targetId: STEPPLING_HATCHABLE.tile.unlockId, now: now + 1 }).changed, false, 'once home, asking again changes nothing');
+  // The Lost Trail itself is a story tile: revealed free by its unlock.
+  const trail = reduceMergeWorld(rescued.state, { type: 'unlockWorldTarget', targetId: LOST_TRAIL.unlockId, now });
+  assert.ok(trail.state.worldUnlocks?.[LOST_TRAIL.unlockId], 'the Lost Trail is found again');
+  assert.equal(trail.state.coins, 7);
 });

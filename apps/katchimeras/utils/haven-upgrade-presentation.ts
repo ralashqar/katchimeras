@@ -29,6 +29,15 @@ export type HavenTileUpgradePresentation = {
    * The Last Clearing's Heart Tree waking: the Heartwood crossblends between these two stages, with the coins and the
    * field of light of any restoration. The world is written alongside; the finish path hands the story on.
    */
+  /**
+   * A Last Clearing reveal the story plays locally while it writes the world (the Lost Trail clearing, Steppling's tile
+   * opening); the finish path hands its beat on instead of a purchase's story.
+   */
+  ftueReveal?: 'lost-trail' | 'steppling-home';
+  /** A hero building's new look on its friend's tile: the tile crossblends from one look to the next. */
+  tileLook?: { tileId: string; from: number; to: number };
+  /** A friend's tile opening with them already home: no Egg is revealed with it. */
+  noEgg?: boolean;
   heartTree?: { from: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage; to: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage };
   status: HavenUpgradePresentationStatus;
   storyPresentationKey?: string;

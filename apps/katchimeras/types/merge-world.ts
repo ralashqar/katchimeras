@@ -560,6 +560,16 @@ export type MergeWorldState = {
   openingGlow?: { receiptId: string; amount: number; grantedAt: number } | null;
   /** The Last Clearing's Heart Tree, woken with the first light (`docs/cozy-4x-ftue-the-last-clearing.md`, beat 8). */
   heartTree?: { receiptId: string; restoredAt: number } | null;
+  /** The Sanctuary's chapters whose reward has been paid (`constants/sanctuary-chapters.ts`), by id. */
+  chaptersClaimed?: readonly string[];
+  /** The Sanctuary's chapters whose opening scene has played (The Signal), by id. */
+  chapterOpeningsSeen?: readonly string[];
+  /** Friends' own buildings on their tiles (`constants/hero-buildings.ts`), by id. Absent until one is built. */
+  heroBuildings?: Partial<Record<import('@/constants/hero-buildings').HeroBuildingId, { level: number; builtAt: number }>>;
+  /** Building materials, earned on Supply Runs and spent on the Sanctuary's buildings. */
+  materials?: { timber: number };
+  /** The Supply Run's order slots (which pool index each of the two shows) and how many orders have been served. */
+  supplyRun?: { slots: readonly [number, number]; served: number; crates?: number };
   /** Kept for saves written before `gardenLessons`; mirrors `gardenLessons.steppling`. */
   stepplingGardenLesson?: { preparedAt: number; servedAt?: number };
   /** Each hatchable companion's garden lesson (parcel, grow, serve): prepared once, served once. */
@@ -641,6 +651,8 @@ export type MergeWorldCommand =
   | { type: 'ensureCompanionDailyGarden'; familyId: MergeCharacterId; now: number }
   | { type: 'grantJourneyReturn'; cycle: import('./companion-journey-cycle').CompanionJourneyCycle; dayId: string; now: number }
   | { type: 'unlockWorldTarget'; targetId: string; now: number; receiptId?: string }
+  /** A friend rescued from the Mist (the Last Clearing's Lost Trail): their tile open and them home at once, free. */
+  | { type: 'rescueWorldFriend'; targetId: string; now: number }
   | { type: 'payHatchableMission'; companion: MergeCharacterId; receiptId: string; now: number }
   | { type: 'transferDiscoveryEgg'; targetId: string; now: number }
   | { type: 'hatchWorldEgg'; targetId: string; now: number }
@@ -648,6 +660,14 @@ export type MergeWorldCommand =
   /** The first light: the Glow that drove the opening's wisps off stays with you, once per run. */
   | { type: 'grantOpeningGlow'; receiptId: string; amount: number; now: number }
   | { type: 'restoreHeartTree'; receiptId: string; cost: number; now: number }
+  | { type: 'claimChapterReward'; chapterId: string; glow: number; now: number }
+  | { type: 'markChapterOpened'; chapterId: string; now: number }
+  /** A hero building up a level: its Glow and Timber, once per level. */
+  | { type: 'upgradeHeroBuilding'; id: import('@/constants/hero-buildings').HeroBuildingId; expectedLevel: number; now: number }
+  /** A board-local order (a Supply Run's): its items leave the board, and nothing else about the board's world changes. */
+  | { type: 'serveBoardOrder'; order: MergeOrder; now: number }
+  /** A Supply Run order served: its slot moves on to the next pool index, and it pays Timber and Glow. Once per index. */
+  | { type: 'completeSupplyOrder'; slot: 0 | 1; index: number; timber: number; glow: number; crate?: { every: number; timber: number; glow: number }; now: number }
   /** Glow the story hands over once (e.g. Steppling's mist price), keyed in the encounter ledger's receipts. */
   | { type: 'grantStoryGlow'; receiptId: string; amount: number; now: number }
   /** Keep going on a lost level: its Glow, once per receipt; refused when the Glow is not there. */

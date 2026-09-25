@@ -12,7 +12,26 @@ const TILE_ART: Readonly<Record<string, () => HatchableTileArt>> = {
     medium: require('@incubator/art-world/hex/shared_world_mossprout_old_grove_hex_tile_v1_512.webp'),
     thumb: require('@incubator/art-world/hex/shared_world_mossprout_old_grove_hex_tile_v1_256.webp'),
   }),
+  'lost-trail': () => ({
+    full: require('@incubator/art-world/hex/shared_world_lost_trail_hex_tile_v1.webp'),
+    medium: require('@incubator/art-world/hex/shared_world_lost_trail_hex_tile_v1_512.webp'),
+    thumb: require('@incubator/art-world/hex/shared_world_lost_trail_hex_tile_v1_256.webp'),
+  }),
 };
+
+/** A story tile's own art while the Mist keeps it, where the story shows the place before it is cleared. */
+const MISTED_TILE_ART: Readonly<Record<string, () => HatchableTileArt>> = {
+  'lost-trail': () => ({
+    full: require('@incubator/art-world/hex/shared_world_lost_trail_tracks_hex_tile_v1.webp'),
+    medium: require('@incubator/art-world/hex/shared_world_lost_trail_tracks_hex_tile_v1_512.webp'),
+    thumb: require('@incubator/art-world/hex/shared_world_lost_trail_tracks_hex_tile_v1_256.webp'),
+  }),
+};
+
+/** A story tile's misted art, or null for the shared full-mist tile. */
+export function storyTileMistedArt(tileId: string): HatchableTileArt | null {
+  return MISTED_TILE_ART[tileId]?.() ?? null;
+}
 
 export const STORY_TILE_ART_IDS: readonly string[] = Object.keys(TILE_ART);
 

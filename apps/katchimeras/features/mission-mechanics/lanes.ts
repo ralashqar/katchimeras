@@ -275,7 +275,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
         const cell = laneCell(window, spec.column, laneRowOf(wisps[index]!.row));
         return cell == null ? [] : [cell];
       }));
-      const free = window.cellIndices.filter((cell) => isFree(current(), cell) && !occupied.has(cell));
+      const free = (seeds.area ?? window.cellIndices).filter((cell) => window.cellIndices.includes(cell) && isFree(current(), cell) && !occupied.has(cell));
       if (free.length) {
         const cell = free[Math.min(free.length - 1, Math.floor(seededUnit(`lanes-seed:${seeded}:${Math.round(nextSeedAt)}`) * free.length))]!;
         const lucky = seededUnit(`lanes-luck:${seeded}`) < Math.max(0, Math.min(1, luck.tierTwoChance ?? 0));

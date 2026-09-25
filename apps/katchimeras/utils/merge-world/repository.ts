@@ -782,6 +782,28 @@ export async function ensureStoredOpeningGlow(receiptId: string, amount: number 
   return { state: result.state, granted: result.changed, amount };
 }
 
+/** A Supply Run order served: Timber and Glow into the world, once per pool index (`completeSupplyOrder`). */
+export function completeStoredSupplyOrder(slot: 0 | 1, index: number, timber: number, glow: number, crate?: { every: number; timber: number; glow: number }, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'completeSupplyOrder', slot, index, timber, glow, ...(crate ? { crate } : {}), now }), now);
+}
+
+/** A hero building up a level (`upgradeHeroBuilding`); throws the reason when it cannot. */
+export async function upgradeStoredHeroBuilding(id: import('@/constants/hero-buildings').HeroBuildingId, expectedLevel: number, now = gameNow()) {
+  const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'upgradeHeroBuilding', id, expectedLevel, now }), now);
+  if (!result.changed && result.message) throw new Error(result.message);
+  return result;
+}
+
+/** A chapter's opening scene has played (`markChapterOpened`). */
+export function markStoredChapterOpened(chapterId: string, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'markChapterOpened', chapterId, now }), now);
+}
+
+/** Pays a Sanctuary chapter's reward, once (`claimChapterReward`). */
+export function claimStoredChapterReward(chapterId: string, glow: number, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'claimChapterReward', chapterId, glow, now }), now);
+}
+
 /** Wakes the Heart Tree with the first light, once (`docs/cozy-4x-ftue-the-last-clearing.md`, beat 8). */
 export async function restoreStoredHeartTree(receiptId: string, cost: number = GLOW.firstRestorationCost, now = gameNow()) {
   const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'restoreHeartTree', receiptId, cost, now }), now);
@@ -821,6 +843,16 @@ export function seedStoredMossproutGardenAfterFtue(dayId: string, now = gameNow(
 }
 
 /** Serialize purchases and Egg ownership against the latest persisted balance. */
+/** A friend rescued from the Mist: their tile open and them home, free and once (`rescueWorldFriend`). */
+export function rescueStoredWorldFriend(targetId: string, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'rescueWorldFriend', targetId, now }), now);
+}
+
+/** A story tile revealed by the story itself (the Lost Trail after its rescue): free, once. */
+export function revealStoredStoryTile(unlockId: string, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'unlockWorldTarget', targetId: unlockId, now }), now);
+}
+
 export function applyStoredGlowDiscovery(command: Extract<MergeWorldCommand, { type: 'unlockWorldTarget' | 'transferDiscoveryEgg' | 'hatchWorldEgg' | 'prepareGlowDiscoveryLesson' }>) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, command), command.now);
 }

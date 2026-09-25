@@ -1,3 +1,4 @@
+import { HERO_BUILDING_MAX_LEVEL, heroBuildingById, heroBuildingCost, heroBuildingForCompanion, heroBuildingLevel, heroLevelCap, type HeroBuildingId } from '@/constants/hero-buildings';
 import { normalizeAdventure } from '@/features/shared-adventure/normalize';
 import { normalizeTimeTrials } from '@/features/time-trial/trial-world';
 import { createOrderQueries } from '@incubator/merge/orders';
@@ -571,6 +572,7 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       return upgradeHavenFeature(current, command);
     case 'payHatchableMission':
     case 'unlockWorldTarget':
+    case 'rescueWorldFriend':
     case 'transferDiscoveryEgg':
     case 'hatchWorldEgg':
     case 'prepareGlowDiscoveryLesson':
@@ -586,6 +588,54 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
         coins: Math.min(999_999, current.coins + amount),
         openingGlow: { receiptId: command.receiptId, amount, grantedAt: command.now },
       }, command.now));
+    }
+    case 'serveBoardOrder': {
+      if (!mergeOrderReady(current, command.order)) return unchanged(current, 'The requested items are not ready yet.');
+      return { ...changed(touch({ ...current, board: boardAfterServingOrder(current, command.order) }, command.now)), servedOrderId: command.order.id };
+    }
+    case 'completeSupplyOrder': {
+      const run = current.supplyRun ?? { slots: [0, 0] as const, served: 0 };
+      // Only the order the card is showing: a replay (or a stale second tap) pays nothing. Each card keeps its friend
+      // and moves on to that friend's next order.
+      if (run.slots[command.slot] !== command.index) return unchanged(current);
+      const slots: readonly [number, number] = command.slot === 0 ? [command.index + 1, run.slots[1]] : [run.slots[0], command.index + 1];
+      const served = run.served + 1;
+      // A crate filled: its bonus comes with the order that filled it, in the same write.
+      const crate = command.crate && served % Math.max(1, command.crate.every) === 0 ? command.crate : null;
+      const glow = Math.max(0, Math.floor(command.glow)) + (crate ? crate.glow : 0);
+      const timber = Math.max(0, Math.floor(command.timber)) + (crate ? crate.timber : 0);
+      return changed(touch({
+        ...current,
+        coins: Math.min(999_999, current.coins + glow),
+        materials: { ...current.materials, timber: (current.materials?.timber ?? 0) + timber },
+        supplyRun: { slots, served, crates: (run.crates ?? 0) + (crate ? 1 : 0) },
+      }, command.now));
+    }
+    case 'upgradeHeroBuilding': {
+      const definition = heroBuildingById.get(command.id);
+      if (!definition) return unchanged(current, 'That building does not exist.');
+      const level = heroBuildingLevel(current, command.id);
+      // A second tap, or a request made against an older world: already done.
+      if (level !== command.expectedLevel) return unchanged(current);
+      const cost = heroBuildingCost(level);
+      if (!cost) return unchanged(current, 'Fully grown.');
+      if (!current.companionDiscovery.records.some((record) => record.characterId === definition.companion)) return unchanged(current, 'Its friend is not home yet.');
+      if (current.coins < cost.glow) return unchanged(current, `You need ${(cost.glow - current.coins).toLocaleString()} more Glow.`);
+      const timber = current.materials?.timber ?? 0;
+      if (timber < cost.timber) return unchanged(current, `You need ${cost.timber - timber} more Timber. Run supplies on the Lost Trail.`);
+      return changed(touch({
+        ...current, coins: current.coins - cost.glow, materials: { ...current.materials, timber: timber - cost.timber },
+        heroBuildings: { ...current.heroBuildings, [command.id]: { level: level + 1, builtAt: current.heroBuildings?.[command.id]?.builtAt ?? command.now } },
+      }, command.now), level === 0 ? `${definition.name} built.` : `${definition.name}: level ${level + 1}.`);
+    }
+    case 'markChapterOpened': {
+      if (current.chapterOpeningsSeen?.includes(command.chapterId)) return unchanged(current);
+      return changed(touch({ ...current, chapterOpeningsSeen: [...(current.chapterOpeningsSeen ?? []), command.chapterId] }, command.now));
+    }
+    case 'claimChapterReward': {
+      // Once per chapter, whatever else the ledgers keep or trim.
+      if (current.chaptersClaimed?.includes(command.chapterId)) return unchanged(current);
+      return changed(touch({ ...current, coins: Math.min(999_999, current.coins + Math.max(0, Math.floor(command.glow))), chaptersClaimed: [...(current.chaptersClaimed ?? []), command.chapterId] }, command.now));
     }
     case 'restoreHeartTree': {
       // Once: the Tree wakes the first time it is paid for; any later ask (a relaunch, the story's own repair) changes nothing.
@@ -930,6 +980,11 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     ...normalizeHatchableEggs(source),
     openingGlow: normalizeOpeningGlow(source.openingGlow),
     heartTree: normalizeHeartTree(source.heartTree),
+    materials: normalizeMaterials(source.materials),
+    heroBuildings: normalizeHeroBuildings(source.heroBuildings),
+    supplyRun: normalizeSupplyRun(source.supplyRun),
+    chapterOpeningsSeen: Array.isArray(source.chapterOpeningsSeen) ? [...new Set(source.chapterOpeningsSeen.filter((id): id is string => typeof id === 'string'))] : [],
+    chaptersClaimed: Array.isArray(source.chaptersClaimed) ? [...new Set(source.chaptersClaimed.filter((id): id is string => typeof id === 'string'))] : [],
     version: 25,
     pivot: 'campaign-v1',
     encounters: normalizeEncounters(source.encounters, now),
@@ -1736,6 +1791,8 @@ function upgradeKatchimera(state: MergeWorldState, characterId: MergeCharacterId
   const needed = katchimeraXpForLevel(progress.level + 1);
   if (progress.xp < needed) return unchanged(state, `${(needed - progress.xp).toLocaleString()} more experience in the Mist first.`);
   if (state.coins < cost) return unchanged(state, `You need ${(cost - state.coins).toLocaleString()} more Glow.`);
+  const cap = heroLevelCap(state, characterId);
+  if (cap != null && progress.level + 1 > cap) return unchanged(state, `Grow ${heroBuildingForCompanion(characterId)?.name ?? 'their building'} first.`);
   const level = progress.level + 1;
   return {
     state: touch({ ...state, coins: state.coins - cost, katchimeraProgress: { ...state.katchimeraProgress, [characterId]: { ...progress, level, upgradedAt: now } } }, now),
@@ -4329,6 +4386,28 @@ function finite(value: unknown, fallback: number) {
 
 function uniqueStrings(value: unknown): string[] {
   return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === 'string'))] : [];
+}
+
+function normalizeHeroBuildings(value: unknown): MergeWorldState['heroBuildings'] {
+  if (!value || typeof value !== 'object') return {};
+  return Object.fromEntries(Object.entries(value as Record<string, { level?: unknown; builtAt?: unknown }>).flatMap(([id, entry]) => {
+    if (!heroBuildingById.has(id as HeroBuildingId) || !entry || typeof entry !== 'object') return [];
+    return [[id, { level: Math.max(0, Math.min(HERO_BUILDING_MAX_LEVEL, Math.floor(Number(entry.level) || 0))), builtAt: finite(entry.builtAt, 0) }]];
+  }));
+}
+
+function normalizeMaterials(value: unknown): MergeWorldState['materials'] {
+  const timber = value && typeof value === 'object' ? Number((value as { timber?: unknown }).timber) : 0;
+  return { timber: Number.isFinite(timber) ? Math.max(0, Math.floor(timber)) : 0 };
+}
+
+function normalizeSupplyRun(value: unknown): MergeWorldState['supplyRun'] {
+  if (!value || typeof value !== 'object') return undefined;
+  const raw = value as { slots?: unknown; served?: unknown };
+  const raw2 = raw as { crates?: unknown };
+  const slots = Array.isArray(raw.slots) && raw.slots.length === 2 && raw.slots.every((slot) => Number.isInteger(slot) && Number(slot) >= 0)
+    ? [Number(raw.slots[0]), Number(raw.slots[1])] as const : [0, 0] as const;
+  return { slots, served: Math.max(0, Math.floor(Number(raw.served) || 0)), crates: Math.max(0, Math.floor(Number(raw2.crates) || 0)) };
 }
 
 function normalizeHeartTree(value: unknown): MergeWorldState['heartTree'] {

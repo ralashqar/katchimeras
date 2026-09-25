@@ -1,6 +1,12 @@
 # The Last Clearing: the cozy 4X first session
 
-Status: **steps 1 to 3 built Sept 24 2026**. Step 1: story graph v57, the cold open, the guardian, and Mossprout from the first frame. Step 2: the first battle is a scripted Lanes level that cannot be lost (`constants/last-clearing-battle.ts`, `forgiving` lanes push a breaching wisp back). Mossprout speaks lines over the board, and the story moves on the `battle_won` event. Step 3 (graph v58):
+Status: **steps 1 to 5 built Sept 24 2026** (the whole first session, cold open to home). Step 1: story graph v57, the cold open, the guardian, and Mossprout from the first frame. Step 2: the first battle is a scripted Lanes level that cannot be lost (`constants/last-clearing-battle.ts`, `forgiving` lanes push a breaching wisp back). Mossprout speaks lines over the board, and the story moves on the `battle_won` event. First battle, reworked (Sept 24 2026, per the user) into a dense Steppling-style chain:
+- **Start:** five Seeds on the bottom row, one Seed asleep under half Mist above them, and the rest under full Mist. Seeds sit on row four, Sprouts on row three, and two Plants on row two.
+- **Waking:** each wake (a twin onto a sleeper) makes the piece one tier up and opens the full Mist beside it. The finger guides every wake (`firstBattleGuide`).
+- **Seeds:** new Seeds land only in the bottom two rows (`seeds.area`).
+- **Wisps:** 13 in waves across every lane: the first down the middle, then a pair, then a spitter and its partner, then three, then all five lanes together.
+
+Step 3 (graph v58):
 - The veil lift is the Mist's retreat, with the lines "We did it" / "We actually did it".
 - `world.heart_tree` pushes the camera in on the Heartwood, and Mossprout's two lines bring **Restore the Heart Tree**.
 - The first light flies from the counter, `restoreHeartTree` is written (once, idempotent), and the Heartwood crossblends from dormant to stirring under the field of light.
@@ -8,7 +14,27 @@ Status: **steps 1 to 3 built Sept 24 2026**. Step 1: story graph v57, the cold o
 
 Deferred from beat 9: the little structures appearing, which come with Sanctuary buildings.
 
-For now the first session ends at the title card. Steps 4 to 6 are to come. This is the first focus of the cozy 4X direction (`cozy-4x-direction` in memory; the full game spec was handed over the same day). It replaces the companion-life first session: the Egg and its questions, the hatch meeting, the Garden planting, the first rest and meditation, and the Glow-ticket Steppling discovery.
+Step 4 (graph v59 / script v57):
+- `world.frontier`: a slow `fit_targets` pull-out, with the minimum zoom lowered to 0.16 for this beat, and a top-placed **The First Grove** card with Mossprout's two lines.
+- `world.lost_tracks`: the camera drifts to the Lost Trail. Mossprout's lines are followed by **Look closer**, then the ordinary finger and spotlight on the trail tile, which is tapped.
+- `world.lost_trail_mission`: the **Follow the Lost Trail** card.
+
+The new art went through the shared-world hex pipeline (`art-source/katchimeras/shared-world-discovery-v2`: `lost-trail-tracks`, `lost-trail`, `hollow-tree`):
+- The Lost Trail is a story tile (`constants/story-tiles/lost-trail.ts`). While misted, it keeps its own tracks art (`mistedAlphaBoundsKey`), with Steppling's silhouette breathing in its Mist (`lostSkinId`, drawn at runtime).
+- The Hollow Tree is a landmark layer at (0,-4), past the rings.
+
+Step 5 (graph v60 / script v58):
+- **The trail battles:** `world.trail_stone_1..3` are three forgiving Lanes battles docked under the Lost Trail tile (`LOST_TRAIL_BATTLES`). Each opens with its own card, and the Kingdom docks them through the same scripted-battle slot and finger as the first battle (`scriptedBattleGuide`):
+  - The Trail In, with a quick wisp;
+  - Mist Rows;
+  - Someone's in There: a new `rescue` objective. Steppling sits under thick Mist on cell 17, drawn as a silhouette in the cell. The battle is won with every wisp down and that cell cleared, and the finger steers merges toward it.
+- **`world.steppling_rescued`:** the Lost Trail crossblends from tracks to the cleared path.
+- **`world.steppling_meets`:** Steppling's tile opens with him home (the new `rescueWorldFriend` command: free, no Egg). Then his card reveal (the existing modal) and his first words.
+- **`effect.haven.steppling_joins`:** guarantees both writes.
+- **`world.steppling_joined`:** a card.
+- **`world.home`:** *"Welcome home, Wayfinder."* The first session ends here.
+
+Deferred: the first Sanctuary goal (the Explorer's Lodge), which comes with Sanctuary buildings. Step 6, the test cleanup, is still to come. This is the first focus of the cozy 4X direction (`cozy-4x-direction` in memory; the full game spec was handed over the same day). It replaces the companion-life first session: the Egg and its questions, the hatch meeting, the Garden planting, the first rest and meditation, and the Glow-ticket Steppling discovery.
 
 It ends with the player knowing four things:
 

@@ -1,0 +1,6 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "prompt": "Use the reference only for its art style: one chunky, glossy, cushiony 3D toy icon with soft bevels, a single soft highlight, large flat colour blocks, very low detail and no texture. Replace the golden swirl with a DIFFERENT icon: TWO plump short round wooden logs stacked, one lying on top of the other at a slight angle, centred and very large. The bark is one solid warm honey-brown with a slightly deeper brown on the shaded side; each log shows one round cut end facing the viewer in pale warm tan with two simple darker tan rings. At most four colours: honey-brown, deeper brown, pale tan, darker tan. No wood grain lines, no knots, no leaves, no moss, no axe, no rope. It must be unmistakable at 20 pixels and clearly different from a golden swirl. Perfectly flat pure black #000000 background for matting, the whole silhouette inside the canvas with clear padding. No third object, no ring, no coin, no sparkles, no particles, no aura, no face, no text, no letters, no border, no UI, no watermark, no floor, no cast shadow.",
+  "sourceSha256": "f5b5cfdcb624e874024abc113b78df385193a717653d4517d8898d81f5f2261d",
+  "referenceSha256": "3d71c3d7ceb88fef92161e03118f87cc01a3614b9f8a66029c3d2764532b3050"
+}

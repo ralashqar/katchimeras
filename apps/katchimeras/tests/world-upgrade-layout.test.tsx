@@ -150,7 +150,8 @@ test('a stage slot shows the tile the map drew at that level, the freshly reveal
     './shared-resident-presentation': { sharedResidentAnchor },
     '@/constants/mossprout-memory-plants': { mossproutMemoryPlantById: new Map() },
     '@/constants/hatchable-companions/tile-art': { hatchableTileArt: (tileId: string) => ({ full: `${tileId}:full`, medium: `${tileId}:512`, thumb: `${tileId}:256` }) },
-    '@/constants/story-tiles/tile-art': { storyTileArt: (tileId: string) => ({ full: `${tileId}:full`, medium: `${tileId}:512`, thumb: `${tileId}:256` }) },
+    '@/constants/hero-building-art': { heroTileLook: () => null },
+    '@/constants/story-tiles/tile-art': { storyTileArt: (tileId: string) => ({ full: `${tileId}:full`, medium: `${tileId}:512`, thumb: `${tileId}:256` }), storyTileMistedArt: (tileId: string) => ({ full: `${tileId}:misted`, medium: `${tileId}:misted:512`, thumb: `${tileId}:misted:256` }) },
     '@/components/katchadeck/world/kingdom-hex-scene': { tileVisibleBounds: (x: number, y: number) => ({ left: x - 200, top: y - 200, right: x + 200, bottom: y + 200 }) },
   };
   for (const match of readFileSync(file, 'utf8').matchAll(/require\('([^']+)'\)/g)) mocks[match[1]] = match[1];

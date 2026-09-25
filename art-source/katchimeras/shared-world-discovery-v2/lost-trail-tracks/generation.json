@@ -1,0 +1,19 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "resolution": 2048,
+  "createdAt": "2026-09-24T19:01:40.809444+00:00",
+  "references": [
+    {
+      "path": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "sha256": "64b441e4c33b1d3a02e418f22fd474c4b994557243e43869a89cf8e530df0f2a"
+    },
+    {
+      "path": "design/shared-world-discovery-v2/mist/source.png",
+      "sha256": "c0a0085f3eaa013b986a260531a1d31f6d1221287441106a2670c6edce3ff7a0"
+    }
+  ],
+  "prompt": "Use Image 1 as the authoritative camera, framing, deep tapered floating hex-island geometry and rendering reference. Preserve its six-sided top footprint, broad chunky cliff blocks, deep tapered underside, centered recessed front stairs, lighting direction and square framing. Keep the entire silhouette comfortably inside the canvas with black padding on all four sides. Perfectly flat pure-black #000000 background for BiRefNet Heavy matting; no ground plane, external drop shadow, text, numbers, UI, watermark, characters or eggs.\n\nPremium cozy 3D toy diorama matching the Mossprout reference: very low detail density, very low texture detail, broad cushiony shapes, soft rounded bevels, smooth matte clay-like surfaces, large readable color blocks, soft upper-left daylight and restrained ambient occlusion. No photographic texture, grain, tiny repeated details, speckles, cracks, grass blades, pine needles or surface noise. Every main shape must read at 256 pixels.\n\nGenerate the Lost Trail as the Mist keeps it: a trail tile half swallowed by magical mist, NOT a fully developed habitat. Image 2 is only the mist style guide: use exactly its large rounded cushiony cloud masses with creamy pearl highlights, pale powder-blue midtones and gentle muted lavender recesses. Replace all Mossprout-specific top-face content from Image 1: no leaf-roof cottage, garden pond, bridge, planter boxes, flower beds or surrounding fence. The rear two thirds of the top face are completely covered by that dense opaque mist, which also wraps the rear rim. The front third stays clear: broad smooth warm-ochre trail earth with a few broad moss cushions at the side edges. One smooth ochre footpath climbs from the centred front stairs across the clear front part and disappears straight into the wall of mist. Along the path, a short line of small, simple, rounded footprint dents (a small creature's, two by two, clearly readable at 256 pixels) leads INTO the mist; no footprints come back out. Beside the path at the mist's edge, one chunky honey-timber trail marker with a blank rounded arrow board and no writing, leaning over at an angle as if nobody has tended it. Use only these few features, not a scatter of tiny props. No character, creature, silhouette, Egg or eyes anywhere. Retheme the cliff blocks in coordinated warm sandstone and muted slate-blue while preserving their shapes; mist lobes obscure the rear cliff top. Cozy toy diorama, quiet and a little eerie, never scary.",
+  "assetKey": "shared_world_lost_trail_tracks_hex_tile_v1",
+  "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/shared-world-lost-trail-tracks-hex-tile-v1/1790276559386_grid.png",
+  "sourceSha256": "bf27cd5fe332bb0a48234c549c9d025c9391f9e60855bb45481330b5af2a7841"
+}

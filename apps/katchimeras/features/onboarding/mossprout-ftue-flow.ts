@@ -61,7 +61,9 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
   // v57: the Last Clearing (`docs/cozy-4x-ftue-the-last-clearing.md`), the cozy 4X first session. The game is not
   // launched, so there is no migration of meaning: every retired beat simply ends an old run.
   // v58: step 3, the Heart Tree woken and the Sanctuary founded after the Mist pulls back.
-  version: 58,
+  // v59: step 4, the frontier pull-out, the Lost Trail's tracks and its mission card.
+  // v60: step 5, the Lost Trail's three battles, Steppling's rescue and joining, and home.
+  version: 60,
   entryNodeId: 'world.mist_open',
   metadata: {
     kind: 'ftue' as const,
@@ -84,7 +86,26 @@ export const MOSSPROUT_FTUE_FLOW = defineStory({
     scene('world.heart_tree', 'haven', [{ id: 'world.restore_heart_tree', next: 'effect.haven.restore_heart_tree' }]),
     story.effect({ id: 'effect.haven.restore_heart_tree', capability: 'haven.restore_heart_tree', next: 'world.sanctuary_founded' }),
     // SANCTUARY FOUNDED.
-    scene('world.sanctuary_founded', 'haven', [{ id: 'world.found_sanctuary', next: 'complete' }]),
+    scene('world.sanctuary_founded', 'haven', [{ id: 'world.found_sanctuary', next: 'world.frontier' }]),
+    // THE FIRST GROVE: the pull-out over the Mist to the Hollow Tree.
+    scene('world.frontier', 'haven', [{ id: 'world.see_frontier', next: 'world.lost_tracks' }]),
+    // The tracks into the Mist, and someone still in there.
+    scene('world.lost_tracks', 'haven', [{ id: 'world.follow_tracks', next: 'world.lost_trail_mission' }]),
+    // FOLLOW THE LOST TRAIL (its levels are step 5).
+    scene('world.lost_trail_mission', 'haven', [{ id: 'world.accept_lost_trail', next: 'world.trail_stone_1' }]),
+    // The Lost Trail: three battles docked under the trail, the last a rescue.
+    task('world.trail_stone_1', 'haven', { id: 'world.clear_trail_1', event: ftueEvent('battle_won'), count: 1, next: 'world.trail_stone_2' }),
+    task('world.trail_stone_2', 'haven', { id: 'world.clear_trail_2', event: ftueEvent('battle_won'), count: 1, next: 'world.trail_stone_3' }),
+    task('world.trail_stone_3', 'haven', { id: 'world.clear_trail_3', event: ftueEvent('battle_won'), count: 1, next: 'world.steppling_rescued' }),
+    // The Mist bursts off the trail; Steppling is free.
+    scene('world.steppling_rescued', 'haven', [{ id: 'world.free_steppling', next: 'world.steppling_meets' }]),
+    // Steppling home in the Sanctuary, the reveal, and his first words.
+    scene('world.steppling_meets', 'haven', [{ id: 'world.meet_steppling', next: 'effect.haven.steppling_joins' }]),
+    story.effect({ id: 'effect.haven.steppling_joins', capability: 'haven.steppling_joins', next: 'world.steppling_joined' }),
+    // STEPPLING HAS JOINED YOUR SANCTUARY.
+    scene('world.steppling_joined', 'haven', [{ id: 'world.welcome_steppling', next: 'world.home' }]),
+    // Home: the first session ends.
+    scene('world.home', 'haven', [{ id: 'world.come_home', next: 'complete' }]),
     story.complete(),
   ],
   migrations: Object.fromEntries([

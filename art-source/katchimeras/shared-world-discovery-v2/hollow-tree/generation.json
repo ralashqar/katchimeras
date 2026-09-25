@@ -1,0 +1,19 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "resolution": 2048,
+  "createdAt": "2026-09-24T19:01:40.833190+00:00",
+  "references": [
+    {
+      "path": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "sha256": "64b441e4c33b1d3a02e418f22fd474c4b994557243e43869a89cf8e530df0f2a"
+    },
+    {
+      "path": "design/shared-world-discovery-v2/mist/source.png",
+      "sha256": "c0a0085f3eaa013b986a260531a1d31f6d1221287441106a2670c6edce3ff7a0"
+    }
+  ],
+  "prompt": "Use Image 1 as the authoritative camera, framing, deep tapered floating hex-island geometry and rendering reference. Preserve its six-sided top footprint, broad chunky cliff blocks, deep tapered underside, centered recessed front stairs, lighting direction and square framing. Keep the entire silhouette comfortably inside the canvas with black padding on all four sides. Perfectly flat pure-black #000000 background for BiRefNet Heavy matting; no ground plane, external drop shadow, text, numbers, UI, watermark, characters or eggs.\n\nPremium cozy 3D toy diorama matching the Mossprout reference: very low detail density, very low texture detail, broad cushiony shapes, soft rounded bevels, smooth matte clay-like surfaces, large readable color blocks, soft upper-left daylight and restrained ambient occlusion. No photographic texture, grain, tiny repeated details, speckles, cracks, grass blades, pine needles or surface noise. Every main shape must read at 256 pixels.\n\nGenerate the Hollow Tree: a far-off landmark, a floating hex island entirely swallowed by the Mist with ONE enormous ancient tree rising out of it. Image 2 is only the mist style guide: the whole top face and rim of the island are covered by exactly its dense opaque cushiony cloud masses, creamy pearl highlights, pale powder-blue midtones and muted lavender recesses; no ground, props or objects show. From the centre of the mist rises one huge, tall, leafless ancient tree, much taller than the island is wide: a thick, softly twisted grey trunk with a large dark rounded hollow near its base, and a few big, broad, rounded bare branches reaching up and out like a crown. Its bark is smooth matte cool grey and pale ash with muted lavender shadow, drained of colour, sleeping rather than dead; no leaves, no glow, no face, no eyes. To fit the tall tree, draw the island SMALLER than in Image 1, about half the canvas width, sitting in the lower part of the canvas, and let the tree fill the upper canvas, with the whole tree and its topmost branches comfortably inside the canvas and clear black padding above them. The deep tapered chunky cliff underside stays visible below the mist in quiet muted grey-blue and warm sandstone. Solemn, mysterious and quiet, still a cozy readable toy diorama, never scary. No character, creature, Egg, text or UI.",
+  "assetKey": "shared_world_hollow_tree_hex_tile_v1",
+  "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/shared-world-hollow-tree-hex-tile-v1/1790276557557_grid.png",
+  "sourceSha256": "c531af7a7edd1bac1e4e29d7c325cdf3b7d2fd8122627b911aeb310279f7814d"
+}

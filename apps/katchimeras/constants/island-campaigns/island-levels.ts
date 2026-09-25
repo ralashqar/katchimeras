@@ -58,8 +58,11 @@ export type IslandLevelSpec = {
   mist: readonly EncounterMistCell[];
   /** The Seed Pod: where it stands, how many pieces it holds, and a piece back every few merges. A Lanes level with `seeds` has none. */
   pod?: { cell: number; charges: number; every: number };
-  /** Lanes: a Seed arrives on its own every `every` seconds, on a random empty cell (by the player's luck, a Sprout). */
-  seeds?: { every: number };
+  /**
+   * Lanes: a Seed arrives on its own every `every` seconds, on a random empty cell (by the player's luck, a Sprout).
+   * `area` keeps them to those cells (the first battle's bottom rows).
+   */
+  seeds?: { every: number; area?: readonly number[] };
   /** Lanes: a level that cannot be lost (the first battle); a wisp that would get through is pushed back. */
   forgiving?: boolean;
   /**
@@ -90,6 +93,8 @@ export type IslandLevelSpec = {
    */
   sleepers?: readonly (readonly [number, number])[];
   veiled?: readonly (readonly [number, number])[];
+  /** A friend trapped under thick Mist on this cell: the level is won with every wisp down and that cell cleared. */
+  rescue?: { cell: number };
   /** Board rows: a merge-tactics level plays on five (cells 43-47 under the usual four). */
   rows?: 4 | 5;
   chain?: string;
@@ -149,7 +154,7 @@ export function islandLevel(campaignId: string, key: string, spec: IslandLevelSp
     }
   }
   const bound: EncounterMistCell[] = (spec.bound ?? []).map(([cell, value]) => ({ cell, type: 'bound', holds: { kind: 'item', definitionId: tier(value) } }));
-  const mist = [...spec.mist, ...bound, ...ring];
+  const mist = [...spec.mist, ...bound, ...ring, ...(spec.rescue ? [{ cell: spec.rescue.cell, type: 'dense' as const }] : [])];
   const encounter: EncounterDefinition = {
     id,
     storageKey: `katchimeras.encounter.${campaignId.replace(/:/g, '.')}.${key}.${lanes ? 'lanes4' : tactics ? 'v6' : 'v5'}`,
@@ -166,11 +171,11 @@ export function islandLevel(campaignId: string, key: string, spec: IslandLevelSp
       ...(spec.spring ? [{ id: 'spring', generatorId: 'mist-spring', cell: spec.spring.cell, charges: spec.spring.charges, drops: [`${WATER_CHAIN}:1`], recharge: { kind: 'merges' as const, every: spec.spring.every, amount: 1 }, ...(spec.spring.under ? { hidden: true } : {}) }] : []),
     ],
     mechanic: lanes
-      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const } } : {}), wisps: lanes.map((lane) => ({ id: lane.id, hp: lane.hp, column: lane.column - 1, at: Math.round(lane.at * 1_000), stepMs: Math.round(lane.step * 1_000), ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}), ...(lane.spit ? { spitEvery: Math.round(lane.spit * 1_000) } : {}) })) }
+      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: lanes.map((lane) => ({ id: lane.id, hp: lane.hp, column: lane.column - 1, at: Math.round(lane.at * 1_000), stepMs: Math.round(lane.step * 1_000), ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}), ...(lane.spit ? { spitEvery: Math.round(lane.spit * 1_000) } : {}) })) }
       : { kind: 'dark-wisps', wisps, damageByTier: [1, 1, 2, 3], targeting: 'adjacent', ...(tactics ? { mode: 'tactics' as const } : { rest: spec.rest ?? REST_BY_DIFFICULTY[spec.difficulty] }) },
     required: lanes ? lanes.reduce((sum, lane) => sum + lane.hp, 0) : wisps.filter((wisp) => !wisp.hidden).reduce((sum, wisp) => sum + wisp.hp, 0),
     wisps: [],
-    objective: spec.target ? { kind: 'dark-wisp', wispId: spec.target } : { kind: 'wisps' },
+    objective: spec.rescue ? { kind: 'rescue', cell: spec.rescue.cell } : spec.target ? { kind: 'dark-wisp', wispId: spec.target } : { kind: 'wisps' },
     resolve: null,
     // Lanes are lost when a wisp gets through, never to the Mist's hold: the line is the whole board.
     territory: { overrun: lanes ? 1 : spec.overrun ?? OVERRUN_BY_DIFFICULTY[spec.difficulty] },

@@ -210,7 +210,12 @@ export type MissionMechanicDefinition =
        * Pieces arrive on their own (there is no spawner to tap): every `everyMs`, a `drops[0]` (a Seed) lands on a random
        * empty cell, or, by the player's luck (the Haven's Seed Nursery), a `drops[1]` (a Sprout). A full board waits.
        */
-      seeds?: { everyMs: number; drops: readonly [string, string] };
+      seeds?: {
+        everyMs: number;
+        drops: readonly [string, string];
+        /** The cells a Seed may land on (the first battle keeps them to the bottom rows); every free cell when absent. */
+        area?: readonly number[];
+      };
       /** A level that cannot be lost (the first battle): a wisp that would get through is pushed back over the board. */
       forgiving?: boolean;
     };

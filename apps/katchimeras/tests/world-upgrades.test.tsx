@@ -101,7 +101,8 @@ for (const compiler of ['typescript', 'babel'] as const) test(`mist islands are 
     './shared-resident-presentation': { sharedResidentAnchor },
     '@/constants/mossprout-memory-plants': { mossproutMemoryPlantById: new Map() },
     '@/constants/hatchable-companions/tile-art': { hatchableTileArt: (tileId: string) => ({ full: `${tileId}:full`, medium: `${tileId}:512`, thumb: `${tileId}:256` }) },
-    '@/constants/story-tiles/tile-art': { storyTileArt: (tileId: string) => ({ full: `${tileId}:full`, medium: `${tileId}:512`, thumb: `${tileId}:256` }) },
+    '@/constants/hero-building-art': { heroTileLook: () => null },
+    '@/constants/story-tiles/tile-art': { storyTileArt: (tileId: string) => ({ full: `${tileId}:full`, medium: `${tileId}:512`, thumb: `${tileId}:256` }), storyTileMistedArt: (tileId: string) => ({ full: `${tileId}:misted`, medium: `${tileId}:misted:512`, thumb: `${tileId}:misted:256` }) },
     '@/components/katchadeck/world/kingdom-hex-scene': {
       tileVisibleBounds: (x: number, y: number) => ({ left: x - 200, top: y - 200, right: x + 200, bottom: y + 200 }),
     },
@@ -171,11 +172,16 @@ for (const compiler of ['typescript', 'babel'] as const) test(`mist islands are 
     }
   }
   // No two layers share a hex: a story tile has its own place beside the islands and the friends' tiles.
-  const hexes = baseline.tileArtLayers.filter((layer) => !layer.id.endsWith(':growth')).map((layer) => `${layer.coord.q},${layer.coord.r}`);
+  // The Hollow Tree is a far landmark past the rings (the Last Clearing's frontier), not a ring tile.
+  const landmark = baseline.tileArtLayers.find((layer) => layer.id === 'structure:hollow-tree');
+  assert.ok(landmark, 'the Hollow Tree stands in the world');
+  const ringLayers = baseline.tileArtLayers.filter((layer) => layer !== landmark);
+  const hexes = ringLayers.filter((layer) => !layer.id.endsWith(':growth')).map((layer) => `${layer.coord.q},${layer.coord.r}`);
   assert.equal(new Set(hexes).size, hexes.length, `every layer on its own hex: ${hexes.join(' ')}`);
   const radius = ({ q, r }: { q: number; r: number }) => Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
   const occupied = new Set(hexes);
-  const outerRadius = Math.max(...baseline.tileArtLayers.map(layer => radius(layer.coord)));
+  const outerRadius = Math.max(...ringLayers.map(layer => radius(layer.coord)));
+  assert.ok(radius(landmark!.coord) > outerRadius + 1, 'the Hollow Tree stands well past the outer ring');
   for (let q = -outerRadius; q <= outerRadius; q++) {
     for (let r = -outerRadius; r <= outerRadius; r++) {
       if (radius({ q, r }) < outerRadius) assert.ok(occupied.has(`${q},${r}`), `no gaps inside the outer ring: ${q},${r}`);

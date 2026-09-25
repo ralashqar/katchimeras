@@ -62,7 +62,7 @@ import { worldEventActions, worldEventConversation, type WorldEventAction, type 
 import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
-import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, ensureStoredFirstSpringLight, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , restoreStoredHeartTree, acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat, startStoredEncounter, abandonStoredEncounter, completeStoredEncounter, upgradeStoredKatchimera } from '@/utils/merge-world/repository';
+import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, ensureStoredFirstSpringLight, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , restoreStoredHeartTree, rescueStoredWorldFriend, revealStoredStoryTile, grantStoredStoryGlow, claimStoredChapterReward, completeStoredSupplyOrder, markStoredChapterOpened, upgradeStoredHeroBuilding, acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat, startStoredEncounter, abandonStoredEncounter, completeStoredEncounter, upgradeStoredKatchimera } from '@/utils/merge-world/repository';
 import { katchimeraLevel, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
 import { encounterRunId } from '@/features/encounter/run-id';
 import type { EncounterLoadout } from '@/types/encounter';
@@ -78,7 +78,7 @@ import { hatchableTicketReceiptId } from '@/constants/glow-discovery-ids';
 import { companionHasPage } from '@/features/companion/companion-page-policy';
 import { familyIdFromCompanionId } from '@/constants/katchimera-skins';
 import { HATCHABLE_LESSON_FINALE_NODE_IDS, hatchableDiscoveryScene } from '@/features/onboarding/hatchable-flows';
-import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_MERGE_REQUIRED, OPENING_CAMERA_ENTRY_ZOOM, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
+import { homeSoloForStep, homeVeilForStep, isMossproutOpeningStep, MISSION_CAMERA_ANCHOR_Y, MISSION_CAMERA_ZOOM, OPENING_MERGE_REQUIRED, OPENING_CAMERA_ENTRY_ZOOM, OPENING_CAMERA_ZOOM, OPENING_CAMERA_ANCHOR_Y, OPENING_LIFTED_ACTION_ID, OPENING_MIST_CLEAR_STEP_ID, OPENING_MIST_LIFT_STEP_ID, OPENING_MIST_OPEN_STEP_ID, openingMistBoardStep, openingMistProgress } from '@/features/onboarding/opening-mist';
 import { BoardSessionDim } from '@/components/katchadeck/world/board-session-dim';
 import { KingdomOpeningMergeDock, MissionGlowLayer, OPENING_GLOW_FLIGHT_MS, useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
 import { HatchableMissionDock } from '@/components/katchadeck/world/hatchable-mission-dock';
@@ -98,13 +98,40 @@ import type { MissionStrike } from '@/types/mission-mechanic';
 import { MissionWisps, type CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
 import { LastClearingColdOpen } from '@/components/katchadeck/world/last-clearing-cold-open';
 import { LastClearingGuardian } from '@/components/katchadeck/world/last-clearing-guardian';
-import { FIRST_BATTLE_ID, GUARDIAN_STEP_ID, HEART_TREE_ACTION_ID, HEART_TREE_STEP_ID, SANCTUARY_ACTION_ID, SANCTUARY_LINE, SANCTUARY_STEP_ID, SANCTUARY_TITLE } from '@/features/onboarding/last-clearing';
+import { FIRST_BATTLE_ID, FRONTIER_ACTION_ID, FRONTIER_LINES, FRONTIER_STEP_ID, FRONTIER_TITLE, GUARDIAN_STEP_ID, HEART_TREE_ACTION_ID, HEART_TREE_STEP_ID, LOST_TRACKS_ACTION_ID, LOST_TRACKS_STEP_ID, LOST_TRAIL_MISSION_ACTION_ID, LOST_TRAIL_MISSION_EYEBROW, LOST_TRAIL_MISSION_LINE, LOST_TRAIL_MISSION_STEP_ID, LOST_TRAIL_MISSION_TITLE, LOST_TRAIL_TILE_ID, SANCTUARY_ACTION_ID, SANCTUARY_LINE, SANCTUARY_STEP_ID, SANCTUARY_TITLE, LOST_TRAIL_STONE_STEP_IDS, LOST_TRAIL_STONE_BATTLE_IDS, LOST_TRAIL_STONES, LOST_TRAIL_EYEBROW, LOST_TRAIL_STONE_GLOW, STEPPLING_RESCUED_STEP_ID, STEPPLING_RESCUED_ACTION_ID, STEPPLING_MEETS_STEP_ID, STEPPLING_MEETS_ACTION_ID, STEPPLING_JOINED_STEP_ID, STEPPLING_JOINED_ACTION_ID, STEPPLING_JOINED_EYEBROW, STEPPLING_JOINED_TITLE, HOME_STEP_ID, HOME_ACTION_ID, HOME_TITLE, HOME_LINES } from '@/features/onboarding/last-clearing';
+import { LastClearingTracks, LostTrailTapTarget } from '@/components/katchadeck/world/last-clearing-tracks';
+import { BattleRewardCard, type BattleReward } from '@/components/katchadeck/world/battle-reward-card';
+import { ChapterGoalCard } from '@/components/katchadeck/world/chapter-goal-card';
+import { sanctuaryChapterState } from '@/constants/sanctuary-chapters';
+import { HeroBuildingPanel } from '@/components/katchadeck/world/hero-building-panel';
+import { HeroRosterSheet } from '@/components/katchadeck/world/hero-roster-sheet';
+import { heroBuildingById, heroBuildingLevel, heroBuildingLook, lodgeCrateGlowBonus, lodgeTimberBonus, type HeroBuildingId } from '@/constants/hero-buildings';
+import { LIFE_INPUT_ENABLED } from '@/constants/product-scope';
+import { SignalFlare } from '@/components/katchadeck/world/signal-flare';
+import { ConversationNarrativeOverlay } from '@/components/katchadeck/world/conversation-narrative-overlay';
+import { SupplyRunDock, type SupplyRunOrder } from '@/components/katchadeck/world/supply-run-dock';
+import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from '@/components/katchadeck/games/merge-serve-reward-overlay';
+import { mergeOrderServingCells } from '@/utils/merge-world/engine';
+import { createSupplyRunBoard, SUPPLY_CRATE, supplyOrder, supplyRunSlots } from '@/features/supply-run/supply-run';
 import { LastClearingHeartTree } from '@/components/katchadeck/world/last-clearing-heart-tree';
 import { LastClearingTitleCard } from '@/components/katchadeck/world/last-clearing-title-card';
-import { FIRST_BATTLE, firstBattleGuide, firstBattleLine } from '@/constants/last-clearing-battle';
+import { FIRST_BATTLE, firstBattleLine, LOST_TRAIL_BATTLES, LOST_TRAIL_RESCUE_CELL, lostTrailLine, scriptedBattleGuide } from '@/constants/last-clearing-battle';
+import { LastClearingStepplingMeets, TrappedFriendSilhouette } from '@/components/katchadeck/world/last-clearing-rescue';
+import { LOST_TRAIL } from '@/constants/story-tiles/lost-trail';
+import { mergeCellCenter, mergeCellOrigin } from '@/utils/merge-world/board-geometry';
 
 /** A first-battle hint shows once the board has asked for the same thing this long. */
 const FIRST_BATTLE_HINT_DELAY_MS = 1_200;
+/** A wake on the first battle's chain is shown this soon after the board settles: the finger leads the whole chain. */
+const FIRST_BATTLE_WAKE_HINT_DELAY_MS = 450;
+/** The frontier's pull-out goes past the usual limit, until the clearing is a speck in the Mist. */
+const FRONTIER_MINIMUM_SCALE = 0.16;
+/** The currency bar's width: its left padding, then each pill at full width with the gap between them. */
+const currencyHudWidth = (count: number) => 18 + count * 88 + Math.max(0, count - 1) * 20;
+/** How long a chapter's signal flares over its island before the friends react. */
+const CHAPTER_SIGNAL_FLARE_MS = 2_600;
+/** How long Steppling is seen home on his tile before his card reveal. */
+const STEPPLING_ARRIVAL_HOLD_MS = 1_600;
 
 /** The first battle is Mossprout's: level one, no helper Wisp. */
 const FIRST_BATTLE_LOADOUT = { companionId: 'mossprout' as const, level: 1 };
@@ -124,7 +151,7 @@ import { worldUpgradeStory, upgradeUsesTutorialNarrative } from '@/features/worl
 import { useGlowEggHandoff } from '@/features/onboarding/use-glow-egg-handoff';
 import { CompanionJournalButton } from '@/components/katchadeck/world/companion-life-actions';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View, useWindowDimensions, type ImageSourcePropType, type View as ViewType } from 'react-native';
+import { ActivityIndicator, BackHandler, Pressable, StyleSheet, Text, View, useWindowDimensions, type ImageSourcePropType, type View as ViewType } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { useIsFocused } from '@react-navigation/native';
@@ -406,7 +433,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const rushSpec = useMemo(() => rushRun ? heatFor(rushRun.dayId, rushRun.index) : null, [rushRun]);
   const rushTileNode = islandTileNodes[WISP_RUSH_HOST.islandId] ?? null;
   // Glow flies into whichever misted tile the live board sits under.
-  const openingGlow = useOpeningGlow(rushSpec ? rushTileNode : stepplingMissionActive ? gatewayTileNode : journeyMissionActive ? journeyTileNode : islandEncounter ? islandEncounterTileNode : islandRestoration ? restorationTileNode : homeTileNode);
+  const trailGlowTarget = (LOST_TRAIL_STONE_STEP_IDS as readonly string[]).includes(routeFtueStepId ?? '') ? storyTileNodes[LOST_TRAIL_TILE_ID] ?? null : null;
+  const openingGlow = useOpeningGlow(trailGlowTarget ? trailGlowTarget : rushSpec ? rushTileNode : stepplingMissionActive ? gatewayTileNode : journeyMissionActive ? journeyTileNode : islandEncounter ? islandEncounterTileNode : islandRestoration ? restorationTileNode : homeTileNode);
   // A board's finale is its last item striking the last wisp. Nothing moves on until that landing,
   // and then only once the wisp has fallen: the mission is over when the player has seen it end.
   const restorationFinaleIdRef = useRef<number | null>(null);
@@ -732,7 +760,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [ftueStepId, screenFocused, upgradePresentation, ftueCameraSettled, growthPresentationKey]);
   const holdFirstSeedGraphic = ftueStepId === 'world.first_bloom_restore'
     || (ftueStepId === 'world.first_seed_grew' && releasedSeedGrowth !== growthPresentationKey);
+  const lodgeLook = heroBuildingLook(heroBuildingLevel(mergeWorld, 'explorers-lodge'));
   const mossproutGardenScene = useMemo(() => ({
+    heroTileLooks: { [heroBuildingById.get('explorers-lodge')!.tileId]: lodgeLook },
     heartwoodStage: treeStage,
     gateway: stepplingEncounter.open ? 'egg' as const : gatewayState,
     hatchableTiles,
@@ -741,6 +771,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     plantableMemories: mergeWorld.haven.plantableMemories,
     featureLevels: mergeWorld.haven.structures.mossproutGarden.featureLevels,
   }), [
+    lodgeLook,
     treeStage,
     gatewayState,
     hatchableTiles,
@@ -836,6 +867,22 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }, 1000);
     return () => clearTimeout(timer);
   }, [heartwoodIntroActive, ftueCameraSettled, screenFocused, worldSubjectPresentation?.onIntroFramingReady]);
+  // The Supply Run docks under the Lost Trail, framed the way the trail's battles were.
+  const [supplyRunOpen, setSupplyRunOpen] = useState(false);
+  // A chapter's opening scene (The Signal) frames the island the signal comes from.
+  const [chapterOpeningIsland, setChapterOpeningIsland] = useState<MossproutNatureIslandId | null>(null);
+  const chapterOpeningCamera = useMemo((): FtueCameraDirective | null => chapterOpeningIsland
+    ? { kind: 'focus_target', target: { kind: 'haven_nature_island', islandId: chapterOpeningIsland }, zoom: 1.05, anchorY: 0.5, durationMs: 1_800 }
+    : null, [chapterOpeningIsland]);
+  const supplyRunCamera = useMemo((): FtueCameraDirective | null => supplyRunOpen
+    ? { kind: 'focus_target', target: { kind: 'haven_structure', structureId: LOST_TRAIL_TILE_ID }, zoom: OPENING_CAMERA_ZOOM, anchorY: OPENING_CAMERA_ANCHOR_Y, durationMs: 700 }
+    : null, [supplyRunOpen]);
+  // A friend's own building (the Explorer's Lodge): their tile framed over the docked panel, like a hero's.
+  const [heroBuildingPanelId, setHeroBuildingPanelId] = useState<HeroBuildingId | null>(null);
+  const [heroRosterOpen, setHeroRosterOpen] = useState(false);
+  const heroBuildingCamera = useMemo((): FtueCameraDirective | null => heroBuildingPanelId
+    ? { kind: 'focus_target', target: { kind: 'haven_structure', structureId: heroBuildingById.get(heroBuildingPanelId)!.tileId }, zoom: 1.5, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.15) / Math.max(1, window.height), durationMs: 520 }
+    : null, [heroBuildingPanelId, upgradeStage, window.height]);
   const katchimeraCamera = useMemo((): FtueCameraDirective | null => katchimeraPanelId
     ? { kind: 'focus_target', target: { kind: 'haven_tile', characterId: katchimeraPanelId }, zoom: 1.5, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.15) / Math.max(1, window.height), durationMs: 520 }
     : null, [katchimeraPanelId, upgradeStage, window.height]);
@@ -846,7 +893,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.7, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.2) / Math.max(1, window.height), durationMs: 520 }
     : wispLanternOpen ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: 'front-right' }, zoom: 1.15, anchorY: 0.42, durationMs: 850 } : null, [buildingPanelId, lanternUpgradeOpen, upgradeStage, window.height, wispLanternOpen]);
   // A level on a tile (or its open track) frames that tile, whatever story would otherwise resume its camera.
-  const baseTutorialCamera = katchimeraCamera ?? lanternCamera ?? rushCamera ?? heartwoodIntroCamera ?? eventCamera ?? (islandEncounter || trackOpen ? islandEncounterCamera : null) ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : islandEncounterCamera ?? restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
+  const baseTutorialCamera = katchimeraCamera ?? heroBuildingCamera ?? supplyRunCamera ?? chapterOpeningCamera ?? lanternCamera ?? rushCamera ?? heartwoodIntroCamera ?? eventCamera ?? (islandEncounter || trackOpen ? islandEncounterCamera : null) ?? (mistResumeCamera ? screenFocused ? mistResumeCamera : null : islandEncounterCamera ?? restorationCamera ?? (openingLiftCameraHeld ? OPENING_CLEAR_CAMERA : ftueStep?.camera ?? null));
   const tutorialCamera = useMemo(() => {
     if (!ftueStepId?.startsWith('egg.') || baseTutorialCamera?.kind !== 'focus_target') return baseTutorialCamera;
     return { ...baseTutorialCamera, zoom: sharedEggZoom(worldSubjectPresentation?.wispsCleared
@@ -917,6 +964,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     else ftueTargetRefs.current.delete(key);
     setFtueTargetRevision((revision) => revision + 1);
   }, []);
+  // The Lost Trail's tile is an FTUE target (`shared-world:lost-trail`): the tracks beat's finger and spotlight find it.
+  const lostTrailNode = storyTileNodes[LOST_TRAIL_TILE_ID] ?? null;
+  useEffect(() => { registerFtueTarget(`shared-world:${LOST_TRAIL_TILE_ID}`, lostTrailNode); }, [lostTrailNode, registerFtueTarget]);
   const setRestoreButtonNode = useCallback((node: View | null) => {
     restoreButtonRef.current = node;
     registerFtueTarget('upgrade:mossprout', node);
@@ -950,39 +1000,85 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // The spotlight and finger wait for the dock to finish fading in, or they point at a board still in motion.
   const [openingDockSettled, setOpeningDockSettled] = useState(false);
   const firstBattleStepActive = ftueStepId === OPENING_MIST_CLEAR_STEP_ID && screenFocused;
+  // A won battle's card (`BattleRewardCard`): its reward is written first, the card shows it, and Continue hands the
+  // story on (or, off the story, leaves the track to come back under it). The Glow counts into the counter as it goes.
+  const [battleReward, setBattleReward] = useState<(BattleReward & { before: number; finish: () => void }) | null>(null);
+  const battleOutcomeRef = useRef<{ grade?: string } | null>(null);
+  const gradeStars = (grade: string | undefined) => grade === 'perfect' ? 3 : grade === 'bright' ? 2 : 1;
   const completeFirstBattle = useCallback(async () => {
-    clearMission(FIRST_BATTLE.storageKey);
-    dispatchFtueEvent({ type: 'battle_won', battleId: FIRST_BATTLE_ID, revision: 1 }, FIRST_BATTLE_ID);
-  }, []);
+    // The first battle's light is the opening Glow (the same receipt the story's effect keeps): the Heart Tree's price.
+    const before = mergeWorldRef.current.coins;
+    const lit = await ensureStoredOpeningGlow(`${activeFtueRunId ?? 'current'}:opening-glow`).catch(() => null);
+    setBattleReward({ key: FIRST_BATTLE_ID, title: 'They found us', stars: gradeStars(battleOutcomeRef.current?.grade), glow: lit?.granted ? lit.amount : GLOW.firstRestorationCost, before,
+      finish: () => {
+        clearMission(FIRST_BATTLE.storageKey);
+        dispatchFtueEvent({ type: 'battle_won', battleId: FIRST_BATTLE_ID, revision: 1 }, FIRST_BATTLE_ID);
+      } });
+  }, [activeFtueRunId]);
   const firstBattle = useMistMission({ guided: false, active: firstBattleStepActive, mission: null, encounter: FIRST_BATTLE, owner: 'mossprout', loadout: FIRST_BATTLE_LOADOUT, world: mergeWorld, tileNode: homeTileNode,
     boardMetrics: openingDockSettled ? openingBoardMetrics : null, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: completeFirstBattle, speechFor: firstBattleLine });
-  const openingBoardActive = firstBattleStepActive && Boolean(firstBattle.store.state);
+  // The Lost Trail's three battles (step 5), docked under the trail's tile the same way; each opens with its own card.
+  const trailStoneIndex = (LOST_TRAIL_STONE_STEP_IDS as readonly string[]).indexOf(ftueStepId ?? '');
+  const [trailIntroSeen, setTrailIntroSeen] = useState<string | null>(null);
+  const trailStoneActive = (index: number) => trailStoneIndex === index && screenFocused && trailIntroSeen === LOST_TRAIL_STONE_STEP_IDS[index];
+  const trailComplete = useMemo(() => LOST_TRAIL_BATTLES.map((encounter, index) => async () => {
+    const battleId = LOST_TRAIL_STONE_BATTLE_IDS[index]!;
+    const glow = LOST_TRAIL_STONE_GLOW[index]!;
+    const before = mergeWorldRef.current.coins;
+    // Paid once per run, whatever happens to the card: a relaunch replays the battle, never the payment.
+    await grantStoredStoryGlow(`${battleId}:${activeFtueRunId ?? 'current'}`, glow).catch(() => undefined);
+    setBattleReward({ key: battleId, title: LOST_TRAIL_STONES[index]!.title, stars: gradeStars(battleOutcomeRef.current?.grade), glow, before,
+      finish: () => {
+        clearMission(encounter.storageKey);
+        dispatchFtueEvent({ type: 'battle_won', battleId, revision: 1 }, battleId);
+      } });
+  }), [activeFtueRunId]);
+  const trailSpeech = useMemo(() => LOST_TRAIL_BATTLES.map((_, index) => (input: Parameters<typeof lostTrailLine>[1]) => lostTrailLine(index, input)), []);
+  const trailBoardMetrics = openingDockSettled ? openingBoardMetrics : null;
+  const trail1 = useMistMission({ guided: false, active: trailStoneActive(0), mission: null, encounter: LOST_TRAIL_BATTLES[0]!, owner: 'mossprout', loadout: FIRST_BATTLE_LOADOUT, world: mergeWorld, tileNode: lostTrailNode,
+    boardMetrics: trailBoardMetrics, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: trailComplete[0]!, speechFor: trailSpeech[0] });
+  const trail2 = useMistMission({ guided: false, active: trailStoneActive(1), mission: null, encounter: LOST_TRAIL_BATTLES[1]!, owner: 'mossprout', loadout: FIRST_BATTLE_LOADOUT, world: mergeWorld, tileNode: lostTrailNode,
+    boardMetrics: trailBoardMetrics, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: trailComplete[1]!, speechFor: trailSpeech[1] });
+  const trail3 = useMistMission({ guided: false, active: trailStoneActive(2), mission: null, encounter: LOST_TRAIL_BATTLES[2]!, owner: 'mossprout', loadout: FIRST_BATTLE_LOADOUT, world: mergeWorld, tileNode: lostTrailNode,
+    boardMetrics: trailBoardMetrics, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: trailComplete[2]!, speechFor: trailSpeech[2] });
+  // One scripted battle is docked at a time: the first battle, or the Lost Trail stone under way.
+  const trailBattle = trailStoneIndex >= 0 && trailStoneActive(trailStoneIndex) ? [trail1, trail2, trail3][trailStoneIndex]! : null;
+  const battle = firstBattleStepActive ? firstBattle : trailBattle;
+  const battleEncounter = firstBattleStepActive ? FIRST_BATTLE : trailBattle ? LOST_TRAIL_BATTLES[trailStoneIndex]! : null;
+  const openingBoardActive = Boolean(battle?.store.state);
+  battleOutcomeRef.current = battle?.encounter?.outcome ?? null;
   const openingProgress = openingMistProgress(openingRun);
   const openingStep = ftueStepId ? mossproutFtueStep(ftueStepId) ?? null : null;
   // The same beat the dock projects: spotlight and finger on the first pairs, the Basket refill, or nothing.
   // The hand on the first two Seeds, until the first merge; then the board is the player's.
-  // The first battle's finger: the first merge at once; after it, whatever the board most needs (a piece moved out of
-  // an empty lane under an uncovered wisp, else a pair to merge), once that same hint has stood a moment unanswered.
-  const firstBattleHint = useMemo(() => openingBoardActive && firstBattle.store.merges > 0 && firstBattle.store.state && firstBattle.store.mechanicState
-    ? firstBattleGuide(firstBattle.store.state, firstBattle.store.mechanicState) : null, [firstBattle.store.mechanicState, firstBattle.store.merges, firstBattle.store.state, openingBoardActive]);
+  // The first battle's finger (`firstBattleGuide`): every wake of the chain under the Mist, then whatever the board most
+  // needs (a piece moved out of an empty lane under an uncovered wisp, else a pair to merge). The very first wake shows
+  // at once, spotlit; each later wake a beat after the board settles; moves and merges once they have stood unanswered.
+  const firstBattleHint = useMemo(() => openingBoardActive && battleEncounter && battle?.store.state && battle.store.mechanicState
+    ? scriptedBattleGuide(battleEncounter, battle.store.state, battle.store.mechanicState) : null, [battle?.store.mechanicState, battle?.store.state, battleEncounter, openingBoardActive]);
   const firstBattleHintKey = firstBattleHint ? `${firstBattleHint.kind}:${firstBattleHint.from}:${firstBattleHint.to}` : null;
+  const battleMerges = battle?.store.merges ?? 0;
+  const firstBattleHintDelay = firstBattleStepActive && battleMerges === 0 ? 0 : firstBattleHint?.kind === 'wake' || battleMerges === 0 ? FIRST_BATTLE_WAKE_HINT_DELAY_MS : FIRST_BATTLE_HINT_DELAY_MS;
   const [shownBattleHint, setShownBattleHint] = useState<{ key: string; revision: number } | null>(null);
   useEffect(() => {
     setShownBattleHint(null);
     if (!firstBattleHintKey) return;
-    const timer = setTimeout(() => setShownBattleHint((current) => ({ key: firstBattleHintKey, revision: (current?.revision ?? 0) + 1 })), FIRST_BATTLE_HINT_DELAY_MS);
+    const timer = setTimeout(() => setShownBattleHint((current) => ({ key: firstBattleHintKey, revision: (current?.revision ?? 0) + 1 })), firstBattleHintDelay);
     return () => clearTimeout(timer);
+  // The delay belongs to the hint it was chosen with.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstBattleHintKey]);
   const openingBoardStep = useMemo((): FtueStepDefinition | null => {
     if (!openingBoardActive || !openingStep) return null;
-    if (firstBattle.store.merges === 0) return openingMistBoardStep(openingStep, firstBattle.store.state, 0);
     if (!firstBattleHint || shownBattleHint?.key !== firstBattleHintKey) return null;
     const from: FtueTarget = { kind: 'board_cell', cell: firstBattleHint.from };
     const to: FtueTarget = { kind: 'board_cell', cell: firstBattleHint.to };
-    // Mossprout's line over the board already says why; the finger only shows how.
-    return { ...openingStep, id: `${openingStep.id}.hint-${firstBattleHintKey}`, surface: 'merge', interaction: { mode: 'none' }, cue: { kind: 'drag', from, to }, spotlight: undefined, guide: { eyebrow: '', title: '', body: '' } };
-  }, [firstBattle.store.merges, firstBattle.store.state, firstBattleHint, firstBattleHintKey, openingBoardActive, openingStep, shownBattleHint?.key]);
-  const openingBoardRevision = firstBattle.store.merges * 1_000 + (shownBattleHint?.revision ?? 0);
+    const first = firstBattleStepActive && battleMerges === 0;
+    // Mossprout's line over the board already says why; the finger only shows how. The first is spotlit.
+    return { ...openingStep, id: `${openingStep.id}.hint-${firstBattleHintKey}`, surface: 'merge', interaction: { mode: 'none' }, cue: { kind: 'drag', from, to },
+      spotlight: first ? { targets: [from, to], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.64 } : undefined, guide: { eyebrow: '', title: '', body: '' } };
+  }, [battleMerges, firstBattleHint, firstBattleHintKey, firstBattleStepActive, openingBoardActive, openingStep, shownBattleHint?.key]);
+  const openingBoardRevision = battleMerges * 1_000 + (shownBattleHint?.revision ?? 0);
   const openingGuidanceVisible = Boolean(openingBoardStep && (openingBoardStep.cue || openingBoardStep.spotlight));
   useEffect(() => { if (!openingBoardActive && !stepplingMissionActive && !journeyMissionActive && !islandRestoration) setOpeningDockSettled(false); }, [islandRestoration, journeyMissionActive, openingBoardActive, stepplingMissionActive]);
   const markOpeningDockSettled = useCallback(() => setOpeningDockSettled(true), []);
@@ -1300,6 +1396,17 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // The canvas may report completion more than once; a single story owns the ack.
     if (revealedUpgradeRef.current === presentation.nonce) return;
     revealedUpgradeRef.current = presentation.nonce;
+    if (presentation.tileLook) {
+      setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
+      setUpgrading(false);
+      return;
+    }
+    if (presentation.ftueReveal) {
+      setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
+      setUpgrading(false);
+      ftueRevealFinished.current?.(presentation.ftueReveal);
+      return;
+    }
     if (presentation.heartTree) {
       // The Heart Tree is awake (written before the reveal): the story moves on to the Sanctuary's title card.
       setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
@@ -1451,6 +1558,81 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const foundSanctuary = useCallback(() => {
     commitFtueAction({ actionId: SANCTUARY_ACTION_ID, evidenceRef: 'mossprout-world:sanctuary-founded' });
   }, []);
+  // Step 4: the frontier pull-out, the tracks (Mossprout's lines, then the trail tapped) and the mission card.
+  const seeFrontier = useCallback(() => {
+    commitFtueAction({ actionId: FRONTIER_ACTION_ID, evidenceRef: 'mossprout-world:frontier-seen' });
+  }, []);
+  const [tracksLooked, setTracksLooked] = useState(false);
+  useEffect(() => { if (ftueStepId !== LOST_TRACKS_STEP_ID) setTracksLooked(false); }, [ftueStepId]);
+  const followTracks = useCallback(() => {
+    commitFtueAction({ actionId: LOST_TRACKS_ACTION_ID, evidenceRef: `shared-world:${LOST_TRAIL_TILE_ID}` });
+  }, []);
+  const acceptLostTrail = useCallback(() => {
+    commitFtueAction({ actionId: LOST_TRAIL_MISSION_ACTION_ID, evidenceRef: 'mossprout-world:lost-trail-mission' });
+  }, []);
+  // Step 5's payoff (`docs/cozy-4x-ftue-the-last-clearing.md`, beats 14 and 15). Each reveal is played locally while its
+  // write lands (the Lost Trail clearing, then Steppling's tile opening with him home), and a relaunch after a write
+  // simply moves on; the story's own effect after them guarantees both.
+  const [stepplingPhase, setStepplingPhase] = useState<'reveal' | 'arrived' | 'card' | 'talk'>('reveal');
+  // Steppling is seen home on his tile for a beat before his card: the card never covers his arrival.
+  useEffect(() => {
+    if (stepplingPhase !== 'arrived') return;
+    const timer = setTimeout(() => setStepplingPhase('card'), STEPPLING_ARRIVAL_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [stepplingPhase]);
+  const ftueRevealStartedRef = useRef<string | null>(null);
+  const playFtueReveal = useCallback(async (reveal: 'lost-trail' | 'steppling-home', write: () => Promise<unknown>, onDone: () => void) => {
+    const key = `${activeFtueRunId ?? 'current'}:${reveal}`;
+    if (ftueRevealStartedRef.current === key) return;
+    ftueRevealStartedRef.current = key;
+    if (reduceMotion) { await write().catch(() => undefined); onDone(); return; }
+    revealedUpgradeRef.current = null;
+    setUpgrading(true);
+    const steppling = reveal === 'steppling-home';
+    setUpgradePresentation({
+      cameraAlreadyFocused: true, characterId: steppling ? 'steppling' : 'mossprout', coinCost: 0, coinOrigin: { x: 0, y: 0 },
+      creatureId: steppling ? 'companion:steppling' : 'companion:mossprout', creatureName: steppling ? 'Steppling' : 'Mossprout', fromStage: 0, toStage: 1,
+      nonce: ++upgradeNonceRef.current,
+      palette: { accent: '#DDF6FF', glow: '#A9E4FF', mist: 'rgba(214,229,238,0.92)', primary: '#7FBFD9' },
+      reactionLine: '', showCoins: false, status: 'playing', upgradeName: steppling ? 'home' : 'Lost Trail',
+      visualTarget: { kind: 'haven_structure', structureId: steppling ? 'steppling-home' : LOST_TRAIL_TILE_ID },
+      ftueReveal: reveal, ...(steppling ? { noEgg: true } : {}),
+    });
+    await write().catch((error) => console.warn('The rescue could not be written', error));
+  }, [activeFtueRunId, reduceMotion]);
+  const stepplingHome = mergeWorld.companionDiscovery.records.some((record) => record.characterId === 'steppling');
+  const lostTrailRevealed = Boolean(mergeWorld.worldUnlocks?.[LOST_TRAIL.unlockId]);
+  useEffect(() => {
+    if (ftueStepId !== STEPPLING_RESCUED_STEP_ID || !screenFocused || !ftueCameraSettled) return;
+    const freed = () => commitFtueAction({ actionId: STEPPLING_RESCUED_ACTION_ID, evidenceRef: `shared-world:${LOST_TRAIL_TILE_ID}` });
+    if (lostTrailRevealed && !upgradePresentation && ftueRevealStartedRef.current !== `${activeFtueRunId ?? 'current'}:lost-trail`) { freed(); return; }
+    void playFtueReveal('lost-trail', () => revealStoredStoryTile(LOST_TRAIL.unlockId), freed);
+  // A reveal already on screen is left to finish.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ftueStepId, ftueCameraSettled, screenFocused]);
+  useEffect(() => {
+    if (ftueStepId !== STEPPLING_MEETS_STEP_ID) { setStepplingPhase('reveal'); return; }
+    if (!screenFocused || !ftueCameraSettled || stepplingPhase !== 'reveal') return;
+    if (stepplingHome && !upgradePresentation && ftueRevealStartedRef.current !== `${activeFtueRunId ?? 'current'}:steppling-home`) { setStepplingPhase('card'); return; }
+    void playFtueReveal('steppling-home', () => rescueStoredWorldFriend(STEPPLING_HATCHABLE.tile.unlockId), () => setStepplingPhase('arrived'));
+  // A reveal already on screen is left to finish.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ftueStepId, ftueCameraSettled, screenFocused]);
+  const ftueRevealFinished = useRef<((reveal: 'lost-trail' | 'steppling-home') => void) | null>(null);
+  ftueRevealFinished.current = (reveal) => {
+    if (reveal === 'lost-trail') commitFtueAction({ actionId: STEPPLING_RESCUED_ACTION_ID, evidenceRef: `shared-world:${LOST_TRAIL_TILE_ID}` });
+    else setStepplingPhase('arrived');
+  };
+  const welcomeSteppling = useCallback(() => {
+    commitFtueAction({ actionId: STEPPLING_MEETS_ACTION_ID, evidenceRef: 'shared-world:steppling-home' });
+  }, []);
+  const stepplingJoined = useCallback(() => {
+    commitFtueAction({ actionId: STEPPLING_JOINED_ACTION_ID, evidenceRef: 'mossprout-world:steppling-joined' });
+  }, []);
+  const comeHome = useCallback(() => {
+    commitFtueAction({ actionId: HOME_ACTION_ID, evidenceRef: 'mossprout-world:home' });
+  }, []);
+  const { cards: stepplingCards } = useKatchimeraCards('steppling');
 
   // Upgrading a building is a small version of upgrading a tile: the Glow leaves the top bar as coins, each one rocks
   // the building as it lands and the counter counts down with them; on the last landing the upgrade is written and
@@ -2072,6 +2254,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     recordEncounterBond(result);
     const cleared = result.encounterCleared;
     if (cleared?.bossPack) grantTrackPack({ ...cleared.bossPack, kind: 'bright' });
+    if (cleared) setBattleReward({ key: `encounter:${runId}`, title: found.mission.title, stars: gradeStars(cleared.grade), glow: cleared.glow, xp: cleared.xp || undefined,
+      before: Math.max(0, result.state.coins - cleared.glow), finish: () => undefined });
     setIslandEncounter(null);
     // A friend's first level lifts their island's Mist, and the discovery that always followed it plays.
     if (focus.campaignId && isMistLevel(focus.mission.id) && cleared?.firstClear) { setIslandLiftHold(true); void liftIslandMist(focus.campaignId); return; }
@@ -2216,9 +2400,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const rushWispTarget = useMemo((): CorruptionWispTarget | null => activeRush && rushHost && screenFocused
     ? { ...missionWispTarget({ key: activeRush.runKey, host: rushHost, mechanicState: createMechanicState(resolveMechanic(rushHost)), node: activeRush.node, boardMetrics: openingBoardMetrics, settled: ftueCameraSettled }), live: rushLive }
     : null, [activeRush, ftueCameraSettled, openingBoardMetrics, rushHost, rushLive, screenFocused]);
-  const wispTarget = useMemo((): CorruptionWispTarget | null => rushWispTarget ?? firstBattle.wispTarget ?? hatchableMist.wispTarget ?? journeyMist.wispTarget ?? islandMist.wispTarget ?? (restorationBoardVisible && restorationBinding && restorationBoardRunId && restorationStore.mechanicState
+  const wispTarget = useMemo((): CorruptionWispTarget | null => rushWispTarget ?? firstBattle.wispTarget ?? trail1.wispTarget ?? trail2.wispTarget ?? trail3.wispTarget ?? hatchableMist.wispTarget ?? journeyMist.wispTarget ?? islandMist.wispTarget ?? (restorationBoardVisible && restorationBinding && restorationBoardRunId && restorationStore.mechanicState
       ? missionWispTarget({ key: restorationBoardRunId, host: restorationBinding.host, mechanicState: restorationStore.mechanicState, node: restorationTileNode, boardMetrics: openingBoardMetrics, window: restorationBinding.window, lines: restorationWispLines, settled: ftueCameraSettled })
-      : null), [rushWispTarget, ftueCameraSettled, firstBattle.wispTarget, hatchableMist.wispTarget, islandMist.wispTarget, journeyMist.wispTarget, openingBoardMetrics, restorationBinding, restorationBoardRunId, restorationBoardVisible, restorationStore.mechanicState, restorationTileNode, restorationWispLines]);
+      : null), [rushWispTarget, ftueCameraSettled, firstBattle.wispTarget, trail1.wispTarget, trail2.wispTarget, trail3.wispTarget, hatchableMist.wispTarget, islandMist.wispTarget, journeyMist.wispTarget, openingBoardMetrics, restorationBinding, restorationBoardRunId, restorationBoardVisible, restorationStore.mechanicState, restorationTileNode, restorationWispLines]);
   useEffect(() => {
     // Back puts the board away; it never leaves the Kingdom from here.
     if (!restorationBoardVisible) return;
@@ -2753,7 +2937,173 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // Alone until the hatch: no markers at all until the islands are drawn. And none while any mini board is
   // docked (the opening's, Steppling's, a friend's): the board is the only thing to do until it is put away.
   // A level docked under a tile (a friend's island, the Grove, the Daily Mist) holds the world like every other board: no markers, no taps on tiles.
-  const missionBoardDocked = eventBoardActive || openingBoardActive || stepplingMissionActive || journeyMissionActive || restorationBoardVisible || Boolean(rushSpec) || islandEncounterActive;
+  // The Supply Run (`features/supply-run/supply-run.ts`): the calm board under the Lost Trail, kept between visits.
+  const supplyRunStore = useMissionBoard('katchimeras.supply-run.v1', supplyRunOpen ? 'supply-run' : null, createSupplyRunBoard);
+  const supplyRunDocked = supplyRunOpen && screenFocused && Boolean(supplyRunStore.state);
+  const supplyRunOrders = useMemo((): SupplyRunOrder[] => supplyRunSlots(mergeWorld).map((index, slot) => ({ slot: slot as 0 | 1, index, order: supplyOrder(slot as 0 | 1, index) })), [mergeWorld]);
+  const [supplyCrateFull, setSupplyCrateFull] = useState(false);
+  // Serving is the Merge page's own serve (`MergeServeRewardOverlay`): each piece the order takes flies from its cell to
+  // its own slot on the card, then the order's Glow flies from the card to the counter, and only then is the order served
+  // and paid. A flight that cannot be measured serves at once instead, so Serve always works.
+  const [supplyServeFlight, setSupplyServeFlight] = useState<MergeServeRewardFlight | null>(null);
+  const [supplyHiddenItemIds, setSupplyHiddenItemIds] = useState<ReadonlySet<string>>(() => new Set());
+  const supplyServingRef = useRef<SupplyRunOrder | null>(null);
+  const supplyServeNonceRef = useRef(0);
+  const measureInScreen = useCallback((node: View | null) => new Promise<{ x: number; y: number; width: number; height: number } | null>((resolve) => {
+    if (!node) { resolve(null); return; }
+    node.measureInWindow((x, y, width, height) => resolve(width > 0 && height > 0 ? { x, y, width, height } : null));
+  }), []);
+  const commitSupplyOrder = useCallback(async (entry: SupplyRunOrder) => {
+    const served = supplyRunStore.send({ type: 'serveBoardOrder', order: entry.order, now: Date.now() });
+    if (!served?.changed) return false;
+    const before = mergeWorldRef.current.coins;
+    const servedBefore = mergeWorldRef.current.supplyRun?.served ?? 0;
+    // The Explorer's Lodge pays extra Timber on every order and extra Glow in every crate.
+    const lodge = heroBuildingLevel(mergeWorldRef.current, 'explorers-lodge');
+    const timber = entry.order.timber + lodgeTimberBonus(lodge);
+    const crate = { ...SUPPLY_CRATE, glow: SUPPLY_CRATE.glow + lodgeCrateGlowBonus(lodge) };
+    const paid = await completeStoredSupplyOrder(entry.slot, entry.index, timber, entry.order.reward.coins, crate).catch((error) => { console.warn('The order could not be paid', error); return null; });
+    const servedAfter = paid?.state.supplyRun?.served ?? servedBefore;
+    if (servedAfter > servedBefore && servedAfter % SUPPLY_CRATE.every === 0) {
+      // A crate filled: its bonus is shown (the order's Glow with it), and the run is done for now.
+      setSupplyCrateFull(true);
+      setBattleReward({ key: `supply-crate:${servedAfter}`, eyebrow: 'Supply crate', title: 'Crate filled!', stars: 0,
+        glow: entry.order.reward.coins + crate.glow, timber: timber + crate.timber, before,
+        finish: () => { setSupplyCrateFull(false); setSupplyRunOpen(false); } });
+      return true;
+    }
+    countGlowIn(before, entry.order.reward.coins);
+    return true;
+  // `countGlowIn` is declared below and stable.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplyRunStore.send]);
+  const serveSupplyOrder = useCallback(async (entry: SupplyRunOrder, itemTargets: readonly MergeScreenPoint[]) => {
+    const board = supplyRunStore.state;
+    const metrics = openingBoardMetrics;
+    if (!board || supplyServingRef.current) return false;
+    const servingItems = mergeOrderServingCells(board, entry.order);
+    const [screenRect, coinRect] = await Promise.all([measureInScreen(screenRef.current), measureInScreen(glowCurrencyArtRef.current)]);
+    if (reduceMotion || !metrics || !screenRect || !coinRect || servingItems.length !== itemTargets.length) return commitSupplyOrder(entry);
+    const targets = itemTargets.map((point) => ({ x: point.x - screenRect.x, y: point.y - screenRect.y }));
+    const items = servingItems.map((item, index) => {
+      const center = mergeCellCenter(metrics.geometry, item.cell);
+      return { definitionId: item.definitionId, instanceId: item.instanceId, from: { x: metrics.x - screenRect.x + center.x, y: metrics.y - screenRect.y + center.y }, to: targets[index]! };
+    });
+    const coinFrom = targets.reduce((point, target) => ({ x: point.x + target.x / targets.length, y: point.y + target.y / targets.length }), { x: 0, y: 0 });
+    const coinTo = { x: coinRect.x - screenRect.x + coinRect.width / 2, y: coinRect.y - screenRect.y + coinRect.height / 2 };
+    supplyServingRef.current = entry;
+    supplyServeNonceRef.current += 1;
+    setSupplyHiddenItemIds(new Set(items.map((item) => item.instanceId)));
+    setSupplyServeFlight({ coinAmount: entry.order.reward.coins, coinFrom, coinTo, coinTargetSize: { width: coinRect.width, height: coinRect.height }, energyAmount: 0, energyTo: coinTo, items, nonce: supplyServeNonceRef.current, phase: 'items' });
+    return true;
+  }, [commitSupplyOrder, measureInScreen, openingBoardMetrics, reduceMotion, supplyRunStore.state]);
+  const supplyItemsArrived = useCallback(() => {
+    if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setSupplyServeFlight((current) => current ? { ...current, phase: 'rewards' } : null);
+  }, []);
+  const supplyCoinArrived = useCallback(() => {
+    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, []);
+  const finishSupplyServe = useCallback(() => {
+    const entry = supplyServingRef.current;
+    supplyServingRef.current = null;
+    setSupplyServeFlight(null);
+    if (!entry) { setSupplyHiddenItemIds(new Set()); return; }
+    void commitSupplyOrder(entry).finally(() => setSupplyHiddenItemIds(new Set()));
+  }, [commitSupplyOrder]);
+  const supplyRunAvailable = !ftueStepId && Boolean(mergeWorld.worldUnlocks?.[LOST_TRAIL.unlockId]);
+  // Timber joins the currency bar once there is any (or a Supply Run has begun).
+  const timberShown = (mergeWorld.materials?.timber ?? 0) > 0 || Boolean(mergeWorld.supplyRun);
+  const missionBoardDocked = eventBoardActive || openingBoardActive || stepplingMissionActive || journeyMissionActive || restorationBoardVisible || Boolean(rushSpec) || islandEncounterActive || supplyRunDocked;
+  // The Glow a card or chapter paid counts up into the counter once it is back on screen.
+  const countGlowIn = useCallback((before: number, amount: number) => {
+    if (amount <= 0) return;
+    setGlowSpend({ amount, counting: true });
+    setDisplayedGlow(before);
+    setTimeout(() => setDisplayedGlow(mergeWorldRef.current.coins), 380);
+    setTimeout(() => setGlowSpend(null), 1_600);
+  }, []);
+  const continueBattleReward = useCallback(() => {
+    const reward = battleReward;
+    if (!reward) return;
+    setBattleReward(null);
+    reward.finish();
+    countGlowIn(reward.before, reward.glow);
+  }, [battleReward, countGlowIn]);
+  // The Sanctuary's next thing (`constants/sanctuary-chapters.ts`), once the first session is over.
+  const chapterState = useMemo(() => sanctuaryChapterState(mergeWorld), [mergeWorld]);
+  const chapterSurfaceFree = Boolean(chapterState) && !ftueStepId && screenFocused && !missionBoardDocked && !upgradePresentation && !buildingPanelId && !katchimeraPanelId && !heroBuildingPanelId && !heroRosterOpen
+    && !activeInteractionResidentId && !interactionCreatureId && !trackOpen && !islandEncounter && !battleReward && !selectedUpgrade && !progressSheetOpen && !pendingIslandCampaign;
+  const followChapterGoal = useCallback(() => {
+    const goal = chapterState?.goal;
+    if (!goal) return;
+    if (goal.action.kind === 'building') { setBuildingPanelId(goal.action.buildingId); return; }
+    if (goal.action.kind === 'supply_run') { setSupplyRunOpen(true); return; }
+    if (goal.action.kind === 'hero') { setKatchimeraPanelId(goal.action.characterId); return; }
+    if (goal.action.kind === 'hero_building') { setHeroBuildingPanelId(goal.action.id); return; }
+    followKingdomNext(progressSummary.next);
+  }, [chapterState?.goal, followKingdomNext, progressSummary.next]);
+  // The chapter's opening (The Signal): camera to the island, the flare, the friends' lines, the chapter's card. Once.
+  const [chapterOpeningPhase, setChapterOpeningPhase] = useState<'camera' | 'flare' | 'talk' | 'title' | null>(null);
+  const chapterOpening = chapterState?.openingPending ? chapterState.chapter.opening ?? null : null;
+  useEffect(() => {
+    if (!chapterOpening || !chapterSurfaceFree || chapterOpeningPhase) return;
+    setChapterOpeningIsland(chapterOpening.islandId);
+    setChapterOpeningPhase('camera');
+  }, [chapterOpening, chapterOpeningPhase, chapterSurfaceFree]);
+  useEffect(() => {
+    if (chapterOpeningPhase !== 'camera') return;
+    // The flare waits for the camera, but never forever: a camera already there reports nothing.
+    const timer = setTimeout(() => setChapterOpeningPhase('flare'), ftueCameraSettled ? 300 : 2_600);
+    return () => clearTimeout(timer);
+  }, [chapterOpeningPhase, ftueCameraSettled]);
+  useEffect(() => {
+    if (chapterOpeningPhase !== 'flare') return;
+    const timer = setTimeout(() => setChapterOpeningPhase('talk'), CHAPTER_SIGNAL_FLARE_MS);
+    return () => clearTimeout(timer);
+  }, [chapterOpeningPhase]);
+  const finishChapterOpening = useCallback(() => {
+    const chapter = chapterState?.chapter;
+    setChapterOpeningPhase(null);
+    setChapterOpeningIsland(null);
+    if (chapter) void markStoredChapterOpened(chapter.id).catch(() => undefined);
+  }, [chapterState?.chapter]);
+  // A hero building up a level: Glow leaves the counter, the world is written, and a new look crossblends on the tile.
+  const upgradeHeroBuildingWithFx = useCallback(async (id: HeroBuildingId, expectedLevel: number) => {
+    const before = mergeWorldRef.current.coins;
+    const result = await upgradeStoredHeroBuilding(id, expectedLevel);
+    const spent = before - result.state.coins;
+    if (spent > 0) {
+      setGlowSpend({ amount: spent, counting: true });
+      setDisplayedGlow(result.state.coins);
+      setTimeout(() => setGlowSpend(null), 900);
+    }
+    const [from, to] = [heroBuildingLook(expectedLevel), heroBuildingLook(expectedLevel + 1)];
+    if (from !== to && !reduceMotion) {
+      revealedUpgradeRef.current = null;
+      setUpgrading(true);
+      const building = heroBuildingById.get(id)!;
+      setUpgradePresentation({
+        cameraAlreadyFocused: true, characterId: building.companion, coinCost: 0, coinOrigin: { x: 0, y: 0 },
+        creatureId: `companion:${building.companion}`, creatureName: building.name, fromStage: 1, toStage: 1,
+        nonce: ++upgradeNonceRef.current,
+        palette: { accent: '#FFE7A8', glow: '#FFD36B', mist: 'rgba(255,240,205,0.9)', primary: '#B07A3E' },
+        reactionLine: '', showCoins: false, status: 'playing', upgradeName: building.name,
+        tileLook: { tileId: building.tileId, from, to },
+      });
+    }
+    return result;
+  }, [reduceMotion]);
+  const chapterClaimingRef = useRef(false);
+  const claimChapter = useCallback(() => {
+    const chapter = chapterState?.chapter;
+    if (!chapter || chapterClaimingRef.current) return;
+    chapterClaimingRef.current = true;
+    const before = mergeWorldRef.current.coins;
+    void claimStoredChapterReward(chapter.id, chapter.reward.glow)
+      .then(() => countGlowIn(before, chapter.reward.glow))
+      .finally(() => { chapterClaimingRef.current = false; });
+  }, [chapterState?.chapter, countGlowIn]);
   const visibleUpgradeOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : missionBoardDocked ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun, activeHatchable.tile.id);
 
   // The canvas is memoised, and it holds only if none of its props change identity on an ordinary
@@ -2967,6 +3317,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onGatewayTargetChange={setGatewayNode}
         onNatureIslandTargetChange={setNatureIslandTileNode}
         onStoryTileTargetChange={setStoryTileNode}
+        cameraMinimumScale={ftueStepId === FRONTIER_STEP_ID ? FRONTIER_MINIMUM_SCALE : undefined}
         soloLayerId={soloLayerId}
         soloOfferId={soloOfferId}
         storyOperationsEnabled={screenFocused && !activeInteractionResidentId && !interactionExiting}
@@ -2987,11 +3338,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         worldEggTargetRef={worldEggTargetRef}
         worldSubjectPresentation={openingLiftCameraHeld ? null : worldSubjectPresentation}
       />
-      {!activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && (!ftueStepId || ftueStepId === 'companion.meditating') ? <View style={{ position: 'absolute', left: 16, bottom: Math.max(insets.bottom, 12) + 10, zIndex: 30 }}>
+      {/* The companion journal is a life-input feature: off with them (`constants/product-scope.ts`). */}
+      {LIFE_INPUT_ENABLED && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && (!ftueStepId || ftueStepId === 'companion.meditating') ? <View style={{ position: 'absolute', left: 16, bottom: Math.max(insets.bottom, 12) + 10, zIndex: 30 }}>
         <CompanionJournalButton familyId="mossprout" />
       </View> : null}
       {heartwoodRecap ? <HeartwoodStoryScene scene="recap" onContinue={() => { if (kingdomGoal?.introducedAt) setAdventureOpen(true); }} /> : null}
-      {sharedAdventureAllowed && (mergeWorld.haven.tileStages.mossprout ?? 0) >= 1 && !heartwoodRecap && !havenMergeBoardActive && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed') ? <View style={{ position: 'absolute', top: insets.top + 56, left: 18, right: 18, zIndex: 32 }}>
+      {sharedAdventureAllowed && !chapterState && (mergeWorld.haven.tileStages.mossprout ?? 0) >= 1 && !heartwoodRecap && !havenMergeBoardActive && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed') ? <View style={{ position: 'absolute', top: insets.top + 56, left: 18, right: 18, zIndex: 32 }}>
         <HeartwoodRoad selectedBed={selectedHeartwoodBed} world={mergeWorld} openToken={heartwoodOpenToken} onOpenHandled={() => setHeartwoodOpenToken(0)} onGarden={() => openGarden(undefined, 'mossprout')} onNext={() => {
           if (kingdomGoal?.introducedAt) { setAdventureOpen(true); return; }
           const offer = upgradeOffers.find(item => item.id === 'mist:steppling-home');
@@ -3036,6 +3388,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       {katchimeraPanelId && screenFocused ? <KatchimeraUpgradePanel key={katchimeraPanelId} world={mergeWorld} characterId={katchimeraPanelId} layout={upgradeStage} bottomInset={insets.bottom}
         registerDismiss={registerUpgradeDismiss} onClose={() => setKatchimeraPanelId(null)} onMist={() => { setKatchimeraPanelId(null); setProgressSheetOpen(true); }}
         onUpgrade={async (id, expectedLevel) => { const result = await upgradeStoredKatchimera(id, expectedLevel); if (!result.changed && result.message) throw new Error(result.message); }} /> : null}
+      {heroBuildingPanelId && screenFocused ? <HeroBuildingPanel key={heroBuildingPanelId} world={mergeWorld} buildingId={heroBuildingPanelId} layout={upgradeStage} bottomInset={insets.bottom}
+        registerDismiss={registerUpgradeDismiss} onClose={() => setHeroBuildingPanelId(null)}
+        onSupplyRun={() => { setHeroBuildingPanelId(null); setSupplyRunOpen(true); }}
+        onUpgrade={upgradeHeroBuildingWithFx} /> : null}
+      {heroRosterOpen && screenFocused ? <HeroRosterSheet world={mergeWorld} onClose={() => setHeroRosterOpen(false)}
+        onTrain={(id) => { setHeroRosterOpen(false); setKatchimeraPanelId(id); }}
+        onBuilding={(id) => { setHeroRosterOpen(false); setHeroBuildingPanelId(id); }} /> : null}
       {buildingPanelId && screenFocused ? <HeartwoodBuildingPanel key={buildingPanelId} world={mergeWorld} buildingId={buildingPanelId} layout={upgradeStage} bottomInset={insets.bottom}
         onUpgrade={upgradeHeartwoodBuildingWithFx}
         onClose={() => setBuildingPanelId(null)}
@@ -3095,14 +3454,16 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
             content={!laneBattleActive && kingdomGoal?.introducedAt && !kingdomGoalGuideActive && !ftueStepId && !stepplingLesson.active && !upgradePresentation && !restorationHandoff && !interactionCreatureId && !stepplingEncounter.open
               ? <View style={styles.progressPill}><KingdomProgressPill progress={progressSummary} onPress={() => setProgressSheetOpen(true)} /></View>
               : <View />}
-            trailing={laneBattleActive ? <View /> : <GameCurrencyHud balances={[{
+            trailing={laneBattleActive ? <View /> : <GameCurrencyHud style={[styles.currencyHud, { width: currencyHudWidth(timberShown ? 2 : 1) }]} balances={[...(timberShown ? [{
+              art: GAME_CURRENCY_ART.timber, id: 'timber' as const, value: mergeWorld.materials?.timber ?? 0, valueAnimationDurationMs: reduceMotion ? 180 : 650,
+            }] : []), {
               animateValue: Boolean(upgradePresentation?.showCoins && upgradePresentation.coinCost > 0) || Boolean(glowSpend?.counting),
               art: GAME_CURRENCY_ART.coins,
               artTargetRef: glowCurrencyArtRef,
               id: 'coins',
               value: displayedGlow,
               valueAnimationDurationMs: reduceMotion ? 180 : 650,
-            }]} style={styles.currencyHud} tone="glass" />}
+            }]} tone="glass" />}
             density="compact"
             style={styles.topHud}
             tone="glass"
@@ -3342,15 +3703,83 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         ? <LastClearingHeartTree onRestore={() => { void restoreHeartTree(); }} /> : null}
       {ftueStepId === SANCTUARY_STEP_ID && ftueStep && screenFocused && ftueCameraSettled
         ? <LastClearingTitleCard title={SANCTUARY_TITLE} line={SANCTUARY_LINE} onContinue={foundSanctuary} /> : null}
+      {ftueStepId === FRONTIER_STEP_ID && ftueStep && screenFocused && ftueCameraSettled
+        ? <LastClearingTitleCard title={FRONTIER_TITLE} lines={FRONTIER_LINES} placement="top" onContinue={seeFrontier} /> : null}
+      {ftueStepId === LOST_TRACKS_STEP_ID && ftueStep && screenFocused && ftueCameraSettled && !tracksLooked
+        ? <LastClearingTracks onLooked={() => setTracksLooked(true)} /> : null}
+      {ftueStepId === LOST_TRACKS_STEP_ID && ftueStep && screenFocused && ftueCameraSettled && tracksLooked ? <>
+        <HavenFtueOverlay cue={ftueStep.cue ?? null} fingerPlacement="center" screenRef={screenRef} spotlight={ftueStep.spotlight ?? null} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision} />
+        <LostTrailTapTarget node={lostTrailNode} onPress={followTracks} />
+      </> : null}
+      {ftueStepId === LOST_TRAIL_MISSION_STEP_ID && ftueStep && screenFocused && ftueCameraSettled
+        ? <LastClearingTitleCard eyebrow={LOST_TRAIL_MISSION_EYEBROW} title={LOST_TRAIL_MISSION_TITLE} line={LOST_TRAIL_MISSION_LINE} onContinue={acceptLostTrail} /> : null}
+      {trailStoneIndex >= 0 && ftueStep && screenFocused && ftueCameraSettled && trailIntroSeen !== LOST_TRAIL_STONE_STEP_IDS[trailStoneIndex]
+        ? <LastClearingTitleCard key={LOST_TRAIL_STONE_STEP_IDS[trailStoneIndex]} eyebrow={`${LOST_TRAIL_EYEBROW} \u00b7 ${trailStoneIndex + 1} of 3`} title={LOST_TRAIL_STONES[trailStoneIndex]!.title}
+            line={LOST_TRAIL_STONES[trailStoneIndex]!.line} placement="top" onContinue={() => setTrailIntroSeen(LOST_TRAIL_STONE_STEP_IDS[trailStoneIndex]!)} /> : null}
+      {trailStoneIndex === 2 && openingBoardActive && openingDockSettled && openingBoardMetrics && battle?.store.state?.board[LOST_TRAIL_RESCUE_CELL]?.mist ? (() => {
+        const origin = mergeCellOrigin(openingBoardMetrics.geometry, LOST_TRAIL_RESCUE_CELL);
+        return <TrappedFriendSilhouette frame={{ x: openingBoardMetrics.x + origin.x, y: openingBoardMetrics.y + origin.y, width: openingBoardMetrics.geometry.cellSize, height: openingBoardMetrics.geometry.cellHeight ?? openingBoardMetrics.geometry.cellSize }} />;
+      })() : null}
+      {ftueStepId === STEPPLING_MEETS_STEP_ID && screenFocused && stepplingPhase === 'card' ? (
+        <KatchimeraCardRevealModal cardId={'steppling' as KatchimeraSkinId} cards={stepplingCards} onDone={() => setStepplingPhase('talk')} />
+      ) : null}
+      {ftueStepId === STEPPLING_MEETS_STEP_ID && ftueStep && screenFocused && stepplingPhase === 'talk'
+        ? <LastClearingStepplingMeets onWelcome={welcomeSteppling} /> : null}
+      {ftueStepId === STEPPLING_JOINED_STEP_ID && ftueStep && screenFocused && ftueCameraSettled
+        ? <LastClearingTitleCard eyebrow={STEPPLING_JOINED_EYEBROW} title={STEPPLING_JOINED_TITLE} onContinue={stepplingJoined} /> : null}
+      {ftueStepId === HOME_STEP_ID && ftueStep && screenFocused && ftueCameraSettled
+        ? <LastClearingTitleCard title={HOME_TITLE} lines={HOME_LINES} placement="top" onContinue={comeHome} /> : null}
+      {/* After the first session: the chapter's next goal, and its reward once every goal is done. */}
+      {chapterOpening && chapterOpeningPhase === 'flare' || chapterOpening && chapterOpeningPhase === 'talk'
+        ? <SignalFlare node={islandTileNodes[chapterOpening.islandId] ?? null} color={chapterOpening.color} /> : null}
+      {chapterOpening && chapterOpeningPhase === 'talk' ? (
+        <ConversationNarrativeOverlay title={chapterOpening.title} entries={chapterOpening.lines.map((line, index) => ({ id: `chapter-opening:${chapterState!.chapter.id}:${index}`, speaker: line.speaker, text: line.text }))}
+          checkpoint={`chapter-opening:${chapterState!.chapter.id}`} required paced onClose={() => undefined}>
+          {(perform) => <KatchaButton fullWidth glow pill label="Answer the signal" onPress={() => perform(() => setChapterOpeningPhase('title'), true)} />}
+        </ConversationNarrativeOverlay>
+      ) : null}
+      {chapterOpening && chapterOpeningPhase === 'title' && chapterState ? (
+        <LastClearingTitleCard key={`chapter-title:${chapterState.chapter.id}`} eyebrow={`Chapter ${chapterState.chapter.number}`} title={chapterState.chapter.title}
+          line={chapterState.goal?.title} onContinue={finishChapterOpening} />
+      ) : null}
+      {chapterSurfaceFree && chapterState && !chapterState.complete && !chapterState.openingPending ? (
+        <View pointerEvents="box-none" style={[styles.chapterGoal, { top: insets.top + 64 }]}>
+          <ChapterGoalCard state={chapterState} onPress={followChapterGoal} />
+        </View>
+      ) : null}
+      {chapterSurfaceFree && chapterState?.complete ? (
+        <LastClearingTitleCard key={chapterState.chapter.id} eyebrow={`Chapter ${chapterState.chapter.number} complete`} title={chapterState.chapter.title}
+          lines={[chapterState.chapter.closing, `+${chapterState.chapter.reward.glow} Glow`]} onContinue={claimChapter} />
+      ) : null}
+      {supplyRunDocked && supplyRunStore.state ? <SupplyRunDock state={supplyRunStore.state} send={supplyRunStore.send} orders={supplyRunOrders} served={mergeWorld.supplyRun?.served ?? 0}
+        hiddenItemIds={supplyHiddenItemIds} servingOrderId={supplyServeFlight ? supplyServingRef.current?.order.id ?? null : null} crateFull={supplyCrateFull}
+        width={window.width} bottomInset={insets.bottom} onServe={serveSupplyOrder} onBoardMetrics={setOpeningBoardMetrics} onEntranceSettled={markOpeningDockSettled}
+        onClose={() => setSupplyRunOpen(false)} /> : null}
+      {!ftueStepId && chapterSurfaceFree ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Heroes" accessibilityHint="Your friends, their levels and their buildings" onPress={() => setHeroRosterOpen(true)}
+          style={({ pressed }) => [styles.supplyRunButton, { bottom: Math.max(insets.bottom, 12) + (supplyRunAvailable ? 64 : 14) }, pressed ? { opacity: 0.85 } : null]}>
+          <Text style={styles.heroesStar}>★</Text>
+          <Text style={styles.supplyRunLabel}>Heroes</Text>
+        </Pressable>
+      ) : null}
+      {supplyRunAvailable && chapterSurfaceFree ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Supply Run" accessibilityHint="Fill friends' orders for Timber and Glow" onPress={() => setSupplyRunOpen(true)}
+          style={({ pressed }) => [styles.supplyRunButton, { bottom: Math.max(insets.bottom, 12) + 14 }, pressed ? { opacity: 0.85 } : null]}>
+          <Image source={GAME_CURRENCY_ART.timber} style={styles.supplyRunIcon} contentFit="contain" transition={0} />
+          <Text style={styles.supplyRunLabel}>Supply Run</Text>
+        </Pressable>
+      ) : null}
+      {supplyServeFlight ? <MergeServeRewardOverlay flight={supplyServeFlight} onItemsArrive={supplyItemsArrived} onCoinArrive={supplyCoinArrived} onEnergyArrive={() => undefined} onFinish={finishSupplyServe} /> : null}
+      {battleReward ? <BattleRewardCard key={`battle-reward:${battleReward.key}`} reward={battleReward} onContinue={continueBattleReward} /> : null}
       {/* A docked mini board dims the Kingdom behind it, easing in and out. */}
-      <BoardSessionDim active={Boolean(openingBoardActive || (stepplingMissionActive && stepplingMission.state) || (journeyMissionActive && journeyMissionStore.state) || (activeRush && screenFocused) || (islandEncounterActive && islandMist.store.state) || (restorationBoardVisible && !chapterRush))} />
-      {openingBoardActive && firstBattle.mission && firstBattle.store.state ? <HatchableMissionDock mission={firstBattle.mission}
-        state={firstBattle.store.state} send={firstBattle.store.send} merges={firstBattle.store.merges} mechanicState={firstBattle.store.mechanicState} encounter={firstBattle.encounter} width={window.width} bottomInset={insets.bottom}
-        landings={openingGlow.store} onStrike={firstBattle.onStrike} onFinale={firstBattle.onFinale} onReveal={firstBattle.bumpReveal} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
+      <BoardSessionDim active={Boolean(openingBoardActive || supplyRunDocked || (stepplingMissionActive && stepplingMission.state) || (journeyMissionActive && journeyMissionStore.state) || (activeRush && screenFocused) || (islandEncounterActive && islandMist.store.state) || (restorationBoardVisible && !chapterRush))} />
+      {openingBoardActive && battle?.mission && battle.store.state ? <HatchableMissionDock key={`battle-dock:${battleEncounter?.id ?? 'none'}`} mission={battle.mission}
+        state={battle.store.state} send={battle.store.send} merges={battle.store.merges} mechanicState={battle.store.mechanicState} encounter={battle.encounter} width={window.width} bottomInset={insets.bottom}
+        landings={openingGlow.store} onStrike={battle.onStrike} onFinale={battle.onFinale} onReveal={battle.bumpReveal} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} /> : null}
       {openingGuidanceVisible && ftueCameraSettled && openingDockSettled ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
         <MergeFtueOverlay blockedPulseNonce={openingBlockedNonce} boardMetrics={openingBoardMetrics} cue={openingBoardStep?.cue ?? null} guide={openingBoardStep?.guide?.title ? openingBoardStep.guide : null}
-          layoutNonce={openingBoardRevision} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={openingBoardStep?.spotlight ?? null} state={firstBattle.store.state ?? mergeWorld} targetRevision={openingBoardRevision} />
+          layoutNonce={openingBoardRevision} railTargetRefs={openingRailRefs} screenRef={screenRef} spotlight={openingBoardStep?.spotlight ?? null} state={battle?.store.state ?? mergeWorld} targetRevision={openingBoardRevision} />
       </View> : null}
       {stepplingMissionActive && stepplingMission.state ? <HatchableMissionDock mission={hatchableMist.mission ?? activeHatchable.mission}
         state={stepplingMission.state} send={stepplingMission.send} merges={stepplingMission.merges} mechanicState={stepplingMission.mechanicState} encounter={hatchableMist.encounter} width={window.width} bottomInset={insets.bottom}
@@ -3469,6 +3898,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
 const ISLAND_LIFT_HOLD_MAX_MS = 12_000;
 
 const styles = StyleSheet.create({
+  supplyRunButton: { position: 'absolute', right: 12, zIndex: 26, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(22,20,40,0.78)', borderWidth: 1, borderColor: 'rgba(255,231,168,0.35)' },
+  supplyRunIcon: { width: 24, height: 24 },
+  heroesStar: { fontSize: 18, lineHeight: 22, color: '#FFD36B' },
+  supplyRunLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '800', color: '#FFF8E6' },
+  chapterGoal: { position: 'absolute', left: 12, right: 12, zIndex: 26 },
   screen: { backgroundColor: '#55A9E2', flex: 1 },
   openingFade: { backgroundColor: '#203447', zIndex: 100 },
   companionOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 45 },
@@ -3496,7 +3930,7 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   topHud: { maxWidth: 430, width: '100%' },
-  currencyHud: { flex: 0, paddingLeft: 18, width: 106 },
+  currencyHud: { flex: 0, flexShrink: 0, paddingLeft: 18 },
   progressPill: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   gardenButton: {
     height: 99,

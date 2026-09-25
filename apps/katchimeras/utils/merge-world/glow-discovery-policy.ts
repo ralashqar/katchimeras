@@ -87,8 +87,21 @@ function changed(state: MergeWorldState, next: MergeWorldState, now: number): Me
   return { state: { ...next, revision: state.revision + 1, updatedAt: now }, changed: true };
 }
 
-export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<MergeWorldCommand, { type: 'unlockWorldTarget' | 'transferDiscoveryEgg' | 'hatchWorldEgg' | 'prepareGlowDiscoveryLesson' | 'payHatchableMission' }>): MergeWorldCommandResult {
+export function reduceGlowDiscovery(state: MergeWorldState, command: Extract<MergeWorldCommand, { type: 'unlockWorldTarget' | 'transferDiscoveryEgg' | 'hatchWorldEgg' | 'prepareGlowDiscoveryLesson' | 'payHatchableMission' | 'rescueWorldFriend' }>): MergeWorldCommandResult {
   const no = (message?: string): MergeWorldCommandResult => ({ state, changed: false, message });
+  if (command.type === 'rescueWorldFriend') {
+    // The Lost Trail's rescue: no ticket, no Egg to carry. The tile is open and carried in one write, then the same
+    // hatch every friend's arrival records. Once home, asking again changes nothing.
+    const definition = Object.prototype.hasOwnProperty.call(WORLD_UNLOCK_CATALOG, command.targetId) ? WORLD_UNLOCK_CATALOG[command.targetId] : undefined;
+    if (!definition) return no('This path is not available.');
+    if (state.companionDiscovery.records.some((record) => record.characterId === definition.destination)) return no();
+    const existing = state.worldUnlocks?.[command.targetId];
+    const carried: MergeWorldState = { ...state, worldUnlocks: { ...state.worldUnlocks, [command.targetId]: {
+      unlockedAt: existing?.unlockedAt ?? command.now, paid: existing?.paid ?? 0, destination: definition.destination,
+      transferredAt: existing?.transferredAt ?? command.now, hatchedAt: null,
+    } } };
+    return reduceGlowDiscovery(carried, { type: 'hatchWorldEgg', targetId: command.targetId, now: command.now });
+  }
   if (command.type === 'payHatchableMission') {
     // The ticket: the tile's price, once, at the bubble. Refused while the tile sleeps, once it is already
     // revealed or the friend is home, or without the light; a second payment for the same run is a no-op.

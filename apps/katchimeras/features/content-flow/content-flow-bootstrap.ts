@@ -16,8 +16,10 @@ import { startGlowDiscovery } from '@/features/onboarding/glow-discovery-runtime
 import { GLOW_GATEWAY_ID } from '@/utils/merge-world/glow-discovery-policy';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { StoryWorldUpgradeEffectPayload } from '@/types/content-flow';
-import { applyStoredGlowDiscovery, grantStoredGeneratorParcel, reconcileStoredHavenStory, activateStoredResidentCardDiscovery, ensureStoredFirstSpringBuilt, wakeStoredFirstSpring, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget, ensureStoredOpeningGlow, restoreStoredHeartTree } from '@/utils/merge-world/repository';
+import { applyStoredGlowDiscovery, grantStoredGeneratorParcel, reconcileStoredHavenStory, activateStoredResidentCardDiscovery, ensureStoredFirstSpringBuilt, wakeStoredFirstSpring, loadMergeWorldState, revealStoredHaven, revealStoredMovementEgg, seedStoredMossproutGardenAfterFtue, upgradeStoredHavenFeature, upgradeStoredStoryWorldTarget, ensureStoredOpeningGlow, restoreStoredHeartTree, rescueStoredWorldFriend, revealStoredStoryTile } from '@/utils/merge-world/repository';
 import { GLOW } from '@/constants/glow';
+import { LOST_TRAIL } from '@/constants/story-tiles/lost-trail';
+import { STEPPLING_HATCHABLE } from '@/constants/hatchable-companions/registry';
 import { heartwoodBuildingById } from '@/constants/heartwood-buildings';
 import { FIRST_SEED_BUILDING_ID } from '@/features/heartwood-buildings/buildings-world';
 import { completeDayOneLesson } from '@/game/katchimeras/action-runtime';
@@ -209,6 +211,14 @@ export function bootstrapContentFlowCatalog() {
     const result = await restoreStoredHeartTree(`${sourceId}:heart-tree`);
     if (!result.restored) throw new Error(result.message ?? 'The Heart Tree could not be woken');
     return { effectKey, receiptId: result.state.heartTree!.receiptId };
+  });
+  // The Kingdom plays the Lost Trail clearing and Steppling's tile opening as it writes them; this is the story's own
+  // guarantee after them (a relaunch between): the trail revealed and Steppling home, both idempotent.
+  registerContentFlowEffect('haven.steppling_joins', async ({ effectKey }) => {
+    await revealStoredStoryTile(LOST_TRAIL.unlockId);
+    const result = await rescueStoredWorldFriend(STEPPLING_HATCHABLE.tile.unlockId);
+    if (!result.state.companionDiscovery.records.some((record) => record.characterId === 'steppling')) throw new Error(result.message ?? 'Steppling could not come home');
+    return { effectKey, companion: 'steppling' };
   });
   registerContentFlowEffect('haven.place_first_memory', async ({ effectKey }) => {
     const built = await ensureStoredFirstSpringBuilt();

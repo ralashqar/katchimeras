@@ -135,6 +135,11 @@ export function heartwoodBuildingCost(level: number): number | null {
   return level >= HEARTWOOD_BUILDING_MAX_LEVEL ? null : HEARTWOOD_BUILDING_COSTS[clampLevel(level)] ?? null;
 }
 
+/** The Timber a building takes to go up from `level`: none to build, then more at every level (Supply Runs pay it). */
+export function heartwoodBuildingTimberCost(level: number): number {
+  return level < 1 ? 0 : 2 + level * 2;
+}
+
 export function heartwoodBuildingLevel(world: Pick<MergeWorldState, 'heartwoodBuildings'> | null | undefined, id: HeartwoodBuildingId): number {
   return clampLevel(world?.heartwoodBuildings?.[id]?.level ?? 0);
 }

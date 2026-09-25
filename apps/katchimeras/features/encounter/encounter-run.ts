@@ -144,9 +144,11 @@ export function keepGoing(board: MergeWorldState, run: EncounterRunState, window
 }
 
 /** Whether the board's objective is met: every wisp down, one named Dark Wisp down, or the cache opened. */
-export function objectiveMet(encounter: EncounterDefinition, host: MissionMechanicHost, mechanicState: MissionMechanicState, run: EncounterRunState): boolean {
+export function objectiveMet(encounter: EncounterDefinition, host: MissionMechanicHost, mechanicState: MissionMechanicState, run: EncounterRunState, board?: MergeWorldState): boolean {
   const mechanic = resolveMechanic(host);
   if (encounter.objective.kind === 'cache') return run.cacheOpened;
+  // A rescue: the wisps down is not enough; the trapped cell must be out of the Mist too (a board unseen is not).
+  if (encounter.objective.kind === 'rescue') return Boolean(board && !board.board[encounter.objective.cell]?.mist) && mechanicComplete(mechanic, host, mechanicState);
   if (encounter.objective.kind === 'dark-wisp') {
     const wispId = encounter.objective.wispId;
     const named = wispViews(mechanic, host, mechanicState).find((wisp) => wisp.id === wispId);
@@ -172,7 +174,7 @@ export function chargedSpawners(board: MergeWorldState, window: MissionWindow): 
  * shut (or spent).
  */
 export function encounterStatus(encounter: EncounterDefinition, host: MissionMechanicHost, mechanicState: MissionMechanicState, run: EncounterRunState, board: MergeWorldState, window: MissionWindow): EncounterStatus {
-  if (objectiveMet(encounter, host, mechanicState, run)) return 'cleared';
+  if (objectiveMet(encounter, host, mechanicState, run, board)) return 'cleared';
   if (run.territory) {
     const reason = lossReason(encounter, host, mechanicState, run, board, window);
     // Lanes: pieces keep arriving on their own, so a board with nothing to merge is only waiting, never stuck.
@@ -194,7 +196,7 @@ const freeCells = (board: MergeWorldState, window: MissionWindow) => window.cell
  */
 export type EncounterLossReason = 'overrun' | 'choked' | 'spent' | 'resolve' | 'breached';
 export function lossReason(encounter: EncounterDefinition, host: MissionMechanicHost, mechanicState: MissionMechanicState, run: EncounterRunState, board: MergeWorldState, window: MissionWindow): EncounterLossReason | null {
-  if (objectiveMet(encounter, host, mechanicState, run)) return null;
+  if (objectiveMet(encounter, host, mechanicState, run, board)) return null;
   if (!run.territory) return resolveLeft(run) <= 0 ? 'resolve' : null;
   // Lanes: lost only when a wisp gets past the bottom row (a dry board brings the rescue, again and again).
   if (mechanicState.kind === 'lanes') return mechanicState.breached != null ? 'breached' : null;

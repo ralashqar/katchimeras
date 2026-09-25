@@ -3,6 +3,7 @@ import type { HexCoord } from '@incubator/environments/hex';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { MOSSPROUT_OLD_GROVE } from './mossprout-old-grove';
+import { LOST_TRAIL } from './lost-trail';
 
 /**
  * Story tiles: places in the shared world a friend's journey chapter reveals.
@@ -27,6 +28,13 @@ export type StoryTileDefinition = {
   revealPreset: 'mist-clear';
   /** The key its revealed art's alpha bounds are generated under. */
   alphaBoundsKey: string;
+  /**
+   * Its own art while the Mist keeps it (`tile-art.ts`, misted), under this bounds key: a place the story shows
+   * before it is cleared (the Lost Trail's tracks). Absent, the shared full-mist tile.
+   */
+  mistedAlphaBoundsKey?: string;
+  /** A friend lost inside the Mist here, drawn as a dim silhouette in it until the tile is revealed. */
+  lostSkinId?: KatchimeraSkinId;
   lines: {
     /** Said as the mist clears. */
     reveal: string;
@@ -35,7 +43,7 @@ export type StoryTileDefinition = {
 
 export type StoryTileState = 'misted' | 'revealed';
 
-export const STORY_TILES_BUNDLED: readonly StoryTileDefinition[] = [MOSSPROUT_OLD_GROVE];
+export const STORY_TILES_BUNDLED: readonly StoryTileDefinition[] = [MOSSPROUT_OLD_GROVE, LOST_TRAIL];
 export const STORY_TILES: readonly StoryTileDefinition[] = [...STORY_TILES_BUNDLED, ...packEntries('storyTiles')];
 markRegistryBuilt('storyTiles');
 

@@ -1,3 +1,4 @@
+import { heroBuildingForCompanion, heroLevelCap } from '@/constants/hero-buildings';
 import type { KatchimeraProgress, MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 
 /**
@@ -34,14 +35,16 @@ export function katchimeraUpgradeCost(level: number): number | null {
   return at >= KATCHIMERA_MAX_LEVEL ? null : KATCHIMERA_LEVEL_GLOW[at - 1] ?? null;
 }
 
-export type KatchimeraUpgradeCheck = { ok: true } | { ok: false; reason: 'top' | 'xp' | 'glow'; message: string };
+export type KatchimeraUpgradeCheck = { ok: true } | { ok: false; reason: 'top' | 'xp' | 'glow' | 'building'; message: string };
 
-export function canUpgradeKatchimera(world: Pick<MergeWorldState, 'katchimeraProgress' | 'coins'>, id: MergeCharacterId): KatchimeraUpgradeCheck {
+export function canUpgradeKatchimera(world: Pick<MergeWorldState, 'katchimeraProgress' | 'coins'> & Partial<Pick<MergeWorldState, 'heroBuildings'>>, id: MergeCharacterId): KatchimeraUpgradeCheck {
   const progress = katchimeraProgress(world, id);
   const cost = katchimeraUpgradeCost(progress.level);
   if (cost == null) return { ok: false, reason: 'top', message: 'Nothing more to learn here.' };
   const needed = katchimeraXpForLevel(progress.level + 1);
   if (progress.xp < needed) return { ok: false, reason: 'xp', message: `${(needed - progress.xp).toLocaleString()} more experience in the Mist first.` };
   if (world.coins < cost) return { ok: false, reason: 'glow', message: `You need ${(cost - world.coins).toLocaleString()} more Glow.` };
+  const cap = heroLevelCap(world, id);
+  if (cap != null && progress.level + 1 > cap) return { ok: false, reason: 'building', message: `Grow ${heroBuildingForCompanion(id)?.name ?? 'their building'} first.` };
   return { ok: true };
 }

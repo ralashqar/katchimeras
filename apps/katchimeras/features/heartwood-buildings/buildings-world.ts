@@ -1,7 +1,7 @@
 import {
   HEARTWOOD_BUILDING_MAX_LEVEL,
   heartwoodBuildingById,
-  heartwoodBuildingCost,
+  heartwoodBuildingCost, heartwoodBuildingTimberCost,
   heartwoodBuildingLevel,
   mergeEnergyCap,
   type HeartwoodBuildingId,
@@ -110,9 +110,13 @@ export function upgradeHeartwoodBuilding(input: MergeWorldState, id: HeartwoodBu
   if (!heartwoodBuildingsEligible(input)) throw new Error('Heartwood is not ready for this yet.');
   const cost = heartwoodBuildingCost(level)!;
   if (input.coins < cost) throw new Error(`You need ${(cost - input.coins).toLocaleString()} more Glow.`);
+  const timber = heartwoodBuildingTimberCost(level);
+  const held = input.materials?.timber ?? 0;
+  if (held < timber) throw new Error(`You need ${timber - held} more Timber. Run supplies on the Lost Trail.`);
   const state = structuredClone(input);
   if (level === 0) sendPlantHome(state, definition.slotId);
   state.coins -= cost;
+  if (timber > 0) state.materials = { ...state.materials, timber: held - timber };
   // Spending on a building brings it to life, whatever the story was doing with it.
   const { dormant: _dormant, ...standing } = state.heartwoodBuildings?.[id] ?? { builtAt: now };
   state.heartwoodBuildings = { ...state.heartwoodBuildings, [id]: { ...standing, level: level + 1 } };

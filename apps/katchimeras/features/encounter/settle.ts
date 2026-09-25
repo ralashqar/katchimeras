@@ -160,7 +160,7 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
   }
   // The wisps' turn, once the player's action has cost them something and the Dark Wisps' delay is spent.
   // A territory battle: after every merge that did not just win the level.
-  const wispsTurn = territory ? turnTaken && (tactics ? run.actions : run.merges) > run.delay && !objectiveMet(encounter, host, mechanicState, run) : cost > 0 && run.actions > run.delay;
+  const wispsTurn = territory ? turnTaken && (tactics ? run.actions : run.merges) > run.delay && !objectiveMet(encounter, host, mechanicState, run, state) : cost > 0 && run.actions > run.delay;
   if (wispsTurn) {
     const turn = afterAction(mechanic, host, mechanicState, state, { window, action: action === 'tap' ? 'tap' : 'merge', rng, items });
     mechanicState = turn.state;

@@ -1,0 +1,19 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "resolution": 2048,
+  "createdAt": "2026-09-25T00:17:01.987442+00:00",
+  "references": [
+    {
+      "path": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "sha256": "64b441e4c33b1d3a02e418f22fd474c4b994557243e43869a89cf8e530df0f2a"
+    },
+    {
+      "path": "design/shared-world-discovery-v2/steppling/source.png",
+      "sha256": "8671cd6e9de25659943fb76c726ae50fed4fb559b17d1ed76e7cb644c566e1b8"
+    }
+  ],
+  "prompt": "Use Image 1 as the authoritative camera, framing, deep tapered floating hex-island geometry and rendering reference. Preserve its six-sided top footprint, broad chunky cliff blocks, deep tapered underside, centered recessed front stairs, lighting direction and square framing. Keep the entire silhouette comfortably inside the canvas with black padding on all four sides. Perfectly flat pure-black #000000 background for BiRefNet Heavy matting; no ground plane, external drop shadow, text, numbers, UI, watermark, characters or eggs.\n\nPremium cozy 3D toy diorama matching the Mossprout reference: very low detail density, very low texture detail, broad cushiony shapes, soft rounded bevels, smooth matte clay-like surfaces, large readable color blocks, soft upper-left daylight and restrained ambient occlusion. No photographic texture, grain, tiny repeated details, speckles, cracks, grass blades, pine needles or surface noise. Every main shape must read at 256 pixels.\n\nGenerate the Explorer's Lodge, grand stage: Steppling's trailhead with its lodge fully grown. Image 2 is Steppling's existing trailhead tile: keep its exact layout, palette and features where they are (the two cushiony pines, the broad ochre trail earth, the three rounded sandstone steps to the blue-grey lookout boulder, the blank arrow trail marker, the ochre backpack, the trail lantern, the slate-blue and sandstone cliff blocks) and change only the lodge at the rear, which has grown. The honey-timber lodge is now a grand two-storey Explorer's Lodge with the same chunky soft-blue roof, a wraparound porch, warm lit windows, a short sturdy timber lookout tower on one side topped by a small blue roof and a chunky brass telescope, a tall flagpole with an orange pennant, and a big blank wooden map board on an easel by the door. Still at the rear and inside the tile, it must not cover the pines or the steps, and the whole tower stays inside the canvas with clear black padding above it. Cozy toy diorama, fully developed and welcoming. No character, creature, Egg, text, letters or numbers.",
+  "assetKey": "shared_world_steppling_lodge_3_hex_tile_v1",
+  "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/shared-world-steppling-lodge-3-hex-tile-v1/1790295479776_grid.png",
+  "sourceSha256": "86dc4d182515edc5957ad1b928ec3855e2d7b85c584a5a193d8a7e980b4b420d"
+}
