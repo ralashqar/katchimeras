@@ -125,7 +125,7 @@ import { SignalFlare } from '@/components/katchadeck/world/signal-flare';
 import { ConversationNarrativeOverlay } from '@/components/katchadeck/world/conversation-narrative-overlay';
 import { SupplyRunDock, type SupplyRunOrder } from '@/components/katchadeck/world/supply-run-dock';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from '@/components/katchadeck/games/merge-serve-reward-overlay';
-import { mergeOrderServingCells } from '@/utils/merge-world/engine';
+import { mergeOrderReady, mergeOrderServingCells } from '@/utils/merge-world/engine';
 import { createSupplyRunBoard, kitchenOpen, SUPPLY_CRATE, supplyOrder, supplyRunSlots } from '@/features/supply-run/supply-run';
 import { LastClearingHeartTree } from '@/components/katchadeck/world/last-clearing-heart-tree';
 import { LastClearingTitleCard } from '@/components/katchadeck/world/last-clearing-title-card';
@@ -222,7 +222,7 @@ import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { ConversationSession } from '@/types/companion-conversation';
 import { HAVEN_ENVIRONMENTS, type HavenStage } from '@/constants/haven-catalog';
 
-import type { FtueCameraDirective, FtueCueDefinition, FtueStepDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
+import type { FtueCameraDirective, FtueCueDefinition, FtueSpotlightDefinition, FtueStepDefinition, FtueTarget } from '@/features/onboarding/ftue-types';
 import { IslandRestorationDock } from '@/components/katchadeck/world/island-restoration-dock';
 import { WispRushDock } from '@/components/katchadeck/world/wisp-rush-dock';
 import { WispRushSheet, type WispRushResult } from '@/components/katchadeck/world/wisp-rush-sheet';
@@ -1485,6 +1485,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (presentation.tileLook) {
       setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
       setUpgrading(false);
+      setDisplayedGlow(mergeWorldRef.current.coins);
       return;
     }
     if (presentation.ftueReveal) {
@@ -3009,8 +3010,19 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const leaveCafe = useCallback(() => { if (!supplyServingRef.current) setSupplyRunOpen(false); }, []);
   // The Café's and the Kitchen's buildings pour better pieces: their odds ride on every generator tap.
   const { send: cafeStoreSend } = supplyRunStore;
-  const cafeSend = useCallback((command: MergeWorldCommand) => cafeStoreSend(command.type === 'tapGenerator'
-    ? { ...command, dropProfile: cafeDropProfile(mergeWorldRef.current, command.generatorId) } : command), [cafeStoreSend]);
+  // The first visit's lesson remembers the first pour (tap the Ritual Bar) so it moves on to the merge.
+  const [cafePoured, setCafePoured] = useState(false);
+  const cafeSend = useCallback((command: MergeWorldCommand) => {
+    if (command.type === 'tapGenerator') setCafePoured(true);
+    return cafeStoreSend(command.type === 'tapGenerator'
+      ? { ...command, dropProfile: cafeDropProfile(mergeWorldRef.current, command.generatorId) } : command);
+  }, [cafeStoreSend]);
+  const cafeRailRefs = useRef(new Map<string, View>());
+  const [cafeRailRevision, setCafeRailRevision] = useState(0);
+  const setCafeRailTarget = useCallback((key: string, view: View | null) => {
+    if (view) cafeRailRefs.current.set(key, view); else cafeRailRefs.current.delete(key);
+    setCafeRailRevision((revision) => revision + 1);
+  }, []);
   const supplyRunOrders = useMemo((): SupplyRunOrder[] => supplyRunSlots(mergeWorld).map((index, slot) => ({ slot: slot as 0 | 1, index, order: supplyOrder(slot as 0 | 1, index, kitchen) })), [kitchen, mergeWorld]);
   const [supplyCrateFull, setSupplyCrateFull] = useState(false);
   // Serving is the Merge page's own serve (`MergeServeRewardOverlay`): each piece the order takes flies from its cell to
@@ -3191,6 +3203,66 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }
     followKingdomNext(progressSummary.next);
   }, [chapterGoalNeed, chapterState?.goal, followKingdomNext, openGlowSource, openGoalSource, progressSummary.next, upgradeOffers]);
+  const followChapterGoalRef = useRef(followChapterGoal);
+  followChapterGoalRef.current = followChapterGoal;
+  // The Café's first visit is taught (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Chapter 1), the way the Merge page
+  // once taught it: a spotlight and a finger, one step at a time, on the first friend's first order. Pour (tap the Ritual
+  // Bar), merge the two pieces the order's item is made of, then Serve. Baristabbit says each step.
+  const cafeLesson = useMemo(() => {
+    const board = supplyRunStore.state;
+    const entry = supplyRunOrders[0];
+    if (!supplyRunDocked || !board || !entry || (mergeWorld.supplyRun?.served ?? 0) > 0) return null;
+    const order = entry.order;
+    const say = (text: string) => ({ speaker: 'Baristabbit', text });
+    if (mergeOrderReady(board, order)) {
+      const target: FtueTarget = { kind: 'order_serve', orderId: order.id };
+      return { cue: { kind: 'tap', target } as FtueCueDefinition, spotlight: { targets: [target], grouping: 'bounding_rect', padding: 6, radius: 18, dimOpacity: 0.55 } as FtueSpotlightDefinition, line: say('That\u2019s it. Tap Serve, and Steppling eats.') };
+    }
+    const wanted = order.requirements[0]?.definitionId ?? '';
+    const tierAt = wanted.lastIndexOf(':');
+    const part = tierAt > 0 ? `${wanted.slice(0, tierAt)}:${Number(wanted.slice(tierAt + 1)) - 1}` : '';
+    const loose = board.board.flatMap((cell, index) => cell?.occupant?.kind === 'item' && !cell.mist && !cell.locked && cell.occupant.definitionId === part ? [index] : []);
+    const bar = board.board.findIndex((cell) => cell?.occupant?.kind === 'generator' && cell.occupant.generatorId === 'ritual-bar');
+    if (!cafePoured && bar >= 0) {
+      const target: FtueTarget = { kind: 'board_cell', cell: bar };
+      return { cue: { kind: 'tap', target } as FtueCueDefinition, spotlight: { targets: [target], grouping: 'bounding_rect', padding: 4, radius: 14, dimOpacity: 0.55 } as FtueSpotlightDefinition, line: say('Tap the Ritual Bar. It pours a Tiny Espresso.') };
+    }
+    if (loose.length >= 2) {
+      const from: FtueTarget = { kind: 'board_cell', cell: loose[1]! };
+      const to: FtueTarget = { kind: 'board_cell', cell: loose[0]! };
+      return { cue: { kind: 'drag', from, to } as FtueCueDefinition, spotlight: { targets: [from, to], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.55 } as FtueSpotlightDefinition, line: say('Two of the same make the next one. Drag one onto the other.') };
+    }
+    if (bar >= 0) {
+      const target: FtueTarget = { kind: 'board_cell', cell: bar };
+      return { cue: { kind: 'tap', target } as FtueCueDefinition, spotlight: null, line: say('Pour another one.') };
+    }
+    return null;
+  }, [cafePoured, mergeWorld.supplyRun?.served, supplyRunDocked, supplyRunOrders, supplyRunStore.state]);
+  const cafeAfterFirstLine = (mergeWorld.supplyRun?.served ?? 0) === 1 ? { speaker: 'Baristabbit', text: 'That\u2019s Meals in the pantry. Meals train heroes.' } : null;
+  // The bar is the chapter goal's own count when the goal is the Café's (Serve 3 orders: 1 of 3), a crate's five when
+  // the goal is a crate; no bar at all otherwise.
+  const cafeBar = useMemo(() => {
+    const goal = chapterState?.goal;
+    if (goal?.action.kind !== 'supply_run') return null;
+    const served = mergeWorld.supplyRun?.served ?? 0;
+    const orders = /^Serve (\d+)/.exec(goal.title);
+    if (orders) return { progress: Math.min(served, Number(orders[1])), required: Number(orders[1]) };
+    return { progress: served % SUPPLY_CRATE.every, required: SUPPLY_CRATE.every };
+  }, [chapterState?.goal, mergeWorld.supplyRun?.served]);
+  // When the Café's goal is done, the visit ends on its own and the next goal opens: nothing to find, no bar to restart.
+  const cafeGoalRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!supplyRunDocked) { cafeGoalRef.current = null; return; }
+    const goal = chapterState?.goal ?? null;
+    if (cafeGoalRef.current == null) { cafeGoalRef.current = goal?.action.kind === 'supply_run' ? goal.id : ''; return; }
+    if (!cafeGoalRef.current || goal?.id === cafeGoalRef.current || supplyServeFlight || battleReward) return;
+    const timer = setTimeout(() => {
+      setSupplyRunOpen(false);
+      // The next goal, straight there (its panel, the next friend's tile); a finished chapter shows its card instead.
+      if (goal && !chapterState?.complete) setTimeout(() => followChapterGoalRef.current?.(), 450);
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [battleReward, chapterState?.complete, chapterState?.goal, supplyRunDocked, supplyServeFlight]);
   // The chapter's opening (The Signal): camera to the island, the flare, the friends' lines, the chapter's card. Once.
   const [chapterOpeningPhase, setChapterOpeningPhase] = useState<'camera' | 'flare' | 'talk' | 'title' | null>(null);
   const chapterOpening = chapterState?.openingPending ? chapterState.chapter.opening ?? null : null;
@@ -3221,56 +3293,56 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const upgradeHeartTreeWithFx = useCallback(async (expectedLevel: number) => {
     const before = mergeWorldRef.current.coins;
     const from = heartwoodStage(mergeWorldRef.current);
+    // Every level plays the tile upgrade (the same sequence as a Mist clear): Glow flies from the counter into the tree,
+    // the field of light rises around it, and when it grows a stage the Heartwood crossblends into its new art.
+    const coinOrigin = reduceMotion ? { x: 0, y: 0 } : await measureGlowCurrencyOrigin();
     const result = await upgradeStoredHeartTree(expectedLevel);
     const spent = before - result.state.coins;
-    if (spent > 0) {
-      setGlowSpend({ amount: spent, counting: true });
-      setDisplayedGlow(result.state.coins);
-      setTimeout(() => setGlowSpend(null), 900);
-    }
     const to = heartwoodStage(result.state);
-    if (from !== to && !reduceMotion) {
+    if (spent > 0 && reduceMotion) setDisplayedGlow(result.state.coins);
+    if (spent > 0 && !reduceMotion) {
       revealedUpgradeRef.current = null;
       setUpgrading(true);
+      // The counter holds the old Glow while the coins fly into the tile; it counts down when the upgrade lands.
+      setDisplayedGlow(before);
       const homeStage = (result.state.haven.tileStages.mossprout ?? 0) as HavenStage;
       setUpgradePresentation({
-        cameraAlreadyFocused: true, characterId: 'mossprout', coinCost: 0, coinOrigin: { x: 0, y: 0 },
+        cameraAlreadyFocused: true, characterId: 'mossprout', coinCost: spent, coinOrigin,
         creatureId: 'companion:mossprout', creatureName: 'Mossprout', fromStage: homeStage, toStage: homeStage,
         nonce: ++upgradeNonceRef.current,
         palette: { accent: '#FFE7A8', glow: '#FFD36B', mist: 'rgba(255,240,205,0.9)', primary: '#E0A23C' },
-        reactionLine: '', showCoins: false, status: 'playing', upgradeName: 'Heart Tree',
+        reactionLine: '', showCoins: true, status: 'playing', upgradeName: 'Heart Tree',
         heartTree: { from, to, grown: true },
       });
     }
     return result;
-  }, [reduceMotion]);
+  }, [measureGlowCurrencyOrigin, reduceMotion]);
   // A hero building up a level: Glow leaves the counter, the world is written, and a new look crossblends on the tile.
   const upgradeHeroBuildingWithFx = useCallback(async (id: HeroBuildingId, expectedLevel: number) => {
     const before = mergeWorldRef.current.coins;
+    // Every level plays the tile upgrade (the same sequence as a Mist clear): Glow flies from the counter into the tile,
+    // the field of light rises around it, and when the building reaches a new look the tile crossblends into it.
+    const coinOrigin = reduceMotion ? { x: 0, y: 0 } : await measureGlowCurrencyOrigin();
     const result = await upgradeStoredHeroBuilding(id, expectedLevel);
     const spent = before - result.state.coins;
-    if (spent > 0) {
-      setGlowSpend({ amount: spent, counting: true });
-      setDisplayedGlow(result.state.coins);
-      setTimeout(() => setGlowSpend(null), 900);
-    }
     const building = heroBuildingById.get(id)!;
     const [from, to] = [heroTileSlot(expectedLevel), heroTileSlot(expectedLevel + 1)];
-    const art = (slot: number) => heroTileLook(building.tileId, slot)?.alphaBoundsKey ?? null;
-    if (from !== to && art(from) !== art(to) && !reduceMotion) {
+    if (spent > 0 && reduceMotion) setDisplayedGlow(result.state.coins);
+    if (spent > 0 && !reduceMotion) {
       revealedUpgradeRef.current = null;
       setUpgrading(true);
+      setDisplayedGlow(before);
       setUpgradePresentation({
-        cameraAlreadyFocused: true, characterId: building.companion, coinCost: 0, coinOrigin: { x: 0, y: 0 },
+        cameraAlreadyFocused: true, characterId: building.companion, coinCost: spent, coinOrigin,
         creatureId: `companion:${building.companion}`, creatureName: building.name, fromStage: 1, toStage: 1,
         nonce: ++upgradeNonceRef.current,
         palette: { accent: '#FFE7A8', glow: '#FFD36B', mist: 'rgba(255,240,205,0.9)', primary: '#B07A3E' },
-        reactionLine: '', showCoins: false, status: 'playing', upgradeName: building.name,
+        reactionLine: '', showCoins: true, status: 'playing', upgradeName: building.name,
         tileLook: { tileId: building.tileId, from, to },
       });
     }
     return result;
-  }, [reduceMotion]);
+  }, [measureGlowCurrencyOrigin, reduceMotion]);
   const chapterClaimingRef = useRef(false);
   const claimChapter = useCallback(() => {
     const chapter = chapterState?.chapter;
@@ -3428,7 +3500,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           <GardenEventAdornment world={mergeWorld} onExplore={eventActions.length ? () => { void openWorldEvent(eventActions[0]); } : undefined} />
         </View> : null}
         background={background}
-        cameraLocked={lanternSurfaceOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(upgradeStageSubject) || Boolean(requiredUpgradeStory) || restorationBoardVisible || rushSheetOpen || Boolean(rushSpec) || islandEncounterActive}
+        cameraLocked={lanternSurfaceOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(upgradeStageSubject) || Boolean(requiredUpgradeStory) || restorationBoardVisible || rushSheetOpen || Boolean(rushSpec) || islandEncounterActive
+          // The Café holds the camera on its tile: nothing behind the board moves it.
+          || supplyRunOpen}
         discoveredEggInteraction={stepplingEncounter.open}
         gatewayTileId={activeHatchable.tile.id}
         discoveredEggPresentation={stepplingEncounter.presentation}
@@ -3444,7 +3518,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         identity={identity}
         discoveryRevealFamilyId={null}
         highlightedLockedFamilyId={null}
-        interactionEnabled={!lanternSurfaceOpen && !activeInteractionResidentId && !stepplingEncounter.open && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
+        interactionEnabled={!lanternSurfaceOpen && !activeInteractionResidentId && !stepplingEncounter.open && !supplyRunOpen && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
         interactionExitNonce={interactionExitNonce}
         levelTrackStones={levelTrackStones}
         onLevelTrackStonePress={playTrackStone}
@@ -3619,7 +3693,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       {/* A Lanes battle keeps only Back in the top bar: the Glow count and the friends pill step out while it is played. */}
       {laneBattleActive || ftueGardenUpgradeActive || seedPlantingFtueActive || Boolean(selectedUpgrade) || Boolean(upgradePresentation && !upgradePresentation.veilLift)
         || (!upgradePresentation && (!ftueStepId || ftueStepId === 'companion.meditating')) ? (
-        <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 360)} exiting={FadeOut.duration(reduceMotion ? 80 : 260)} pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }, ftueGardenUpgradeActive && { zIndex: 90 }]}>
+        <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 360)} exiting={FadeOut.duration(reduceMotion ? 80 : 260)} pointerEvents="box-none" style={[styles.topHudLayer, { top: insets.top + 3 }, ftueGardenUpgradeActive && { zIndex: 90 }, supplyRunDocked && { zIndex: FTUE_SCENE_LAYERS.spotlight + 2 }]}>
           <GameHudBar
             leading={laneBattleActive ? <KatchimeraBackButton
               accessibilityHint="Puts the battle away; it is here to come back to"
@@ -3950,10 +4024,15 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         <LastClearingTitleCard key={chapterState.chapter.id} eyebrow={`Chapter ${chapterState.chapter.number} complete`} title={chapterState.chapter.title}
           lines={[chapterState.chapter.closing, `+${chapterState.chapter.reward.glow} Glow`, ...(chapterState.chapter.unlock ? [chapterState.chapter.unlock] : [])]} onContinue={claimChapter} />
       ) : null}
-      {supplyRunDocked && supplyRunStore.state ? <SupplyRunDock state={supplyRunStore.state} send={cafeSend} orders={supplyRunOrders} served={mergeWorld.supplyRun?.served ?? 0}
-        hiddenItemIds={supplyHiddenItemIds} servingOrderId={supplyServeFlight ? supplyServingRef.current?.order.id ?? null : null} crateFull={supplyCrateFull}
+      {supplyRunDocked && supplyRunStore.state ? <SupplyRunDock state={supplyRunStore.state} send={cafeSend} orders={supplyRunOrders} bar={cafeBar} line={cafeLesson?.line ?? cafeAfterFirstLine}
+        hiddenItemIds={supplyHiddenItemIds} servingOrderId={supplyServeFlight ? supplyServingRef.current?.order.id ?? null : null} onRailTargetRef={setCafeRailTarget}
         width={window.width} bottomInset={insets.bottom} onServe={serveSupplyOrder} onBoardMetrics={setOpeningBoardMetrics} onEntranceSettled={markOpeningDockSettled}
-        title={kitchen ? 'Feastle\u2019s Kitchen' : undefined} onClose={leaveCafe} /> : null}
+        title={kitchen ? 'Feastle\u2019s Kitchen' : undefined} /> : null}
+      {cafeLesson && openingDockSettled && !supplyServeFlight && !battleReward ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
+        <MergeFtueOverlay blockedPulseNonce={0} boardMetrics={openingBoardMetrics} cue={cafeLesson.cue} guide={null}
+          layoutNonce={cafeRailRevision} railTargetRefs={cafeRailRefs} screenRef={screenRef} spotlight={cafeLesson.spotlight}
+          state={supplyRunStore.state!} targetRevision={(supplyRunStore.state?.revision ?? 0) * 100 + cafeRailRevision} />
+      </View> : null}
       {sanctuarySurfaceFree ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Heroes" accessibilityHint="Your friends, their levels and their buildings" onPress={() => setHeroRosterOpen(true)}
           style={({ pressed }) => [styles.supplyRunButton, { bottom: Math.max(insets.bottom, 12) + (supplyRunAvailable ? 64 : 14) }, pressed ? { opacity: 0.85 } : null]}>

@@ -7,7 +7,7 @@ import type { MergeScreenPoint } from '@/components/katchadeck/games/merge-serve
 import { MergeOrderTrayCard } from '@/components/katchadeck/games/merge-order-rail';
 import { createMergeBoardSession } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import type { MissionCommandResult } from '@/features/onboarding/use-opening-mission-board';
-import { SUPPLY_CRATE, type supplyOrder } from '@/features/supply-run/supply-run';
+import type { supplyOrder } from '@/features/supply-run/supply-run';
 import type { MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
 import { mergeOrderItemReadiness, mergeOrderReady } from '@/utils/merge-world/engine';
 import { FriendSpeechBubble, type SpeechLine } from './friend-speech-bubble';
@@ -16,7 +16,6 @@ import { MistMissionDock } from './kingdom-opening-merge-dock';
 export type SupplyRunOrder = { slot: 0 | 1; index: number; order: ReturnType<typeof supplyOrder> };
 
 /** Orders filled toward the bar's crate. */
-const CRATE = SUPPLY_CRATE.every;
 
 /**
  * The Supply Run's dock (`features/supply-run/supply-run.ts`): the board with no wisps, and above it the two orders the
@@ -25,22 +24,18 @@ const CRATE = SUPPLY_CRATE.every;
  * by the host over the whole screen), and the order pays out. What the first friend wants is said beside the cards.
  * Back (in the top bar) puts the board away; it keeps everything for next time.
  */
-/**
- * Baristabbit teaching the Café, the first time (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Chapter 1): what it is
- * for before the first order, then what Meals are for once the first is served. The friends' own lines after that.
- */
-const CAFE_TEACHING_LINES: Readonly<Record<number, SpeechLine>> = {
-  0: { speaker: 'Baristabbit', text: 'Heroes fight on full bellies. Merge what they ask for, then serve it.' },
-  1: { speaker: 'Baristabbit', text: 'That’s Meals in the pantry. Meals train heroes.' },
-};
-
 export const SupplyRunDock = memo(function SupplyRunDock({
-  state, send, orders, served, width, bottomInset, onServe, onBoardMetrics, onEntranceSettled, onClose, hiddenItemIds, servingOrderId, crateFull = false, title,
+  state, send, orders, width, bottomInset, onServe, onBoardMetrics, onEntranceSettled, hiddenItemIds, servingOrderId, title, bar, line, onRailTargetRef,
 }: {
   state: MergeWorldState;
   send: (command: MergeWorldCommand) => MissionCommandResult | null;
   orders: readonly SupplyRunOrder[];
-  served: number;
+  /** The bar: the chapter goal's count when the goal is the Café's (Serve 3 orders); none otherwise. */
+  bar: { progress: number; required: number } | null;
+  /** What is said over the cards: Baristabbit teaching (the first order), else the first friend's own line. */
+  line?: SpeechLine | null;
+  /** Each card's targets (the serve button) for the first order's guidance. */
+  onRailTargetRef?: (targetKey: string, view: View | null) => void;
   width: number;
   bottomInset: number;
   /** Serve: the card's item slots on screen, in requirement order, are where the served items fly to. */
@@ -51,11 +46,8 @@ export const SupplyRunDock = memo(function SupplyRunDock({
   hiddenItemIds?: ReadonlySet<string>;
   /** The order whose items are in flight: its card shows it, and no other can be served meanwhile. */
   servingOrderId?: string | null;
-  /** A crate was just filled: the bar stays full until the run closes. */
-  crateFull?: boolean;
   onBoardMetrics?: (metrics: MergeBoardScreenMetrics | null) => void;
   onEntranceSettled?: () => void;
-  onClose: () => void;
 }) {
   const reduceMotion = useReducedMotion();
   const sessionRef = useRef<ReturnType<typeof createMergeBoardSession> | null>(null);
@@ -66,7 +58,7 @@ export const SupplyRunDock = memo(function SupplyRunDock({
   const serve = useCallback((entry: SupplyRunOrder, itemTargets: readonly MergeScreenPoint[]) => (servingOrderId ? false : onServe(entry, itemTargets)), [onServe, servingOrderId]);
   const first = orders[0]?.order;
   const tray = <View pointerEvents="box-none" style={styles.trayPanel}>
-    {first ? <View pointerEvents="none" style={styles.bubble}><FriendSpeechBubble text={CAFE_TEACHING_LINES[served] ?? first.line} reduceMotion={reduceMotion} /></View> : null}
+    {first ? <View pointerEvents="none" style={styles.bubble}><FriendSpeechBubble text={line ?? first.line} reduceMotion={reduceMotion} /></View> : null}
     <View pointerEvents="box-none" style={styles.trayRow}>
       {orders.map((entry, index) => {
         const ready = mergeOrderReady(state, entry.order);
@@ -81,13 +73,14 @@ export const SupplyRunDock = memo(function SupplyRunDock({
           serveInFlight={servingOrderId === entry.order.id}
           onReroll={() => {}}
           onServe={(itemTargets) => serve(entry, itemTargets)}
+          onRailTargetRef={onRailTargetRef}
           reduceMotion={reduceMotion}
         />;
       })}
     </View>
   </View>;
   return <MistMissionDock
-    state={state} boardStep={null} progress={served > 0 && served % CRATE === 0 && crateFull ? CRATE : served % CRATE} required={CRATE} barTitle={title ?? "Baristabbit’s Café"}
+    state={state} boardStep={null} progress={bar?.progress ?? 0} required={bar?.required ?? 1} hideBar={!bar} barTitle={title ?? "Baristabbit’s Café"}
     interactionKey="supply-run" sessionId={sessionRef.current.id} hiddenItemIds={hiddenItemIds ?? noneHidden}
     width={width} bottomInset={bottomInset}
     onCommand={dispatch} onBoardMetrics={onBoardMetrics} onEntranceSettled={onEntranceSettled}
