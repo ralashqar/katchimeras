@@ -895,6 +895,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [chapterOpeningPlace, setChapterOpeningPlace] = useState<{ islandId?: MossproutNatureIslandId; tileId?: string } | null>(null);
   // A chapter opening on a friend's tile (the lit window) ends on a tap on that tile (`finishChapterOpening`).
   const [openingTileTap, setOpeningTileTap] = useState<string | null>(null);
+  // The story holds the world (a chapter's opening from before its camera moves to its guided tile tap, a rescued
+  // friend's tile clearing and their arrival scene): no tile, marker, resident or panel takes a touch meanwhile. Only
+  // the guided tap goes through (`storyBypassRef`).
+  const storyHoldRef = useRef(false);
+  const storyBypassRef = useRef(false);
   const chapterOpeningCamera = useMemo((): FtueCameraDirective | null => chapterOpeningPlace?.islandId
     ? { kind: 'focus_target', target: { kind: 'haven_nature_island', islandId: chapterOpeningPlace.islandId }, zoom: 1.05, anchorY: 0.5, durationMs: 1_800 }
     : chapterOpeningPlace?.tileId
@@ -2887,6 +2892,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [screenFocused, stepplingLesson.active, stepplingLesson.run, havenMergeBoardActive, companionSlots, interactionCreatureId, activeInteractionResidentId, activeLessonHatchable.companion, selectResident, openGarden]);
 
   const openUpgradeOffer = useCallback(async (offer: WorldUpgradeOffer) => {
+    if (storyHoldRef.current && !storyBypassRef.current) return;
     // The trial's clock on the Rush Track opens today's ladder, not an upgrade.
     if (offer.trial) { setRushNotice(null); setRushSheetOpen(true); return; }
     // Mossprout's own tile carries the Grove's track, and the Daily Mist's once the Grove is done.
@@ -3336,7 +3342,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const tapOpeningTile = useCallback(() => {
     setOpeningTileTap(null);
     setChapterOpeningPlace(null);
-    followChapterGoalRef.current?.();
+    // The one guided way through the story's hold: this tap opens the tile's panel.
+    storyBypassRef.current = true;
+    try { followChapterGoalRef.current?.(); } finally { storyBypassRef.current = false; }
   }, []);
   // The Heart Tree up a level: Glow leaves the counter, and when it grows into its next stage the Heartwood
   // crossblends (the same reveal the first session wakes it with).
@@ -3428,7 +3436,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       .finally(() => { chapterClaimingRef.current = false; });
   }, [chapterState?.chapter, countGlowIn]);
   // A chapter's opening scene (and a friend's tile clearing) plays alone: no markers pop up over it.
-  const worldOffers = homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : missionBoardDocked ? NO_UPGRADE_OFFERS : chapterOpeningPhase || rescueRevealing ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun, activeHatchable.tile.id);
+  const storyHold = Boolean(chapterState?.openingPending) || Boolean(chapterOpeningPhase) || Boolean(openingTileTap) || Boolean(arrivalTalk) || Boolean(rescueRevealing);
+  storyHoldRef.current = storyHold;
+  const worldOffers = storyHold ? NO_UPGRADE_OFFERS : homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : missionBoardDocked ? NO_UPGRADE_OFFERS : chapterOpeningPhase || rescueRevealing ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun, activeHatchable.tile.id);
   // After the first session only what the story is about shows: the chapter's island, a friend's tile the chapter asks
   // for, anything already open, and the Grove. The old restore, sleeping islands and later friends wait their turn.
   const visibleUpgradeOffers = useMemo(() => (ftueStepId || !sanctuaryFounded(mergeWorld) ? worldOffers : chapterOffers(mergeWorld, worldOffers, chapterState)), [chapterState, ftueStepId, mergeWorld, worldOffers]);
@@ -3463,7 +3473,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     openNatureIslandOffer(islandId);
   });
   const selectGateway = useStableCallback(() => {
-    if (kingdomGoalGuideActive || missionBoardDocked) return;
+    if (kingdomGoalGuideActive || missionBoardDocked || storyHoldRef.current) return;
     // The Egg on the live companion's tile opens their encounter.
     if (hatchableGatewayState(mergeWorld, activeHatchable) === 'egg' && !glowDiscoveryLocksCamera(glowRun)) {
       setFtueCameraSettled(false);
@@ -3478,6 +3488,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     void resumeActiveHatchable();
   });
   const selectResidentFromCanvas = useStableCallback((creatureId: string) => {
+    if (storyHoldRef.current) return;
     if (glowDiscoveryLocksCamera(glowRun) || kingdomGoalGuideActive || missionBoardDocked) return;
     selectResident(creatureId);
   });
@@ -3594,7 +3605,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         identity={identity}
         discoveryRevealFamilyId={null}
         highlightedLockedFamilyId={null}
-        interactionEnabled={!lanternSurfaceOpen && !activeInteractionResidentId && !stepplingEncounter.open && !supplyRunOpen && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
+        interactionEnabled={!lanternSurfaceOpen && !activeInteractionResidentId && !stepplingEncounter.open && !supplyRunOpen && !storyHold && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
         interactionExitNonce={interactionExitNonce}
         levelTrackStones={levelTrackStones}
         onLevelTrackStonePress={playTrackStone}

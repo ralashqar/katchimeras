@@ -198,7 +198,7 @@ test('the Kingdom wires the Last Clearing: the cold open, the first battle docke
   assert.match(dock, /finaleIdRef\.current = id;\s*finaleHoldRef\.current = true;\s*setFinaleActive\(true\);/, 'the finale flag is raised synchronously at launch, before the flight is measured');
   assert.match(dock, /if \(landed && !miss && \(finale \|\| landed\.shot \|\| landed\.direct \|\| landed\.index % 2 === 0\)\)/, 'the finale always bursts (and every Glow shot or lane bolt that hits)');
   assert.match(screen, /const openingGuidanceVisible = Boolean\(openingBoardStep && \(openingBoardStep\.cue \|\| openingBoardStep\.spotlight\)\)/);
-  assert.match(screen, /const worldOffers = homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS : missionBoardDocked \? NO_UPGRADE_OFFERS : chapterOpeningPhase \|\| rescueRevealing \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch, nor while a board hands off to its story');
+  assert.match(screen, /const worldOffers = storyHold \? NO_UPGRADE_OFFERS : homeSoloForStep\(ftueStepId\) \? NO_UPGRADE_OFFERS : restorationHandoff \? NO_UPGRADE_OFFERS : missionBoardDocked \? NO_UPGRADE_OFFERS : chapterOpeningPhase \|\| rescueRevealing \? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers/, 'no markers at all until the hatch, nor while a board hands off to its story');
   assert.doesNotMatch(screen, /MOSSPROUT_SLEEPING_OFFER/, 'the silhouette marker is gone from the opening');
   assert.match(screen, /openingWeather=\{homeVeil !== 'none'\}/, 'rain and sparkles while the veil is up');
   assert.match(screen, /openingGuidanceVisible && ftueCameraSettled && openingDockSettled \?/, 'the spotlight waits for the dock to settle');
