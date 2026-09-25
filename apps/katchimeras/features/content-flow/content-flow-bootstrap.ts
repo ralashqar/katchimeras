@@ -220,6 +220,13 @@ export function bootstrapContentFlowCatalog() {
     if (!result.state.companionDiscovery.records.some((record) => record.characterId === 'steppling')) throw new Error(result.message ?? 'Steppling could not come home');
     return { effectKey, companion: 'steppling' };
   });
+  // A friend rescued straight home at the end of their tile's board (cozy 4X: no Egg; Baristabbit), idempotent.
+  registerContentFlowEffect('haven.friend_joins', async ({ effectKey, payload }) => {
+    const companion = String(payload.companion ?? '');
+    const result = await rescueStoredWorldFriend(String(payload.targetId ?? ''));
+    if (!result.state.companionDiscovery.records.some((record) => record.characterId === companion)) throw new Error(result.message ?? 'The friend could not come home');
+    return { effectKey, companion };
+  });
   registerContentFlowEffect('haven.place_first_memory', async ({ effectKey }) => {
     const built = await ensureStoredFirstSpringBuilt();
     if (!built.placed) throw new Error('The Dew Spring could not be built');

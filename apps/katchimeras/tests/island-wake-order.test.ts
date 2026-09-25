@@ -91,3 +91,13 @@ test('saves that already grew an island keep it revealed and inherit a completed
   assert.equal(normalizeMergeWorldState(JSON.parse(JSON.stringify(home)), NOW).ownedKatchimeraCards.filter((card) => card.cardId === 'petalimp').length, 1);
   assert.equal(worldUpgradeOffers(home).some((offer) => offer.id === 'nature:bloom-garden'), false);
 });
+
+test('once the Heart Tree is woken, each island past the first waits for it to grow tall enough', () => {
+  const petalimpHome = completeIslandCampaign(fresh(), islandCampaignForIsland('bloom-garden')!, NOW + 100);
+  assert.equal(islandWakeState(petalimpHome, 'wildgrowth-grove'), 'open', 'a world with no woken Tree (from before the Last Clearing) is not gated');
+  const woken = { ...petalimpHome, heartTree: { receiptId: 'test:tree', restoredAt: NOW, level: 2 } };
+  assert.equal(islandWakeState(woken, 'wildgrowth-grove'), 'sleeping');
+  assert.match(islandWakeLockedReason(woken, 'wildgrowth-grove') ?? '', /Heart Tree to level 3/);
+  assert.equal(islandWakeState({ ...woken, heartTree: { ...woken.heartTree, level: 3 } }, 'wildgrowth-grove'), 'open');
+  assert.equal(islandWakeState(woken, 'bloom-garden'), 'revealed', 'the first island is never gated');
+});

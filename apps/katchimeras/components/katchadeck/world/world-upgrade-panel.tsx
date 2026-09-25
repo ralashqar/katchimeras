@@ -1,3 +1,4 @@
+import { heroSlots, withPartner } from '@/features/encounter/team';
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { WorldUpgradeNarrative } from './world-upgrade-narrative';
@@ -83,7 +84,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
   const playable = campaignState?.playable ?? PLAYABLE_KATCHIMERAS;
   const eligible = campaignState?.mission?.eligible ?? null;
   const defaultKatchimera = (campaignState?.loadout?.katchimeraId && (!eligible || eligible.includes(campaignState.loadout.katchimeraId)) ? campaignState.loadout.katchimeraId : playable.find((id) => !eligible || eligible.includes(id))) ?? 'mossprout';
-  const [loadout, setLoadout] = useState<EncounterLoadoutChoice>({ katchimeraId: defaultKatchimera, helperWispId: campaignState?.loadout?.helperWispId ?? null });
+  const [loadout, setLoadout] = useState<EncounterLoadoutChoice>(() => withPartner(world, { katchimeraId: defaultKatchimera, helperWispId: campaignState?.loadout?.helperWispId ?? null, partnerId: campaignState?.loadout?.partnerId ?? null }, playable));
   const closeHistory = useCallback(() => { if (!history) return false; setHistory(false); return true; }, [history]);
   const motion = useUpgradeDockMotion({ busy, onClose, onBack: closeHistory, registerDismiss });
   const { closing, leave, reopen, settled } = motion;
@@ -154,7 +155,7 @@ export function WorldUpgradePanel({ offer, world, busy, error, coached = false, 
         {!locked && campaignState?.mission && (campaignState.action === 'enter_mist' || campaignState.action === 'resume_mist') ? <UpgradeSection label="The Mist" aside={campaignState.ladder ? `${campaignState.ladder.filter((entry) => entry.state === 'done').length} / ${campaignState.ladder.length}` : undefined}>
           <UpgradeMissionCard mission={campaignState.mission} cleared={campaignState.cleared ?? null} />
           {campaignState.ladder?.length ? <UpgradeLadderRow ladder={campaignState.ladder} /> : null}
-          <UpgradeLoadoutRow world={world} playable={playable} ownedWispIds={campaignState.ownedWispIds ?? []} value={loadout} eligible={eligible} disabled={busy || closing || campaignState.action === 'resume_mist'} onChange={setLoadout} />
+          <UpgradeLoadoutRow world={world} playable={playable} ownedWispIds={campaignState.ownedWispIds ?? []} value={loadout} eligible={eligible} slots={heroSlots(world)} disabled={busy || closing || campaignState.action === 'resume_mist'} onChange={setLoadout} />
         </UpgradeSection> : null}
         {!locked && model.levels.length > 1 ? <UpgradeSection label="Stages" aside="Each one is a surprise">
           <UpgradeLevelSlots levels={model.levels} selected={shown?.level ?? null} current={pick.current} levelOffset={model.levelOffset} onSelect={pick.pick} artFor={pick.slotArt} disabled={busy || closing} />

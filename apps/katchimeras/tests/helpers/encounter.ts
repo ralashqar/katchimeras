@@ -30,7 +30,7 @@ export function makeEncounter(overrides: Partial<EncounterDefinition> = {}): Enc
 
 export type Play = { encounter: EncounterDefinition; state: MergeWorldState; run: EncounterRunState; mechanicState: MissionMechanicState; last: SettleResult | null };
 
-export function startPlay(encounter: EncounterDefinition, input: { loadout?: EncounterLoadout | null; profile?: EncounterProfile; attempt?: number; ability?: boolean } = {}): Play {
+export function startPlay(encounter: EncounterDefinition, input: { loadout?: EncounterLoadout | null; profile?: EncounterProfile; attempt?: number; ability?: boolean; partnerAbility?: boolean } = {}): Play {
   const host = encounterMechanicHost(encounter);
   return { encounter, state: createEncounterState(encounter, 'mossprout', NOW, input.profile), run: createEncounterRun(encounter, input), mechanicState: createMechanicState(resolveMechanic(host)), last: null };
 }

@@ -2,11 +2,16 @@ import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeWorldState, MossproutNatureIslandId } from '@/types/merge-world';
 import { hatchableEggProgress } from '@/features/onboarding/hatchable-egg-policy';
+import { heartTreeLevel } from '@/constants/heart-tree';
 import { heartwoodStage, type HeartwoodStage } from '@/features/shared-adventure/heartwood-progression';
 import { ISLAND_CAMPAIGNS, islandCampaignForIsland, islandCampaignForResident } from './registry';
 import type { IslandWakeCondition } from './types';
 
-export type IslandWakeEntry = { islandId: MossproutNatureIslandId; residentSkinId: KatchimeraSkinId };
+export type IslandWakeEntry = {
+  islandId: MossproutNatureIslandId; residentSkinId: KatchimeraSkinId;
+  /** The Heart Tree level the island needs before it wakes (`constants/heart-tree.ts`): the Sanctuary must be strong enough to reach it. */
+  heartTree?: number;
+};
 const HEARTWOOD_STAGES: readonly HeartwoodStage[] = ['dormant', 'stirring', 'rooted', 'blooming', 'awakened'];
 
 /**
@@ -16,11 +21,11 @@ const HEARTWOOD_STAGES: readonly HeartwoodStage[] = ['dormant', 'stirring', 'roo
  */
 export const ISLAND_WAKE_ORDER: readonly IslandWakeEntry[] = [
   { islandId: 'bloom-garden', residentSkinId: 'petalimp' },
-  { islandId: 'wildgrowth-grove', residentSkinId: 'fernip' },
-  { islandId: 'seed-nursery', residentSkinId: 'blossle' },
-  { islandId: 'pond-sanctuary', residentSkinId: 'drizzlet' },
-  { islandId: 'orchard-grove', residentSkinId: 'amberleaf' },
-  { islandId: 'ancient-tree-grove', residentSkinId: 'mistle' },
+  { islandId: 'wildgrowth-grove', residentSkinId: 'fernip', heartTree: 3 },
+  { islandId: 'seed-nursery', residentSkinId: 'blossle', heartTree: 4 },
+  { islandId: 'pond-sanctuary', residentSkinId: 'drizzlet', heartTree: 5 },
+  { islandId: 'orchard-grove', residentSkinId: 'amberleaf', heartTree: 6 },
+  { islandId: 'ancient-tree-grove', residentSkinId: 'mistle', heartTree: 7 },
 ];
 
 export type IslandWakeState = 'open' | 'sleeping' | 'revealed';
@@ -58,7 +63,18 @@ export function islandWakeState(world: MergeWorldState, islandId: MossproutNatur
   const index = ISLAND_WAKE_ORDER.findIndex((entry) => entry.islandId === islandId);
   if (index < 0 || !islandCampaignForIsland(islandId)) return 'sleeping';
   const previous = ISLAND_WAKE_ORDER[index - 1];
-  return !previous || islandFriendHome(world, previous.residentSkinId) ? 'open' : 'sleeping';
+  if (previous && !islandFriendHome(world, previous.residentSkinId)) return 'sleeping';
+  return islandHeartTreeShort(world, islandId) ? 'sleeping' : 'open';
+}
+
+/**
+ * The Heart Tree level an island still waits for, or null when it is tall enough. Only a woken Tree gates (worlds
+ * from before the Last Clearing never had one to grow).
+ */
+export function islandHeartTreeShort(world: MergeWorldState, islandId: MossproutNatureIslandId): number | null {
+  const needed = ISLAND_WAKE_ORDER.find((entry) => entry.islandId === islandId)?.heartTree ?? 0;
+  if (!world.heartTree || heartTreeLevel(world) >= needed) return null;
+  return needed;
 }
 
 /** The friend who has to come home before this island wakes, if there is one. */
@@ -74,6 +90,8 @@ export function islandWakeLockedReason(world: MergeWorldState, islandId: Mosspro
   const own = islandCampaignForIsland(islandId);
   if (own?.wake) return own.copy.sleepingHint;
   const blocker = islandWakeBlocker(world, islandId);
+  const tree = blocker ? null : islandHeartTreeShort(world, islandId);
+  if (tree != null) return `The Mist is too thick to reach. Grow the Heart Tree to level ${tree} first.`;
   return blocker
     ? `Someone is resting here. Bring ${blocker.residentName} home first.`
     : 'Someone is resting here. This part of the garden is not ready to wake yet.';

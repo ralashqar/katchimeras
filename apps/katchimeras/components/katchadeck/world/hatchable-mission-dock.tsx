@@ -256,18 +256,24 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
   }, [launchShots, onBlockedInteraction, onFinale, onReveal, onStrike, send]);
 
   // The ability: a tap uses it at once when it wants no target; otherwise the board's possible targets light up for a pick.
+  // Two heroes (the second slot): each has its own button; `pickSlot` is whose target is being chosen.
   const [picking, setPicking] = useState(false);
-  const ability = encounter?.ability ?? null;
+  const [pickSlot, setPickSlot] = useState<0 | 1>(0);
+  const lead = encounter?.ability ?? null;
+  const partner = encounter?.partnerAbility ?? null;
+  const ability = pickSlot === 1 ? partner : lead;
   useEffect(() => { if (!ability?.ready) setPicking(false); }, [ability?.ready]);
-  const pressAbility = useCallback(() => {
-    if (!ability?.ready || !encounter) return;
-    if (ability.definition.targeting === 'none') { encounter.onUseAbility(null); return; }
-    setPicking((value) => !value);
-  }, [ability, encounter]);
+  const pressAbility = useCallback((slot: 0 | 1) => {
+    const pressed = slot === 1 ? partner : lead;
+    if (!pressed?.ready || !encounter) return;
+    if (pressed.definition.targeting === 'none') { encounter.onUseAbility(null, slot); return; }
+    setPicking((value) => !(value && pickSlot === slot));
+    setPickSlot(slot);
+  }, [encounter, lead, partner, pickSlot]);
   const pickTarget = useCallback((cell: number) => {
-    encounter?.onUseAbility(cell);
+    encounter?.onUseAbility(cell, pickSlot);
     setPicking(false);
-  }, [encounter]);
+  }, [encounter, pickSlot]);
   const reduceMotion = useReducedMotion();
   // Lanes (`docs/encounter-lanes.md`): the level runs on its own clock once the dock has risen, while it is being
   // played; each piece's Glow flies from its cell at the wisp it is aimed at, for exactly as long as the level says.
@@ -397,11 +403,11 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
         <Text style={styles.pillLabel}>Resolve</Text>
         <Text style={styles.pillValue}>{encounter.resolveLeft == null ? '∞' : encounter.resolveLeft}</Text>
       </View>}
-      {ability ? <Pressable accessibilityRole="button" accessibilityState={{ disabled: !ability.ready }} accessibilityLabel={`${ability.definition.name}, ${ability.ready ? 'ready' : `${ability.charge} of ${ability.tier.chargeEvery} charged`}`}
-        onPress={pressAbility} style={[styles.abilityButton, ability.ready ? styles.abilityReady : null, picking ? styles.abilityPicking : null]}>
-        <Text style={styles.abilityName}>{ability.definition.name}</Text>
-        <Text style={styles.abilityCharge}>{ability.ready ? (picking ? 'Choose' : 'Ready') : `${Math.min(ability.charge, ability.tier.chargeEvery)}/${ability.tier.chargeEvery}`}</Text>
-      </Pressable> : null}
+      {([[lead, 0], [partner, 1]] as const).map(([shown, slot]) => shown ? <Pressable key={`ability:${slot}`} accessibilityRole="button" accessibilityState={{ disabled: !shown.ready }} accessibilityLabel={`${shown.definition.name}, ${shown.ready ? 'ready' : `${shown.charge} of ${shown.tier.chargeEvery} charged`}`}
+        onPress={() => pressAbility(slot)} style={[styles.abilityButton, shown.ready ? styles.abilityReady : null, picking && pickSlot === slot ? styles.abilityPicking : null]}>
+        <Text style={styles.abilityName}>{shown.definition.name}</Text>
+        <Text style={styles.abilityCharge}>{shown.ready ? (picking && pickSlot === slot ? 'Choose' : 'Ready') : `${Math.min(shown.charge, shown.tier.chargeEvery)}/${shown.tier.chargeEvery}`}</Text>
+      </Pressable> : null)}
       {boostLabel ? <Animated.View entering={ZoomIn.duration(reduceMotion ? 60 : 220)} exiting={FadeOut.duration(160)} style={[styles.pill, styles.boostPill]}><Text style={styles.boostText}>{boostLabel}</Text></Animated.View> : null}
       {encounter.outcome?.cleared ? <View style={styles.pill}><Text style={styles.pillValue}>{gradeLabel(encounter.outcome.grade)}</Text></View> : null}
     </View>

@@ -119,7 +119,11 @@ export type EncounterTerritory = { overrun: number; stars?: readonly [number, nu
 export const TERRITORY_DEFAULT_STARS: readonly [number, number] = [0.25, 0.45];
 
 /** What the player brings in: the Katchimera and its level, and one helper Wisp. */
-export type EncounterLoadout = { companionId: MergeCharacterId; level: number; wispId?: WispId };
+export type EncounterLoadout = {
+  companionId: MergeCharacterId; level: number; wispId?: WispId;
+  /** The second hero (the slot Chapter 3 opens; `features/encounter/team.ts`): their own ability, charged by the same merges, and the same XP. */
+  partner?: { companionId: MergeCharacterId; level: number };
+};
 
 export const ENCOUNTER_MIST_DEFAULT_HP: Readonly<Record<EncounterMistType, number>> = { light: 1, dense: 2, root: 1, 'wisp-bound': 1, bound: 1 };
 export const ENCOUNTER_DEFAULT_GRADES: EncounterDefinition['grades'] = { bright: 5, perfect: 10 };

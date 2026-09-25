@@ -1,3 +1,4 @@
+import { ISLAND_WAKE_ORDER, islandFriendHome } from '@/constants/island-campaigns/wake-order';
 import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -12,8 +13,11 @@ import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 
 /** The friends who are home, in the order they came: Mossprout first. */
-export function heroesHome(world: Pick<MergeWorldState, 'companionDiscovery'>): MergeCharacterId[] {
-  return ['mossprout', ...world.companionDiscovery.records.map((record) => record.characterId).filter((id) => id !== 'mossprout')] as MergeCharacterId[];
+export function heroesHome(world: Pick<MergeWorldState, 'companionDiscovery'> & Partial<Pick<MergeWorldState, 'ownedKatchimeraCards' | 'islandCampaigns'>>): MergeCharacterId[] {
+  const met = world.companionDiscovery.records.map((record) => record.characterId).filter((id) => id !== 'mossprout');
+  // Friends brought home by their island campaigns (Petalimp on), in the order they came home.
+  const islands = ISLAND_WAKE_ORDER.filter((entry) => islandFriendHome(world as MergeWorldState, entry.residentSkinId)).map((entry) => entry.residentSkinId);
+  return [...new Set(['mossprout', ...met, ...islands])] as MergeCharacterId[];
 }
 
 /**

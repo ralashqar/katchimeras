@@ -1,3 +1,4 @@
+import { heroTileLayerId } from '@/constants/hero-buildings';
 import { EGG_FEED_TARGET_Y_RATIO } from '@/features/today/egg-feed-target';
 import { LevelTrackStones, type LevelTrackStone } from './level-track-stones';
 import { eggHatchRattle, eggHatchPulse } from '@/components/katchadeck/ui/egg-hatch-motion';
@@ -233,6 +234,8 @@ type Props = {
   onStoryTileTargetChange?: (tileId: string, node: View | null) => void;
   /** How far the camera may pull out; the Last Clearing's frontier pulls out past the usual limit. */
   cameraMinimumScale?: number;
+  /** Something waiting on a tile (the Lodge's Timber): a bubble over it, in the world, tapped to collect. */
+  tileBubbles?: readonly { tileId: string; label: string; art?: ImageSourcePropType; onPress: () => void }[];
   storyOperationsEnabled?: boolean;
   worldEggTargetRef?: RefObject<ViewType | null>;
   worldSubjectPresentation?: WorldFtueSubjectPresentation | null;
@@ -583,6 +586,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onNatureIslandTargetChange,
   onStoryTileTargetChange,
   cameraMinimumScale,
+  tileBubbles,
   storyOperationsEnabled = true,
   worldEggTargetRef,
   worldSubjectPresentation,
@@ -799,7 +803,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (focusedMossproutWorld && upgradePresentation.tileLook && mossproutNatureIslandLevels) {
       // A hero building's new look: its friend's tile, one look to the next; nothing else changes.
       const { tileId, from, to } = upgradePresentation.tileLook;
-      const layerId = `structure:${tileId}`;
+      const layerId = heroTileLayerId(tileId);
       const atLook = (look: number) => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels,
         { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), heroTileLooks: { ...mossproutGarden?.heroTileLooks, [tileId]: look } }, mossproutNatureIslandReveals);
       const fromLayer = atLook(from).tileArtLayers.find((layer) => layer.id === layerId);
@@ -2129,6 +2133,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             {focusedMossproutWorld && onStoryTileTargetChange ? storyTileFrames.map(({ tileId, frame }) => (
               <View key={`story-tile-target-${tileId}`} ref={storyTileTargetRefs.get(tileId)} collapsable={false} pointerEvents="none" style={[styles.natureIslandHitTarget, frame]} />
             )) : null}
+            {focusedMossproutWorld && tileBubbles?.length ? tileBubbles.map((bubble) => {
+              const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${bubble.tileId}`)?.interactionFrame;
+              return frame ? <TileBubble key={`tile-bubble-${bubble.tileId}`} frame={frame} label={bubble.label} art={bubble.art} onPress={bubble.onPress} /> : null;
+            }) : null}
             {focusedMossproutWorld ? lostSilhouettes.map(({ tileId, frame, source }) => (
               <LostSilhouette key={`lost-silhouette-${tileId}`} frame={frame} source={source} />
             )) : null}
@@ -3848,5 +3856,28 @@ const LostSilhouette = memo(function LostSilhouette({ frame, source }: { frame: 
   const size = frame.width * 0.2;
   return <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: frame.left + frame.width * 0.56 - size / 2, top: frame.top + frame.height * 0.2, width: size, height: size }, style]}>
     <Image source={source} style={{ width: size, height: size, tintColor: '#2B2640' }} contentFit="contain" transition={0} accessible={false} />
+  </Animated.View>;
+});
+
+/**
+ * Something waiting on a tile (the Explorer's Lodge's Timber): a round bubble over the tile's top, bobbing gently,
+ * tapped to collect. In world space, so it moves with the camera like the tile it belongs to.
+ */
+const TileBubble = memo(function TileBubble({ frame, label, art, onPress }: { frame: { left: number; top: number; width: number; height: number }; label: string; art?: ImageSourcePropType; onPress: () => void }) {
+  const reduceMotion = useReducedMotion();
+  const bob = useSharedValue(0);
+  useEffect(() => {
+    if (reduceMotion) return;
+    bob.value = withRepeat(withSequence(withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sin) }), withTiming(0, { duration: 900, easing: Easing.inOut(Easing.sin) })), -1, false);
+    return () => cancelAnimation(bob);
+  }, [bob, reduceMotion]);
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: -bob.value * 8 }] }));
+  const size = Math.max(64, frame.width * 0.2);
+  return <Animated.View style={[{ position: 'absolute', left: frame.left + frame.width / 2 - size * 0.75, top: frame.top - size * 0.2, width: size * 1.5, alignItems: 'center' }, style]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`Collect ${label}`} onPress={onPress} hitSlop={12}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: size * 0.08, paddingHorizontal: size * 0.18, paddingVertical: size * 0.1, borderRadius: size, backgroundColor: '#FFF8E6', borderWidth: size * 0.05, borderColor: '#E0A23C' }}>
+      {art ? <Image source={art} style={{ width: size * 0.5, height: size * 0.5 }} contentFit="contain" transition={0} accessible={false} /> : null}
+      <Text style={{ fontSize: size * 0.3, fontWeight: '900', color: '#5A3A1A' }}>{label}</Text>
+    </Pressable>
   </Animated.View>;
 });

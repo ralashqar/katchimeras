@@ -135,7 +135,7 @@ export const laneRowOf = (row: number) => Math.floor(row + 0.5);
  * due to fire fires, at the lowest wisp over it or, with none, off the top of the board. Pure.
  */
 /** What the player brings to the level: the chance a piece that arrives on its own is the better one (the Seed Nursery). */
-export type LanesLuck = { tierTwoChance?: number };
+export type LanesLuck = { tierTwoChance?: number; /** The Bloom House: Seeds land this much sooner (a fraction). */ seedPace?: number };
 
 export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: MergeWorldState, dt: number, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID, luck: LanesLuck = {}): LanesTickResult {
   if (input.breached != null || lanesComplete(mechanic, input)) return { state: input, board, fired: [], effects: [], changed: false, moved: false, hit: false, spat: [] };
@@ -268,7 +268,8 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   let nextInstance = board.nextInstance;
   const seeds = mechanic.seeds;
   if (seeds && breached == null) {
-    nextSeedAt ??= seeds.everyMs;
+    const everyMs = seeds.everyMs * (1 - Math.max(0, Math.min(0.6, luck.seedPace ?? 0)));
+    nextSeedAt ??= everyMs;
     if (clock >= nextSeedAt) {
       const occupied = new Set(mechanic.wisps.flatMap((spec, index) => {
         if (!arrived(index) || !alive(index)) return [];
@@ -283,7 +284,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
         cells[cell] = { ...cells[cell]!, occupant: { kind: 'item', instanceId: `merge-item:${nextInstance}`, definitionId: lucky ? seeds.drops[1] : seeds.drops[0] } };
         nextInstance += 1;
         seeded += 1;
-        nextSeedAt = clock + seeds.everyMs;
+        nextSeedAt = clock + everyMs;
         changed = true;
       }
     }

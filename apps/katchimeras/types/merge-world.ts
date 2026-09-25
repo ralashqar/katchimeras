@@ -518,7 +518,7 @@ export type EncounterLedger = {
   receipts: string[];
   clears: Record<string, EncounterClearRecord>;
   active: EncounterActive | null;
-  loadout: { katchimeraId: MergeCharacterId; helperWispId: WispId | null } | null;
+  loadout: { katchimeraId: MergeCharacterId; helperWispId: WispId | null; partnerId?: MergeCharacterId | null } | null;
   daily: Record<string, { slots: Record<string, { clearedAt: number; grade: import('./encounter').EncounterGrade }> }>;
   lastOutcome: EncounterOutcomeRecord | null;
   /** Per level track: the star milestones already opened. */
@@ -559,15 +559,16 @@ export type MergeWorldState = {
   /** The first light, earned when the last wisp fell on the opening board: what the first garden restore is paid with. */
   openingGlow?: { receiptId: string; amount: number; grantedAt: number } | null;
   /** The Last Clearing's Heart Tree, woken with the first light (`docs/cozy-4x-ftue-the-last-clearing.md`, beat 8). */
-  heartTree?: { receiptId: string; restoredAt: number } | null;
+  heartTree?: { receiptId: string; restoredAt: number; /** Its level (`constants/heart-tree.ts`); woken, it is 1. */ level?: number } | null;
   /** The Sanctuary's chapters whose reward has been paid (`constants/sanctuary-chapters.ts`), by id. */
   chaptersClaimed?: readonly string[];
   /** The Sanctuary's chapters whose opening scene has played (The Signal), by id. */
   chapterOpeningsSeen?: readonly string[];
   /** Friends' own buildings on their tiles (`constants/hero-buildings.ts`), by id. Absent until one is built. */
-  heroBuildings?: Partial<Record<import('@/constants/hero-buildings').HeroBuildingId, { level: number; builtAt: number }>>;
+  heroBuildings?: Partial<Record<import('@/constants/hero-buildings').HeroBuildingId, { level: number; builtAt: number; /** When what it makes was last collected (production starts at the build). */ collectedAt?: number }>>;
   /** Building materials, earned on Supply Runs and spent on the Sanctuary's buildings. */
-  materials?: { timber: number };
+  /** Timber builds; Meals feed the team (earned at Baristabbit's Café, spent training heroes). */
+  materials?: { timber: number; meals?: number };
   /** The Supply Run's order slots (which pool index each of the two shows) and how many orders have been served. */
   supplyRun?: { slots: readonly [number, number]; served: number; crates?: number };
   /** Kept for saves written before `gardenLessons`; mirrors `gardenLessons.steppling`. */
@@ -662,12 +663,16 @@ export type MergeWorldCommand =
   | { type: 'restoreHeartTree'; receiptId: string; cost: number; now: number }
   | { type: 'claimChapterReward'; chapterId: string; glow: number; now: number }
   | { type: 'markChapterOpened'; chapterId: string; now: number }
+  /** The Heart Tree growing a level: its Glow and Timber, once per level. */
+  | { type: 'upgradeHeartTree'; expectedLevel: number; now: number }
+  /** What a hero building has made since it was last collected (the Lodge's Timber). */
+  | { type: 'collectHeroBuilding'; id: import('@/constants/hero-buildings').HeroBuildingId; now: number }
   /** A hero building up a level: its Glow and Timber, once per level. */
   | { type: 'upgradeHeroBuilding'; id: import('@/constants/hero-buildings').HeroBuildingId; expectedLevel: number; now: number }
   /** A board-local order (a Supply Run's): its items leave the board, and nothing else about the board's world changes. */
   | { type: 'serveBoardOrder'; order: MergeOrder; now: number }
   /** A Supply Run order served: its slot moves on to the next pool index, and it pays Timber and Glow. Once per index. */
-  | { type: 'completeSupplyOrder'; slot: 0 | 1; index: number; timber: number; glow: number; crate?: { every: number; timber: number; glow: number }; now: number }
+  | { type: 'completeSupplyOrder'; slot: 0 | 1; index: number; timber: number; glow: number; meals?: number; crate?: { every: number; timber: number; glow: number; meals?: number }; now: number }
   /** Glow the story hands over once (e.g. Steppling's mist price), keyed in the encounter ledger's receipts. */
   | { type: 'grantStoryGlow'; receiptId: string; amount: number; now: number }
   /** Keep going on a lost level: its Glow, once per receipt; refused when the Glow is not there. */
@@ -734,7 +739,7 @@ export type MergeWorldCommand =
   | { type: 'recordMovementEggProgress'; observedSteps?: number; manualMovement?: boolean; receiptId: string; now: number }
   | { type: 'ackExternalReward'; receiptId: string; now: number }
   /** A Mist encounter begins: the board that is up, and what was brought in. */
-  | { type: 'startEncounter'; missionId: string; runId: string; campaignId?: string; katchimeraId: MergeCharacterId; helperWispId: WispId | null; now: number }
+  | { type: 'startEncounter'; missionId: string; runId: string; campaignId?: string; katchimeraId: MergeCharacterId; helperWispId: WispId | null; partnerId?: MergeCharacterId | null; now: number }
   | { type: 'abandonEncounter'; now: number }
   /**
    * A cleared encounter pays once per receipt: Glow to the world, experience to the Katchimera, the clear to the ledger,
@@ -742,7 +747,7 @@ export type MergeWorldCommand =
    */
   /** A star milestone on a level track: its Glow once, and the friend pack the caller then grants. */
   | { type: 'claimTrackMilestone'; trackId: string; threshold: number; now: number }
-  | { type: 'completeEncounter'; receiptId: string; missionId: string; campaignId?: string; katchimeraId: MergeCharacterId; helperWispId: WispId | null; outcome: import('@/features/encounter/outcome').EncounterOutcome; difficulty: import('./encounter').EncounterDifficulty; base?: { glow: number; xp: number } | null; now: number }
+  | { type: 'completeEncounter'; receiptId: string; missionId: string; campaignId?: string; katchimeraId: MergeCharacterId; helperWispId: WispId | null; partnerId?: MergeCharacterId | null; outcome: import('@/features/encounter/outcome').EncounterOutcome; difficulty: import('./encounter').EncounterDifficulty; base?: { glow: number; xp: number } | null; now: number }
   | { type: 'ackEncounterOutcome'; now: number }
   /** A Katchimera a level up, for Glow, once their experience allows; a stale expected level changes nothing. */
   | { type: 'upgradeKatchimera'; characterId: MergeCharacterId; expectedLevel: number; now: number };
@@ -786,7 +791,7 @@ export type MergeWorldCommandResult = {
   natureIslandUpgrade?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; coinCost: number; completedTier: boolean };
   storyWorldMutationReceipt?: StoryWorldMutationReceipt;
   /** An encounter just paid: what it paid and to whom, for the provider's celebration, Bond and sparks. */
-  encounterCleared?: { missionId: string; campaignId?: string; glow: number; xp: number; grade: import('./encounter').EncounterGrade; firstClear: boolean; katchimeraId: MergeCharacterId; islandRaised?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel }; trackId?: string; bossPack?: { receiptId: string; familyId: string } };
+  encounterCleared?: { missionId: string; campaignId?: string; glow: number; xp: number; grade: import('./encounter').EncounterGrade; firstClear: boolean; katchimeraId: MergeCharacterId; partnerId?: MergeCharacterId; islandRaised?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel }; trackId?: string; bossPack?: { receiptId: string; familyId: string } };
   milestoneClaimed?: { trackId: string; threshold: number; glow: number; pack: 'gift' | 'gift-rare' | 'finale'; familyId: string; receiptId: string };
   /** A Katchimera just levelled. */
   katchimeraUpgraded?: { characterId: MergeCharacterId; level: number; cost: number };

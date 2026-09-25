@@ -19,8 +19,10 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
       "sleeping": "The old lantern path leads to a warm table. A spoon taps against a bowl."
     }
   },
+  // Cozy 4X: the warm table wakes once Petalimp is home (Chapter 4, The Kitchen); Feastle brings the Hearth Pantry.
   "availability": {
-    "kind": "kingdom_goal_introduced"
+    "kind": "island_friend_home",
+    "residentSkinId": "petalimp"
   },
   "discovery": {
     "gateId": "gate-3-first-choice",
@@ -152,8 +154,19 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
   },
   "discoveryFlow": {
     "id": "glow-feastle-discovery",
-    "version": 1,
+    // v2: no Egg; Feastle is rescued straight home once the table is revealed.
+    "version": 2,
     "runId": "story:glow-feastle-v1",
+    "migrations": { "gateway.egg": "gateway.rescue", "egg.enter": "gateway.rescue" },
+    "arrival": "rescue",
+    "joined": {
+      "guide": {
+        "eyebrow": "Feastle has joined your Sanctuary",
+        "title": "Someone saved you a seat.",
+        "body": "Feastle kept the hearth warm the whole time. Now the Caf\u00e9 is a Kitchen: proper dishes, desserts, and feasts that feed the whole team."
+      },
+      "actionLabel": "Pull up a chair"
+    },
     "egg": {
       "guide": {
         "eyebrow": "A place kept warm",

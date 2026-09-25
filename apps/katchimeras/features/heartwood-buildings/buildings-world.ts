@@ -1,3 +1,4 @@
+import { buildingLevelCap, heartTreeLevel } from '@/constants/heart-tree';
 import {
   HEARTWOOD_BUILDING_MAX_LEVEL,
   heartwoodBuildingById,
@@ -110,9 +111,11 @@ export function upgradeHeartwoodBuilding(input: MergeWorldState, id: HeartwoodBu
   if (!heartwoodBuildingsEligible(input)) throw new Error('Heartwood is not ready for this yet.');
   const cost = heartwoodBuildingCost(level)!;
   if (input.coins < cost) throw new Error(`You need ${(cost - input.coins).toLocaleString()} more Glow.`);
+  const tree = heartTreeLevel(input);
+  if (tree > 0 && level + 1 > buildingLevelCap(tree)) throw new Error('Grow the Heart Tree first.');
   const timber = heartwoodBuildingTimberCost(level);
   const held = input.materials?.timber ?? 0;
-  if (held < timber) throw new Error(`You need ${timber - held} more Timber. Run supplies on the Lost Trail.`);
+  if (held < timber) throw new Error(`You need ${timber - held} more Timber. Serve orders at the Café.`);
   const state = structuredClone(input);
   if (level === 0) sendPlantHome(state, definition.slotId);
   state.coins -= cost;

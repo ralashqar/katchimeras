@@ -274,14 +274,14 @@ const storedWorldStep = (step: (state: MergeWorldState, now: number) => MergeWor
 
 /** A finished Wisp Rush heat: saved once, paid once, records only ever better. Throws if the run cannot be accepted. */
 /** A Mist encounter begins: the board that is up and the loadout brought in are remembered with the world. */
-export async function startStoredEncounter(input: { missionId: string; runId: string; campaignId?: string; katchimeraId: import('@/types/merge-world').MergeCharacterId; helperWispId: import('@/types/wisp').WispId | null }, now = gameNow()) {
+export async function startStoredEncounter(input: { missionId: string; runId: string; campaignId?: string; katchimeraId: import('@/types/merge-world').MergeCharacterId; helperWispId: import('@/types/wisp').WispId | null; partnerId?: import('@/types/merge-world').MergeCharacterId | null }, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'startEncounter', ...input, now }), now);
 }
 export async function abandonStoredEncounter(now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'abandonEncounter', now }), now);
 }
 /** A cleared encounter paid once per receipt: Glow, experience, the clear, and the island a level up when the rung was its chapter's last. */
-export async function completeStoredEncounter(input: { receiptId: string; missionId: string; campaignId?: string; katchimeraId: import('@/types/merge-world').MergeCharacterId; helperWispId: import('@/types/wisp').WispId | null; outcome: import('@/features/encounter/outcome').EncounterOutcome; difficulty: import('@/types/encounter').EncounterDifficulty; base?: { glow: number; xp: number } | null }, now = gameNow()) {
+export async function completeStoredEncounter(input: { receiptId: string; missionId: string; campaignId?: string; katchimeraId: import('@/types/merge-world').MergeCharacterId; helperWispId: import('@/types/wisp').WispId | null; partnerId?: import('@/types/merge-world').MergeCharacterId | null; outcome: import('@/features/encounter/outcome').EncounterOutcome; difficulty: import('@/types/encounter').EncounterDifficulty; base?: { glow: number; xp: number } | null }, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'completeEncounter', ...input, now }), now);
 }
 /** A star milestone on a level track: Glow once; the result names the friend pack for the caller to grant. */
@@ -783,8 +783,8 @@ export async function ensureStoredOpeningGlow(receiptId: string, amount: number 
 }
 
 /** A Supply Run order served: Timber and Glow into the world, once per pool index (`completeSupplyOrder`). */
-export function completeStoredSupplyOrder(slot: 0 | 1, index: number, timber: number, glow: number, crate?: { every: number; timber: number; glow: number }, now = gameNow()) {
-  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'completeSupplyOrder', slot, index, timber, glow, ...(crate ? { crate } : {}), now }), now);
+export function completeStoredSupplyOrder(slot: 0 | 1, index: number, timber: number, glow: number, crate?: { every: number; timber: number; glow: number; meals?: number }, meals = 0, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'completeSupplyOrder', slot, index, timber, glow, meals, ...(crate ? { crate } : {}), now }), now);
 }
 
 /** A hero building up a level (`upgradeHeroBuilding`); throws the reason when it cannot. */
@@ -792,6 +792,18 @@ export async function upgradeStoredHeroBuilding(id: import('@/constants/hero-bui
   const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'upgradeHeroBuilding', id, expectedLevel, now }), now);
   if (!result.changed && result.message) throw new Error(result.message);
   return result;
+}
+
+/** The Heart Tree growing a level (`upgradeHeartTree`); throws the reason when it cannot. */
+export async function upgradeStoredHeartTree(expectedLevel: number, now = gameNow()) {
+  const result = await reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'upgradeHeartTree', expectedLevel, now }), now);
+  if (!result.changed && result.message) throw new Error(result.message);
+  return result;
+}
+
+/** What a hero building has made, collected (`collectHeroBuilding`). */
+export function collectStoredHeroBuilding(id: import('@/constants/hero-buildings').HeroBuildingId, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'collectHeroBuilding', id, now }), now);
 }
 
 /** A chapter's opening scene has played (`markChapterOpened`). */

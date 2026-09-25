@@ -5,7 +5,7 @@ import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feas
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
 import type { CorruptionWispTarget } from '@/components/katchadeck/world/corruption-wisp-layer';
 import type { useOpeningGlow } from '@/components/katchadeck/world/kingdom-opening-merge-dock';
-import { abilityFor, abilityReady, abilityTargets } from '@/features/encounter/abilities';
+import { abilityFor, abilityReady, partnerAbilityFor, partnerAbilityReady, abilityTargets } from '@/features/encounter/abilities';
 import { encounterMechanicHost } from '@/features/encounter/adapt';
 import { createEncounterState } from '@/features/encounter/create-state';
 import { encounterLine, EXPOSED_WISP_LINE, GATHER_LINE, SPREAD_LINE, KEEP_GOING_RESOLVE, LOW_RESOLVE, THREAT_LINE, WISP_ACT_LINES, WISP_ACT_ORDER } from '@/features/encounter/encounter-copy';
@@ -68,10 +68,12 @@ export type EncounterDockState = {
   status: EncounterStatus | null;
   outcome: EncounterOutcome | null;
   ability: { definition: CompanionAbilityDefinition; tier: CompanionAbilityTier; charge: number; ready: boolean; targets: number[] } | null;
+  /** The partner's ability (the second hero slot), with who they are; null without a partner. */
+  partnerAbility: { definition: CompanionAbilityDefinition; tier: CompanionAbilityTier; charge: number; ready: boolean; targets: number[]; companionId: string } | null;
   /** What the friend says right now, or nothing. */
   speech: string | null;
   effects: MechanicEffect[];
-  onUseAbility: (target: number | null) => void;
+  onUseAbility: (target: number | null, slot?: 0 | 1) => void;
   /** Focus / Ripple: the next merge (the next Water merge) clears as if this many steps bigger. */
   boost: { next: number; water: number };
   /** Scout: Mist cells whose hidden contents are shown. */
@@ -129,7 +131,8 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
   const effectiveLoadout = useMemo((): EncounterLoadout | null => encounter ? loadout ?? { companionId: 'mossprout', level: 1 } : null, [encounter, loadout]);
   const profile = useMemo(() => encounterProfile(world ?? null, effectiveLoadout), [effectiveLoadout, world]);
   const window = useMemo(() => missionWindow(encounter?.rows ?? 4), [encounter?.rows]);
-  const host = useMemo(() => (encounter ? encounterMechanicHost(encounter) : played), [encounter, played]);
+  const wispSlow = profile.wispSlow ?? 0;
+  const host = useMemo(() => (encounter ? encounterMechanicHost(encounter, { wispSlow }) : played), [encounter, played, wispSlow]);
   const [attempt, setAttempt] = useState(1);
   useEffect(() => { setAttempt(1); }, [encounter?.id]);
   const binding = useMemo(() => host ? { host, window, ...(encounter ? { encounter, loadout: effectiveLoadout, profile, attempt } : {}) } : null, [attempt, effectiveLoadout, encounter, host, profile, window]);
@@ -252,6 +255,12 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     if (!found) return null;
     return { definition: found.definition, tier: found.tier, charge: store.run.ability?.charge ?? 0, ready: abilityReady(store.run, found.tier), targets: abilityTargets(found.definition, found.tier, store.state, window) };
   }, [effectiveLoadout, encounter, store.run, store.state, window]);
+  const partnerAbility = useMemo(() => {
+    if (!encounter || !store.run || !store.state || !effectiveLoadout?.partner) return null;
+    const found = partnerAbilityFor(effectiveLoadout);
+    if (!found) return null;
+    return { definition: found.definition, tier: found.tier, charge: store.run.partnerAbility?.charge ?? 0, ready: partnerAbilityReady(store.run, found.tier), targets: abilityTargets(found.definition, found.tier, store.state, window), companionId: effectiveLoadout.partner.companionId };
+  }, [effectiveLoadout, encounter, store.run, store.state, window]);
   const outcome = useMemo(() => (encounter && store.run && store.status ? encounterOutcome(encounter, store.run, store.status) : null), [encounter, store.run, store.status]);
   const speech = useMemo(() => {
     if (!encounter || !store.run) return null;
@@ -289,12 +298,12 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     // Paid once per loss of this attempt: the receipt names the attempt and which continue it is.
     void payKeepGoing(`continue:${runId}:${continues}`).then((paid) => { if (paid) keepGoing(KEEP_GOING_RESOLVE); }).catch(() => undefined);
   }, [continues, keepGoing, payKeepGoing, runId]);
-  const onUseAbility = useCallback((target: number | null) => { useAbility(target); }, [useAbility]);
+  const onUseAbility = useCallback((target: number | null, slot: 0 | 1 = 0) => { useAbility(target, slot); }, [useAbility]);
   const lossReason = useMemo(() => (encounter && store.run && store.state && store.mechanicState && host && store.status === 'failed'
     ? encounterLossReason(encounter, host, store.mechanicState, store.run, store.state, window) : null), [encounter, host, store.mechanicState, store.run, store.state, store.status, window]);
   const lanes = mechanic?.kind === 'lanes' ? mechanic : null;
   const encounterDock = useMemo((): EncounterDockState | null => encounter && store.run ? {
-    definition: encounter, resolveLeft: store.run.resolve.budget == null ? null : resolveLeft(store.run), status: store.status, outcome, ability, speech, effects,
+    definition: encounter, resolveLeft: store.run.resolve.budget == null ? null : resolveLeft(store.run), status: store.status, outcome, ability, partnerAbility, speech, effects,
     // Lanes are never lost to the Mist's hold: no meter.
     territory: store.run.territory && !lanes ? { mist: store.run.territory.last, overrun: store.run.territory.overrun, cells: encounter.rows * 5 } : null,
     lanes: lanes && store.mechanicState?.kind === 'lanes' ? { left: wispViews(lanes, host!, store.mechanicState).filter((wisp) => wisp.damage < wisp.hp).length } : null,
@@ -303,7 +312,7 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     turns: host && mechanicIsTactics(resolveMechanic(host)) ? store.run.actions : store.run.merges, lossReason, keepGoingCost: payKeepGoing ? keepGoingCost ?? 0 : 0,
     boost: store.run.boost ?? { next: 0, water: 0 }, revealed: store.run.revealed ?? [],
     onUseAbility, onKeepGoing, onRetry, onLeave: onLeave ?? null,
-  } : null, [ability, effects, encounter, host, lanes, lossReason, onKeepGoing, onLeave, onRetry, onUseAbility, outcome, speech, laneTick, store.mechanicState, store.run, store.status]);
+  } : null, [ability, effects, encounter, host, lanes, lossReason, onKeepGoing, onLeave, onRetry, onUseAbility, outcome, partnerAbility, speech, laneTick, store.mechanicState, store.run, store.status]);
   return {
     /** The mission as played: itself, or with the preview mechanic laid over it. */
     mission: played,

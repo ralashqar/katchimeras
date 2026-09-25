@@ -100,6 +100,12 @@ export type HatchableDiscoveryFlowDefinition = {
     ready: HatchableFlowCopy;
   };
   egg: HatchableFlowCopy;
+  /**
+   * How the friend comes home after the board: through the Egg (the old path), or rescued straight home once the tile
+   * is revealed (cozy 4X: the way Steppling came home), with `joined` as the card that welcomes them.
+   */
+  arrival?: 'egg' | 'rescue';
+  joined?: HatchableFlowCopy;
 };
 
 export type HatchableDayOneDefinition = {

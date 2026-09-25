@@ -1,4 +1,5 @@
-import { HERO_BUILDING_MAX_LEVEL, heroBuildingById, heroBuildingCost, heroBuildingForCompanion, heroBuildingLevel, heroLevelCap, type HeroBuildingId } from '@/constants/hero-buildings';
+import { HERO_BUILDING_MAX_LEVEL, heroBuildingById, heroCompanionHome, heroBuildingCost, heroBuildingForCompanion, heroBuildingLevel, heroLevelCap, LODGE_PRODUCTION_INTERVAL_MS, lodgeTimberStore, lodgeTimberWaiting, type HeroBuildingId } from '@/constants/hero-buildings';
+import { buildingLevelCap, heartTreeCost, heartTreeLevel } from '@/constants/heart-tree';
 import { normalizeAdventure } from '@/features/shared-adventure/normalize';
 import { normalizeTimeTrials } from '@/features/time-trial/trial-world';
 import { createOrderQueries } from '@incubator/merge/orders';
@@ -67,7 +68,7 @@ import type { EncounterGrade, EncounterMistHolds, EncounterMistType } from '@/ty
 import { encounterRewards } from '@/features/encounter/encounter-rewards';
 import { wispPerk } from '@/constants/helper-wisps';
 import { regionRung } from '@/constants/island-campaigns/ladder';
-import { katchimeraProgress, katchimeraUpgradeCost, katchimeraXpForLevel, KATCHIMERA_MAX_LEVEL } from '@/constants/katchimera-progression';
+import { katchimeraProgress, katchimeraUpgradeCost, katchimeraUpgradeMeals, katchimeraXpForLevel, KATCHIMERA_MAX_LEVEL } from '@/constants/katchimera-progression';
 import type { WispId } from '@/types/wisp';
 import type {
   EncounterClearRecord,
@@ -604,12 +605,41 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       const crate = command.crate && served % Math.max(1, command.crate.every) === 0 ? command.crate : null;
       const glow = Math.max(0, Math.floor(command.glow)) + (crate ? crate.glow : 0);
       const timber = Math.max(0, Math.floor(command.timber)) + (crate ? crate.timber : 0);
+      const meals = Math.max(0, Math.floor(command.meals ?? 0)) + (crate ? Math.max(0, Math.floor(crate.meals ?? 0)) : 0);
       return changed(touch({
         ...current,
         coins: Math.min(999_999, current.coins + glow),
-        materials: { ...current.materials, timber: (current.materials?.timber ?? 0) + timber },
+        materials: { ...current.materials, timber: (current.materials?.timber ?? 0) + timber, meals: (current.materials?.meals ?? 0) + meals },
         supplyRun: { slots, served, crates: (run.crates ?? 0) + (crate ? 1 : 0) },
       }, command.now));
+    }
+    case 'upgradeHeartTree': {
+      const level = heartTreeLevel(current);
+      if (level !== command.expectedLevel) return unchanged(current);
+      const cost = heartTreeCost(level);
+      if (!cost) return unchanged(current, level < 1 ? 'The Heart Tree is still asleep.' : 'Fully grown.');
+      if (current.coins < cost.glow) return unchanged(current, `You need ${(cost.glow - current.coins).toLocaleString()} more Glow.`);
+      const timber = current.materials?.timber ?? 0;
+      if (timber < cost.timber) return unchanged(current, `You need ${cost.timber - timber} more Timber. Serve orders at the Café.`);
+      return changed(touch({
+        ...current, coins: current.coins - cost.glow, materials: { ...current.materials, timber: timber - cost.timber },
+        heartTree: { ...current.heartTree!, level: level + 1 },
+      }, command.now), `The Heart Tree grows: level ${level + 1}.`);
+    }
+    case 'collectHeroBuilding': {
+      const lodge = current.heroBuildings?.[command.id];
+      if (command.id !== 'explorers-lodge' || !lodge) return unchanged(current);
+      const waiting = lodgeTimberWaiting(current, command.now);
+      if (waiting < 1) return unchanged(current);
+      const store = lodgeTimberStore(lodge.level);
+      const since = Math.max(0, command.now - (lodge.collectedAt ?? lodge.builtAt));
+      const intervals = Math.floor(since / LODGE_PRODUCTION_INTERVAL_MS);
+      // A full store starts again from now; otherwise the part-made next batch keeps its time.
+      const collectedAt = waiting >= store ? command.now : (lodge.collectedAt ?? lodge.builtAt) + intervals * LODGE_PRODUCTION_INTERVAL_MS;
+      return changed(touch({
+        ...current, materials: { ...current.materials, timber: (current.materials?.timber ?? 0) + waiting },
+        heroBuildings: { ...current.heroBuildings, [command.id]: { ...lodge, collectedAt } },
+      }, command.now), `+${waiting} Timber`);
     }
     case 'upgradeHeroBuilding': {
       const definition = heroBuildingById.get(command.id);
@@ -619,13 +649,14 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       if (level !== command.expectedLevel) return unchanged(current);
       const cost = heroBuildingCost(level);
       if (!cost) return unchanged(current, 'Fully grown.');
-      if (!current.companionDiscovery.records.some((record) => record.characterId === definition.companion)) return unchanged(current, 'Its friend is not home yet.');
+      if (!heroCompanionHome(current, definition)) return unchanged(current, 'Its friend is not home yet.');
+      if (level + 1 > buildingLevelCap(heartTreeLevel(current))) return unchanged(current, 'Grow the Heart Tree first.');
       if (current.coins < cost.glow) return unchanged(current, `You need ${(cost.glow - current.coins).toLocaleString()} more Glow.`);
       const timber = current.materials?.timber ?? 0;
-      if (timber < cost.timber) return unchanged(current, `You need ${cost.timber - timber} more Timber. Run supplies on the Lost Trail.`);
+      if (timber < cost.timber) return unchanged(current, `You need ${cost.timber - timber} more Timber. Serve orders at the Café.`);
       return changed(touch({
         ...current, coins: current.coins - cost.glow, materials: { ...current.materials, timber: timber - cost.timber },
-        heroBuildings: { ...current.heroBuildings, [command.id]: { level: level + 1, builtAt: current.heroBuildings?.[command.id]?.builtAt ?? command.now } },
+        heroBuildings: { ...current.heroBuildings, [command.id]: { level: level + 1, builtAt: current.heroBuildings?.[command.id]?.builtAt ?? command.now, collectedAt: current.heroBuildings?.[command.id]?.collectedAt ?? command.now } },
       }, command.now), level === 0 ? `${definition.name} built.` : `${definition.name}: level ${level + 1}.`);
     }
     case 'markChapterOpened': {
@@ -1683,7 +1714,8 @@ function startEncounter(state: MergeWorldState, command: Extract<MergeWorldComma
   const ledger = encounterLedger(state);
   if (ledger.active?.missionId === command.missionId && ledger.active.runId === command.runId) return unchanged(state);
   const active = { missionId: command.missionId, runId: command.runId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), katchimeraId: command.katchimeraId, helperWispId: command.helperWispId, startedAt: command.now };
-  return changed(touch({ ...state, encounters: { ...ledger, active, loadout: { katchimeraId: command.katchimeraId, helperWispId: command.helperWispId } } }, command.now));
+  const partnerId = command.partnerId && command.partnerId !== command.katchimeraId && KNOWN_CHARACTERS.has(command.partnerId) ? command.partnerId : null;
+  return changed(touch({ ...state, encounters: { ...ledger, active, loadout: { katchimeraId: command.katchimeraId, helperWispId: command.helperWispId, ...(partnerId ? { partnerId } : {}) } } }, command.now));
 }
 
 function abandonEncounter(state: MergeWorldState, now: number): MergeWorldCommandResult {
@@ -1718,7 +1750,10 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
   const bestGrade = previous && order[previous.bestGrade] >= order[command.outcome.grade] ? previous.bestGrade : command.outcome.grade;
   const clears = { ...ledger.clears, [command.missionId]: { firstClearedAt: previous?.firstClearedAt ?? command.now, clears: (previous?.clears ?? 0) + 1, bestGrade, lastKatchimeraId: command.katchimeraId } };
   const progress = katchimeraProgress(state, command.katchimeraId);
-  const katchimeraProgressNext = { ...state.katchimeraProgress, [command.katchimeraId]: { ...progress, xp: progress.xp + paid.xp } };
+  // Both heroes who were there learn from it: the lead and, with the second slot open, their partner.
+  const partnerId = command.partnerId && command.partnerId !== command.katchimeraId && KNOWN_CHARACTERS.has(command.partnerId) ? command.partnerId : null;
+  const partnerProgress = partnerId ? katchimeraProgress(state, partnerId) : null;
+  const katchimeraProgressNext = { ...state.katchimeraProgress, [command.katchimeraId]: { ...progress, xp: progress.xp + paid.xp }, ...(partnerId && partnerProgress ? { [partnerId]: { ...partnerProgress, xp: partnerProgress.xp + paid.xp } } : {}) };
   const receipts = [...ledger.receipts, command.receiptId].slice(-200);
   const lastOutcome = { missionId: command.missionId, receiptId: command.receiptId, grade: command.outcome.grade, glow: paid.glow, xp: paid.xp, firstClear, katchimeraId: command.katchimeraId, ackedAt: null };
   const dailyMatch = /^daily:(\d{4}-\d{2}-\d{2}):(\d+)$/.exec(command.missionId);
@@ -1746,7 +1781,7 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
   return {
     state: next, changed: true,
     message: `${paid.glow} Glow.`,
-    encounterCleared: { missionId: command.missionId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), glow: paid.glow, xp: paid.xp, grade: command.outcome.grade, firstClear, katchimeraId: command.katchimeraId, ...(islandRaised ? { islandRaised } : {}), trackId, ...(bossPack ? { bossPack } : {}) },
+    encounterCleared: { missionId: command.missionId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), glow: paid.glow, xp: paid.xp, grade: command.outcome.grade, firstClear, katchimeraId: command.katchimeraId, ...(partnerId ? { partnerId } : {}), ...(islandRaised ? { islandRaised } : {}), trackId, ...(bossPack ? { bossPack } : {}) },
   };
 }
 
@@ -1788,14 +1823,17 @@ function upgradeKatchimera(state: MergeWorldState, characterId: MergeCharacterId
   if (progress.level !== expectedLevel) return unchanged(state);
   if (progress.level >= KATCHIMERA_MAX_LEVEL) return unchanged(state, 'Nothing more to learn here.');
   const cost = katchimeraUpgradeCost(progress.level)!;
+  const meals = katchimeraUpgradeMeals(progress.level);
   const needed = katchimeraXpForLevel(progress.level + 1);
   if (progress.xp < needed) return unchanged(state, `${(needed - progress.xp).toLocaleString()} more experience in the Mist first.`);
   if (state.coins < cost) return unchanged(state, `You need ${(cost - state.coins).toLocaleString()} more Glow.`);
+  const held = state.materials?.meals ?? 0;
+  if (held < meals) return unchanged(state, `You need ${meals - held} more Meals. Serve orders at the Café.`);
   const cap = heroLevelCap(state, characterId);
   if (cap != null && progress.level + 1 > cap) return unchanged(state, `Grow ${heroBuildingForCompanion(characterId)?.name ?? 'their building'} first.`);
   const level = progress.level + 1;
   return {
-    state: touch({ ...state, coins: state.coins - cost, katchimeraProgress: { ...state.katchimeraProgress, [characterId]: { ...progress, level, upgradedAt: now } } }, now),
+    state: touch({ ...state, coins: state.coins - cost, materials: { timber: state.materials?.timber ?? 0, ...state.materials, meals: held - meals }, katchimeraProgress: { ...state.katchimeraProgress, [characterId]: { ...progress, level, upgradedAt: now } } }, now),
     changed: true, message: `Level ${level}.`, katchimeraUpgraded: { characterId, level, cost },
   };
 }
@@ -4392,13 +4430,17 @@ function normalizeHeroBuildings(value: unknown): MergeWorldState['heroBuildings'
   if (!value || typeof value !== 'object') return {};
   return Object.fromEntries(Object.entries(value as Record<string, { level?: unknown; builtAt?: unknown }>).flatMap(([id, entry]) => {
     if (!heroBuildingById.has(id as HeroBuildingId) || !entry || typeof entry !== 'object') return [];
-    return [[id, { level: Math.max(0, Math.min(HERO_BUILDING_MAX_LEVEL, Math.floor(Number(entry.level) || 0))), builtAt: finite(entry.builtAt, 0) }]];
+    const collectedAt = (entry as { collectedAt?: unknown }).collectedAt;
+    return [[id, { level: Math.max(0, Math.min(HERO_BUILDING_MAX_LEVEL, Math.floor(Number(entry.level) || 0))), builtAt: finite(entry.builtAt, 0), ...(collectedAt != null ? { collectedAt: finite(collectedAt, 0) } : {}) }]];
   }));
 }
 
 function normalizeMaterials(value: unknown): MergeWorldState['materials'] {
-  const timber = value && typeof value === 'object' ? Number((value as { timber?: unknown }).timber) : 0;
-  return { timber: Number.isFinite(timber) ? Math.max(0, Math.floor(timber)) : 0 };
+  const read = (key: 'timber' | 'meals') => {
+    const raw = value && typeof value === 'object' ? Number((value as Record<string, unknown>)[key]) : 0;
+    return Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
+  };
+  return { timber: read('timber'), meals: read('meals') };
 }
 
 function normalizeSupplyRun(value: unknown): MergeWorldState['supplyRun'] {
@@ -4413,7 +4455,7 @@ function normalizeSupplyRun(value: unknown): MergeWorldState['supplyRun'] {
 function normalizeHeartTree(value: unknown): MergeWorldState['heartTree'] {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<NonNullable<MergeWorldState['heartTree']>>;
-  return typeof candidate.receiptId === 'string' ? { receiptId: candidate.receiptId, restoredAt: finite(candidate.restoredAt, 0) } : null;
+  return typeof candidate.receiptId === 'string' ? { receiptId: candidate.receiptId, restoredAt: finite(candidate.restoredAt, 0), level: Math.max(1, Math.floor(finite(candidate.level, 1))) } : null;
 }
 
 function normalizeOpeningGlow(value: unknown): MergeWorldState['openingGlow'] {
@@ -4718,7 +4760,7 @@ function normalizeEncounters(value: unknown, now: number): EncounterLedger {
     ? { missionId: source.active.missionId, runId: source.active.runId, ...(typeof source.active.campaignId === 'string' ? { campaignId: source.active.campaignId } : {}), katchimeraId: character(source.active.katchimeraId)!, helperWispId: wisp(source.active.helperWispId), startedAt: finite(source.active.startedAt, now) }
     : null;
   const loadout = source.loadout && typeof source.loadout === 'object' && character(source.loadout.katchimeraId)
-    ? { katchimeraId: character(source.loadout.katchimeraId)!, helperWispId: wisp(source.loadout.helperWispId) }
+    ? { katchimeraId: character(source.loadout.katchimeraId)!, helperWispId: wisp(source.loadout.helperWispId), ...(character(source.loadout.partnerId) ? { partnerId: character(source.loadout.partnerId)! } : {}) }
     : null;
   const dayIds = Object.keys(source.daily ?? {}).filter((dayId) => /^\d{4}-\d{2}-\d{2}$/.test(dayId)).sort().slice(-ENCOUNTER_DAILY_DAYS_KEPT);
   const daily: EncounterLedger['daily'] = {};

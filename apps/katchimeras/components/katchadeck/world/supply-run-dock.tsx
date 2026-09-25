@@ -26,7 +26,7 @@ const CRATE = SUPPLY_CRATE.every;
  * Done puts the board away; it keeps everything for next time.
  */
 export const SupplyRunDock = memo(function SupplyRunDock({
-  state, send, orders, served, width, bottomInset, onServe, onBoardMetrics, onEntranceSettled, onClose, hiddenItemIds, servingOrderId, crateFull = false,
+  state, send, orders, served, width, bottomInset, onServe, onBoardMetrics, onEntranceSettled, onClose, hiddenItemIds, servingOrderId, crateFull = false, title,
 }: {
   state: MergeWorldState;
   send: (command: MergeWorldCommand) => MissionCommandResult | null;
@@ -36,6 +36,8 @@ export const SupplyRunDock = memo(function SupplyRunDock({
   bottomInset: number;
   /** Serve: the card's item slots on screen, in requirement order, are where the served items fly to. */
   onServe: (order: SupplyRunOrder, itemTargets: readonly MergeScreenPoint[]) => Promise<boolean> | boolean;
+  /** The bar's title: Baristabbit's Caf\u00e9 until Feastle makes it a Kitchen. */
+  title?: string;
   /** Pieces on their way to a card: hidden on the board while their copies fly. */
   hiddenItemIds?: ReadonlySet<string>;
   /** The order whose items are in flight: its card shows it, and no other can be served meanwhile. */
@@ -76,7 +78,7 @@ export const SupplyRunDock = memo(function SupplyRunDock({
     </View>
   </View>;
   return <MistMissionDock
-    state={state} boardStep={null} progress={served > 0 && served % CRATE === 0 && crateFull ? CRATE : served % CRATE} required={CRATE} barTitle="Supplies for the Sanctuary"
+    state={state} boardStep={null} progress={served > 0 && served % CRATE === 0 && crateFull ? CRATE : served % CRATE} required={CRATE} barTitle={title ?? "Baristabbit’s Café"}
     interactionKey="supply-run" sessionId={sessionRef.current.id} hiddenItemIds={hiddenItemIds ?? noneHidden}
     width={width} bottomInset={bottomInset}
     onCommand={dispatch} onBoardMetrics={onBoardMetrics} onEntranceSettled={onEntranceSettled}

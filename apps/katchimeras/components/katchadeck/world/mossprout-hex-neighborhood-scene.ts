@@ -315,9 +315,14 @@ function natureLayerFor(
   islandId: MossproutNatureIslandId,
   level: MossproutNatureIslandLevel,
   revealed = false,
+  heroSlot = 0,
 ): KingdomTileArtLayer {
   const fallback = natureIslandArt(islandId);
-  const authored = level > 0 || revealed ? { ...fallback, ...natureIslandLevelArt(islandId, level) } : fallback;
+  // A friend's building on their island (the Bloom House) grows the island's art with it.
+  const look = level > 0 || revealed ? heroTileLook(islandId, heroSlot) : null;
+  const authored = look
+    ? { ...fallback, alphaBounds: hexAlphaBounds(look.alphaBoundsKey), sources: look.art() }
+    : level > 0 || revealed ? { ...fallback, ...natureIslandLevelArt(islandId, level) } : fallback;
   const locked = level === 0 && !revealed;
   const rendered = locked
     ? {
@@ -450,6 +455,7 @@ export function buildMossproutHexNeighborhoodScene(
       island.id,
       natureIslandLevels[island.id] ?? 0,
       Boolean(natureIslandReveals[island.id]),
+      gardenState.heroTileLooks?.[island.id] ?? 0,
     )),
   ];
   // The Hollow Tree: the far landmark over the Mist (`docs/cozy-4x-ftue-the-last-clearing.md`, beat 10), past the

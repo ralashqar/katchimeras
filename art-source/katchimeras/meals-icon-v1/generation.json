@@ -1,0 +1,6 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "prompt": "Use the reference only for its art style: one chunky, glossy, cushiony 3D toy icon with soft bevels, a single soft highlight, large flat colour blocks, very low detail and no texture. Replace the golden swirl with a DIFFERENT icon: ONE plump round bowl of warm stew seen from a slight three-quarter angle, centred and very large. The bowl is a solid warm cream with one broad rosy-red band around it; the stew is one smooth rounded golden-orange mound with two simple round green pea dots on top, heaped slightly above the rim. At most four colours: cream, rosy red, golden orange, green. No steam, no smoke, no curls, no symbols above the bowl. No spoon, no chopsticks, no table, no pattern, no tiny details. It must be unmistakable at 20 pixels and clearly different from a golden swirl or wooden logs. Perfectly flat pure black #000000 background for matting, the whole silhouette inside the canvas with clear padding. No second object, no ring, no coin, no sparkles, no particles, no aura, no face, no text, no letters, no border, no UI, no watermark, no floor, no cast shadow.",
+  "sourceSha256": "153fce0e1167913d9b663c1dac8f64c4f3c8c6b9fa5e7af3a4db8a7f6b87f54b",
+  "referenceSha256": "3d71c3d7ceb88fef92161e03118f87cc01a3614b9f8a66029c3d2764532b3050"
+}

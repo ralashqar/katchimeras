@@ -1,3 +1,4 @@
+import { heroSlots, withPartner } from '@/features/encounter/team';
 import { useState } from 'react';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { UpgradeDock, useUpgradeDockMotion } from '@/components/katchadeck/upgrade/upgrade-dock';
@@ -44,13 +45,15 @@ export function LevelTrackSheet({ track, world, layout, bottomInset, ownedWispId
   const motion = useUpgradeDockMotion({ busy, onClose });
   const playable = PLAYABLE_KATCHIMERAS.filter((id) => id === 'mossprout' || world.unlockedCharacters.includes(id));
   const remembered = world.encounters?.loadout;
-  const [loadout, setLoadout] = useState<EncounterLoadoutChoice>({ katchimeraId: (remembered && playable.includes(remembered.katchimeraId) ? remembered.katchimeraId : 'mossprout') as MergeCharacterId, helperWispId: remembered?.helperWispId ?? null });
+  const [loadout, setLoadout] = useState<EncounterLoadoutChoice>(() => withPartner(world, { katchimeraId: (remembered && playable.includes(remembered.katchimeraId) ? remembered.katchimeraId : 'mossprout') as MergeCharacterId, helperWispId: remembered?.helperWispId ?? null, partnerId: remembered?.partnerId ?? null }, playable));
   const nextNode = track.primary.kind === 'play' ? track.primary.node : null;
   const eligible = nextNode?.mission?.eligible ?? null;
   const loadoutFor = (node: LevelNode): EncounterLoadoutChoice => {
     const allowed = node.mission?.eligible;
     // A level that asks for one friend in particular brings them, whoever was picked.
-    return allowed && !allowed.includes(loadout.katchimeraId) ? { ...loadout, katchimeraId: allowed[0] as MergeCharacterId } : loadout;
+    if (!allowed || allowed.includes(loadout.katchimeraId)) return loadout;
+    const lead = allowed[0] as MergeCharacterId;
+    return withPartner(world, { ...loadout, katchimeraId: lead, partnerId: loadout.partnerId === lead ? loadout.katchimeraId : loadout.partnerId }, playable);
   };
   const doPrimary = (primary: TrackPrimary) => {
     if (primary.kind === 'play') motion.leave(() => onPlay(primary.node, loadoutFor(primary.node)));
@@ -89,8 +92,8 @@ export function LevelTrackSheet({ track, world, layout, bottomInset, ownedWispId
         detail={`+${milestone.glow} Glow · ${PACK_NAMES[milestone.pack]}`}
         action={milestone.state === 'ready' ? { label: 'Open', primary: true, disabled: busy || motion.closing, onPress: () => onChest(milestone.threshold) } : undefined} />)}
     </UpgradeSection> : null}
-    <UpgradeSection label="Bring">
-      <UpgradeLoadoutRow world={world} playable={playable} ownedWispIds={ownedWispIds} value={loadout} eligible={eligible} disabled={busy || motion.closing} onChange={setLoadout} />
+    <UpgradeSection label="Bring" aside={heroSlots(world) === 2 ? 'Two heroes' : undefined}>
+      <UpgradeLoadoutRow world={world} playable={playable} ownedWispIds={ownedWispIds} value={loadout} eligible={eligible} slots={heroSlots(world)} disabled={busy || motion.closing} onChange={setLoadout} />
     </UpgradeSection>
   </UpgradeDock>;
 }

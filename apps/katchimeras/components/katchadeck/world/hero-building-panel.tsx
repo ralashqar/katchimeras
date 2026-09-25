@@ -4,7 +4,8 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { UpgradeDock, useUpgradeDockMotion } from '@/components/katchadeck/upgrade/upgrade-dock';
 import { UpgradeBenefitRow, UpgradeHero, UpgradeLevelSlots, UpgradeRequirementRow, UpgradeSection, useUpgradeLevelPick } from '@/components/katchadeck/upgrade/upgrade-rows';
 import { heroTileLook } from '@/constants/hero-building-art';
-import { heroBuildingById, heroBuildingLook, type HeroBuildingId } from '@/constants/hero-buildings';
+import { heroBuildingById, heroTileSlot, type HeroBuildingId } from '@/constants/hero-buildings';
+import { natureIslandLevelArt } from '@/components/katchadeck/world/mossprout-hex-neighborhood-scene';
 import { hatchableTileArt } from '@/constants/hatchable-companions/tile-art';
 import { heroBuildingUpgradeModel } from '@/features/upgrade-stage/upgrade-panel-model';
 import type { UpgradeStageLayout } from '@/features/upgrade-stage/upgrade-stage-layout';
@@ -14,7 +15,8 @@ import type { MergeWorldState } from '@/types/merge-world';
 function heroBuildingLevelArt(id: HeroBuildingId, level: number): ImageSourcePropType | null {
   const building = heroBuildingById.get(id);
   if (!building || level < 1) return null;
-  return (heroTileLook(building.tileId, heroBuildingLook(level))?.art() ?? hatchableTileArt(building.tileId)).medium as ImageSourcePropType;
+  const own = building.place === 'island' ? natureIslandLevelArt(building.tileId, 4).sources : hatchableTileArt(building.tileId);
+  return (heroTileLook(building.tileId, heroTileSlot(level))?.art() ?? own).medium as ImageSourcePropType;
 }
 
 /**
@@ -57,7 +59,7 @@ export function HeroBuildingPanel({ world, buildingId, layout, bottomInset, regi
       <UpgradeLevelSlots levels={model.levels} selected={pick.shown?.level ?? null} current={pick.current} onSelect={pick.pick} artFor={pick.slotArt} disabled={busy || motion.closing} />
     </UpgradeSection>
     {model.requirements.length ? <UpgradeSection label="Requires">
-      {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement.id === 'timber' && !requirement.met ? { ...requirement, action: { id: 'garden', label: 'Supply Run' } } : requirement}
+      {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement.id === 'timber' && !requirement.met ? { ...requirement, action: { id: 'garden', label: 'Café' } } : requirement}
         disabled={busy || motion.closing} onAction={() => motion.leave(requirement.id === 'timber' ? onSupplyRun : onClose)} />)}
     </UpgradeSection> : null}
   </UpgradeDock>;

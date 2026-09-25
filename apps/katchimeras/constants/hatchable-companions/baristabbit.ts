@@ -24,8 +24,9 @@ export const BARISTABBIT_HATCHABLE: HatchableCompanionDefinition = {
     alphaBoundsKey: 'shared_world_baristabbit_window_hex_tile_v1.webp',
     markerLines: { sleeping: 'The Mist keeps this window until Petalimp is home.' },
   },
-  // The window wakes once Petalimp is home: Baristabbit is the rescue at the end of her island's levels.
-  availability: { kind: 'island_friend_home', residentSkinId: 'petalimp' },
+  // Cozy 4X: the window wakes once Steppling is home (the end of the first session); Baristabbit is Chapter 1's rescue,
+  // and his Café is where the team's Meals come from.
+  availability: { kind: 'after_companion', companion: 'steppling' },
   discovery: { gateId: 'gate-3-first-choice', pathId: 'warm-light' },
   mission: {
     id: 'mission:baristabbit',
@@ -71,9 +72,11 @@ export const BARISTABBIT_HATCHABLE: HatchableCompanionDefinition = {
     },
   },
   discoveryFlow: {
-    id: 'glow-baristabbit-discovery', version: 2, runId: 'story:glow-baristabbit-v1',
-    // v1 opened the board from the bubble; the bubble pays first now.
-    migrations: { 'gateway.offer': 'gateway.pay', 'gateway.return': 'gateway.pay', 'gateway.focus': 'gateway.pay' },
+    id: 'glow-baristabbit-discovery', version: 3, runId: 'story:glow-baristabbit-v1',
+    // v1 opened the board from the bubble; the bubble pays first now. v3: no Egg, he is rescued straight home.
+    migrations: { 'gateway.offer': 'gateway.pay', 'gateway.return': 'gateway.pay', 'gateway.focus': 'gateway.pay', 'gateway.egg': 'gateway.rescue', 'egg.enter': 'gateway.rescue' },
+    arrival: 'rescue',
+    joined: { guide: { eyebrow: 'Baristabbit has joined your Sanctuary', title: 'The kettle\u2019s on.', body: 'He kept that window lit the whole time. Now his Caf\u00e9 is open: friends order, you serve, and the team eats well.' }, actionLabel: 'Welcome' },
     egg: { guide: { eyebrow: 'An Egg', title: 'So the window was keeping someone.', body: 'Something in there kept a kettle warm for nobody. Go on. That is you now.' }, actionLabel: 'Meet the Egg' },
   },
   dayOne: {

@@ -16,9 +16,13 @@ test('the Sanctuary always has one next thing: its chapter goals are read off th
   assert.equal(state.goal?.action.kind, 'building', 'a tap opens the building');
   world = built(world, 'dew-spring');
   state = sanctuaryChapterState(world)!;
-  assert.equal(state.goal?.id, 'supply-run', 'then the Supply Run: Timber');
+  assert.equal(state.goal?.id, 'baristabbit-home', 'then the lit window: Baristabbit');
+  assert.deepEqual(state.goal?.action, { kind: 'world_offer', offerId: 'mist:baristabbit-home' }, 'a tap opens his tile');
+  world = { ...world, companionDiscovery: { ...world.companionDiscovery, records: [...world.companionDiscovery.records, { characterId: 'baristabbit' }] } } as unknown as MergeWorldState;
+  state = sanctuaryChapterState(world)!;
+  assert.equal(state.goal?.id, 'supply-run', 'then his Café: Meals and Timber');
   assert.equal(state.goal?.action.kind, 'supply_run');
-  assert.equal(state.done, 1);
+  assert.equal(state.done, 2);
   world = { ...world, supplyRun: { slots: [3, 4], served: 3 } };
   assert.equal(sanctuaryChapterState(world)!.goal?.id, 'dew-spring-2', 'then the Timber spent: the Dew Spring grows');
   world = { ...world, heartwoodBuildings: { ...world.heartwoodBuildings, 'dew-spring': { level: 2 } } } as MergeWorldState;
@@ -38,7 +42,7 @@ test('a chapter pays once, then the next one opens: the Signal points at Petalim
   const lodge = sanctuaryChapterState(world)!;
   assert.equal(lodge.chapter.id, 'explorers-lodge', 'the claim survives a reload, and the Lodge chapter follows');
   assert.deepEqual(lodge.goal?.action, { kind: 'hero_building', id: 'explorers-lodge' }, 'a tap opens the Lodge');
-  world = { ...world, heroBuildings: { 'explorers-lodge': { level: 2, builtAt: 3_000 } }, supplyRun: { slots: [3, 3], served: 5, crates: 1 } };
+  world = { ...world, heroBuildings: { 'explorers-lodge': { level: 2, builtAt: 3_000 } }, supplyRun: { slots: [3, 3], served: 5, crates: 1 }, heartTree: { receiptId: 'test:tree', restoredAt: 1_000, level: 2 } };
   assert.equal(sanctuaryChapterState(world)?.complete, true);
   world = reduceMergeWorld(world, { type: 'claimChapterReward', chapterId: 'explorers-lodge', glow: 40, now: 3_200 }).state;
   const next = sanctuaryChapterState(world)!;
@@ -57,4 +61,20 @@ test('a chapter pays once, then the next one opens: the Signal points at Petalim
   assert.equal(sanctuaryChapterState(world)?.goal?.id, 'petalimp-home');
   const home = { ...world, islandCampaigns: { ...world.islandCampaigns, [PETALIMP_ISLAND_CAMPAIGN_ID]: { ...(world.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID] ?? {}), cardEarnedAt: 4_000 } } } as MergeWorldState;
   assert.equal(sanctuaryChapterState(home)?.complete, true, 'Petalimp home completes the Signal');
+});
+
+test('every friend after Petalimp has a chapter: a signal, the Heart Tree, a hero trained, the first battle, home', async () => {
+  const { SANCTUARY_CHAPTERS } = await import('@/constants/sanctuary-chapters');
+  const { ISLAND_WAKE_ORDER } = await import('@/constants/island-campaigns/wake-order');
+  const { islandCampaignForIsland } = await import('@/constants/island-campaigns/registry');
+  assert.deepEqual(SANCTUARY_CHAPTERS.map((chapter) => chapter.number), SANCTUARY_CHAPTERS.map((_, index) => index + 1));
+  for (const entry of ISLAND_WAKE_ORDER.slice(1)) {
+    const chapter = SANCTUARY_CHAPTERS.find((candidate) => candidate.opening?.islandId === entry.islandId);
+    assert.ok(chapter, `a chapter for ${entry.residentSkinId}`);
+    assert.equal(chapter.goals.find((goal) => goal.action.kind === 'heart_tree')!.title, `Grow the Heart Tree to level ${entry.heartTree}`, 'the chapter asks for the level its island needs');
+    assert.deepEqual(chapter.goals.map((goal) => goal.action.kind).filter((kind) => kind !== 'hero_building'), ['heart_tree', 'hero', 'kingdom_next', 'kingdom_next']);
+    const campaign = islandCampaignForIsland(entry.islandId)!;
+    const home = { ...createInitialMergeWorldState(1_000), islandCampaigns: { [campaign.campaignId]: { cardEarnedAt: 5 } } } as never;
+    assert.equal(chapter.goals.at(-1)!.done(home), true, 'the last goal is the friend home');
+  }
 });

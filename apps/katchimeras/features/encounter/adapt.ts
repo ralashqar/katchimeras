@@ -79,6 +79,11 @@ export function encounterFromRestoration(definition: RestorationBoardDefinition,
 }
 
 /** The encounter as its mechanic sees it: the host every board's rules are resolved through. */
-export function encounterMechanicHost(encounter: EncounterDefinition): { required: number; wisps: EncounterDefinition['wisps']; mechanic?: EncounterDefinition['mechanic'] } {
-  return { required: encounter.required, wisps: encounter.wisps, ...(encounter.mechanic ? { mechanic: encounter.mechanic } : {}) };
+export function encounterMechanicHost(encounter: EncounterDefinition, profile?: { wispSlow?: number }): { required: number; wisps: EncounterDefinition['wisps']; mechanic?: EncounterDefinition['mechanic'] } {
+  const slow = Math.max(0, Math.min(0.5, profile?.wispSlow ?? 0));
+  // Fernip's Thicket: a Lanes battle's wisps take longer over every row.
+  const mechanic = slow > 0 && encounter.mechanic?.kind === 'lanes'
+    ? { ...encounter.mechanic, wisps: encounter.mechanic.wisps.map((wisp) => ({ ...wisp, stepMs: Math.round(wisp.stepMs * (1 + slow)) })) }
+    : encounter.mechanic;
+  return { required: encounter.required, wisps: encounter.wisps, ...(mechanic ? { mechanic } : {}) };
 }

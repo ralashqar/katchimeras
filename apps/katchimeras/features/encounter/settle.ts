@@ -142,6 +142,8 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
       if (gained > 0) state = { ...state, generators: { ...state.generators, [spawner.generatorId]: { ...generator, charges: generator.charges + gained, capacity: Math.max(generator.capacity, generator.charges + gained) } } };
     }
     if (run.ability) run = { ...run, ability: { ...run.ability, charge: run.ability.charge + 1 } };
+    // The second hero's ability charges from the same merges.
+    if (run.partnerAbility) run = { ...run, partnerAbility: { ...run.partnerAbility, charge: run.partnerAbility.charge + 1 } };
     if (lanes && mechanicState.kind === 'lanes') {
       const made = state.board[result.mergedCell]?.occupant;
       mechanicState = lanesAfterMerge(mechanicState, made?.kind === 'item' ? made.instanceId : null);

@@ -38,7 +38,7 @@ export type HavenTileUpgradePresentation = {
   tileLook?: { tileId: string; from: number; to: number };
   /** A friend's tile opening with them already home: no Egg is revealed with it. */
   noEgg?: boolean;
-  heartTree?: { from: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage; to: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage };
+  heartTree?: { from: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage; to: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage; /** A level grown from its panel, not the first session's waking: the story is not moved on. */ grown?: boolean };
   status: HavenUpgradePresentationStatus;
   storyPresentationKey?: string;
   toStage: HavenStage;

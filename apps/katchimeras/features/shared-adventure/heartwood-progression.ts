@@ -1,6 +1,7 @@
 import type { MergeWorldState } from '@/types/merge-world';
 import { HEARTWOOD_BUILDINGS, heartwoodBuildingLevel } from '@/constants/heartwood-buildings';
 import { heartwoodPlants } from './heartwood-garden';
+import { heartTreeLevel, heartTreeStage } from '@/constants/heart-tree';
 
 export const GARDEN_SUPPLY_INTERVAL = 12 * 60 * 60 * 1000;
 export type HeartwoodStage = 'dormant' | 'stirring' | 'rooted' | 'blooming' | 'awakened';
@@ -26,8 +27,9 @@ function buildingStage(world: MergeWorldState): HeartwoodStage {
 export function heartwoodStage(world: MergeWorldState): HeartwoodStage {
   const [plants, buildings] = [plantStage(world), buildingStage(world)];
   const grown = STAGES.indexOf(buildings) > STAGES.indexOf(plants) ? buildings : plants;
-  // The Last Clearing wakes the Tree with the first light: it stirs from then on.
-  return grown === 'dormant' && world.heartTree ? 'stirring' : grown;
+  // The Heart Tree, once woken, is grown by its own level (`constants/heart-tree.ts`): whichever reading is further along.
+  const byTree = world.heartTree ? heartTreeStage(heartTreeLevel(world)) : 'dormant';
+  return STAGES.indexOf(byTree) > STAGES.indexOf(grown) ? byTree : grown;
 }
 
 function plantStage(world: MergeWorldState): HeartwoodStage {

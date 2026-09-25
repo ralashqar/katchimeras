@@ -179,3 +179,13 @@ test('pieces arrive on their own: a Seed on a random empty cell every beat (neve
   const waited = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 900 }, full, 200, seeded.window);
   assert.ok(!waited.changed && (waited.state.nextSeedAt ?? 0) <= waited.state.clock, 'nothing lands, and it is still due');
 });
+
+test('the Bloom House makes Seeds land sooner: its pace shortens every beat', () => {
+  const seeded = setup({ pod: undefined, seeds: { every: 1 }, lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] });
+  // 1 s beats; at 40% pace the first lands at 600 ms.
+  const early = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 500 }, seeded.state, 100, seeded.window, MERGE_ITEMS_BY_ID, { seedPace: 0.4 });
+  assert.ok(early.changed, 'landed at 600 ms, not 1 s');
+  assert.equal(early.state.nextSeedAt, 1_200, 'and the next beat is 600 ms after it');
+  const plain = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 500 }, seeded.state, 100, seeded.window, MERGE_ITEMS_BY_ID);
+  assert.equal(plain.changed, false, 'with no Bloom House, nothing yet');
+});

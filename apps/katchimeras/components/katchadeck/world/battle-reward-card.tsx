@@ -18,7 +18,10 @@ export type BattleReward = {
   stars: number;
   glow: number;
   xp?: number;
+  /** Two heroes fought: each took the XP. */
+  xpEach?: boolean;
   timber?: number;
+  meals?: number;
 };
 
 /**
@@ -51,7 +54,11 @@ export function BattleRewardCard({ reward, onContinue }: { reward: BattleReward;
             <Image source={GAME_CURRENCY_ART.timber} style={styles.rewardIcon} contentFit="contain" transition={0} />
             <Text style={styles.rewardValue}>+{reward.timber} Timber</Text>
           </View> : null}
-          {reward.xp ? <View style={styles.reward}><Text style={styles.rewardValue}>+{reward.xp} XP</Text></View> : null}
+          {reward.meals ? <View style={styles.reward}>
+            <Image source={GAME_CURRENCY_ART.meals} style={styles.rewardIcon} contentFit="contain" transition={0} />
+            <Text style={styles.rewardValue}>+{reward.meals} Meals</Text>
+          </View> : null}
+          {reward.xp ? <View style={styles.reward}><Text style={styles.rewardValue}>+{reward.xp} XP{reward.xpEach ? ' each' : ''}</Text></View> : null}
         </View>
         <KatchaButton fullWidth glow pill label="Continue" onPress={onContinue} />
       </Animated.View>

@@ -11,6 +11,17 @@ User-requested fal Nano Banana regeneration, using the existing project pipeline
   - `lost-trail`: the revealed trail to the sea. The Steppling palette guide supplies the sea-glass stepping stones, the shell on a sandy boulder, a pine, an upright blank marker and a lantern.
   - `hollow-tree`: the far landmark. A fully misted hex, with one huge leafless grey hollow tree rising from it. The scene draws it at 1.6x, past the outer ring.
 
+- **Petalimp's Bloom House (Sept 25, 2026):** `bloom-house-1/2/3`, the three looks of Petalimp's hero building on the Bloom Garden island.
+  - The house grows from a petal-roofed cottage, to two tiers with a watering can, to a tulip-bud tower beside a glass greenhouse.
+  - The garden itself is unchanged.
+  - The identity guide `bloom-garden-l4-guide/source.png` is the island's shipped level-4 tile flattened onto black. That tile has no 2048px source.
+
+- **Fernip's Thicket (Sept 25, 2026):** `fern-thicket-1/2/3`, the three looks of Fernip's hero building on the Wildgrowth Grove.
+  - The building grows from a fern-roofed burrow nook, to a house with a lantern and a fern arch, to a great house crowned by a huge fiddlehead.
+  - The house takes the red mushroom's place at the rear left. The purple and orange mushrooms, the log tunnel and the path are unchanged.
+  - The guide `wildgrowth-grove-guide/source.png` is the island's shipped tile flattened onto black.
+  - `fern-thicket-2-candidate-1` is the rejected first stage 2: it replaced the purple mushroom.
+
 Both use Mossprout's main hex as the camera/geometry/style reference. Steppling also uses its previous regular environment for identity and palette. Existing Mossprout images and its protected generation manifest are unchanged.
 
 ## Recipe and provenance

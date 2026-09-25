@@ -24,7 +24,11 @@ import { Face } from './upgrade-rows';
  * one helper Wisp). Nothing here decides anything: the rung comes from the
  * campaign's ladder, the numbers from the encounter and the reward tables.
  */
-export type EncounterLoadoutChoice = { katchimeraId: MergeCharacterId; helperWispId: string | null };
+export type EncounterLoadoutChoice = {
+  katchimeraId: MergeCharacterId; helperWispId: string | null;
+  /** The second hero, once Chapter 3 opens the slot (`features/encounter/team.ts`). */
+  partnerId?: MergeCharacterId | null;
+};
 
 export const DIFFICULTY_LABELS: Readonly<Record<EncounterDifficulty, string>> = { calm: 'Calm Mist', thick: 'Thick Mist', dark: 'Dark Mist', boss: 'Ancient Mist' };
 const DIFFICULTY_TINT: Readonly<Record<EncounterDifficulty, string>> = { calm: '#5FA87B', thick: '#4E9CC4', dark: '#8A63C9', boss: '#D98A1F' };
@@ -74,7 +78,7 @@ export const UpgradeLadderRow = memo(function UpgradeLadderRow({ ladder }: { lad
  * What the player brings in: one of the playable Katchimeras (their level
  * and ability under the portrait) and one helper Wisp from the collection.
  */
-export const UpgradeLoadoutRow = memo(function UpgradeLoadoutRow({ world, playable, ownedWispIds, value, eligible, disabled, onChange }: {
+export const UpgradeLoadoutRow = memo(function UpgradeLoadoutRow({ world, playable, ownedWispIds, value, eligible, disabled, slots = 1, onChange }: {
   world: Pick<MergeWorldState, 'katchimeraProgress'>;
   playable: readonly MergeCharacterId[];
   ownedWispIds: readonly string[];
@@ -82,6 +86,8 @@ export const UpgradeLoadoutRow = memo(function UpgradeLoadoutRow({ world, playab
   /** Katchimeras the rung allows; absent, any of the playable ones. */
   eligible?: readonly MergeCharacterId[] | null;
   disabled?: boolean;
+  /** Heroes a battle takes (1, or 2 once the second slot is open). With two, a tap picks the partner; tapping the partner swaps them into the lead. */
+  slots?: 1 | 2;
   onChange: (next: EncounterLoadoutChoice) => void;
 }) {
   const wisps = useMemo(() => ownedWispIds.map((id) => WISP_CATALOG.find((wisp) => wisp.id === id)).filter((wisp): wisp is NonNullable<typeof wisp> => Boolean(wisp)).slice(0, 12), [ownedWispIds]);
@@ -90,13 +96,23 @@ export const UpgradeLoadoutRow = memo(function UpgradeLoadoutRow({ world, playab
       {playable.map((id) => {
         const skin = katchimeraSkinById.get(id);
         const visual = skin?.visualKey ? getCreatureVisual(skin.visualKey, 'grown') : null;
-        const allowed = !eligible || eligible.includes(id);
-        const picked = value.katchimeraId === id;
+        const partnered = slots === 2 && value.partnerId === id;
+        // A level that asks for one friend holds its lead; anyone can come along as the partner.
+        const allowed = !eligible || eligible.includes(id) || (slots === 2 && id !== value.katchimeraId);
+        const picked = value.katchimeraId === id || partnered;
+        const choose = () => {
+          if (slots < 2) { onChange({ ...value, katchimeraId: id }); return; }
+          if (id === value.katchimeraId) return;
+          // The partner tapped: they take the lead (when the level allows), and the lead comes along instead.
+          if (partnered && (!eligible || eligible.includes(id))) { onChange({ ...value, katchimeraId: id, partnerId: value.katchimeraId }); return; }
+          onChange({ ...value, partnerId: id });
+        };
         const level = katchimeraLevel(world, id);
         const ability = abilityForCompanion(id);
         const tier = ability ? abilityTier(ability, level) : null;
-        return <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: picked, disabled: disabled || !allowed }} accessibilityLabel={`${skin?.displayName ?? id}, level ${level}${ability ? `, ${ability.name}` : ''}${allowed ? '' : ', not for this rung'}`}
-          disabled={disabled || !allowed} onPress={() => onChange({ ...value, katchimeraId: id })} style={[styles.portraitWrap, picked ? styles.portraitPicked : null, !allowed ? styles.portraitDimmed : null]}>
+        return <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: picked, disabled: disabled || !allowed }} accessibilityLabel={`${skin?.displayName ?? id}, level ${level}${ability ? `, ${ability.name}` : ''}${slots === 2 && value.katchimeraId === id ? ', lead' : partnered ? ', partner' : ''}${allowed ? '' : ', not for this rung'}`}
+          disabled={disabled || !allowed} onPress={choose} style={[styles.portraitWrap, picked ? styles.portraitPicked : null, !allowed ? styles.portraitDimmed : null]}>
+          {slots === 2 && picked ? <View style={styles.slotBadge}><Text style={styles.slotBadgeText}>{partnered ? '2' : '1'}</Text></View> : null}
           {visual ? <Image accessibilityIgnoresInvertColors cachePolicy="memory-disk" contentFit="contain" source={visual.source} style={styles.portrait} transition={0} /> : <View style={styles.portrait} />}
           <Text numberOfLines={1} style={styles.portraitName}>{skin?.displayName ?? id}</Text>
           <Text numberOfLines={1} style={styles.portraitMeta}>{`Lv. ${level}${ability && tier ? ` · ${ability.name}` : ''}`}</Text>
@@ -123,6 +139,8 @@ export const UpgradeLoadoutRow = memo(function UpgradeLoadoutRow({ world, playab
 });
 
 const styles = StyleSheet.create({
+  slotBadge: { position: 'absolute', top: 2, right: 2, zIndex: 1, minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: '#5FA87B' },
+  slotBadgeText: { color: '#FFFFFF', fontFamily: AppFontFamilies.fredokaBold, fontSize: 11 },
   card: { marginBottom: 8 },
   cardBody: { paddingHorizontal: 14, paddingVertical: 12, gap: 6 },
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },

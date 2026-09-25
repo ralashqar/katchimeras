@@ -17,6 +17,22 @@ export function abilityFor(loadout: EncounterLoadout | null): { definition: Comp
 
 export const abilityReady = (run: EncounterRunState, tier: CompanionAbilityTier): boolean => Boolean(run.ability) && run.ability!.charge >= Math.max(1, Math.floor(tier.chargeEvery));
 
+/** The partner's ability (the second hero slot), from the loadout, or null with no partner or an ability-less one. */
+export function partnerAbilityFor(loadout: EncounterLoadout | null): { definition: CompanionAbilityDefinition; tier: CompanionAbilityTier } | null {
+  return loadout?.partner ? abilityFor({ companionId: loadout.partner.companionId, level: loadout.partner.level }) : null;
+}
+export const partnerAbilityReady = (run: EncounterRunState, tier: CompanionAbilityTier): boolean => Boolean(run.partnerAbility) && run.partnerAbility!.charge >= Math.max(1, Math.floor(tier.chargeEvery));
+
+/**
+ * The partner's ability used: the same `applyAbility`, played on the partner's meter. The lead's meter is untouched and
+ * the partner's is spent, so the two charge and fire independently from the same merges.
+ */
+export function applyPartnerAbility(definition: CompanionAbilityDefinition, tier: CompanionAbilityTier, board: Parameters<typeof applyAbility>[2], window: Parameters<typeof applyAbility>[3], run: EncounterRunState, target: number | null) {
+  if (!run.partnerAbility) return null;
+  const applied = applyAbility(definition, tier, board, window, { ...run, ability: run.partnerAbility }, target);
+  return applied ? { ...applied, run: { ...applied.run, ability: run.ability, partnerAbility: applied.run.ability } } : null;
+}
+
 export type AbilityEffect =
   | { kind: 'bloomed'; cell: number; definitionId: string }
   /** Clear Path: one Mist cell cleared outright (what it held comes out). */
