@@ -1,14 +1,15 @@
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import type { MergeScreenPoint } from '@/components/katchadeck/games/merge-serve-reward-overlay';
-import { MergeOrderTrayCard } from '@/components/katchadeck/games/merge-order-rail';
+import { MergeOrderRail, type MergeTrayEntry } from '@/components/katchadeck/games/merge-order-rail';
+import { ServiceCounter } from '@/components/katchadeck/games/merge-play-surface';
 import { createMergeBoardSession } from '@/features/onboarding/merge-ftue-interaction-coordinator';
 import type { MissionCommandResult } from '@/features/onboarding/use-opening-mission-board';
 import type { supplyOrder } from '@/features/supply-run/supply-run';
-import type { MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
+import type { MergeOrder, MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
 import { mergeOrderItemReadiness, mergeOrderReady } from '@/utils/merge-world/engine';
 import { FriendSpeechBubble, type SpeechLine } from './friend-speech-bubble';
 import { MistMissionDock } from './kingdom-opening-merge-dock';
@@ -57,27 +58,22 @@ export const SupplyRunDock = memo(function SupplyRunDock({
   const dispatch = useCallback((command: MergeWorldCommand) => send(command.type === 'tapGenerator' ? { ...command, spendEnergy: false } : command), [send]);
   const serve = useCallback((entry: SupplyRunOrder, itemTargets: readonly MergeScreenPoint[]) => (servingOrderId ? false : onServe(entry, itemTargets)), [onServe, servingOrderId]);
   const first = orders[0]?.order;
-  const tray = <View pointerEvents="box-none" style={styles.trayPanel}>
-    {first ? <View pointerEvents="none" style={styles.bubble}><FriendSpeechBubble text={line ?? first.line} reduceMotion={reduceMotion} /></View> : null}
-    <View pointerEvents="box-none" style={styles.trayRow}>
-      {orders.map((entry, index) => {
-        const ready = mergeOrderReady(state, entry.order);
-        // Keyed by the card, not the order: the friend stays at their card, and only what they ask for changes.
-        return <MergeOrderTrayCard
-          key={`supply-card:${entry.slot}`}
-          animateEntrance={false}
-          entry={{ id: entry.order.id, kind: 'order', order: entry.order, itemReadiness: mergeOrderItemReadiness(state, entry.order), ready }}
-          index={index}
-          interactionAllowed
-          interactionLocked={Boolean(servingOrderId)}
-          serveInFlight={servingOrderId === entry.order.id}
-          onReroll={() => {}}
-          onServe={(itemTargets) => serve(entry, itemTargets)}
-          onRailTargetRef={onRailTargetRef}
-          reduceMotion={reduceMotion}
-        />;
-      })}
-    </View>
+  // The Merge page's own tray (as it was): the orders on a horizontal rail of tray cards, sitting on the full-width
+  // service counter, right above the board. The first friend's (or Baristabbit's) line is said over it.
+  const entries = useMemo((): MergeTrayEntry[] => orders.map((entry) => ({
+    id: entry.order.id, kind: 'order', order: entry.order, itemReadiness: mergeOrderItemReadiness(state, entry.order), ready: mergeOrderReady(state, entry.order),
+  })), [orders, state]);
+  const serveOrder = useCallback((order: MergeOrder, itemTargets: readonly MergeScreenPoint[]) => {
+    const entry = orders.find((candidate) => candidate.order.id === order.id);
+    return entry ? serve(entry, itemTargets) : false;
+  }, [orders, serve]);
+  const parcelRef = useRef<View | null>(null);
+  const noop = useCallback(() => undefined, []);
+  const tray = <View pointerEvents="box-none" style={styles.traySection}>
+    {first ? <View pointerEvents="none" style={styles.bubble}><FriendSpeechBubble text={line ?? first.line} reduceMotion={reduceMotion} tail="none" /></View> : null}
+    <MergeOrderRail entries={entries} servingOrderId={servingOrderId ?? null} onOpenChat={noop} onOpenParcel={noop} onReroll={noop}
+      onServe={serveOrder} onRailTargetRef={onRailTargetRef} parcelTargetRef={parcelRef} />
+    <ServiceCounter viewportWidth={width} />
   </View>;
   return <MistMissionDock
     state={state} boardStep={null} progress={bar?.progress ?? 0} required={bar?.required ?? 1} hideBar={!bar} barTitle={title ?? "Baristabbit’s Café"}
@@ -88,7 +84,6 @@ export const SupplyRunDock = memo(function SupplyRunDock({
 });
 
 const styles = StyleSheet.create({
-  trayPanel: { alignSelf: 'stretch', borderRadius: 24, borderCurve: 'continuous', backgroundColor: 'rgba(22,16,40,0.26)', paddingTop: 10, paddingBottom: 10, paddingHorizontal: 10, gap: 6 },
-  bubble: { alignItems: 'center' },
-  trayRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 10 },
+  traySection: { alignSelf: 'stretch', alignItems: 'stretch' },
+  bubble: { alignItems: 'center', marginBottom: 6 },
 });

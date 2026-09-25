@@ -208,7 +208,8 @@ export const MergePlaySurface = memo(function MergePlaySurface({
   );
 });
 
-function ServiceCounter({ viewportWidth }: { viewportWidth: number }) {
+/** The Merge page's service counter: the full-width strip the order trays sit on (the Café's tray uses it too). */
+export function ServiceCounter({ viewportWidth }: { viewportWidth: number }) {
   return (
     <View
       accessibilityElementsHidden
