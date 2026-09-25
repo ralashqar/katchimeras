@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
-import { UpgradeDock, useUpgradeDockMotion } from '@/components/katchadeck/upgrade/upgrade-dock';
+import { UpgradeDock, useUpgradeDockMotion, type UpgradeDockTabs } from '@/components/katchadeck/upgrade/upgrade-dock';
 import { UpgradeBenefitRow, UpgradeHero, UpgradeLevelSlots, UpgradeRequirementRow, UpgradeSection, useUpgradeLevelPick } from '@/components/katchadeck/upgrade/upgrade-rows';
 import { heroTileLook } from '@/constants/hero-building-art';
 import { heroBuildingById, heroTileSlot, type HeroBuildingId } from '@/constants/hero-buildings';
@@ -24,15 +24,19 @@ function heroBuildingLevelArt(id: HeroBuildingId, level: number): ImageSourcePro
  * in the world above, this docks under it, and it stays up across an upgrade so the next level is there at once.
  * Short of Timber, the requirement's Go leads to the Supply Run.
  */
-export function HeroBuildingPanel({ world, buildingId, layout, bottomInset, registerDismiss, onClose, onSupplyRun, onMist, onUpgrade }: {
+export function HeroBuildingPanel({ world, buildingId, layout, bottomInset, registerDismiss, tabs, entered, onClose, onSupplyRun, onMist, onUpgrade }: {
   world: MergeWorldState; buildingId: HeroBuildingId; layout: UpgradeStageLayout; bottomInset: number;
   registerDismiss?: (dismiss: (() => void) | null) => void;
+  /** A friend's one panel: their Hero and their Building, as tabs (`FriendPanelTab`). */
+  tabs?: UpgradeDockTabs<'hero' | 'building'>;
+  /** Opened by a tab switch: already in place, no rise. */
+  entered?: boolean;
   onClose: () => void; onSupplyRun: () => void; onMist?: () => void;
   onUpgrade: (id: HeroBuildingId, expectedLevel: number) => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const motion = useUpgradeDockMotion({ busy, onClose, registerDismiss });
+  const motion = useUpgradeDockMotion({ busy, onClose, registerDismiss, entered });
   const model = heroBuildingUpgradeModel(world, buildingId);
   const artFor = useCallback((level: number) => heroBuildingLevelArt(buildingId, level), [buildingId]);
   const pick = useUpgradeLevelPick(model.levels, artFor);
@@ -47,7 +51,7 @@ export function HeroBuildingPanel({ world, buildingId, layout, bottomInset, regi
 
   return <UpgradeDock motion={motion} title={model.title} levelLabel={current > 0 ? `Lv. ${current}` : undefined}
     progressLabel={model.progressLabel} progressFraction={model.progressFraction}
-    height={layout.panelHeight} width={layout.panelWidth} bottomInset={bottomInset} closeLabel={`Close ${model.title}`}
+    tabs={tabs} height={layout.panelHeight} width={layout.panelWidth} bottomInset={bottomInset} closeLabel={`Close ${model.title}`}
     hero={<UpgradeHero description={current === 0 && onFocus ? pick.description : null}
       action={onFocus && model.primary ? <KatchaButton fullWidth size="compact" loading={busy} disabled={busy || motion.closing || model.primary.disabled}
         accessibilityLabel={`${model.primary.label} ${model.title}${model.level.next ? `, Level ${model.level.next}` : ''}`}

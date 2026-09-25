@@ -53,7 +53,7 @@ import type { RegionMissionDefinition } from '@/constants/island-campaigns/types
 import { recordEncounterBond } from '@/features/encounter/encounter-bond';
 import { FriendWispsSheet } from '@/components/katchadeck/wisps/friend-wisps-sheet';
 import { FRIEND_CONSTELLATIONS } from '@/constants/friend-wisp-constellations';
-import { katchimeraFamilyById } from '@/constants/katchimera-skins';
+import { katchimeraFamilyById, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { useWisps } from '@/features/wisps/wisp-provider';
 import { friendEquippedWisp, friendPacksWaiting } from '@/utils/friend-wisp-packs';
 import { HeartwoodBuildingWorld } from '@/components/katchadeck/world/heartwood-building-world';
@@ -70,7 +70,7 @@ import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
 import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, ensureStoredFirstSpringLight, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , restoreStoredHeartTree, rescueStoredWorldFriend, revealStoredStoryTile, grantStoredStoryGlow, claimStoredChapterReward, completeStoredSupplyOrder, markStoredChapterOpened, upgradeStoredHeroBuilding, acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat, startStoredEncounter, abandonStoredEncounter, completeStoredEncounter, upgradeStoredKatchimera } from '@/utils/merge-world/repository';
-import { isPlayableKatchimera, katchimeraLevel, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
+import { canUpgradeKatchimera, isPlayableKatchimera, katchimeraLevel, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
 import { encounterRunId } from '@/features/encounter/run-id';
 import type { EncounterLoadout } from '@/types/encounter';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
@@ -113,7 +113,7 @@ import { ChapterGoalCard } from '@/components/katchadeck/world/chapter-goal-card
 import { sanctuaryChapterState } from '@/constants/sanctuary-chapters';
 import { HeroBuildingPanel } from '@/components/katchadeck/world/hero-building-panel';
 import { heroTileLook } from '@/constants/hero-building-art';
-import { HERO_BUILDINGS, heroTileSlot } from '@/constants/hero-buildings';
+import { HERO_BUILDINGS, heroBuildingForCompanion, heroCompanionHome, heroTileLayerId, heroTileSlot } from '@/constants/hero-buildings';
 import { HeartTreePanel } from '@/components/katchadeck/world/heart-tree-panel';
 import { heartTreeLevel } from '@/constants/heart-tree';
 import { collectStoredHeroBuilding, upgradeStoredHeartTree } from '@/utils/merge-world/repository';
@@ -528,6 +528,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [buildingPanelId, setBuildingPanelId] = useState<HeartwoodBuildingId | null>(null);
   // A playable Katchimera's level, on the upgrade stage over their tile.
   const [katchimeraPanelId, setKatchimeraPanelId] = useState<MergeCharacterId | null>(null);
+  // A friend's one panel (Sept 25 2026): their Hero and their Building share a tile, so they share a panel, as two tabs
+  // on the upgrade stage. Every way in (a tap on them, a goal, the Heroes list) opens it on the tab that is asked for,
+  // or the one that needs them (a hero held back by their building opens on the building).
+  const [friendPanelSwitched, setFriendPanelSwitched] = useState(false);
   // A friend's own Wisps menu, opened from the small button beside them.
   const [friendWispsFamilyId, setFriendWispsFamilyId] = useState<string | null>(null);
   const { state: wispState } = useWisps();
@@ -899,6 +903,33 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     : null, [supplyRunOpen]);
   // A friend's own building (the Explorer's Lodge): their tile framed over the docked panel, like a hero's.
   const [heroBuildingPanelId, setHeroBuildingPanelId] = useState<HeroBuildingId | null>(null);
+  const openFriendPanel = useCallback((characterId: MergeCharacterId, tab?: 'hero' | 'building') => {
+    const world = mergeWorldRef.current;
+    const building = heroBuildingForCompanion(characterId);
+    const hasBuilding = Boolean(building && heroCompanionHome(world, building));
+    const hasHero = isPlayableKatchimera(characterId);
+    const heldByBuilding = hasHero && (() => { const check = canUpgradeKatchimera(world, characterId); return !check.ok && check.reason === 'building'; })();
+    const open = tab === 'building' && hasBuilding ? 'building' : tab === 'hero' && hasHero ? 'hero' : heldByBuilding && hasBuilding ? 'building' : hasHero ? 'hero' : hasBuilding ? 'building' : null;
+    setFriendPanelSwitched(false);
+    if (open === 'building' && building) { setKatchimeraPanelId(null); setHeroBuildingPanelId(building.id); return true; }
+    if (open === 'hero') { setHeroBuildingPanelId(null); setKatchimeraPanelId(characterId); return true; }
+    return false;
+  }, []);
+  const friendPanelCharacter = katchimeraPanelId ?? (heroBuildingPanelId ? HERO_BUILDINGS.find((building) => building.id === heroBuildingPanelId)?.companion ?? null : null);
+  const friendTabs = useMemo(() => {
+    if (!friendPanelCharacter) return undefined;
+    const building = heroBuildingForCompanion(friendPanelCharacter);
+    if (!building || !heroCompanionHome(mergeWorld, building) || !isPlayableKatchimera(friendPanelCharacter)) return undefined;
+    return {
+      items: [{ id: 'hero' as const, label: 'Hero', icon: 'star.fill' as const }, { id: 'building' as const, label: building.name, icon: 'house.fill' as const }],
+      value: katchimeraPanelId ? 'hero' as const : 'building' as const,
+      onChange: (tab: 'hero' | 'building') => {
+        setFriendPanelSwitched(true);
+        if (tab === 'building') { setKatchimeraPanelId(null); setHeroBuildingPanelId(building.id); }
+        else { setHeroBuildingPanelId(null); setKatchimeraPanelId(friendPanelCharacter); }
+      },
+    };
+  }, [friendPanelCharacter, katchimeraPanelId, mergeWorld]);
   const [heartTreePanelOpen, setHeartTreePanelOpen] = useState(false);
   const heartTreeCamera = useMemo((): FtueCameraDirective | null => heartTreePanelOpen
     ? { kind: 'focus_target', target: { kind: 'haven_garden_tile', characterId: 'mossprout' }, zoom: 1.4, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.15) / Math.max(1, window.height), durationMs: 520 }
@@ -1482,7 +1513,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // The canvas may report completion more than once; a single story owns the ack.
     if (revealedUpgradeRef.current === presentation.nonce) return;
     revealedUpgradeRef.current = presentation.nonce;
-    if (presentation.tileLook) {
+    if (presentation.tileLook || presentation.tileLevelUp) {
       setUpgradePresentation((current) => current?.nonce === presentation.nonce ? null : current);
       setUpgrading(false);
       setDisplayedGlow(mergeWorldRef.current.coins);
@@ -1863,7 +1894,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // Cozy 4X: a friend on the map is a hero. Tapping one opens their hero panel (level, ability, training), never the
     // companion-life page (Bond, meditation, day one) the old first session used; a friend who cannot fight is looked at.
     if (sanctuaryFounded(mergeWorldRef.current) && !ftueStepId) {
-      if (tappedFamilyId && isPlayableKatchimera(tappedFamilyId)) { setDetailCreatureId(null); setKatchimeraPanelId(tappedFamilyId); }
+      if (tappedFamilyId && openFriendPanel(tappedFamilyId as MergeCharacterId)) setDetailCreatureId(null);
       else setDetailCreatureId(creatureId);
       return;
     }
@@ -3191,8 +3222,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (chapterGoalNeed) { openGoalSource(chapterGoalNeed.source); return; }
     if (goal.action.kind === 'building') { setBuildingPanelId(goal.action.buildingId); return; }
     if (goal.action.kind === 'supply_run') { setSupplyRunOpen(true); return; }
-    if (goal.action.kind === 'hero') { setKatchimeraPanelId(goal.action.characterId); return; }
-    if (goal.action.kind === 'hero_building') { setHeroBuildingPanelId(goal.action.id); return; }
+    if (goal.action.kind === 'hero') { openFriendPanel(goal.action.characterId, 'hero'); return; }
+    if (goal.action.kind === 'hero_building') {
+      const building = HERO_BUILDINGS.find((candidate) => candidate.id === (goal.action as { id: HeroBuildingId }).id);
+      if (building) openFriendPanel(building.companion, 'building'); else setHeroBuildingPanelId(goal.action.id);
+      return;
+    }
     if (goal.action.kind === 'heart_tree') { setHeartTreePanelOpen(true); return; }
     if (goal.action.kind === 'grove') { openGlowSource(); return; }
     if (goal.action.kind === 'world_offer') {
@@ -3342,6 +3377,30 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       });
     }
     return result;
+  }, [measureGlowCurrencyOrigin, reduceMotion]);
+  const upgradeKatchimeraWithFx = useCallback(async (id: MergeCharacterId, expectedLevel: number) => {
+    const before = mergeWorldRef.current.coins;
+    const coinOrigin = reduceMotion ? { x: 0, y: 0 } : await measureGlowCurrencyOrigin();
+    const result = await upgradeStoredKatchimera(id, expectedLevel);
+    if (!result.changed && result.message) throw new Error(result.message);
+    const spent = before - result.state.coins;
+    if (spent > 0 && reduceMotion) setDisplayedGlow(result.state.coins);
+    if (spent <= 0 || reduceMotion) return;
+    const building = heroBuildingForCompanion(id);
+    const hatchable = hatchableByCompanion(id);
+    const layerId = id === 'mossprout' ? 'home' : building ? heroTileLayerId(building.tileId) : hatchable ? `structure:${hatchable.tile.id}` : null;
+    if (!layerId) { setDisplayedGlow(result.state.coins); return; }
+    revealedUpgradeRef.current = null;
+    setUpgrading(true);
+    setDisplayedGlow(before);
+    setUpgradePresentation({
+      cameraAlreadyFocused: true, characterId: id, coinCost: spent, coinOrigin,
+      creatureId: `companion:${id}`, creatureName: katchimeraSkinById.get(id)?.displayName ?? id, fromStage: 1, toStage: 1,
+      nonce: ++upgradeNonceRef.current,
+      palette: { accent: '#DDF6FF', glow: '#A9E4FF', mist: 'rgba(214,229,238,0.92)', primary: '#7FBFD9' },
+      reactionLine: '', showCoins: true, status: 'playing', upgradeName: 'level',
+      tileLevelUp: { layerId },
+    });
   }, [measureGlowCurrencyOrigin, reduceMotion]);
   const chapterClaimingRef = useRef(false);
   const claimChapter = useCallback(() => {
@@ -3643,9 +3702,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onPlay={playRushHeat} onOpenChest={openRushChest} onClose={() => setRushSheetOpen(false)}
         onStory={() => { setRushSheetOpen(false); openNatureIslandOffer(WISP_RUSH_HOST.islandId); }} /> : null}
       {katchimeraPanelId && screenFocused ? <KatchimeraUpgradePanel key={katchimeraPanelId} world={mergeWorld} characterId={katchimeraPanelId} layout={upgradeStage} bottomInset={insets.bottom}
+        tabs={friendTabs} entered={friendPanelSwitched} onBuilding={friendTabs ? () => friendTabs.onChange('building') : undefined}
         registerDismiss={registerUpgradeDismiss} onClose={() => setKatchimeraPanelId(null)} onMist={() => { setKatchimeraPanelId(null); openGlowSource(); }} onSupplyRun={() => { setKatchimeraPanelId(null); openCafe(); }}
-        onUpgrade={async (id, expectedLevel) => { const result = await upgradeStoredKatchimera(id, expectedLevel); if (!result.changed && result.message) throw new Error(result.message); }} /> : null}
+        onUpgrade={upgradeKatchimeraWithFx} /> : null}
       {heroBuildingPanelId && screenFocused ? <HeroBuildingPanel key={heroBuildingPanelId} world={mergeWorld} buildingId={heroBuildingPanelId} layout={upgradeStage} bottomInset={insets.bottom}
+        tabs={friendTabs} entered={friendPanelSwitched}
         registerDismiss={registerUpgradeDismiss} onClose={() => setHeroBuildingPanelId(null)}
         onSupplyRun={() => { setHeroBuildingPanelId(null); openCafe(); }} onMist={() => { setHeroBuildingPanelId(null); openGlowSource(); }}
         onUpgrade={upgradeHeroBuildingWithFx} /> : null}
@@ -3654,8 +3715,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onSupplyRun={() => { setHeartTreePanelOpen(false); openCafe(); }} onMist={() => { setHeartTreePanelOpen(false); openGlowSource(); }}
         onUpgrade={upgradeHeartTreeWithFx} /> : null}
       {heroRosterOpen && screenFocused ? <HeroRosterSheet world={mergeWorld} onClose={() => setHeroRosterOpen(false)}
-        onTrain={(id) => { setHeroRosterOpen(false); setKatchimeraPanelId(id); }}
-        onBuilding={(id) => { setHeroRosterOpen(false); setHeroBuildingPanelId(id); }} /> : null}
+        onTrain={(id) => { setHeroRosterOpen(false); openFriendPanel(id, 'hero'); }}
+        onBuilding={(id) => { setHeroRosterOpen(false); const building = HERO_BUILDINGS.find((candidate) => candidate.id === id); if (building) openFriendPanel(building.companion, 'building'); else setHeroBuildingPanelId(id); }} /> : null}
       {buildingPanelId && screenFocused ? <HeartwoodBuildingPanel key={buildingPanelId} world={mergeWorld} buildingId={buildingPanelId} layout={upgradeStage} bottomInset={insets.bottom} registerDismiss={registerUpgradeDismiss}
         onUpgrade={upgradeHeartwoodBuildingWithFx}
         onClose={() => setBuildingPanelId(null)}

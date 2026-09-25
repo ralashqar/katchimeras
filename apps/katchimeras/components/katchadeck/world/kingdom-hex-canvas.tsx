@@ -814,6 +814,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const footprint = toLayer?.interactionFrame ?? toLayer?.frame;
       return fromLayer && toLayer && footprint ? { fromLayer, toLayer, tile: { id: layerId, cx: footprint.left + footprint.width / 2, cy: footprint.top + footprint.height / 2 } } : null;
     }
+    if (focusedMossproutWorld && upgradePresentation.tileLevelUp) {
+      // A hero's level up: their own tile, unchanged, under the field of light.
+      const layerId = upgradePresentation.tileLevelUp.layerId === 'home' ? scene.centerTile.id : upgradePresentation.tileLevelUp.layerId;
+      const layer = scene.tileArtLayers.find((candidate) => candidate.id === layerId);
+      const footprint = layer?.interactionFrame ?? layer?.frame;
+      return layer && footprint ? { fromLayer: layer, toLayer: layer, tile: { id: layerId, cx: footprint.left + footprint.width / 2, cy: footprint.top + footprint.height / 2 } } : null;
+    }
     if (focusedMossproutWorld && upgradePresentation.heartTree && mossproutNatureIslandLevels) {
       // The Heart Tree waking: the Heartwood's art at one stage, then the next; nothing else changes.
       const layerId = 'structure:mossprout-hex-garden';
@@ -1910,20 +1917,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         node: (
           <ResidentCreature
             animated={stableWorldPresentation || interactionResidentId === tile.companion.creature.creatureId && !interactionNatureIslandId}
-            celebrationNonce={
-              !interactionNatureIslandId && interactionResidentId === tile.companion.creature.creatureId && interactionRewardPulseKey > 0
-                ? 1_000_000 + interactionRewardPulseKey
-              : !upgradePresentation?.natureIslandId
-              // The opening's veil lift is not his restoration: he stays steady through it.
-              && !upgradePresentation?.veilLift
-              // Nor is the Heart Tree's: the Heartwood grows under him and he stays exactly as he is.
-              && !upgradePresentation?.heartTree
-              && upgradePresentation?.visualTarget?.kind !== 'haven_structure'
-              && upgradePresentation?.creatureId === tile.companion.creature.creatureId
-              && (upgradePhase === 'react' || upgradePhase === 'complete')
-                ? upgradePresentation.nonce
-                : undefined
-            }
+            // No hop, wobble or scale on a friend for any upgrade or reward (the user, Sept 25 2026): they stay as they are.
+            celebrationNonce={undefined}
             disabled={!residentInteractionEnabled}
             entrance={!mountedResidentIdsRef.current?.has(tile.id)}
             focusAnchorX={tile.cx}
@@ -2271,7 +2266,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           creature={interactionResidentProjection.creature}
           frame={interactionResidentProjection.frame}
           meditating={interactionResidentProjection.creature.familyId === 'mossprout' && mossproutMeditating}
-          rewardPulseKey={interactionResidentId ? interactionRewardPulseKey : worldSubjectPresentation?.rewardPulseKey ?? 0}
+          rewardPulseKey={interactionResidentId ? 0 : worldSubjectPresentation?.rewardPulseKey ?? 0}
           sceneHeight={scene.height}
           sceneWidth={scene.width}
           source={interactionResidentProjection.source}

@@ -176,6 +176,8 @@ const GUIDE_URGENCY: Readonly<Record<FirstBattleGuide['kind'], number>> = { move
  */
 export function stickyBattleGuide(shown: FirstBattleGuide | null, next: FirstBattleGuide | null, board: MergeWorldState): FirstBattleGuide | null {
   if (!shown || !next) return next;
+  // A move to an empty lane is only right while that lane has no shooter: it is never held, only re-read.
+  if (shown.kind === 'move' || next.kind === 'move') return next;
   if (GUIDE_URGENCY[next.kind] > GUIDE_URGENCY[shown.kind]) return next;
   const cell = (index: number) => board.board[index];
   const piece = cell(shown.from);

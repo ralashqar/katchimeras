@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
-import { UpgradeDock, useUpgradeDockMotion } from '@/components/katchadeck/upgrade/upgrade-dock';
+import { UpgradeDock, useUpgradeDockMotion, type UpgradeDockTabs } from '@/components/katchadeck/upgrade/upgrade-dock';
 import { UpgradeBenefitRow, UpgradeHero, UpgradeLevelSlots, UpgradeRequirementRow, UpgradeSection, useUpgradeLevelPick } from '@/components/katchadeck/upgrade/upgrade-rows';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { getCreatureVisual } from '@/game/days/visuals';
@@ -14,19 +14,25 @@ import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
  * once the Mist has taught them enough, and brings their ability's next tier.
  * The panel stays up across a level so the next one's numbers are there at once.
  */
-export function KatchimeraUpgradePanel({ world, characterId, layout, bottomInset, registerDismiss, onClose, onMist, onSupplyRun, onUpgrade }: {
+export function KatchimeraUpgradePanel({ world, characterId, layout, bottomInset, registerDismiss, tabs, entered, onClose, onMist, onSupplyRun, onBuilding, onUpgrade }: {
   world: MergeWorldState; characterId: MergeCharacterId; layout: UpgradeStageLayout; bottomInset: number;
   registerDismiss?: (dismiss: (() => void) | null) => void;
+  /** A friend's one panel: their Hero and their Building, as tabs (`FriendPanelTab`). */
+  tabs?: UpgradeDockTabs<'hero' | 'building'>;
+  /** Opened by a tab switch: already in place, no rise. */
+  entered?: boolean;
   onClose: () => void;
   /** Where experience comes from: the nearest region's panel. */
   onMist: () => void;
   /** Where Meals are served (the Café). */
   onSupplyRun?: () => void;
+  /** Their building holds them back: its tab. */
+  onBuilding?: () => void;
   onUpgrade: (id: MergeCharacterId, expectedLevel: number) => Promise<unknown>;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const motion = useUpgradeDockMotion({ busy, onClose, registerDismiss });
+  const motion = useUpgradeDockMotion({ busy, onClose, registerDismiss, entered });
   const model = companionUpgradeModel(world, characterId);
   const skin = katchimeraSkinById.get(characterId);
   const portrait = skin?.visualKey ? getCreatureVisual(skin.visualKey, 'grown').source : null;
@@ -43,7 +49,7 @@ export function KatchimeraUpgradePanel({ world, characterId, layout, bottomInset
 
   return <UpgradeDock motion={motion} title={model.title} levelLabel={`Lv. ${current}`}
     progressLabel={model.progressLabel} progressFraction={model.progressFraction}
-    height={layout.panelHeight} width={layout.panelWidth} bottomInset={bottomInset} closeLabel={`Close ${model.title}`}
+    tabs={tabs} height={layout.panelHeight} width={layout.panelWidth} bottomInset={bottomInset} closeLabel={`Close ${model.title}`}
     hero={<UpgradeHero picture={portrait ? { art: portrait } : null} name={pick.name ?? model.title} description={onFocus ? pick.description : null}
       action={onFocus && model.primary ? <KatchaButton fullWidth size="compact" loading={busy} disabled={busy || motion.closing || model.primary.disabled}
         accessibilityLabel={`${model.primary.label} ${model.title}${model.level.next ? `, Level ${model.level.next}` : ''}`}
@@ -55,8 +61,11 @@ export function KatchimeraUpgradePanel({ world, characterId, layout, bottomInset
       <UpgradeLevelSlots levels={model.levels} selected={pick.shown?.level ?? null} current={pick.current} onSelect={pick.pick} artFor={pick.slotArt} disabled={busy || motion.closing} />
     </UpgradeSection>
     {model.requirements.length ? <UpgradeSection label="Requires">
-      {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id} requirement={requirement.id === 'meals' && !requirement.met && onSupplyRun ? { ...requirement, action: { id: 'garden', label: 'Café' } } : requirement}
-        disabled={busy || motion.closing} onAction={() => motion.leave(requirement.id === 'meals' && onSupplyRun ? onSupplyRun : onMist)} />)}
+      {model.requirements.map((requirement) => <UpgradeRequirementRow key={requirement.id}
+        requirement={requirement.id === 'meals' && !requirement.met && onSupplyRun ? { ...requirement, action: { id: 'garden', label: 'Café' } }
+          : requirement.id === 'building' && !requirement.met && onBuilding ? { ...requirement, action: { id: 'garden', label: 'Upgrade' } } : requirement}
+        disabled={busy || motion.closing}
+        onAction={() => (requirement.id === 'building' && onBuilding ? onBuilding() : motion.leave(requirement.id === 'meals' && onSupplyRun ? onSupplyRun : onMist))} />)}
     </UpgradeSection> : null}
   </UpgradeDock>;
 }

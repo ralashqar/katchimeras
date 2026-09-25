@@ -22,8 +22,10 @@ import { UpgradePanelUI } from '@/constants/upgrade-panel';
 export type UpgradeDockMotion = ReturnType<typeof useUpgradeDockMotion>;
 export type UpgradeDockTabs<T extends string = string> = { items: readonly { id: T; label: string; icon?: IconSymbolName }[]; value: T; onChange: (id: T) => void };
 
-export function useUpgradeDockMotion({ busy, onClose, onBack, locked = false, registerDismiss }: {
+export function useUpgradeDockMotion({ busy, onClose, onBack, locked = false, registerDismiss, entered = false }: {
   busy: boolean;
+  /** Already on screen (a friend panel's tab switch): no rise, it is simply there. */
+  entered?: boolean;
   onClose: () => void;
   /** A guided step owns the panel: it cannot be closed, only acted on. */
   locked?: boolean;
@@ -33,9 +35,9 @@ export function useUpgradeDockMotion({ busy, onClose, onBack, locked = false, re
   onBack?: () => boolean;
 }) {
   const reduced = useReducedMotion();
-  const progress = useSharedValue(0);
+  const progress = useSharedValue(entered ? 1 : 0);
   const drag = useSharedValue(0);
-  const [settled, setSettled] = useState(false);
+  const [settled, setSettled] = useState(entered);
   const [closing, setClosing] = useState(false);
   const closeGuard = useRef(false);
 
@@ -43,7 +45,7 @@ export function useUpgradeDockMotion({ busy, onClose, onBack, locked = false, re
     let timer: ReturnType<typeof setTimeout> | undefined;
     // Mount off-screen, then rise on the next frame so the first painted frame is never the resting one.
     const frame = requestAnimationFrame(() => {
-      if (closeGuard.current) return;
+      if (closeGuard.current || entered) return;
       progress.value = withTiming(1, { duration: reduced ? 100 : UpgradePanelUI.motion.enter, easing: Easing.out(Easing.cubic) });
       timer = setTimeout(() => setSettled(true), reduced ? 120 : UpgradePanelUI.motion.settle);
     });
