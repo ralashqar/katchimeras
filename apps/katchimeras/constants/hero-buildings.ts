@@ -8,10 +8,11 @@ import type { UpgradeBenefitIcon } from '@/features/upgrade-stage/upgrade-panel-
  *
  * The first is Steppling's Explorer's Lodge, on his trailhead: more Timber from the Café. The second is Petalimp's Bloom
  * House, on the Bloom Garden island: Seeds come faster in battle. Fernip's Thicket, on the Wildgrowth Grove, tangles
- * the wisps: they drift down more slowly. A building's tile grows with it in three looks
+ * the wisps: they drift down more slowly. Baristabbit's Café and Feastle's Kitchen grow the food the team eats: better
+ * drops on the Café board, more Meals per order, bigger crates. A building's tile grows with it in three looks
  * (`constants/hero-building-art.ts`).
  */
-export type HeroBuildingId = 'explorers-lodge' | 'bloom-house' | 'fern-thicket';
+export type HeroBuildingId = 'explorers-lodge' | 'bloom-house' | 'fern-thicket' | 'baristabbit-cafe' | 'feastle-kitchen';
 
 /** Something a building does, shown as a benefit row and growing with its level. */
 export type HeroBuildingPerk = { label: string; icon: UpgradeBenefitIcon; tint: string; value: (level: number) => number; format: 'plus' | 'percent' };
@@ -72,6 +73,28 @@ export const HERO_BUILDINGS: readonly HeroBuildingDefinition[] = [
     ],
     levelLine: (level) => `Wisps drift ${Math.round(fernWispSlow(level) * 100)}% slower in battle`,
   },
+  {
+    id: 'baristabbit-cafe', name: 'Baristabbit’s Café', companion: 'baristabbit', tileId: 'baristabbit-home', place: 'structure',
+    tagline: 'Baristabbit’s counter: better drinks and pastries, more Meals from every order, and a Baristabbit who can go further.',
+    description: 'The kettle never goes cold here. Now it has a proper café around it.',
+    lookNames: ['Window Kiosk', 'Corner Café', 'Grand Café'],
+    perks: [
+      { label: 'Better drinks & pastries', icon: 'sparkles', tint: '#C98A66', value: (level) => Math.round(cafeTierTwoChance(level) * 100), format: 'percent' },
+      { label: 'Meals per order', icon: 'star.fill', tint: '#D9534F', value: (level) => cafeMealsBonus(level), format: 'plus' },
+    ],
+    levelLine: (level) => `Café orders +${cafeMealsBonus(level)} Meals · ${Math.round(cafeTierTwoChance(level) * 100)}% better drinks`,
+  },
+  {
+    id: 'feastle-kitchen', name: 'Feastle’s Kitchen', companion: 'feastle', tileId: 'feastle-home', place: 'structure',
+    tagline: 'Feastle’s hearth: better dishes and desserts, and bigger Kitchen crates.',
+    description: 'Every good feast starts with one warm stove.',
+    lookNames: ['Hearth Cottage', 'Farmhouse Kitchen', 'Grand Kitchen Hall'],
+    perks: [
+      { label: 'Better dishes & desserts', icon: 'sparkles', tint: '#C97847', value: (level) => Math.round(kitchenTierTwoChance(level) * 100), format: 'percent' },
+      { label: 'Meals per crate', icon: 'shippingbox.fill', tint: '#D9534F', value: (level) => kitchenCrateMealsBonus(level), format: 'plus' },
+    ],
+    levelLine: (level) => `Kitchen crates +${kitchenCrateMealsBonus(level)} Meals · ${Math.round(kitchenTierTwoChance(level) * 100)}% better dishes`,
+  },
 ];
 
 export const heroBuildingById = new Map(HERO_BUILDINGS.map((building) => [building.id, building]));
@@ -111,6 +134,19 @@ export const bloomSeedPace = (level: number) => Math.max(0, Math.min(10, level))
 
 /** Fernip's Thicket's gift: wisps take this much longer over every row in battle (3% a level). */
 export const fernWispSlow = (level: number) => Math.max(0, Math.min(10, level)) * 0.03;
+
+/** Baristabbit's Café: the Ritual Bar and the Café Counter pour a tier-2 piece this often (5% a level), and every order pays more Meals. */
+export const cafeTierTwoChance = (level: number) => Math.max(0, Math.min(10, level)) * 0.05;
+export const cafeMealsBonus = (level: number) => Math.ceil(Math.max(0, Math.min(10, level)) / 2);
+/** Feastle's Kitchen: the Hearth Pantry's tier-2 odds (5% a level), and Meals added to every crate. */
+export const kitchenTierTwoChance = (level: number) => Math.max(0, Math.min(10, level)) * 0.05;
+export const kitchenCrateMealsBonus = (level: number) => Math.max(0, Math.min(10, level)) * 2;
+
+/** The odds a Café board's generator pours with, from the two buildings (Feastle's Kitchen for the Hearth Pantry). */
+export function cafeDropProfile(world: Pick<MergeWorldState, 'heroBuildings'>, generatorId: string): { tierTwoChance: number; tierThreeChance: number } {
+  const chance = generatorId === 'hearth-pantry' ? kitchenTierTwoChance(heroBuildingLevel(world, 'feastle-kitchen')) : cafeTierTwoChance(heroBuildingLevel(world, 'baristabbit-cafe'));
+  return { tierTwoChance: chance, tierThreeChance: 0 };
+}
 
 /** The Lodge's Café gifts: extra Timber on every order, and extra Glow in every crate. */
 export const lodgeTimberBonus = (level: number) => Math.floor(level / 2);

@@ -1,0 +1,19 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "resolution": 2048,
+  "createdAt": "2026-09-25T15:45:24.077147+00:00",
+  "references": [
+    {
+      "path": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "sha256": "64b441e4c33b1d3a02e418f22fd474c4b994557243e43869a89cf8e530df0f2a"
+    },
+    {
+      "path": "design/feastle-hearth-v1/source.png",
+      "sha256": "d54ab92172c8cf11c7a962d0e15769a6ffb760af60eb4c492b5875c5d2f20310"
+    }
+  ],
+  "prompt": "Use Image 1 as the authoritative camera, framing, deep tapered floating hex-island geometry and rendering reference. Preserve its six-sided top footprint, broad chunky cliff blocks, deep tapered underside, centered recessed front stairs, lighting direction and square framing. Keep the entire silhouette comfortably inside the canvas with black padding on all four sides. Perfectly flat pure-black #000000 background for BiRefNet Heavy matting; no ground plane, external drop shadow, text, numbers, UI, watermark, characters or eggs.\n\nPremium cozy 3D toy diorama matching the Mossprout reference: very low detail density, very low texture detail, broad cushiony shapes, soft rounded bevels, smooth matte clay-like surfaces, large readable color blocks, soft upper-left daylight and restrained ambient occlusion. No photographic texture, grain, tiny repeated details, speckles, cracks, grass blades, pine needles or surface noise. Every main shape must read at 256 pixels.\n\nGenerate Feastle's Kitchen, stage 2. Image 2 is Feastle's existing hearth tile: keep its exact layout, palette and features where they are (the soft green lawn, the wooden fence posts around it, the bread basket and the pumpkin on the left, the small table with two bowls on the right, the two lanterns, the sage, terracotta and cream cliff blocks and the centred front stairs) and change only the cream cottage at the rear, which has grown. The cottage now has a kitchen wing: the same cream walls and chunky terracotta roof, a second rounded wing on its right with a big warm lit window, a taller chunky brick chimney with one soft puff, and a small wooden herb rack by the door. It must stay at the rear and inside the tile, and the quiet flat centre and the front stairs stay clear for the separately rendered live character. Cozy toy diorama, fully developed and welcoming. No character, creature, Egg, text, letters or numbers.",
+  "assetKey": "shared_world_kitchen_2_hex_tile_v1",
+  "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/shared-world-kitchen-2-hex-tile-v1/1790351190284_grid.png",
+  "sourceSha256": "4bb92f0444cc854eaa60e835ce9f09fed195515641f5e0bfbdacf5552d4b620a"
+}

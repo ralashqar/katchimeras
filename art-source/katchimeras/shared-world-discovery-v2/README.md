@@ -22,6 +22,11 @@ User-requested fal Nano Banana regeneration, using the existing project pipeline
   - The guide `wildgrowth-grove-guide/source.png` is the island's shipped tile flattened onto black.
   - `fern-thicket-2-candidate-1` is the rejected first stage 2: it replaced the purple mushroom.
 
+- **Baristabbit's Café and Feastle's Kitchen (Sept 25, 2026):** `cafe-2/3` and `kitchen-2/3`, the grown looks of the two food buildings. Each building's first look is the friend's own tile.
+  - **The Café** grows from the window kiosk to a two-storey café with a menu board, then a grand café with a striped awning, a rooftop terrace and a coffee machine.
+  - **The Kitchen** grows from the hearth cottage to a cottage with a brick-chimneyed kitchen wing, then a grand kitchen hall with a serving counter.
+  - Stage 2's small table with bowls sits further forward than on the other two looks.
+
 Both use Mossprout's main hex as the camera/geometry/style reference. Steppling also uses its previous regular environment for identity and palette. Existing Mossprout images and its protected generation manifest are unchanged.
 
 ## Recipe and provenance

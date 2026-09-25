@@ -1,3 +1,5 @@
+import type { MergeWorldCommand } from '@/types/merge-world';
+import { cafeDropProfile, cafeMealsBonus, kitchenCrateMealsBonus } from '@/constants/hero-buildings';
 import { battleLoadout, withPartner } from '@/features/encounter/team';
 import { BARISTABBIT_HATCHABLE } from '@/constants/hatchable-companions/baristabbit';
 import { loadWispState } from '@/utils/wisp-storage';
@@ -65,7 +67,7 @@ import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
 import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, ensureStoredFirstSpringLight, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , restoreStoredHeartTree, rescueStoredWorldFriend, revealStoredStoryTile, grantStoredStoryGlow, claimStoredChapterReward, completeStoredSupplyOrder, markStoredChapterOpened, upgradeStoredHeroBuilding, acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat, startStoredEncounter, abandonStoredEncounter, completeStoredEncounter, upgradeStoredKatchimera } from '@/utils/merge-world/repository';
-import { katchimeraLevel, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
+import { PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
 import { encounterRunId } from '@/features/encounter/run-id';
 import type { EncounterLoadout } from '@/types/encounter';
 import type { EncounterLoadoutChoice } from '@/components/katchadeck/upgrade/upgrade-mission-rows';
@@ -2955,6 +2957,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const createCafeBoard = useCallback((now: number) => createSupplyRunBoard(now, kitchen), [kitchen]);
   const supplyRunStore = useMissionBoard('katchimeras.cafe.v1', supplyRunOpen ? (kitchen ? 'kitchen' : 'supply-run') : null, createCafeBoard);
   const supplyRunDocked = supplyRunOpen && screenFocused && Boolean(supplyRunStore.state);
+  // The Café's and the Kitchen's buildings pour better pieces: their odds ride on every generator tap.
+  const { send: cafeStoreSend } = supplyRunStore;
+  const cafeSend = useCallback((command: MergeWorldCommand) => cafeStoreSend(command.type === 'tapGenerator'
+    ? { ...command, dropProfile: cafeDropProfile(mergeWorldRef.current, command.generatorId) } : command), [cafeStoreSend]);
   const supplyRunOrders = useMemo((): SupplyRunOrder[] => supplyRunSlots(mergeWorld).map((index, slot) => ({ slot: slot as 0 | 1, index, order: supplyOrder(slot as 0 | 1, index, kitchen) })), [kitchen, mergeWorld]);
   const [supplyCrateFull, setSupplyCrateFull] = useState(false);
   // Serving is the Merge page's own serve (`MergeServeRewardOverlay`): each piece the order takes flies from its cell to
@@ -2976,14 +2982,16 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // The Explorer's Lodge pays extra Timber on every order and extra Glow in every crate.
     const lodge = heroBuildingLevel(mergeWorldRef.current, 'explorers-lodge');
     const timber = entry.order.timber + lodgeTimberBonus(lodge);
-    const crate = { ...SUPPLY_CRATE, glow: SUPPLY_CRATE.glow + lodgeCrateGlowBonus(lodge) };
-    const paid = await completeStoredSupplyOrder(entry.slot, entry.index, timber, entry.order.reward.coins, crate, entry.order.meals).catch((error) => { console.warn('The order could not be paid', error); return null; });
+    // Baristabbit's Café adds Meals to every order; Feastle's Kitchen to every crate.
+    const meals = entry.order.meals + cafeMealsBonus(heroBuildingLevel(mergeWorldRef.current, 'baristabbit-cafe'));
+    const crate = { ...SUPPLY_CRATE, glow: SUPPLY_CRATE.glow + lodgeCrateGlowBonus(lodge), meals: SUPPLY_CRATE.meals + kitchenCrateMealsBonus(heroBuildingLevel(mergeWorldRef.current, 'feastle-kitchen')) };
+    const paid = await completeStoredSupplyOrder(entry.slot, entry.index, timber, entry.order.reward.coins, crate, meals).catch((error) => { console.warn('The order could not be paid', error); return null; });
     const servedAfter = paid?.state.supplyRun?.served ?? servedBefore;
     if (servedAfter > servedBefore && servedAfter % SUPPLY_CRATE.every === 0) {
       // A crate filled: its bonus is shown (the order's Glow with it), and the run is done for now.
       setSupplyCrateFull(true);
       setBattleReward({ key: `supply-crate:${servedAfter}`, eyebrow: 'Café crate', title: 'Crate filled!', stars: 0,
-        glow: entry.order.reward.coins + crate.glow, timber: timber + crate.timber, meals: entry.order.meals + crate.meals, before,
+        glow: entry.order.reward.coins + crate.glow, timber: timber + crate.timber, meals: meals + crate.meals, before,
         finish: () => { setSupplyCrateFull(false); setSupplyRunOpen(false); } });
       return true;
     }
@@ -3832,7 +3840,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         <LastClearingTitleCard key={chapterState.chapter.id} eyebrow={`Chapter ${chapterState.chapter.number} complete`} title={chapterState.chapter.title}
           lines={[chapterState.chapter.closing, `+${chapterState.chapter.reward.glow} Glow`, ...(chapterState.chapter.unlock ? [chapterState.chapter.unlock] : [])]} onContinue={claimChapter} />
       ) : null}
-      {supplyRunDocked && supplyRunStore.state ? <SupplyRunDock state={supplyRunStore.state} send={supplyRunStore.send} orders={supplyRunOrders} served={mergeWorld.supplyRun?.served ?? 0}
+      {supplyRunDocked && supplyRunStore.state ? <SupplyRunDock state={supplyRunStore.state} send={cafeSend} orders={supplyRunOrders} served={mergeWorld.supplyRun?.served ?? 0}
         hiddenItemIds={supplyHiddenItemIds} servingOrderId={supplyServeFlight ? supplyServingRef.current?.order.id ?? null : null} crateFull={supplyCrateFull}
         width={window.width} bottomInset={insets.bottom} onServe={serveSupplyOrder} onBoardMetrics={setOpeningBoardMetrics} onEntranceSettled={markOpeningDockSettled}
         title={kitchen ? 'Feastle\u2019s Kitchen' : undefined} onClose={() => setSupplyRunOpen(false)} /> : null}

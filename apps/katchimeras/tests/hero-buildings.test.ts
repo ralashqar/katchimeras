@@ -81,3 +81,25 @@ test('Fernip’s Thicket: built once Fernip is home, it slows a Lanes battle’s
   const blossle = SANCTUARY_CHAPTERS.find((chapter) => chapter.id === 'seed-keeper')!;
   assert.deepEqual(blossle.goals[0]!.action, { kind: 'hero_building', id: 'fern-thicket' });
 });
+
+test('Baristabbit’s Café and Feastle’s Kitchen: built once their friend is home, they pour better pieces and pay more Meals', async () => {
+  const { cafeDropProfile, cafeMealsBonus, kitchenCrateMealsBonus, heroTileLayerId } = await import('@/constants/hero-buildings');
+  const { heroTileLook } = await import('@/constants/hero-building-art');
+  const { SANCTUARY_CHAPTERS } = await import('@/constants/sanctuary-chapters');
+  const base = { ...createInitialMergeWorldState(1_000), coins: 500, materials: { timber: 100, meals: 0 }, heartTree: { receiptId: 't', restoredAt: 1, level: 1 } };
+  assert.equal(reduceMergeWorld(base, { type: 'upgradeHeroBuilding', id: 'baristabbit-cafe', expectedLevel: 0, now: 2_000 }).changed, false, 'not before Baristabbit is home');
+  const home = reduceMergeWorld(base, { type: 'rescueWorldFriend', targetId: 'mossprout:warm-light', now: 1_500 }).state;
+  const built = reduceMergeWorld(home, { type: 'upgradeHeroBuilding', id: 'baristabbit-cafe', expectedLevel: 0, now: 2_000 });
+  assert.equal(built.changed, true);
+  assert.deepEqual(cafeDropProfile(built.state, 'ritual-bar'), { tierTwoChance: 0.05, tierThreeChance: 0 }, 'the Ritual Bar pours better');
+  assert.deepEqual(cafeDropProfile(built.state, 'hearth-pantry'), { tierTwoChance: 0, tierThreeChance: 0 }, 'the Pantry waits for Feastle’s Kitchen');
+  assert.deepEqual([cafeMealsBonus(1), cafeMealsBonus(4), cafeMealsBonus(10)], [1, 2, 5]);
+  assert.equal(kitchenCrateMealsBonus(3), 6);
+  assert.equal(heroTileLayerId('baristabbit-home'), 'structure:baristabbit-home');
+  assert.equal(heroTileLook('baristabbit-home', 1), null, 'the first look is his own window');
+  assert.ok(heroTileLook('baristabbit-home', 2) && heroTileLook('feastle-home', 3), 'the grown looks are there');
+  const lodgeChapter = SANCTUARY_CHAPTERS.find((chapter) => chapter.id === 'explorers-lodge')!;
+  assert.ok(lodgeChapter.goals.some((goal) => goal.action.kind === 'hero_building' && goal.action.id === 'baristabbit-cafe'));
+  const kitchenChapter = SANCTUARY_CHAPTERS.find((chapter) => chapter.id === 'the-kitchen')!;
+  assert.deepEqual(kitchenChapter.goals[1]!.action, { kind: 'hero_building', id: 'feastle-kitchen' });
+});

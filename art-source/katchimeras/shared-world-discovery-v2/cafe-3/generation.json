@@ -1,0 +1,19 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "resolution": 2048,
+  "createdAt": "2026-09-25T15:45:24.074140+00:00",
+  "references": [
+    {
+      "path": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "sha256": "64b441e4c33b1d3a02e418f22fd474c4b994557243e43869a89cf8e530df0f2a"
+    },
+    {
+      "path": "design/shared-world-discovery-v2/baristabbit/source.png",
+      "sha256": "8a2c5b00dba55e45e05689b056d96a1f6079730bd8daf2366e2719b0c55f9b50"
+    }
+  ],
+  "prompt": "Use Image 1 as the authoritative camera, framing, deep tapered floating hex-island geometry and rendering reference. Preserve its six-sided top footprint, broad chunky cliff blocks, deep tapered underside, centered recessed front stairs, lighting direction and square framing. Keep the entire silhouette comfortably inside the canvas with black padding on all four sides. Perfectly flat pure-black #000000 background for BiRefNet Heavy matting; no ground plane, external drop shadow, text, numbers, UI, watermark, characters or eggs.\n\nPremium cozy 3D toy diorama matching the Mossprout reference: very low detail density, very low texture detail, broad cushiony shapes, soft rounded bevels, smooth matte clay-like surfaces, large readable color blocks, soft upper-left daylight and restrained ambient occlusion. No photographic texture, grain, tiny repeated details, speckles, cracks, grass blades, pine needles or surface noise. Every main shape must read at 256 pixels.\n\nGenerate Baristabbit's Caf\u00e9, stage 3. Image 2 is Baristabbit's existing caf\u00e9 tile: keep its exact layout, palette and features where they are (the honey plank floor, the big cream teapot on the left, the sage bench and round table on the right, the two little lanterns, the wooden fence posts, the sage, terracotta and cream cliff blocks and the centred front stairs) and change only the caf\u00e9 kiosk at the rear, which has grown. The kiosk is now a grand cream caf\u00e9: two storeys under a chunky terracotta roof, a broad cream-and-terracotta striped awning over a wide amber-lit counter, a small round rooftop terrace with a tiny parasol, a big chunky copper coffee machine on the counter, and hanging lanterns along the awning. The whole building stays inside the canvas with clear black padding above it. It must stay at the rear and inside the tile, and the quiet flat centre and the front stairs stay clear for the separately rendered live character. Cozy toy diorama, fully developed and welcoming. No character, creature, Egg, text, letters or numbers.",
+  "assetKey": "shared_world_cafe_3_hex_tile_v1",
+  "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/shared-world-cafe-3-hex-tile-v1/1790351188528_grid.png",
+  "sourceSha256": "5cf8f2620089e986c49848d8048e0b6c7075c55c336ca8bb3989b69ec3fd7593"
+}

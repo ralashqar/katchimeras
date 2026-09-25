@@ -42,7 +42,7 @@ test('a chapter pays once, then the next one opens: the Signal points at Petalim
   const lodge = sanctuaryChapterState(world)!;
   assert.equal(lodge.chapter.id, 'explorers-lodge', 'the claim survives a reload, and the Lodge chapter follows');
   assert.deepEqual(lodge.goal?.action, { kind: 'hero_building', id: 'explorers-lodge' }, 'a tap opens the Lodge');
-  world = { ...world, heroBuildings: { 'explorers-lodge': { level: 2, builtAt: 3_000 } }, supplyRun: { slots: [3, 3], served: 5, crates: 1 }, heartTree: { receiptId: 'test:tree', restoredAt: 1_000, level: 2 } };
+  world = { ...world, heroBuildings: { 'explorers-lodge': { level: 2, builtAt: 3_000 }, 'baristabbit-cafe': { level: 1, builtAt: 3_000 } }, supplyRun: { slots: [3, 3], served: 5, crates: 1 }, heartTree: { receiptId: 'test:tree', restoredAt: 1_000, level: 2 } };
   assert.equal(sanctuaryChapterState(world)?.complete, true);
   world = reduceMergeWorld(world, { type: 'claimChapterReward', chapterId: 'explorers-lodge', glow: 40, now: 3_200 }).state;
   const next = sanctuaryChapterState(world)!;

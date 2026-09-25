@@ -4,7 +4,7 @@ import type { HatchableTileArt } from '@/types/hatchable-companion';
  * A hero building's tile as it grows (`constants/hero-buildings.ts`), by art slot (`heroTileSlot`): slot 0 is the
  * tile's own art, slots 1-3 the building's three looks. A slot with null keeps the tile's own art (the Lodge's first
  * look is Steppling's trailhead, which already has its hut). The looks come from the shared-world hex pipeline
- * (`art-source/katchimeras/shared-world-discovery-v2`, briefs `steppling-lodge-2/3`, `bloom-house-1/2/3` and `fern-thicket-1/2/3`), each
+ * (`art-source/katchimeras/shared-world-discovery-v2`, briefs `steppling-lodge-2/3`, `bloom-house-1/2/3`, `fern-thicket-1/2/3`, `cafe-2/3` and `kitchen-2/3`), each
  * with its generated bounds key.
  */
 type TileLook = { art: () => HatchableTileArt; alphaBoundsKey: string };
@@ -78,6 +78,44 @@ const LOOKS: Readonly<Record<string, readonly [TileLook | null, TileLook | null,
         full: require('@incubator/art-world/hex/shared_world_fern_thicket_3_hex_tile_v1.webp'),
         medium: require('@incubator/art-world/hex/shared_world_fern_thicket_3_hex_tile_v1_512.webp'),
         thumb: require('@incubator/art-world/hex/shared_world_fern_thicket_3_hex_tile_v1_256.webp'),
+      }),
+    },
+  ],
+  'baristabbit-home': [
+    null,
+    {
+      alphaBoundsKey: 'shared_world_cafe_2_hex_tile_v1.webp',
+      art: () => ({
+        full: require('@incubator/art-world/hex/shared_world_cafe_2_hex_tile_v1.webp'),
+        medium: require('@incubator/art-world/hex/shared_world_cafe_2_hex_tile_v1_512.webp'),
+        thumb: require('@incubator/art-world/hex/shared_world_cafe_2_hex_tile_v1_256.webp'),
+      }),
+    },
+    {
+      alphaBoundsKey: 'shared_world_cafe_3_hex_tile_v1.webp',
+      art: () => ({
+        full: require('@incubator/art-world/hex/shared_world_cafe_3_hex_tile_v1.webp'),
+        medium: require('@incubator/art-world/hex/shared_world_cafe_3_hex_tile_v1_512.webp'),
+        thumb: require('@incubator/art-world/hex/shared_world_cafe_3_hex_tile_v1_256.webp'),
+      }),
+    },
+  ],
+  'feastle-home': [
+    null,
+    {
+      alphaBoundsKey: 'shared_world_kitchen_2_hex_tile_v1.webp',
+      art: () => ({
+        full: require('@incubator/art-world/hex/shared_world_kitchen_2_hex_tile_v1.webp'),
+        medium: require('@incubator/art-world/hex/shared_world_kitchen_2_hex_tile_v1_512.webp'),
+        thumb: require('@incubator/art-world/hex/shared_world_kitchen_2_hex_tile_v1_256.webp'),
+      }),
+    },
+    {
+      alphaBoundsKey: 'shared_world_kitchen_3_hex_tile_v1.webp',
+      art: () => ({
+        full: require('@incubator/art-world/hex/shared_world_kitchen_3_hex_tile_v1.webp'),
+        medium: require('@incubator/art-world/hex/shared_world_kitchen_3_hex_tile_v1_512.webp'),
+        thumb: require('@incubator/art-world/hex/shared_world_kitchen_3_hex_tile_v1_256.webp'),
       }),
     },
   ],

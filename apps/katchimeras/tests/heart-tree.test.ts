@@ -65,7 +65,7 @@ test('the Explorer’s Lodge makes Timber while you are away, up to its store, c
 test('Chapter 2 asks for the Heart Tree at level 2', () => {
   const chapter2 = { ...awake(createInitialMergeWorldState(1_000)), chaptersClaimed: ['home-for-two'] } as MergeWorldState;
   assert.equal(sanctuaryChapterState(chapter2)?.chapter.id, 'explorers-lodge');
-  const withLodge = { ...chapter2, heroBuildings: { 'explorers-lodge': { level: 2, builtAt: 1 } }, supplyRun: { slots: [], served: 5, crates: 1 } } as unknown as MergeWorldState;
+  const withLodge = { ...chapter2, heroBuildings: { 'explorers-lodge': { level: 2, builtAt: 1 }, 'baristabbit-cafe': { level: 1, builtAt: 1 } }, supplyRun: { slots: [], served: 5, crates: 1 } } as unknown as MergeWorldState;
   assert.equal(sanctuaryChapterState(withLodge)?.goal?.action.kind, 'heart_tree');
   assert.equal(sanctuaryChapterState(awake(withLodge, 2))?.complete, true);
 });
