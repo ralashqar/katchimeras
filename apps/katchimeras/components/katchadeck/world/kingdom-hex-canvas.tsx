@@ -977,12 +977,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   // A friend lost in a tile's Mist (Steppling on his trailhead): a dim silhouette deep in it until it clears.
   const lostSilhouettes = useMemo(() => [
     ...STORY_TILES.flatMap((tile) => (tile.lostSkinId && (mossproutGarden?.storyTiles?.[tile.id] ?? 'misted') === 'misted' ? [{ tileId: tile.id, skinId: tile.lostSkinId }] : [])),
-    ...HATCHABLE_COMPANIONS.flatMap((definition) => {
-      const state = mossproutGarden?.hatchableTiles?.[definition.tile.id] ?? (definition.companion === 'steppling' ? mossproutGarden?.gateway : undefined) ?? 'locked';
-      // Held through a rescue's reveal until the tile starts to clear (the write lands before the blend begins).
-      const clearing = revealingHatchableTileId === definition.tile.id && upgradePhase !== 'reveal' && upgradePhase !== 'react' && upgradePhase !== 'complete';
-      return definition.tile.lostSkinId && (state === 'locked' || clearing) ? [{ tileId: definition.tile.id, skinId: definition.tile.lostSkinId }] : [];
-    }),
   ].flatMap(({ tileId, skinId }) => {
     const frame = storyTileFrames.find((entry) => entry.tileId === tileId)?.frame;
     const source = frame ? resolveCreatureArtSource(skinId) : null;
@@ -3891,22 +3885,24 @@ const LostSilhouette = memo(function LostSilhouette({ frame, source }: { frame: 
  * tapped to collect. In world space, so it moves with the camera like the tile it belongs to.
  */
 /**
- * Someone waiting in the Mist (a chapter's beacon: Baristabbit at his lit window): their own resident sprite, in the
- * spot and size they take once home, as a dark silhouette over the Mist, its edge glowing softly in a slow pulse (an
- * alpha shadow on the sprite itself; no shapes behind it). Runtime, not baked.
+ * A friend waiting under their tile's Mist (Steppling on his trailhead, Baristabbit at his window, and each after):
+ * their own resident sprite, exactly where and as big as they stand once home, as a dark shadow breathing faintly in
+ * and out of sight, the way a trapped friend shows in a battle board's Mist cell. Runtime, not baked.
  */
 const TileBeacon = memo(function TileBeacon({ frame, source, color }: { frame: { left: number; top: number; width: number; height: number }; source: ImageSourcePropType; color: string }) {
   const reduceMotion = useReducedMotion();
-  const breath = useSharedValue(0.5);
+  const presence = useSharedValue(0.4);
   useEffect(() => {
     if (reduceMotion) return;
-    breath.value = withRepeat(withSequence(withTiming(1, { duration: 1_400, easing: Easing.inOut(Easing.sin) }), withTiming(0.35, { duration: 1_700, easing: Easing.inOut(Easing.sin) })), -1, false);
-    return () => cancelAnimation(breath);
-  }, [breath, reduceMotion]);
-  const glow = useAnimatedStyle(() => ({ shadowOpacity: 0.35 + breath.value * 0.55 }));
-  return <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: frame.left, top: frame.top, width: frame.width, height: frame.height,
-    shadowColor: color, shadowOffset: { width: 0, height: 0 }, shadowRadius: Math.max(4, frame.width * 0.08) }, glow]}>
-    <Image source={source} style={{ width: frame.width, height: frame.height, tintColor: '#2E2338' }} contentFit="contain" transition={0} accessible={false} />
+    presence.value = withRepeat(withSequence(
+      withTiming(0.62, { duration: 1_400, easing: Easing.inOut(Easing.sin) }),
+      withTiming(0.28, { duration: 1_700, easing: Easing.inOut(Easing.sin) }),
+    ), -1, false);
+    return () => cancelAnimation(presence);
+  }, [presence, reduceMotion]);
+  const style = useAnimatedStyle(() => ({ opacity: presence.value }));
+  return <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: frame.left, top: frame.top, width: frame.width, height: frame.height }, style]}>
+    <Image source={source} style={{ width: frame.width, height: frame.height, tintColor: color }} contentFit="contain" transition={0} accessible={false} />
   </Animated.View>;
 });
 

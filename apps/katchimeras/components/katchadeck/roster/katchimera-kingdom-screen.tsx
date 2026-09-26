@@ -175,7 +175,7 @@ import { useHatchableEncounter } from '@/features/onboarding/use-hatchable-encou
 import { hatchableEggProgress } from '@/features/onboarding/hatchable-egg-policy';
 import { GLOW_GATEWAY_NODE_IDS, GLOW_MISSION_CLEAR_NODE_ID, GLOW_MISSION_FOCUS_NODE_ID, glowDiscoveryAllowsGarden, glowDiscoveryLocksCamera, glowDiscoveryMissionNode, glowDiscoveryResumeCamera } from '@/features/onboarding/glow-discovery-flow';
 import { ftueLocksCamera } from '@/features/onboarding/ftue-camera-policy';
-import { glowGatewayState, hatchableGatewayState } from '@/utils/merge-world/glow-discovery-policy';
+import { glowGatewayState, hatchableAvailable, hatchableGatewayState } from '@/utils/merge-world/glow-discovery-policy';
 import { sharedWorldIncludesCompanion } from '@/constants/shared-world';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -3221,11 +3221,15 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const openGoalSource = useCallback((source: GoalNeedSource) => { if (source === 'cafe') openCafe(); else openGlowSource(); }, [openCafe, openGlowSource]);
   const chapterGoalNeed = useMemo(() => (chapterState?.goal ? goalNeed(mergeWorld, chapterState.goal) : null), [chapterState?.goal, mergeWorld]);
   // A light kept on a misted tile while the chapter points there (the lit window): from the opening's camera on.
-  const chapterBeacons = useMemo(() => {
-    const beacon = chapterState?.goal?.beacon;
-    // Not over a docked board or a tile clearing: the rescue itself shows them trapped in the board instead.
-    return beacon && !ftueStepId && !missionBoardDocked && !upgradePresentation && !stepplingMissionActive ? [beacon] : undefined;
-  }, [chapterState?.goal?.beacon, ftueStepId, missionBoardDocked, stepplingMissionActive, upgradePresentation]);
+  // Every friend waiting under their tile's Mist, as a faint silhouette where they will stand: those lost in it from the
+  // start (Steppling on his trailhead) and those who can be reached now (Baristabbit's window, then on). Not while their
+  // own rescue plays (the board shows them trapped in its cell; the tile clears with them fading in).
+  const mistedFriends = useMemo(() => HATCHABLE_COMPANIONS.flatMap((definition) => {
+    if (hatchableTiles[definition.tile.id] !== 'locked') return [];
+    if (!definition.tile.lostSkinId && !hatchableAvailable(mergeWorld, definition)) return [];
+    if (rescueRevealing === definition.companion || (stepplingMissionActive && activeHatchable.companion === definition.companion)) return [];
+    return [{ tileId: definition.tile.id, color: '#2B2640' }];
+  }), [activeHatchable.companion, hatchableTiles, mergeWorld, rescueRevealing, stepplingMissionActive]);
   const followChapterGoal = useCallback(() => {
     const goal = chapterState?.goal;
     if (!goal) return;
@@ -3318,12 +3322,24 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     setChapterOpeningPlace({ islandId: chapterOpening.islandId, tileId: chapterOpening.tileId });
     setChapterOpeningPhase('camera');
   }, [chapterOpening, chapterOpeningPhase, chapterSurfaceFree]);
+  // The flare waits for the camera, but never forever: its fallback runs from the moment the camera phase starts and
+  // is not restarted by the camera settling and unsettling (a camera that keeps moving once left the opening stuck).
   useEffect(() => {
     if (chapterOpeningPhase !== 'camera') return;
-    // The flare waits for the camera, but never forever: a camera already there reports nothing.
-    const timer = setTimeout(() => setChapterOpeningPhase('flare'), ftueCameraSettled ? 300 : 2_600);
+    const fallback = setTimeout(() => setChapterOpeningPhase((phase) => (phase === 'camera' ? 'flare' : phase)), 2_600);
+    return () => clearTimeout(fallback);
+  }, [chapterOpeningPhase]);
+  useEffect(() => {
+    if (chapterOpeningPhase !== 'camera' || !ftueCameraSettled) return;
+    const timer = setTimeout(() => setChapterOpeningPhase((phase) => (phase === 'camera' ? 'flare' : phase)), 300);
     return () => clearTimeout(timer);
   }, [chapterOpeningPhase, ftueCameraSettled]);
+  // An opening whose chapter was marked opened elsewhere (a relaunch, another device) lets go of the camera.
+  useEffect(() => {
+    if (chapterOpening || !chapterOpeningPhase || openingTileTap) return;
+    setChapterOpeningPhase(null);
+    setChapterOpeningPlace(null);
+  }, [chapterOpening, chapterOpeningPhase, openingTileTap]);
   useEffect(() => {
     if (chapterOpeningPhase !== 'flare') return;
     const timer = setTimeout(() => setChapterOpeningPhase('talk'), CHAPTER_SIGNAL_FLARE_MS);
@@ -3436,7 +3452,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       .finally(() => { chapterClaimingRef.current = false; });
   }, [chapterState?.chapter, countGlowIn]);
   // A chapter's opening scene (and a friend's tile clearing) plays alone: no markers pop up over it.
-  const storyHold = Boolean(chapterState?.openingPending) || Boolean(chapterOpeningPhase) || Boolean(openingTileTap) || Boolean(arrivalTalk) || Boolean(rescueRevealing);
+  const storyHold = Boolean(chapterState?.openingPending && chapterState.chapter.opening?.tileId) || Boolean(chapterOpeningPhase) || Boolean(openingTileTap) || Boolean(arrivalTalk) || Boolean(rescueRevealing);
   storyHoldRef.current = storyHold;
   const worldOffers = storyHold ? NO_UPGRADE_OFFERS : homeSoloForStep(ftueStepId) ? NO_UPGRADE_OFFERS : restorationHandoff ? NO_UPGRADE_OFFERS : missionBoardDocked ? NO_UPGRADE_OFFERS : chapterOpeningPhase || rescueRevealing ? NO_UPGRADE_OFFERS : visibleWorldUpgradeOffers(presentedUpgradeOffers, ftueStepId, glowRun, activeHatchable.tile.id);
   // After the first session only what the story is about shows: the chapter's island, a friend's tile the chapter asks
@@ -3607,8 +3623,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         highlightedLockedFamilyId={null}
         interactionEnabled={!lanternSurfaceOpen && !activeInteractionResidentId && !stepplingEncounter.open && !supplyRunOpen && !storyHold && (mistUpgradeActive || havenOpeningActive || !ftueStep || ftueStep.surface !== 'haven')}
         interactionExitNonce={interactionExitNonce}
-        levelTrackStones={levelTrackStones}
-        onLevelTrackStonePress={playTrackStone}
         interactionNatureIslandId={pendingIslandCampaign?.campaign.islandId ?? null}
         preserveInteractionCameraOnExit={Boolean(pendingIslandCampaign || eventSelection || interactionExitHandsOver)}
         interactionResidentAnchorY={ftueReturnResidentAnchorY}
@@ -3661,7 +3675,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onStoryTileTargetChange={setStoryTileNode}
         cameraMinimumScale={ftueStepId === FRONTIER_STEP_ID ? FRONTIER_MINIMUM_SCALE : undefined}
         tileBubbles={lodgeTileBubbles}
-        tileBeacons={chapterBeacons}
+        tileBeacons={mistedFriends}
         soloLayerId={soloLayerId}
         soloOfferId={soloOfferId}
         storyOperationsEnabled={screenFocused && !activeInteractionResidentId && !interactionExiting}

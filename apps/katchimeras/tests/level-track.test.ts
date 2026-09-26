@@ -90,7 +90,7 @@ test('the Kingdom opens a friend’s island on its level track, and one sheet se
   // A level holds the world like every docked board (no markers, no tile taps, the camera still), and its board,
   // which draws no lesson, is free from the first move.
   assert.match(screen, /const missionBoardDocked = [^\n]*\|\| islandEncounterActive[^\n]*;/);
-  assert.match(screen, /\|\| Boolean\(rushSpec\) \|\| islandEncounterActive\}/);
+  assert.match(screen, /cameraLocked=\{[^}]*\|\| Boolean\(rushSpec\) \|\| islandEncounterActive\b/, 'an island battle holds the camera');
   assert.match(screen, /useMistMission\(\{ guided: false, [^\n]*active: islandEncounterActive/);
   // After a level or a story beat the game goes on: a chapter played as levels closes its opening conversation
   // (it once threw looking for a Merge request), a won level lands back on its track unless a story takes over,
