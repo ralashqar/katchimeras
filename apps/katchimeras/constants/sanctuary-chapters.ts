@@ -1,5 +1,6 @@
 import { heartTreeLevel } from '@/constants/heart-tree';
 import { frontierContestedTiles, frontierReclaimedCount, frontierSurgesStarted } from '@/constants/frontier-tiles';
+import { HOLLOW_TREE_FINALE_ID } from '@/constants/finale';
 import { heartwoodBuildingLevel, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
 import { heroBuildingLevel, type HeroBuildingId } from '@/constants/hero-buildings';
 import { PETALIMP_ISLAND_CAMPAIGN_ID } from '@/constants/island-campaigns/petalimp-bloom';
@@ -31,7 +32,9 @@ export type ChapterGoalAction =
   /** The Frontier's next tile in the Tree's light: its battle, docked under it (`constants/frontier-tiles.ts`). */
   | { kind: 'frontier' }
   /** The first Mist Surge: the Mist comes for the Heart Tree, and the defence battle docks under it. */
-  | { kind: 'surge_defence' };
+  | { kind: 'surge_defence' }
+  /** The finale: the Hollow Tree's keeper, the battle docked under the Hollow Tree (`features/finale/hollow-tree.ts`). */
+  | { kind: 'finale' };
 
 export type ChapterGoal = {
   id: string;
@@ -272,6 +275,38 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     ] },
     reward: 120, closing: 'Everyone’s home. The Heart Tree is humming. But out past the Hollow Tree, the Mist is stirring.',
   }),
+  {
+    // The finale (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Chapter 10): the Hollow Tree was the first Sanctuary; the
+    // Mist is a forgetting, and its keeper forgot first. The battle wakes it, and past it other lights are waiting.
+    id: 'the-hollow-tree', number: 10, title: 'The Hollow Tree',
+    opening: {
+      tileId: 'hollow-tree', color: '#FFD27A', title: 'What the Mist Forgot', answer: 'Go to the Hollow Tree',
+      lines: [
+        { speaker: 'mistle', text: 'I know that tree. I knew it before the Mist.' },
+        { speaker: 'mistle', text: 'It was the first Sanctuary, long before ours. Everyone lived under it once.' },
+        { speaker: 'mossprout', text: 'Then why does nobody remember it?' },
+        { speaker: 'mistle', text: 'That is what the Mist is. Not a cloud: a forgetting. And the one who kept that tree forgot first.' },
+        { speaker: 'steppling', text: 'Then we go and remind it.' },
+      ],
+    },
+    goals: [
+      { id: 'tree-8', title: 'Grow the Heart Tree to its full height', detail: 'Only the Heart Tree at its brightest can light the way to the Hollow Tree.', done: (world) => heartTreeLevel(world) >= 8, action: { kind: 'heart_tree' },
+        outro: [{ speaker: 'mossprout', text: 'Look how far the light goes now. All the way to the Hollow Tree.' }] },
+      { id: 'train-mistle', title: 'Train Mistle to level 3', detail: 'Mistle\u2019s Forget turns the Mist\u2019s own trick back on it. The Hollow Tree\u2019s keeper will need it.', done: (world) => heroLevel(world, 'mistle') >= 3, action: { kind: 'hero', characterId: 'mistle' },
+        outro: [{ speaker: 'mistle', text: 'I remember how to make it forget. Let\u2019s go.' }] },
+      { id: 'hollow-heart', title: 'Wake the Hollow Tree', detail: 'Its keeper waits under the tree, guarded, forgetting. Bring it down, and help it remember.', done: (world) => Boolean(world.encounters?.clears?.[HOLLOW_TREE_FINALE_ID]), action: { kind: 'finale' },
+        outro: [
+          { speaker: 'mossprout', text: 'It\u2019s\u2026 still.' },
+          { speaker: 'mistle', text: 'It remembers. Look at the tree.' },
+          { speaker: 'baristabbit', text: 'That\u2019s the first light I ever saw, as a kit. I\u2019d forgotten it too.' },
+          { speaker: 'steppling', text: 'Hey. Past the tree. Are those\u2026 more lights?' },
+          { speaker: 'mossprout', text: 'Someone else is keeping a lamp lit.' },
+        ] },
+    ],
+    reward: { glow: 300 },
+    closing: 'The Hollow Tree is green again, and everyone remembers it. Far off, past its branches, other lights are waiting.',
+    unlock: 'The lands beyond the Hollow Tree: coming soon.',
+  },
 ];
 
 export type SanctuaryChapterState = {

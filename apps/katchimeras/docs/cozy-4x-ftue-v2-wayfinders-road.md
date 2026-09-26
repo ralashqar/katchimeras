@@ -304,6 +304,34 @@ Mistle's chapter reveals the lore turn: the Mist is a forgetting, and the Hollow
 - **Validator.** The encounter validator now accepts `bound` Mist, which must hold a piece.
 - **Fallback.** `lanesPatternSpecs` stays only for islands that have no levels of their own (content packs).
 
+**Wisp variety, built (Sept 26 2026):**
+- **Eight new Lanes wisp behaviours** (`LaneWisp` in `types/mission-mechanic.ts`, `lanesTick`):
+  - **weave:** slides between its column and the ones beside it;
+  - **dash:** lunges a couple of rows when close;
+  - **shield (bulwark):** wisps beside it take no damage;
+  - **mend:** heals every wisp within a column, itself included;
+  - **frost:** the plant under it holds fire for 4s;
+  - **snatch:** steals the smallest piece under it;
+  - **split:** shards appear beside it when it falls;
+  - **call:** brings its mistlings down one at a time.
+- **Phases.** A boss can bring its next phase with `after:<id>`, in the place it fell (`spawn` on death).
+- **Art.** New looks: weaver, dasher, bulwark, frost, splitter, snatcher, and the finale's hollow and forgotten.
+- **Teaching.** The first of each kind in a battle is named by Mossprout (`WISP_KIND_LINES`).
+- **Where they appear:**
+  - **Frontier, from power 3:** the Meadow weaves, the Copse snatches, the Brook freezes, and the Stones get a bulwark.
+  - **The Heart Tree defence:** a dasher and a splitter.
+  - **Each later island:** its own kinds from Chapter 3, and some bosses use them. The Seed Caller calls; the Hungry Harvest mends.
+
+**Chapter 10, the Hollow Tree, built (Sept 26 2026):**
+- **Opening.** Mistle's lore turn: the Hollow Tree was the first Sanctuary, and the Mist is a forgetting.
+- **Goals:** the Heart Tree to 8, Mistle to level 3, then wake the Hollow Tree.
+- **The finale** (`features/finale/hollow-tree.ts`) is a three-phase boss docked under the Hollow Tree:
+  1. the Hollow Heart, guarded by two bulwarks;
+  2. it remembers: it weaves and calls its mistlings;
+  3. the Forgotten Light: quick, and lunging.
+- **The win.** The Hollow Tree crossblends to its restored art. The outro ends on a callback to Chapter 1: someone else is keeping a lamp lit. The chapter's unlock teases the lands beyond.
+- **Pacing:** the playthrough completes all 10 chapters in 89 battles, 54 orders and 188 steps.
+
 ### D3. Frontier tiles and Mist Surges (the 4X layer)
 - **New tile kind `frontier`.** It fills the empty ring-2 cells (4) and ring-3 cells (18) through `ringSources` in `mossprout-hex-neighborhood-scene.ts:245-263`, with authored frontier ids in `constants/frontier-tiles.ts`. Its states are `misted | contested | reclaimed`, stored in `world.frontier[tileId]` and changed by engine commands `reclaimFrontierTile` and `contestFrontierTile`.
 - **Art:** 4 wild reclaimed variants (meadow, copse, brook, stones), plus a contested edge overlay drawn at runtime. It goes through the shared-world hex pipeline (`shared-world-discovery-v2/briefs.json` → generate → matte → package → bounds → review). The misted state reuses `dream_mist_locked_hex_tile_v4`.

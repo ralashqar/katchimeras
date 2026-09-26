@@ -92,7 +92,9 @@ test('the main quest hands off with a scene: the goals that end away from the ne
   for (const id of ['supply-run', 'frontier-1', 'lodge-built', 'frontier-3', 'cafe-built', 'lodge-2', 'tree-2', 'bloom-mist', 'train-mossprout-3', 'kitchen-built', 'first-surge', 'surge-retake', 'kitchen-feasts']) {
     assert.ok((chapterGoalById(id)?.outro?.length ?? 0) >= 1, `${id} ends on a scene`);
   }
-  for (const chapter of SANCTUARY_CHAPTERS.slice(4)) {
+  // Chapters 5 to 9 are the friends' chapters; 10 is the finale, with its own scenes.
+  for (const id of ['tree-8', 'train-mistle', 'hollow-heart']) assert.ok((chapterGoalById(id)?.outro?.length ?? 0) >= 1, `${id} ends on a scene`);
+  for (const chapter of SANCTUARY_CHAPTERS.slice(4, 9)) {
     for (const suffix of ['tree', 'frontier', 'train', 'mist']) assert.ok(chapter.goals.find((goal) => goal.id === `${chapter.id}:${suffix}`)?.outro?.length, `${chapter.id}:${suffix} ends on a scene`);
   }
 });

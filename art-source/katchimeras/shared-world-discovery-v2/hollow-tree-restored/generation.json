@@ -1,0 +1,15 @@
+{
+  "model": "fal-ai/nano-banana-2/edit",
+  "resolution": 2048,
+  "createdAt": "2026-09-26T19:22:33.666954+00:00",
+  "references": [
+    {
+      "path": "design/shared-world-discovery-v2/hollow-tree/source.png",
+      "sha256": "c531af7a7edd1bac1e4e29d7c325cdf3b7d2fd8122627b911aeb310279f7814d"
+    }
+  ],
+  "prompt": "Use Image 1 as the authoritative camera, framing, deep tapered floating hex-island geometry and rendering reference. Preserve its six-sided top footprint, broad chunky cliff blocks, deep tapered underside, centered recessed front stairs, lighting direction and square framing. Keep the entire silhouette comfortably inside the canvas with black padding on all four sides. Perfectly flat pure-black #000000 background for BiRefNet Heavy matting; no ground plane, external drop shadow, text, numbers, UI, watermark, characters or eggs.\n\nPremium cozy 3D toy diorama matching the Mossprout reference: very low detail density, very low texture detail, broad cushiony shapes, soft rounded bevels, smooth matte clay-like surfaces, large readable color blocks, soft upper-left daylight and restrained ambient occlusion. No photographic texture, grain, tiny repeated details, speckles, cracks, grass blades, pine needles or surface noise. Every main shape must read at 256 pixels.\n\nGenerate the Hollow Tree restored, from Image 1: the exact same composition, camera, island size and position, and the same huge tree in the same place and pose, but the Mist is gone and the tree has remembered itself. The whole top face of the small island is now soft bright spring grass with a few broad cushions of warm yellow and pale pink flowers around the roots, and a gentle ring of small rounded stones. The tree is alive: the same thick softly twisted trunk and big rounded branches, now in warm living bark browns, carrying a broad, cushiony, rounded canopy of fresh golden-green leaves with a few glowing warm lanterns of light hanging from the branches, the whole canopy comfortably inside the canvas with clear black padding above it. The large hollow near its base glows softly with warm golden light from inside, like a doorway home. The cliff underside is warm sandstone and moss green. Joyful, warm and quiet, the first Sanctuary remembered. Cozy readable toy diorama, broad soft shapes, no tiny detail, no characters, no text.",
+  "assetKey": "shared_world_hollow_tree_restored_hex_tile_v1",
+  "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/shared-world-hollow-tree-restored-hex-tile-v1/1790450587509_grid.png",
+  "sourceSha256": "d95e9ea64d89fa1cc90af000b43a302e248f4fd76db90feb35592679f3e31f66"
+}

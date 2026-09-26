@@ -7,7 +7,9 @@ import type { DarkWisp, DarkWispKind, WispIntentKind } from '@/types/mission-mec
  */
 export const DARK_WISP_LOOKS = ['snuffer', 'shrouder', 'nibbler', 'creeper', 'warden', 'mender', 'caller', 'mistling', 'keeper', 'thief', 'overgrowth',
   // Lanes variety (Sept 2026): a look for each new kind of wisp.
-  'weaver', 'dasher', 'bulwark', 'frost', 'splitter', 'snatcher'] as const;
+  'weaver', 'dasher', 'bulwark', 'frost', 'splitter', 'snatcher',
+  // The finale's keeper, in its phases.
+  'hollow', 'forgotten'] as const;
 export type DarkWispLook = (typeof DARK_WISP_LOOKS)[number];
 
 

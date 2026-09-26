@@ -70,6 +70,13 @@ LOOKS: dict[str, str] = {
                 'as if it is about to split into two halves, with a small curl on each half of its head.',
     'snatcher': 'A small crouched body with one long, thin, stretchy smoke arm ending in a little three-fingered claw '
                 'hand that clutches a small bright green seed, the only colour on it. Sneaky, mischievous.',
+    # The finale (Chapter 10): the Hollow Tree's forgotten keeper, in two phases.
+    'hollow': 'An enormous ancient boss wisp with grey bark-like plates grown over its shoulders and head like a hollow '
+              'old tree, and a large dark round hollow right through the middle of its chest with a faint warm golden '
+              'glow deep inside it. Heavy, sorrowful, imposing, very old.',
+    'forgotten': 'A tall, pale, fading boss wisp, its smoke almost white-lavender and half transparent at the edges, '
+                 'with a small warm golden light glowing in the centre of its chest like a remembered spark. Sad, gentle '
+                 'eyes rather than angry ones. Graceful and old.',
 }
 
 spec = importlib.util.spec_from_file_location('generator', Path(__file__).with_name('generate-katchimera-hex-tile.py'))

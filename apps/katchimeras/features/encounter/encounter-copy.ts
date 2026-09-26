@@ -149,4 +149,6 @@ export const WISP_KIND_LINES: Readonly<Record<string, string>> = {
   splitter: 'A splitter. When it falls, it bursts into two small ones.',
   caller: 'A caller. It calls little ones down its lane until it falls.',
   snatcher: 'A snatcher. It steals the smallest piece under it.',
+  hollow: 'The Hollow Heart. It forgot everything. Its bulwarks first, then the heart.',
+  forgotten: 'The last of it. It remembers now, a little. Let it rest.',
 };

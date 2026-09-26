@@ -158,6 +158,7 @@ export const KINGDOM_HEX_TILE_ALPHA_BOUNDS = {
   'shared_world_frontier_meadow_hex_tile_v1.webp': { left: 43, top: 73, right: 980, bottom: 952 },
   'shared_world_frontier_stones_hex_tile_v1.webp': { left: 43, top: 29, right: 980, bottom: 952 },
   'shared_world_hollow_tree_hex_tile_v1.webp': { left: 106, top: 48, right: 902, bottom: 952 },
+  'shared_world_hollow_tree_restored_hex_tile_v1.webp': { left: 107, top: 28, right: 902, bottom: 952 },
   'shared_world_kitchen_2_hex_tile_v1.webp': { left: 42, top: 20, right: 980, bottom: 952 },
   'shared_world_kitchen_3_hex_tile_v1.webp': { left: 43, top: 22, right: 980, bottom: 952 },
   'shared_world_lost_trail_hex_tile_v1.webp': { left: 43, top: 26, right: 980, bottom: 952 },

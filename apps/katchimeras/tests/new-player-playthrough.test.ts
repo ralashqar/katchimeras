@@ -1,6 +1,7 @@
 import { localDayId } from '@/utils/world-identity-rules';
 import { frontierOpen, frontierTileById, frontierTileState, nextFrontierTile } from '@/constants/frontier-tiles';
 import { frontierMission, frontierRetakeMission, surgeDefenceMission } from '@/features/frontier/frontier-levels';
+import { hollowTreeFinaleMission } from '@/features/finale/hollow-tree';
 import { battleSourceCampaign } from '@/features/sanctuary/battle-source';
 import { islandCampaignForIsland } from '@/constants/island-campaigns/registry';
 import assert from 'node:assert/strict';
@@ -297,7 +298,15 @@ test('a new player plays the main quest from Steppling home to the last chapter 
       else if (action.kind === 'hero') apply({ type: 'upgradeKatchimera', characterId: action.characterId, expectedLevel: katchimeraLevel(world, action.characterId), now: now++ } as MergeWorldCommand, `train ${action.characterId}`);
       else if (action.kind === 'supply_run') serveOrder();
       else if (action.kind === 'grove') playGrove();
-      else if (action.kind === 'surge_defence') {
+      else if (action.kind === 'finale') {
+        // The Hollow Tree's keeper: the last battle, plants that shoot, in three phases.
+        const mission = hollowTreeFinaleMission();
+        assert.equal(mission.encounter?.mechanic?.kind, 'lanes', 'the finale is plants that shoot');
+        now += 3 * MINUTE;
+        apply({ type: 'completeEncounter', receiptId: `encounter:finale:${now}`, missionId: mission.id, katchimeraId: 'mossprout', helperWispId: null, partnerId: null,
+          outcome: { cleared: true, grade: 'bright' } as never, difficulty: mission.difficulty, base: mission.rewards, now } as MergeWorldCommand, 'wake the Hollow Tree');
+        tally().battles += 1;
+      } else if (action.kind === 'surge_defence') {
         // The first Mist Surge: the defence under the Heart Tree, plants that shoot; the Mist takes two edge tiles meanwhile.
         const mission = surgeDefenceMission();
         assert.equal(mission.encounter?.mechanic?.kind, 'lanes', 'the Heart Tree is held with plants that shoot');

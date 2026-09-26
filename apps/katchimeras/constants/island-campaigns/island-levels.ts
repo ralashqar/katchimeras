@@ -59,6 +59,7 @@ export type IslandLaneSpec = {
   /** A snatcher: every this many seconds it steals the smallest piece under it. */ snatch?: number;
   /** A splitter: when it falls it bursts into this many small shards beside it. */ splits?: number;
   /** A caller: every `every` seconds it calls one of its `count` mistlings (of `hp`) down its column. */ calls?: { every: number; count: number; hp?: number };
+  /** A boss's next phase: it comes, where it fell, when the wisp with this id falls (its `at` is ignored). */ after?: string;
 };
 
 export type IslandLevelSpec = {
@@ -150,6 +151,7 @@ export function laneWisps(lanes: readonly IslandLaneSpec[]): LaneWisp[] {
     ...(lane.frost ? { frostEvery: seconds(lane.frost) } : {}),
     ...(lane.snatch ? { snatchEvery: seconds(lane.snatch) } : {}),
     ...(lane.calls ? { callEvery: seconds(lane.calls.every) } : {}),
+    ...(lane.after ? { spawn: { by: lanes.findIndex((other) => other.id === lane.after), on: 'death' as const } } : {}),
   }));
   const brought: LaneWisp[] = [];
   lanes.forEach((lane, index) => {

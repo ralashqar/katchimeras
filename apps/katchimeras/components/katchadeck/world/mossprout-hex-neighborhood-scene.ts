@@ -69,6 +69,8 @@ export type MossproutGardenSceneState = {
   storyTiles?: Partial<Record<string, StoryTileState>>;
   /** Every Frontier tile by id (`constants/frontier-tiles.ts`): dark past the Tree's light, misted, or taken back. */
   frontier?: Partial<Record<string, FrontierTileState>>;
+  /** The Hollow Tree woken (the finale won): its restored art. */
+  hollowTreeRestored?: boolean;
   level: number;
   plantableMemories: readonly PlantableMemoryInstance[];
   previewMemoryId?: string;
@@ -359,9 +361,19 @@ const HOLLOW_TREE_ART = {
   thumb: require('@incubator/art-world/hex/shared_world_hollow_tree_hex_tile_v1_256.webp'),
 };
 
-function hollowTreeLayer(): KingdomTileArtLayer {
+/** The Hollow Tree woken (the finale won): green again, lanterns in its branches, its hollow glowing like a door home. */
+const HOLLOW_TREE_RESTORED_ART = {
+  full: require('@incubator/art-world/hex/shared_world_hollow_tree_restored_hex_tile_v1.webp'),
+  medium: require('@incubator/art-world/hex/shared_world_hollow_tree_restored_hex_tile_v1_512.webp'),
+  thumb: require('@incubator/art-world/hex/shared_world_hollow_tree_restored_hex_tile_v1_256.webp'),
+};
+
+function hollowTreeLayer(restored = false): KingdomTileArtLayer {
   const bounds = hexAlphaBounds('shared_world_hollow_tree_hex_tile_v1.webp');
-  const layer = layerFor('structure:hollow-tree', 'structure', { coord: HOLLOW_TREE_COORD, alphaBounds: bounds, sources: HOLLOW_TREE_ART });
+  // Woken, it keeps the sleeping tree's frame, so the world never shifts when it wakes.
+  const layer = restored
+    ? layerFor('structure:hollow-tree', 'structure', { coord: HOLLOW_TREE_COORD, alphaBounds: hexAlphaBounds('shared_world_hollow_tree_restored_hex_tile_v1.webp'), sources: HOLLOW_TREE_RESTORED_ART }, bounds)
+    : layerFor('structure:hollow-tree', 'structure', { coord: HOLLOW_TREE_COORD, alphaBounds: bounds, sources: HOLLOW_TREE_ART });
   // Scaled about the bottom of its frame, so it stands on the same ground line as a tile would.
   const { left, top, width, height } = layer.frame;
   const scaled = { left: left + width / 2 - (width * HOLLOW_TREE_SCALE) / 2, top: top + height - height * HOLLOW_TREE_SCALE, width: width * HOLLOW_TREE_SCALE, height: height * HOLLOW_TREE_SCALE };
@@ -544,7 +556,7 @@ export function buildMossproutHexNeighborhoodScene(
   ];
   // The Hollow Tree: the far landmark over the Mist (`docs/cozy-4x-ftue-the-last-clearing.md`, beat 10), past the
   // outer ring and bigger than a tile. Always reserved in the envelope, so it never shifts the world when it shows.
-  const hollowTree = hollowTreeLayer();
+  const hollowTree = hollowTreeLayer(Boolean(gardenState.hollowTreeRestored));
   // Reveal Heartwood and every neighbour in the same render, sharing the tile fade.
   const rawLayers = [
     ...(solo ? [] : [gardenLayer]), mainLayer, ...(options.homeVeiled || solo ? [] : plantLayers),
