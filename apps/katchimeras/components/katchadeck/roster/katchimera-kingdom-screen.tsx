@@ -235,6 +235,7 @@ import { WispRushSheet, type WispRushResult } from '@/components/katchadeck/worl
 import { createRushLive, heatHost, WISP_RUSH_HOST } from '@/features/time-trial/heat-mechanic';
 import { HEATS_PER_DAY, heatFor, heatFromRules, heatPars } from '@/features/time-trial/ladder';
 import { heatsCleared, nextHeatIndex, timeTrialFor } from '@/features/time-trial/trial-world';
+import { eventIntroSeenId, sanctuaryEventOpen, WISP_RUSH_EVENT } from '@/constants/sanctuary-events';
 import { commandFriendWispPacks } from '@/features/wisps/friend-wisp-runtime';
 import { gameNow } from '@/utils/game-clock';
 import { localDayId } from '@/utils/world-identity-rules';
@@ -3376,6 +3377,16 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const lodgeTileBubbles = useMemo(() => (sanctuarySurfaceFree && lodgeWaiting > 0
     ? [{ tileId: 'steppling-home', label: `+${lodgeWaiting}`, art: GAME_CURRENCY_ART.timber, onPress: collectLodge }]
     : undefined), [collectLodge, lodgeWaiting, sanctuarySurfaceFree]);
+  // The Sanctuary's events (`constants/sanctuary-events.ts`): repeatable modes beside the main quest. The daily Wisp
+  // Rush opens after Chapter 4, hosted by Steppling until Dashkit's own track brings them home (a content pack).
+  const dashkitHome = (mergeWorld.haven.mossproutNatureIslands[WISP_RUSH_HOST.islandId] ?? 0) >= WISP_RUSH_HOST.unlockLevel;
+  const rushHostName = dashkitHome ? WISP_RUSH_HOST.hostName : WISP_RUSH_EVENT.host.name;
+  const rushEventOpen = sanctuaryEventOpen(mergeWorld, WISP_RUSH_EVENT) || dashkitHome;
+  const rushToday = timeTrialFor(mergeWorld).days[localDayId(new Date(gameNow()))];
+  const rushHeatsDone = heatsCleared(rushToday);
+  const openRushEvent = useCallback(() => { setRushNotice(null); setRushResult(null); setRushSheetOpen(true); }, []);
+  // The first time it opens, its host says so, once.
+  const rushIntroDue = sanctuaryEventOpen(mergeWorld, WISP_RUSH_EVENT) && !mergeWorld.chapterOpeningsSeen?.includes(eventIntroSeenId(WISP_RUSH_EVENT));
   // The Frontier's next tile in the light carries a bubble: the fight that is always there.
   const nextFrontier = frontierOpen(mergeWorld) ? nextFrontierTile(mergeWorld) : null;
   const frontierBubbleShown = Boolean(nextFrontier) && sanctuarySurfaceFree && !chapterState?.openingPending && !goalHandoff && !frontierRevealing && !frontierTalk;
@@ -3385,6 +3396,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (frontierBubbleShown && nextFrontier) bubbles.push({ tileId: nextFrontier.id, label: retake ? 'Retake' : 'Take back', onPress: () => { startFrontierBattle(nextFrontier.id); }, accessibilityLabel: `${retake ? 'Retake' : 'Take back'} ${FRONTIER_VARIANT_NAMES[nextFrontier.variant]}` });
     return bubbles.length ? bubbles : undefined;
   }, [frontierBubbleShown, lodgeTileBubbles, mergeWorld, nextFrontier, startFrontierBattle]);
+  useEffect(() => {
+    if (!rushIntroDue || !sanctuarySurfaceFree || frontierTalk || goalHandoff || chapterState?.complete) return;
+    void markStoredChapterOpened(eventIntroSeenId(WISP_RUSH_EVENT)).catch(() => undefined);
+    setFrontierTalk({ key: `event:${WISP_RUSH_EVENT.id}`, lines: WISP_RUSH_EVENT.intro, action: { label: 'Race them', run: openRushEvent } });
+  }, [chapterState?.complete, frontierTalk, goalHandoff, openRushEvent, rushIntroDue, sanctuarySurfaceFree]);
   // A new day's Mist Surge (after the first was held): the Mist takes back an edge tile or two, and Mossprout says so
   // the first time the Sanctuary is seen that day, with the way to take it back.
   const surgeDayId = localDayId(new Date(gameNow()));
@@ -3987,8 +4003,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         ownedWispIds={Object.keys(wispState.unlocked)} busy={trackBusy} notice={trackNotice}
         onPlay={enterTrackLevel} onStory={openTrackStory} onReveal={revealFromTrack} onChest={(threshold) => { void openTrackChest(threshold); }}
         onClose={() => { setTrackOpen(null); setTrackNotice(null); }} /> : null}
-      {rushSheetOpen && !rushSpec && screenFocused ? <WispRushSheet world={mergeWorld} dayId={localDayId(new Date(gameNow()))} hostName={WISP_RUSH_HOST.hostName} layout={upgradeStage} bottomInset={insets.bottom}
-        result={rushResult} notice={rushNotice} storyLabel={`${WISP_RUSH_HOST.hostName}’s story`}
+      {rushSheetOpen && !rushSpec && screenFocused ? <WispRushSheet world={mergeWorld} dayId={localDayId(new Date(gameNow()))} hostName={rushHostName} layout={upgradeStage} bottomInset={insets.bottom}
+        result={rushResult} notice={rushNotice} storyLabel={dashkitHome ? `${WISP_RUSH_HOST.hostName}’s story` : null}
         onPlay={playRushHeat} onOpenChest={openRushChest} onClose={() => setRushSheetOpen(false)}
         onStory={() => { setRushSheetOpen(false); openNatureIslandOffer(WISP_RUSH_HOST.islandId); }} /> : null}
       {katchimeraPanelId && screenFocused ? <KatchimeraUpgradePanel key={katchimeraPanelId} world={mergeWorld} characterId={katchimeraPanelId} layout={upgradeStage} bottomInset={insets.bottom}
@@ -4367,7 +4383,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         <LostTrailTapTarget node={frontierTileById(openingTileTap) ? storyTileNodes[openingTileTap] ?? null : gatewayTileNode} onPress={tapOpeningTile} />
       </> : null}
       {frontierTalk && screenFocused && !battleReward && !upgradePresentation ? (
-        <ConversationNarrativeOverlay title="The Frontier" entries={frontierTalk.lines.map((line, index) => ({ id: `frontier-talk:${frontierTalk.key}:${index}`, speaker: line.speaker, text: line.text }))}
+        <ConversationNarrativeOverlay title={frontierTalk.key.startsWith('event:') ? WISP_RUSH_EVENT.name : 'The Frontier'} entries={frontierTalk.lines.map((line, index) => ({ id: `frontier-talk:${frontierTalk.key}:${index}`, speaker: line.speaker, text: line.text }))}
           checkpoint={`frontier-talk:${frontierTalk.key}`} paced onClose={() => setFrontierTalk(null)}>
           {(perform) => <KatchaButton fullWidth glow pill label={frontierTalk.action?.label ?? 'Okay'} onPress={() => perform(() => { const run = frontierTalk.action?.run; setFrontierTalk(null); run?.(); }, true)} />}
         </ConversationNarrativeOverlay>
@@ -4413,6 +4429,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           style={({ pressed }) => [styles.supplyRunButton, { bottom: Math.max(insets.bottom, 12) + (supplyRunAvailable ? 64 : 14) }, pressed ? { opacity: 0.85 } : null]}>
           <Text style={styles.heroesStar}>★</Text>
           <Text style={styles.supplyRunLabel}>Heroes</Text>
+        </Pressable>
+      ) : null}
+      {sanctuarySurfaceFree && rushEventOpen ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`${WISP_RUSH_EVENT.name}, ${rushHeatsDone} of ${HEATS_PER_DAY} heats today`} accessibilityHint={WISP_RUSH_EVENT.tagline} onPress={openRushEvent}
+          style={({ pressed }) => [styles.supplyRunButton, { bottom: Math.max(insets.bottom, 12) + (supplyRunAvailable ? 164 : 114) }, pressed ? { opacity: 0.85 } : null]}>
+          <Text style={styles.heroesStar}>⚡</Text>
+          <Text style={styles.supplyRunLabel}>{`${WISP_RUSH_EVENT.name} · ${rushHeatsDone}/${HEATS_PER_DAY}`}</Text>
         </Pressable>
       ) : null}
       {sanctuarySurfaceFree && mergeWorld.heartTree ? (

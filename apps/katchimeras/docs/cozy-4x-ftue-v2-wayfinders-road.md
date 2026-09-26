@@ -332,6 +332,22 @@ Mistle's chapter reveals the lore turn: the Mist is a forgetting, and the Hollow
 - **The win.** The Hollow Tree crossblends to its restored art. The outro ends on a callback to Chapter 1: someone else is keeping a lamp lit. The chapter's unlock teases the lands beyond.
 - **Pacing:** the playthrough completes all 10 chapters in 89 battles, 54 orders and 188 steps.
 
+**Special events, and the modes toolbox (Sept 26 2026, user direction):**
+- **The rule.** Modes that are not on the main path are kept for special and repeatable events, never deleted:
+  - wisp-rush (the time trial);
+  - territory and tactics;
+  - column-shot;
+  - glow-strikes.
+- **The registry.** `constants/sanctuary-events.ts` is the events registry: what is on offer, when it opens, and who hosts it.
+- **The first event is Wisp Rush,** the daily time trial:
+  - it opens after Chapter 4 (the Kitchen);
+  - Steppling hosts it until Dashkit's own track brings Dashkit home (a content pack);
+  - it has its own Sanctuary button ("Wisp Rush · heats done / 3");
+  - Steppling introduces it once.
+
+  Before this, it was unreachable, because Dashkit's pack island sleeps in cozy saves.
+- **Old FTUE steps stay for now.** 69 script steps from the old first session are no longer in the flow (`mossprout-ftue-script.ts`). They are still read by the FTUE run repair and migrations for old saves (`ftue-runtime`, `repository`) and by their tests. Removing them needs a save-version cut, so they stay until then.
+
 ### D3. Frontier tiles and Mist Surges (the 4X layer)
 - **New tile kind `frontier`.** It fills the empty ring-2 cells (4) and ring-3 cells (18) through `ringSources` in `mossprout-hex-neighborhood-scene.ts:245-263`, with authored frontier ids in `constants/frontier-tiles.ts`. Its states are `misted | contested | reclaimed`, stored in `world.frontier[tileId]` and changed by engine commands `reclaimFrontierTile` and `contestFrontierTile`.
 - **Art:** 4 wild reclaimed variants (meadow, copse, brook, stones), plus a contested edge overlay drawn at runtime. It goes through the shared-world hex pipeline (`shared-world-discovery-v2/briefs.json` → generate → matte → package → bounds → review). The misted state reuses `dream_mist_locked_hex_tile_v4`.
