@@ -20,6 +20,8 @@ export type EncounterProfile = {
   seedPace?: number;
   /** Fernip's Thicket: wisps take this much longer over every row in a Lanes battle (a fraction). */
   wispSlow?: number;
+  /** The lead hero's level: added to every Lanes shot (+1 at levels 3, 6 and 9). Training is felt in battle. */
+  shotPower?: number;
   /** Root Cellar: Mist cells opened before the first move. */
   openCells: number;
   /** Turns before the Dark Wisps first act (the Dew Spring's calm, a helper Wisp). */

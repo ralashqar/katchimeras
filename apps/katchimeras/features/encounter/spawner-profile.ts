@@ -8,6 +8,11 @@ import { DEFAULT_ENCOUNTER_PROFILE, type EncounterProfile, type EncounterRunStat
 export { dewSpringResolveBonus, rootCellarOpenCells };
 
 /** What the Haven and the helper Wisp add to an encounter, from the world's buildings and the loadout. */
+/** A hero's level in a Lanes battle: every shot hits harder at levels 3, 6 and 9. */
+export function heroShotPower(level: number): number {
+  return level >= 9 ? 3 : level >= 6 ? 2 : level >= 3 ? 1 : 0;
+}
+
 export function encounterProfile(world: (Pick<MergeWorldState, 'heartwoodBuildings'> & Partial<Pick<MergeWorldState, 'heroBuildings'>>) | null | undefined, loadout: EncounterLoadout | null): EncounterProfile {
   const perk: EncounterPerk | null = wispPerk(loadout?.wispId);
   const nursery = heartwoodBuildingLevel(world, 'seed-nursery');
@@ -19,6 +24,7 @@ export function encounterProfile(world: (Pick<MergeWorldState, 'heartwoodBuildin
     tierThreeChance: seedNurseryTierThreeChance(nursery),
     seedPace: bloomSeedPace(heroBuildingLevel(world, 'bloom-house')),
     wispSlow: fernWispSlow(heroBuildingLevel(world, 'fern-thicket')),
+    shotPower: heroShotPower(loadout?.level ?? 1),
     // Territory: a common helper Wisp's steadiness opens Mist before the first move (a legendary two cells).
     openCells: rootCellarOpenCells(heartwoodBuildingLevel(world, 'root-cellar')) + (perk?.kind === 'reveal' ? perk.cells : 0) + (perk?.kind === 'resolve' ? perk.amount : 0),
     // The Dew Spring's calm holds the wisps back a turn at levels 3, 6 and 9.

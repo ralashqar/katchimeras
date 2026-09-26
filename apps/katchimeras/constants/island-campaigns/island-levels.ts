@@ -47,7 +47,7 @@ export type IslandWispSpec = {
  * Lanes (`docs/encounter-lanes.md`): a wisp arriving over a board column (1-5) `at` seconds in, coming down a row every
  * `step` seconds, leaving Mist on the free cell it steps off every `drop` steps.
  */
-export type IslandLaneSpec = { id: string; column: number; at: number; hp: number; step: number; drop?: number; look?: string; /** While over the board, it spits Mist down its column every this many seconds. */ spit?: number };
+export type IslandLaneSpec = { id: string; column: number; at: number; hp: number; step: number; drop?: number; look?: string; /** While over the board, it spits Mist down its column every this many seconds. */ spit?: number; /** A striker: it strikes the nearest plant in its column every this many seconds, dropping it a tier. */ strike?: number };
 
 export type IslandLevelSpec = {
   title: string;
@@ -171,7 +171,7 @@ export function islandLevel(campaignId: string, key: string, spec: IslandLevelSp
       ...(spec.spring ? [{ id: 'spring', generatorId: 'mist-spring', cell: spec.spring.cell, charges: spec.spring.charges, drops: [`${WATER_CHAIN}:1`], recharge: { kind: 'merges' as const, every: spec.spring.every, amount: 1 }, ...(spec.spring.under ? { hidden: true } : {}) }] : []),
     ],
     mechanic: lanes
-      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: lanes.map((lane) => ({ id: lane.id, hp: lane.hp, column: lane.column - 1, at: Math.round(lane.at * 1_000), stepMs: Math.round(lane.step * 1_000), ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}), ...(lane.spit ? { spitEvery: Math.round(lane.spit * 1_000) } : {}) })) }
+      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: lanes.map((lane) => ({ id: lane.id, hp: lane.hp, column: lane.column - 1, at: Math.round(lane.at * 1_000), stepMs: Math.round(lane.step * 1_000), ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}), ...(lane.spit ? { spitEvery: Math.round(lane.spit * 1_000) } : {}), ...(lane.strike ? { strikeEvery: Math.round(lane.strike * 1_000) } : {}) })) }
       : { kind: 'dark-wisps', wisps, damageByTier: [1, 1, 2, 3], targeting: 'adjacent', ...(tactics ? { mode: 'tactics' as const } : { rest: spec.rest ?? REST_BY_DIFFICULTY[spec.difficulty] }) },
     required: lanes ? lanes.reduce((sum, lane) => sum + lane.hp, 0) : wisps.filter((wisp) => !wisp.hidden).reduce((sum, wisp) => sum + wisp.hp, 0),
     wisps: [],
@@ -264,11 +264,13 @@ export const PETALIMP_LEVEL_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Islan
       lanes: waves('wisp', { first: 2, gap: 7, hp: 6, step: 4, grow: 1, drop: 2, spit: 7 }, [[2], [4], [1, 3], [5, 2], [4, 1, 3]]),
     },
     {
-      title: 'Pollinators', objective: 'A big one comes down among the rest. Merge big where it matters most.', difficulty: 'thick',
+      title: 'Pollinators', objective: 'A big one comes down among the rest, and a nibbler strikes your plants down a size. Merge big where it matters most.', difficulty: 'thick',
       pieces: [[36, 1], [38, 2], [40, 1], [43, 1], [44, 1], [46, 1]], sleepers: [[37, 1], [39, 1]],
       veiled: [[30, 1], [32, 1], [29, 2], [33, 2], [31, 2], [22, 1], [26, 1]],
       mist: [], seeds: { every: 3.2 }, wisps: [],
-      lanes: [...waves('wisp', { first: 2, gap: 7, hp: 6, step: 3.8, grow: 1, drop: 2, spit: 7 }, [[1], [5], [2, 4], [1, 5], [2, 3, 4]]), { id: 'big', column: 3, at: 16, hp: 12, step: 4.5, drop: 2, look: 'warden', spit: 7 }],
+      lanes: [...waves('wisp', { first: 2, gap: 7, hp: 6, step: 3.8, grow: 1, drop: 2, spit: 7 }, [[1], [5], [2, 4], [1, 5], [2, 3, 4]]), { id: 'big', column: 3, at: 16, hp: 12, step: 4.5, drop: 2, look: 'warden', spit: 7 },
+        // The first striker (Sept 2026, enemy variety): it knocks the nearest plant under it down a tier.
+        { id: 'nibbler', column: 1, at: 11, hp: 6, step: 4.2, look: 'nibbler', strike: 5 }],
     },
   ],
   3: [
@@ -299,6 +301,7 @@ export const PETALIMP_LEVEL_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Islan
       lanes: [
         { id: 'thief', column: 3, at: 3, hp: 26, step: 6, drop: 1, look: 'thief', spit: 5 },
         ...waves('escort', { first: 8, gap: 8, hp: 6, step: 3.5, grow: 1, drop: 2, spit: 6 }, [[1], [5], [2, 4], [1, 5], [2, 4, 1]]),
+        { id: 'nibbler', column: 5, at: 14, hp: 7, step: 4, look: 'nibbler', strike: 5 },
       ],
       rewards: { glow: 50, xp: 30 },
     },

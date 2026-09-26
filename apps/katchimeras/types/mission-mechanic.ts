@@ -42,14 +42,19 @@ export type LaneWisp = {
   id: string; hp: number; column: number; at: number; stepMs: number; dropEvery?: number; startRow?: number; look?: string;
   /** While still over the board, it spits Mist down its column every this many ms (absent: it never does). */
   spitEvery?: number;
+  /**
+   * A striker: every this many ms it strikes down its column at the nearest plant under it, which drops a tier (a Seed
+   * is knocked off the board). Absent: it never does.
+   */
+  strikeEvery?: number;
 };
 /** Mist a wisp spat down its column: at which cell, and when it lands (ms of level time). */
-export type LaneSpit = { id: number; wisp: number; cell: number; firedAt: number; landsAt: number };
+export type LaneSpit = { id: number; wisp: number; cell: number; firedAt: number; landsAt: number; /** A striker's bolt at a plant, not Mist. */ strike?: boolean };
 /**
  * A lane wisp as the level stands: its board row as it drifts (fractional; below 0 over the board; its cell is the
  * one its centre is in), damage taken, the level time it holds until (after reaching a piece), and cells entered.
  */
-export type LaneWispState = { row: number; damage: number; holdUntil: number; cells: number; /** When it spits Mist next (level time). */ spitAt?: number };
+export type LaneWispState = { row: number; damage: number; holdUntil: number; cells: number; /** When it spits Mist next (level time). */ spitAt?: number; /** When it strikes next (level time). */ strikeAt?: number };
 /** Glow a piece fired up its column: from which cell, at which wisp (-1: nothing over it), for how much, and when it lands (ms of level time). */
 export type LaneShot = { id: number; fromCell: number; wisp: number; damage: number; firedAt: number; landsAt: number };
 

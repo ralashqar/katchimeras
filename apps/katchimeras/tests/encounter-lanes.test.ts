@@ -189,3 +189,24 @@ test('the Bloom House makes Seeds land sooner: its pace shortens every beat', ()
   const plain = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 500 }, seeded.state, 100, seeded.window, MERGE_ITEMS_BY_ID);
   assert.equal(plain.changed, false, 'with no Bloom House, nothing yet');
 });
+
+test('a striker knocks the nearest plant under it down a tier (a Seed off the board); a trained hero hits harder', async () => {
+  // Column 3 is cells 17, 24, 31, 38, 45: a Sprout (tier 2) on 31 is the nearest plant under a striker high over it.
+  const { mechanic, window, state, lanes } = setup({ pieces: [[31, 2], [45, 1]], lanes: [{ id: 'n', column: 3, at: 0, hp: 50, step: 600, strike: 1 }] });
+  const tierOf = (board: MergeWorldState, cell: number) => { const occupant = board.board[cell]!.occupant; return occupant?.kind === 'item' ? MERGE_ITEMS_BY_ID.get(occupant.definitionId)?.tier ?? 0 : 0; };
+  assert.equal(tierOf(state, 31), 2);
+  const struck = run(mechanic, lanes, state, 2_000, window);
+  assert.equal(tierOf(struck.board, 31), 1, 'the Sprout drops to a Seed');
+  const again = run(mechanic, lanes, state, 3_200, window);
+  assert.equal(again.board.board[31]!.occupant, null, 'the Seed is knocked off');
+  // Hero power: every shot carries the lead's bonus.
+  const { heroShotPower } = await import('@/features/encounter/spawner-profile');
+  assert.deepEqual([1, 3, 6, 9].map(heroShotPower), [0, 1, 2, 3], '+1 at levels 3, 6 and 9');
+  const shooter = setup({ pieces: [[38, 3]], lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 600 }] });
+  let plain = shooter.lanes; let strong = shooter.lanes; let boardA = shooter.state; let boardB = shooter.state;
+  for (let t = 0; t < 4_000; t += 100) {
+    const a = lanesTick(shooter.mechanic, plain, boardA, 100, shooter.window); plain = a.state; boardA = a.board;
+    const b = lanesTick(shooter.mechanic, strong, boardB, 100, shooter.window, undefined, { shotPower: 2 }); strong = b.state; boardB = b.board;
+  }
+  assert.ok(strong.wisps[0]!.damage > plain.wisps[0]!.damage, `a stronger hero deals more (${strong.wisps[0]!.damage} > ${plain.wisps[0]!.damage})`);
+});
