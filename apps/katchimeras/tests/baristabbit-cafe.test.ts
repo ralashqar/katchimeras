@@ -1,3 +1,4 @@
+import { openTierOneDropIds } from '@/utils/merge-world/generator-branches';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -30,7 +31,7 @@ test('his window wakes once Steppling is home, and the rescue brings him home on
 
 test('Feastle comes home without an Egg once Petalimp is home, and turns the Café into a Kitchen', async () => {
   const { FEASTLE_HATCHABLE } = await import('@/constants/hatchable-companions/feastle');
-  const { createSupplyRunBoard, kitchenOpen, supplyOrder } = await import('@/features/supply-run/supply-run');
+  const { createSupplyRunBoard, kitchenOpen, supplyOrder, supplyRunChains } = await import('@/features/supply-run/supply-run');
   const { SANCTUARY_CHAPTERS } = await import('@/constants/sanctuary-chapters');
   const ids = createHatchableDiscoveryFlow(FEASTLE_HATCHABLE).nodes.map((node) => node.id);
   assert.ok(ids.includes('gateway.rescue') && !ids.includes('gateway.egg'), 'no Egg');
@@ -43,10 +44,11 @@ test('Feastle comes home without an Egg once Petalimp is home, and turns the Caf
   const board = createSupplyRunBoard(1_000, true);
   const generators = board.board.flatMap((cell) => (cell.occupant?.kind === 'generator' ? [cell.occupant.generatorId] : []));
   assert.deepEqual(generators.sort(), ['hearth-pantry', 'ritual-bar'], 'the coffee bar, and Feastle’s food chain');
-  const chains = new Set(generators.flatMap((id) => {
-    const generator = board.generators[id];
-    return [...(generator?.tierOneDropDefinitionIds ?? []), ...(generator?.forcedDropDefinitionId ? [generator.forcedDropDefinitionId] : [])].map((drop) => drop.replace(/:\d+$/, ''));
-  }));
+  // What the spawners can really make: a branch no friend has brought yet (Desserts, Cheerlet's) is shut.
+  const chains = supplyRunChains(board);
+  assert.deepEqual([...chains].sort(), ['drink:hot', 'food:table'], 'coffee and Feastle’s savoury chain; no Desserts yet');
+  const pantry = board.generators['hearth-pantry']!;
+  assert.deepEqual([...openTierOneDropIds(board, pantry)], ['food:table:1'], 'the Pantry drops Ingredients only');
   for (const slot of [0, 1] as const) for (let index = 0; index < 8; index += 1) {
     for (const requirement of supplyOrder(slot, index, true).requirements) assert.ok(chains.has(requirement.definitionId.replace(/:\d+$/, '')), `${requirement.definitionId} can be made in the Kitchen`);
   }

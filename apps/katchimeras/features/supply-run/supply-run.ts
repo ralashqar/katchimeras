@@ -1,5 +1,6 @@
 import { placeSpawner } from '@/features/encounter/create-state';
 import { createMissionState } from '@/features/onboarding/steppling-mission';
+import { openTierOneDropIds } from '@/utils/merge-world/generator-branches';
 import type { MergeCharacterId, MergeOrder, MergeWorldState } from '@/types/merge-world';
 
 /**
@@ -48,8 +49,9 @@ export const SUPPLY_ORDER_POOLS: Readonly<Record<'steppling' | 'mossprout', read
 };
 
 /**
- * Once Feastle is home the Café is a Kitchen: the Hearth Pantry joins the board (savoury dishes and desserts), and
- * each friend's list gains Feastle's feasts, bigger orders that pay more Meals. The friends keep their cards.
+ * Once Feastle is home the Café is a Kitchen: the Hearth Pantry joins the board (savoury dishes; desserts once Cheerlet
+ * brings them), and each friend's list gains Feastle's feasts, bigger orders that pay more Meals. The friends keep their
+ * cards. An order the board cannot make yet (a Dessert) is skipped until it can (`supplyRunChains`).
  */
 export const KITCHEN_ORDER_POOLS: Readonly<Record<'steppling' | 'mossprout', readonly SupplyOrderSpec[]>> = {
   steppling: [
@@ -57,19 +59,53 @@ export const KITCHEN_ORDER_POOLS: Readonly<Record<'steppling' | 'mossprout', rea
     { title: 'Coffee for the trail', wants: [['drink:hot', 2, 1]], meals: 3, timber: 1, glow: 5, line: 'A Caramel Latte for the road!' },
     { title: 'Summit cupcakes', wants: [['food:dessert', 3, 2]], meals: 9, timber: 2, glow: 8, line: 'Two Cupcakes, for the top of the hill.' },
     { title: 'A hiker\u2019s feast', wants: [['food:table', 4, 1], ['drink:hot', 3, 1]], meals: 14, timber: 2, glow: 12, line: 'A Meal and a Boba. I could walk for days on that.' },
+    { title: 'Packed lunches', wants: [['food:table', 3, 2]], meals: 10, timber: 2, glow: 8, line: 'Two Dishes. One for me, one for whoever I find out there.' },
   ],
   mossprout: [
     { title: 'Supper for two', wants: [['food:table', 3, 1], ['drink:hot', 2, 1]], meals: 8, timber: 1, glow: 7, line: 'A warm Dish and a Latte. Like old times.' },
     { title: 'Something warm', wants: [['drink:hot', 2, 1]], meals: 3, timber: 1, glow: 5, line: 'A Caramel Latte. Warm paws, warm heart.' },
     { title: 'Cake for the Tree', wants: [['food:dessert', 4, 1]], meals: 10, timber: 2, glow: 9, line: 'A Layer Cake. The Heart Tree deserves a party.' },
     { title: 'A Sanctuary feast', wants: [['food:table', 4, 1], ['food:dessert', 3, 1]], meals: 16, timber: 2, glow: 14, line: 'A Meal and a Cupcake for everyone. Well. For me first.' },
+    // Savoury feasts: the Pantry makes these from the start (Desserts wait for Cheerlet, and so do the orders for them).
+    { title: 'Harvest supper', wants: [['food:table', 4, 1]], meals: 11, timber: 2, glow: 9, line: 'A whole Meal, under the Heart Tree. Just like the old days.' },
+    { title: 'A feast for the Tree', wants: [['food:table', 5, 1]], meals: 16, timber: 3, glow: 13, line: 'A real Feast. Everyone\u2019s invited, even the Tree.' },
   ],
 };
 
-/** The order a card shows: its friend's list at `index` (the list repeats, a little richer each time round). */
-export function supplyOrder(slot: 0 | 1, index: number, kitchen = false): MergeOrder & { timber: number; meals: number; line: string } {
+/**
+ * The chains the board's spawners can make right now: the Ritual Bar's one pour, and each of the Hearth Pantry's
+ * branches that is open (`openTierOneDropIds`: a branch opens with the friend who brings it; Desserts come with
+ * Cheerlet). An order never asks for anything these cannot make.
+ */
+export function supplyRunChains(board: MergeWorldState): ReadonlySet<string> {
+  const chains = new Set<string>();
+  for (const cell of board.board) {
+    if (cell.occupant?.kind !== 'generator') continue;
+    const generator = board.generators[cell.occupant.generatorId];
+    if (!generator) continue;
+    const drops = generator.forcedDropDefinitionId ? [generator.forcedDropDefinitionId] : openTierOneDropIds(board, generator);
+    for (const drop of drops) chains.add(drop.replace(/:\d+$/, ''));
+  }
+  return chains;
+}
+
+const defaultChains = new Map<boolean, ReadonlySet<string>>();
+/** A fresh board's chains (a Café's, or a Kitchen's): what the orders can ask for before a board is loaded. */
+export function cafeChains(kitchen: boolean): ReadonlySet<string> {
+  let chains = defaultChains.get(kitchen);
+  if (!chains) { chains = supplyRunChains(createSupplyRunBoard(0, kitchen)); defaultChains.set(kitchen, chains); }
+  return chains;
+}
+
+/**
+ * The order a card shows: its friend's list at `index` (the list repeats, a little richer each time round), keeping
+ * only the orders whose every piece the board's spawners can make (`chains`: the live board's, else a fresh one's).
+ */
+export function supplyOrder(slot: 0 | 1, index: number, kitchen = false, chains: ReadonlySet<string> = cafeChains(kitchen)): MergeOrder & { timber: number; meals: number; line: string } {
   const characterId = SUPPLY_SLOT_CHARACTERS[slot];
-  const pool = (kitchen ? KITCHEN_ORDER_POOLS : SUPPLY_ORDER_POOLS)[characterId as 'steppling' | 'mossprout'];
+  const listed = (kitchen ? KITCHEN_ORDER_POOLS : SUPPLY_ORDER_POOLS)[characterId as 'steppling' | 'mossprout'];
+  const makeable = listed.filter((spec) => spec.wants.every(([chain]) => chains.has(chain)));
+  const pool = makeable.length ? makeable : SUPPLY_ORDER_POOLS[characterId as 'steppling' | 'mossprout'];
   const spec = pool[index % pool.length]!;
   const round = Math.floor(index / pool.length);
   return {
@@ -92,13 +128,13 @@ export const kitchenOpen = (world: Pick<MergeWorldState, 'companionDiscovery'>) 
 
 /**
  * The board: a few coffees, a chain asleep under the Mist to wake, and the Ritual Bar; a Kitchen's has the Hearth
- * Pantry too, with an Ingredient and a Dessert beside it.
+ * Pantry too, with two Ingredients beside it.
  */
 export function createSupplyRunBoard(now: number, kitchen = false): MergeWorldState {
   const base = createMissionState({
     items: [
       { cell: 37, definitionId: 'drink:hot:1' }, { cell: kitchen ? 29 : 38, definitionId: 'drink:hot:1' }, { cell: 30, definitionId: 'drink:hot:1' },
-      ...(kitchen ? [{ cell: 26, definitionId: 'food:table:1' }, { cell: 22, definitionId: 'food:dessert:1' }] : []),
+      ...(kitchen ? [{ cell: 26, definitionId: 'food:table:1' }, { cell: 22, definitionId: 'food:table:1' }] : []),
     ],
     echoes: [{ cell: 31, id: 'cafe:sleeper-1', definitionId: 'drink:hot:1' }],
     veiled: [

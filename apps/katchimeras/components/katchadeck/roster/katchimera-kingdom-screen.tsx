@@ -134,7 +134,7 @@ import { ConversationNarrativeOverlay } from '@/components/katchadeck/world/conv
 import { SupplyRunDock, type SupplyRunOrder } from '@/components/katchadeck/world/supply-run-dock';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from '@/components/katchadeck/games/merge-serve-reward-overlay';
 import { mergeOrderReady, mergeOrderServingCells } from '@/utils/merge-world/engine';
-import { createSupplyRunBoard, kitchenOpen, supplyOrder, supplyRunSlots } from '@/features/supply-run/supply-run';
+import { cafeChains, createSupplyRunBoard, kitchenOpen, supplyOrder, supplyRunChains, supplyRunSlots } from '@/features/supply-run/supply-run';
 import { LastClearingHeartTree } from '@/components/katchadeck/world/last-clearing-heart-tree';
 import { LastClearingTitleCard } from '@/components/katchadeck/world/last-clearing-title-card';
 import { FIRST_BATTLE, firstBattleLine, LOST_TRAIL_BATTLES, LOST_TRAIL_RESCUE_CELL, lostTrailLine, FIRST_BATTLE_INTRO_MS, rescueBattleLine, scriptedBattleGuide, stickyBattleGuide } from '@/constants/last-clearing-battle';
@@ -3315,7 +3315,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (view) cafeRailRefs.current.set(key, view); else cafeRailRefs.current.delete(key);
     setCafeRailRevision((revision) => revision + 1);
   }, []);
-  const supplyRunOrders = useMemo((): SupplyRunOrder[] => supplyRunSlots(mergeWorld).map((index, slot) => ({ slot: slot as 0 | 1, index, order: supplyOrder(slot as 0 | 1, index, kitchen) })), [kitchen, mergeWorld]);
+  // Orders ask only for what the board's spawners can make now (the live board's, else a fresh one's).
+  const cafeChainKey = [...(supplyRunStore.state ? supplyRunChains(supplyRunStore.state) : cafeChains(kitchen))].sort().join('|');
+  const supplyRunOrders = useMemo((): SupplyRunOrder[] => {
+    const chains = new Set(cafeChainKey.split('|').filter(Boolean));
+    return supplyRunSlots(mergeWorld).map((index, slot) => ({ slot: slot as 0 | 1, index, order: supplyOrder(slot as 0 | 1, index, kitchen, chains) }));
+  }, [cafeChainKey, kitchen, mergeWorld]);
   const [supplyCrateFull, setSupplyCrateFull] = useState(false);
   // Serving is the Merge page's own serve (`MergeServeRewardOverlay`): each piece the order takes flies from its cell to
   // its own slot on the card, then the order's Glow flies from the card to the counter, and only then is the order served
