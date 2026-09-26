@@ -58,7 +58,11 @@ export function islandFriendHome(world: MergeWorldState, residentSkinId: Katchim
 
 export function islandWakeState(world: MergeWorldState, islandId: MossproutNatureIslandId): IslandWakeState {
   if (world.haven.mossproutNatureIslandReveals[islandId] || (world.haven.mossproutNatureIslands[islandId] ?? 0) > 0) return 'revealed';
-  const own = islandCampaignForIsland(islandId)?.wake;
+  const campaign = islandCampaignForIsland(islandId);
+  // Cozy 4X (a woken Heart Tree): a pack still built on the old boards (a clock, column-shot) stays asleep until its
+  // levels are Lanes (the Wanderling Trail, the Rush Track).
+  if (world.heartTree && campaign?.chapters.some((chapter) => chapter.restoration?.rush || chapter.restoration?.mechanic)) return 'sleeping';
+  const own = campaign?.wake;
   if (own) return islandWakeConditionHolds(world, own) ? 'open' : 'sleeping';
   const index = ISLAND_WAKE_ORDER.findIndex((entry) => entry.islandId === islandId);
   if (index < 0 || !islandCampaignForIsland(islandId)) return 'sleeping';

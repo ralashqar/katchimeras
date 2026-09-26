@@ -24,7 +24,8 @@ test('the Sleeping Grove has ten rungs in order: an opening, eight encounters, a
 });
 
 test('every authored rung validates, is a territory battle, and the careful player wins it on nine seeds of ten', () => {
-  assert.ok(authored.length >= 9);
+  // The Grove's own rungs (kept, no longer reached in the cozy flow); the extra island rungs are gone (Lanes bosses).
+  assert.ok(authored.length >= 8);
   for (const mission of authored) {
     assert.deepEqual(validateEncounterDefinition(mission.encounter), [], mission.id);
     assert.equal(mission.encounter.resolve, null);

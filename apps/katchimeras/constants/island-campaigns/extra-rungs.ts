@@ -36,7 +36,12 @@ function extra(input: { id: string; title: string; objective: string; difficulty
   return { id: input.id, title: input.title, objective: input.objective, difficulty: input.difficulty, encounter, rewards: input.rewards };
 }
 
-export const EXTRA_RUNGS: Readonly<Record<string, Partial<Record<number, readonly RegionMissionDefinition[]>>>> = {
+/**
+ * Extra rungs after a chapter's levels. None are bundled now: the Overgrowth was a territory boss, and every island's
+ * last chapter ends on its Lanes boss (`lanesPatternSpecs`). Kept as data for content packs.
+ */
+export const EXTRA_RUNGS: Readonly<Record<string, Partial<Record<number, readonly RegionMissionDefinition[]>>>> = {};
+const RETIRED_TERRITORY_RUNGS: Readonly<Record<string, Partial<Record<number, readonly RegionMissionDefinition[]>>>> = {
   'island-campaign:fernip-wildgrowth': {
     4: [islandLevel('island-campaign:fernip-wildgrowth', 'boss', {
       title: 'The Overgrowth', objective: 'Roots that were never the forest\u2019s own. It burrows from you; when it gathers, cut it back hard.', difficulty: 'boss',
@@ -51,3 +56,6 @@ export const EXTRA_RUNGS: Readonly<Record<string, Partial<Record<number, readonl
     })],
   },
 };
+
+/** The retired territory rungs, for reference and old saves' ids. */
+export const RETIRED_EXTRA_RUNGS = RETIRED_TERRITORY_RUNGS;

@@ -1,3 +1,4 @@
+import { battleSourceCampaign } from '@/features/sanctuary/battle-source';
 import { sanctuaryFounded } from '@/constants/heart-tree';
 import { FIRST_GOAL_COACH_ID, goalNeed, type GoalNeedSource } from '@/features/sanctuary/goal-need';
 import type { SanctuaryChapterState } from '@/constants/sanctuary-chapters';
@@ -35,9 +36,11 @@ function withTrackBadges(world: MergeWorldState, offers: readonly WorldUpgradeOf
     const track = islandTrack(world, campaign);
     return { ...offer, track: { kind: 'island' as const, cleared: track.cleared, total: track.total, label: `${track.cleared}/${track.total}` }, eligible: true, affordable: true, missingGlow: 0, lockedReason: undefined };
   });
+  // Cozy 4X: no Grove on Mossprout's tile (its battles were the old territory kind); battles are on friends' islands.
+  if (sanctuaryFounded(world)) return badged;
   const grove = groveTrack(world, { ftueComplete: true });
   const home = grove.cleared < grove.total ? grove : dailyMistUnlocked(world) ? dailyTrack(world, localDayId(new Date(gameNow()))) : null;
-  if (!home || ((world.haven.tileStages.mossprout ?? 0) < 1 && !sanctuaryFounded(world))) return badged;
+  if (!home || (world.haven.tileStages.mossprout ?? 0) < 1) return badged;
   // Framed as Mossprout's own restore marker is: over his garden.
   return [...badged, {
     id: HOME_TRACK_OFFER_ID, target: { kind: 'haven_tile' as const, familyId: 'mossprout' }, visualTarget: { kind: 'haven_structure' as const, structureId: 'mossprout-hex-garden' }, name: home.title, nextName: home.title, description: home.caption,
@@ -110,7 +113,7 @@ import { FIRST_BATTLE_ID, FIRST_BATTLE_XP, LOST_TRAIL_STONE_XP, FRONTIER_ACTION_
 import { LastClearingTracks, LostTrailTapTarget } from '@/components/katchadeck/world/last-clearing-tracks';
 import { BattleRewardCard, type BattleReward } from '@/components/katchadeck/world/battle-reward-card';
 import { ChapterGoalCard } from '@/components/katchadeck/world/chapter-goal-card';
-import { sanctuaryChapterState } from '@/constants/sanctuary-chapters';
+import { chapterGoalById, sanctuaryChapterState } from '@/constants/sanctuary-chapters';
 import { HeroBuildingPanel } from '@/components/katchadeck/world/hero-building-panel';
 import { heroTileLook } from '@/constants/hero-building-art';
 import { HERO_BUILDINGS, heroBuildingForCompanion, heroCompanionHome, heroTileLayerId, heroTileSlot } from '@/constants/hero-buildings';
@@ -895,6 +898,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [chapterOpeningPlace, setChapterOpeningPlace] = useState<{ islandId?: MossproutNatureIslandId; tileId?: string } | null>(null);
   // A chapter opening on a friend's tile (the lit window) ends on a tap on that tile (`finishChapterOpening`).
   const [openingTileTap, setOpeningTileTap] = useState<string | null>(null);
+  // A goal just done with a scene to play before the next one (`ChapterGoal.outro`).
+  const [goalHandoff, setGoalHandoff] = useState<{ goalId: string; lines: readonly { speaker: string; text: string }[] } | null>(null);
   // The story holds the world (a chapter's opening from before its camera moves to its guided tile tap, a rescued
   // friend's tile clearing and their arrival scene): no tile, marker, resident or panel takes a touch meanwhile. Only
   // the guided tap goes through (`storyBypassRef`).
@@ -3065,7 +3070,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const createCafeBoard = useCallback((now: number) => createSupplyRunBoard(now, kitchen), [kitchen]);
   // v2: coffee is the Café's one drink chain (a board saved with juice on it starts fresh).
   const supplyRunStore = useMissionBoard('katchimeras.cafe.v3', supplyRunOpen ? (kitchen ? 'kitchen' : 'supply-run') : null, createCafeBoard);
-  const supplyRunDocked = supplyRunOpen && screenFocused && Boolean(supplyRunStore.state);
+  // The Café's board comes up once the camera has reached its tile, never while it is still flying there.
+  const [cafeArrived, setCafeArrived] = useState(false);
+  useEffect(() => {
+    if (!supplyRunOpen) { setCafeArrived(false); return; }
+    const timer = setTimeout(() => setCafeArrived(true), reduceMotion ? 80 : 760);
+    return () => clearTimeout(timer);
+  }, [reduceMotion, supplyRunOpen]);
+  const supplyRunDocked = supplyRunOpen && cafeArrived && screenFocused && Boolean(supplyRunStore.state);
   // Back ends a Café visit whenever: the board keeps everything for next time. Not while an order's pieces are flying.
   const leaveCafe = useCallback(() => { if (!supplyServingRef.current) setSupplyRunOpen(false); }, []);
   // The Café's and the Kitchen's buildings pour better pieces: their odds ride on every generator tap.
@@ -3185,7 +3197,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const sanctuarySurfaceFree = !ftueStepId && screenFocused && !rushSheetOpen && !wispLanternOpen && !adventureOpen && !friendWispsFamilyId && !lockedHintFamilyId && !detailCreatureId
     && !pendingIslandDiscovery && !revealedFriendCardId && !wakeHandoffCampaign && !requiredUpgradeStory && !stepplingEncounter.open && !supplyRunOpen && !missionBoardDocked && !upgradePresentation && !buildingPanelId && !katchimeraPanelId && !heroBuildingPanelId && !heroRosterOpen && !heartTreePanelOpen
     && !activeInteractionResidentId && !interactionCreatureId && !trackOpen && !islandEncounter && !battleReward && !selectedUpgrade && !progressSheetOpen && !pendingIslandCampaign;
-  const chapterSurfaceFree = Boolean(chapterState) && sanctuarySurfaceFree && !openingTileTap && !arrivalTalk && !rescueRevealing;
+  const chapterSurfaceFree = Boolean(chapterState) && sanctuarySurfaceFree && !openingTileTap && !arrivalTalk && !rescueRevealing && !goalHandoff;
   // The first goal after the first session: a finger on the card, once, so the player knows where "next" lives.
   const goalCardRef = useRef<View>(null);
   const firstGoalCoach = chapterSurfaceFree && Boolean(chapterState) && !chapterState!.complete && !chapterState!.openingPending
@@ -3214,8 +3226,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const openGlowSource = useCallback(() => {
     setSelectedUpgrade(null); setUpgradeError(null); setProgressSheetOpen(false);
     const world = mergeWorldRef.current;
-    const grove = groveTrack(world, { ftueComplete: true });
     setTrackNotice(null);
+    // Battles for Glow and XP: the latest friend island's levels (plants that shoot); before any, the Café's orders.
+    if (sanctuaryFounded(world)) {
+      const battles = battleSourceCampaign(world);
+      if (battles) { setTrackOpen({ kind: 'island', campaignId: battles.campaignId }); return; }
+      if (world.companionDiscovery.records.some((record) => record.characterId === 'baristabbit')) { setSupplyRunOpen(true); return; }
+    }
+    const grove = groveTrack(world, { ftueComplete: true });
     setTrackOpen({ kind: grove.cleared < grove.total || !dailyMistUnlocked(world) ? 'grove' : 'daily' });
   }, []);
   const openCafe = useCallback(() => {
@@ -3309,6 +3327,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const goal = chapterState?.goal ?? null;
     if (cafeGoalRef.current == null) { cafeGoalRef.current = goal?.action.kind === 'supply_run' ? goal.id : ''; return; }
     if (!cafeGoalRef.current || goal?.id === cafeGoalRef.current || supplyServeFlight || battleReward) return;
+    // The goal just done has a scene: it plays over the Café, and its button leaves the Café and goes on.
+    if (chapterGoalById(cafeGoalRef.current)?.outro?.length) return;
     const timer = setTimeout(() => {
       setSupplyRunOpen(false);
       // The next goal, straight there (its panel, the next friend's tile); a finished chapter shows its card instead.
@@ -3316,6 +3336,24 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }, 700);
     return () => clearTimeout(timer);
   }, [battleReward, chapterState?.complete, chapterState?.goal, supplyRunDocked, supplyServeFlight]);
+  // A goal done with a scene (`ChapterGoal.outro`): when the goal moves on, its lines play one at a time, then the button
+  // names the next goal and goes straight there, leaving whatever the goal was done in (the Café, a panel) first.
+  const lastGoalIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const goalId = chapterState?.goal?.id ?? null;
+    const previous = lastGoalIdRef.current;
+    lastGoalIdRef.current = goalId;
+    if (previous === undefined || !previous || previous === goalId) return;
+    const done = chapterGoalById(previous);
+    if (done?.outro?.length) setGoalHandoff({ goalId: previous, lines: done.outro });
+  }, [chapterState?.goal?.id]);
+  const finishGoalHandoff = useCallback(() => {
+    setGoalHandoff(null);
+    const leaving = supplyRunOpen || katchimeraPanelId || heroBuildingPanelId || heartTreePanelOpen || buildingPanelId || trackOpen;
+    setSupplyRunOpen(false); setKatchimeraPanelId(null); setHeroBuildingPanelId(null); setHeartTreePanelOpen(false); setBuildingPanelId(null); setTrackOpen(null);
+    // A finished chapter shows its own card; otherwise the next goal, once what was open has gone.
+    if (chapterState && !chapterState.complete) setTimeout(() => followChapterGoalRef.current?.(), leaving ? 520 : 0);
+  }, [buildingPanelId, chapterState, heartTreePanelOpen, heroBuildingPanelId, katchimeraPanelId, supplyRunOpen, trackOpen]);
   // The chapter's opening (The Signal): camera to the island, the flare, the friends' lines, the chapter's card. Once.
   const [chapterOpeningPhase, setChapterOpeningPhase] = useState<'camera' | 'flare' | 'talk' | 'title' | null>(null);
   const chapterOpening = chapterState?.openingPending ? chapterState.chapter.opening ?? null : null;
@@ -3357,6 +3395,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     else setChapterOpeningPlace(null);
     if (chapter) void markStoredChapterOpened(chapter.id).catch(() => undefined);
   }, [chapterState?.chapter, chapterState?.goal]);
+  const goalHandoffShown = Boolean(goalHandoff) && screenFocused && !battleReward && !supplyServeFlight && !upgradePresentation && !chapterOpeningPhase && !arrivalTalk && !rescueRevealing;
   const tapOpeningTile = useCallback(() => {
     setOpeningTileTap(null);
     // The camera stays on the tile while the rescue takes it over (its own framing of the same tile), then lets go.
@@ -4121,6 +4160,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           spotlight={{ targets: [{ kind: 'haven_structure', structureId: openingTileTap }], grouping: 'bounding_rect', padding: 8, radius: 26, dimOpacity: 0.5 }} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision} />
         <LostTrailTapTarget node={gatewayTileNode} onPress={tapOpeningTile} />
       </> : null}
+      {goalHandoffShown && goalHandoff ? (
+        <ConversationNarrativeOverlay title="Next" entries={goalHandoff.lines.map((line, index) => ({ id: `handoff:${goalHandoff.goalId}:${index}`, speaker: line.speaker, text: line.text }))}
+          checkpoint={`handoff:${goalHandoff.goalId}`} required paced onClose={() => undefined}>
+          {(perform) => <KatchaButton fullWidth glow pill label={chapterState?.goal ? `Next: ${chapterState.goal.title}` : 'Continue'} onPress={() => perform(finishGoalHandoff, true)} />}
+        </ConversationNarrativeOverlay>
+      ) : null}
       {arrivalTalk && screenFocused && !battleReward ? (
         <ConversationNarrativeOverlay title={arrivalTalk.title} entries={arrivalTalk.lines.map((line, index) => ({ id: `arrival:${arrivalTalk.companion}:${index}`, speaker: line.speaker, text: line.text }))}
           checkpoint={`arrival:${arrivalTalk.companion}`} required paced onClose={() => undefined}>

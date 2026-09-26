@@ -381,6 +381,48 @@ export const FERNIP_LEVEL_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly IslandL
  * Bundled islands without authored levels get two a chapter from this pattern: a gentle bed, then a harder one whose
  * wisps fight back the way the chapter's number says. Always a Seed Pod; never an item that arrives by itself.
  */
+/**
+ * A friend's island without levels of its own, as Lanes (Sept 2026: plants that shoot, wisps coming down, everywhere):
+ * two levels a chapter, each harder than the last. Chapter 2 on brings a striker (a nibbler that knocks plants down a
+ * size), chapter 3 quick ones, and the last chapter's second level is the island's boss: a warden down the middle with
+ * its escort. The chain climbs from a sleeper in the middle of the bottom rows, so the wisps come down either side.
+ */
+export function lanesPatternSpecs(level: number, residentName: string): IslandLevelSpec[] {
+  const hp = 4 + level;
+  const step = Math.max(3.2, 5 - level * 0.35);
+  const spit = level >= 2 ? Math.max(6, 10 - level) : undefined;
+  const first: IslandLevelSpec = {
+    title: `${residentName}\u2019s Patch`, objective: 'Wisps are coming down. Wake what sleeps, merge under them: every plant shoots up its own column.',
+    difficulty: level <= 1 ? 'calm' : level <= 2 ? 'thick' : 'dark',
+    pieces: [[36, 1], [37, 1], [39, 1], [40, 1], [44, 1], [46, 1]], sleepers: [[38, 1]],
+    veiled: [[31, 1], [30, 1], [32, 1], [24, 2], [29, 2], [33, 2]],
+    mist: [], seeds: { every: 3.2 }, wisps: [],
+    lanes: [
+      ...waves('wisp', { first: 2, gap: 8, hp, step, grow: 1, drop: level >= 3 ? 2 : 3, ...(spit ? { spit } : {}) }, [[1], [5], [2, 4], [1, 5], [2, 4]]),
+      ...(level >= 2 ? [{ id: 'nibbler', column: 5, at: 12, hp: hp + 1, step, look: 'nibbler', strike: 5 }] : []),
+    ],
+  };
+  const boss = level >= 4;
+  const second: IslandLevelSpec = {
+    title: boss ? 'The Heart of the Mist' : 'Deeper In',
+    objective: boss ? 'Something big holds this place. It comes down the middle with others at its side. Split your plants.' : 'The Mist is thicker here, and they come two at a time.',
+    difficulty: boss ? 'boss' : level <= 1 ? 'calm' : level <= 2 ? 'thick' : 'dark',
+    pieces: [[36, 2], [37, 1], [38, 1], [39, 1], [40, 2], [44, 1]], mist: [light(23), light(25)], seeds: { every: 3.6 }, wisps: [],
+    lanes: boss
+      ? [
+          { id: 'heart', column: 3, at: 3, hp: 24, step: 6, drop: 1, look: 'warden', spit: 6 },
+          ...waves('escort', { first: 8, gap: 8, hp: hp + 1, step: 3.6, grow: 1, drop: 2 }, [[1], [5], [2, 4], [1, 5], [2, 4]]),
+          { id: 'nibbler', column: 1, at: 14, hp: hp + 2, step: 4, look: 'nibbler', strike: 5 },
+        ]
+      : [
+          ...waves('deep', { first: 2, gap: 7, hp: hp + 1, step: step - 0.3, grow: 1, drop: 2, ...(spit ? { spit } : {}) }, [[2], [4], [1, 5], [2, 4], [1, 5, 3]]),
+          ...(level >= 3 ? [{ id: 'quick', column: 1, at: 16, hp: hp, step: 2.6, look: 'snuffer' }] : []),
+        ],
+    ...(boss ? { rewards: { glow: 50, xp: 30 } } : {}),
+  };
+  return [first, second];
+}
+
 export function patternLevelSpecs(level: number, residentName: string): IslandLevelSpec[] {
   const first: IslandLevelSpec = {
     title: `${residentName}’s Patch`, objective: 'Merge right next to a wisp to strike it.', difficulty: level <= 1 ? 'calm' : 'thick',

@@ -1,7 +1,7 @@
 import { encounterFromRestoration } from '@/features/encounter/adapt';
 import { withSolvedBudget } from '@/features/encounter/budget';
 import { EXTRA_RUNGS } from './extra-rungs';
-import { FERNIP_LEVEL_SPECS, islandLevel, MIST_LEVEL_SPEC, patternLevelSpecs, PETALIMP_LEVEL_SPECS, type IslandLevelSpec } from './island-levels';
+import { islandLevel, lanesPatternSpecs, MIST_LEVEL_SPEC, PETALIMP_LEVEL_SPECS, type IslandLevelSpec } from './island-levels';
 import { ENCOUNTER_DEFAULT_GRADES, type EncounterDefinition, type EncounterDifficulty } from '@/types/encounter';
 import type { MossproutNatureIslandLevel } from '@/types/merge-world';
 import { ISLAND_WISP_LINES } from '@/features/onboarding/corruption-wisps';
@@ -86,13 +86,14 @@ export function chapterBoards(campaign: IslandCampaignDefinition, chapter: Islan
     const encounter = encounterFromRestoration(chapter.restoration, campaign.campaignId, chapter.level, restorationStorageKey(campaign.campaignId, chapter.level), chapter.fallbackOrder.requirements, CHAPTER_DIFFICULTY[chapter.level - 1]);
     return [{ id: encounter.id, title: chapter.title, objective: rush ? `Strike down ${chapter.restoration.rush!.goal} wisps before the clock runs out.` : 'Clear the Mist over the island.', difficulty: encounter.difficulty, encounter, rewards: { glow: 0, xp: 0 }, ...(rush ? { rush: true } : {}) }];
   }
-  return patternLevelSpecs(chapter.level, campaign.residentName).map((spec, index) => islandLevel(campaign.campaignId, `c${chapter.level}-${index + 1}`, spec, lines));
+  // Plants that shoot, everywhere (Sept 2026): an island without its own levels plays the Lanes pattern.
+  return lanesPatternSpecs(chapter.level, campaign.residentName).map((spec, index) => islandLevel(campaign.campaignId, `c${chapter.level}-${index + 1}`, spec, lines));
 }
 
 /** Bundled islands whose levels are written out by hand. */
 const BUNDLED_LEVEL_SPECS: Readonly<Record<string, Partial<Record<1 | 2 | 3 | 4, readonly IslandLevelSpec[]>>>> = {
   'island-campaign:petalimp-bloom': PETALIMP_LEVEL_SPECS,
-  'island-campaign:fernip-wildgrowth': FERNIP_LEVEL_SPECS,
+  // Fernip's own levels were territory battles (the Water chain); his island plays the Lanes pattern now.
 };
 
 /** The id of a friend's first level, the one that lifts the Mist off their island. */

@@ -35,6 +35,11 @@ export type ChapterGoal = {
   detail: string;
   done: (world: MergeWorldState) => boolean;
   action: ChapterGoalAction;
+  /**
+   * Said when the goal is done, before the next one opens (a few lines, one at a time): why it mattered and where the
+   * story goes now. The scene's button names the next goal and goes straight there. Absent: the next goal just shows.
+   */
+  outro?: readonly { speaker: KatchimeraSkinId; text: string }[];
   /** How far along a counted goal is (the Café's orders): the Café's bar shows it. */
   progress?: (world: MergeWorldState) => { current: number; total: number };
   /** A light kept on a misted tile while this goal is the one to do (Baristabbit's lit window): where to look. */
@@ -95,14 +100,23 @@ function friendChapter(input: {
     opening: { islandId: input.islandId, color: input.color, title: input.opening.title, lines: input.opening.lines },
     goals: [
       ...(input.building ? [{ id: `${input.id}:building`, title: input.building.title, detail: input.building.detail, done: (world: MergeWorldState) => heroBuildingLevel(world, input.building!.id) >= 1, action: { kind: 'hero_building' as const, id: input.building.id } }] : []),
-      { id: `${input.id}:tree`, title: `Grow the Heart Tree to level ${input.heartTree}`, detail: `The Mist around ${input.place} is too thick to reach until the Heart Tree is stronger.`, done: (world) => heartTreeLevel(world) >= input.heartTree || revealed(world), action: { kind: 'heart_tree' } },
-      { id: `${input.id}:train`, title: `Train ${input.train.name} to level ${input.train.level}`, detail: input.train.why, done: (world) => heroLevel(world, input.train.characterId) >= input.train.level, action: { kind: 'hero', characterId: input.train.characterId } },
-      { id: `${input.id}:mist`, title: `Answer the signal: clear the Mist over ${input.place}`, detail: 'Win its first battle.', done: revealed, action: { kind: 'world_offer', offerId: `nature:${input.islandId}` } },
+      { id: `${input.id}:tree`, title: `Grow the Heart Tree to level ${input.heartTree}`, detail: `The Mist around ${input.place} is too thick to reach until the Heart Tree is stronger.`, done: (world) => heartTreeLevel(world) >= input.heartTree || revealed(world), action: { kind: 'heart_tree' },
+        outro: [{ speaker: 'mossprout', text: `The Tree\u2019s light reaches further. The Mist over ${input.place} is thin enough now.` }] },
+      { id: `${input.id}:train`, title: `Train ${input.train.name} to level ${input.train.level}`, detail: input.train.why, done: (world) => heroLevel(world, input.train.characterId) >= input.train.level, action: { kind: 'hero', characterId: input.train.characterId },
+        outro: [{ speaker: input.train.characterId as KatchimeraSkinId, text: 'Ready. Let\u2019s answer that signal.' }] },
+      { id: `${input.id}:mist`, title: `Answer the signal: clear the Mist over ${input.place}`, detail: 'Win its first battle.', done: revealed, action: { kind: 'world_offer', offerId: `nature:${input.islandId}` },
+        outro: [{ speaker: 'mossprout', text: `${input.place} is open. ${input.friend} is in there somewhere. Keep going.` }] },
       { id: `${input.id}:home`, title: `Bring ${input.friend} home`, detail: `${input.friend} is still out there. Keep going.`, done: (world) => world.islandCampaigns?.[input.campaignId]?.cardEarnedAt != null, action: { kind: 'world_offer', offerId: `nature:${input.islandId}` } },
     ],
     reward: { glow: input.reward },
     closing: input.closing,
   };
+}
+
+/** Any chapter goal by id (the hand-off scene of a goal just done). */
+export function chapterGoalById(id: string): ChapterGoal | null {
+  for (const chapter of SANCTUARY_CHAPTERS) for (const goal of chapter.goals) if (goal.id === id) return goal;
+  return null;
 }
 
 export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
@@ -121,7 +135,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     },
     goals: [
       { id: 'baristabbit-home', title: 'Answer the lit window', detail: 'Someone has kept a lamp lit by that window all this time. The wisps are drawn to it. Get there first.', done: (world) => world.companionDiscovery.records.some((record) => record.characterId === 'baristabbit'), action: { kind: 'world_offer', offerId: 'mist:baristabbit-home' }, beacon: LIT_WINDOW_BEACON },
-      { id: 'supply-run', title: 'Serve your first order at the Café', detail: 'Heroes fight on full bellies. Merge what a friend asks for and serve it: every order pays Meals.', done: (world) => (world.supplyRun?.served ?? 0) >= 1, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(1, world.supplyRun?.served ?? 0), total: 1 }) },
+      { id: 'supply-run', title: 'Serve your first order at the Café', detail: 'Heroes fight on full bellies. Merge what a friend asks for and serve it: every order pays Meals.', done: (world) => (world.supplyRun?.served ?? 0) >= 1, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(1, world.supplyRun?.served ?? 0), total: 1 }), outro: [{ speaker: 'baristabbit', text: 'That\u2019s the first plate out. Meals in the pantry.' }, { speaker: 'baristabbit', text: 'Meals make heroes stronger. Mossprout has been fighting on an empty stomach for years.' }, { speaker: 'mossprout', text: 'I can feel it already. Let\u2019s put it to use.' }] },
       { id: 'train-mossprout', title: 'Train Mossprout to level 2', detail: 'Battles gave Mossprout experience. Meals and Glow turn it into strength.', done: (world) => heroLevel(world, 'mossprout') >= 2, action: { kind: 'hero', characterId: 'mossprout' } },
     ],
     reward: { glow: 50 },
@@ -130,10 +144,10 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   {
     id: 'explorers-lodge', number: 2, title: 'The Explorer\u2019s Lodge',
     goals: [
-      { id: 'lodge-built', title: 'Build Steppling\u2019s Explorer\u2019s Lodge', detail: 'Every friend who comes home needs a home of their own. Glow and Timber.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 1, action: { kind: 'hero_building', id: 'explorers-lodge' } },
-      { id: 'cafe-built', title: 'Build Baristabbit\u2019s Caf\u00e9', detail: 'A real caf\u00e9 around his window: better drinks, and more Meals from every order.', done: (world) => heroBuildingLevel(world, 'baristabbit-cafe') >= 1, action: { kind: 'hero_building', id: 'baristabbit-cafe' } },
-      { id: 'supply-orders', title: 'Serve 4 orders at the Café', detail: 'Every order pays Meals and Timber. The Lodge makes every order pay more Timber.', done: (world) => (world.supplyRun?.served ?? 0) >= 4, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(4, world.supplyRun?.served ?? 0), total: 4 }) },
-      { id: 'lodge-2', title: 'Upgrade the Lodge to level 2', detail: 'A bigger Lodge lets Steppling grow further, and pays more on every run.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 2, action: { kind: 'hero_building', id: 'explorers-lodge' } },
+      { id: 'lodge-built', title: 'Build Steppling\u2019s Explorer\u2019s Lodge', detail: 'Every friend who comes home needs a home of their own. Glow and Timber.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 1, action: { kind: 'hero_building', id: 'explorers-lodge' }, outro: [{ speaker: 'steppling', text: 'My own Lodge! Maps on every wall.' }, { speaker: 'steppling', text: 'And it makes Timber while we\u2019re out on the trails.' }] },
+      { id: 'cafe-built', title: 'Build Baristabbit\u2019s Caf\u00e9', detail: 'A real caf\u00e9 around his window: better drinks, and more Meals from every order.', done: (world) => heroBuildingLevel(world, 'baristabbit-cafe') >= 1, action: { kind: 'hero_building', id: 'baristabbit-cafe' }, outro: [{ speaker: 'baristabbit', text: 'A real Café. Better cups, and more Meals from every order.' }] },
+      { id: 'supply-orders', title: 'Serve 4 orders at the Café', detail: 'Every order pays Meals and Timber. The Lodge makes every order pay more Timber.', done: (world) => (world.supplyRun?.served ?? 0) >= 4, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(4, world.supplyRun?.served ?? 0), total: 4 }), outro: [{ speaker: 'baristabbit', text: 'That\u2019s Timber and Meals enough for now.' }, { speaker: 'steppling', text: 'Then let\u2019s grow the Lodge. Bigger Lodge, longer trails.' }] },
+      { id: 'lodge-2', title: 'Upgrade the Lodge to level 2', detail: 'A bigger Lodge lets Steppling grow further, and pays more on every run.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 2, action: { kind: 'hero_building', id: 'explorers-lodge' }, outro: [{ speaker: 'steppling', text: 'I can go further now. The Heart Tree should grow with us.' }] },
       { id: 'tree-2', title: 'Grow the Heart Tree to level 2', detail: 'Nothing in the Sanctuary grows past the Heart Tree. The Lodge’s Timber helps.', done: (world) => heartTreeLevel(world) >= 2, action: { kind: 'heart_tree' } },
     ],
     reward: { glow: 60 },
@@ -151,8 +165,8 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
       ],
     },
     goals: [
-      { id: 'bloom-mist', title: 'Answer the signal: clear the Mist over the Bloom Garden', detail: 'Win the Garden\u2019s first battle. Every battle trains the hero who fights it.', done: (world) => Boolean(world.haven.mossproutNatureIslandReveals['bloom-garden']) || (world.haven.mossproutNatureIslands['bloom-garden'] ?? 0) > 0, action: { kind: 'world_offer', offerId: 'nature:bloom-garden' } },
-      { id: 'train-mossprout-3', title: 'Train Mossprout to level 3', detail: 'The Garden’s wisps are tougher. Every battle trains the hero who fights it; Meals and Glow do the rest.', done: (world) => heroLevel(world, 'mossprout') >= 3, action: { kind: 'hero', characterId: 'mossprout' } },
+      { id: 'bloom-mist', title: 'Answer the signal: clear the Mist over the Bloom Garden', detail: 'Win the Garden\u2019s first battle. Every battle trains the hero who fights it.', done: (world) => Boolean(world.haven.mossproutNatureIslandReveals['bloom-garden']) || (world.haven.mossproutNatureIslands['bloom-garden'] ?? 0) > 0, action: { kind: 'world_offer', offerId: 'nature:bloom-garden' }, outro: [{ speaker: 'mossprout', text: 'The Garden\u2019s edge is clear. The flare came from deeper in.' }, { speaker: 'steppling', text: 'Whoever sent it, they\u2019re still out there. Let\u2019s get stronger first.' }] },
+      { id: 'train-mossprout-3', title: 'Train Mossprout to level 3', detail: 'The Garden’s wisps are tougher. Every battle trains the hero who fights it; Meals and Glow do the rest.', done: (world) => heroLevel(world, 'mossprout') >= 3, action: { kind: 'hero', characterId: 'mossprout' }, outro: [{ speaker: 'mossprout', text: 'Stronger. Now let\u2019s go and find who sent that flare.' }] },
       { id: 'petalimp-home', title: 'Bring Petalimp home', detail: 'Whoever sent the signal is still in the Garden. Keep going.', done: (world) => world.islandCampaigns?.[PETALIMP_ISLAND_CAMPAIGN_ID]?.cardEarnedAt != null, action: { kind: 'world_offer', offerId: 'nature:bloom-garden' } },
     ],
     reward: { glow: 50 },
@@ -163,8 +177,8 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     id: 'the-kitchen', number: 4, title: 'The Kitchen',
     goals: [
       { id: 'feastle-home', title: 'Follow the smell of supper', detail: 'Someone has kept a table warm in the Mist. A spoon taps against a bowl.', done: (world) => world.companionDiscovery.records.some((record) => record.characterId === 'feastle'), action: { kind: 'world_offer', offerId: 'mist:feastle-home' } },
-      { id: 'kitchen-built', title: 'Build Feastle\u2019s Kitchen', detail: 'Feastle wants a proper stove. Better dishes, and bigger crates.', done: (world) => heroBuildingLevel(world, 'feastle-kitchen') >= 1, action: { kind: 'hero_building', id: 'feastle-kitchen' } },
-      { id: 'kitchen-feasts', title: 'Serve 3 of Feastle’s feasts', detail: 'Feastle’s feasts pay the most Meals. A fed team is a strong team.', done: (world) => (world.supplyRun?.kitchenServed ?? 0) >= 3, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(3, world.supplyRun?.kitchenServed ?? 0), total: 3 }) },
+      { id: 'kitchen-built', title: 'Build Feastle\u2019s Kitchen', detail: 'Feastle wants a proper stove. Better dishes, and bigger crates.', done: (world) => heroBuildingLevel(world, 'feastle-kitchen') >= 1, action: { kind: 'hero_building', id: 'feastle-kitchen' }, outro: [{ speaker: 'feastle', text: 'A real stove! Now we cook properly.' }] },
+      { id: 'kitchen-feasts', title: 'Serve 3 of Feastle’s feasts', detail: 'Feastle’s feasts pay the most Meals. A fed team is a strong team.', done: (world) => (world.supplyRun?.kitchenServed ?? 0) >= 3, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(3, world.supplyRun?.kitchenServed ?? 0), total: 3 }), outro: [{ speaker: 'feastle', text: 'Everyone\u2019s fed, and the pantry\u2019s full.' }, { speaker: 'petalimp', text: 'Then a home for me next? I\u2019ve been sketching it for days!' }] },
       { id: 'bloom-house', title: 'Build Petalimp’s Bloom House', detail: 'Petalimp needs a home of her own. Hers makes Seeds come faster in every battle.', done: (world) => heroBuildingLevel(world, 'bloom-house') >= 1, action: { kind: 'hero_building', id: 'bloom-house' } },
     ],
     reward: { glow: 55 },

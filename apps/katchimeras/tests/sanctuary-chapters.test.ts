@@ -80,3 +80,13 @@ test('every friend after Petalimp has a chapter: a signal, the Heart Tree, a her
     assert.equal(chapter.goals.at(-1)!.done(home), true, 'the last goal is the friend home');
   }
 });
+
+test('the main quest hands off with a scene: the goals that end away from the next one say why, then go on', async () => {
+  const { chapterGoalById, SANCTUARY_CHAPTERS } = await import('@/constants/sanctuary-chapters');
+  for (const id of ['supply-run', 'lodge-built', 'cafe-built', 'supply-orders', 'lodge-2', 'bloom-mist', 'train-mossprout-3', 'kitchen-built', 'kitchen-feasts']) {
+    assert.ok((chapterGoalById(id)?.outro?.length ?? 0) >= 1, `${id} ends on a scene`);
+  }
+  for (const chapter of SANCTUARY_CHAPTERS.slice(4)) {
+    for (const suffix of ['tree', 'train', 'mist']) assert.ok(chapter.goals.find((goal) => goal.id === `${chapter.id}:${suffix}`)?.outro?.length, `${chapter.id}:${suffix} ends on a scene`);
+  }
+});

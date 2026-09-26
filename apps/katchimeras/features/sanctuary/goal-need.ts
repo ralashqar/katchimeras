@@ -2,9 +2,13 @@ import { hatchableByTile } from '@/constants/hatchable-companions/registry';
 import type { ChapterGoal } from '@/constants/sanctuary-chapters';
 import { buildingUpgradeModel, companionUpgradeModel, heartTreeUpgradeModel, heroBuildingUpgradeModel, type UpgradePanelModel } from '@/features/upgrade-stage/upgrade-panel-model';
 import type { MergeWorldState } from '@/types/merge-world';
+import { battleSourceCampaign } from './battle-source';
 
-/** Where a missing thing is earned: the Grove's levels (Glow and XP) or the Caf\u00e9 (Timber and Meals). */
-export type GoalNeedSource = 'grove' | 'cafe';
+/**
+ * Where a missing thing is earned: battles on the latest friend island (Glow and XP; `battleSourceCampaign`), or the
+ * Caf\u00e9 (Timber and Meals, and Glow before any island is cleared). Never the old Grove.
+ */
+export type GoalNeedSource = 'battle' | 'cafe';
 export type GoalNeed = { text: string; source: GoalNeedSource };
 
 /** The first goal's pointer, remembered with the chapter openings once the card has been tapped. */
@@ -26,7 +30,7 @@ export function goalNeed(world: MergeWorldState, goal: ChapterGoal): GoalNeed | 
   else if (action.kind === 'hero') model = companionUpgradeModel(world, action.characterId);
   else if (action.kind === 'world_offer' && action.offerId.startsWith('mist:')) {
     const price = hatchableByTile(action.offerId.slice('mist:'.length))?.tile.price ?? 0;
-    return world.coins < price ? { text: `Needs ${price - world.coins} more Glow \u00b7 play the Grove`, source: 'grove' } : null;
+    return world.coins < price ? glowNeed(world, price - world.coins) : null;
   }
   if (!model || model.locked || !model.primary) return null;
   const missing = model.requirements.find((requirement) => !requirement.met);
@@ -34,9 +38,19 @@ export function goalNeed(world: MergeWorldState, goal: ChapterGoal): GoalNeed | 
   const short = Math.max(0, (missing.total ?? 0) - (missing.current ?? 0));
   if (missing.id === 'timber' || missing.id === 'meals') {
     const what = missing.id === 'timber' ? 'Timber' : 'Meals';
-    return home(world, 'baristabbit') ? { text: `Needs ${short} more ${what} \u00b7 serve at the Caf\u00e9`, source: 'cafe' } : { text: `Needs ${short} more ${what}`, source: 'grove' };
+    return home(world, 'baristabbit') ? { text: `Needs ${short} more ${what} \u00b7 serve at the Caf\u00e9`, source: 'cafe' } : { text: `Needs ${short} more ${what}`, source: 'battle' };
   }
-  if (missing.id === 'xp') return { text: `Needs ${short} more XP \u00b7 battle in the Grove`, source: 'grove' };
-  if (missing.id === 'glow') return { text: `Needs ${short} more Glow \u00b7 play the Grove`, source: 'grove' };
+  if (missing.id === 'xp') {
+    const battles = battleSourceCampaign(world);
+    return { text: `Needs ${short} more XP \u00b7 ${battles ? `battle at ${battles.place}` : 'win battles'}`, source: 'battle' };
+  }
+  if (missing.id === 'glow') return glowNeed(world, short);
   return null;
+}
+
+/** Glow: from the latest island's battles, or the Caf\u00e9's orders before any island is cleared. */
+function glowNeed(world: MergeWorldState, short: number): GoalNeed {
+  const battles = battleSourceCampaign(world);
+  if (battles) return { text: `Needs ${short} more Glow \u00b7 battle at ${battles.place}`, source: 'battle' };
+  return { text: `Needs ${short} more Glow \u00b7 serve at the Caf\u00e9`, source: 'cafe' };
 }

@@ -34,7 +34,7 @@ test('every bundled island has a ladder: one rung per chapter at least, the last
   }
 });
 
-test('an island plays authored levels (Petalimp), the pattern when it has none, and keeps only a board with a clock', () => {
+test('an island plays authored levels (Petalimp), the Lanes pattern when it has none, and keeps only a board with a clock', () => {
   const petalimp = ISLAND_CAMPAIGNS.find((campaign) => campaign.campaignId.includes('petalimp'))!;
   const first = chapterMissions(petalimp, petalimp.chapters[0]!);
   assert.equal(first.length, 2);
@@ -46,9 +46,14 @@ test('an island plays authored levels (Petalimp), the pattern when it has none, 
   assert.ok(bare, 'an island with panel-only chapters');
   const pattern = chapterMissions(bare, bare.chapters[2]!);
   assert.equal(pattern.length, 2);
-  assert.equal(pattern[1]!.encounter.mechanic?.kind, 'dark-wisps');
+  assert.equal(pattern[1]!.encounter.mechanic?.kind, 'lanes', 'plants that shoot, on every island (Sept 2026)');
   assert.equal(pattern[0]!.encounter.resolve, null);
-  assert.ok(pattern[1]!.encounter.mechanic?.kind === 'dark-wisps' && pattern[1]!.encounter.mechanic.wisps.some((wisp) => wisp.intents?.length), 'its wisps show what they will do');
+  // No bundled friend island plays the old territory battles any more: every chapter level is Lanes, the last a boss.
+  for (const campaign of ISLAND_CAMPAIGNS.filter((entry) => !entry.chapters.some((chapter) => chapter.restoration?.rush || chapter.restoration?.mechanic))) {
+    for (const chapter of campaign.chapters) {
+      for (const mission of chapterMissions(campaign, chapter)) assert.equal(mission.encounter.mechanic?.kind, 'lanes', `${mission.id} plays Lanes`);
+    }
+  }
   const rush = ISLAND_CAMPAIGNS.flatMap((campaign) => campaign.chapters.filter((chapter) => chapter.restoration?.rush).map((chapter) => ({ campaign, chapter })))[0];
   if (rush) {
     const kept = chapterMissions(rush.campaign, rush.chapter);

@@ -1,3 +1,5 @@
+import { battleSourceCampaign } from '@/features/sanctuary/battle-source';
+import { islandCampaignForIsland } from '@/constants/island-campaigns/registry';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -56,12 +58,16 @@ test('a new player gets from Steppling home to the Bloom Garden’s first battle
     const order = supplyOrder(slot, slots[slot], kitchenOpen(world));
     apply({ type: 'completeSupplyOrder', slot, index: slots[slot], timber: order.timber, glow: order.reward.coins, meals: order.meals, kitchen: kitchenOpen(world), now: now++ }, `serve ${order.title}`);
   };
+  // Where the card sends a player short of Glow or XP: the latest friend island's levels (Lanes), or the Café before any.
   const playGrove = () => {
-    const track = groveTrack(world, { ftueComplete: true });
-    // The Grove's rungs, then its levels again: always something to play.
+    const battles = battleSourceCampaign(world);
+    if (!battles) { serveOrder(); return; }
+    const campaign = islandCampaignForIsland(battles.islandId)!;
+    const track = islandTrack(world, campaign);
     const node = track.primary.kind === 'play' ? track.primary.node : track.levels.find((candidate) => candidate.playable && candidate.mission);
-    assert.ok(node?.mission, `the Grove has nothing to play. Log:\n${log.slice(-12).join('\n')}`);
-    apply({ type: 'completeEncounter', receiptId: `grove:${now}`, missionId: node.mission.id, katchimeraId: 'mossprout', helperWispId: null, outcome: { cleared: true, grade: 'bright' } as never, difficulty: node.mission.difficulty, base: node.mission.rewards, now: now++ }, `grove ${node.title}`);
+    assert.ok(node?.mission, `${battles.place} has nothing to play. Log:\n${log.slice(-12).join('\n')}`);
+    assert.equal(node.mission.encounter?.mechanic?.kind, 'lanes', `every battle is plants that shoot: ${node.mission.id}`);
+    apply({ type: 'completeEncounter', receiptId: `battle:${now}`, missionId: node.mission.id, campaignId: campaign.campaignId, katchimeraId: 'mossprout', helperWispId: null, outcome: { cleared: true, grade: 'bright' } as never, difficulty: node.mission.difficulty, base: node.mission.rewards, now: now++ } as MergeWorldCommand, `battle ${node.title}`);
   };
   const doable = (goal: ChapterGoal) => {
     const action = goal.action;
