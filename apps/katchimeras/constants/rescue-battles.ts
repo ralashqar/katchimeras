@@ -37,6 +37,53 @@ const BARISTABBIT_RESCUE_SPEC: IslandLevelSpec = {
 
 export const BARISTABBIT_RESCUE_BATTLE: EncounterDefinition = islandLevel('rescue', 'baristabbit', BARISTABBIT_RESCUE_SPEC).encounter;
 
+/**
+ * Chapter 4, The Kitchen: Feastle, who kept a table laid in the Mist. One wave more than the lit window, a quick wisp
+ * and a spitter on the side, and the table's keeper down the middle. After Petalimp: the player has two heroes by now.
+ */
+const FEASTLE_RESCUE_SPEC: IslandLevelSpec = {
+  title: 'A Warm Table', objective: 'Bring down every wisp, and burn the thick Mist off whoever laid the table.', difficulty: 'calm',
+  pieces: [[43, 1], [44, 2], [45, 1], [46, 2], [47, 1], [36, 2], [38, 1], [40, 2], [30, 2], [32, 2]],
+  mist: [16, 18, 24, 23, 25].map((cell) => ({ cell, type: 'light' as const })),
+  rescue: { cell: 17 },
+  wisps: [], seeds: { every: 3, area: BOTTOM_ROWS }, rows: 5,
+  lanes: [
+    { id: 'crumb-1', column: 2, at: 2, hp: 5, step: 5.5 },
+    { id: 'crumb-2', column: 4, at: 2.6, hp: 5, step: 5.5 },
+    { id: 'quick', column: 1, at: 9, hp: 5, step: 2.6, look: 'snuffer' },
+    { id: 'spitter-1', column: 5, at: 10, hp: 5, step: 5, spit: 6 },
+    // Never a spitter down the middle lane: it keeps re-misting around the trapped cell and the rescue never ends.
+    { id: 'guard', column: 3, at: 15, hp: 6, step: 5 },
+    { id: 'table-keeper', column: 3, at: 22, hp: 11, step: 5, look: 'warden' },
+    { id: 'last-1', column: 1, at: 28, hp: 6, step: 4.5 },
+    { id: 'last-2', column: 5, at: 28.6, hp: 6, step: 4.5 },
+    { id: 'last-3', column: 2, at: 29.2, hp: 6, step: 4.5 },
+  ],
+  rewards: { glow: 40, xp: 20 },
+};
+
+export const FEASTLE_RESCUE_BATTLE: EncounterDefinition = islandLevel('rescue', 'feastle', FEASTLE_RESCUE_SPEC).encounter;
+
+export const FEASTLE_RESCUE_COPY: RescueBattleCopy = {
+  intro: { title: 'A Warm Table', line: 'Supper, in the Mist, and the wisps have smelled it too. Clear them, then burn the Mist off whoever set the table.' },
+  voice: 'Someone at the table',
+  hello: 'If you’re a wisp, the soup isn’t for you.',
+  guard: 'They’re circling the table. Hungry, all of them.',
+  light: 'That’s light. Real light. Keep going.',
+  almost: 'Nearly. Mind the soup.',
+  steer: 'Merge beside the thick Mist at the table. Burn it off them.',
+  arrival: {
+    title: 'A Warm Table', answer: 'Open the Kitchen',
+    lines: [
+      { speaker: 'feastle', text: 'You came through all that for supper? Sit, sit.' },
+      { speaker: 'feastle', text: 'I’ve kept this table laid since the paths closed. Nobody ever came.' },
+      { speaker: 'baristabbit', text: 'I’ve got the coffee. You’ve got the food. We could feed an army.' },
+      { speaker: 'feastle', text: 'Then we will. My Pantry goes right next to your Bar. One kitchen, one board.' },
+      { speaker: 'feastle', text: 'Dishes and desserts, served beside the coffee. A feast is worth more Meals than a cup.' },
+    ],
+  },
+};
+
 export const BARISTABBIT_RESCUE_COPY: RescueBattleCopy = {
   intro: { title: 'The Lit Window', line: 'The wisps are drawn to the lamp. Get there first: clear them, then burn the Mist off whoever kept it lit.' },
   voice: 'Someone at the window',

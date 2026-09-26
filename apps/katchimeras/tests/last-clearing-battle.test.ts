@@ -125,3 +125,16 @@ test('FTUE v2: Baristabbit is rescued in a Lanes battle, winnable by a careful p
   assert.ok((arrival?.lines.length ?? 0) >= 3, 'home, he says who he is and what the Café is for before the goal widget comes back');
   assert.ok(intro, 'the rescue opens with its story card before the wisps come');
 });
+
+test('Feastle is rescued in a Lanes battle too (after Petalimp), winnable with care, no ticket, then his arrival scene', async () => {
+  const { FEASTLE_RESCUE_BATTLE, FEASTLE_RESCUE_COPY } = await import('@/constants/rescue-battles');
+  const { FEASTLE_HATCHABLE } = await import('@/constants/hatchable-companions/feastle');
+  assert.equal(FEASTLE_RESCUE_BATTLE.mechanic?.kind, 'lanes');
+  assert.equal(FEASTLE_RESCUE_BATTLE.objective.kind, 'rescue');
+  assert.equal(FEASTLE_HATCHABLE.mission.encounter, FEASTLE_RESCUE_BATTLE);
+  assert.equal(FEASTLE_HATCHABLE.tile.price, 0);
+  const careful = lanesFairness(FEASTLE_RESCUE_BATTLE, 'careful', 4);
+  assert.ok(careful.wins >= 3, `careful wins the warm table (${careful.wins}/${careful.seeds}, ${careful.seconds}s)`);
+  assert.equal(lanesFairness(FEASTLE_RESCUE_BATTLE, 'idle', 2).wins, 0);
+  assert.ok((FEASTLE_RESCUE_COPY.arrival?.lines.length ?? 0) >= 3);
+});

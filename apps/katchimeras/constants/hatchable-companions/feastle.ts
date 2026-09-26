@@ -1,4 +1,5 @@
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
+import { FEASTLE_RESCUE_BATTLE, FEASTLE_RESCUE_COPY } from '@/constants/rescue-battles';
 
 /** Feastle's first playable pass. Authored data, consumed by the shared hatchable runtime. */
 export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
@@ -11,7 +12,8 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
       "r": -1
     },
     "unlockId": "feastle:arrival",
-    "price": 60,
+    // Cozy 4X v2: no ticket. The rescue battle is the price (`constants/rescue-battles.ts`).
+    "price": 0,
     "name": "A warm table",
     "revealPreset": "mist-clear",
     "alphaBoundsKey": "feastle_hearth_v1_hex_tile.webp",
@@ -34,6 +36,9 @@ export const FEASTLE_HATCHABLE: HatchableCompanionDefinition = {
   "mission": {
     "id": "mission:feastle",
     "storageKey": "katchimeras.mist-mission.feastle.v1",
+    // Played: a Lanes rescue at the warm table (Chapter 4). The board below is the retired glow-strikes one.
+    "encounter": FEASTLE_RESCUE_BATTLE,
+    "rescue": FEASTLE_RESCUE_COPY,
     "required": 8,
     "camera": {
       "kind": "focus_target",
