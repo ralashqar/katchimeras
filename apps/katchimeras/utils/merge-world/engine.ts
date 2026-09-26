@@ -1,3 +1,4 @@
+import { frontierLodgeStoreBonus, frontierReclaimedCount, frontierReclaimTimber, frontierTileById, frontierTileIdForMission } from '@/constants/frontier-tiles';
 import { HERO_BUILDING_MAX_LEVEL, heroBuildingById, heroCompanionHome, heroBuildingCost, heroBuildingForCompanion, heroBuildingLevel, heroLevelCap, LODGE_PRODUCTION_INTERVAL_MS, lodgeTimberStore, lodgeTimberWaiting, type HeroBuildingId } from '@/constants/hero-buildings';
 import { buildingLevelCap, heartTreeCost, heartTreeLevel } from '@/constants/heart-tree';
 import { normalizeAdventure } from '@/features/shared-adventure/normalize';
@@ -631,7 +632,7 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       if (command.id !== 'explorers-lodge' || !lodge) return unchanged(current);
       const waiting = lodgeTimberWaiting(current, command.now);
       if (waiting < 1) return unchanged(current);
-      const store = lodgeTimberStore(lodge.level);
+      const store = lodgeTimberStore(lodge.level) + frontierLodgeStoreBonus(frontierReclaimedCount(current));
       const since = Math.max(0, command.now - (lodge.collectedAt ?? lodge.builtAt));
       const intervals = Math.floor(since / LODGE_PRODUCTION_INTERVAL_MS);
       // A full store starts again from now; otherwise the part-made next batch keeps its time.
@@ -1769,6 +1770,11 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
     katchimeraProgress: katchimeraProgressNext,
     encounters: { ...ledger, receipts, clears, active: ledger.active?.missionId === command.missionId ? null : ledger.active, daily, lastOutcome, ...(replays ? { replays } : {}) },
   }, command.now);
+  // Frontier land taken back (`constants/frontier-tiles.ts`): the first clear is the reclaim, and the land's store of
+  // Timber comes with it. The ledger's clear is the only record: the scene and the Lodge read it from there.
+  const frontierTile = firstClear ? frontierTileById(frontierTileIdForMission(command.missionId) ?? '') : null;
+  const reclaimedTimber = frontierTile ? frontierReclaimTimber(frontierTile) : 0;
+  if (reclaimedTimber > 0) next = { ...next, materials: { ...next.materials, timber: (next.materials?.timber ?? 0) + reclaimedTimber } };
   let islandRaised: NonNullable<MergeWorldCommandResult['encounterCleared']>['islandRaised'];
   // The last rung of a chapter grows the island to the chapter's level, as the restoration boards did.
   const campaign = command.campaignId ? islandCampaignById.get(command.campaignId) : null;
@@ -1784,7 +1790,7 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
   return {
     state: next, changed: true,
     message: `${paid.glow} Glow.`,
-    encounterCleared: { missionId: command.missionId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), glow: paid.glow, xp: paid.xp, grade: command.outcome.grade, firstClear, katchimeraId: command.katchimeraId, ...(partnerId ? { partnerId } : {}), ...(islandRaised ? { islandRaised } : {}), trackId, ...(bossPack ? { bossPack } : {}) },
+    encounterCleared: { missionId: command.missionId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), glow: paid.glow, xp: paid.xp, grade: command.outcome.grade, firstClear, katchimeraId: command.katchimeraId, ...(partnerId ? { partnerId } : {}), ...(islandRaised ? { islandRaised } : {}), trackId, ...(bossPack ? { bossPack } : {}), ...(frontierTile ? { reclaimed: { tileId: frontierTile.id, timber: reclaimedTimber } } : {}) },
   };
 }
 

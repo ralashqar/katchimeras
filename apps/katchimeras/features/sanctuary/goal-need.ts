@@ -4,14 +4,16 @@ import { buildingUpgradeModel, companionUpgradeModel, heartTreeUpgradeModel, her
 import type { MergeWorldState } from '@/types/merge-world';
 import { heroBuildingForCompanion, type HeroBuildingId } from '@/constants/hero-buildings';
 import { battleSourceCampaign } from './battle-source';
+import { frontierOpen, nextFrontierTile } from '@/constants/frontier-tiles';
 
 /**
- * Where a missing thing is earned: battles on the latest friend island (Glow and XP; `battleSourceCampaign`), or the
- * Caf\u00e9 (Timber and Meals, and Glow before any island is cleared). Never the old Grove.
+ * Where a missing thing is earned: the Frontier's next tile in the Tree's light (Glow and XP, and its land's Timber),
+ * else battles on the latest friend island (`battleSourceCampaign`), or the Caf\u00e9 (Timber and Meals, and Glow before
+ * any of those). Never the old Grove.
  */
-export type GoalNeedSource = 'battle' | 'cafe' | 'building';
-/** `building`: a hero held back by their own building (the Lodge): the goal card opens that building. */
-export type GoalNeed = { text: string; source: GoalNeedSource; buildingId?: HeroBuildingId };
+export type GoalNeedSource = 'frontier' | 'battle' | 'cafe' | 'building';
+/** `building`: a hero held back by their own building (the Lodge): the goal card opens that building. `frontier`: that tile's battle. */
+export type GoalNeed = { text: string; source: GoalNeedSource; buildingId?: HeroBuildingId; tileId?: string };
 
 /** The first goal's pointer, remembered with the chapter openings once the card has been tapped. */
 export const FIRST_GOAL_COACH_ID = 'coach:first-goal';
@@ -43,6 +45,8 @@ export function goalNeed(world: MergeWorldState, goal: ChapterGoal): GoalNeed | 
     return home(world, 'baristabbit') ? { text: `Needs ${short} more ${what} \u00b7 serve at the Caf\u00e9`, source: 'cafe' } : { text: `Needs ${short} more ${what}`, source: 'battle' };
   }
   if (missing.id === 'xp') {
+    const frontier = frontierBattle(world);
+    if (frontier) return { text: `Needs ${short} more XP \u00b7 take back the Frontier`, source: 'frontier', tileId: frontier };
     const battles = battleSourceCampaign(world);
     return { text: `Needs ${short} more XP \u00b7 ${battles ? `battle at ${battles.place}` : 'win battles'}`, source: 'battle' };
   }
@@ -63,8 +67,15 @@ export function goalNeed(world: MergeWorldState, goal: ChapterGoal): GoalNeed | 
   return null;
 }
 
-/** Glow: from the latest island's battles, or the Caf\u00e9's orders before any island is cleared. */
+/** The Frontier tile a player short of Glow or XP is sent to: the next in the Tree's light, once the Frontier is open. */
+function frontierBattle(world: MergeWorldState): string | null {
+  return frontierOpen(world) ? nextFrontierTile(world)?.id ?? null : null;
+}
+
+/** Glow: from the Frontier, else the latest island's battles, else the Caf\u00e9's orders. */
 function glowNeed(world: MergeWorldState, short: number): GoalNeed {
+  const frontier = frontierBattle(world);
+  if (frontier) return { text: `Needs ${short} more Glow \u00b7 take back the Frontier`, source: 'frontier', tileId: frontier };
   const battles = battleSourceCampaign(world);
   if (battles) return { text: `Needs ${short} more Glow \u00b7 battle at ${battles.place}`, source: 'battle' };
   return { text: `Needs ${short} more Glow \u00b7 serve at the Caf\u00e9`, source: 'cafe' };

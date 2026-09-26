@@ -1,3 +1,4 @@
+import { FRONTIER_TILES } from '@/constants/frontier-tiles';
 import { buildingLevelCap, HEART_TREE_MAX_LEVEL, HEART_TREE_STAGE_NAMES, heartTreeCost, heartTreeLevel, heartTreeStage } from '@/constants/heart-tree';
 import { HERO_BUILDING_MAX_LEVEL, heroBuildingById, heroBuildingCost, heroBuildingForCompanion, heroBuildingLevel, heroCompanionHome, heroBuildingLook, heroLevelCap, type HeroBuildingId } from '@/constants/hero-buildings';
 import { HAVEN_ENVIRONMENTS } from '@/constants/haven-catalog';
@@ -349,6 +350,9 @@ function heartTreeRequirement(tree: number, next: number | null): UpgradeRequire
  * The Heart Tree (`constants/heart-tree.ts`), the Sanctuary's centre: its level caps every other building's, and each
  * two levels grow it into its next stage. Level 0 is the Tree still asleep (the first session wakes it).
  */
+/** Frontier tiles a Heart Tree of this level lights. */
+const frontierLitCount = (level: number) => FRONTIER_TILES.filter((tile) => tile.tree <= level).length;
+
 export function heartTreeUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'materials' | 'heartTree'>): UpgradePanelModel {
   const current = heartTreeLevel(world);
   const next = current < 1 || current >= HEART_TREE_MAX_LEVEL ? null : current + 1;
@@ -363,18 +367,19 @@ export function heartTreeUpgradeModel(world: Pick<MergeWorldState, 'coins' | 'ma
   return {
     title: 'Heart Tree',
     levelOffset: 0,
-    tagline: 'The heart of the Sanctuary. Everything here grows as far as it does.',
+    tagline: 'The heart of the Sanctuary. Its light is how far out we can fight; everything here grows as far as it does.',
     level: { current, next, max: HEART_TREE_MAX_LEVEL },
     progressLabel: next == null || cost == null ? 'MAX' : `${percent(Math.min(world.coins, cost.glow) + Math.min(timberHeld, cost.timber), cost.glow + cost.timber)}%`,
     progressFraction: next == null || cost == null ? 1 : percent(Math.min(world.coins, cost.glow) + Math.min(timberHeld, cost.timber), cost.glow + cost.timber) / 100,
     levels: Array.from({ length: HEART_TREE_MAX_LEVEL }, (_, index) => {
       const level = index + 1;
-      return { level, name: HEART_TREE_STAGE_NAMES[heartTreeStage(level)], description: `Buildings up to level ${buildingLevelCap(level)}`, state: levelState(level, current, next) };
+      return { level, name: HEART_TREE_STAGE_NAMES[heartTreeStage(level)], description: `Buildings up to level ${buildingLevelCap(level)} \u00b7 ${frontierLitCount(level)} Frontier tiles in its light`, state: levelState(level, current, next) };
     }),
-    benefits: [row('Building level cap', 'star.fill', '#8A63C9', buildingLevelCap)],
+    // Its light: the Frontier land in reach of a battle (`constants/frontier-tiles.ts`).
+    benefits: [row('Frontier in its light', 'sparkles', '#E0A23C', frontierLitCount), row('Building level cap', 'star.fill', '#8A63C9', buildingLevelCap)],
     requirements: next == null || cost == null ? [] : [
       { id: 'glow', label: 'Glow', detail: 'Earned in the Mist.', currency: 'coins', met: glowMet, current: Math.min(world.coins, cost.glow), total: cost.glow, action: glowMet ? undefined : { id: 'mist', label: 'Enter the Mist' } },
-      { id: 'timber', label: 'Timber', detail: 'Earned at the Café and the Explorer\u2019s Lodge.', currency: 'timber', met: timberMet, current: Math.min(timberHeld, cost.timber), total: cost.timber },
+      { id: 'timber', label: 'Timber', detail: 'Earned at the Café, from Frontier land and at the Explorer\u2019s Lodge.', currency: 'timber', met: timberMet, current: Math.min(timberHeld, cost.timber), total: cost.timber },
     ],
     locked: current < 1 ? { label: 'Asleep', reason: 'The Heart Tree has not been woken yet.' } : undefined,
     complete: current >= HEART_TREE_MAX_LEVEL,

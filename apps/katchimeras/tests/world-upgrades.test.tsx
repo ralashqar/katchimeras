@@ -128,13 +128,17 @@ for (const compiler of ['typescript', 'babel'] as const) test(`mist islands are 
   // The Hollow Tree is a far landmark past the rings (the Last Clearing's frontier), not a ring tile.
   const landmark = baseline.tileArtLayers.find((layer) => layer.id === 'structure:hollow-tree');
   assert.ok(landmark, 'the Hollow Tree stands in the world');
-  const ringLayers = baseline.tileArtLayers.filter((layer) => layer !== landmark);
-  const hexes = ringLayers.filter((layer) => !layer.id.endsWith(':growth')).map((layer) => `${layer.coord.q},${layer.coord.r}`);
+  // The Frontier (`constants/frontier-tiles.ts`) fills the rest of the second ring and all of the third, around them.
+  const frontier = baseline.tileArtLayers.filter((layer) => /^structure:frontier-\d+$/.test(layer.id));
+  assert.equal(frontier.length, 23, 'every Frontier tile is drawn');
+  const ringLayers = baseline.tileArtLayers.filter((layer) => layer !== landmark && !frontier.includes(layer));
+  const hexes = [...ringLayers, ...frontier].filter((layer) => !layer.id.endsWith(':growth')).map((layer) => `${layer.coord.q},${layer.coord.r}`);
   assert.equal(new Set(hexes).size, hexes.length, `every layer on its own hex: ${hexes.join(' ')}`);
   const radius = ({ q, r }: { q: number; r: number }) => Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
   const occupied = new Set(hexes);
   const outerRadius = Math.max(...ringLayers.map(layer => radius(layer.coord)));
   assert.ok(radius(landmark!.coord) > outerRadius + 1, 'the Hollow Tree stands well past the outer ring');
+  assert.ok(frontier.every((layer) => radius(layer.coord) >= outerRadius && radius(layer.coord) < radius(landmark!.coord)), 'the Frontier lies between the friends and the Hollow Tree');
   for (let q = -outerRadius; q <= outerRadius; q++) {
     for (let r = -outerRadius; r <= outerRadius; r++) {
       if (radius({ q, r }) < outerRadius) assert.ok(occupied.has(`${q},${r}`), `no gaps inside the outer ring: ${q},${r}`);

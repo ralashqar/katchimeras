@@ -42,7 +42,13 @@ test('a chapter pays once, then the next one opens: the Signal points at Petalim
   world = normalizeMergeWorldState(JSON.parse(JSON.stringify(claimed.state)), 3_000);
   const lodge = sanctuaryChapterState(world)!;
   assert.equal(lodge.chapter.id, 'explorers-lodge', 'the claim survives a reload, and the Lodge chapter follows');
-  assert.deepEqual(lodge.goal?.action, { kind: 'hero_building', id: 'explorers-lodge' }, 'a tap opens the Lodge');
+  // Chapter 2 is Push It Back (FTUE v2): its opening points at the Frontier's first tile, and the first goal is that battle.
+  assert.equal(lodge.chapter.opening?.tileId, 'frontier-1');
+  assert.deepEqual(lodge.goal?.action, { kind: 'frontier' }, 'a tap takes back the edge of the Mist');
+  const reclaim = (state: MergeWorldState, tileIds: readonly string[]) => ({ ...state, encounters: { ...state.encounters, clears: { ...state.encounters?.clears, ...Object.fromEntries(tileIds.map((id) => [`frontier:${id}`, { firstClearedAt: 1, clears: 1, bestGrade: 'bright', lastKatchimeraId: 'mossprout' }])) } } }) as MergeWorldState;
+  world = reclaim(world, ['frontier-1']);
+  assert.deepEqual(sanctuaryChapterState(world)?.goal?.action, { kind: 'hero_building', id: 'explorers-lodge' }, 'then a tap opens the Lodge');
+  world = reclaim(world, ['frontier-2', 'frontier-3']);
   world = { ...world, heroBuildings: { 'explorers-lodge': { level: 2, builtAt: 3_000 }, 'baristabbit-cafe': { level: 1, builtAt: 3_000 } }, supplyRun: { slots: [3, 3], served: 5, crates: 1 }, heartTree: { receiptId: 'test:tree', restoredAt: 1_000, level: 2 } };
   assert.equal(sanctuaryChapterState(world)?.complete, true);
   world = reduceMergeWorld(world, { type: 'claimChapterReward', chapterId: 'explorers-lodge', glow: 40, now: 3_200 }).state;
@@ -73,7 +79,7 @@ test('every friend after Petalimp has a chapter: a signal, the Heart Tree, a her
     const chapter = SANCTUARY_CHAPTERS.find((candidate) => candidate.opening?.islandId === entry.islandId);
     assert.ok(chapter, `a chapter for ${entry.residentSkinId}`);
     assert.equal(chapter.goals.find((goal) => goal.action.kind === 'heart_tree')!.title, `Grow the Heart Tree to level ${entry.heartTree}`, 'the chapter asks for the level its island needs');
-    assert.deepEqual(chapter.goals.map((goal) => goal.action.kind).filter((kind) => kind !== 'hero_building'), ['heart_tree', 'hero', 'world_offer', 'world_offer']);
+    assert.deepEqual(chapter.goals.map((goal) => goal.action.kind).filter((kind) => kind !== 'hero_building'), ['heart_tree', 'frontier', 'hero', 'world_offer', 'world_offer']);
     assert.ok(chapter.goals.slice(-2).every((goal) => goal.action.kind === 'world_offer' && goal.action.offerId === `nature:${entry.islandId}`), 'the island’s goals open its levels');
     const campaign = islandCampaignForIsland(entry.islandId)!;
     const home = { ...createInitialMergeWorldState(1_000), islandCampaigns: { [campaign.campaignId]: { cardEarnedAt: 5 } } } as never;
@@ -83,10 +89,10 @@ test('every friend after Petalimp has a chapter: a signal, the Heart Tree, a her
 
 test('the main quest hands off with a scene: the goals that end away from the next one say why, then go on', async () => {
   const { chapterGoalById, SANCTUARY_CHAPTERS } = await import('@/constants/sanctuary-chapters');
-  for (const id of ['supply-run', 'lodge-built', 'cafe-built', 'supply-orders', 'lodge-2', 'bloom-mist', 'train-mossprout-3', 'kitchen-built', 'kitchen-feasts']) {
+  for (const id of ['supply-run', 'frontier-1', 'lodge-built', 'frontier-3', 'cafe-built', 'lodge-2', 'tree-2', 'bloom-mist', 'train-mossprout-3', 'kitchen-built', 'kitchen-feasts']) {
     assert.ok((chapterGoalById(id)?.outro?.length ?? 0) >= 1, `${id} ends on a scene`);
   }
   for (const chapter of SANCTUARY_CHAPTERS.slice(4)) {
-    for (const suffix of ['tree', 'train', 'mist']) assert.ok(chapter.goals.find((goal) => goal.id === `${chapter.id}:${suffix}`)?.outro?.length, `${chapter.id}:${suffix} ends on a scene`);
+    for (const suffix of ['tree', 'frontier', 'train', 'mist']) assert.ok(chapter.goals.find((goal) => goal.id === `${chapter.id}:${suffix}`)?.outro?.length, `${chapter.id}:${suffix} ends on a scene`);
   }
 });

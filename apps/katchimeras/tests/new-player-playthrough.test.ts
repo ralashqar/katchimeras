@@ -1,3 +1,5 @@
+import { frontierOpen, frontierTileById, frontierTileState, nextFrontierTile } from '@/constants/frontier-tiles';
+import { frontierMission } from '@/features/frontier/frontier-levels';
 import { battleSourceCampaign } from '@/features/sanctuary/battle-source';
 import { islandCampaignForIsland } from '@/constants/island-campaigns/registry';
 import assert from 'node:assert/strict';
@@ -14,7 +16,7 @@ import {
 import { isMistLevel, regionRung } from '@/constants/island-campaigns/ladder';
 import type { IslandCampaignDefinition } from '@/constants/island-campaigns/types';
 import { islandCampaignForOffer } from '@/constants/island-campaigns/registry';
-import { katchimeraLevel, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
+import { isPlayableKatchimera, katchimeraLevel, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
 import { heartwoodBuildingLevel } from '@/constants/heartwood-buildings';
 import { sanctuaryChapterState, SANCTUARY_CHAPTERS, type ChapterGoal } from '@/constants/sanctuary-chapters';
 import { defaultPartner, heroSlots } from '@/features/encounter/team';
@@ -193,8 +195,29 @@ test('a new player plays the main quest from Steppling home to the last chapter 
     playLevel(campaign, best, want);
     return true;
   };
-  // Where the card sends a player short of Glow or XP: the latest friend island's levels (Lanes), or the Café before any.
+  /** A Frontier tile's battle, as the Kingdom plays it (`startFrontierBattle`): in the light, under the Mist, won once for good. */
+  const playFrontier = (tileId: string, want: MergeCharacterId | null) => {
+    const tile = frontierTileById(tileId);
+    assert.ok(tile, `${tileId} is not Frontier land`);
+    assert.equal(frontierTileState(world, tile), 'misted', `${tileId} is not in the light or is already ours`);
+    const mission = frontierMission(tile);
+    assert.equal(mission.encounter?.mechanic?.kind, 'lanes', `every battle is plants that shoot: ${mission.id}`);
+    const lead = want && isPlayableKatchimera(want) ? want : 'mossprout';
+    now += 3 * MINUTE;
+    const runId = `run:${now}`;
+    apply({ type: 'startEncounter', missionId: mission.id, runId, katchimeraId: lead, helperWispId: null, partnerId: null, now } as MergeWorldCommand, `enter ${mission.title}`);
+    log.pop();
+    const result = apply({ type: 'completeEncounter', receiptId: `encounter:${runId}`, missionId: mission.id, katchimeraId: lead, helperWispId: null, partnerId: null,
+      outcome: { cleared: true, grade: 'bright' } as never, difficulty: mission.difficulty, base: mission.rewards, now } as MergeWorldCommand, `frontier ${tile.id} “${mission.title}” (${lead})`);
+    tally().battles += 1;
+    assert.equal(result.encounterCleared?.reclaimed?.tileId, tile.id, `${tile.id} was won but not taken back`);
+  };
+  // Where the card sends a player short of Glow or XP: the Frontier, the latest friend island's levels (Lanes), or the Café before any.
   const playGrove = (want: MergeCharacterId | null = null) => {
+    if (frontierOpen(world)) {
+      const next = nextFrontierTile(world);
+      if (next) { playFrontier(next.id, want); return; }
+    }
     const battles = battleSourceCampaign(world);
     if (!battles) { serveOrder(); return; }
     const campaign = islandCampaignForIsland(battles.islandId)!;
@@ -250,6 +273,9 @@ test('a new player plays the main quest from Steppling home to the last chapter 
           const model = heroBuildingUpgradeModel(world, need.buildingId);
           assert.ok(model.primary && !model.primary.disabled, `“${goal.title}” sends to ${need.buildingId}, which cannot be upgraded and names nothing missing`);
           apply({ type: 'upgradeHeroBuilding', id: need.buildingId, expectedLevel: heroBuildingLevel(world, need.buildingId), now: now++ }, `grow ${need.buildingId} for the hero`);
+        } else if (need.source === 'frontier') {
+          assert.ok(need.tileId, `“${goal.title}” sends to the Frontier without saying where`);
+          playFrontier(need.tileId, training);
         } else playGrove(training);
         continue;
       }
@@ -263,6 +289,12 @@ test('a new player plays the main quest from Steppling home to the last chapter 
       else if (action.kind === 'hero') apply({ type: 'upgradeKatchimera', characterId: action.characterId, expectedLevel: katchimeraLevel(world, action.characterId), now: now++ } as MergeWorldCommand, `train ${action.characterId}`);
       else if (action.kind === 'supply_run') serveOrder();
       else if (action.kind === 'grove') playGrove();
+      else if (action.kind === 'frontier') {
+        // The next tile in the light; with none, the card must say so (it opens the Heart Tree).
+        const next = nextFrontierTile(world);
+        assert.ok(next, `“${goal.title}” wants Frontier land but none is in the Tree's light.${tail(8)}`);
+        playFrontier(next.id, null);
+      }
       else if (action.kind === 'world_offer') {
         const hatchable = action.offerId.startsWith('mist:') ? hatchableByTile(action.offerId.slice('mist:'.length)) : null;
         if (hatchable) {

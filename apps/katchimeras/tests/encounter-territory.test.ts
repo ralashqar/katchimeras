@@ -325,8 +325,10 @@ test('a Spring waits under the Mist: clearing its cell places it, and it makes t
   const { ISLAND_CAMPAIGNS } = await import('@/constants/island-campaigns/registry');
   const { regionLadder } = await import('@/constants/island-campaigns/ladder');
   const { ENCOUNTER_ONLY_GENERATORS, MERGE_LOCKED_TIER_ONE_ECHOES } = await import('@/constants/merge-world-catalog');
-  const fernip = ISLAND_CAMPAIGNS.find((campaign) => campaign.campaignId.includes('fernip'))!;
-  const first = regionLadder(fernip).find((rung) => rung.mission.id.endsWith(':c1-1'))!.mission.encounter;
+  // Every island plays Lanes now (Sept 2026), so no shipping level hides a Spring: the mechanic is checked on its own level.
+  void ISLAND_CAMPAIGNS; void regionLadder;
+  const { islandLevel } = await import('@/constants/island-campaigns/island-levels');
+  const first = islandLevel('test', 'spring', { title: 'Spring', objective: 'Test.', difficulty: 'calm', pieces: [[36, 1], [37, 1]], mist: [], pod: { cell: 40, charges: 4, every: 2 }, spring: { cell: 30, charges: 3, every: 2, under: 'light' }, wisps: [{ id: 'a', hp: 2, cell: 17 }] }).encounter;
   const spring = first.spawners.find((spawner) => spawner.generatorId === 'mist-spring')!;
   assert.equal(spring.hidden, true);
   assert.ok(first.mist.some((mist) => mist.cell === spring.cell && mist.holds?.kind === 'spawner'));

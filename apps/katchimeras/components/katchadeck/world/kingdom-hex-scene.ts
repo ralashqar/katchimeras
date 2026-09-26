@@ -37,6 +37,8 @@ export type KingdomTileRender = {
   depth: number;
   companion?: KingdomHexCompanionSlot;
   squareCoord?: { column: number; row: number };
+  /** Out past the Heart Tree's light (a dark Frontier tile): drawn faint, far off in the Mist. */
+  dim?: boolean;
 };
 
 export type KingdomTileArtLayer = {
@@ -60,6 +62,8 @@ export type KingdomTileArtLayer = {
   source: ImageSourcePropType;
   sources?: KingdomHexTileLodSources;
   squareCoord?: { column: number; row: number };
+  /** Out past the Heart Tree's light (a dark Frontier tile): drawn faint, far off in the Mist. */
+  dim?: boolean;
 };
 
 export type KingdomHexScene = {

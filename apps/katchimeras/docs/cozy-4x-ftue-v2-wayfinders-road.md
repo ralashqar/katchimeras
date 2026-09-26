@@ -279,6 +279,42 @@ Mistle's chapter reveals the lore turn: the Mist is a forgetting, and the Hollow
   - Contested tiles replace Daily Mist as the daily fight.
 - **Docking:** frontier battles use the existing `islandEncounter` slot, with a `frontierTileId` and a `frontierTileNodes` map like `storyTileNodes`.
 
+**Built (Sept 26 2026).** This differs from the sketch above in these ways:
+- **Tiles.** `constants/frontier-tiles.ts` authors 23 tiles:
+  - the second ring's 5 empty cells, starting with the one beside Steppling's trailhead;
+  - all 18 cells of the third ring.
+  - They are placed as world cells and are never mapped through the ring spiral. A content pack's island placed onto a Frontier cell wins it, and that Frontier tile is not drawn.
+- **State.** Nothing new is stored. A tile is reclaimed when the encounter ledger holds its battle's first clear (`frontier:<tile>`).
+  - A tile beyond the light is `dark`: drawn faint (`layer.dim`), and it brightens over 1.4s when the Tree grows.
+  - A tile in the light is `misted`.
+  - The `contested` state waits for Mist Surges (Phase 4).
+- **Light.** Each tile wakes at its own Heart Tree level instead of a whole ring at once.
+  - Tree level 1 lights the second ring.
+  - The third ring then lights nearest home first: 6 tiles at level 2, 5 at 3, 4 at 4, 2 at 5.
+  - At level 7, the Hollow Tree's doorstep (0,-3), a boss, is the last tile lit.
+- **Battles.** `features/frontier/frontier-levels.ts` builds one Lanes level per tile from its power (1 to 6) and its land, which sets the wrinkle:
+  - **Copse:** strikers.
+  - **Brook:** spitters.
+  - **Meadow:** quick wisps.
+  - **Stones:** a slow warden.
+
+  Every tile passes `lanesFairness` (`tests/frontier.test.ts`).
+- **Yields.**
+  - The first clear pays `1 + ceil(power / 2)` Timber (`completeEncounter` → `encounterCleared.reclaimed`).
+  - Reclaimed land feeds the Lodge: +1 to its store per tile, and a faster stream per 3 tiles (`lodgeTimberWaiting`).
+- **Flow.**
+  - A tap on a lit tile starts its battle, docked under the tile (`islandEncounter.frontierTileId`).
+  - The reward card reads "Land taken back". Then the tile's Mist lifts through the story-tile crossblend, and the tile is held misted (`frontierRevealing`) until the reveal plays.
+  - A tap on a reclaimed or dark tile gets a one-line Mossprout card; the dark tile's card links to the Heart Tree.
+  - The next tile in the light carries a "Take back" bubble.
+  - The Frontier opens once Chapter 1 is claimed.
+- **Routing.** Glow and XP shortfalls go to the next Frontier tile (`GoalNeedSource` `frontier`), then to the latest island, then to the Café. `openGlowSource` follows the same order.
+- **Chapters.**
+  - Chapter 2 is "Push It Back". Its opening is on `frontier-1` and ends on a guided tap. Its goals: reclaim 1, the Lodge, reclaim 3, the Café, Lodge level 2, Heart Tree level 2.
+  - Each friend chapter adds a goal, "Push the Frontier toward <place>", with a running total: 8, 12, 16, 19, 23.
+- **Art.** `shared-world-discovery-v2/frontier-{meadow,copse,brook,stones}`.
+- **Pacing** (`PLAYTHROUGH_LOG=1`): 79 battles, 48 orders and 168 steps to the end of Chapter 9. Chapter 2 plays 3 battles and 4 orders.
+
 ### D4. Economy and goal fixes
 - **`goalNeed`** handles the `hero-building` and `heart-tree` requirement rows by returning "Needs the Lodge at level N" / "Needs the Heart Tree at level N", and the tap routes there.
 - **`followChapterGoal`** falls back to opening the island track when the `world_offer` is missing. It never silently does nothing.

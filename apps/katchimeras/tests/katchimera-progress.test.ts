@@ -32,7 +32,7 @@ test('a level-up needs the experience and the Glow, spends the Glow, changes not
   world = { ...world, katchimeraProgress: { mossprout: { level: 1, xp: 45, upgradedAt: null } } };
   assert.deepEqual(canUpgradeKatchimera({ ...world, coins: 3 }, 'mossprout'), { ok: false, reason: 'glow', message: 'You need 12 more Glow.' });
   // A fed team is a strong team: Meals from the Café as well.
-  assert.deepEqual(canUpgradeKatchimera(world, 'mossprout'), { ok: false, reason: 'meals', message: 'You need 5 more Meals. Serve orders at the Café.' });
+  assert.deepEqual(canUpgradeKatchimera(world, 'mossprout'), { ok: false, reason: 'meals', message: 'You need 3 more Meals. Serve orders at the Café.' });
   assert.equal(reduceMergeWorld(world, { type: 'upgradeKatchimera', characterId: 'mossprout', expectedLevel: 1, now: NOW }).changed, false);
   world = { ...world, materials: { timber: 0, meals: 7 } };
   assert.deepEqual(canUpgradeKatchimera(world, 'mossprout'), { ok: true });
@@ -41,7 +41,7 @@ test('a level-up needs the experience and the Glow, spends the Glow, changes not
   const upgraded = reduceMergeWorld(world, { type: 'upgradeKatchimera', characterId: 'mossprout', expectedLevel: 1, now: NOW });
   assert.equal(upgraded.changed, true);
   assert.equal(upgraded.state.coins, 85);
-  assert.equal(upgraded.state.materials?.meals, 2, 'the Meals are eaten');
+  assert.equal(upgraded.state.materials?.meals, 4, 'the Meals are eaten (3 for level 2)');
   assert.deepEqual(upgraded.state.katchimeraProgress?.mossprout, { level: 2, xp: 45, upgradedAt: NOW });
   assert.deepEqual(upgraded.katchimeraUpgraded, { characterId: 'mossprout', level: 2, cost: 15 });
   assert.equal(abilityTier(abilityForCompanion('mossprout')!, 2).chargeEvery, 7, 'the ability’s next tier comes with the level');

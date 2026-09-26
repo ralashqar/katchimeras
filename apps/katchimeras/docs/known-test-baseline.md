@@ -1,4 +1,4 @@
-# Known test baseline (Sept 25 2026)
+# Known test baseline (Sept 25 2026; rechecked Sept 26 2026 after the Frontier)
 
 ## Status
 
@@ -49,4 +49,4 @@ These need the owning system's intent checked, not a blind update. None of them 
 | `game-hub` (1), `game-ui` (2), `kingdom-rendering` (1) | UI source regexes | UI moved on |
 | `wisp-lantern-repository` (1) | Lantern pouch receipt | The Lantern economy |
 | `wisp-lantern-upgrades` (1) | Imports a missing `./friend-wisp-constellations` | The design was never built |
-| `conversation-narrative-overlay`, `haven-detail-panel`, `wisp-lantern-hub` (1 each) | "Invalid or unexpected token" | The harness loads `constants/merge-world-ui-art`, whose images are not mocked |
+| `haven-detail-panel`, `wisp-lantern-hub` (1 each) | "Invalid or unexpected token" | The harness loads `constants/merge-world-ui-art`, whose images are not mocked |

@@ -1,5 +1,6 @@
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import type { UpgradeBenefitIcon } from '@/features/upgrade-stage/upgrade-panel-model';
+import { frontierLodgeRateBonus, frontierLodgeStoreBonus, frontierReclaimedCount } from '@/constants/frontier-tiles';
 
 /**
  * Hero buildings (cozy 4X, Phase 1): every friend who comes home brings a building to their own tile, the way
@@ -157,12 +158,16 @@ export const LODGE_PRODUCTION_INTERVAL_MS = 30 * 60 * 1000;
 export const lodgeTimberPerInterval = (level: number) => Math.max(0, level);
 export const lodgeTimberStore = (level: number) => (level < 1 ? 0 : 4 + level * 4);
 
-/** Timber waiting at the Lodge, from its level and when it was last collected. */
-export function lodgeTimberWaiting(world: Pick<MergeWorldState, 'heroBuildings'>, now: number): number {
+/**
+ * Timber waiting at the Lodge, from its level and when it was last collected. Land taken back from the Mist feeds it
+ * (`constants/frontier-tiles.ts`): a bigger store for every Frontier tile reclaimed, a faster stream for every three.
+ */
+export function lodgeTimberWaiting(world: Pick<MergeWorldState, 'heroBuildings'> & Partial<Pick<MergeWorldState, 'encounters'>>, now: number): number {
   const lodge = world.heroBuildings?.['explorers-lodge'];
   if (!lodge || lodge.level < 1) return 0;
   const since = Math.max(0, now - (lodge.collectedAt ?? lodge.builtAt));
-  return Math.min(lodgeTimberStore(lodge.level), Math.floor(since / LODGE_PRODUCTION_INTERVAL_MS) * lodgeTimberPerInterval(lodge.level));
+  const reclaimed = frontierReclaimedCount(world);
+  return Math.min(lodgeTimberStore(lodge.level) + frontierLodgeStoreBonus(reclaimed), Math.floor(since / LODGE_PRODUCTION_INTERVAL_MS) * (lodgeTimberPerInterval(lodge.level) + frontierLodgeRateBonus(reclaimed)));
 }
 
 /** The highest level a hero may reach: one past their building. A hero without a building has no cap. */

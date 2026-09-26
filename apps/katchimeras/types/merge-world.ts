@@ -791,7 +791,9 @@ export type MergeWorldCommandResult = {
   natureIslandUpgrade?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel; coinCost: number; completedTier: boolean };
   storyWorldMutationReceipt?: StoryWorldMutationReceipt;
   /** An encounter just paid: what it paid and to whom, for the provider's celebration, Bond and sparks. */
-  encounterCleared?: { missionId: string; campaignId?: string; glow: number; xp: number; grade: import('./encounter').EncounterGrade; firstClear: boolean; katchimeraId: MergeCharacterId; partnerId?: MergeCharacterId; islandRaised?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel }; trackId?: string; bossPack?: { receiptId: string; familyId: string } };
+  encounterCleared?: { missionId: string; campaignId?: string; glow: number; xp: number; grade: import('./encounter').EncounterGrade; firstClear: boolean; katchimeraId: MergeCharacterId; partnerId?: MergeCharacterId; islandRaised?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel }; trackId?: string; bossPack?: { receiptId: string; familyId: string };
+    /** A Frontier tile taken back by this clear, and the Timber its land gave. */
+    reclaimed?: { tileId: string; timber: number } };
   milestoneClaimed?: { trackId: string; threshold: number; glow: number; pack: 'gift' | 'gift-rare' | 'finale'; familyId: string; receiptId: string };
   /** A Katchimera just levelled. */
   katchimeraUpgraded?: { characterId: MergeCharacterId; level: number; cost: number };

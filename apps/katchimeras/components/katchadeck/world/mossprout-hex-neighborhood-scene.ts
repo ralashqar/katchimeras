@@ -16,6 +16,7 @@ import { hatchableMistedTileArt, hatchableTileArt } from '@/constants/hatchable-
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { STORY_TILES, type StoryTileDefinition, type StoryTileState } from '@/constants/story-tiles/registry';
+import { FRONTIER_TILES, type FrontierTile, type FrontierTileState, type FrontierVariant } from '@/constants/frontier-tiles';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { storyTileResidents, storyTileStructureId } from '@/utils/story-tile-residents';
 import { storyTileArt, storyTileMistedArt } from '@/constants/story-tiles/tile-art';
@@ -66,6 +67,8 @@ export type MossproutGardenSceneState = {
   hatchableTiles?: Partial<Record<string, 'locked' | 'egg' | 'open'>>;
   /** Every story tile by tile id: under the Mist until a journey episode reveals it. */
   storyTiles?: Partial<Record<string, StoryTileState>>;
+  /** Every Frontier tile by id (`constants/frontier-tiles.ts`): dark past the Tree's light, misted, or taken back. */
+  frontier?: Partial<Record<string, FrontierTileState>>;
   level: number;
   plantableMemories: readonly PlantableMemoryInstance[];
   previewMemoryId?: string;
@@ -84,6 +87,41 @@ const DREAM_MIST_LOCKED_NATURE_SOURCES: TileSources = {
   thumb: require('@incubator/art-world/hex/dream_mist_locked_hex_tile_v4_256.webp'),
 };
 const DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS = KINGDOM_HEX_TILE_ALPHA_BOUNDS['dream_mist_locked_hex_tile_v4.webp'];
+/** Frontier land taken back from the Mist, one look per kind of land (`shared-world-discovery-v2`, frontier-*). */
+const FRONTIER_ART: Readonly<Record<FrontierVariant, Omit<ArtSpec, 'coord'>>> = {
+  meadow: {
+    alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['shared_world_frontier_meadow_hex_tile_v1.webp'],
+    sources: {
+      full: require('@incubator/art-world/hex/shared_world_frontier_meadow_hex_tile_v1.webp'),
+      medium: require('@incubator/art-world/hex/shared_world_frontier_meadow_hex_tile_v1_512.webp'),
+      thumb: require('@incubator/art-world/hex/shared_world_frontier_meadow_hex_tile_v1_256.webp'),
+    },
+  },
+  copse: {
+    alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['shared_world_frontier_copse_hex_tile_v1.webp'],
+    sources: {
+      full: require('@incubator/art-world/hex/shared_world_frontier_copse_hex_tile_v1.webp'),
+      medium: require('@incubator/art-world/hex/shared_world_frontier_copse_hex_tile_v1_512.webp'),
+      thumb: require('@incubator/art-world/hex/shared_world_frontier_copse_hex_tile_v1_256.webp'),
+    },
+  },
+  brook: {
+    alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['shared_world_frontier_brook_hex_tile_v1.webp'],
+    sources: {
+      full: require('@incubator/art-world/hex/shared_world_frontier_brook_hex_tile_v1.webp'),
+      medium: require('@incubator/art-world/hex/shared_world_frontier_brook_hex_tile_v1_512.webp'),
+      thumb: require('@incubator/art-world/hex/shared_world_frontier_brook_hex_tile_v1_256.webp'),
+    },
+  },
+  stones: {
+    alphaBounds: KINGDOM_HEX_TILE_ALPHA_BOUNDS['shared_world_frontier_stones_hex_tile_v1.webp'],
+    sources: {
+      full: require('@incubator/art-world/hex/shared_world_frontier_stones_hex_tile_v1.webp'),
+      medium: require('@incubator/art-world/hex/shared_world_frontier_stones_hex_tile_v1_512.webp'),
+      thumb: require('@incubator/art-world/hex/shared_world_frontier_stones_hex_tile_v1_256.webp'),
+    },
+  },
+};
 /**
  * Mossprout's home under the Mist (the Last Clearing's opening): his own tile buried in the house Mist, with the round
  * patio left clear where he stands, so he stands in his clearing rather than floating on a cloud. Same canvas as his
@@ -276,15 +314,23 @@ const ringSources = [
 const uniqueRingSources = [...new Map(ringSources.map(coord => [coordKey(coord), coord])).values()];
 const ringPositions = hexSpiral(uniqueRingSources.length);
 const heartwoodPositions = new Map(uniqueRingSources.map((coord, index) => [coordKey(coord), ringPositions[index]]));
+/**
+ * The Frontier around them (`constants/frontier-tiles.ts`): every cell of its rings the placed tiles leave free. A
+ * content pack's island placed onto a Frontier cell wins it: that piece of Frontier is simply not drawn.
+ */
+const occupiedCells = new Set(['0,0', '0,-4', ...ringPositions.map(coordKey)]);
+const DRAWN_FRONTIER = FRONTIER_TILES.filter((tile) => !occupiedCells.has(coordKey(tile.coord)));
 
 function layerFor(
   id: string,
   kind: KingdomTileArtLayer['kind'],
   spec: ArtSpec,
   layoutBounds = spec.alphaBounds,
+  /** Already a world cell (the Frontier's): never mapped through the rings. */
+  placed = false,
 ): KingdomTileArtLayer {
   // Heartwood owns the centre; all other tiles occupy contiguous outer rings.
-  const coord = id === 'structure:mossprout-hex-garden' ? spec.coord : heartwoodWorldCoord(spec.coord);
+  const coord = placed || id === 'structure:mossprout-hex-garden' ? spec.coord : heartwoodWorldCoord(spec.coord);
   const point = mossproutHexPoint(coord);
   const { frame, interactionFrame } = mossproutLayerGeometry(coord, layoutBounds);
   return {
@@ -320,6 +366,14 @@ function hollowTreeLayer(): KingdomTileArtLayer {
   const { left, top, width, height } = layer.frame;
   const scaled = { left: left + width / 2 - (width * HOLLOW_TREE_SCALE) / 2, top: top + height - height * HOLLOW_TREE_SCALE, width: width * HOLLOW_TREE_SCALE, height: height * HOLLOW_TREE_SCALE };
   return { ...layer, frame: scaled, interactionFrame: undefined };
+}
+
+/** A Frontier tile: the house Mist until it is taken back (faint out past the Tree's light), then its own wild land. */
+function frontierLayer(tile: FrontierTile, state: FrontierTileState): KingdomTileArtLayer {
+  const art = state === 'reclaimed' ? FRONTIER_ART[tile.variant] : { alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS, sources: DREAM_MIST_LOCKED_NATURE_SOURCES };
+  const layer = layerFor(`structure:${tile.id}`, 'structure', { coord: tile.coord, ...art }, art.alphaBounds, true);
+  if (state === 'dark') layer.dim = true;
+  return layer;
 }
 
 export function heartwoodWorldCoord(coord: HexCoord): HexCoord {
@@ -472,6 +526,7 @@ export function buildMossproutHexNeighborhoodScene(
     return layer;
   };
   const storyTileLayers = STORY_TILES.map((tile) => ({ tile, misted: storyTileLayer(tile, false), revealed: storyTileLayer(tile, true) }));
+  const frontierLayers = DRAWN_FRONTIER.map((tile) => frontierLayer(tile, gardenState.frontier?.[tile.id] ?? 'dark'));
   // Keep the home Mist in front during non-solo reveal transitions too.
   if (options.homeVeiled) mainLayer.depth = Math.max(mainLayer.depth, gardenLayer.depth + 2);
   // The opening excludes neighbours without changing their reserved bounds.
@@ -479,6 +534,7 @@ export function buildMossproutHexNeighborhoodScene(
   const neighbourLayers = solo ? [] : [
     ...hatchableLayers.map(({ definition, locked, revealed }) => (hatchableTileState(definition) === 'locked' ? locked : revealed)),
     ...storyTileLayers.map(({ tile, misted, revealed }) => ((gardenState.storyTiles?.[tile.id] ?? 'misted') === 'revealed' ? revealed : misted)),
+    ...frontierLayers,
     ...MOSSPROUT_NATURE_ISLANDS.map((island) => natureLayerFor(
       island.id,
       natureIslandLevels[island.id] ?? 0,
@@ -500,7 +556,9 @@ export function buildMossproutHexNeighborhoodScene(
   // A reveal must never shift the scene origin (and every other island/camera).
   const natureBoundsLayers = MOSSPROUT_NATURE_ISLANDS.flatMap((island) =>
     [natureLayerFor(island.id, 0), natureLayerFor(island.id, 0, true), ...island.levels.map((level) => natureLayerFor(island.id, level.level, true))]);
-  const boundsLayers = [...rawLayers, ...hatchableLayers.flatMap(({ locked, revealed }) => [locked, revealed]), ...storyTileLayers.flatMap(({ misted, revealed }) => [misted, revealed]), ...natureBoundsLayers];
+  // Both of every Frontier tile's looks, so taking one back never shifts the world either.
+  const frontierBoundsLayers = DRAWN_FRONTIER.flatMap((tile) => [frontierLayer(tile, 'misted'), frontierLayer(tile, 'reclaimed')]);
+  const boundsLayers = [...rawLayers, ...hatchableLayers.flatMap(({ locked, revealed }) => [locked, revealed]), ...storyTileLayers.flatMap(({ misted, revealed }) => [misted, revealed]), ...natureBoundsLayers, ...frontierBoundsLayers];
   // Veiled or solo scenes leave layers out; their frames still shape the envelope.
   boundsLayers.push(unveiledMain, gardenLayer, hollowTree);
   const { dx, dy, width, height } = mossproutSceneEnvelope(boundsLayers.map(layer => layer.frame));

@@ -69,6 +69,7 @@ import { runRewardArrivalMotion } from '@/components/katchadeck/ui/reward-arriva
 import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunburst';
 import { HATCHABLE_COMPANIONS, hatchableByCompanion, hatchableByTile } from '@/constants/hatchable-companions/registry';
 import { STORY_TILES, storyTileById } from '@/constants/story-tiles/registry';
+import { FRONTIER_TILES, frontierTileById } from '@/constants/frontier-tiles';
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
@@ -236,7 +237,9 @@ type Props = {
   /** How far the camera may pull out; the Last Clearing's frontier pulls out past the usual limit. */
   cameraMinimumScale?: number;
   /** Something waiting on a tile (the Lodge's Timber): a bubble over it, in the world, tapped to collect. */
-  tileBubbles?: readonly { tileId: string; label: string; art?: ImageSourcePropType; onPress: () => void }[];
+  tileBubbles?: readonly { tileId: string; label: string; art?: ImageSourcePropType; onPress: () => void; accessibilityLabel?: string }[];
+  /** A Frontier tile tapped (`constants/frontier-tiles.ts`): the Kingdom decides what it means (its battle, or why not yet). */
+  onFrontierTilePress?: (tileId: string) => void;
   /** A light kept in the Mist on a tile (a chapter's beacon: Baristabbit's lit window), pulsing warm through its Mist. */
   tileBeacons?: readonly { tileId: string; color: string }[];
   storyOperationsEnabled?: boolean;
@@ -590,6 +593,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   onStoryTileTargetChange,
   cameraMinimumScale,
   tileBubbles,
+  onFrontierTilePress,
   tileBeacons,
   storyOperationsEnabled = true,
   worldEggTargetRef,
@@ -624,6 +628,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   const revealingStepplingEgg = revealingHatchableTileId != null && upgradePresentation?.fromStage === 0 && !upgradePresentation.noEgg;
   // A story tile clearing from the Mist: a journey episode's consequence.
   const revealingStoryTileId = upgradePresentation?.visualTarget?.kind === 'haven_structure' && storyTileById(upgradePresentation.visualTarget.structureId)
+    ? upgradePresentation.visualTarget.structureId : null;
+  // A Frontier tile taken back: its Mist lifts to its own wild land.
+  const revealingFrontierTileId = upgradePresentation?.visualTarget?.kind === 'haven_structure' && frontierTileById(upgradePresentation.visualTarget.structureId)
     ? upgradePresentation.visualTarget.structureId : null;
   // One clock owns both the restored tile and its Egg, including slow art loads.
   const stepplingRevealProgress = useSharedValue(0);
@@ -721,6 +728,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), hatchableTiles: { ...mossproutGarden?.hatchableTiles, [revealingHatchableTileId]: upgradePresentation.fromStage === 0 ? 'locked' as const : 'egg' as const } }
       : revealingStoryTileId
       ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), storyTiles: { ...mossproutGarden?.storyTiles, [revealingStoryTileId]: 'misted' as const } }
+      : revealingFrontierTileId
+      ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), frontier: { ...mossproutGarden?.frontier, [revealingFrontierTileId]: 'misted' as const } }
       : upgradePresentation.visualTarget?.kind === 'haven_structure'
       && upgradePresentation.visualTarget.structureId === 'mossprout-hex-garden'
       ? { ...(mossproutGarden ?? { plantableMemories: [] }), level: upgradePresentation.fromStage }
@@ -735,7 +744,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     // The opening's lift keeps the veiled, solo world: the from-scene must not
     // bring the Garden and the islands in for the length of the crossblend.
     return buildMossproutHexNeighborhoodScene(fromSlots, fromNatureLevels, fromGarden, fromReveals, { homeVeiled: homeVeil === 'veiled' || homeVeil === 'lifting', homeSolo, revealWorldWithHome });
-  }, [committedScene, companionSlots, focusedMossproutWorld, homeSolo, revealWorldWithHome, homeVeil, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingHatchableTileId, revealingStoryTileId, upgradePresentation]);
+  }, [committedScene, companionSlots, focusedMossproutWorld, homeSolo, revealWorldWithHome, homeVeil, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingFrontierTileId, revealingHatchableTileId, revealingStoryTileId, upgradePresentation]);
   // A friend arriving with their tile (a rescue: no Egg) stands on it from the moment the Mist lets go, not only once
   // the whole reveal is over: from its reveal phase the from-scene carries their resident from the committed world.
   const arrivingFriendTile = useMemo(() => {
@@ -846,6 +855,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const toLayer = atState('revealed').tileArtLayers.find((layer) => layer.id === layerId);
       return fromLayer && toLayer ? { fromLayer, toLayer, tile: { id: toLayer.id, cx: toLayer.frame.left + toLayer.frame.width / 2, cy: toLayer.frame.top + toLayer.frame.height / 2 } } : null;
     }
+    if (focusedMossproutWorld && revealingFrontierTileId) {
+      const layerId = `structure:${revealingFrontierTileId}`;
+      const atState = (state: 'misted' | 'reclaimed') => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels!, { ...mossproutGarden, level: mossproutGarden?.level ?? 0, plantableMemories: mossproutGarden?.plantableMemories ?? [], frontier: { ...mossproutGarden?.frontier, [revealingFrontierTileId]: state } }, mossproutNatureIslandReveals);
+      const fromLayer = atState('misted').tileArtLayers.find((layer) => layer.id === layerId);
+      const toLayer = atState('reclaimed').tileArtLayers.find((layer) => layer.id === layerId);
+      return fromLayer && toLayer ? { fromLayer, toLayer, tile: { id: toLayer.id, cx: toLayer.frame.left + toLayer.frame.width / 2, cy: toLayer.frame.top + toLayer.frame.height / 2 } } : null;
+    }
     if (focusedMossproutWorld && upgradePresentation.natureIslandId && mossproutNatureIslandLevels) {
       const islandId = upgradePresentation.natureIslandId;
       const fromLevels = { ...mossproutNatureIslandLevels, [islandId]: upgradePresentation.fromStage };
@@ -911,7 +927,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const toLayer = toScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const tile = toScene.tiles.find((candidate) => candidate.id === `family:${upgradePresentation.characterId}`);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingHatchableTileId, revealingStoryTileId, scene.centerTile, upgradePresentation, verticalAlignmentSelection]);
+  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingFrontierTileId, revealingHatchableTileId, revealingStoryTileId, scene.centerTile, upgradePresentation, verticalAlignmentSelection]);
   const discoveryLayers = useMemo(() => {
     if (!discoveryRevealFamilyId) return null;
     const revealed = companionSlots.find((slot) => slot.familyId === discoveryRevealFamilyId && slot.kind === 'revealed_egg');
@@ -965,7 +981,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   }, [onNatureIslandTargetChange]);
   // Tiles the story points at before they clear: every story tile, and a friend's own tile with someone lost in its
   // Mist (Steppling's trailhead, where the Lost Trail's battles dock).
-  const storyTargetTiles = useMemo(() => [...STORY_TILES.map((tile) => tile.id), ...HATCHABLE_COMPANIONS.filter((definition) => definition.tile.lostSkinId).map((definition) => definition.tile.id)], []);
+  const storyTargetTiles = useMemo(() => [...STORY_TILES.map((tile) => tile.id), ...HATCHABLE_COMPANIONS.filter((definition) => definition.tile.lostSkinId).map((definition) => definition.tile.id), ...FRONTIER_TILES.map((tile) => tile.id)], []);
   const storyTileTargetRefs = useMemo(() => {
     const refs = new Map<string, (node: View | null) => void>();
     if (onStoryTileTargetChange) for (const tileId of storyTargetTiles) refs.set(tileId, (node) => onStoryTileTargetChange(tileId, node));
@@ -2017,6 +2033,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 <Fragment key={`tile-stack-${layer.id}`}>
                   <Animated.View entering={joinedLater ? FadeIn.duration(reduceMotion ? 120 : 720) : undefined} pointerEvents="box-none"
                     style={fadeSolo && layer.id !== fadeSolo ? [StyleSheet.absoluteFill, othersStyle] : StyleSheet.absoluteFill}>
+                  <LayerLight dim={Boolean(layer.dim)} reducedMotion={reduceMotion}>
                   <KingdomTileArt
                     hidden={transitionHasPainted}
                     focusAnchorX={scene.tileById.get(layer.id)?.cx ?? layer.frame.left + layer.frame.width / 2}
@@ -2034,6 +2051,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                         : undefined}
                     priority={layer.id === scene.centerTile.id || layer.id === 'structure:mossprout-hex-garden' ? 'high' : 'normal'}
                   />
+                  </LayerLight>
                   </Animated.View>
                   {layer.id === scene.centerTile.id && openingWeatherShown ? (
                     <Animated.View pointerEvents="none" style={[styles.tileWeather, layer.frame, openingWeatherStyle]}>
@@ -2123,6 +2141,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                   />
                 ))
               : null}
+            {/* The Frontier first, under every friend's tile: where hit frames overlap at a corner, the friend's wins. */}
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onFrontierTilePress ? storyTileFrames.filter(({ tileId }) => frontierTileById(tileId)).map(({ tileId, frame }) => (
+              <Pressable key={`frontier-hit-target-${tileId}`} accessibilityRole="button"
+                accessibilityLabel={(mossproutGarden?.frontier?.[tileId] ?? 'dark') === 'reclaimed' ? 'Frontier land, taken back' : 'Frontier land under the Mist'}
+                onPress={() => onFrontierTilePress(tileId)} style={[styles.natureIslandHitTarget, frame]} />
+            )) : null}
             {focusedMossproutWorld && interactionEnabled && !upgradePresentation ? natureIslandFrames.map(({ frame, islandId }) => {
               const definition = mossproutNatureIslandById.get(islandId);
               const level = mossproutNatureIslandLevels?.[islandId] ?? 0;
@@ -2155,7 +2179,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             }) : null}
             {focusedMossproutWorld && tileBubbles?.length ? tileBubbles.map((bubble) => {
               const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${bubble.tileId}`)?.interactionFrame;
-              return frame ? <TileBubble key={`tile-bubble-${bubble.tileId}`} frame={frame} label={bubble.label} art={bubble.art} onPress={bubble.onPress} /> : null;
+              return frame ? <TileBubble key={`tile-bubble-${bubble.tileId}`} frame={frame} label={bubble.label} art={bubble.art} onPress={bubble.onPress} accessibilityLabel={bubble.accessibilityLabel} /> : null;
             }) : null}
             {focusedMossproutWorld ? lostSilhouettes.map(({ tileId, frame, source }) => (
               <LostSilhouette key={`lost-silhouette-${tileId}`} frame={frame} source={source} />
@@ -3908,7 +3932,17 @@ const TileBeacon = memo(function TileBeacon({ frame, source, color }: { frame: {
   </Animated.View>;
 });
 
-const TileBubble = memo(function TileBubble({ frame, label, art, onPress }: { frame: { left: number; top: number; width: number; height: number }; label: string; art?: ImageSourcePropType; onPress: () => void }) {
+/** A tile's light: out past the Heart Tree's reach it is faint; when the light reaches it, it brightens (slowly). */
+function LayerLight({ dim, reducedMotion, children }: { dim: boolean; reducedMotion: boolean; children: ReactNode }) {
+  const light = useSharedValue(dim ? 0.42 : 1);
+  useEffect(() => {
+    light.value = withTiming(dim ? 0.42 : 1, { duration: reducedMotion ? 0 : 1_400, easing: Easing.inOut(Easing.cubic) });
+  }, [dim, light, reducedMotion]);
+  const style = useAnimatedStyle(() => ({ opacity: light.value }));
+  return <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, style]}>{children}</Animated.View>;
+}
+
+const TileBubble = memo(function TileBubble({ frame, label, art, onPress, accessibilityLabel }: { frame: { left: number; top: number; width: number; height: number }; label: string; art?: ImageSourcePropType; onPress: () => void; accessibilityLabel?: string }) {
   const reduceMotion = useReducedMotion();
   const bob = useSharedValue(0);
   useEffect(() => {
@@ -3919,7 +3953,7 @@ const TileBubble = memo(function TileBubble({ frame, label, art, onPress }: { fr
   const style = useAnimatedStyle(() => ({ transform: [{ translateY: -bob.value * 8 }] }));
   const size = Math.max(64, frame.width * 0.2);
   return <Animated.View style={[{ position: 'absolute', left: frame.left + frame.width / 2 - size * 0.75, top: frame.top - size * 0.2, width: size * 1.5, alignItems: 'center' }, style]}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`Collect ${label}`} onPress={onPress} hitSlop={12}
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? `Collect ${label}`} onPress={onPress} hitSlop={12}
       style={{ flexDirection: 'row', alignItems: 'center', gap: size * 0.08, paddingHorizontal: size * 0.18, paddingVertical: size * 0.1, borderRadius: size, backgroundColor: '#FFF8E6', borderWidth: size * 0.05, borderColor: '#E0A23C' }}>
       {art ? <Image source={art} style={{ width: size * 0.5, height: size * 0.5 }} contentFit="contain" transition={0} accessible={false} /> : null}
       <Text style={{ fontSize: size * 0.3, fontWeight: '900', color: '#5A3A1A' }}>{label}</Text>

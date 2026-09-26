@@ -210,7 +210,7 @@ const SEEDS = [[36, 1], [37, 1], [38, 1], [39, 1], [44, 1], [46, 1]] as const;
  * while the board is still Seeds, the later ones come two and three at once down different columns, when the player
  * has plants to cover them. A wave cleared early brings the next straight in (`LANE_REFILL_MS`).
  */
-function waves(prefix: string, input: { first: number; gap: number; hp: number; step: number; grow?: number; drop?: number; spit?: number }, list: readonly (readonly number[])[]): IslandLaneSpec[] {
+export function waves(prefix: string, input: { first: number; gap: number; hp: number; step: number; grow?: number; drop?: number; spit?: number }, list: readonly (readonly number[])[]): IslandLaneSpec[] {
   return list.flatMap((columns, wave) => columns.map((column, index): IslandLaneSpec => {
     const hp = input.hp + (input.grow ?? 0) * wave;
     return {

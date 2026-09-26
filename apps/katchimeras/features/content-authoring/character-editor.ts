@@ -117,13 +117,15 @@ export function validateCharacterDraft(input:unknown):{draft:CharacterDraft|null
 }
 export function characterBoards(model:RecordData){
   const boards:{path:string;window:readonly number[];deliveryCells:number[];cells:{cell:number;definitionId:string;kind:string}[]}[]=[];
-  function walk(value:unknown,path:string[]=[]){
+  // A board's rows are its own, or its encounter's (a Lanes battle's seed plays on five rows).
+  function walk(value:unknown,path:string[]=[],rows?:unknown){
     if(!value||typeof value!=='object')return;
+    const own=isObject(value)&&typeof value.rows==='number'?value.rows:rows;
     if(isObject(value)&&Array.isArray(value.items)&&Array.isArray(value.echoes)){
-      const window=missionWindow(value.rows===3?3:4).cellIndices;
+      const window=missionWindow(own===3?3:own===5?5:4).cellIndices;
       boards.push({path:path.join('/'),window,deliveryCells:(value.deliveryCells??[]) as number[],cells:['items','echoes','veiled'].flatMap(kind=>(Array.isArray(value[kind])?value[kind] as {cell:number;definitionId:string}[]:[]).map(c=>({...c,kind})))});
     }
-    for(const [key,v]of Object.entries(value))walk(v,[...path,key]);
+    for(const [key,v]of Object.entries(value))walk(v,[...path,key],own);
   }walk(model);return boards;
 }
 export function characterDialogue(draft:CharacterDraft,index:number){

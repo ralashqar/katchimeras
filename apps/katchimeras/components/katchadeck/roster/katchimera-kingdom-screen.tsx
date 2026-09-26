@@ -1,4 +1,6 @@
 import { battleSourceCampaign } from '@/features/sanctuary/battle-source';
+import { FRONTIER_VARIANT_NAMES, frontierOpen, frontierTileById, frontierTileLit, frontierTileReclaimed, frontierTileState, frontierTileStates, nextFrontierTile, type FrontierTileState } from '@/constants/frontier-tiles';
+import { frontierMission } from '@/features/frontier/frontier-levels';
 import { sanctuaryFounded } from '@/constants/heart-tree';
 import { FIRST_GOAL_COACH_ID, goalNeed, type GoalNeedSource } from '@/features/sanctuary/goal-need';
 import type { SanctuaryChapterState } from '@/constants/sanctuary-chapters';
@@ -408,6 +410,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     setStoryTileNodes((current) => (current[tileId] === node ? current : { ...current, [tileId]: node }));
   }, []);
   const journeyTileNode = journeyMission ? storyTileNodes[journeyMission.tile.id] ?? null : null;
+  const storyTileNodesRef = useRef(storyTileNodes);
+  storyTileNodesRef.current = storyTileNodes;
   // The final merge's item flies into the mist before the lift beat: the run
   // is already at `world.mist_lift`, but the Kingdom keeps presenting the
   // clear beat (its camera, the veiled tile, the dock, no caption) until the
@@ -424,10 +428,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   islandTileNodesRef.current = islandTileNodes;
   // The campaign pivot: a rung of an island's ladder up as an encounter under the island, with what was brought in.
   // The campaign pivot: a rung up as an encounter, docked under its island, or under Mossprout's own tile for the Daily Mist.
-  const [islandEncounter, setIslandEncounter] = useState<{ campaignId?: string; islandId?: string; mission: RegionMissionDefinition; loadout: EncounterLoadout } | null>(null);
+  // Or under a Frontier tile (`frontierTileId`): the land's own battle (`constants/frontier-tiles.ts`).
+  const [islandEncounter, setIslandEncounter] = useState<{ campaignId?: string; islandId?: string; frontierTileId?: string; mission: RegionMissionDefinition; loadout: EncounterLoadout } | null>(null);
   const islandEncounterRung = islandEncounter;
   const islandEncounterIslandId = islandEncounter?.islandId ?? null;
-  const islandEncounterTileNode = islandEncounterIslandId ? islandTileNodes[islandEncounterIslandId] ?? null : homeTileNode;
+  const islandEncounterTileNode = islandEncounter?.frontierTileId ? storyTileNodes[islandEncounter.frontierTileId] ?? null
+    : islandEncounterIslandId ? islandTileNodes[islandEncounterIslandId] ?? null : homeTileNode;
   // The tile whose level track is open on the upgrade stage: a friend's island, Mossprout's Grove, or the Daily Mist.
   const [trackOpen, setTrackOpen] = useState<{ kind: 'island'; campaignId: string } | { kind: 'grove' } | { kind: 'daily' } | null>(null);
   const [trackNotice, setTrackNotice] = useState<string | null>(null);
@@ -759,6 +765,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // Keyed by the states themselves, like the hatchable tiles: a Glow landing must not rebuild the scene.
   const storyTileStateKey = Object.entries(storyTileStates(mergeWorld)).map(([id, state]) => `${id}=${state}`).join('|');
   const storyTiles = useMemo(() => Object.fromEntries(storyTileStateKey.split('|').filter(Boolean).map((entry) => entry.split('=') as [string, 'misted' | 'revealed'])), [storyTileStateKey]);
+  // The Frontier (`constants/frontier-tiles.ts`), keyed the same way. A tile just won stays under its Mist until its
+  // reveal plays (after the battle's card), so the land is seen coming back rather than already back.
+  const [frontierRevealing, setFrontierRevealing] = useState<string | null>(null);
+  const frontierStateKey = Object.entries(frontierTileStates(mergeWorld)).map(([id, state]) => `${id}=${id === frontierRevealing && state === 'reclaimed' ? 'misted' : state}`).join('|');
+  const frontierTiles = useMemo(() => Object.fromEntries(frontierStateKey.split('|').filter(Boolean).map((entry) => entry.split('=') as [string, FrontierTileState])), [frontierStateKey]);
   const [heartwoodOpenToken, setHeartwoodOpenToken] = useState(0);
   const [selectedHeartwoodBed, setSelectedHeartwoodBed] = useState<MossproutGardenPlantSlotId | undefined>();
   const treeStage = heartwoodStage(mergeWorld);
@@ -791,6 +802,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     gateway: stepplingEncounter.open ? 'egg' as const : gatewayState,
     hatchableTiles,
     storyTiles,
+    frontier: frontierTiles,
     level: mergeWorld.haven.structures.mossproutGarden.level,
     plantableMemories: mergeWorld.haven.plantableMemories,
     featureLevels: mergeWorld.haven.structures.mossproutGarden.featureLevels,
@@ -800,6 +812,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     gatewayState,
     hatchableTiles,
     storyTiles,
+    frontierTiles,
     stepplingEncounter.open,
     mergeWorld.haven.plantableMemories,
     mergeWorld.haven.structures.mossproutGarden.featureLevels,
@@ -861,7 +874,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700,
   } : null, [restorationIslandId, restorationOpen, screenFocused]);
   const islandEncounterCamera = useMemo((): FtueCameraDirective | null => !screenFocused ? null : islandEncounter ? {
-    kind: 'focus_target' as const, target: islandEncounterIslandId ? { kind: 'haven_nature_island' as const, islandId: islandEncounterIslandId } : { kind: 'haven_tile' as const, characterId: 'mossprout' as const },
+    kind: 'focus_target' as const, target: islandEncounter.frontierTileId ? { kind: 'haven_structure' as const, structureId: islandEncounter.frontierTileId }
+      : islandEncounterIslandId ? { kind: 'haven_nature_island' as const, islandId: islandEncounterIslandId } : { kind: 'haven_tile' as const, characterId: 'mossprout' as const },
     zoom: MISSION_CAMERA_ZOOM, anchorY: MISSION_CAMERA_ANCHOR_Y, durationMs: 700,
   } : trackOpen ? {
     // The track's tile framed over the docked panel: a friend's island, else Mossprout's own tile.
@@ -1034,6 +1048,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // The Lost Trail's tile is an FTUE target (`shared-world:lost-trail`): the tracks beat's finger and spotlight find it.
   const lostTrailNode = storyTileNodes[LOST_TRAIL_TILE_ID] ?? null;
   useEffect(() => { registerFtueTarget(`shared-world:${LOST_TRAIL_TILE_ID}`, lostTrailNode); }, [lostTrailNode, registerFtueTarget]);
+  // A chapter opening that ends on a Frontier tile (Chapter 2): its finger and spotlight find the tile the same way.
+  const openingFrontierTileId = openingTileTap && frontierTileById(openingTileTap) ? openingTileTap : null;
+  const openingFrontierNode = openingFrontierTileId ? storyTileNodes[openingFrontierTileId] ?? null : null;
+  useEffect(() => {
+    if (!openingFrontierTileId) return;
+    registerFtueTarget(`shared-world:${openingFrontierTileId}`, openingFrontierNode);
+    return () => registerFtueTarget(`shared-world:${openingFrontierTileId}`, null);
+  }, [openingFrontierNode, openingFrontierTileId, registerFtueTarget]);
   const setRestoreButtonNode = useCallback((node: View | null) => {
     restoreButtonRef.current = node;
     registerFtueTarget('upgrade:mossprout', node);
@@ -1181,6 +1203,24 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       ftueReveal: definition.tile.id, noEgg: true,
     });
     await write().catch((error) => console.warn('The rescue could not be written', error));
+  }, [reduceMotion]);
+  // A Frontier tile taken back: after the battle's card, its Mist lifts to its own wild land (the reveal a friend's tile
+  // clears with, no one arriving). Then the tile is the world's again.
+  const playFrontierReveal = useCallback((tileId: string) => {
+    // Only a tile the map draws can be revealed (a pack's island can stand on a Frontier cell): otherwise it just is ours.
+    if (reduceMotion || !storyTileNodesRef.current[tileId]) { setFrontierRevealing(null); return; }
+    revealedUpgradeRef.current = null;
+    friendRevealDoneRef.current = () => setFrontierRevealing(null);
+    setUpgrading(true);
+    setUpgradePresentation({
+      cameraAlreadyFocused: true, characterId: 'mossprout', coinCost: 0, coinOrigin: { x: 0, y: 0 },
+      creatureId: 'companion:mossprout', creatureName: 'Mossprout', fromStage: 0, toStage: 1,
+      nonce: ++upgradeNonceRef.current,
+      palette: { accent: '#E9FFD8', glow: '#BDF2A2', mist: 'rgba(214,229,238,0.92)', primary: '#7FC46B' },
+      reactionLine: '', showCoins: false, status: 'playing', upgradeName: 'frontier',
+      visualTarget: { kind: 'haven_structure', structureId: tileId },
+      ftueReveal: tileId, noEgg: true,
+    });
   }, [reduceMotion]);
   // A friend rescued in a Lanes battle (cozy 4X v2: Baristabbit's lit window): the lead's rescue, paid once like the
   // Lost Trail's stones, with the battle's card before the story moves on to the reveal.
@@ -2354,6 +2394,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const found = islandEncounterRungRef.current;
     const { outcome, runId } = islandMistOutcomeRef.current;
     if (!focus || !found || !outcome || !runId) return;
+    // Frontier land won for the first time: held under its Mist from the write until its reveal.
+    const frontierTileId = focus.frontierTileId && !frontierTileReclaimed(mergeWorldRef.current, focus.frontierTileId) ? focus.frontierTileId : null;
+    if (frontierTileId) setFrontierRevealing(frontierTileId);
     const result = await completeStoredEncounter({
       receiptId: `encounter:${runId}`, missionId: focus.mission.id, ...(focus.campaignId ? { campaignId: focus.campaignId } : {}),
       katchimeraId: focus.loadout.companionId, helperWispId: focus.loadout.wispId ?? null, partnerId: focus.loadout.partner?.companionId ?? null,
@@ -2366,9 +2409,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     recordEncounterBond(result);
     const cleared = result.encounterCleared;
     if (cleared?.bossPack) grantTrackPack({ ...cleared.bossPack, kind: 'bright' });
-    if (cleared) setBattleReward({ key: `encounter:${runId}`, title: found.mission.title, stars: gradeStars(cleared.grade), glow: cleared.glow, xp: cleared.xp || undefined, xpEach: Boolean(cleared.partnerId),
-      before: Math.max(0, result.state.coins - cleared.glow), finish: () => undefined });
+    const reclaimed = cleared?.reclaimed ?? null;
+    if (frontierTileId && reclaimed?.tileId !== frontierTileId) setFrontierRevealing(null);
+    if (cleared) setBattleReward({ key: `encounter:${runId}`, eyebrow: reclaimed ? 'Land taken back' : undefined, title: found.mission.title, stars: gradeStars(cleared.grade), glow: cleared.glow, xp: cleared.xp || undefined, xpEach: Boolean(cleared.partnerId),
+      timber: reclaimed?.timber || undefined,
+      before: Math.max(0, result.state.coins - cleared.glow), finish: reclaimed ? () => playFrontierReveal(reclaimed.tileId) : () => undefined });
     setIslandEncounter(null);
+    // The Frontier has no track: the player stays on the map, where the land is coming back.
+    if (focus.frontierTileId) return;
     // A friend's first level lifts their island's Mist, and the discovery that always followed it plays.
     if (focus.campaignId && isMistLevel(focus.mission.id) && cleared?.firstClear) { setIslandLiftHold(true); void liftIslandMist(focus.campaignId); return; }
     // A chapter's last level grows the island and its closing conversation opens on its own; that story brings the
@@ -2376,7 +2424,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (cleared?.islandRaised) return;
     setTrackReopen(focus.campaignId ? { kind: 'island', campaignId: focus.campaignId }
       : focus.mission.id.startsWith('daily:') ? { kind: 'daily' } : { kind: 'grove' });
-  }, [grantTrackPack, liftIslandMist]);
+  }, [grantTrackPack, liftIslandMist, playFrontierReveal]);
   const islandMist = useMistMission({ guided: false, keepGoingCost: GLOW.keepGoingCost, payKeepGoing: payIslandKeepGoing, active: islandEncounterActive, mission: null, encounter: islandEncounterRung?.mission.encounter ?? null, owner: 'mossprout', loadout: islandEncounter?.loadout ?? null, world: mergeWorld, tileNode: islandEncounterTileNode,
     // A battle's wisps stand on the board's cells: they appear only once the dock has finished rising, where they stay.
     boardMetrics: openingDockSettled ? openingBoardMetrics : null, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: completeIslandEncounter, onLeave: leaveIslandEncounter });
@@ -2388,6 +2436,44 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => { leaveIslandEncounter(); return true; });
     return () => subscription.remove();
   }, [islandEncounterActive, leaveIslandEncounter]);
+  /**
+   * A Frontier tile's battle (`features/frontier/frontier-levels.ts`), docked under the tile with the heroes last taken
+   * into the Mist. Only land in the Tree's light and still under the Mist; true when the battle starts.
+   */
+  const startFrontierBattle = useCallback((tileId: string) => {
+    const world = mergeWorldRef.current;
+    const tile = frontierTileById(tileId);
+    if (!tile || !frontierTileLit(world, tile) || frontierTileReclaimed(world, tileId)) return false;
+    const mission = frontierMission(tile);
+    const remembered = world.encounters?.loadout;
+    const picked: EncounterLoadoutChoice = { katchimeraId: remembered?.katchimeraId ?? 'mossprout', helperWispId: remembered?.helperWispId ?? null, partnerId: remembered?.partnerId ?? null };
+    const loadout = battleLoadout(world, withPartner(world, picked, playableHeroes(world)));
+    void startStoredEncounter({ missionId: mission.id, runId: encounterRunId(mission.encounter, 1, loadout), katchimeraId: loadout.companionId, helperWispId: loadout.wispId ?? null, partnerId: loadout.partner?.companionId ?? null }).catch(() => undefined);
+    setSelectedUpgrade(null);
+    setTrackOpen(null);
+    setTrackNotice(null);
+    setIslandEncounter({ frontierTileId: tile.id, mission, loadout });
+    return true;
+  }, []);
+  // What a Frontier tile says when it is not a battle: land already ours, or land past the Tree's light (and the way there).
+  const [frontierTalk, setFrontierTalk] = useState<{ key: string; lines: readonly { speaker: string; text: string }[]; action?: { label: string; run: () => void } } | null>(null);
+  const pressFrontierTile = useCallback((tileId: string) => {
+    if (storyHoldRef.current && !storyBypassRef.current) return;
+    const world = mergeWorldRef.current;
+    const tile = frontierTileById(tileId);
+    if (!tile || !frontierOpen(world) || islandEncounterRef.current) return;
+    const state = frontierTileState(world, tile);
+    if (state === 'misted') { startFrontierBattle(tileId); return; }
+    const place = FRONTIER_VARIANT_NAMES[tile.variant];
+    if (state === 'reclaimed') {
+      setFrontierTalk({ key: `reclaimed:${tileId}`, lines: [{ speaker: 'mossprout', text: `${place.charAt(0).toUpperCase()}${place.slice(1)} is ours again. Its Timber goes to the Lodge.` }] });
+      return;
+    }
+    setFrontierTalk({ key: `dark:${tileId}`, lines: [
+      { speaker: 'mossprout', text: 'Out there the Mist is too thick. The Heart Tree\u2019s light doesn\u2019t reach it yet.' },
+      { speaker: 'mossprout', text: `Grow the Tree to level ${tile.tree}, and we can fight for it.` },
+    ], action: { label: 'Grow the Heart Tree', run: () => setHeartTreePanelOpen(true) } });
+  }, [startFrontierBattle]);
   /** A level from a track, docked under its tile: a friend's island under theirs, the Grove and the Daily Mist under Mossprout's. */
   const enterTrackLevel = useCallback((node: LevelNode, choice: EncounterLoadoutChoice) => {
     const mission = node.mission;
@@ -3222,13 +3308,26 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const lodgeTileBubbles = useMemo(() => (sanctuarySurfaceFree && lodgeWaiting > 0
     ? [{ tileId: 'steppling-home', label: `+${lodgeWaiting}`, art: GAME_CURRENCY_ART.timber, onPress: collectLodge }]
     : undefined), [collectLodge, lodgeWaiting, sanctuarySurfaceFree]);
+  // The Frontier's next tile in the light carries a bubble: the fight that is always there.
+  const nextFrontier = frontierOpen(mergeWorld) ? nextFrontierTile(mergeWorld) : null;
+  const frontierBubbleShown = Boolean(nextFrontier) && sanctuarySurfaceFree && !chapterState?.openingPending && !goalHandoff && !frontierRevealing && !frontierTalk;
+  const worldTileBubbles = useMemo(() => {
+    const bubbles: { tileId: string; label: string; art?: ImageSourcePropType; onPress: () => void; accessibilityLabel?: string }[] = [...(lodgeTileBubbles ?? [])];
+    if (frontierBubbleShown && nextFrontier) bubbles.push({ tileId: nextFrontier.id, label: 'Take back', onPress: () => { startFrontierBattle(nextFrontier.id); }, accessibilityLabel: `Take back ${FRONTIER_VARIANT_NAMES[nextFrontier.variant]}` });
+    return bubbles.length ? bubbles : undefined;
+  }, [frontierBubbleShown, lodgeTileBubbles, nextFrontier, startFrontierBattle]);
   // Where Glow, XP and Meals come from, for every "Enter the Mist" and "Earn more" there is: the Grove's levels (Mossprout's
   // own track, then the Daily Mist), or the Café for Timber and Meals. The Merge page these used to open is gone.
   const openGlowSource = useCallback(() => {
     setSelectedUpgrade(null); setUpgradeError(null); setProgressSheetOpen(false);
     const world = mergeWorldRef.current;
     setTrackNotice(null);
-    // Battles for Glow and XP: the latest friend island's levels (plants that shoot); before any, the Café's orders.
+    // Battles for Glow and XP: the Frontier's next tile in the light; else the latest friend island's levels (plants
+    // that shoot); before any, the Café's orders.
+    if (frontierOpen(world)) {
+      const next = nextFrontierTile(world);
+      if (next && startFrontierBattle(next.id)) return;
+    }
     if (sanctuaryFounded(world)) {
       const battles = battleSourceCampaign(world);
       if (battles) { setTrackOpen({ kind: 'island', campaignId: battles.campaignId }); return; }
@@ -3236,21 +3335,22 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }
     const grove = groveTrack(world, { ftueComplete: true });
     setTrackOpen({ kind: grove.cleared < grove.total || !dailyMistUnlocked(world) ? 'grove' : 'daily' });
-  }, []);
+  }, [startFrontierBattle]);
   const openCafe = useCallback(() => {
     setSelectedUpgrade(null); setUpgradeError(null);
     if (mergeWorldRef.current.companionDiscovery.records.some((record) => record.characterId === 'baristabbit')) setSupplyRunOpen(true);
     else openGlowSource();
   }, [openGlowSource]);
-  const openGoalSource = useCallback((source: GoalNeedSource, buildingId?: HeroBuildingId) => {
+  const openGoalSource = useCallback((source: GoalNeedSource, buildingId?: HeroBuildingId, tileId?: string) => {
     if (source === 'cafe') { openCafe(); return; }
+    if (source === 'frontier' && tileId && startFrontierBattle(tileId)) return;
     // A hero held back by their own building: that friend's panel, on its Building tab.
     if (source === 'building' && buildingId) {
       const building = HERO_BUILDINGS.find((candidate) => candidate.id === buildingId);
       if (building) { openFriendPanel(building.companion, 'building'); return; }
     }
     openGlowSource();
-  }, [openCafe, openFriendPanel, openGlowSource]);
+  }, [openCafe, openFriendPanel, openGlowSource, startFrontierBattle]);
   const chapterGoalNeed = useMemo(() => (chapterState?.goal ? goalNeed(mergeWorld, chapterState.goal) : null), [chapterState?.goal, mergeWorld]);
   // A light kept on a misted tile while the chapter points there (the lit window): from the opening's camera on.
   // Every friend waiting under their tile's Mist, as a faint silhouette where they will stand: those lost in it from the
@@ -3267,7 +3367,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (!goal) return;
     if (!mergeWorldRef.current.chapterOpeningsSeen?.includes(FIRST_GOAL_COACH_ID)) void markStoredChapterOpened(FIRST_GOAL_COACH_ID).catch(() => undefined);
     // Short of something: straight to where it is earned (the card says what and where).
-    if (chapterGoalNeed) { openGoalSource(chapterGoalNeed.source, chapterGoalNeed.buildingId); return; }
+    if (chapterGoalNeed) { openGoalSource(chapterGoalNeed.source, chapterGoalNeed.buildingId, chapterGoalNeed.tileId); return; }
     if (goal.action.kind === 'building') { setBuildingPanelId(goal.action.buildingId); return; }
     if (goal.action.kind === 'supply_run') { setSupplyRunOpen(true); return; }
     if (goal.action.kind === 'hero') { openFriendPanel(goal.action.characterId, 'hero'); return; }
@@ -3277,6 +3377,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       return;
     }
     if (goal.action.kind === 'heart_tree') { setHeartTreePanelOpen(true); return; }
+    if (goal.action.kind === 'frontier') {
+      // The next tile in the light; with none left in it, the Tree has to grow first.
+      const next = nextFrontierTile(mergeWorldRef.current);
+      if (!next || !startFrontierBattle(next.id)) setHeartTreePanelOpen(true);
+      return;
+    }
     if (goal.action.kind === 'grove') { openGlowSource(); return; }
     if (goal.action.kind === 'world_offer') {
       const offerId = goal.action.offerId;
@@ -3285,7 +3391,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       return;
     }
     followKingdomNext(progressSummary.next);
-  }, [chapterGoalNeed, chapterState?.goal, followKingdomNext, openGlowSource, openGoalSource, progressSummary.next, upgradeOffers]);
+  }, [chapterGoalNeed, chapterState?.goal, followKingdomNext, openGlowSource, openGoalSource, progressSummary.next, startFrontierBattle, upgradeOffers]);
   const followChapterGoalRef = useRef(followChapterGoal);
   followChapterGoalRef.current = followChapterGoal;
   // The Café's first visit is taught (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Chapter 1), the way the Merge page
@@ -3400,11 +3506,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const chapter = chapterState?.chapter;
     setChapterOpeningPhase(null);
     const tileId = chapter?.opening?.tileId;
-    if (tileId && chapterState?.goal?.action.kind === 'world_offer' && chapterState.goal.action.offerId === `mist:${tileId}`) setOpeningTileTap(tileId);
+    if (tileId && ((chapterState?.goal?.action.kind === 'world_offer' && chapterState.goal.action.offerId === `mist:${tileId}`)
+      || (chapterState?.goal?.action.kind === 'frontier' && frontierTileById(tileId)))) setOpeningTileTap(tileId);
     else setChapterOpeningPlace(null);
     if (chapter) void markStoredChapterOpened(chapter.id).catch(() => undefined);
   }, [chapterState?.chapter, chapterState?.goal]);
-  const goalHandoffShown = Boolean(goalHandoff) && screenFocused && !battleReward && !supplyServeFlight && !upgradePresentation && !chapterOpeningPhase && !arrivalTalk && !rescueRevealing;
+  const goalHandoffShown = Boolean(goalHandoff) && screenFocused && !battleReward && !supplyServeFlight && !upgradePresentation && !chapterOpeningPhase && !arrivalTalk && !rescueRevealing && !frontierRevealing;
   const tapOpeningTile = useCallback(() => {
     setOpeningTileTap(null);
     // The camera stays on the tile while the rescue takes it over (its own framing of the same tile), then lets go.
@@ -3725,7 +3832,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         onNatureIslandTargetChange={setNatureIslandTileNode}
         onStoryTileTargetChange={setStoryTileNode}
         cameraMinimumScale={ftueStepId === FRONTIER_STEP_ID ? FRONTIER_MINIMUM_SCALE : undefined}
-        tileBubbles={lodgeTileBubbles}
+        tileBubbles={worldTileBubbles}
+        onFrontierTilePress={frontierOpen(mergeWorld) && sanctuarySurfaceFree && !frontierTalk ? pressFrontierTile : undefined}
         tileBeacons={mistedFriends}
         soloLayerId={soloLayerId}
         soloOfferId={soloOfferId}
@@ -4167,8 +4275,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         <Pressable accessibilityElementsHidden importantForAccessibility="no-hide-descendants" onPress={() => undefined} style={[StyleSheet.absoluteFill, { zIndex: 998 }]} />
         <HavenFtueOverlay cue={{ kind: 'tap', target: { kind: 'haven_structure', structureId: openingTileTap }, offset: { y: 34 } }} fingerPlacement="center" screenRef={screenRef}
           spotlight={{ targets: [{ kind: 'haven_structure', structureId: openingTileTap }], grouping: 'bounding_rect', padding: 8, radius: 26, dimOpacity: 0.5 }} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision} />
-        <LostTrailTapTarget node={gatewayTileNode} onPress={tapOpeningTile} />
+        <LostTrailTapTarget node={frontierTileById(openingTileTap) ? storyTileNodes[openingTileTap] ?? null : gatewayTileNode} onPress={tapOpeningTile} />
       </> : null}
+      {frontierTalk && screenFocused && !battleReward && !upgradePresentation ? (
+        <ConversationNarrativeOverlay title="The Frontier" entries={frontierTalk.lines.map((line, index) => ({ id: `frontier-talk:${frontierTalk.key}:${index}`, speaker: line.speaker, text: line.text }))}
+          checkpoint={`frontier-talk:${frontierTalk.key}`} paced onClose={() => setFrontierTalk(null)}>
+          {(perform) => <KatchaButton fullWidth glow pill label={frontierTalk.action?.label ?? 'Okay'} onPress={() => perform(() => { const run = frontierTalk.action?.run; setFrontierTalk(null); run?.(); }, true)} />}
+        </ConversationNarrativeOverlay>
+      ) : null}
       {goalHandoffShown && goalHandoff ? (
         <ConversationNarrativeOverlay title="Next" entries={goalHandoff.lines.map((line, index) => ({ id: `handoff:${goalHandoff.goalId}:${index}`, speaker: line.speaker, text: line.text }))}
           checkpoint={`handoff:${goalHandoff.goalId}`} required paced onClose={() => undefined}>

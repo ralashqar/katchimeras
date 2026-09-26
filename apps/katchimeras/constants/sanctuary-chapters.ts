@@ -1,4 +1,5 @@
 import { heartTreeLevel } from '@/constants/heart-tree';
+import { frontierReclaimedCount } from '@/constants/frontier-tiles';
 import { heartwoodBuildingLevel, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
 import { heroBuildingLevel, type HeroBuildingId } from '@/constants/hero-buildings';
 import { PETALIMP_ISLAND_CAMPAIGN_ID } from '@/constants/island-campaigns/petalimp-bloom';
@@ -26,7 +27,9 @@ export type ChapterGoalAction =
   /** Open a friend's own building's panel (the Explorer's Lodge). */
   | { kind: 'hero_building'; id: HeroBuildingId }
   /** Open the Heart Tree's panel (`constants/heart-tree.ts`). */
-  | { kind: 'heart_tree' };
+  | { kind: 'heart_tree' }
+  /** The Frontier's next tile in the Tree's light: its battle, docked under it (`constants/frontier-tiles.ts`). */
+  | { kind: 'frontier' };
 
 export type ChapterGoal = {
   id: string;
@@ -88,6 +91,8 @@ function friendChapter(input: {
   id: string; number: number; title: string;
   islandId: MossproutNatureIslandId; campaignId: string; friend: string; color: string;
   place: string; heartTree: number;
+  /** Frontier tiles taken back in all by the chapter's end: the path toward the island (`constants/frontier-tiles.ts`). */
+  frontier: number;
   train: { characterId: MergeCharacterId; name: string; level: number; why: string };
   /** The last friend home's own building, built first: the chapter's new thing. */
   building?: { id: HeroBuildingId; title: string; detail: string };
@@ -102,6 +107,9 @@ function friendChapter(input: {
       ...(input.building ? [{ id: `${input.id}:building`, title: input.building.title, detail: input.building.detail, done: (world: MergeWorldState) => heroBuildingLevel(world, input.building!.id) >= 1, action: { kind: 'hero_building' as const, id: input.building.id } }] : []),
       { id: `${input.id}:tree`, title: `Grow the Heart Tree to level ${input.heartTree}`, detail: `The Mist around ${input.place} is too thick to reach until the Heart Tree is stronger.`, done: (world) => heartTreeLevel(world) >= input.heartTree || revealed(world), action: { kind: 'heart_tree' },
         outro: [{ speaker: 'mossprout', text: `The Tree\u2019s light reaches further. The Mist over ${input.place} is thin enough now.` }] },
+      { id: `${input.id}:frontier`, title: `Push the Frontier toward ${input.place}`, detail: `Take back the land between here and ${input.place}: ${input.frontier} Frontier tiles in all.`, done: (world) => frontierReclaimedCount(world) >= input.frontier || revealed(world), action: { kind: 'frontier' },
+        progress: (world) => ({ current: Math.min(input.frontier, frontierReclaimedCount(world)), total: input.frontier }),
+        outro: [{ speaker: 'steppling', text: `That\u2019s a path. ${input.place} is right there now.` }] },
       { id: `${input.id}:train`, title: `Train ${input.train.name} to level ${input.train.level}`, detail: input.train.why, done: (world) => heroLevel(world, input.train.characterId) >= input.train.level, action: { kind: 'hero', characterId: input.train.characterId },
         outro: [{ speaker: input.train.characterId as KatchimeraSkinId, text: 'Ready. Let\u2019s answer that signal.' }] },
       { id: `${input.id}:mist`, title: `Answer the signal: clear the Mist over ${input.place}`, detail: 'Win its first battle.', done: revealed, action: { kind: 'world_offer', offerId: `nature:${input.islandId}` },
@@ -142,16 +150,31 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     closing: 'Three of us, and a kitchen that smells like morning. Now we can go further.',
   },
   {
-    id: 'explorers-lodge', number: 2, title: 'The Explorer\u2019s Lodge',
+    // Cozy 4X v2 (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Act III): the Frontier. The Mist sits on the land around the
+    // Sanctuary; every battle won there takes a tile back for good, and the Heart Tree's light decides how far out.
+    id: 'explorers-lodge', number: 2, title: 'Push It Back',
+    opening: {
+      tileId: 'frontier-1', color: '#9FD8FF', title: 'The Edge of the Mist', answer: 'Push it back',
+      lines: [
+        { speaker: 'mossprout', text: 'It\u2019s closer than yesterday.' },
+        { speaker: 'steppling', text: 'The Mist? It\u2019s sitting right on the end of my trail.' },
+        { speaker: 'mossprout', text: 'Then we move it. Land we take back stays ours.' },
+        { speaker: 'steppling', text: 'Race you there.' },
+      ],
+    },
     goals: [
-      { id: 'lodge-built', title: 'Build Steppling\u2019s Explorer\u2019s Lodge', detail: 'Every friend who comes home needs a home of their own. Glow and Timber.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 1, action: { kind: 'hero_building', id: 'explorers-lodge' }, outro: [{ speaker: 'steppling', text: 'My own Lodge! Maps on every wall.' }, { speaker: 'steppling', text: 'And it makes Timber while we\u2019re out on the trails.' }] },
-      { id: 'cafe-built', title: 'Build Baristabbit\u2019s Caf\u00e9', detail: 'A real caf\u00e9 around his window: better drinks, and more Meals from every order.', done: (world) => heroBuildingLevel(world, 'baristabbit-cafe') >= 1, action: { kind: 'hero_building', id: 'baristabbit-cafe' }, outro: [{ speaker: 'baristabbit', text: 'A real Café. Better cups, and more Meals from every order.' }] },
-      { id: 'supply-orders', title: 'Serve 4 orders at the Café', detail: 'Every order pays Meals and Timber. The Lodge makes every order pay more Timber.', done: (world) => (world.supplyRun?.served ?? 0) >= 4, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(4, world.supplyRun?.served ?? 0), total: 4 }), outro: [{ speaker: 'baristabbit', text: 'That\u2019s Timber and Meals enough for now.' }, { speaker: 'steppling', text: 'Then let\u2019s grow the Lodge. Bigger Lodge, longer trails.' }] },
-      { id: 'lodge-2', title: 'Upgrade the Lodge to level 2', detail: 'A bigger Lodge lets Steppling grow further, and pays more on every run.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 2, action: { kind: 'hero_building', id: 'explorers-lodge' }, outro: [{ speaker: 'steppling', text: 'I can go further now. The Heart Tree should grow with us.' }] },
-      { id: 'tree-2', title: 'Grow the Heart Tree to level 2', detail: 'Nothing in the Sanctuary grows past the Heart Tree. The Lodge’s Timber helps.', done: (world) => heartTreeLevel(world) >= 2, action: { kind: 'heart_tree' } },
+      { id: 'frontier-1', title: 'Take back the edge of the Mist', detail: 'The Mist has crept onto the land beside Steppling\u2019s trail. Win the battle there and the land is ours again.', done: (world) => frontierReclaimedCount(world) >= 1, action: { kind: 'frontier' }, progress: (world) => ({ current: Math.min(1, frontierReclaimedCount(world)), total: 1 }),
+        outro: [{ speaker: 'mossprout', text: 'Land we take back gives back. There\u2019s Timber in it.' }, { speaker: 'steppling', text: 'Timber! I know exactly what I\u2019d build with that.' }] },
+      { id: 'lodge-built', title: 'Build Steppling\u2019s Explorer\u2019s Lodge', detail: 'Every friend who comes home needs a home of their own. Glow and Timber.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 1, action: { kind: 'hero_building', id: 'explorers-lodge' }, outro: [{ speaker: 'steppling', text: 'My own Lodge! Maps on every wall.' }, { speaker: 'steppling', text: 'And every bit of land we take back sends Timber here.' }] },
+      { id: 'frontier-3', title: 'Take back 3 Frontier tiles', detail: 'The Mist holds the ring of land around the Sanctuary. Every tile taken back feeds the Lodge.', done: (world) => frontierReclaimedCount(world) >= 3, action: { kind: 'frontier' }, progress: (world) => ({ current: Math.min(3, frontierReclaimedCount(world)), total: 3 }),
+        outro: [{ speaker: 'mossprout', text: 'Past there, the Tree\u2019s light doesn\u2019t reach. Not yet.' }, { speaker: 'steppling', text: 'Then the Tree has to grow. And it needs Timber, like everything.' }] },
+      { id: 'cafe-built', title: 'Build Baristabbit\u2019s Caf\u00e9', detail: 'A real caf\u00e9 around his window: better drinks, and more Meals from every order.', done: (world) => heroBuildingLevel(world, 'baristabbit-cafe') >= 1, action: { kind: 'hero_building', id: 'baristabbit-cafe' }, outro: [{ speaker: 'baristabbit', text: 'A real Caf\u00e9. Better cups, and more Meals from every order.' }] },
+      { id: 'lodge-2', title: 'Upgrade the Lodge to level 2', detail: 'A bigger Lodge lets Steppling grow further, and holds more of the land\u2019s Timber.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 2, action: { kind: 'hero_building', id: 'explorers-lodge' }, outro: [{ speaker: 'steppling', text: 'I can go further now. The Heart Tree should grow with us.' }] },
+      { id: 'tree-2', title: 'Grow the Heart Tree to level 2', detail: 'The Heart Tree\u2019s light is how far out we can fight. Grow it, and more of the Mist is in reach.', done: (world) => heartTreeLevel(world) >= 2, action: { kind: 'heart_tree' },
+        outro: [{ speaker: 'mossprout', text: 'Look. The light reaches the next ring now.' }, { speaker: 'steppling', text: 'More land to take back. I\u2019ll start the map.' }] },
     ],
     reward: { glow: 60 },
-    closing: 'Steppling\u2019s got a real home now. He hasn\u2019t stopped grinning.',
+    closing: 'The edge is ours again. Steppling\u2019s already drawing maps of the next bit.',
   },
   {
     id: 'the-signal', number: 3, title: 'The Signal',
@@ -186,7 +209,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   },
   friendChapter({
     id: 'wild-tangle', number: 5, title: 'The Wild Tangle', islandId: 'wildgrowth-grove', campaignId: 'island-campaign:fernip-wildgrowth',
-    friend: 'Fernip', color: '#7ED67A', place: 'the Wildgrowth Grove', heartTree: 3,
+    friend: 'Fernip', color: '#7ED67A', place: 'the Wildgrowth Grove', heartTree: 3, frontier: 8,
     train: { characterId: 'steppling', name: 'Steppling', level: 3, why: 'The Grove is a maze. Steppling finds the way through, if he’s strong enough.' },
     opening: { title: 'Something Growing', lines: [
       { speaker: 'petalimp', text: 'Look, over the Wildgrowth! Green light, and it’s moving.' },
@@ -197,7 +220,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   }),
   friendChapter({
     id: 'seed-keeper', number: 6, title: 'The Seed Keeper', islandId: 'seed-nursery', campaignId: 'island-campaign:blossle-nursery',
-    friend: 'Blossle', color: '#F5C26B', place: 'the Seed Nursery', heartTree: 4,
+    friend: 'Blossle', color: '#F5C26B', place: 'the Seed Nursery', heartTree: 4, frontier: 12,
     building: { id: 'fern-thicket', title: 'Build Fernip\u2019s Thicket', detail: 'Fernip wants to put down roots. The Thicket tangles the wisps, so they come down slower in every battle.' },
     train: { characterId: 'mossprout', name: 'Mossprout', level: 4, why: 'The Nursery’s wisps are old ones. Mossprout has to be ready for them.' },
     opening: { title: 'A Lantern in the Beds', lines: [
@@ -209,7 +232,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   }),
   friendChapter({
     id: 'still-water', number: 7, title: 'Still Water', islandId: 'pond-sanctuary', campaignId: 'island-campaign:drizzlet-pond',
-    friend: 'Drizzlet', color: '#7CC8F2', place: 'the Pond Sanctuary', heartTree: 5,
+    friend: 'Drizzlet', color: '#7CC8F2', place: 'the Pond Sanctuary', heartTree: 5, frontier: 16,
     train: { characterId: 'steppling', name: 'Steppling', level: 4, why: 'The paths around the Pond are drowned in Mist. Steppling needs his longest stride.' },
     opening: { title: 'Rain Where There Is No Cloud', lines: [
       { speaker: 'blossle', text: 'It’s raining over the Pond. Just there. Nowhere else.' },
@@ -220,7 +243,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   }),
   friendChapter({
     id: 'the-orchard', number: 8, title: 'The Last Harvest', islandId: 'orchard-grove', campaignId: 'island-campaign:amberleaf-orchard',
-    friend: 'Amberleaf', color: '#F2A33C', place: 'the Orchard', heartTree: 6,
+    friend: 'Amberleaf', color: '#F2A33C', place: 'the Orchard', heartTree: 6, frontier: 19,
     train: { characterId: 'mossprout', name: 'Mossprout', level: 5, why: 'The Orchard’s wisps have been feeding for a long time. Only a strong light will move them.' },
     opening: { title: 'Autumn in the Mist', lines: [
       { speaker: 'drizzlet', text: 'The Orchard’s turned gold. In the middle of all that grey.' },
@@ -231,7 +254,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   }),
   friendChapter({
     id: 'the-oldest-tree', number: 9, title: 'The Oldest Tree', islandId: 'ancient-tree-grove', campaignId: 'island-campaign:mistle-ancient-tree',
-    friend: 'Mistle', color: '#B99CF2', place: 'the Ancient Grove', heartTree: 7,
+    friend: 'Mistle', color: '#B99CF2', place: 'the Ancient Grove', heartTree: 7, frontier: 23,
     train: { characterId: 'steppling', name: 'Steppling', level: 6, why: 'Nobody has walked to the Ancient Grove in a very long time. Steppling will have to be the first.' },
     opening: { title: 'The Oldest Light', lines: [
       { speaker: 'amberleaf', text: 'Do you see it? At the very edge, by the oldest tree.' },
