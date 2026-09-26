@@ -8,14 +8,17 @@ import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-wo
 test('the Frontier fills the empty second ring and all of the third, never twice on a cell', () => {
   const cells = FRONTIER_TILES.map((tile) => `${tile.coord.q},${tile.coord.r}`);
   assert.equal(new Set(cells).size, cells.length);
-  assert.equal(FRONTIER_TILES.filter((tile) => tile.ring === 2).length, 5);
-  assert.equal(FRONTIER_TILES.filter((tile) => tile.ring === 3).length, 18);
-  for (const tile of FRONTIER_TILES) {
+  assert.equal(FRONTIER_TILES.filter((tile) => !tile.region && tile.ring === 2).length, 5);
+  assert.equal(FRONTIER_TILES.filter((tile) => !tile.region && tile.ring === 3).length, 18);
+  // The Hollow Reaches' land lies past the Sanctuary's rings, around the Hollow Tree.
+  assert.ok(FRONTIER_TILES.some((tile) => tile.region === 'hollow-reaches'));
+  for (const tile of FRONTIER_TILES.filter((candidate) => candidate.region)) assert.ok(tile.ring > 3, `${tile.id} is outside the Sanctuary`);
+  for (const tile of FRONTIER_TILES.filter((candidate) => !candidate.region)) {
     const d = Math.max(Math.abs(tile.coord.q), Math.abs(tile.coord.r), Math.abs(tile.coord.q + tile.coord.r));
     assert.equal(d, tile.ring, `${tile.id} sits on its ring`);
   }
   // The Hollow Tree's doorstep is the last lit.
-  const last = [...FRONTIER_TILES].sort((a, b) => b.tree - a.tree)[0]!;
+  const last = FRONTIER_TILES.filter((tile) => !tile.region).sort((a, b) => b.tree - a.tree)[0]!;
   assert.deepEqual(last.coord, { q: 0, r: -3 });
 });
 

@@ -150,6 +150,7 @@ export const KINGDOM_HEX_TILE_ALPHA_BOUNDS = {
   'shared_world_bloom_house_3_hex_tile_v1.webp': { left: 43, top: 28, right: 980, bottom: 952 },
   'shared_world_cafe_2_hex_tile_v1.webp': { left: 42, top: 44, right: 980, bottom: 952 },
   'shared_world_cafe_3_hex_tile_v1.webp': { left: 43, top: 24, right: 980, bottom: 952 },
+  'shared_world_dawnle_lamp_house_hex_tile_v1.webp': { left: 42, top: 21, right: 980, bottom: 952 },
   'shared_world_fern_thicket_1_hex_tile_v1.webp': { left: 42, top: 74, right: 982, bottom: 952 },
   'shared_world_fern_thicket_2_hex_tile_v1.webp': { left: 100, top: 92, right: 924, bottom: 924 },
   'shared_world_fern_thicket_3_hex_tile_v1.webp': { left: 100, top: 25, right: 924, bottom: 924 },

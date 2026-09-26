@@ -145,6 +145,18 @@ export const COMPANION_ABILITIES: readonly CompanionAbilityDefinition[] = [
       { level: 10, chargeEvery: 5, wisps: 3 },
     ],
   },
+  {
+    // The Hollow Reaches' keeper (Region 2): the first light of the morning, on the board.
+    id: 'first-light', companion: 'dawnle', name: 'First Light', targeting: 'none', lanes: true, callout: 'Good morning, everyone.',
+    description: 'Dawn breaks over the board: the Mist on it burns away, and frozen plants thaw.',
+    tiers: [
+      { level: 1, chargeEvery: 8 },
+      { level: 3, chargeEvery: 7 },
+      { level: 5, chargeEvery: 6 },
+      { level: 7, chargeEvery: 5 },
+      { level: 10, chargeEvery: 4 },
+    ],
+  },
 ];
 
 const byCompanion = new Map(COMPANION_ABILITIES.map((ability) => [ability.companion, ability]));

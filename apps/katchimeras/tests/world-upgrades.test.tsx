@@ -130,8 +130,10 @@ for (const compiler of ['typescript', 'babel'] as const) test(`mist islands are 
   assert.ok(landmark, 'the Hollow Tree stands in the world');
   // The Frontier (`constants/frontier-tiles.ts`) fills the rest of the second ring and all of the third, around them.
   const frontier = baseline.tileArtLayers.filter((layer) => /^structure:frontier-\d+$/.test(layer.id));
-  assert.equal(frontier.length, 23, 'every Frontier tile is drawn');
-  const ringLayers = baseline.tileArtLayers.filter((layer) => layer !== landmark && !frontier.includes(layer));
+  assert.equal(frontier.length, 23, 'every Sanctuary Frontier tile is drawn');
+  // The wide world's regions (`constants/regions.ts`) lie past the Hollow Tree's own ring: counted apart.
+  const regionLayers = baseline.tileArtLayers.filter((layer) => /^structure:(reaches-|region-)/.test(layer.id));
+  const ringLayers = baseline.tileArtLayers.filter((layer) => layer !== landmark && !frontier.includes(layer) && !regionLayers.includes(layer));
   const hexes = [...ringLayers, ...frontier].filter((layer) => !layer.id.endsWith(':growth')).map((layer) => `${layer.coord.q},${layer.coord.r}`);
   assert.equal(new Set(hexes).size, hexes.length, `every layer on its own hex: ${hexes.join(' ')}`);
   const radius = ({ q, r }: { q: number; r: number }) => Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));

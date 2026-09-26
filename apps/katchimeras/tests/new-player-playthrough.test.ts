@@ -2,6 +2,8 @@ import { localDayId } from '@/utils/world-identity-rules';
 import { frontierOpen, frontierTileById, frontierTileState, nextFrontierTile } from '@/constants/frontier-tiles';
 import { frontierMission, frontierRetakeMission, surgeDefenceMission } from '@/features/frontier/frontier-levels';
 import { hollowTreeFinaleMission } from '@/features/finale/hollow-tree';
+import { regionFriendById } from '@/constants/region-friends';
+import { regionRescueMission } from '@/features/regions/region-rescue';
 import { battleSourceCampaign } from '@/features/sanctuary/battle-source';
 import { islandCampaignForIsland } from '@/constants/island-campaigns/registry';
 import assert from 'node:assert/strict';
@@ -298,7 +300,18 @@ test('a new player plays the main quest from Steppling home to the last chapter 
       else if (action.kind === 'hero') apply({ type: 'upgradeKatchimera', characterId: action.characterId, expectedLevel: katchimeraLevel(world, action.characterId), now: now++ } as MergeWorldCommand, `train ${action.characterId}`);
       else if (action.kind === 'supply_run') serveOrder();
       else if (action.kind === 'grove') playGrove();
-      else if (action.kind === 'finale') {
+      else if (action.kind === 'region_rescue') {
+        // The wide world: a region friend's rescue, docked under their home. Plants that shoot.
+        const friend = regionFriendById(action.friendId);
+        assert.ok(friend, `“${goal.title}” names a friend who is not in the wide world`);
+        const mission = regionRescueMission(friend);
+        assert.equal(mission.encounter?.mechanic?.kind, 'lanes', `${friend.name}'s rescue is plants that shoot`);
+        now += 3 * MINUTE;
+        apply({ type: 'completeEncounter', receiptId: `encounter:region:${now}`, missionId: mission.id, katchimeraId: 'mossprout', helperWispId: null, partnerId: null,
+          outcome: { cleared: true, grade: 'bright' } as never, difficulty: mission.difficulty, base: mission.rewards, now } as MergeWorldCommand, `rescue ${friend.name}`);
+        tally().battles += 1;
+        assert.ok(playableHeroes(world).includes(friend.id), `${friend.name} is a hero once home`);
+      } else if (action.kind === 'finale') {
         // The Hollow Tree's keeper: the last battle, plants that shoot, in three phases.
         const mission = hollowTreeFinaleMission();
         assert.equal(mission.encounter?.mechanic?.kind, 'lanes', 'the finale is plants that shoot');
@@ -317,7 +330,7 @@ test('a new player plays the main quest from Steppling home to the last chapter 
         assert.ok((result.encounterCleared?.surged?.length ?? 0) >= 1, 'the first Surge takes Frontier land back');
       } else if (action.kind === 'frontier') {
         // The next tile in the light; with none, the card must say so (it opens the Heart Tree).
-        const next = nextFrontierTile(world);
+        const next = nextFrontierTile(world, action.region);
         assert.ok(next, `“${goal.title}” wants Frontier land but none is in the Tree's light.${tail(8)}`);
         playFrontier(next.id, null);
       }

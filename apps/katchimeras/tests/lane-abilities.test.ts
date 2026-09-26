@@ -43,7 +43,7 @@ test('every friend brought home is a hero with an ability', () => {
   assert.ok(playableHeroes(petalimpHome).includes('petalimp'), 'an island friend is a hero once home');
   const trained = reduceMergeWorld({ ...(petalimpHome as object), heroBuildings: { 'bloom-house': { level: 1, builtAt: 0 } }, coins: 999, materials: { timber: 0, meals: 99 }, katchimeraProgress: { petalimp: { level: 1, xp: 999, upgradedAt: null } } } as never, { type: 'upgradeKatchimera', characterId: 'petalimp', expectedLevel: 1, now: 1 });
   assert.equal(trained.changed, true, 'and trains like any hero');
-  assert.equal(COMPANION_ABILITIES.filter((ability) => ability.lanes).length, 7);
+  assert.equal(COMPANION_ABILITIES.filter((ability) => ability.lanes).length, 8, 'the seven friends, and Dawnle');
 });
 
 test('the friends’ abilities act on the battle in play', () => {

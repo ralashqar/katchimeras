@@ -70,6 +70,7 @@ import { RotatingRadialSunburst } from '@/components/katchadeck/ui/radial-sunbur
 import { HATCHABLE_COMPANIONS, hatchableByCompanion, hatchableByTile } from '@/constants/hatchable-companions/registry';
 import { STORY_TILES, storyTileById } from '@/constants/story-tiles/registry';
 import { FRONTIER_TILES, frontierTileById } from '@/constants/frontier-tiles';
+import { REGION_FRIENDS, regionFriendByTile } from '@/constants/region-friends';
 import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
@@ -634,6 +635,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     ? upgradePresentation.visualTarget.structureId : null;
   // The Hollow Tree waking (the finale won).
   const revealingHollowTree = upgradePresentation?.visualTarget?.kind === 'haven_structure' && upgradePresentation.visualTarget.structureId === 'hollow-tree';
+  // A region friend's home clearing: their rescue won (`constants/region-friends.ts`).
+  const revealingRegionTileId = upgradePresentation?.visualTarget?.kind === 'haven_structure' && regionFriendByTile(upgradePresentation.visualTarget.structureId)
+    ? upgradePresentation.visualTarget.structureId : null;
   // One clock owns both the restored tile and its Egg, including slow art loads.
   const stepplingRevealProgress = useSharedValue(0);
   useLayoutEffect(() => {
@@ -734,6 +738,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), frontier: { ...mossproutGarden?.frontier, [revealingFrontierTileId]: 'misted' as const } }
       : revealingHollowTree
       ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), hollowTreeRestored: false }
+      : revealingRegionTileId
+      ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), regionHomes: { ...mossproutGarden?.regionHomes, [revealingRegionTileId]: 'misted' as const } }
       : upgradePresentation.visualTarget?.kind === 'haven_structure'
       && upgradePresentation.visualTarget.structureId === 'mossprout-hex-garden'
       ? { ...(mossproutGarden ?? { plantableMemories: [] }), level: upgradePresentation.fromStage }
@@ -748,7 +754,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     // The opening's lift keeps the veiled, solo world: the from-scene must not
     // bring the Garden and the islands in for the length of the crossblend.
     return buildMossproutHexNeighborhoodScene(fromSlots, fromNatureLevels, fromGarden, fromReveals, { homeVeiled: homeVeil === 'veiled' || homeVeil === 'lifting', homeSolo, revealWorldWithHome });
-  }, [committedScene, companionSlots, focusedMossproutWorld, homeSolo, revealWorldWithHome, homeVeil, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingFrontierTileId, revealingHatchableTileId, revealingHollowTree, revealingStoryTileId, upgradePresentation]);
+  }, [committedScene, companionSlots, focusedMossproutWorld, homeSolo, revealWorldWithHome, homeVeil, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingFrontierTileId, revealingHatchableTileId, revealingHollowTree, revealingRegionTileId, revealingStoryTileId, upgradePresentation]);
   // A friend arriving with their tile (a rescue: no Egg) stands on it from the moment the Mist lets go, not only once
   // the whole reveal is over: from its reveal phase the from-scene carries their resident from the committed world.
   const arrivingFriendTile = useMemo(() => {
@@ -859,6 +865,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       const toLayer = atState('revealed').tileArtLayers.find((layer) => layer.id === layerId);
       return fromLayer && toLayer ? { fromLayer, toLayer, tile: { id: toLayer.id, cx: toLayer.frame.left + toLayer.frame.width / 2, cy: toLayer.frame.top + toLayer.frame.height / 2 } } : null;
     }
+    if (focusedMossproutWorld && revealingRegionTileId) {
+      const layerId = `structure:${revealingRegionTileId}`;
+      const atState = (state: 'misted' | 'home') => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels!, { ...mossproutGarden, level: mossproutGarden?.level ?? 0, plantableMemories: mossproutGarden?.plantableMemories ?? [], regionHomes: { ...mossproutGarden?.regionHomes, [revealingRegionTileId]: state } }, mossproutNatureIslandReveals);
+      const fromLayer = atState('misted').tileArtLayers.find((layer) => layer.id === layerId);
+      const toLayer = atState('home').tileArtLayers.find((layer) => layer.id === layerId);
+      return fromLayer && toLayer ? { fromLayer, toLayer, tile: { id: toLayer.id, cx: toLayer.frame.left + toLayer.frame.width / 2, cy: toLayer.frame.top + toLayer.frame.height / 2 } } : null;
+    }
     if (focusedMossproutWorld && revealingHollowTree) {
       const layerId = 'structure:hollow-tree';
       const atState = (restored: boolean) => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels!, { ...mossproutGarden, level: mossproutGarden?.level ?? 0, plantableMemories: mossproutGarden?.plantableMemories ?? [], hollowTreeRestored: restored }, mossproutNatureIslandReveals);
@@ -938,7 +951,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     const toLayer = toScene.tileArtLayers.find((layer) => layer.id === `family:${upgradePresentation.characterId}`);
     const tile = toScene.tiles.find((candidate) => candidate.id === `family:${upgradePresentation.characterId}`);
     return fromLayer && toLayer && tile ? { fromLayer, tile, toLayer } : null;
-  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingFrontierTileId, revealingHatchableTileId, revealingHollowTree, revealingStoryTileId, scene.centerTile, upgradePresentation, verticalAlignmentSelection]);
+  }, [companionSlots, focusedMossproutWorld, hexTileSelection, identity, mossproutGarden, mossproutNatureIslandLevels, mossproutNatureIslandReveals, revealingFrontierTileId, revealingHatchableTileId, revealingHollowTree, revealingRegionTileId, revealingStoryTileId, scene.centerTile, upgradePresentation, verticalAlignmentSelection]);
   const discoveryLayers = useMemo(() => {
     if (!discoveryRevealFamilyId) return null;
     const revealed = companionSlots.find((slot) => slot.familyId === discoveryRevealFamilyId && slot.kind === 'revealed_egg');
@@ -992,7 +1005,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   }, [onNatureIslandTargetChange]);
   // Tiles the story points at before they clear: every story tile, and a friend's own tile with someone lost in its
   // Mist (Steppling's trailhead, where the Lost Trail's battles dock).
-  const storyTargetTiles = useMemo(() => [...STORY_TILES.map((tile) => tile.id), ...HATCHABLE_COMPANIONS.filter((definition) => definition.tile.lostSkinId).map((definition) => definition.tile.id), ...FRONTIER_TILES.map((tile) => tile.id), 'mossprout-hex-garden', 'hollow-tree'], []);
+  const storyTargetTiles = useMemo(() => [...STORY_TILES.map((tile) => tile.id), ...HATCHABLE_COMPANIONS.filter((definition) => definition.tile.lostSkinId).map((definition) => definition.tile.id), ...FRONTIER_TILES.map((tile) => tile.id), 'mossprout-hex-garden', 'hollow-tree', ...REGION_FRIENDS.map((friend) => friend.tileId)], []);
   const storyTileTargetRefs = useMemo(() => {
     const refs = new Map<string, (node: View | null) => void>();
     if (onStoryTileTargetChange) for (const tileId of storyTargetTiles) refs.set(tileId, (node) => onStoryTileTargetChange(tileId, node));
@@ -2153,7 +2166,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 ))
               : null}
             {/* The Frontier first, under every friend's tile: where hit frames overlap at a corner, the friend's wins. */}
-            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onFrontierTilePress ? storyTileFrames.filter(({ tileId }) => frontierTileById(tileId)).map(({ tileId, frame }) => (
+            {focusedMossproutWorld && interactionEnabled && !upgradePresentation && onFrontierTilePress ? storyTileFrames.filter(({ tileId }) => frontierTileById(tileId) || regionFriendByTile(tileId)).map(({ tileId, frame }) => (
               <Pressable key={`frontier-hit-target-${tileId}`} accessibilityRole="button"
                 accessibilityLabel={(mossproutGarden?.frontier?.[tileId] ?? 'dark') === 'reclaimed' ? 'Frontier land, taken back' : 'Frontier land under the Mist'}
                 onPress={() => onFrontierTilePress(tileId)} style={[styles.natureIslandHitTarget, frame]} />
@@ -2181,12 +2194,21 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               // The friend waiting in the Mist: their silhouette where they will stand once it clears, glowing.
               const layer = scene.tileArtLayers.find((candidate) => candidate.id === `structure:${beacon.tileId}`);
               const anchor = layer?.restingAnchor ?? layer?.residentAnchor;
-              const companion = hatchableByTile(beacon.tileId)?.companion;
+              const companion = hatchableByTile(beacon.tileId)?.companion ?? regionFriendByTile(beacon.tileId)?.id;
               // Exactly their resident: the same art, frame and spot they take once home, drawn as a shadow.
               const visualKey = companion ? katchimeraSkinById.get(companion)?.visualKey ?? companion : null;
               // The still frame of the animated idle they stand in once home (Steppling standing), else their world sprite.
               const source = visualKey ? resolveCreatureIdleFallbackSource(visualKey) ?? worldAssetSource(`creature:${visualKey}`, KINGDOM_RENDERING.havenImageLod) : null;
               return anchor && source && companion ? <TileBeacon key={`tile-beacon-${beacon.tileId}`} frame={residentCreatureFrame(anchor.x, anchor.y, creatureWorldSize, usesSharedResidentStage(companion))} source={source} color={beacon.color} /> : null;
+            }) : null}
+            {focusedMossproutWorld ? REGION_FRIENDS.map((friend) => {
+              // A region friend home again stands on their home (their standing still frame): tap them for their panel.
+              if ((mossproutGarden?.regionHomes?.[friend.tileId] ?? 'misted') !== 'home' || revealingRegionTileId === friend.tileId) return null;
+              const layer = scene.tileArtLayers.find((candidate) => candidate.id === `structure:${friend.tileId}`);
+              const anchor = layer?.residentAnchor;
+              const visualKey = katchimeraSkinById.get(friend.id)?.visualKey ?? friend.id;
+              const source = resolveCreatureIdleFallbackSource(visualKey) ?? worldAssetSource(`creature:${visualKey}`, KINGDOM_RENDERING.havenImageLod);
+              return anchor && source ? <RegionResident key={`region-resident-${friend.id}`} frame={residentCreatureFrame(anchor.x, anchor.y, creatureWorldSize, usesSharedResidentStage(friend.id))} source={source} reducedMotion={reduceMotion} /> : null;
             }) : null}
             {focusedMossproutWorld && tileBubbles?.length ? tileBubbles.map((bubble) => {
               const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${bubble.tileId}`)?.interactionFrame;
@@ -3899,6 +3921,13 @@ const styles = StyleSheet.create({
  * Someone lost in a story tile's Mist: their cut-out, tinted to a shadow, standing where the Mist is deepest (the
  * back of the tile), breathing faintly in and out of sight. Runtime, not baked: the tile art never draws a character.
  */
+/** A friend of the wide world at home: their standing art on their home, fading in once, then still. */
+const RegionResident = memo(function RegionResident({ frame, source, reducedMotion }: { frame: { left: number; top: number; width: number; height: number }; source: ImageSourcePropType; reducedMotion: boolean }) {
+  return <Animated.View pointerEvents="none" entering={reducedMotion ? undefined : FadeIn.duration(480)} style={{ position: 'absolute', ...frame }}>
+    <Image source={source} style={{ width: frame.width, height: frame.height }} contentFit="contain" transition={0} accessible={false} />
+  </Animated.View>;
+});
+
 const LostSilhouette = memo(function LostSilhouette({ frame, source }: { frame: { left: number; top: number; width: number; height: number }; source: ImageSourcePropType }) {
   const reduceMotion = useReducedMotion();
   const presence = useSharedValue(reduceMotion ? 0.5 : 0.28);

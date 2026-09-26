@@ -361,6 +361,7 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
       pip={view.hp > 1 ? `${Math.max(0, view.hp - view.damage)}` : null}
       intent={view.intent ?? null}
       aimed={aimedIndex === index}
+      guarded={Boolean(view.guarded) && view.alive}
       look={view.look ?? null}
       weakTo={view.weakTo ?? null}
       alive={view.alive} leaving={wisps.leaving} strikeNonce={wisps.strikes[index] ?? 0} />)}
@@ -387,7 +388,7 @@ export const MissionWisps = memo(function MissionWisps({ target, glow, screenRef
 });
 
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */
-const CorruptionWisp = memo(function CorruptionWisp({ drift = false, vy = 0, index, enterDelayMs, x, y, size, pip, intent, aimed = false, look = null, weakTo = null, alive, leaving, strikeNonce }: { /** Lanes: it drifts down steadily; its place arrives every tick, and it moves between them on its own at its speed. */ drift?: boolean; /** Lanes: its drift, px per ms (0 while it holds). */ vy?: number; /** v2: the chain it is weak to. */ weakTo?: 'growth' | 'water' | null; /** v2: its Dark Wisp art, when it has one. */ look?: string | null; /** v2: the wisp a held piece would hit. */ aimed?: boolean; index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; /** v2: what it will do next, and in how many turns. */ intent: MissionWispView['intent'] | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
+const CorruptionWisp = memo(function CorruptionWisp({ guarded = false, drift = false, vy = 0, index, enterDelayMs, x, y, size, pip, intent, aimed = false, look = null, weakTo = null, alive, leaving, strikeNonce }: { /** Shielded by a bulwark beside it: a ring of violet light, and nothing gets through it. */ guarded?: boolean; /** Lanes: it drifts down steadily; its place arrives every tick, and it moves between them on its own at its speed. */ drift?: boolean; /** Lanes: its drift, px per ms (0 while it holds). */ vy?: number; /** v2: the chain it is weak to. */ weakTo?: 'growth' | 'water' | null; /** v2: its Dark Wisp art, when it has one. */ look?: string | null; /** v2: the wisp a held piece would hit. */ aimed?: boolean; index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; /** v2: what it will do next, and in how many turns. */ intent: MissionWispView['intent'] | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
   const reduceMotion = useReducedMotion();
   const hover = useSharedValue(0);
   const shake = useSharedValue(0);
@@ -536,6 +537,7 @@ const CorruptionWisp = memo(function CorruptionWisp({ drift = false, vy = 0, ind
     </Animated.View>
     {!alive ? <DeathBurst size={size} reduceMotion={reduceMotion} /> : null}
     {arrivalNonce && alive ? <ArrivalBurst key={`arrival:${arrivalNonce}`} size={size} /> : null}
+    {guarded ? <Animated.View entering={reduceMotion ? undefined : ZoomIn.duration(220)} exiting={reduceMotion ? undefined : FadeOut.duration(200)} pointerEvents="none" style={[styles.guardRing, { width: size * 1.28, height: size * 1.28, borderRadius: size, left: -size * 0.14, top: -size * 0.14 }]} /> : null}
     {aimed && alive ? <Animated.View entering={reduceMotion ? undefined : ZoomIn.duration(160)} exiting={reduceMotion ? undefined : FadeOut.duration(140)} pointerEvents="none" style={[styles.aim, { width: size * 1.35, height: size * 1.35, borderRadius: size, left: -size * 0.175, top: -size * 0.175 }]} /> : null}
     {/* Its badges arrive with it: they grow in as it does, never before it. */}
     <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, badgeStyle]}>
@@ -647,6 +649,7 @@ const styles = StyleSheet.create({
   pip: { position: 'absolute', alignSelf: 'center', zIndex: 3, paddingHorizontal: 7, paddingVertical: 1, borderRadius: 9, backgroundColor: 'rgba(38,18,58,0.78)' },
   pipText: { fontFamily: 'FredokaBold', fontSize: 12, color: '#F3E6FF', textAlign: 'center' },
   aim: { position: 'absolute', borderWidth: 3, borderColor: '#FFD27A', backgroundColor: 'rgba(255,210,122,0.12)', zIndex: 2 },
+  guardRing: { position: 'absolute', borderWidth: 3, borderColor: 'rgba(196,150,255,0.95)', backgroundColor: 'rgba(170,120,255,0.18)', zIndex: 1 },
   weak: { position: 'absolute', zIndex: 4, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
   weakWater: { backgroundColor: '#3B9CC4' },
   weakGrowth: { backgroundColor: '#4E9F57' },

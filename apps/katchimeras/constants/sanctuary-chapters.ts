@@ -1,6 +1,8 @@
 import { heartTreeLevel } from '@/constants/heart-tree';
 import { frontierContestedTiles, frontierReclaimedCount, frontierSurgesStarted } from '@/constants/frontier-tiles';
 import { HOLLOW_TREE_FINALE_ID } from '@/constants/finale';
+import { DAWNLE_FRIEND, regionFriendHome } from '@/constants/region-friends';
+import type { RegionId } from '@/constants/regions';
 import { heartwoodBuildingLevel, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
 import { heroBuildingLevel, type HeroBuildingId } from '@/constants/hero-buildings';
 import { PETALIMP_ISLAND_CAMPAIGN_ID } from '@/constants/island-campaigns/petalimp-bloom';
@@ -30,11 +32,13 @@ export type ChapterGoalAction =
   /** Open the Heart Tree's panel (`constants/heart-tree.ts`). */
   | { kind: 'heart_tree' }
   /** The Frontier's next tile in the Tree's light: its battle, docked under it (`constants/frontier-tiles.ts`). */
-  | { kind: 'frontier' }
+  | { kind: 'frontier'; region?: RegionId }
   /** The first Mist Surge: the Mist comes for the Heart Tree, and the defence battle docks under it. */
   | { kind: 'surge_defence' }
   /** The finale: the Hollow Tree's keeper, the battle docked under the Hollow Tree (`features/finale/hollow-tree.ts`). */
-  | { kind: 'finale' };
+  | { kind: 'finale' }
+  /** A region friend's rescue, docked under their misted home (`constants/region-friends.ts`). */
+  | { kind: 'region_rescue'; friendId: string };
 
 export type ChapterGoal = {
   id: string;
@@ -306,6 +310,30 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     reward: { glow: 300 },
     closing: 'The Hollow Tree is green again, and everyone remembers it. Far off, past its branches, other lights are waiting.',
     unlock: 'The lands beyond the Hollow Tree: coming soon.',
+  },
+  {
+    // Region 2, the Hollow Reaches (`docs/regions-world-design.md`): past the Hollow Tree, the lamp from Chapter 10's
+    // last line. Its keeper, Dawnle, is rescued; the Reaches' own Frontier opens; and three more homes wait in the Mist.
+    id: 'the-lamp-beyond', number: 11, title: 'The Lamp Beyond',
+    opening: {
+      tileId: DAWNLE_FRIEND.tileId, color: DAWNLE_FRIEND.beaconColor, title: 'Past the Hollow Tree', answer: 'Go to the lamp',
+      lines: [
+        { speaker: 'steppling', text: 'There. Past the tree. The lamp I saw.' },
+        { speaker: 'mistle', text: 'Those are the Hollow Reaches. The first Sanctuary\u2019s own homes, all under the Mist.' },
+        { speaker: 'mossprout', text: 'And someone in there has kept a lamp lit the whole time.' },
+        { speaker: 'baristabbit', text: 'Like I did. You don\u2019t leave a lamp on unless you\u2019re waiting for someone.' },
+      ],
+    },
+    goals: [
+      { id: 'dawnle-home', title: 'Answer the lamp beyond the Hollow Tree', detail: 'Someone past the Hollow Tree has kept a lamp lit all this time. The wisps are drawn to it. Get there first.', done: (world) => regionFriendHome(world, 'dawnle'), action: { kind: 'region_rescue', friendId: 'dawnle' }, beacon: { tileId: DAWNLE_FRIEND.tileId, color: DAWNLE_FRIEND.beaconColor } },
+      { id: 'reaches-frontier', title: 'Push into the Hollow Reaches', detail: 'The land around the Hollow Tree is old, and the Mist has held it longest. Take back 3 of its tiles.', done: (world) => frontierReclaimedCount(world, 'hollow-reaches') >= 3, action: { kind: 'frontier', region: 'hollow-reaches' }, progress: (world) => ({ current: Math.min(3, frontierReclaimedCount(world, 'hollow-reaches')), total: 3 }),
+        outro: [{ speaker: 'dawnle', text: 'Morning reaches further every day now.' }, { speaker: 'mossprout', text: 'There are three more homes out here. Three more lights, waiting.' }] },
+      { id: 'train-dawnle', title: 'Train Dawnle to level 2', detail: 'Dawnle\u2019s First Light burns the Mist off the board. The Reaches\u2019 wisps are old ones, and they need burning.', done: (world) => heroLevel(world, 'dawnle') >= 2, action: { kind: 'hero', characterId: 'dawnle' },
+        outro: [{ speaker: 'dawnle', text: 'Brighter already. Let\u2019s find the others.' }] },
+    ],
+    reward: { glow: 150 },
+    closing: 'Dawnle\u2019s lamp burns on the Hollow Tree\u2019s doorstep now. Somewhere in the Reaches, something old is waiting to be found.',
+    unlock: 'Next in the Hollow Reaches: the Keeper of Old Things.',
   },
 ];
 

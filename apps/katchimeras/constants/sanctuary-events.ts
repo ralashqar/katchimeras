@@ -7,7 +7,7 @@ import type { MergeWorldState } from '@/types/merge-world';
  * their own features (`features/time-trial`); this is only what is on offer, when, and who hosts it. Keep every mode
  * that is not on the main path here rather than deleting it: they are the toolbox for events.
  */
-export type SanctuaryEventKind = 'time-trial';
+export type SanctuaryEventKind = 'time-trial' | 'daily-puzzle';
 
 export type SanctuaryEvent = {
   id: string;
@@ -38,7 +38,26 @@ export const WISP_RUSH_EVENT: SanctuaryEvent = {
   ],
 };
 
-export const SANCTUARY_EVENTS: readonly SanctuaryEvent[] = [WISP_RUSH_EVENT];
+/**
+ * Mist Puzzles: the Daily Mist's three patches (the territory mode, `features/encounters/daily-mist.ts`), the same three
+ * for everyone each day. A different way to play: every merge is a turn, and the wisps answer it.
+ */
+export const MIST_PUZZLES_EVENT: SanctuaryEvent = {
+  id: 'mist-puzzles',
+  kind: 'daily-puzzle',
+  name: 'Mist Puzzles',
+  host: { speaker: 'mossprout', name: 'Mossprout' },
+  tagline: 'Three puzzle patches a day. Here the wisps only move when you do: every merge is a turn. Think first.',
+  // After the Wild Tangle (Chapter 5): the player knows plants, lanes and wisps well enough to try them another way.
+  opensAfterChapter: 'wild-tangle',
+  intro: [
+    { speaker: 'mossprout', text: 'The Mist has left puzzles in the old Garden beds. Three new ones every morning.' },
+    { speaker: 'mossprout', text: 'Here the wisps only move when you do. Every merge is a turn, and they answer it.' },
+    { speaker: 'fernip', text: 'Oh, I like these. Take your time. The Mist does not get to rush you here.' },
+  ],
+};
+
+export const SANCTUARY_EVENTS: readonly SanctuaryEvent[] = [WISP_RUSH_EVENT, MIST_PUZZLES_EVENT];
 
 export function sanctuaryEventOpen(world: Pick<MergeWorldState, 'chaptersClaimed'>, event: SanctuaryEvent): boolean {
   return Boolean(world.chaptersClaimed?.includes(event.opensAfterChapter));

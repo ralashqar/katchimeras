@@ -17,7 +17,8 @@ export type LaneAbilityEffect =
   | { kind: 'grown'; cells: number[] }
   | { kind: 'rained'; cleared: number[]; wisps: number[] }
   | { kind: 'leaves'; wisps: number[]; damage: number }
-  | { kind: 'forgot'; wisps: number[] };
+  | { kind: 'forgot'; wisps: number[] }
+  | { kind: 'dawn'; cleared: number[]; thawed: number };
 
 export type LaneAbilityInput = { mechanic: LanesMechanic; state: LanesState };
 
@@ -123,6 +124,19 @@ export function applyLaneAbility(
       const sent = inPlay.slice(0, Math.max(1, tier.wisps ?? 1));
       if (!sent.length) return null;
       return { board, lanes: { ...state, wisps: setWisps((index) => (sent.includes(index) ? { row: startRow(mechanic, index), holdUntil: state.clock } : null)) }, effects: [{ kind: 'forgot', wisps: sent }] };
+    }
+    case 'first-light': {
+      // Dawn: every light Mist on the board (and the pieces bound under it) comes clear, and frozen plants thaw.
+      let next = board;
+      const cleared: number[] = [];
+      for (const cell of window.cellIndices) {
+        const mist = next.board[cell]?.mist;
+        if (mist?.kind === 'encounter' && (mist.type === 'light' || mist.type === 'bound')) { next = openMistCell(next, cell).board; cleared.push(cell); }
+      }
+      const thawed = Object.keys(state.frozen ?? {}).length;
+      if (!cleared.length && !thawed) return null;
+      const { frozen: _thawed, ...rest } = state;
+      return { board: next, lanes: rest, effects: [{ kind: 'dawn', cleared, thawed }] };
     }
     default:
       return null;

@@ -101,6 +101,8 @@ export function lanesViews(mechanic: LanesMechanic, state: LanesState): MissionW
       enterDelayMs: 0,
       drift: laneArrived(mechanic, state, index) && standing.damage < wisp.hp && state.breached == null && (standing.holdUntil ?? 0) <= state.clock ? (dashing ? Math.max(1, wisp.dashRows ?? 2) / LANE_DASH_MS : 1 / Math.max(250, wisp.stepMs)) : 0,
       ...(wisp.look ? { look: wisp.look } : {}),
+      // A bulwark beside it (and standing) shields it: its ring shows it.
+      ...(mechanic.wisps.some((other, j) => j !== index && other.shield && laneArrived(mechanic, state, j) && laneAlive(mechanic, state, j) && Math.abs(laneColumn(mechanic, state, j) - laneColumn(mechanic, state, index)) <= 1) ? { guarded: true } : {}),
     };
   });
 }

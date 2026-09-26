@@ -13,7 +13,9 @@ import { NOW, PLANT, SEED, SPROUT, itemAt, makeEncounter, mistAt, move, play, st
 test('every playable Katchimera has one ability whose tiers climb with the level and hold between them', () => {
   assert.deepEqual(COMPANION_ABILITIES.map((ability) => [ability.companion, ability.id]), [['mossprout', 'bloom'], ['steppling', 'clear-path'], ['baristabbit', 'focus'], ['shellio', 'ripple'], ['voyagle', 'scout'],
     // Every friend brought home is a hero (cozy 4X v2, Phase 5): their abilities act on a Lanes battle.
-    ['petalimp', 'petal-burst'], ['fernip', 'vine-snare'], ['feastle', 'second-helpings'], ['blossle', 'seedkeeper'], ['drizzlet', 'rainfall'], ['amberleaf', 'falling-leaves'], ['mistle', 'forget']]);
+    ['petalimp', 'petal-burst'], ['fernip', 'vine-snare'], ['feastle', 'second-helpings'], ['blossle', 'seedkeeper'], ['drizzlet', 'rainfall'], ['amberleaf', 'falling-leaves'], ['mistle', 'forget'],
+    // The wide world (Region 2 on).
+    ['dawnle', 'first-light']]);
   for (const id of PLAYABLE_KATCHIMERAS) assert.equal(COMPANION_ABILITIES.filter((ability) => ability.companion === id).length, 1, `${id} has exactly one ability`);
   for (const ability of COMPANION_ABILITIES) {
     assert.equal(ability.tiers[0]!.level, 1, `${ability.id}: level 1 is authored`);

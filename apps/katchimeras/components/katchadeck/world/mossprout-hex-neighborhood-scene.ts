@@ -17,6 +17,8 @@ import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import { SHARED_WORLD_TILES } from '@/constants/shared-world';
 import { STORY_TILES, type StoryTileDefinition, type StoryTileState } from '@/constants/story-tiles/registry';
 import { FRONTIER_TILES, type FrontierTile, type FrontierTileState, type FrontierVariant } from '@/constants/frontier-tiles';
+import { REGION_FRIENDS, type RegionFriend } from '@/constants/region-friends';
+import { HOLLOW_REACHES_HOMES } from '@/constants/regions';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { storyTileResidents, storyTileStructureId } from '@/utils/story-tile-residents';
 import { storyTileArt, storyTileMistedArt } from '@/constants/story-tiles/tile-art';
@@ -71,6 +73,8 @@ export type MossproutGardenSceneState = {
   frontier?: Partial<Record<string, FrontierTileState>>;
   /** The Hollow Tree woken (the finale won): its restored art. */
   hollowTreeRestored?: boolean;
+  /** The wide world's friends' homes by tile id (`constants/region-friends.ts`): under the Mist, or theirs again. */
+  regionHomes?: Partial<Record<string, 'misted' | 'home'>>;
   level: number;
   plantableMemories: readonly PlantableMemoryInstance[];
   previewMemoryId?: string;
@@ -380,6 +384,35 @@ function hollowTreeLayer(restored = false): KingdomTileArtLayer {
   return { ...layer, frame: scaled, interactionFrame: undefined };
 }
 
+/** The wide world's friends' homes, once theirs again (`constants/region-friends.ts`). */
+const REGION_HOME_ART: Readonly<Record<string, TileSources>> = {
+  dawnle: {
+    full: require('@incubator/art-world/hex/shared_world_dawnle_lamp_house_hex_tile_v1.webp'),
+    medium: require('@incubator/art-world/hex/shared_world_dawnle_lamp_house_hex_tile_v1_512.webp'),
+    thumb: require('@incubator/art-world/hex/shared_world_dawnle_lamp_house_hex_tile_v1_256.webp'),
+  },
+};
+
+/** A region friend's home: the house Mist (their silhouette in it, a beacon's work) until their rescue, then theirs. */
+function regionHomeLayer(friend: RegionFriend, state: 'misted' | 'home'): KingdomTileArtLayer {
+  const homeBounds = hexAlphaBounds(friend.home.alphaBoundsKey);
+  const home = state === 'home' && REGION_HOME_ART[friend.id];
+  const layer = home
+    ? layerFor(`structure:${friend.tileId}`, 'structure', { coord: friend.coord, alphaBounds: homeBounds, sources: REGION_HOME_ART[friend.id]! }, homeBounds, true)
+    : layerFor(`structure:${friend.tileId}`, 'structure', { coord: friend.coord, alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS, sources: DREAM_MIST_LOCKED_NATURE_SOURCES }, homeBounds, true);
+  const anchor = sharedResidentAnchor(layer.frame);
+  if (home) layer.residentAnchor = anchor; else layer.restingAnchor = anchor;
+  return layer;
+}
+
+/** The Reaches' homes still to come (Relicoon's, Pagelet's, Museling's, the crown): faint Mist, far off, for now. */
+const REACHES_PLACEHOLDERS = Object.entries(HOLLOW_REACHES_HOMES).filter(([key]) => !REGION_FRIENDS.some((friend) => friend.id === key));
+function reachesPlaceholderLayer(key: string, coord: HexCoord): KingdomTileArtLayer {
+  const layer = layerFor(`structure:reaches-home-${key}`, 'structure', { coord, alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS, sources: DREAM_MIST_LOCKED_NATURE_SOURCES }, DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS, true);
+  layer.dim = true;
+  return layer;
+}
+
 /** A Frontier tile: the house Mist until it is taken back (faint out past the Tree's light), then its own wild land. */
 function frontierLayer(tile: FrontierTile, state: FrontierTileState): KingdomTileArtLayer {
   const art = state === 'reclaimed' ? FRONTIER_ART[tile.variant] : { alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS, sources: DREAM_MIST_LOCKED_NATURE_SOURCES };
@@ -539,6 +572,9 @@ export function buildMossproutHexNeighborhoodScene(
   };
   const storyTileLayers = STORY_TILES.map((tile) => ({ tile, misted: storyTileLayer(tile, false), revealed: storyTileLayer(tile, true) }));
   const frontierLayers = DRAWN_FRONTIER.map((tile) => frontierLayer(tile, gardenState.frontier?.[tile.id] ?? 'dark'));
+  // The wide world (Region 2 on): its friends' homes, and the homes still to come.
+  const regionHomeLayers = REGION_FRIENDS.map((friend) => regionHomeLayer(friend, gardenState.regionHomes?.[friend.tileId] ?? 'misted'));
+  const placeholderLayers = REACHES_PLACEHOLDERS.map(([key, coord]) => reachesPlaceholderLayer(key, coord));
   // Keep the home Mist in front during non-solo reveal transitions too.
   if (options.homeVeiled) mainLayer.depth = Math.max(mainLayer.depth, gardenLayer.depth + 2);
   // The opening excludes neighbours without changing their reserved bounds.
@@ -547,6 +583,8 @@ export function buildMossproutHexNeighborhoodScene(
     ...hatchableLayers.map(({ definition, locked, revealed }) => (hatchableTileState(definition) === 'locked' ? locked : revealed)),
     ...storyTileLayers.map(({ tile, misted, revealed }) => ((gardenState.storyTiles?.[tile.id] ?? 'misted') === 'revealed' ? revealed : misted)),
     ...frontierLayers,
+    ...regionHomeLayers,
+    ...placeholderLayers,
     ...MOSSPROUT_NATURE_ISLANDS.map((island) => natureLayerFor(
       island.id,
       natureIslandLevels[island.id] ?? 0,
@@ -570,7 +608,8 @@ export function buildMossproutHexNeighborhoodScene(
     [natureLayerFor(island.id, 0), natureLayerFor(island.id, 0, true), ...island.levels.map((level) => natureLayerFor(island.id, level.level, true))]);
   // Both of every Frontier tile's looks, so taking one back never shifts the world either.
   const frontierBoundsLayers = DRAWN_FRONTIER.flatMap((tile) => [frontierLayer(tile, 'misted'), frontierLayer(tile, 'reclaimed')]);
-  const boundsLayers = [...rawLayers, ...hatchableLayers.flatMap(({ locked, revealed }) => [locked, revealed]), ...storyTileLayers.flatMap(({ misted, revealed }) => [misted, revealed]), ...natureBoundsLayers, ...frontierBoundsLayers];
+  const regionBoundsLayers = [...REGION_FRIENDS.flatMap((friend) => [regionHomeLayer(friend, 'misted'), regionHomeLayer(friend, 'home')]), ...REACHES_PLACEHOLDERS.map(([key, coord]) => reachesPlaceholderLayer(key, coord))];
+  const boundsLayers = [...rawLayers, ...hatchableLayers.flatMap(({ locked, revealed }) => [locked, revealed]), ...storyTileLayers.flatMap(({ misted, revealed }) => [misted, revealed]), ...natureBoundsLayers, ...frontierBoundsLayers, ...regionBoundsLayers];
   // Veiled or solo scenes leave layers out; their frames still shape the envelope.
   boundsLayers.push(unveiledMain, gardenLayer, hollowTree);
   const { dx, dy, width, height } = mossproutSceneEnvelope(boundsLayers.map(layer => layer.frame));

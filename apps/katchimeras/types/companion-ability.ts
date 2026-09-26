@@ -8,7 +8,9 @@ import type { MergeCharacterId } from './merge-world';
  */
 export type CompanionAbilityId = 'bloom' | 'clear-path' | 'focus' | 'ripple' | 'scout'
   /** Lanes (`features/encounter/lane-abilities.ts`): the friends' abilities that act on the wisps and the plants in play. */
-  | 'petal-burst' | 'vine-snare' | 'second-helpings' | 'seedkeeper' | 'rainfall' | 'falling-leaves' | 'forget';
+  | 'petal-burst' | 'vine-snare' | 'second-helpings' | 'seedkeeper' | 'rainfall' | 'falling-leaves' | 'forget'
+  /** The wide world's heroes (Region 2 on). */
+  | 'first-light';
 
 export type CompanionAbilityTier = {
   /** The Katchimera level this tier is reached at. */

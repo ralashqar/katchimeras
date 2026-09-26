@@ -1,4 +1,5 @@
 import { heroBuildingForCompanion, heroLevelCap } from '@/constants/hero-buildings';
+import { regionFriendById, regionFriendHome } from '@/constants/region-friends';
 import type { KatchimeraProgress, MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 
 /**
@@ -27,18 +28,20 @@ export const ISLAND_HEROES: Readonly<Record<string, string>> = {
   mistle: 'island-campaign:mistle-ancient-tree',
 };
 /** Every friend brought home is a hero (cozy 4X v2, Phase 5): each with an ability (`constants/companion-abilities.ts`). */
-export const PLAYABLE_KATCHIMERAS: readonly MergeCharacterId[] = ['mossprout', 'steppling', 'baristabbit', 'feastle', ...Object.keys(ISLAND_HEROES), 'shellio', 'voyagle'];
+export const PLAYABLE_KATCHIMERAS: readonly MergeCharacterId[] = ['mossprout', 'steppling', 'baristabbit', 'feastle', ...Object.keys(ISLAND_HEROES), 'dawnle', 'shellio', 'voyagle'];
 
 /** Whether a hero is home: Mossprout always; a rescued friend once found; an island friend once their island brings them. */
-export function heroHome(world: Pick<MergeWorldState, 'unlockedCharacters' | 'companionDiscovery' | 'islandCampaigns'>, id: MergeCharacterId): boolean {
+export function heroHome(world: Pick<MergeWorldState, 'unlockedCharacters' | 'companionDiscovery' | 'islandCampaigns'> & Partial<Pick<MergeWorldState, 'encounters'>>, id: MergeCharacterId): boolean {
   if (id === 'mossprout') return true;
+  // A region friend (the wide world): home once their rescue is won.
+  if (regionFriendById(id)) return regionFriendHome({ encounters: world.encounters }, id);
   const campaignId = ISLAND_HEROES[id];
   if (campaignId) return world.islandCampaigns?.[campaignId]?.cardEarnedAt != null;
   return world.unlockedCharacters.includes(id) || world.companionDiscovery.records.some((record) => record.characterId === id);
 }
 
 /** The heroes who can go into battle now: every playable friend who is home. One rule for every screen. */
-export function playableHeroes(world: Pick<MergeWorldState, 'unlockedCharacters' | 'companionDiscovery' | 'islandCampaigns'>): MergeCharacterId[] {
+export function playableHeroes(world: Pick<MergeWorldState, 'unlockedCharacters' | 'companionDiscovery' | 'islandCampaigns'> & Partial<Pick<MergeWorldState, 'encounters'>>): MergeCharacterId[] {
   return PLAYABLE_KATCHIMERAS.filter((id) => heroHome(world, id));
 }
 

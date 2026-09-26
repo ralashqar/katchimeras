@@ -1,5 +1,7 @@
 import type { HexCoord } from '@incubator/environments/hex';
 import { heartTreeLevel } from '@/constants/heart-tree';
+import { hollowTreeRestored } from '@/constants/finale';
+import { regionRing, type RegionId } from '@/constants/regions';
 import type { MergeWorldState } from '@/types/merge-world';
 
 /**
@@ -18,8 +20,13 @@ export type FrontierTile = {
   id: string;
   /** The world cell (already placed: not mapped through the Heartwood spiral). */
   coord: HexCoord;
-  ring: 2 | 3;
+  /** Its distance from the Heart Tree. */
+  ring: number;
   variant: FrontierVariant;
+  /** A region's Frontier (`constants/regions.ts`), lit when its gate opens rather than by the Heart Tree alone. */
+  region?: RegionId;
+  /** The Hollow Reaches' land is lit once the Hollow Tree is awake (the finale won). */
+  gate?: 'hollow-tree';
   /** The Heart Tree level whose light first reaches it. */
   tree: number;
   /** How hard its battle is, 1 (the first, near home) to 6 (the Hollow Tree's doorstep). */
@@ -67,6 +74,10 @@ function buildFrontier(): FrontierTile[] {
     }
     at += count;
   }
+  // The Hollow Reaches' Frontier (Region 2): the Hollow Tree's second ring, lit once it is awake; its land is old.
+  regionRing('hollow-reaches', 2).forEach((coord, index) => {
+    tiles.push({ id: `reaches-${index + 1}`, coord, ring: Math.max(Math.abs(coord.q), Math.abs(coord.r), Math.abs(coord.q + coord.r)), variant: VARIANTS[(index + 1) % VARIANTS.length]!, tree: 8, power: index % 3 === 2 ? 5 : 4, region: 'hollow-reaches', gate: 'hollow-tree' });
+  });
   return tiles;
 }
 
@@ -97,7 +108,8 @@ export function frontierTileReclaimed(world: Pick<MergeWorldState, 'encounters'>
 }
 
 /** Within the Heart Tree's light: a battle can be fought there. */
-export function frontierTileLit(world: Pick<MergeWorldState, 'heartTree'>, tile: FrontierTile): boolean {
+export function frontierTileLit(world: Pick<MergeWorldState, 'heartTree'> & Partial<Pick<MergeWorldState, 'encounters'>>, tile: FrontierTile): boolean {
+  if (tile.gate === 'hollow-tree') return hollowTreeRestored({ encounters: world.encounters });
   return heartTreeLevel(world) >= tile.tree;
 }
 
@@ -117,8 +129,8 @@ export function frontierTileStates(world: FrontierWorld): Record<string, Frontie
 }
 
 /** Every tile ever taken back (the chapters count these: a Surge never undoes a goal). */
-export function frontierReclaimedCount(world: Pick<MergeWorldState, 'encounters'>): number {
-  return FRONTIER_TILES.filter((tile) => frontierTileReclaimed(world, tile.id)).length;
+export function frontierReclaimedCount(world: Pick<MergeWorldState, 'encounters'>, region?: RegionId): number {
+  return FRONTIER_TILES.filter((tile) => (!region || tile.region === region) && frontierTileReclaimed(world, tile.id)).length;
 }
 
 /** The land held right now: taken back and not contested. What feeds the Lodge. */
@@ -131,8 +143,9 @@ export function frontierContestedTiles(world: FrontierWorld): FrontierTile[] {
 }
 
 /** The next tile to fight for: land the Mist took again first, then the first in the light still under the Mist. */
-export function nextFrontierTile(world: FrontierWorld): FrontierTile | null {
-  return frontierContestedTiles(world)[0] ?? FRONTIER_TILES.find((tile) => frontierTileState(world, tile) === 'misted') ?? null;
+export function nextFrontierTile(world: FrontierWorld, region?: RegionId): FrontierTile | null {
+  const inRegion = (tile: FrontierTile) => !region || tile.region === region;
+  return frontierContestedTiles(world).filter(inRegion)[0] ?? FRONTIER_TILES.find((tile) => inRegion(tile) && frontierTileState(world, tile) === 'misted') ?? null;
 }
 
 /** The Heart Tree level that lights the next dark tile, or null once every tile is in the light. */
