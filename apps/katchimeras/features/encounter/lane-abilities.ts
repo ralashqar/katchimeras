@@ -1,5 +1,5 @@
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
-import { LANE_START_ROW, laneAlive, laneArrived, laneCell, laneRowOf, type LanesMechanic, type LanesState } from '@/features/mission-mechanics/lanes';
+import { LANE_START_ROW, laneAlive, laneArrived, laneCell, laneColumn, laneRowOf, type LanesMechanic, type LanesState } from '@/features/mission-mechanics/lanes';
 import type { MissionWindow } from '@/features/mission-mechanics/board-window';
 import type { CompanionAbilityDefinition, CompanionAbilityTier } from '@/types/companion-ability';
 import type { MergeItemDefinition, MergeWorldState } from '@/types/merge-world';
@@ -34,7 +34,7 @@ function wispsInPlay(lanes: LaneAbilityInput): number[] {
 /** Free board cells: no piece, no Mist, not locked, and no wisp standing in it. */
 function freeCells(board: MergeWorldState, window: MissionWindow, lanes: LaneAbilityInput): number[] {
   const taken = new Set(wispsInPlay(lanes).flatMap((index) => {
-    const cell = laneCell(window, lanes.mechanic.wisps[index]!.column, laneRowOf(lanes.state.wisps[index]!.row));
+    const cell = laneCell(window, laneColumn(lanes.mechanic, lanes.state, index), laneRowOf(lanes.state.wisps[index]!.row));
     return cell == null ? [] : [cell];
   }));
   return window.cellIndices.filter((cell) => {

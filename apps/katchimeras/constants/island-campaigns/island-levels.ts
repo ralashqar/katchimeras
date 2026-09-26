@@ -2,7 +2,7 @@ import type { RegionMissionDefinition } from '@/constants/island-campaigns/types
 import { ISLAND_WISP_LINES } from '@/features/onboarding/corruption-wisps';
 import { ENCOUNTER_DEFAULT_GRADES, type EncounterDefinition, type EncounterDifficulty, type EncounterMistCell } from '@/types/encounter';
 import type { CorruptionWispLines } from '@/features/onboarding/corruption-wisps';
-import type { DarkWisp, DarkWispKind, WispIntent } from '@/types/mission-mechanic';
+import type { DarkWisp, DarkWispKind, LaneWisp, WispIntent } from '@/types/mission-mechanic';
 
 /**
  * A friend's island is played as levels, each a territory battle (`docs/encounter-territory.md`): a small board
@@ -47,7 +47,19 @@ export type IslandWispSpec = {
  * Lanes (`docs/encounter-lanes.md`): a wisp arriving over a board column (1-5) `at` seconds in, coming down a row every
  * `step` seconds, leaving Mist on the free cell it steps off every `drop` steps.
  */
-export type IslandLaneSpec = { id: string; column: number; at: number; hp: number; step: number; drop?: number; look?: string; /** While over the board, it spits Mist down its column every this many seconds. */ spit?: number; /** A striker: it strikes the nearest plant in its column every this many seconds, dropping it a tier. */ strike?: number };
+export type IslandLaneSpec = {
+  id: string; column: number; at: number; hp: number; step: number; drop?: number; look?: string;
+  /** While over the board, it spits Mist down its column every this many seconds. */ spit?: number;
+  /** A striker: it strikes the nearest plant in its column every this many seconds, dropping it a tier. */ strike?: number;
+  /** A weaver: it slides a column over every this many seconds, weaving about its own. */ weave?: number;
+  /** A dasher: every `every` seconds near the board it lunges `rows` rows (2 by default). */ dash?: { every: number; rows?: number };
+  /** A bulwark: wisps in the columns beside it take no damage while it stands. */ shield?: true;
+  /** A mender: every `every` seconds it mends `amount` (1) on every wisp within a column of it. */ mend?: { every: number; amount?: number };
+  /** A frost wisp: every this many seconds it freezes the nearest shooting plant under it. */ frost?: number;
+  /** A snatcher: every this many seconds it steals the smallest piece under it. */ snatch?: number;
+  /** A splitter: when it falls it bursts into this many small shards beside it. */ splits?: number;
+  /** A caller: every `every` seconds it calls one of its `count` mistlings (of `hp`) down its column. */ calls?: { every: number; count: number; hp?: number };
+};
 
 export type IslandLevelSpec = {
   title: string;
@@ -121,6 +133,39 @@ export function withNests(wisps: readonly DarkWisp[]): DarkWisp[] {
   });
 }
 
+const seconds = (value: number) => Math.round(value * 1_000);
+/**
+ * A level's lanes as the mechanic plays them: each authored wisp with its kind's timings, then the wisps others bring
+ * (a splitter's shards on each side of it, a caller's mistlings down its column), which come only when brought.
+ */
+export function laneWisps(lanes: readonly IslandLaneSpec[]): LaneWisp[] {
+  const authored: LaneWisp[] = lanes.map((lane) => ({
+    id: lane.id, hp: lane.hp, column: lane.column - 1, at: seconds(lane.at), stepMs: seconds(lane.step),
+    ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}),
+    ...(lane.spit ? { spitEvery: seconds(lane.spit) } : {}), ...(lane.strike ? { strikeEvery: seconds(lane.strike) } : {}),
+    ...(lane.weave ? { weaveEvery: seconds(lane.weave) } : {}),
+    ...(lane.dash ? { dashEvery: seconds(lane.dash.every), dashRows: lane.dash.rows ?? 2 } : {}),
+    ...(lane.shield ? { shield: true } : {}),
+    ...(lane.mend ? { mendEvery: seconds(lane.mend.every), mendAmount: lane.mend.amount ?? 1 } : {}),
+    ...(lane.frost ? { frostEvery: seconds(lane.frost) } : {}),
+    ...(lane.snatch ? { snatchEvery: seconds(lane.snatch) } : {}),
+    ...(lane.calls ? { callEvery: seconds(lane.calls.every) } : {}),
+  }));
+  const brought: LaneWisp[] = [];
+  lanes.forEach((lane, index) => {
+    const column = lane.column - 1;
+    for (let shard = 0; shard < (lane.splits ?? 0); shard += 1) {
+      const side = shard % 2 === 0 ? -1 : 1;
+      const at = column + side * (1 + Math.floor(shard / 2));
+      brought.push({ id: `${lane.id}:shard-${shard + 1}`, hp: Math.max(2, Math.ceil(lane.hp / 3)), column: Math.max(0, Math.min(4, at < 0 || at > 4 ? column - side : at)), at: 0, stepMs: Math.round(seconds(lane.step) * 0.8), look: 'mistling', spawn: { by: index, on: 'death' } });
+    }
+    for (let call = 0; call < (lane.calls?.count ?? 0); call += 1) {
+      brought.push({ id: `${lane.id}:mistling-${call + 1}`, hp: lane.calls!.hp ?? 3, column, at: 0, stepMs: 3_400, look: 'mistling', spawn: { by: index, on: 'call' } });
+    }
+  });
+  return [...authored, ...brought];
+}
+
 export function islandLevel(campaignId: string, key: string, spec: IslandLevelSpec, lines: CorruptionWispLines = ISLAND_WISP_LINES): RegionMissionDefinition {
   const chain = spec.chain ?? 'nature:garden';
   // A level with walking wisps is a merge-tactics battle: five rows, every action a turn, no Mist rings.
@@ -171,9 +216,9 @@ export function islandLevel(campaignId: string, key: string, spec: IslandLevelSp
       ...(spec.spring ? [{ id: 'spring', generatorId: 'mist-spring', cell: spec.spring.cell, charges: spec.spring.charges, drops: [`${WATER_CHAIN}:1`], recharge: { kind: 'merges' as const, every: spec.spring.every, amount: 1 }, ...(spec.spring.under ? { hidden: true } : {}) }] : []),
     ],
     mechanic: lanes
-      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: lanes.map((lane) => ({ id: lane.id, hp: lane.hp, column: lane.column - 1, at: Math.round(lane.at * 1_000), stepMs: Math.round(lane.step * 1_000), ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}), ...(lane.spit ? { spitEvery: Math.round(lane.spit * 1_000) } : {}), ...(lane.strike ? { strikeEvery: Math.round(lane.strike * 1_000) } : {}) })) }
+      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: laneWisps(lanes) }
       : { kind: 'dark-wisps', wisps, damageByTier: [1, 1, 2, 3], targeting: 'adjacent', ...(tactics ? { mode: 'tactics' as const } : { rest: spec.rest ?? REST_BY_DIFFICULTY[spec.difficulty] }) },
-    required: lanes ? lanes.reduce((sum, lane) => sum + lane.hp, 0) : wisps.filter((wisp) => !wisp.hidden).reduce((sum, wisp) => sum + wisp.hp, 0),
+    required: lanes ? laneWisps(lanes).reduce((sum, lane) => sum + lane.hp, 0) : wisps.filter((wisp) => !wisp.hidden).reduce((sum, wisp) => sum + wisp.hp, 0),
     wisps: [],
     objective: spec.rescue ? { kind: 'rescue', cell: spec.rescue.cell } : spec.target ? { kind: 'dark-wisp', wispId: spec.target } : { kind: 'wisps' },
     resolve: null,

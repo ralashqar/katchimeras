@@ -47,6 +47,14 @@ export const LANE_MISS_ROW = 5;
 export const LANE_SPIT_MS = 130;
 /** Keep going: every wisp still standing is pushed back up this many rows. */
 export const LANE_KEEP_GOING_ROWS = 3;
+/** A dasher's lunge lasts this long. */
+export const LANE_DASH_MS = 450;
+/** A frozen plant cannot shoot for this long. */
+export const LANE_FROST_MS = 4_000;
+/** A spawned wisp holds a beat where it appears before it comes on. */
+const LANE_SPAWN_HOLD_MS = 500;
+/** A weaver weaves: its own column, the one to its right, its own, the one to its left (the other way at an edge). */
+const WEAVE = [0, 1, 0, -1] as const;
 
 const startRow = (mechanic: LanesMechanic, index: number) => -Math.max(1, Math.floor(mechanic.wisps[index]?.startRow ?? LANE_START_ROW));
 
@@ -61,7 +69,14 @@ export function createLanesState(mechanic: LanesMechanic): LanesState {
  * When a wisp arrives, in level time: its authored `at`, brought forward by however much the level has skipped ahead
  * (`state.advance`): whenever the board is left with no wisp, the next one comes at once rather than after a gap.
  */
-export const laneArrivalAt = (mechanic: LanesMechanic, state: Pick<LanesState, 'advance'>, index: number) => (mechanic.wisps[index]?.at ?? 0) - (state.advance ?? 0);
+export const laneArrivalAt = (mechanic: LanesMechanic, state: Pick<LanesState, 'advance'> & Partial<Pick<LanesState, 'wisps'>>, index: number) => {
+  const spec = mechanic.wisps[index];
+  // A spawned wisp (a splitter's shard, a caller's mistling) arrives when it is brought, and not before.
+  if (spec?.spawn) return state.wisps?.[index]?.bornAt ?? Infinity;
+  return (spec?.at ?? 0) - (state.advance ?? 0);
+};
+/** The column a wisp is in now: a weaver's changes, every other stays in its own. */
+export const laneColumn = (mechanic: LanesMechanic, state: Pick<LanesState, 'wisps'>, index: number) => state.wisps[index]?.column ?? mechanic.wisps[index]?.column ?? 0;
 export const laneArrived = (mechanic: LanesMechanic, state: LanesState, index: number) => state.clock >= laneArrivalAt(mechanic, state, index);
 /** The board left with no wisp: the next one arrives this soon (and every later one as much sooner). */
 export const LANE_REFILL_MS = 500;
@@ -75,14 +90,16 @@ export const lanesComplete = (mechanic: LanesMechanic, state: LanesState) => mec
 
 export function lanesViews(mechanic: LanesMechanic, state: LanesState): MissionWispView[] {
   return mechanic.wisps.map((wisp, index) => {
-    const standing = state.wisps[index] ?? { row: startRow(mechanic, index), damage: 0 };
+    const standing: Partial<LaneWispState> & { row: number; damage: number } = state.wisps[index] ?? { row: startRow(mechanic, index), damage: 0 };
+    // A dasher mid-lunge drifts at its lunge's pace.
+    const dashing = standing.dashUntil != null && state.clock < standing.dashUntil;
     return {
       id: wisp.id, hp: wisp.hp, damage: Math.min(wisp.hp, standing.damage),
       // Not here yet: drawn as not standing, so it arrives (grows in) the moment it is.
       alive: laneArrived(mechanic, state, index) && standing.damage < wisp.hp,
-      placement: { kind: 'lane', column: wisp.column, row: standing.row },
+      placement: { kind: 'lane', column: laneColumn(mechanic, state, index), row: standing.row },
       enterDelayMs: 0,
-      drift: laneArrived(mechanic, state, index) && standing.damage < wisp.hp && state.breached == null && ('holdUntil' in standing ? standing.holdUntil : 0) <= state.clock ? 1 / Math.max(250, wisp.stepMs) : 0,
+      drift: laneArrived(mechanic, state, index) && standing.damage < wisp.hp && state.breached == null && (standing.holdUntil ?? 0) <= state.clock ? (dashing ? Math.max(1, wisp.dashRows ?? 2) / LANE_DASH_MS : 1 / Math.max(250, wisp.stepMs)) : 0,
       ...(wisp.look ? { look: wisp.look } : {}),
     };
   });
@@ -160,8 +177,34 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   let strikes = input.strikes;
   const alive = (index: number) => wisps[index]!.damage < mechanic.wisps[index]!.hp;
   let advance = input.advance ?? 0;
-  const arrivalAt = (index: number) => mechanic.wisps[index]!.at - advance;
+  const arrivalAt = (index: number) => (mechanic.wisps[index]!.spawn ? wisps[index]!.bornAt ?? Infinity : mechanic.wisps[index]!.at - advance);
   const arrived = (index: number) => clock >= arrivalAt(index);
+  const col = (index: number) => wisps[index]!.column ?? mechanic.wisps[index]!.column;
+  const frozen: Record<string, number> = Object.fromEntries(Object.entries(input.frozen ?? {}).filter(([, until]) => until > clock));
+  let seq = input.seq;
+  // Spawned wisps: a splitter's shards come the moment it falls (however it fell), where it fell; a caller's mistlings
+  // it never called fade with it.
+  const reconcileSpawns = () => {
+    mechanic.wisps.forEach((spec, index) => {
+      const wisp = wisps[index]!;
+      if (!spec.spawn || wisp.bornAt != null || wisp.damage >= spec.hp) return;
+      const parent = spec.spawn.by;
+      if (alive(parent)) return;
+      if (spec.spawn.on === 'death' && clock >= arrivalAt(parent)) {
+        wisp.bornAt = clock;
+        wisp.row = wisps[parent]!.row;
+        wisp.holdUntil = clock + LANE_SPAWN_HOLD_MS;
+        effects.push({ kind: 'split', wisp: parent, twin: index, cell: -1 });
+      } else {
+        wisp.damage = spec.hp;
+      }
+      moved = true;
+      changed = true;
+    });
+  };
+  reconcileSpawns();
+  // A bulwark shields the wisps in the columns beside it: the one standing guard over this one, if any.
+  const shieldFor = (target: number): number => mechanic.wisps.findIndex((spec, index) => index !== target && spec.shield && arrived(index) && alive(index) && Math.abs(col(index) - col(target)) <= 1);
 
   // Glow that has landed.
   const shots: LaneShot[] = [];
@@ -172,15 +215,35 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     // A hit is the wisps' own business (only they show it); the one that brings a wisp down changes the level.
     moved = true;
     hit = true;
+    const guard = shieldFor(shot.wisp);
+    if (guard >= 0) { effects.push({ kind: 'shielded', wisp: guard, target: shot.wisp, amount: shot.damage }); continue; }
     wisp.damage = Math.min(mechanic.wisps[shot.wisp]!.hp, wisp.damage + shot.damage);
     if (!alive(shot.wisp)) changed = true;
     strikes += 1;
   }
+  reconcileSpawns();
 
   // Spat Mist that has fallen: a cell still free mists over; one taken meanwhile (a piece put there) is left alone.
   const spits: LaneSpit[] = [];
   for (const spit of input.spits ?? []) {
     if (spit.landsAt > clock) { spits.push(spit); continue; }
+    if (spit.frost) {
+      // A frost bolt: the plant it was aimed at cannot shoot for a while.
+      const piece = looseItem(current(), spit.cell);
+      if (piece) { frozen[piece.instanceId] = clock + LANE_FROST_MS; effects.push({ kind: 'frozen', wisp: spit.wisp, cell: spit.cell }); changed = true; }
+      continue;
+    }
+    if (spit.snatch) {
+      // A snatcher's grab: the piece is gone.
+      const piece = looseItem(current(), spit.cell);
+      if (piece) {
+        cells ??= [...board.board];
+        cells[spit.cell] = { ...cells[spit.cell]!, occupant: null };
+        effects.push({ kind: 'snatched', wisp: spit.wisp, cell: spit.cell, definitionId: piece.definitionId });
+        changed = true;
+      }
+      continue;
+    }
     if (spit.strike) {
       // A striker's bolt: the plant it was aimed at drops a tier (a Seed is knocked off the board); gone, nothing.
       const piece = looseItem(current(), spit.cell);
@@ -207,9 +270,42 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     const wisp = wisps[index]!;
     if (!arrived(index) || !alive(index)) continue;
     if (from < arrivalAt(index)) moved = true;
+    // A weaver slides a column over now and then, once it is near the board; a piece in its way goes under Mist.
+    if (spec.weaveEvery && wisp.row >= -1.5) {
+      const due = wisp.weaveAt ?? clock + spec.weaveEvery;
+      if (due <= clock) {
+        const weaves = (wisp.weaves ?? 0) + 1;
+        const offset = WEAVE[weaves % WEAVE.length]!;
+        let column = spec.column + offset;
+        if (column < 0 || column >= window.columns) column = spec.column - offset;
+        wisp.column = Math.max(0, Math.min(window.columns - 1, column));
+        wisp.weaves = weaves;
+        wisp.weaveAt = clock + spec.weaveEvery;
+        moved = true;
+        changed = true;
+        const cell = laneRowOf(wisp.row) >= 0 ? laneCell(window, wisp.column, laneRowOf(wisp.row)) : null;
+        const piece = cell != null ? looseItem(current(), cell) : null;
+        if (cell != null && piece) {
+          cells ??= [...board.board];
+          bindPiece(cells, cell, piece.definitionId);
+          effects.push({ kind: 'bound', wisp: index, cell, definitionId: piece.definitionId });
+          wisp.holdUntil = clock + spec.stepMs;
+        }
+      } else wisp.weaveAt = due;
+    }
+    // A dasher lunges now and then once it is near the board: a couple of rows in a moment.
+    if (spec.dashEvery && wisp.row >= -1.5 && wisp.holdUntil <= clock && !(wisp.dashUntil != null && wisp.dashUntil > clock)) {
+      const due = wisp.dashAt ?? clock + spec.dashEvery;
+      if (due <= clock) { wisp.dashFrom = clock; wisp.dashUntil = clock + LANE_DASH_MS; wisp.dashAt = clock + spec.dashEvery; changed = true; }
+      else wisp.dashAt = due;
+    }
     const start = Math.max(from, arrivalAt(index), wisp.holdUntil);
     if (clock <= start) continue;
-    const target = wisp.row + (clock - start) / Math.max(250, spec.stepMs);
+    let target = wisp.row + (clock - start) / Math.max(250, spec.stepMs);
+    if (wisp.dashFrom != null && wisp.dashUntil != null) {
+      const lunge = Math.max(0, Math.min(clock, wisp.dashUntil) - Math.max(start, wisp.dashFrom));
+      target += lunge * (Math.max(1, spec.dashRows ?? 2) / LANE_DASH_MS - 1 / Math.max(250, spec.stepMs));
+    }
     moved = true;
     // Each cell its centre enters on the way, in order.
     let row = wisp.row;
@@ -228,7 +324,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
         }
         breached = index; changed = true; effects.push({ kind: 'breached', wisp: index }); row = next - 0.5; break;
       }
-      const cell = next >= 0 ? laneCell(window, spec.column, next) : null;
+      const cell = next >= 0 ? laneCell(window, col(index), next) : null;
       const piece = cell != null ? looseItem(current(), cell) : null;
       if (cell != null && piece) {
         // It reaches a piece: the piece goes under Mist, and the wisp holds at the cell's edge for a beat.
@@ -240,7 +336,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
         wisp.holdUntil = clock + spec.stepMs;
         break;
       }
-      const left = next - 1 >= 0 ? laneCell(window, spec.column, next - 1) : null;
+      const left = next - 1 >= 0 ? laneCell(window, col(index), next - 1) : null;
       wisp.cells += 1;
       row = next - 0.5;
       // Every so many cells it leaves Mist on the free cell it has just left.
@@ -257,7 +353,6 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
 
   // Wisps still over the board spit Mist down their column now and then: onto its top-most free cell (never a piece).
   const spat: LaneSpit[] = [];
-  let seq = input.seq;
   if (breached == null) {
     for (let index = 0; index < mechanic.wisps.length; index += 1) {
       const spec = mechanic.wisps[index]!;
@@ -268,7 +363,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       wisp.spitAt = clock + spec.spitEvery;
       let cell: number | null = null;
       for (let row = 0; row < window.rows && cell == null; row += 1) {
-        const candidate = laneCell(window, spec.column, row);
+        const candidate = laneCell(window, col(index), row);
         if (candidate == null) continue;
         if (isFree(current(), candidate)) cell = candidate;
       }
@@ -287,13 +382,68 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       wisp.strikeAt = clock + spec.strikeEvery;
       let cell: number | null = null;
       for (let row = Math.max(0, laneRowOf(wisp.row) + 1); row < window.rows && cell == null; row += 1) {
-        const candidate = laneCell(window, spec.column, row);
+        const candidate = laneCell(window, col(index), row);
         if (candidate != null && looseItem(current(), candidate)) cell = candidate;
       }
       if (cell == null) continue;
       const bolt: LaneSpit = { id: ++seq, wisp: index, cell, firedAt: clock, landsAt: clock + LANE_SPIT_MS, strike: true };
       spits.push(bolt);
       spat.push(bolt);
+    }
+    // The rest of what wisps do to the board and to each other, each on its own clock.
+    const below = (index: number) => {
+      const found: { cell: number; tier: number; instanceId: string }[] = [];
+      for (let row = Math.max(0, laneRowOf(wisps[index]!.row) + 1); row < window.rows; row += 1) {
+        const candidate = laneCell(window, col(index), row);
+        const piece = candidate != null ? looseItem(current(), candidate) : null;
+        if (candidate != null && piece) found.push({ cell: candidate, tier: Math.floor(items.get(piece.definitionId)?.tier ?? 1), instanceId: piece.instanceId });
+      }
+      return found;
+    };
+    const dueNow = (index: number, every: number | undefined, key: 'mendAt' | 'frostAt' | 'snatchAt' | 'callAt') => {
+      if (!every || !arrived(index) || !alive(index)) return false;
+      const wisp = wisps[index]!;
+      const due = wisp[key] ?? arrivalAt(index) + every;
+      if (due > clock) { wisp[key] = due; return false; }
+      wisp[key] = clock + every;
+      return true;
+    };
+    for (let index = 0; index < mechanic.wisps.length; index += 1) {
+      const spec = mechanic.wisps[index]!;
+      // A mender mends every wisp within a column of it, itself too.
+      if (dueNow(index, spec.mendEvery, 'mendAt')) {
+        const amount = Math.max(1, spec.mendAmount ?? 1);
+        let mended = false;
+        mechanic.wisps.forEach((_, other) => {
+          if (!arrived(other) || !alive(other) || Math.abs(col(other) - col(index)) > 1 || wisps[other]!.damage <= 0) return;
+          wisps[other]!.damage = Math.max(0, wisps[other]!.damage - amount);
+          mended = true;
+        });
+        if (mended) { effects.push({ kind: 'mended', wisp: index, amount }); moved = true; hit = true; changed = true; }
+      }
+      // A frost wisp freezes the nearest shooting plant under it that is not frozen already.
+      if (dueNow(index, spec.frostEvery, 'frostAt')) {
+        const target = below(index).find((piece) => piece.tier >= 2 && !(frozen[piece.instanceId] > clock));
+        if (target) { const bolt: LaneSpit = { id: ++seq, wisp: index, cell: target.cell, firedAt: clock, landsAt: clock + LANE_SPIT_MS, frost: true }; spits.push(bolt); spat.push(bolt); }
+      }
+      // A snatcher takes the smallest piece under it.
+      if (dueNow(index, spec.snatchEvery, 'snatchAt')) {
+        const target = below(index).sort((a, b) => a.tier - b.tier)[0];
+        if (target) { const bolt: LaneSpit = { id: ++seq, wisp: index, cell: target.cell, firedAt: clock, landsAt: clock + LANE_SPIT_MS, snatch: true }; spits.push(bolt); spat.push(bolt); }
+      }
+      // A caller calls its next mistling down its own column.
+      if (dueNow(index, spec.callEvery, 'callAt')) {
+        const called = mechanic.wisps.findIndex((child, other) => child.spawn?.by === index && child.spawn.on === 'call' && wisps[other]!.bornAt == null && wisps[other]!.damage < child.hp);
+        if (called >= 0) {
+          const child = wisps[called]!;
+          child.bornAt = clock;
+          child.row = startRow(mechanic, called);
+          child.column = col(index);
+          effects.push({ kind: 'called', wisp: called, caller: index });
+          moved = true;
+          changed = true;
+        }
+      }
     }
   }
 
@@ -309,7 +459,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     if (clock >= nextSeedAt) {
       const occupied = new Set(mechanic.wisps.flatMap((spec, index) => {
         if (!arrived(index) || !alive(index)) return [];
-        const cell = laneCell(window, spec.column, laneRowOf(wisps[index]!.row));
+        const cell = laneCell(window, col(index), laneRowOf(wisps[index]!.row));
         return cell == null ? [] : [cell];
       }));
       const free = (seeds.area ?? window.cellIndices).filter((cell) => window.cellIndices.includes(cell) && isFree(current(), cell) && !occupied.has(cell));
@@ -336,6 +486,8 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       if (!piece) continue;
       const fire = laneFire(Math.floor(items.get(piece.definitionId)?.tier ?? 1));
       if (!fire) continue;
+      // Frozen: it holds its fire until it thaws.
+      if (frozen[piece.instanceId] > clock) { ready[piece.instanceId] = Math.max(input.ready[piece.instanceId] ?? 0, frozen[piece.instanceId]!); continue; }
       const at = laneOf(window, cell)!;
       // A piece first seen waits half its beat, so a fresh drop never fires on the spot.
       const due = input.ready[piece.instanceId] ?? clock + fire.periodMs / 2;
@@ -343,7 +495,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       ready[piece.instanceId] = clock + fire.periodMs;
       let target = -1;
       for (let index = 0; index < mechanic.wisps.length; index += 1) {
-        if (mechanic.wisps[index]!.column !== at.column || !arrived(index) || !alive(index)) continue;
+        if (col(index) !== at.column || !arrived(index) || !alive(index)) continue;
         const row = wisps[index]!.row;
         if (row >= at.row) continue;
         if (target < 0 || row > wisps[target]!.row) target = index;
@@ -360,7 +512,8 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   // player never waits on an empty sky (a strong board simply wins faster).
   if (breached == null) {
     const standing = mechanic.wisps.some((_, index) => arrived(index) && alive(index));
-    const pending = mechanic.wisps.flatMap((_, index) => (!arrived(index) && alive(index) ? [arrivalAt(index)] : []));
+    // Spawned wisps come when they are brought: they never call the next wave in early.
+    const pending = mechanic.wisps.flatMap((_, index) => (!arrived(index) && alive(index) && Number.isFinite(arrivalAt(index)) ? [arrivalAt(index)] : []));
     const next = pending.length ? Math.min(...pending) : null;
     if (!standing && next != null && next > clock + LANE_REFILL_MS) {
       advance += next - (clock + LANE_REFILL_MS);
@@ -371,6 +524,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     kind: 'lanes', strikes, clock, wisps, ready, shots, seq, breached: breached ?? input.breached,
     ...(spits.length ? { spits } : {}), ...(advance ? { advance } : {}), ...(nextSeedAt != null ? { nextSeedAt, seeded } : {}),
     ...(pushedBack ? { pushedBack, ...(lastPushAt != null ? { lastPushAt } : {}) } : {}),
+    ...(Object.keys(frozen).length ? { frozen } : {}),
   };
   const next = current();
   return { state, board: nextInstance === next.nextInstance ? next : { ...next, nextInstance }, fired, effects, changed, moved, hit, spat };
@@ -393,7 +547,7 @@ export function lanesCrash(mechanic: LanesMechanic, state: LanesState, board: Me
   const effects: MechanicEffect[] = [];
   mechanic.wisps.forEach((spec, index) => {
     if (!laneArrived(mechanic, state, index) || !laneAlive(mechanic, state, index)) return;
-    const cell = laneCell(window, spec.column, laneRowOf(state.wisps[index]!.row));
+    const cell = laneCell(window, laneColumn(mechanic, state, index), laneRowOf(state.wisps[index]!.row));
     if (cell == null) return;
     const piece = looseItem(cells ? { ...board, board: cells } : board, cell);
     if (!piece) return;
@@ -420,7 +574,9 @@ export function normalizeLanesState(mechanic: LanesMechanic, value: unknown, str
   if (typeof value !== 'object') return null;
   const raw = value as Partial<LanesState>;
   if (!Array.isArray(raw.wisps) || raw.wisps.length !== mechanic.wisps.length || !Number.isFinite(raw.clock)) return null;
-  const wisps = raw.wisps.map((wisp) => ({ row: Number(wisp?.row) || 0, damage: Math.max(0, Number(wisp?.damage) || 0), holdUntil: Number(wisp?.holdUntil) || 0, cells: Math.max(0, Math.floor(Number(wisp?.cells) || 0)), ...(Number.isFinite(wisp?.spitAt) ? { spitAt: Number(wisp!.spitAt) } : {}), ...(Number.isFinite(wisp?.strikeAt) ? { strikeAt: Number(wisp!.strikeAt) } : {}) }));
+  const optional = (wisp: Partial<LaneWispState> | undefined) => Object.fromEntries((['spitAt', 'strikeAt', 'column', 'weaveAt', 'weaves', 'dashAt', 'dashFrom', 'dashUntil', 'mendAt', 'frostAt', 'snatchAt', 'callAt', 'bornAt'] as const)
+    .filter((key) => Number.isFinite(wisp?.[key])).map((key) => [key, Number(wisp![key])]));
+  const wisps = raw.wisps.map((wisp) => ({ row: Number(wisp?.row) || 0, damage: Math.max(0, Number(wisp?.damage) || 0), holdUntil: Number(wisp?.holdUntil) || 0, cells: Math.max(0, Math.floor(Number(wisp?.cells) || 0)), ...optional(wisp) }));
   return {
     kind: 'lanes', strikes: Math.max(0, Math.floor(Number(raw.strikes) || strikes)), clock: Number(raw.clock), wisps,
     ready: raw.ready && typeof raw.ready === 'object' ? { ...raw.ready } : {},
@@ -430,5 +586,6 @@ export function normalizeLanesState(mechanic: LanesMechanic, value: unknown, str
     ...(Number.isFinite(raw.advance) && Number(raw.advance) > 0 ? { advance: Number(raw.advance) } : {}),
     ...(Number.isFinite(raw.nextSeedAt) ? { nextSeedAt: Number(raw.nextSeedAt), seeded: Math.max(0, Math.floor(Number(raw.seeded) || 0)) } : {}),
     ...(Array.isArray(raw.spits) ? { spits: raw.spits.filter((spit) => spit && Number.isFinite(spit.landsAt)).map((spit) => ({ ...spit })) } : {}),
+    ...(raw.frozen && typeof raw.frozen === 'object' ? { frozen: Object.fromEntries(Object.entries(raw.frozen).filter(([, until]) => Number.isFinite(until))) } : {}),
   };
 }

@@ -33,9 +33,18 @@ export function frontierLevelSpec(tile: FrontierTile): IslandLevelSpec {
   const lanes: IslandLaneSpec[] = [
     ...waves('wisp', { first: 2, gap: power <= 1 ? 9 : 8, hp, step, grow: power >= 2 ? 1 : 0, drop: power >= 3 ? 2 : 3, ...(spit ? { spit } : {}) }, PATTERNS[tile.variant].slice(0, count)),
   ];
-  if ((tile.variant === 'copse' && power >= 2) || power >= 4) lanes.push({ id: 'nibbler', column: tile.variant === 'copse' ? 5 : 1, at: 12, hp: hp + 1, step, look: 'nibbler', strike: 5 });
+  // The Copse's nibbler gives way to its snatcher from power 3 (one thief in the trees at a time).
+  if ((tile.variant === 'copse' && power === 2) || (power >= 4 && tile.variant !== 'copse')) lanes.push({ id: 'nibbler', column: tile.variant === 'copse' ? 5 : 1, at: 12, hp: hp + 1, step, look: 'nibbler', strike: 5 });
   if (tile.variant === 'meadow' && power >= 2) lanes.push({ id: 'quick', column: 1, at: 14, hp, step: 2.6, look: 'snuffer' });
   if (tile.variant === 'stones' && power >= 2 && power < 6) lanes.push({ id: 'warden', column: 3, at: 18, hp: 8 + power * 2, step: 6.5, look: 'warden' });
+  // From power 3, each land brings its own new kind of wisp: the Meadow a weaver, the Copse a snatcher, the Brook a
+  // frost wisp, the Stones a bulwark guarding their warden.
+  if (power >= 3 && power < 6) {
+    if (tile.variant === 'meadow') lanes.push({ id: 'weaver', column: 2, at: 20, hp: hp + 1, step: 4.2, look: 'weaver', weave: 2.4 });
+    if (tile.variant === 'copse') lanes.push({ id: 'snatcher', column: 4, at: 16, hp, step: 4.4, look: 'snatcher', snatch: 7 });
+    if (tile.variant === 'brook') lanes.push({ id: 'frost', column: 2, at: 14, hp: hp + 1, step: 4.4, look: 'frost', frost: 6 });
+    if (tile.variant === 'stones') lanes.push({ id: 'bulwark', column: 4, at: 17, hp: hp + 2, step: 6.5, look: 'bulwark', shield: true });
+  }
   const boss = power >= 6;
   if (boss) lanes.push({ id: 'heart', column: 3, at: 3, hp: 24, step: 6, drop: 1, look: 'warden', spit: 6 });
   // The first tile plays like the first boards: sleepers and veiled pieces to wake. After it, a garden already growing.
@@ -94,9 +103,11 @@ export const SURGE_DEFENCE_SPEC: IslandLevelSpec = {
   veiled: [[31, 1], [30, 1], [32, 1], [24, 2]],
   mist: [], seeds: { every: 3 }, wisps: [],
   lanes: [
-    ...waves('surge', { first: 2, gap: 7, hp: 5, step: 4.4, grow: 1, drop: 3 }, [[3], [1, 5], [2, 4], [3], [1, 5], [2, 4]]),
-    { id: 'nibbler', column: 2, at: 16, hp: 6, step: 4.4, look: 'nibbler', strike: 5 },
-    { id: 'quick', column: 4, at: 26, hp: 5, step: 2.8, look: 'snuffer' },
+    ...waves('surge', { first: 2, gap: 8, hp: 5, step: 4.6, grow: 1, drop: 3 }, [[3], [1, 5], [2, 4], [3]]),
+    { id: 'nibbler', column: 2, at: 16, hp: 6, step: 4.6, look: 'nibbler', strike: 6 },
+    // A dasher lunges at the Tree, and a splitter bursts into shards where it falls.
+    { id: 'dasher', column: 4, at: 26, hp: 5, step: 4.8, look: 'dasher', dash: { every: 4.5 } },
+    { id: 'splitter', column: 3, at: 36, hp: 6, step: 4.6, look: 'splitter', splits: 2 },
   ],
   rewards: { glow: 60, xp: 40 },
 };

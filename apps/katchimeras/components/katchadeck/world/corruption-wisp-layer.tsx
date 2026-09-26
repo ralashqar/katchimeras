@@ -501,12 +501,15 @@ const CorruptionWisp = memo(function CorruptionWisp({ drift = false, vy = 0, ind
   const [base] = useState(() => ({ x, y }));
   const placeX = useSharedValue(x);
   const placeY = useSharedValue(y);
+  const lastX = useRef(x);
   useEffect(() => {
     if (reduceMotion) { placeX.value = x; placeY.value = y; return; }
     if (drift && vy > 0) {
       // Drifting: aim a little ahead of where the level says it is and move there at its own speed. The next place
       // arrives before it gets there, so the motion never stops or changes pace; a small lag or lead corrects itself.
-      placeX.value = x;
+      // A weaver sliding a column over glides across rather than jumping.
+      if (Math.abs(lastX.current - x) > 1) placeX.value = withTiming(x, { duration: 380, easing: Easing.inOut(Easing.cubic) });
+      lastX.current = x;
       const ahead = y + vy * DRIFT_LEAD_MS;
       const distance = ahead - placeY.value;
       if (distance > 0 && Math.abs(placeY.value - y) < vy * DRIFT_LEAD_MS * 2) {
@@ -517,7 +520,8 @@ const CorruptionWisp = memo(function CorruptionWisp({ drift = false, vy = 0, ind
       return;
     }
     const glide = drift ? { duration: 220, easing: Easing.out(Easing.quad) } : { duration: 420, easing: Easing.inOut(Easing.cubic) };
-    placeX.value = withTiming(x, glide);
+    lastX.current = x;
+    placeX.value = withTiming(x, drift && Math.abs(placeX.value - x) > 1 ? { duration: 380, easing: Easing.inOut(Easing.cubic) } : glide);
     placeY.value = withTiming(y, glide);
   }, [drift, placeX, placeY, reduceMotion, vy, x, y]);
   const placeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: placeX.value - base.x }, { translateY: placeY.value - base.y }] }));

@@ -5,7 +5,9 @@ import type { DarkWisp, DarkWispKind, WispIntentKind } from '@/types/mission-mec
  * intent chip over it stays the truth of what it does next; the look says what it is. Generated from the corruption
  * wisp as reference (`scripts/generate-dark-wisp-looks.py`, sources in design/dark-wisp-looks-v1).
  */
-export const DARK_WISP_LOOKS = ['snuffer', 'shrouder', 'nibbler', 'creeper', 'warden', 'mender', 'caller', 'mistling', 'keeper', 'thief', 'overgrowth'] as const;
+export const DARK_WISP_LOOKS = ['snuffer', 'shrouder', 'nibbler', 'creeper', 'warden', 'mender', 'caller', 'mistling', 'keeper', 'thief', 'overgrowth',
+  // Lanes variety (Sept 2026): a look for each new kind of wisp.
+  'weaver', 'dasher', 'bulwark', 'frost', 'splitter', 'snatcher'] as const;
 export type DarkWispLook = (typeof DARK_WISP_LOOKS)[number];
 
 

@@ -357,7 +357,16 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
   }, [aim, aimWindow, encounter?.boost, mechanicState, mission, state]);
   // What a wisp took off the board without a merge (a piece it ate) puffs away on the board, never simply vanishing.
   const effectSeq = useRef(0);
-  const effectCells = useMemo(() => (encounter?.effects ?? []).flatMap((effect) => (effect.kind === 'ate' ? [{ id: ++effectSeq.current, cell: effect.cell, kind: 'mist-burst' as const }] : [])), [encounter?.effects]);
+  const effectCells = useMemo(() => (encounter?.effects ?? []).flatMap((effect) => (effect.kind === 'ate' || effect.kind === 'snatched' ? [{ id: ++effectSeq.current, cell: effect.cell, kind: 'mist-burst' as const }] : [])), [encounter?.effects]);
+  // Lanes: plants a frost wisp has frozen (they hold their fire until they thaw) wear the frost.
+  const frozenCells = useMemo(() => {
+    if (mechanicState?.kind !== 'lanes' || !mechanicState.frozen || !aimWindow) return [];
+    const until = mechanicState.frozen;
+    return aimWindow.cellIndices.filter((cell) => {
+      const occupant = state.board[cell]?.occupant;
+      return occupant?.kind === 'item' && (until[occupant.instanceId] ?? 0) > mechanicState.clock;
+    });
+  }, [aimWindow, mechanicState, state.board]);
   // Spores a wisp has dropped: a free cell that turns to Mist unless a piece is put on it.
   const spores = useMemo(() => (mechanicState ? wispViews(mechanic, mission, mechanicState).flatMap((view) => view.spores ?? []) : []), [mechanic, mechanicState, mission]);
   // What every wisp will do after the player's next action, shown on the board before it happens.
@@ -456,6 +465,9 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
     {revealed.map(({ cell, art }) => { const box = cellBox(cell); return box ? <Animated.View key={`seen:${cell}`} entering={ZoomIn.duration(reduceMotion ? 60 : 240)} exiting={FadeOut.duration(160)} pointerEvents="none" accessible accessibilityLabel="Voyagle saw something under this Mist" style={[styles.seenCell, box]}>
       {art ? <Image source={art} style={styles.seenArt} contentFit="contain" transition={0} /> : <IconSymbol name="shippingbox.fill" size={18} color="#FFFFFF" />}
     </Animated.View> : null; })}
+    {frozenCells.map((cell) => { const box = cellBox(cell); return box ? <Animated.View key={`frozen:${cell}`} entering={reduceMotion ? undefined : ZoomIn.duration(200)} exiting={FadeOut.duration(reduceMotion ? 60 : 260)} pointerEvents="none" accessible accessibilityLabel="Frozen: this plant cannot shoot until it thaws" style={[styles.frozenCell, box]}>
+      <View style={styles.frozenBadge}><IconSymbol name="snowflake" size={13} color="#FFFFFF" /></View>
+    </Animated.View> : null; })}
     {pulseCells.map((cell) => { const box = cellBox(cell); return box ? <Animated.View key={`pulse:${cell}`} entering={FadeIn.duration(reduceMotion ? 60 : 140)} exiting={FadeOut.duration(reduceMotion ? 60 : 160)} pointerEvents="none" style={[styles.pulseCell, box]} /> : null; })}
     {spores.map((spore) => { const box = cellBox(spore.cell); return box ? <Animated.View key={`spore:${spore.cell}`} entering={reduceMotion ? undefined : ZoomIn.springify().damping(12)} exiting={reduceMotion ? undefined : ZoomOut.duration(220)} pointerEvents="none" accessible accessibilityLabel={`A spore. It turns to Mist in ${spore.turns} ${spore.turns === 1 ? 'turn' : 'turns'} unless a piece is put here`} style={[styles.sporeCell, box]}>
       <View style={styles.sporeDot}><Text style={styles.sporeText}>{spore.turns}</Text></View>
@@ -517,6 +529,8 @@ const styles = StyleSheet.create({
   intentMove: { borderColor: 'rgba(150,110,210,0.55)', alignItems: 'center', justifyContent: 'center' },
   intentBadge: { margin: 2, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(92,62,140,0.9)' },
   pulseCell: { position: 'absolute', borderRadius: 10, borderWidth: 2, borderColor: 'rgba(255,210,122,0.9)', backgroundColor: 'rgba(255,226,160,0.22)' },
+  frozenCell: { position: 'absolute', borderRadius: 10, borderWidth: 2, borderColor: 'rgba(196,230,255,0.95)', backgroundColor: 'rgba(170,215,255,0.38)', alignItems: 'flex-end', justifyContent: 'flex-start' },
+  frozenBadge: { margin: 2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(90,150,210,0.9)' },
   sporeCell: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   sporeDot: { minWidth: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, backgroundColor: 'rgba(122,92,170,0.85)', borderWidth: 1.5, borderColor: '#E8DDFB' },
   sporeText: { color: '#FFFFFF', fontFamily: AppFontFamilies.fredokaBold, fontSize: 12 },

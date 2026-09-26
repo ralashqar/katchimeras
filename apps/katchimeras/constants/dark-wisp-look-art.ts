@@ -14,4 +14,10 @@ export const DARK_WISP_LOOK_ART: Readonly<Record<DarkWispLook, ImageSourcePropTy
   keeper: require('@incubator/art-cutouts/dark-wisps/keeper.webp'),
   thief: require('@incubator/art-cutouts/dark-wisps/thief.webp'),
   overgrowth: require('@incubator/art-cutouts/dark-wisps/overgrowth.webp'),
+  weaver: require('@incubator/art-cutouts/dark-wisps/weaver.webp'),
+  dasher: require('@incubator/art-cutouts/dark-wisps/dasher.webp'),
+  bulwark: require('@incubator/art-cutouts/dark-wisps/bulwark.webp'),
+  frost: require('@incubator/art-cutouts/dark-wisps/frost.webp'),
+  splitter: require('@incubator/art-cutouts/dark-wisps/splitter.webp'),
+  snatcher: require('@incubator/art-cutouts/dark-wisps/snatcher.webp'),
 };

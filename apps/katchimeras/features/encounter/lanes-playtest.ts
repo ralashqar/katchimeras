@@ -1,5 +1,5 @@
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
-import { laneArrived, laneAlive, laneFire, laneOf, lanesTick } from '@/features/mission-mechanics/lanes';
+import { laneArrived, laneAlive, laneColumn, laneFire, laneOf, lanesTick } from '@/features/mission-mechanics/lanes';
 import { createMechanicState, resolveMechanic } from '@/features/mission-mechanics/mechanic';
 import type { EncounterDefinition } from '@/types/encounter';
 import type { MergeItemDefinition, MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
@@ -69,10 +69,11 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
     const rows: (number | null)[] = Array.from({ length: window.columns }, () => null);
     if (at.mechanicState.kind !== 'lanes') return rows;
     const state = at.mechanicState;
-    mechanic.wisps.forEach((wisp, index) => {
+    mechanic.wisps.forEach((_, index) => {
       if (!laneArrived(mechanic, state, index) || !laneAlive(mechanic, state, index)) return;
       const row = state.wisps[index]!.row;
-      rows[wisp.column] = Math.max(rows[wisp.column] ?? -Infinity, row);
+      const column = laneColumn(mechanic, state, index);
+      rows[column] = Math.max(rows[column] ?? -Infinity, row);
     });
     return rows;
   };

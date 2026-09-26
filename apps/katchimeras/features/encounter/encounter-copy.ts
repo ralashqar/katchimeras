@@ -134,3 +134,19 @@ export function encounterLine(event: EncounterLineEvent, facts: EncounterLineFac
 
 /** Resolve at or under this speaks up. */
 export const LOW_RESOLVE = 3;
+
+/**
+ * The first time a kind of wisp comes down in a battle, Mossprout says what it is and what to do about it (Lanes
+ * variety, Sept 2026). The Mist's voice: no exclamation, the Mist capitalised.
+ */
+export const WISP_KIND_LINES: Readonly<Record<string, string>> = {
+  nibbler: 'A nibbler. It knocks the plant under it down a size.',
+  weaver: 'A weaver. It slides between lanes: cover the ones beside it too.',
+  dasher: 'A dasher. When it gets close, it lunges.',
+  bulwark: 'A bulwark. Nothing beside it can be hurt while it stands. Bring it down first.',
+  mender: 'A mender. It heals the wisps around it. Bring it down fast.',
+  frost: 'A frost wisp. It freezes the plant under it, and that plant stops shooting for a while.',
+  splitter: 'A splitter. When it falls, it bursts into two small ones.',
+  caller: 'A caller. It calls little ones down its lane until it falls.',
+  snatcher: 'A snatcher. It steals the smallest piece under it.',
+};

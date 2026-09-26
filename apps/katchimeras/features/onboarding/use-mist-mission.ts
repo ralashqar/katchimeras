@@ -9,7 +9,7 @@ import type { useOpeningGlow } from '@/components/katchadeck/world/kingdom-openi
 import { abilityFor, abilityReady, partnerAbilityFor, partnerAbilityReady, abilityTargets } from '@/features/encounter/abilities';
 import { encounterMechanicHost } from '@/features/encounter/adapt';
 import { createEncounterState } from '@/features/encounter/create-state';
-import { encounterLine, EXPOSED_WISP_LINE, GATHER_LINE, SPREAD_LINE, KEEP_GOING_RESOLVE, LOW_RESOLVE, THREAT_LINE, WISP_ACT_LINES, WISP_ACT_ORDER } from '@/features/encounter/encounter-copy';
+import { encounterLine, WISP_KIND_LINES, EXPOSED_WISP_LINE, GATHER_LINE, SPREAD_LINE, KEEP_GOING_RESOLVE, LOW_RESOLVE, THREAT_LINE, WISP_ACT_LINES, WISP_ACT_ORDER } from '@/features/encounter/encounter-copy';
 import { lossReason as encounterLossReason, resolveLeft, type EncounterLossReason, type EncounterStatus } from '@/features/encounter/encounter-run';
 import { encounterOutcome, type EncounterOutcome } from '@/features/encounter/outcome';
 import { encounterRunId } from '@/features/encounter/run-id';
@@ -27,6 +27,7 @@ import type { MergeCharacterId, MergeWorldCommand, MergeWorldState } from '@/typ
 import type { MechanicEffect, MissionMechanicLive, MissionMechanicState, MissionStrike } from '@/types/mission-mechanic';
 import { createMissionState, missionBoardStep } from './steppling-mission';
 import { useMissionBoard, type MissionCommandResult } from './use-opening-mission-board';
+import { laneAlive, laneArrived } from '@/features/mission-mechanics/lanes';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 
 /** How long a hero's ability callout stays in the battle's speech bubble. */
@@ -42,6 +43,8 @@ const STALLED_MS = 3000;
 const CACHE_DELAY_MS = 900;
 /** How long a wisp's act is said over the board. */
 const ACT_LINE_MS = 2200;
+/** A new kind of wisp's line stays up long enough to read. */
+const KIND_LINE_MS = 3_400;
 const NO_MISSION_STORAGE_KEY = 'katchimeras.mist-mission.none.v1';
 /** An authored encounter with no guides of its own is free from the first move. */
 const FREE_GUIDES: HatchableMissionDefinition['guides'] = { firstMerge: { eyebrow: '', title: '', body: '' }, wake: { eyebrow: '', title: '', body: '' }, merge: { eyebrow: '', title: '', body: '' }, mergeFallbackTitle: '', free: { eyebrow: '', title: '', body: '' } };
@@ -246,6 +249,26 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
   useEffect(() => { setCacheLine(false); setEffects([]); }, [runId]);
   // v2: what the wisps just did, said for a beat before the friend's own line comes back.
   const [actLine, setActLine] = useState<string | null>(null);
+  // Lanes: the first of each kind of wisp to come down in this battle is named, once, with what it does.
+  const [kindLine, setKindLine] = useState<SpeechLine | null>(null);
+  const kindsSeenRef = useRef<{ runId: string | null; seen: Set<string> }>({ runId: null, seen: new Set() });
+  useEffect(() => {
+    const state = store.mechanicState;
+    if (!host || state?.kind !== 'lanes') return;
+    const mechanic = resolveMechanic(host);
+    if (mechanic.kind !== 'lanes') return;
+    if (kindsSeenRef.current.runId !== runId) kindsSeenRef.current = { runId: runId ?? null, seen: new Set() };
+    const seen = kindsSeenRef.current.seen;
+    const arrived = mechanic.wisps.find((wisp, index) => wisp.look && WISP_KIND_LINES[wisp.look] && !seen.has(wisp.look) && laneArrived(mechanic, state, index) && laneAlive(mechanic, state, index));
+    if (!arrived?.look) return;
+    seen.add(arrived.look);
+    setKindLine({ speaker: 'Mossprout', text: WISP_KIND_LINES[arrived.look]! });
+  }, [host, runId, store.mechanicState]);
+  useEffect(() => {
+    if (!kindLine) return;
+    const timer = setTimeout(() => setKindLine(null), KIND_LINE_MS);
+    return () => clearTimeout(timer);
+  }, [kindLine]);
   useEffect(() => {
     const kinds = new Set(effects.map((effect) => effect.kind));
     const act = WISP_ACT_ORDER.find((kind) => kinds.has(kind));
@@ -273,6 +296,7 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     if (!encounter || !store.run) return null;
     const facts = { remaining: resolveLeft(store.run), katchimera: effectiveLoadout?.companionId ?? null, ability: ability?.definition.name ?? null };
     if (abilityCall && store.status === 'playing') return abilityCall;
+    if (kindLine && store.status === 'playing') return kindLine;
     if (cacheLine) return encounterLine('cacheFound', facts);
     if (actLine && store.status === 'playing') return actLine;
     // A scripted battle says its own lines; otherwise a Lanes sky is where the wisps come from, and nothing is said over it.
@@ -298,7 +322,7 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     if (store.status === 'playing' && Number.isFinite(facts.remaining) && facts.remaining <= LOW_RESOLVE) return encounterLine('lowResolve', facts);
     if (store.status === 'playing' && store.run.actions === 0) return encounterLine('enter', facts);
     return null;
-  }, [ability, abilityCall, actLine, cacheLine, effectiveLoadout?.companionId, encounter, host, store.mechanicState, store.run, store.status]);
+  }, [ability, abilityCall, kindLine, actLine, cacheLine, effectiveLoadout?.companionId, encounter, host, store.mechanicState, store.run, store.status]);
   const onRetry = useCallback(() => setAttempt((value) => value + 1), []);
   const continues = store.run?.resolve.continues ?? 0;
   const onKeepGoing = useCallback(() => {

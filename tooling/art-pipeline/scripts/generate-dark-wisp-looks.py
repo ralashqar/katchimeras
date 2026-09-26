@@ -57,6 +57,19 @@ LOOKS: dict[str, str] = {
              'wrapped around a small bundle of stolen bright pink, yellow and blue flower petals, the only colour on it.',
     'overgrowth': 'A large boss wisp tangled in thick dark green-black vines with sharp thorns and a few dark leaves, '
                   'vines coiling around its body and out to the sides. Heavy, wild, overgrown.',
+    # Lanes variety (Sept 2026): each new kind of wisp reads at a glance by what it does.
+    'weaver': 'A sleek, slender, serpent-like body whose tail becomes two long ribbon-like smoke streamers curving away '
+              'in an S-shape to the left and right, as if it slithers from side to side. Sly narrowed eyes.',
+    'dasher': 'A streamlined teardrop body leaning steeply forward and down, with its smoke swept back into sharp '
+              'streaks behind it like speed lines, and fierce narrowed eyes. It looks about to lunge.',
+    'bulwark': 'A floating ring of five small glowing violet crystal shards orbits around its body like a halo, and a '
+               'faint translucent violet dome of light surrounds it. Round, calm, protective, not holding anything.',
+    'frost': 'A pale frosted lavender and icy blue body with a crown of small sharp icicles on its head, frost '
+             'crystals on its curls and a thin breath of cold white mist from its mouth. Pale icy blue glowing eyes.',
+    'splitter': 'A plump body with a jagged bright glowing crack running straight down its middle from top to bottom, '
+                'as if it is about to split into two halves, with a small curl on each half of its head.',
+    'snatcher': 'A small crouched body with one long, thin, stretchy smoke arm ending in a little three-fingered claw '
+                'hand that clutches a small bright green seed, the only colour on it. Sneaky, mischievous.',
 }
 
 spec = importlib.util.spec_from_file_location('generator', Path(__file__).with_name('generate-katchimera-hex-tile.py'))
