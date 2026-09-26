@@ -3242,7 +3242,15 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (mergeWorldRef.current.companionDiscovery.records.some((record) => record.characterId === 'baristabbit')) setSupplyRunOpen(true);
     else openGlowSource();
   }, [openGlowSource]);
-  const openGoalSource = useCallback((source: GoalNeedSource) => { if (source === 'cafe') openCafe(); else openGlowSource(); }, [openCafe, openGlowSource]);
+  const openGoalSource = useCallback((source: GoalNeedSource, buildingId?: HeroBuildingId) => {
+    if (source === 'cafe') { openCafe(); return; }
+    // A hero held back by their own building: that friend's panel, on its Building tab.
+    if (source === 'building' && buildingId) {
+      const building = HERO_BUILDINGS.find((candidate) => candidate.id === buildingId);
+      if (building) { openFriendPanel(building.companion, 'building'); return; }
+    }
+    openGlowSource();
+  }, [openCafe, openFriendPanel, openGlowSource]);
   const chapterGoalNeed = useMemo(() => (chapterState?.goal ? goalNeed(mergeWorld, chapterState.goal) : null), [chapterState?.goal, mergeWorld]);
   // A light kept on a misted tile while the chapter points there (the lit window): from the opening's camera on.
   // Every friend waiting under their tile's Mist, as a faint silhouette where they will stand: those lost in it from the
@@ -3259,7 +3267,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (!goal) return;
     if (!mergeWorldRef.current.chapterOpeningsSeen?.includes(FIRST_GOAL_COACH_ID)) void markStoredChapterOpened(FIRST_GOAL_COACH_ID).catch(() => undefined);
     // Short of something: straight to where it is earned (the card says what and where).
-    if (chapterGoalNeed) { openGoalSource(chapterGoalNeed.source); return; }
+    if (chapterGoalNeed) { openGoalSource(chapterGoalNeed.source, chapterGoalNeed.buildingId); return; }
     if (goal.action.kind === 'building') { setBuildingPanelId(goal.action.buildingId); return; }
     if (goal.action.kind === 'supply_run') { setSupplyRunOpen(true); return; }
     if (goal.action.kind === 'hero') { openFriendPanel(goal.action.characterId, 'hero'); return; }

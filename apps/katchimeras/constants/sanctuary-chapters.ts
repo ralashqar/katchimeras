@@ -199,7 +199,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     id: 'seed-keeper', number: 6, title: 'The Seed Keeper', islandId: 'seed-nursery', campaignId: 'island-campaign:blossle-nursery',
     friend: 'Blossle', color: '#F5C26B', place: 'the Seed Nursery', heartTree: 4,
     building: { id: 'fern-thicket', title: 'Build Fernip\u2019s Thicket', detail: 'Fernip wants to put down roots. The Thicket tangles the wisps, so they come down slower in every battle.' },
-    train: { characterId: 'mossprout', name: 'Mossprout', level: 3, why: 'The Nursery’s wisps are old ones. Mossprout has to be ready for them.' },
+    train: { characterId: 'mossprout', name: 'Mossprout', level: 4, why: 'The Nursery’s wisps are old ones. Mossprout has to be ready for them.' },
     opening: { title: 'A Lantern in the Beds', lines: [
       { speaker: 'fernip', text: 'There’s a light in the old Nursery beds. A little lantern, going on and off.' },
       { speaker: 'mossprout', text: 'Someone’s been keeping the seeds safe in there. All this time.' },

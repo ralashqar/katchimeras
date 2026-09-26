@@ -2,14 +2,16 @@ import { hatchableByTile } from '@/constants/hatchable-companions/registry';
 import type { ChapterGoal } from '@/constants/sanctuary-chapters';
 import { buildingUpgradeModel, companionUpgradeModel, heartTreeUpgradeModel, heroBuildingUpgradeModel, type UpgradePanelModel } from '@/features/upgrade-stage/upgrade-panel-model';
 import type { MergeWorldState } from '@/types/merge-world';
+import { heroBuildingForCompanion, type HeroBuildingId } from '@/constants/hero-buildings';
 import { battleSourceCampaign } from './battle-source';
 
 /**
  * Where a missing thing is earned: battles on the latest friend island (Glow and XP; `battleSourceCampaign`), or the
  * Caf\u00e9 (Timber and Meals, and Glow before any island is cleared). Never the old Grove.
  */
-export type GoalNeedSource = 'battle' | 'cafe';
-export type GoalNeed = { text: string; source: GoalNeedSource };
+export type GoalNeedSource = 'battle' | 'cafe' | 'building';
+/** `building`: a hero held back by their own building (the Lodge): the goal card opens that building. */
+export type GoalNeed = { text: string; source: GoalNeedSource; buildingId?: HeroBuildingId };
 
 /** The first goal's pointer, remembered with the chapter openings once the card has been tapped. */
 export const FIRST_GOAL_COACH_ID = 'coach:first-goal';
@@ -45,6 +47,19 @@ export function goalNeed(world: MergeWorldState, goal: ChapterGoal): GoalNeed | 
     return { text: `Needs ${short} more XP \u00b7 ${battles ? `battle at ${battles.place}` : 'win battles'}`, source: 'battle' };
   }
   if (missing.id === 'glow') return glowNeed(world, short);
+  // A hero grows no further than one past their own building: the building first. When the building is itself short
+  // of something, that is what the card says (and where it sends); otherwise the card opens the building.
+  if (missing.id === 'building' && action.kind === 'hero') {
+    const building = heroBuildingForCompanion(action.characterId);
+    if (!building) return null;
+    const upgrade = heroBuildingUpgradeModel(world, building.id);
+    const blocking = upgrade.requirements.find((requirement) => !requirement.met);
+    if (blocking && !upgrade.locked) {
+      const inner = goalNeed(world, { ...goal, action: { kind: 'hero_building', id: building.id } });
+      if (inner) return { ...inner, text: `${building.name} first: ${inner.text.charAt(0).toLowerCase()}${inner.text.slice(1)}` };
+    }
+    return { text: `Needs ${building.name} at level ${missing.total ?? 0} \u00b7 upgrade it`, source: 'building', buildingId: building.id };
+  }
   return null;
 }
 
