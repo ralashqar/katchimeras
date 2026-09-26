@@ -1,3 +1,4 @@
+import { PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -10,7 +11,10 @@ import { createInitialMergeWorldState } from '@/utils/merge-world/engine';
 import { NOW, PLANT, SEED, SPROUT, itemAt, makeEncounter, mistAt, move, play, startPlay } from './helpers/encounter';
 
 test('every playable Katchimera has one ability whose tiers climb with the level and hold between them', () => {
-  assert.deepEqual(COMPANION_ABILITIES.map((ability) => [ability.companion, ability.id]), [['mossprout', 'bloom'], ['steppling', 'clear-path'], ['baristabbit', 'focus'], ['shellio', 'ripple'], ['voyagle', 'scout']]);
+  assert.deepEqual(COMPANION_ABILITIES.map((ability) => [ability.companion, ability.id]), [['mossprout', 'bloom'], ['steppling', 'clear-path'], ['baristabbit', 'focus'], ['shellio', 'ripple'], ['voyagle', 'scout'],
+    // Every friend brought home is a hero (cozy 4X v2, Phase 5): their abilities act on a Lanes battle.
+    ['petalimp', 'petal-burst'], ['fernip', 'vine-snare'], ['feastle', 'second-helpings'], ['blossle', 'seedkeeper'], ['drizzlet', 'rainfall'], ['amberleaf', 'falling-leaves'], ['mistle', 'forget']]);
+  for (const id of PLAYABLE_KATCHIMERAS) assert.equal(COMPANION_ABILITIES.filter((ability) => ability.companion === id).length, 1, `${id} has exactly one ability`);
   for (const ability of COMPANION_ABILITIES) {
     assert.equal(ability.tiers[0]!.level, 1, `${ability.id}: level 1 is authored`);
     for (let index = 1; index < ability.tiers.length; index += 1) {
@@ -24,9 +28,9 @@ test('every playable Katchimera has one ability whose tiers climb with the level
   assert.equal(abilityTier(bloom, 3).maxTier, 3);
   assert.equal(abilityTier(bloom, 4).clearsAdjacentLight, true);
   assert.equal(abilityTier(bloom, 6).twoTargets, true, 'level 6 holds level 5’s tier');
-  assert.equal(abilityForCompanion('feastle'), null);
+  assert.equal(abilityForCompanion('flexel'), null, 'a friend who is not a hero has none');
   assert.equal(abilityFor(null), null);
-  assert.equal(abilityFor({ companionId: 'petalimp' as never, level: 3 }), null);
+  assert.equal(abilityFor({ companionId: 'petalimp' as never, level: 3 })?.definition.id, 'petal-burst', 'an island friend brings theirs');
 });
 
 test('Bloom charges one per merge, raises one plant a step within its tier, and clears light Mist beside it from level four', () => {

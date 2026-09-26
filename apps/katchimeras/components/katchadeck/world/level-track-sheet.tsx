@@ -4,7 +4,7 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { UpgradeDock, useUpgradeDockMotion } from '@/components/katchadeck/upgrade/upgrade-dock';
 import { DIFFICULTY_LABELS, UpgradeLoadoutRow, type EncounterLoadoutChoice } from '@/components/katchadeck/upgrade/upgrade-mission-rows';
 import { UpgradeActionRow, UpgradeHero, UpgradeSection } from '@/components/katchadeck/upgrade/upgrade-rows';
-import { PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
+import { playableHeroes } from '@/constants/katchimera-progression';
 import type { LevelNode, LevelTrack, TrackPrimary } from '@/features/level-tracks/level-track';
 import type { UpgradeStageLayout } from '@/features/upgrade-stage/upgrade-stage-layout';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
@@ -43,7 +43,7 @@ export function LevelTrackSheet({ track, world, layout, bottomInset, ownedWispId
   onClose: () => void;
 }) {
   const motion = useUpgradeDockMotion({ busy, onClose });
-  const playable = PLAYABLE_KATCHIMERAS.filter((id) => id === 'mossprout' || world.unlockedCharacters.includes(id));
+  const playable = playableHeroes(world);
   const remembered = world.encounters?.loadout;
   const [loadout, setLoadout] = useState<EncounterLoadoutChoice>(() => withPartner(world, { katchimeraId: (remembered && playable.includes(remembered.katchimeraId) ? remembered.katchimeraId : 'mossprout') as MergeCharacterId, helperWispId: remembered?.helperWispId ?? null, partnerId: remembered?.partnerId ?? null }, playable));
   const nextNode = track.primary.kind === 'play' ? track.primary.node : null;

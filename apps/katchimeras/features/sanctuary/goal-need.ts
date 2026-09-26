@@ -13,7 +13,7 @@ import { frontierOpen, nextFrontierTile } from '@/constants/frontier-tiles';
  */
 export type GoalNeedSource = 'frontier' | 'battle' | 'cafe' | 'building';
 /** `building`: a hero held back by their own building (the Lodge): the goal card opens that building. `frontier`: that tile's battle. */
-export type GoalNeed = { text: string; source: GoalNeedSource; buildingId?: HeroBuildingId; tileId?: string };
+export type GoalNeed = { text: string; source: GoalNeedSource; buildingId?: HeroBuildingId; tileId?: string; /** The hero short of experience: the battle it sends to brings them. */ heroId?: string };
 
 /** The first goal's pointer, remembered with the chapter openings once the card has been tapped. */
 export const FIRST_GOAL_COACH_ID = 'coach:first-goal';
@@ -45,10 +45,11 @@ export function goalNeed(world: MergeWorldState, goal: ChapterGoal): GoalNeed | 
     return home(world, 'baristabbit') ? { text: `Needs ${short} more ${what} \u00b7 serve at the Caf\u00e9`, source: 'cafe' } : { text: `Needs ${short} more ${what}`, source: 'battle' };
   }
   if (missing.id === 'xp') {
+    const heroId = action.kind === 'hero' ? action.characterId : undefined;
     const frontier = frontierBattle(world);
-    if (frontier) return { text: `Needs ${short} more XP \u00b7 take back the Frontier`, source: 'frontier', tileId: frontier };
+    if (frontier) return { text: `Needs ${short} more XP \u00b7 take back the Frontier`, source: 'frontier', tileId: frontier, ...(heroId ? { heroId } : {}) };
     const battles = battleSourceCampaign(world);
-    return { text: `Needs ${short} more XP \u00b7 ${battles ? `battle at ${battles.place}` : 'win battles'}`, source: 'battle' };
+    return { text: `Needs ${short} more XP \u00b7 ${battles ? `battle at ${battles.place}` : 'win battles'}`, source: 'battle', ...(heroId ? { heroId } : {}) };
   }
   if (missing.id === 'glow') return glowNeed(world, short);
   // A hero grows no further than one past their own building: the building first. When the building is itself short

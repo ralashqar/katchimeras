@@ -17,7 +17,7 @@ import {
 import { isMistLevel, regionRung } from '@/constants/island-campaigns/ladder';
 import type { IslandCampaignDefinition } from '@/constants/island-campaigns/types';
 import { islandCampaignForOffer } from '@/constants/island-campaigns/registry';
-import { isPlayableKatchimera, katchimeraLevel, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
+import { katchimeraLevel, playableHeroes } from '@/constants/katchimera-progression';
 import { heartwoodBuildingLevel } from '@/constants/heartwood-buildings';
 import { sanctuaryChapterState, SANCTUARY_CHAPTERS, type ChapterGoal } from '@/constants/sanctuary-chapters';
 import { defaultPartner, heroSlots } from '@/features/encounter/team';
@@ -56,8 +56,7 @@ type Log = string[];
 type Pace = { battles: number; orders: number; steps: number };
 
 /** The heroes who can come into a battle (the Kingdom's `playableHeroes`): Mossprout, and every playable friend who is home. */
-const playableHeroes = (world: MergeWorldState): MergeCharacterId[] => PLAYABLE_KATCHIMERAS.filter((id) => id === 'mossprout'
-  || world.unlockedCharacters.includes(id) || world.companionDiscovery.records.some((record) => record.characterId === id));
+// One rule for who can fight (`playableHeroes`), shared with the Kingdom.
 
 const CONVERSATION_IDS = new Set(ALL_ISLAND_CAMPAIGN_CONVERSATION_DEFINITIONS.map((definition) => definition.id));
 const STEP_CAP = 3000;
@@ -204,13 +203,18 @@ test('a new player plays the main quest from Steppling home to the last chapter 
     assert.ok(state === 'misted' || state === 'contested', `${tileId} is not in the light or is already ours`);
     const mission = state === 'contested' ? frontierRetakeMission(tile) : frontierMission(tile);
     assert.equal(mission.encounter?.mechanic?.kind, 'lanes', `every battle is plants that shoot: ${mission.id}`);
-    const lead = want && isPlayableKatchimera(want) ? want : 'mossprout';
+    // As the Kingdom does: the hero the card is training comes along (the partner once two go in).
+    const heroes = playableHeroes(world);
+    if (want) assert.ok(heroes.includes(want), `the card wants ${want} trained, who is not home`);
+    const twoGo = heroSlots(world) >= 2;
+    const lead: MergeCharacterId = want && !twoGo ? want : 'mossprout';
+    const partnerId = twoGo ? (want && want !== lead ? want : defaultPartner(world, lead, heroes)) : null;
     now += 3 * MINUTE;
     const runId = `run:${now}`;
-    apply({ type: 'startEncounter', missionId: mission.id, runId, katchimeraId: lead, helperWispId: null, partnerId: null, now } as MergeWorldCommand, `enter ${mission.title}`);
+    apply({ type: 'startEncounter', missionId: mission.id, runId, katchimeraId: lead, helperWispId: null, partnerId, now } as MergeWorldCommand, `enter ${mission.title}`);
     log.pop();
-    const result = apply({ type: 'completeEncounter', receiptId: `encounter:${runId}`, missionId: mission.id, katchimeraId: lead, helperWispId: null, partnerId: null,
-      outcome: { cleared: true, grade: 'bright' } as never, difficulty: mission.difficulty, base: mission.rewards, now } as MergeWorldCommand, `frontier ${tile.id} “${mission.title}” (${lead})`);
+    const result = apply({ type: 'completeEncounter', receiptId: `encounter:${runId}`, missionId: mission.id, katchimeraId: lead, helperWispId: null, partnerId,
+      outcome: { cleared: true, grade: 'bright' } as never, difficulty: mission.difficulty, base: mission.rewards, now } as MergeWorldCommand, `frontier ${tile.id} “${mission.title}” (${lead}${partnerId ? ` + ${partnerId}` : ''})`);
     tally().battles += 1;
     assert.equal(result.encounterCleared?.reclaimed?.tileId, tile.id, `${tile.id} was won but not taken back`);
   };

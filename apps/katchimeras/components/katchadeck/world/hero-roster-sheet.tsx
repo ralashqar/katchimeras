@@ -6,7 +6,7 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { abilityForCompanion } from '@/constants/companion-abilities';
 import { heroBuildingForCompanion, heroBuildingLevel, type HeroBuildingId } from '@/constants/hero-buildings';
-import { katchimeraProgress } from '@/constants/katchimera-progression';
+import { katchimeraProgress, isPlayableKatchimera } from '@/constants/katchimera-progression';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { KatchaUI } from '@/constants/katcha-ui';
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
@@ -48,7 +48,7 @@ export function HeroRosterSheet({ world, onClose, onTrain, onBuilding }: {
             {ability ? <Text style={styles.detail} numberOfLines={2}>{ability.name}: {ability.description}</Text> : null}
             {building ? <Text style={styles.building}>{building.name} {buildingLevel > 0 ? `· Lv. ${buildingLevel}` : '· not built yet'}</Text> : null}
             <View style={styles.actions}>
-              <KatchaButton size="compact" label="Train" onPress={() => onTrain(id)} />
+              {isPlayableKatchimera(id) ? <KatchaButton size="compact" label="Train" onPress={() => onTrain(id)} /> : null}
               {building ? <KatchaButton size="compact" glow={buildingLevel === 0} label={buildingLevel === 0 ? 'Build' : building.name.split(' ').slice(-1)[0]!} onPress={() => onBuilding(building.id)} /> : null}
             </View>
           </View>

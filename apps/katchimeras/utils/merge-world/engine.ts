@@ -1,3 +1,4 @@
+import { ISLAND_HEROES } from '@/constants/katchimera-progression';
 import { dailySurgeTakes, FIRST_SURGE_TAKES, FRONTIER_RETAKE_TIMBER, frontierHeldCount, frontierLodgeStoreBonus, frontierReclaimTimber, frontierTileById, frontierTileContested, frontierTileIdForMission, frontierTileIdForRetake, mistSurgePicks, SURGE_DEFENCE_MISSION_ID } from '@/constants/frontier-tiles';
 import { HERO_BUILDING_MAX_LEVEL, heroBuildingById, heroCompanionHome, heroBuildingCost, heroBuildingForCompanion, heroBuildingLevel, heroLevelCap, LODGE_PRODUCTION_INTERVAL_MS, lodgeTimberStore, lodgeTimberWaiting, type HeroBuildingId } from '@/constants/hero-buildings';
 import { buildingLevelCap, heartTreeCost, heartTreeLevel } from '@/constants/heart-tree';
@@ -194,6 +195,8 @@ import {
 import { isDevHavenOrderFiller } from '@/utils/merge-world/dev-haven-order-fillers';
 
 const KNOWN_CHARACTERS = new Set<MergeCharacterId>(MERGE_CHARACTER_IDS);
+/** Who can fight and train: every merge character, and the island friends under their form's id (`ISLAND_HEROES`). */
+const KNOWN_HEROES = new Set<MergeCharacterId>([...MERGE_CHARACTER_IDS, ...Object.keys(ISLAND_HEROES)]);
 const RECENT_ORDER_LIMIT = 8;
 const DISCOVERY_EVENT_LIMIT = 100;
 const DISCOVERY_FIRST_ORDER_COPY: Partial<Record<MergeCharacterId, { title: string; description: string }>> = {
@@ -1723,11 +1726,11 @@ const EMPTY_ENCOUNTER_LEDGER: EncounterLedger = { receipts: [], clears: {}, acti
 const encounterLedger = (state: MergeWorldState): EncounterLedger => state.encounters ?? EMPTY_ENCOUNTER_LEDGER;
 
 function startEncounter(state: MergeWorldState, command: Extract<MergeWorldCommand, { type: 'startEncounter' }>): MergeWorldCommandResult {
-  if (!KNOWN_CHARACTERS.has(command.katchimeraId)) return unchanged(state, 'That Katchimera is not here.');
+  if (!KNOWN_HEROES.has(command.katchimeraId)) return unchanged(state, 'That Katchimera is not here.');
   const ledger = encounterLedger(state);
   if (ledger.active?.missionId === command.missionId && ledger.active.runId === command.runId) return unchanged(state);
   const active = { missionId: command.missionId, runId: command.runId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), katchimeraId: command.katchimeraId, helperWispId: command.helperWispId, startedAt: command.now };
-  const partnerId = command.partnerId && command.partnerId !== command.katchimeraId && KNOWN_CHARACTERS.has(command.partnerId) ? command.partnerId : null;
+  const partnerId = command.partnerId && command.partnerId !== command.katchimeraId && KNOWN_HEROES.has(command.partnerId) ? command.partnerId : null;
   return changed(touch({ ...state, encounters: { ...ledger, active, loadout: { katchimeraId: command.katchimeraId, helperWispId: command.helperWispId, ...(partnerId ? { partnerId } : {}) } } }, command.now));
 }
 
@@ -1762,7 +1765,7 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
   const ledger = encounterLedger(state);
   if (ledger.receipts.includes(command.receiptId)) return unchanged(state);
   if (!command.outcome.cleared) return unchanged(state, 'The Mist is still there.');
-  if (!KNOWN_CHARACTERS.has(command.katchimeraId)) return unchanged(state, 'That Katchimera is not here.');
+  if (!KNOWN_HEROES.has(command.katchimeraId)) return unchanged(state, 'That Katchimera is not here.');
   const previous = ledger.clears[command.missionId];
   const firstClear = !previous;
   const perk = wispPerk(command.helperWispId);
@@ -1778,7 +1781,7 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
   const clears = { ...ledger.clears, [command.missionId]: { firstClearedAt: previous?.firstClearedAt ?? command.now, clears: (previous?.clears ?? 0) + 1, bestGrade, lastKatchimeraId: command.katchimeraId } };
   const progress = katchimeraProgress(state, command.katchimeraId);
   // Both heroes who were there learn from it: the lead and, with the second slot open, their partner.
-  const partnerId = command.partnerId && command.partnerId !== command.katchimeraId && KNOWN_CHARACTERS.has(command.partnerId) ? command.partnerId : null;
+  const partnerId = command.partnerId && command.partnerId !== command.katchimeraId && KNOWN_HEROES.has(command.partnerId) ? command.partnerId : null;
   const partnerProgress = partnerId ? katchimeraProgress(state, partnerId) : null;
   const katchimeraProgressNext = { ...state.katchimeraProgress, [command.katchimeraId]: { ...progress, xp: progress.xp + paid.xp }, ...(partnerId && partnerProgress ? { [partnerId]: { ...partnerProgress, xp: partnerProgress.xp + paid.xp } } : {}) };
   const receipts = [...ledger.receipts, command.receiptId].slice(-200);
@@ -1863,7 +1866,7 @@ function ackEncounterOutcome(state: MergeWorldState, now: number): MergeWorldCom
 }
 
 function upgradeKatchimera(state: MergeWorldState, characterId: MergeCharacterId, expectedLevel: number, now: number): MergeWorldCommandResult {
-  if (!KNOWN_CHARACTERS.has(characterId)) return unchanged(state, 'That Katchimera is not here.');
+  if (!KNOWN_HEROES.has(characterId)) return unchanged(state, 'That Katchimera is not here.');
   const progress = katchimeraProgress(state, characterId);
   // A second tap, or a request made against an older world: already done.
   if (progress.level !== expectedLevel) return unchanged(state);
@@ -4839,7 +4842,7 @@ function normalizeKatchimeraProgress(value: unknown, now: number): NonNullable<M
   if (!value || typeof value !== 'object') return progress;
   for (const [id, raw] of Object.entries(value)) {
     const record = raw as Partial<KatchimeraProgress> | null;
-    if (!record || !KNOWN_CHARACTERS.has(id as MergeCharacterId)) continue;
+    if (!record || !KNOWN_HEROES.has(id as MergeCharacterId)) continue;
     progress[id as MergeCharacterId] = { level: Math.max(1, Math.min(KATCHIMERA_PROGRESS_MAX_LEVEL, Math.floor(finite(record.level, 1)))), xp: Math.max(0, Math.floor(finite(record.xp, 0))), upgradedAt: record.upgradedAt == null ? null : finite(record.upgradedAt, now) };
   }
   return progress;

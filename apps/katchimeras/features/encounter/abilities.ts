@@ -7,6 +7,8 @@ import type { EncounterLoadout } from '@/types/encounter';
 import type { MergeItemDefinition, MergeWorldState } from '@/types/merge-world';
 import type { EncounterRunState } from './encounter-run';
 import { openMistCell, windowNeighbours, type MistOpened } from './mist';
+import { applyLaneAbility, type LaneAbilityEffect, type LaneAbilityInput } from './lane-abilities';
+import type { LanesState } from '@/features/mission-mechanics/lanes';
 
 /** The ability the loadout brings, at the Katchimera's level. */
 export function abilityFor(loadout: EncounterLoadout | null): { definition: CompanionAbilityDefinition; tier: CompanionAbilityTier } | null {
@@ -34,6 +36,8 @@ export function applyPartnerAbility(definition: CompanionAbilityDefinition, tier
 }
 
 export type AbilityEffect =
+  /** A friend's Lanes ability (`lane-abilities.ts`): what it did to the battle in play. */
+  | { kind: 'lane'; effect: LaneAbilityEffect }
   | { kind: 'bloomed'; cell: number; definitionId: string }
   /** Clear Path: one Mist cell cleared outright (what it held comes out). */
   | { kind: 'cleared'; opened: MistOpened }
@@ -114,4 +118,23 @@ export function applyAbility(definition: CompanionAbilityDefinition, tier: Compa
     if (second) raise(second.cell);
   }
   return effects.length ? { board: next, run: spent, effects } : null;
+}
+
+/**
+ * An ability used in a battle: a friend's Lanes ability acts on the battle in play (`applyLaneAbility`, needing the
+ * lanes), every other on the board (`applyAbility`). The lanes after come back with it when they changed.
+ */
+export function applyBattleAbility(definition: CompanionAbilityDefinition, tier: CompanionAbilityTier, board: MergeWorldState, window: MissionWindow, run: EncounterRunState, target: number | null, lanes: LaneAbilityInput | null): { board: MergeWorldState; run: EncounterRunState; effects: AbilityEffect[]; lanes?: LanesState } | null {
+  if (!definition.lanes) return applyAbility(definition, tier, board, window, run, target);
+  if (!lanes || !abilityReady(run, tier)) return null;
+  const applied = applyLaneAbility(definition, tier, board, window, lanes);
+  if (!applied) return null;
+  return { board: applied.board, run: { ...run, ability: { charge: 0, uses: run.ability!.uses + 1 } }, effects: applied.effects.map((effect) => ({ kind: 'lane' as const, effect })), lanes: applied.lanes };
+}
+
+/** The partner's, on the partner's meter (`applyPartnerAbility`, for any ability). */
+export function applyPartnerBattleAbility(definition: CompanionAbilityDefinition, tier: CompanionAbilityTier, board: MergeWorldState, window: MissionWindow, run: EncounterRunState, target: number | null, lanes: LaneAbilityInput | null) {
+  if (!run.partnerAbility) return null;
+  const applied = applyBattleAbility(definition, tier, board, window, { ...run, ability: run.partnerAbility }, target, lanes);
+  return applied ? { ...applied, run: { ...applied.run, ability: run.ability, partnerAbility: applied.run.ability } } : null;
 }

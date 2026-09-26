@@ -14,7 +14,33 @@ export const KATCHIMERA_LEVEL_GLOW: readonly number[] = [15, 30, 50, 80, 120, 17
 /** Meals to go from a level to the next (index = level - 1): a fed team is a strong team. Earned at the Café. */
 // Light at first (Sept 2026: the Café is being introduced): one order feeds Mossprout's first level.
 export const KATCHIMERA_LEVEL_MEALS: readonly number[] = [3, 6, 12, 20, 30, 42, 56, 72, 90];
-export const PLAYABLE_KATCHIMERAS: readonly MergeCharacterId[] = ['mossprout', 'steppling', 'baristabbit', 'shellio', 'voyagle'];
+/**
+ * The island friends play under their own form's id (a form of Mossprout's family, never a merge character): home, and
+ * a hero, once their island's campaign brings them home (its card earned).
+ */
+export const ISLAND_HEROES: Readonly<Record<string, string>> = {
+  petalimp: 'island-campaign:petalimp-bloom',
+  fernip: 'island-campaign:fernip-wildgrowth',
+  blossle: 'island-campaign:blossle-nursery',
+  drizzlet: 'island-campaign:drizzlet-pond',
+  amberleaf: 'island-campaign:amberleaf-orchard',
+  mistle: 'island-campaign:mistle-ancient-tree',
+};
+/** Every friend brought home is a hero (cozy 4X v2, Phase 5): each with an ability (`constants/companion-abilities.ts`). */
+export const PLAYABLE_KATCHIMERAS: readonly MergeCharacterId[] = ['mossprout', 'steppling', 'baristabbit', 'feastle', ...Object.keys(ISLAND_HEROES), 'shellio', 'voyagle'];
+
+/** Whether a hero is home: Mossprout always; a rescued friend once found; an island friend once their island brings them. */
+export function heroHome(world: Pick<MergeWorldState, 'unlockedCharacters' | 'companionDiscovery' | 'islandCampaigns'>, id: MergeCharacterId): boolean {
+  if (id === 'mossprout') return true;
+  const campaignId = ISLAND_HEROES[id];
+  if (campaignId) return world.islandCampaigns?.[campaignId]?.cardEarnedAt != null;
+  return world.unlockedCharacters.includes(id) || world.companionDiscovery.records.some((record) => record.characterId === id);
+}
+
+/** The heroes who can go into battle now: every playable friend who is home. One rule for every screen. */
+export function playableHeroes(world: Pick<MergeWorldState, 'unlockedCharacters' | 'companionDiscovery' | 'islandCampaigns'>): MergeCharacterId[] {
+  return PLAYABLE_KATCHIMERAS.filter((id) => heroHome(world, id));
+}
 
 export const isPlayableKatchimera = (id: string): id is MergeCharacterId => (PLAYABLE_KATCHIMERAS as readonly string[]).includes(id);
 

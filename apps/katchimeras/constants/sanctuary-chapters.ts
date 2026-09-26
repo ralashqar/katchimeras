@@ -219,7 +219,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   friendChapter({
     id: 'wild-tangle', number: 5, title: 'The Wild Tangle', islandId: 'wildgrowth-grove', campaignId: 'island-campaign:fernip-wildgrowth',
     friend: 'Fernip', color: '#7ED67A', place: 'the Wildgrowth Grove', heartTree: 3, frontier: 8,
-    train: { characterId: 'steppling', name: 'Steppling', level: 3, why: 'The Grove is a maze. Steppling finds the way through, if he’s strong enough.' },
+    train: { characterId: 'petalimp', name: 'Petalimp', level: 2, why: 'Petalimp’s Petal Burst fills a board with Sprouts. Take her into battle, and train her before the Wildgrowth.' },
     opening: { title: 'Something Growing', lines: [
       { speaker: 'petalimp', text: 'Look, over the Wildgrowth! Green light, and it’s moving.' },
       { speaker: 'steppling', text: 'That’s not a flare. That’s someone growing their way out.' },
@@ -231,7 +231,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     id: 'seed-keeper', number: 6, title: 'The Seed Keeper', islandId: 'seed-nursery', campaignId: 'island-campaign:blossle-nursery',
     friend: 'Blossle', color: '#F5C26B', place: 'the Seed Nursery', heartTree: 4, frontier: 12,
     building: { id: 'fern-thicket', title: 'Build Fernip\u2019s Thicket', detail: 'Fernip wants to put down roots. The Thicket tangles the wisps, so they come down slower in every battle.' },
-    train: { characterId: 'mossprout', name: 'Mossprout', level: 4, why: 'The Nursery’s wisps are old ones. Mossprout has to be ready for them.' },
+    train: { characterId: 'fernip', name: 'Fernip', level: 2, why: 'Fernip’s Vine Snare holds a wisp still. The Nursery’s old wisps will need holding.' },
     opening: { title: 'A Lantern in the Beds', lines: [
       { speaker: 'fernip', text: 'There’s a light in the old Nursery beds. A little lantern, going on and off.' },
       { speaker: 'mossprout', text: 'Someone’s been keeping the seeds safe in there. All this time.' },
@@ -242,7 +242,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   friendChapter({
     id: 'still-water', number: 7, title: 'Still Water', islandId: 'pond-sanctuary', campaignId: 'island-campaign:drizzlet-pond',
     friend: 'Drizzlet', color: '#7CC8F2', place: 'the Pond Sanctuary', heartTree: 5, frontier: 16,
-    train: { characterId: 'steppling', name: 'Steppling', level: 4, why: 'The paths around the Pond are drowned in Mist. Steppling needs his longest stride.' },
+    train: { characterId: 'blossle', name: 'Blossle', level: 2, why: 'Blossle kept every Seed. In battle, she makes them grow. Train her before the Pond.' },
     opening: { title: 'Rain Where There Is No Cloud', lines: [
       { speaker: 'blossle', text: 'It’s raining over the Pond. Just there. Nowhere else.' },
       { speaker: 'steppling', text: 'Rain doesn’t do that. Somebody’s doing that.' },
@@ -253,7 +253,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   friendChapter({
     id: 'the-orchard', number: 8, title: 'The Last Harvest', islandId: 'orchard-grove', campaignId: 'island-campaign:amberleaf-orchard',
     friend: 'Amberleaf', color: '#F2A33C', place: 'the Orchard', heartTree: 6, frontier: 19,
-    train: { characterId: 'mossprout', name: 'Mossprout', level: 5, why: 'The Orchard’s wisps have been feeding for a long time. Only a strong light will move them.' },
+    train: { characterId: 'drizzlet', name: 'Drizzlet', level: 2, why: 'Drizzlet’s Rainfall washes the Mist away and pushes the wisps back. The Orchard needs rain.' },
     opening: { title: 'Autumn in the Mist', lines: [
       { speaker: 'drizzlet', text: 'The Orchard’s turned gold. In the middle of all that grey.' },
       { speaker: 'fernip', text: 'Someone’s holding the last of the harvest there. Holding it tight.' },
@@ -264,7 +264,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
   friendChapter({
     id: 'the-oldest-tree', number: 9, title: 'The Oldest Tree', islandId: 'ancient-tree-grove', campaignId: 'island-campaign:mistle-ancient-tree',
     friend: 'Mistle', color: '#B99CF2', place: 'the Ancient Grove', heartTree: 7, frontier: 23,
-    train: { characterId: 'steppling', name: 'Steppling', level: 6, why: 'Nobody has walked to the Ancient Grove in a very long time. Steppling will have to be the first.' },
+    train: { characterId: 'amberleaf', name: 'Amberleaf', level: 2, why: 'Amberleaf’s Falling Leaves strike every wisp at once. The Ancient Grove’s are the oldest of all.' },
     opening: { title: 'The Oldest Light', lines: [
       { speaker: 'amberleaf', text: 'Do you see it? At the very edge, by the oldest tree.' },
       { speaker: 'mossprout', text: 'That light… I remember it. From before the Mist.' },

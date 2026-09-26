@@ -27,6 +27,10 @@ import type { MergeCharacterId, MergeWorldCommand, MergeWorldState } from '@/typ
 import type { MechanicEffect, MissionMechanicLive, MissionMechanicState, MissionStrike } from '@/types/mission-mechanic';
 import { createMissionState, missionBoardStep } from './steppling-mission';
 import { useMissionBoard, type MissionCommandResult } from './use-opening-mission-board';
+import { katchimeraSkinById } from '@/constants/katchimera-skins';
+
+/** How long a hero's ability callout stays in the battle's speech bubble. */
+const ABILITY_CALL_MS = 1_800;
 
 /** After a finale lands: the struck wisp's fall (shrink, burst) before the mission is declared over. */
 export const WISP_FALL_MS = 640;
@@ -263,9 +267,12 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     return { definition: found.definition, tier: found.tier, charge: store.run.partnerAbility?.charge ?? 0, ready: partnerAbilityReady(store.run, found.tier), targets: abilityTargets(found.definition, found.tier, store.state, window), companionId: effectiveLoadout.partner.companionId };
   }, [effectiveLoadout, encounter, store.run, store.state, window]);
   const outcome = useMemo(() => (encounter && store.run && store.status ? encounterOutcome(encounter, store.run, store.status) : null), [encounter, store.run, store.status]);
+  // A hero using their ability says so, for a moment, in the battle's speech bubble.
+  const [abilityCall, setAbilityCall] = useState<SpeechLine | null>(null);
   const speech = useMemo(() => {
     if (!encounter || !store.run) return null;
     const facts = { remaining: resolveLeft(store.run), katchimera: effectiveLoadout?.companionId ?? null, ability: ability?.definition.name ?? null };
+    if (abilityCall && store.status === 'playing') return abilityCall;
     if (cacheLine) return encounterLine('cacheFound', facts);
     if (actLine && store.status === 'playing') return actLine;
     // A scripted battle says its own lines; otherwise a Lanes sky is where the wisps come from, and nothing is said over it.
@@ -291,7 +298,7 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     if (store.status === 'playing' && Number.isFinite(facts.remaining) && facts.remaining <= LOW_RESOLVE) return encounterLine('lowResolve', facts);
     if (store.status === 'playing' && store.run.actions === 0) return encounterLine('enter', facts);
     return null;
-  }, [ability, actLine, cacheLine, effectiveLoadout?.companionId, encounter, host, store.mechanicState, store.run, store.status]);
+  }, [ability, abilityCall, actLine, cacheLine, effectiveLoadout?.companionId, encounter, host, store.mechanicState, store.run, store.status]);
   const onRetry = useCallback(() => setAttempt((value) => value + 1), []);
   const continues = store.run?.resolve.continues ?? 0;
   const onKeepGoing = useCallback(() => {
@@ -299,7 +306,19 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     // Paid once per loss of this attempt: the receipt names the attempt and which continue it is.
     void payKeepGoing(`continue:${runId}:${continues}`).then((paid) => { if (paid) keepGoing(KEEP_GOING_RESOLVE); }).catch(() => undefined);
   }, [continues, keepGoing, payKeepGoing, runId]);
-  const onUseAbility = useCallback((target: number | null, slot: 0 | 1 = 0) => { useAbility(target, slot); }, [useAbility]);
+  const onUseAbility = useCallback((target: number | null, slot: 0 | 1 = 0) => {
+    const effects = useAbility(target, slot);
+    const used = slot === 1 ? partnerAbility : ability;
+    if (!effects || !used?.definition.callout) return;
+    const who = slot === 1 ? partnerAbility?.companionId : effectiveLoadout?.companionId;
+    const speaker = (who ? katchimeraSkinById.get(who)?.displayName : null) ?? used.definition.name;
+    setAbilityCall({ speaker, text: used.definition.callout });
+  }, [ability, effectiveLoadout?.companionId, partnerAbility, useAbility]);
+  useEffect(() => {
+    if (!abilityCall) return;
+    const timer = setTimeout(() => setAbilityCall(null), ABILITY_CALL_MS);
+    return () => clearTimeout(timer);
+  }, [abilityCall]);
   const lossReason = useMemo(() => (encounter && store.run && store.state && store.mechanicState && host && store.status === 'failed'
     ? encounterLossReason(encounter, host, store.mechanicState, store.run, store.state, window) : null), [encounter, host, store.mechanicState, store.run, store.state, store.status, window]);
   const lanes = mechanic?.kind === 'lanes' ? mechanic : null;

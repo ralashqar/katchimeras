@@ -267,6 +267,24 @@ Mistle's chapter reveals the lore turn: the Mist is a forgetting, and the Hollow
   - The roster's Train button always works.
 - **Seed Nursery fix:** pass `tierTwoChance` into the live `lanesTick` call.
 
+**Every friend a hero, built (Sept 26 2026):**
+- **Who plays.** `PLAYABLE_KATCHIMERAS` now includes Feastle and the island friends. The island friends play under their form's id (`ISLAND_HEROES`) and count as home once their island's card is earned.
+  - `playableHeroes(world)` / `heroHome` is the one rule for the Kingdom, the level track and the playthrough.
+  - The engine accepts them in battles and training (`KNOWN_HEROES`).
+- **Abilities.** Seven Lanes abilities (`features/encounter/lane-abilities.ts`) act on the battle in play:
+  - **Petal Burst:** Sprouts land on free cells.
+  - **Vine Snare:** holds the nearest wisps.
+  - **Second Helpings:** every plant fires now.
+  - **Seedkeeper:** Seeds grow a size.
+  - **Rainfall:** washes spat Mist off and pushes wisps back.
+  - **Falling Leaves:** damages every wisp over the board.
+  - **Forget:** the nearest wisps go back to the top.
+
+  `applyBattleAbility` routes them. A hero says a `callout` line in the battle's bubble when they use theirs.
+- **Story.** Chapters 5–9 train the friend brought home before: Petalimp, Fernip, Blossle, Drizzlet, then Amberleaf, each to level 2, with their ability as the reason.
+  - An XP shortfall names the hero (`GoalNeed.heroId`), and the Frontier battle the card starts brings them as partner.
+  - An island hero's panel frames their island, and their level-up plays on it.
+
 ### D3. Frontier tiles and Mist Surges (the 4X layer)
 - **New tile kind `frontier`.** It fills the empty ring-2 cells (4) and ring-3 cells (18) through `ringSources` in `mossprout-hex-neighborhood-scene.ts:245-263`, with authored frontier ids in `constants/frontier-tiles.ts`. Its states are `misted | contested | reclaimed`, stored in `world.frontier[tileId]` and changed by engine commands `reclaimFrontierTile` and `contestFrontierTile`.
 - **Art:** 4 wild reclaimed variants (meadow, copse, brook, stones), plus a contested edge overlay drawn at runtime. It goes through the shared-world hex pipeline (`shared-world-discovery-v2/briefs.json` → generate → matte → package → bounds → review). The misted state reuses `dream_mist_locked_hex_tile_v4`.

@@ -180,7 +180,15 @@ export function abilityTierSummary(ability: CompanionAbilityDefinition, tier: Co
   if (ability.id === 'clear-path') return `Clear Path ${every} · clears one Mist cell`;
   if (ability.id === 'ripple') return `Ripple ${every} · the next Water merge clears as if ${tier.boost ?? 1} bigger`;
   if (ability.id === 'scout') return `Scout ${every} · shows what ${tier.cells ?? 2} hidden cells hold`;
-  return `Focus ${every} · the next merge clears as if ${tier.boost ?? 1} bigger`;
+  const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+  if (ability.id === 'petal-burst') return `Petal Burst ${every} · ${plural(tier.sprouts ?? 2, 'Sprout')} burst up on empty cells`;
+  if (ability.id === 'vine-snare') return `Vine Snare ${every} · holds the nearest ${tier.wisps && tier.wisps > 1 ? plural(tier.wisps, 'wisp') : 'wisp'} for ${tier.seconds ?? 4}s`;
+  if (ability.id === 'second-helpings') return `Second Helpings ${every} · every plant shoots at once`;
+  if (ability.id === 'seedkeeper') return `Seedkeeper ${every} · ${(tier.maxTier ?? 1) >= 3 ? 'Seeds, Sprouts and Buds grow' : (tier.maxTier ?? 1) >= 2 ? 'Seeds and Sprouts grow' : 'every Seed grows'} a size`;
+  if (ability.id === 'rainfall') return `Rainfall ${every} · washes off the Mist, pushes every wisp back ${plural(tier.rows ?? 1, 'row')}`;
+  if (ability.id === 'falling-leaves') return `Falling Leaves ${every} · ${tier.damage ?? 1} damage to every wisp over the board`;
+  if (ability.id === 'forget') return `Forget ${every} · the nearest ${tier.wisps && tier.wisps > 1 ? plural(tier.wisps, 'wisp') : 'wisp'} drifts back to the top`;
+  return `Focus ${every} · the next merge lands ${tier.boost ?? 1} bigger`;
 }
 
 /**

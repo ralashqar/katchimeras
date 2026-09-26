@@ -6,7 +6,7 @@ import { FIRST_GOAL_COACH_ID, goalNeed, type GoalNeedSource } from '@/features/s
 import type { SanctuaryChapterState } from '@/constants/sanctuary-chapters';
 import type { MergeWorldCommand } from '@/types/merge-world';
 import { cafeDropProfile, cafeMealsBonus, kitchenCrateMealsBonus } from '@/constants/hero-buildings';
-import { battleLoadout, withPartner } from '@/features/encounter/team';
+import { battleLoadout, heroSlots, withPartner } from '@/features/encounter/team';
 import { BARISTABBIT_HATCHABLE } from '@/constants/hatchable-companions/baristabbit';
 import { loadWispState } from '@/utils/wisp-storage';
 import { heartwoodStage, gardenSupplyStatus } from '@/features/shared-adventure/heartwood-progression';
@@ -75,7 +75,7 @@ import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
 import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, ensureStoredFirstSpringLight, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , restoreStoredHeartTree, rescueStoredWorldFriend, revealStoredStoryTile, surgeStoredFrontier, grantStoredStoryGlow, claimStoredChapterReward, completeStoredSupplyOrder, markStoredChapterOpened, upgradeStoredHeroBuilding, acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat, startStoredEncounter, abandonStoredEncounter, completeStoredEncounter, upgradeStoredKatchimera } from '@/utils/merge-world/repository';
-import { canUpgradeKatchimera, isPlayableKatchimera, katchimeraLevel, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
+import { canUpgradeKatchimera, heroHome, ISLAND_HEROES, isPlayableKatchimera, katchimeraLevel, playableHeroes, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
 import { encounterRunId } from '@/features/encounter/run-id';
 import type { EncounterLoadout } from '@/types/encounter';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
@@ -637,7 +637,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       ...presentation,
       loadout: remembered ? { katchimeraId: remembered.katchimeraId, helperWispId: remembered.helperWispId } : null,
       // Playable friends who are here: Mossprout always, the others once hatched.
-      playable: PLAYABLE_KATCHIMERAS.filter((id) => id === 'mossprout' || mergeWorld.unlockedCharacters.includes(id)),
+      playable: playableHeroes(mergeWorld),
       ownedWispIds: Object.keys(wispState.unlocked),
       cleared: presentation.mission ? mergeWorld.encounters?.clears[presentation.mission.id] ?? null : null,
     };
@@ -966,9 +966,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const heroBuildingCamera = useMemo((): FtueCameraDirective | null => heroBuildingPanelId
     ? { kind: 'focus_target', target: heroBuildingTarget(heroBuildingPanelId), zoom: 1.5, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.15) / Math.max(1, window.height), durationMs: 520 }
     : null, [heroBuildingPanelId, upgradeStage, window.height]);
+  // An island friend's panel frames their island (they have no tile of their own).
+  const katchimeraPanelIsland = katchimeraPanelId && ISLAND_HEROES[katchimeraPanelId] ? islandCampaignById.get(ISLAND_HEROES[katchimeraPanelId]!)?.islandId ?? null : null;
   const katchimeraCamera = useMemo((): FtueCameraDirective | null => katchimeraPanelId
-    ? { kind: 'focus_target', target: { kind: 'haven_tile', characterId: katchimeraPanelId }, zoom: 1.5, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.15) / Math.max(1, window.height), durationMs: 520 }
-    : null, [katchimeraPanelId, upgradeStage, window.height]);
+    ? { kind: 'focus_target', target: katchimeraPanelIsland ? { kind: 'haven_nature_island', islandId: katchimeraPanelIsland as MossproutNatureIslandId } : { kind: 'haven_tile', characterId: katchimeraPanelId }, zoom: 1.5, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.15) / Math.max(1, window.height), durationMs: 520 }
+    : null, [katchimeraPanelId, katchimeraPanelIsland, upgradeStage, window.height]);
   const lanternCamera = useMemo((): FtueCameraDirective | null => buildingPanelId
     ? { kind: 'focus_target', target: { kind: 'haven_garden_plot', characterId: 'mossprout', slotId: heartwoodBuildingById.get(buildingPanelId)!.slotId }, zoom: 1.7, anchorY: (upgradeStage.stageCenterY + upgradeStage.stageHeight * 0.2) / Math.max(1, window.height), durationMs: 520 }
     : lanternUpgradeOpen
@@ -2442,7 +2444,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
    * A Frontier tile's battle (`features/frontier/frontier-levels.ts`), docked under the tile with the heroes last taken
    * into the Mist. Only land in the Tree's light and still under the Mist; true when the battle starts.
    */
-  const startFrontierBattle = useCallback((tileId: string) => {
+  const startFrontierBattle = useCallback((tileId: string, bring?: MergeCharacterId) => {
     const world = mergeWorldRef.current;
     const tile = frontierTileById(tileId);
     const contested = Boolean(tile && frontierTileContested(world, tileId));
@@ -2450,8 +2452,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // Land a Mist Surge took again is a retake: the same land a step harder.
     const mission = contested ? frontierRetakeMission(tile) : frontierMission(tile);
     const remembered = world.encounters?.loadout;
-    const picked: EncounterLoadoutChoice = { katchimeraId: remembered?.katchimeraId ?? 'mossprout', helperWispId: remembered?.helperWispId ?? null, partnerId: remembered?.partnerId ?? null };
-    const loadout = battleLoadout(world, withPartner(world, picked, playableHeroes(world)));
+    const heroes = playableHeroes(world);
+    let picked: EncounterLoadoutChoice = { katchimeraId: remembered?.katchimeraId ?? 'mossprout', helperWispId: remembered?.helperWispId ?? null, partnerId: remembered?.partnerId ?? null };
+    // A hero the goal needs trained comes along: as the partner when two go in, else as the lead.
+    if (bring && heroes.includes(bring) && picked.katchimeraId !== bring) picked = heroSlots(world) >= 2 ? { ...picked, partnerId: bring } : { ...picked, katchimeraId: bring };
+    const loadout = battleLoadout(world, withPartner(world, picked, heroes));
     void startStoredEncounter({ missionId: mission.id, runId: encounterRunId(mission.encounter, 1, loadout), katchimeraId: loadout.companionId, helperWispId: loadout.wispId ?? null, partnerId: loadout.partner?.companionId ?? null }).catch(() => undefined);
     setSelectedUpgrade(null);
     setTrackOpen(null);
@@ -3379,9 +3384,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (mergeWorldRef.current.companionDiscovery.records.some((record) => record.characterId === 'baristabbit')) setSupplyRunOpen(true);
     else openGlowSource();
   }, [openGlowSource]);
-  const openGoalSource = useCallback((source: GoalNeedSource, buildingId?: HeroBuildingId, tileId?: string) => {
+  const openGoalSource = useCallback((source: GoalNeedSource, buildingId?: HeroBuildingId, tileId?: string, heroId?: MergeCharacterId) => {
     if (source === 'cafe') { openCafe(); return; }
-    if (source === 'frontier' && tileId && startFrontierBattle(tileId)) return;
+    if (source === 'frontier' && tileId && startFrontierBattle(tileId, heroId)) return;
     // A hero held back by their own building: that friend's panel, on its Building tab.
     if (source === 'building' && buildingId) {
       const building = HERO_BUILDINGS.find((candidate) => candidate.id === buildingId);
@@ -3405,7 +3410,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (!goal) return;
     if (!mergeWorldRef.current.chapterOpeningsSeen?.includes(FIRST_GOAL_COACH_ID)) void markStoredChapterOpened(FIRST_GOAL_COACH_ID).catch(() => undefined);
     // Short of something: straight to where it is earned (the card says what and where).
-    if (chapterGoalNeed) { openGoalSource(chapterGoalNeed.source, chapterGoalNeed.buildingId, chapterGoalNeed.tileId); return; }
+    if (chapterGoalNeed) { openGoalSource(chapterGoalNeed.source, chapterGoalNeed.buildingId, chapterGoalNeed.tileId, chapterGoalNeed.heroId); return; }
     if (goal.action.kind === 'building') { setBuildingPanelId(goal.action.buildingId); return; }
     if (goal.action.kind === 'supply_run') { setSupplyRunOpen(true); return; }
     if (goal.action.kind === 'hero') { openFriendPanel(goal.action.characterId, 'hero'); return; }
@@ -3624,7 +3629,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (spent <= 0 || reduceMotion) return;
     const building = heroBuildingForCompanion(id);
     const hatchable = hatchableByCompanion(id);
-    const layerId = id === 'mossprout' ? 'home' : building ? heroTileLayerId(building.tileId) : hatchable ? `structure:${hatchable.tile.id}` : null;
+    const heroIsland = ISLAND_HEROES[id] ? islandCampaignById.get(ISLAND_HEROES[id]!)?.islandId ?? null : null;
+    const layerId = id === 'mossprout' ? 'home' : building ? heroTileLayerId(building.tileId) : hatchable ? `structure:${hatchable.tile.id}` : heroIsland ? `nature:mossprout:${heroIsland}` : null;
     if (!layerId) { setDisplayedGlow(result.state.coins); return; }
     revealedUpgradeRef.current = null;
     setUpgrading(true);
@@ -4447,7 +4453,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         const guided = ftueStepId === 'haven.mossprout.restore';
         const hatchable = hatchableByCompanion(characterId);
         const links = ftueStepId ? [] : [
-          ...(PLAYABLE_KATCHIMERAS.includes(characterId) && (characterId === 'mossprout' || mergeWorld.unlockedCharacters.includes(characterId)) ? [{ label: `Train ${slot.creature.name}`, onPress: () => {
+          ...(PLAYABLE_KATCHIMERAS.includes(characterId) && heroHome(mergeWorld, characterId) ? [{ label: `Train ${slot.creature.name}`, onPress: () => {
             setDetailCreatureId(null);
             setKatchimeraPanelId(characterId);
           } }] : []),
@@ -4585,9 +4591,6 @@ function heroBuildingTarget(id: HeroBuildingId): Extract<StoryTarget, { kind: 'h
 }
 
 /** The heroes who can come into a battle: Mossprout, and every playable friend who is home. */
-function playableHeroes(world: MergeWorldState): MergeCharacterId[] {
-  return PLAYABLE_KATCHIMERAS.filter((id) => id === 'mossprout' || world.unlockedCharacters.includes(id) || world.companionDiscovery.records.some((record) => record.characterId === id));
-}
 
 const NO_RESIDENT_WISPS = {} as const;
 
