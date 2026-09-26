@@ -1,5 +1,6 @@
+import { localDayId } from '@/utils/world-identity-rules';
 import { frontierOpen, frontierTileById, frontierTileState, nextFrontierTile } from '@/constants/frontier-tiles';
-import { frontierMission } from '@/features/frontier/frontier-levels';
+import { frontierMission, frontierRetakeMission, surgeDefenceMission } from '@/features/frontier/frontier-levels';
 import { battleSourceCampaign } from '@/features/sanctuary/battle-source';
 import { islandCampaignForIsland } from '@/constants/island-campaigns/registry';
 import assert from 'node:assert/strict';
@@ -199,8 +200,9 @@ test('a new player plays the main quest from Steppling home to the last chapter 
   const playFrontier = (tileId: string, want: MergeCharacterId | null) => {
     const tile = frontierTileById(tileId);
     assert.ok(tile, `${tileId} is not Frontier land`);
-    assert.equal(frontierTileState(world, tile), 'misted', `${tileId} is not in the light or is already ours`);
-    const mission = frontierMission(tile);
+    const state = frontierTileState(world, tile);
+    assert.ok(state === 'misted' || state === 'contested', `${tileId} is not in the light or is already ours`);
+    const mission = state === 'contested' ? frontierRetakeMission(tile) : frontierMission(tile);
     assert.equal(mission.encounter?.mechanic?.kind, 'lanes', `every battle is plants that shoot: ${mission.id}`);
     const lead = want && isPlayableKatchimera(want) ? want : 'mossprout';
     now += 3 * MINUTE;
@@ -259,6 +261,8 @@ test('a new player plays the main quest from Steppling home to the last chapter 
       }
       chapterId = state.chapter.id;
       tally().steps += 1;
+      const surge = reduceMergeWorld(world, { type: 'mistSurge', dayId: localDayId(new Date(now)), now });
+      if (surge.changed) { world = surge.state; log.push(`the Mist surges: ${surge.mistSurged?.join(', ') || 'nothing to take'}`); }
       if (state.openingPending) { apply({ type: 'markChapterOpened', chapterId: state.chapter.id, now: now++ }, `opening ${state.chapter.title}`); continue; }
       if (state.complete) { apply({ type: 'claimChapterReward', chapterId: state.chapter.id, glow: state.chapter.reward.glow, now: now++ }, `claim ${state.chapter.title}`); continue; }
       const goal = state.goal!;
@@ -289,7 +293,16 @@ test('a new player plays the main quest from Steppling home to the last chapter 
       else if (action.kind === 'hero') apply({ type: 'upgradeKatchimera', characterId: action.characterId, expectedLevel: katchimeraLevel(world, action.characterId), now: now++ } as MergeWorldCommand, `train ${action.characterId}`);
       else if (action.kind === 'supply_run') serveOrder();
       else if (action.kind === 'grove') playGrove();
-      else if (action.kind === 'frontier') {
+      else if (action.kind === 'surge_defence') {
+        // The first Mist Surge: the defence under the Heart Tree, plants that shoot; the Mist takes two edge tiles meanwhile.
+        const mission = surgeDefenceMission();
+        assert.equal(mission.encounter?.mechanic?.kind, 'lanes', 'the Heart Tree is held with plants that shoot');
+        now += 3 * MINUTE;
+        const result = apply({ type: 'completeEncounter', receiptId: `encounter:surge:${now}`, missionId: mission.id, katchimeraId: 'mossprout', helperWispId: null, partnerId: null,
+          outcome: { cleared: true, grade: 'bright' } as never, difficulty: mission.difficulty, base: mission.rewards, now } as MergeWorldCommand, 'hold the Heart Tree');
+        tally().battles += 1;
+        assert.ok((result.encounterCleared?.surged?.length ?? 0) >= 1, 'the first Surge takes Frontier land back');
+      } else if (action.kind === 'frontier') {
         // The next tile in the light; with none, the card must say so (it opens the Heart Tree).
         const next = nextFrontierTile(world);
         assert.ok(next, `“${goal.title}” wants Frontier land but none is in the Tree's light.${tail(8)}`);

@@ -52,3 +52,41 @@ test('the Tree’s light reaches the Frontier ring by ring; a won battle takes t
   assert.equal(again.encounterCleared?.reclaimed, undefined, 'the land is given once');
   assert.equal(nextFrontierTile(won.state)?.id, 'frontier-2');
 });
+
+test('a Surge’s battles are fair: every retake, and the Heart Tree’s defence', async () => {
+  const { frontierRetakeMission, surgeDefenceMission } = await import('@/features/frontier/frontier-levels');
+  for (const encounter of [...FRONTIER_TILES.map((tile) => frontierRetakeMission(tile).encounter), surgeDefenceMission().encounter]) {
+    assert.equal(encounter.mechanic?.kind, 'lanes', encounter.id);
+    const careful = lanesFairness(encounter, 'careful', 6);
+    assert.ok(careful.wins >= 4, `${encounter.id}: the careful player won ${careful.wins} of 6`);
+    assert.equal(lanesFairness(encounter, 'idle', 1).wins, 0, `${encounter.id}: doing nothing must lose`);
+  }
+});
+
+test('the first Surge is held at the Heart Tree and takes two edge tiles; then one a day, retaken for good', async () => {
+  const { SURGE_DEFENCE_MISSION_ID, frontierRetakeMissionId, frontierHeldCount, frontierReclaimedCount, frontierContestedTiles } = await import('@/constants/frontier-tiles');
+  const { frontierRetakeMission, surgeDefenceMission } = await import('@/features/frontier/frontier-levels');
+  const { lodgeTimberWaiting, LODGE_PRODUCTION_INTERVAL_MS } = await import('@/constants/hero-buildings');
+  let world = createInitialMergeWorldState(0);
+  const clears = Object.fromEntries(['frontier-1', 'frontier-2', 'frontier-3', 'frontier-4'].map((id) => [frontierMissionId(id), { firstClearedAt: 1, clears: 1, bestGrade: 'bright', lastKatchimeraId: 'mossprout' }]));
+  world = { ...world, heartTree: { receiptId: 't', restoredAt: 0, level: 2 }, encounters: { ...world.encounters, clears }, heroBuildings: { 'explorers-lodge': { level: 1, builtAt: 0 } } } as typeof world;
+  assert.equal(reduceMergeWorld(world, { type: 'mistSurge', dayId: '2026-09-27', now: 5 }).changed, false, 'no Surge before the first is held');
+  const defence = surgeDefenceMission();
+  const held = reduceMergeWorld(world, { type: 'completeEncounter', receiptId: 'd', missionId: SURGE_DEFENCE_MISSION_ID, katchimeraId: 'mossprout', helperWispId: null, outcome: { cleared: true, grade: 'bright' } as never, difficulty: defence.difficulty, base: defence.rewards, now: Date.UTC(2026, 8, 26, 12) });
+  assert.equal(held.encounterCleared?.surged?.length, 2, 'the Mist took two edge tiles while the Tree was held');
+  world = held.state;
+  assert.equal(frontierContestedTiles(world).length, 2);
+  assert.equal(frontierReclaimedCount(world), 4, 'the chapters still count them');
+  assert.equal(frontierHeldCount(world), 2, 'the Lodge does not');
+  assert.equal(lodgeTimberWaiting(world, LODGE_PRODUCTION_INTERVAL_MS * 100), 4 + 4 + 2, 'store: the Lodge’s own and the held land');
+  assert.equal(nextFrontierTile(world)?.id, frontierContestedTiles(world)[0]!.id, 'contested land is fought for first');
+  assert.equal(reduceMergeWorld(world, { type: 'mistSurge', dayId: world.frontierSurges!.lastDay!, now: 6 }).changed, false, 'one Surge a day');
+  const tile = frontierContestedTiles(world)[0]!;
+  const retake = frontierRetakeMission(tile);
+  const retaken = reduceMergeWorld(world, { type: 'completeEncounter', receiptId: 'r', missionId: frontierRetakeMissionId(tile.id), katchimeraId: 'mossprout', helperWispId: null, outcome: { cleared: true, grade: 'bright' } as never, difficulty: retake.difficulty, base: retake.rewards, now: 7 });
+  assert.equal(retaken.encounterCleared?.reclaimed?.tileId, tile.id);
+  assert.equal(frontierTileStates(retaken.state)[tile.id], 'reclaimed');
+  const next = reduceMergeWorld(retaken.state, { type: 'mistSurge', dayId: '2099-01-01', now: 8 });
+  assert.equal(next.mistSurged?.length, 1, 'a new day takes one');
+  assert.ok(frontierContestedTiles(next.state).length <= 3, 'never more than three at once');
+});

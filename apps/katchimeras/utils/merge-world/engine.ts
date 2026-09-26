@@ -1,4 +1,4 @@
-import { frontierLodgeStoreBonus, frontierReclaimedCount, frontierReclaimTimber, frontierTileById, frontierTileIdForMission } from '@/constants/frontier-tiles';
+import { dailySurgeTakes, FIRST_SURGE_TAKES, FRONTIER_RETAKE_TIMBER, frontierHeldCount, frontierLodgeStoreBonus, frontierReclaimTimber, frontierTileById, frontierTileContested, frontierTileIdForMission, frontierTileIdForRetake, mistSurgePicks, SURGE_DEFENCE_MISSION_ID } from '@/constants/frontier-tiles';
 import { HERO_BUILDING_MAX_LEVEL, heroBuildingById, heroCompanionHome, heroBuildingCost, heroBuildingForCompanion, heroBuildingLevel, heroLevelCap, LODGE_PRODUCTION_INTERVAL_MS, lodgeTimberStore, lodgeTimberWaiting, type HeroBuildingId } from '@/constants/hero-buildings';
 import { buildingLevelCap, heartTreeCost, heartTreeLevel } from '@/constants/heart-tree';
 import { normalizeAdventure } from '@/features/shared-adventure/normalize';
@@ -632,7 +632,7 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       if (command.id !== 'explorers-lodge' || !lodge) return unchanged(current);
       const waiting = lodgeTimberWaiting(current, command.now);
       if (waiting < 1) return unchanged(current);
-      const store = lodgeTimberStore(lodge.level) + frontierLodgeStoreBonus(frontierReclaimedCount(current));
+      const store = lodgeTimberStore(lodge.level) + frontierLodgeStoreBonus(frontierHeldCount(current));
       const since = Math.max(0, command.now - (lodge.collectedAt ?? lodge.builtAt));
       const intervals = Math.floor(since / LODGE_PRODUCTION_INTERVAL_MS);
       // A full store starts again from now; otherwise the part-made next batch keeps its time.
@@ -663,6 +663,14 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
     case 'markChapterOpened': {
       if (current.chapterOpeningsSeen?.includes(command.chapterId)) return unchanged(current);
       return changed(touch({ ...current, chapterOpeningsSeen: [...(current.chapterOpeningsSeen ?? []), command.chapterId] }, command.now));
+    }
+    case 'mistSurge': {
+      // Once a day, once the first Surge was held: the Mist takes back held edge land (`mistSurgePicks`).
+      const surges = current.frontierSurges;
+      if (surges?.firstHeldAt == null || surges.lastDay === command.dayId) return unchanged(current);
+      const taken = mistSurgePicks(current, command.dayId, dailySurgeTakes(frontierHeldCount(current)));
+      const contested = { ...surges.contested, ...Object.fromEntries(taken.map((id) => [id, command.now])) };
+      return { ...changed(touch({ ...current, frontierSurges: { ...surges, contested, lastDay: command.dayId } }, command.now)), mistSurged: taken };
     }
     case 'claimChapterReward': {
       // Once per chapter, whatever else the ledgers keep or trim.
@@ -1020,6 +1028,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
     supplyRun: normalizeSupplyRun(source.supplyRun),
     chapterOpeningsSeen: Array.isArray(source.chapterOpeningsSeen) ? [...new Set(source.chapterOpeningsSeen.filter((id): id is string => typeof id === 'string'))] : [],
     chaptersClaimed: Array.isArray(source.chaptersClaimed) ? [...new Set(source.chaptersClaimed.filter((id): id is string => typeof id === 'string'))] : [],
+    frontierSurges: normalizeFrontierSurges(source.frontierSurges),
     version: 25,
     pivot: 'campaign-v1',
     encounters: normalizeEncounters(source.encounters, now),
@@ -1735,6 +1744,20 @@ function abandonEncounter(state: MergeWorldState, now: number): MergeWorldComman
  * clear is written to the ledger; and the last rung of a chapter raises the
  * island to that chapter's level, free.
  */
+/** The Frontier's Surges, as saved: only known tiles, finite times. */
+function normalizeFrontierSurges(value: unknown): MergeWorldState['frontierSurges'] {
+  if (!value || typeof value !== 'object') return undefined;
+  const source = value as { contested?: unknown; lastDay?: unknown; firstHeldAt?: unknown };
+  const contested = source.contested && typeof source.contested === 'object'
+    ? Object.fromEntries(Object.entries(source.contested as Record<string, unknown>).filter(([id, at]) => frontierTileById(id) && typeof at === 'number' && Number.isFinite(at)) as [string, number][])
+    : {};
+  return {
+    contested,
+    ...(typeof source.lastDay === 'string' ? { lastDay: source.lastDay } : {}),
+    ...(typeof source.firstHeldAt === 'number' && Number.isFinite(source.firstHeldAt) ? { firstHeldAt: source.firstHeldAt } : {}),
+  };
+}
+
 function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCommand, { type: 'completeEncounter' }>): MergeWorldCommandResult {
   const ledger = encounterLedger(state);
   if (ledger.receipts.includes(command.receiptId)) return unchanged(state);
@@ -1772,9 +1795,23 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
   }, command.now);
   // Frontier land taken back (`constants/frontier-tiles.ts`): the first clear is the reclaim, and the land's store of
   // Timber comes with it. The ledger's clear is the only record: the scene and the Lodge read it from there.
-  const frontierTile = firstClear ? frontierTileById(frontierTileIdForMission(command.missionId) ?? '') : null;
-  const reclaimedTimber = frontierTile ? frontierReclaimTimber(frontierTile) : 0;
+  // Land a Surge took again, taken back (`retake:<tile>`): no longer contested, and a little of its Timber.
+  const retaken = frontierTileById(frontierTileIdForRetake(command.missionId) ?? '');
+  const retakenTile = retaken && frontierTileContested(next, retaken.id) ? retaken : null;
+  if (retakenTile) {
+    const { [retakenTile.id]: _released, ...contested } = next.frontierSurges?.contested ?? {};
+    next = { ...next, frontierSurges: { ...next.frontierSurges, contested } };
+  }
+  const frontierTile = (firstClear ? frontierTileById(frontierTileIdForMission(command.missionId) ?? '') : null) ?? retakenTile;
+  const reclaimedTimber = retakenTile ? FRONTIER_RETAKE_TIMBER : frontierTile ? frontierReclaimTimber(frontierTile) : 0;
   if (reclaimedTimber > 0) next = { ...next, materials: { ...next.materials, timber: (next.materials?.timber ?? 0) + reclaimedTimber } };
+  // The first Surge held at the Heart Tree (Chapter 4): the Surges begin, and while the Tree was held the Mist took
+  // back two edge tiles. That day's Surge is this one.
+  let surged: string[] | undefined;
+  if (command.missionId === SURGE_DEFENCE_MISSION_ID && next.frontierSurges?.firstHeldAt == null) {
+    surged = mistSurgePicks(next, dayId, FIRST_SURGE_TAKES);
+    next = { ...next, frontierSurges: { contested: { ...next.frontierSurges?.contested, ...Object.fromEntries(surged.map((id) => [id, command.now])) }, lastDay: dayId, firstHeldAt: command.now } };
+  }
   let islandRaised: NonNullable<MergeWorldCommandResult['encounterCleared']>['islandRaised'];
   // The last rung of a chapter grows the island to the chapter's level, as the restoration boards did.
   const campaign = command.campaignId ? islandCampaignById.get(command.campaignId) : null;
@@ -1790,7 +1827,7 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
   return {
     state: next, changed: true,
     message: `${paid.glow} Glow.`,
-    encounterCleared: { missionId: command.missionId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), glow: paid.glow, xp: paid.xp, grade: command.outcome.grade, firstClear, katchimeraId: command.katchimeraId, ...(partnerId ? { partnerId } : {}), ...(islandRaised ? { islandRaised } : {}), trackId, ...(bossPack ? { bossPack } : {}), ...(frontierTile ? { reclaimed: { tileId: frontierTile.id, timber: reclaimedTimber } } : {}) },
+    encounterCleared: { missionId: command.missionId, ...(command.campaignId ? { campaignId: command.campaignId } : {}), glow: paid.glow, xp: paid.xp, grade: command.outcome.grade, firstClear, katchimeraId: command.katchimeraId, ...(partnerId ? { partnerId } : {}), ...(islandRaised ? { islandRaised } : {}), trackId, ...(bossPack ? { bossPack } : {}), ...(frontierTile ? { reclaimed: { tileId: frontierTile.id, timber: reclaimedTimber } } : {}), ...(surged ? { surged } : {}) },
   };
 }
 

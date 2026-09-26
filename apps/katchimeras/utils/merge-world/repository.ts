@@ -860,6 +860,11 @@ export function rescueStoredWorldFriend(targetId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'rescueWorldFriend', targetId, now }), now);
 }
 
+/** A new day's Mist Surge on the Frontier (`mistSurge`): once a day, once the first Surge was held. */
+export function surgeStoredFrontier(dayId: string, now = gameNow()) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'mistSurge', dayId, now }), now);
+}
+
 /** A story tile revealed by the story itself (the Lost Trail after its rescue): free, once. */
 export function revealStoredStoryTile(unlockId: string, now = gameNow()) {
   return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'unlockWorldTarget', targetId: unlockId, now }), now);

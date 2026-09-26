@@ -315,6 +315,26 @@ Mistle's chapter reveals the lore turn: the Mist is a forgetting, and the Hollow
 - **Art.** `shared-world-discovery-v2/frontier-{meadow,copse,brook,stones}`.
 - **Pacing** (`PLAYTHROUGH_LOG=1`): 79 battles, 48 orders and 168 steps to the end of Chapter 9. Chapter 2 plays 3 battles and 4 orders.
 
+**Mist Surges built (Sept 26 2026):**
+- **State.** `world.frontierSurges` holds three things:
+  - `contested` tiles, each with the time it was taken;
+  - `lastDay`;
+  - `firstHeldAt`.
+
+  A contested tile draws the house Mist again. It still counts toward the chapters, but not toward the Lodge (`frontierHeldCount`).
+- **The First Surge** is Chapter 4's `first-surge` goal, after the Kitchen:
+  - The Kitchen's outro ends on "Do you feel that?"
+  - The defence (`surge:heart-tree`, a Lanes battle with a striker and a quick wisp) docks under the Heart Tree. It sits on `islandEncounter.structureId`, and the phone buzzes as it starts.
+  - Holding it contests two edge tiles in the same write. The reward card reads "The Heart Tree held", then the outro: "They took back the edges."
+  - `surge-retake` asks for both tiles back.
+- **Daily Surges.** After that, the first time the Sanctuary is seen each day, `mistSurge` contests edge tiles, seeded by the day:
+  - 1 tile a day, or 2 once 10 are held;
+  - never more than 3 contested at once.
+
+  An edge tile is held land beside Mist that isn't held, or on the outer edge. Mossprout reports the loss, with a "Take it back" button.
+- **Retakes.** A retake (`retake:<tile>`) is the tile's own level one step harder. It pays a smaller purse and 1 Timber, then plays the same reveal. The next Frontier target, the bubble ("Retake") and the goal card all pick contested land first.
+- **Pacing:** 82 battles, 47 orders and 170 steps. Chapter 4 now plays 4 battles.
+
 ### D4. Economy and goal fixes
 - **`goalNeed`** handles the `hero-building` and `heart-tree` requirement rows by returning "Needs the Lodge at level N" / "Needs the Heart Tree at level N", and the tap routes there.
 - **`followChapterGoal`** falls back to opening the island track when the `world_offer` is missing. It never silently does nothing.

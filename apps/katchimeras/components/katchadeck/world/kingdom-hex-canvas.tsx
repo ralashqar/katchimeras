@@ -981,7 +981,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   }, [onNatureIslandTargetChange]);
   // Tiles the story points at before they clear: every story tile, and a friend's own tile with someone lost in its
   // Mist (Steppling's trailhead, where the Lost Trail's battles dock).
-  const storyTargetTiles = useMemo(() => [...STORY_TILES.map((tile) => tile.id), ...HATCHABLE_COMPANIONS.filter((definition) => definition.tile.lostSkinId).map((definition) => definition.tile.id), ...FRONTIER_TILES.map((tile) => tile.id)], []);
+  const storyTargetTiles = useMemo(() => [...STORY_TILES.map((tile) => tile.id), ...HATCHABLE_COMPANIONS.filter((definition) => definition.tile.lostSkinId).map((definition) => definition.tile.id), ...FRONTIER_TILES.map((tile) => tile.id), 'mossprout-hex-garden'], []);
   const storyTileTargetRefs = useMemo(() => {
     const refs = new Map<string, (node: View | null) => void>();
     if (onStoryTileTargetChange) for (const tileId of storyTargetTiles) refs.set(tileId, (node) => onStoryTileTargetChange(tileId, node));

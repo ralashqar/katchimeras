@@ -89,7 +89,7 @@ test('every friend after Petalimp has a chapter: a signal, the Heart Tree, a her
 
 test('the main quest hands off with a scene: the goals that end away from the next one say why, then go on', async () => {
   const { chapterGoalById, SANCTUARY_CHAPTERS } = await import('@/constants/sanctuary-chapters');
-  for (const id of ['supply-run', 'frontier-1', 'lodge-built', 'frontier-3', 'cafe-built', 'lodge-2', 'tree-2', 'bloom-mist', 'train-mossprout-3', 'kitchen-built', 'kitchen-feasts']) {
+  for (const id of ['supply-run', 'frontier-1', 'lodge-built', 'frontier-3', 'cafe-built', 'lodge-2', 'tree-2', 'bloom-mist', 'train-mossprout-3', 'kitchen-built', 'first-surge', 'surge-retake', 'kitchen-feasts']) {
     assert.ok((chapterGoalById(id)?.outro?.length ?? 0) >= 1, `${id} ends on a scene`);
   }
   for (const chapter of SANCTUARY_CHAPTERS.slice(4)) {

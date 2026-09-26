@@ -562,6 +562,11 @@ export type MergeWorldState = {
   heartTree?: { receiptId: string; restoredAt: number; /** Its level (`constants/heart-tree.ts`); woken, it is 1. */ level?: number } | null;
   /** The Sanctuary's chapters whose reward has been paid (`constants/sanctuary-chapters.ts`), by id. */
   chaptersClaimed?: readonly string[];
+  /**
+   * The Mist pushing back on the Frontier (`constants/frontier-tiles.ts`): the tiles a Surge has taken again (when), the
+   * day it last surged, and when the first Surge (at the Heart Tree, Chapter 4) was held.
+   */
+  frontierSurges?: { contested: Readonly<Record<string, number>>; lastDay?: string; firstHeldAt?: number };
   /** The Sanctuary's chapters whose opening scene has played (The Signal), by id. */
   chapterOpeningsSeen?: readonly string[];
   /** Friends' own buildings on their tiles (`constants/hero-buildings.ts`), by id. Absent until one is built. */
@@ -662,6 +667,8 @@ export type MergeWorldCommand =
   | { type: 'grantOpeningGlow'; receiptId: string; amount: number; now: number }
   | { type: 'restoreHeartTree'; receiptId: string; cost: number; now: number }
   | { type: 'claimChapterReward'; chapterId: string; glow: number; now: number }
+  /** A new day's Mist Surge on the Frontier (`mistSurgePicks`): once a day, once the first Surge has been held. */
+  | { type: 'mistSurge'; dayId: string; now: number }
   | { type: 'markChapterOpened'; chapterId: string; now: number }
   /** The Heart Tree growing a level: its Glow and Timber, once per level. */
   | { type: 'upgradeHeartTree'; expectedLevel: number; now: number }
@@ -793,8 +800,12 @@ export type MergeWorldCommandResult = {
   /** An encounter just paid: what it paid and to whom, for the provider's celebration, Bond and sparks. */
   encounterCleared?: { missionId: string; campaignId?: string; glow: number; xp: number; grade: import('./encounter').EncounterGrade; firstClear: boolean; katchimeraId: MergeCharacterId; partnerId?: MergeCharacterId; islandRaised?: { islandId: MossproutNatureIslandId; level: MossproutNatureIslandLevel }; trackId?: string; bossPack?: { receiptId: string; familyId: string };
     /** A Frontier tile taken back by this clear, and the Timber its land gave. */
-    reclaimed?: { tileId: string; timber: number } };
+    reclaimed?: { tileId: string; timber: number };
+    /** The first Surge held at the Heart Tree: the Frontier tiles the Mist took back meanwhile. */
+    surged?: readonly string[] };
   milestoneClaimed?: { trackId: string; threshold: number; glow: number; pack: 'gift' | 'gift-rare' | 'finale'; familyId: string; receiptId: string };
   /** A Katchimera just levelled. */
   katchimeraUpgraded?: { characterId: MergeCharacterId; level: number; cost: number };
+  /** A day's Mist Surge: the Frontier tiles it took back. */
+  mistSurged?: readonly string[];
 };

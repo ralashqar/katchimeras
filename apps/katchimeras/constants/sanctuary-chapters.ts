@@ -1,5 +1,5 @@
 import { heartTreeLevel } from '@/constants/heart-tree';
-import { frontierReclaimedCount } from '@/constants/frontier-tiles';
+import { frontierContestedTiles, frontierReclaimedCount, frontierSurgesStarted } from '@/constants/frontier-tiles';
 import { heartwoodBuildingLevel, type HeartwoodBuildingId } from '@/constants/heartwood-buildings';
 import { heroBuildingLevel, type HeroBuildingId } from '@/constants/hero-buildings';
 import { PETALIMP_ISLAND_CAMPAIGN_ID } from '@/constants/island-campaigns/petalimp-bloom';
@@ -29,7 +29,9 @@ export type ChapterGoalAction =
   /** Open the Heart Tree's panel (`constants/heart-tree.ts`). */
   | { kind: 'heart_tree' }
   /** The Frontier's next tile in the Tree's light: its battle, docked under it (`constants/frontier-tiles.ts`). */
-  | { kind: 'frontier' };
+  | { kind: 'frontier' }
+  /** The first Mist Surge: the Mist comes for the Heart Tree, and the defence battle docks under it. */
+  | { kind: 'surge_defence' };
 
 export type ChapterGoal = {
   id: string;
@@ -200,7 +202,14 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     id: 'the-kitchen', number: 4, title: 'The Kitchen',
     goals: [
       { id: 'feastle-home', title: 'Follow the smell of supper', detail: 'Someone has kept a table warm in the Mist. A spoon taps against a bowl.', done: (world) => world.companionDiscovery.records.some((record) => record.characterId === 'feastle'), action: { kind: 'world_offer', offerId: 'mist:feastle-home' } },
-      { id: 'kitchen-built', title: 'Build Feastle\u2019s Kitchen', detail: 'Feastle wants a proper stove. Better dishes, and bigger crates.', done: (world) => heroBuildingLevel(world, 'feastle-kitchen') >= 1, action: { kind: 'hero_building', id: 'feastle-kitchen' }, outro: [{ speaker: 'feastle', text: 'A real stove! Now we cook properly.' }] },
+      { id: 'kitchen-built', title: 'Build Feastle\u2019s Kitchen', detail: 'Feastle wants a proper stove. Better dishes, and bigger crates.', done: (world) => heroBuildingLevel(world, 'feastle-kitchen') >= 1, action: { kind: 'hero_building', id: 'feastle-kitchen' },
+        outro: [{ speaker: 'feastle', text: 'A real stove! Now we cook properly.' }, { speaker: 'mossprout', text: 'Wait. Do you feel that?' }, { speaker: 'steppling', text: 'The ground\u2019s shaking. And the Mist\u2026 it\u2019s moving. Toward us.' }] },
+      // The First Surge (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Act V): the Mist strikes back at the Heart Tree, and
+      // while it is held takes back two edge tiles of the Frontier. From here on it tries again every day.
+      { id: 'first-surge', title: 'Hold the Heart Tree', detail: 'The Mist is pushing back, straight at the Heart Tree. Every lane, every wisp: hold it.', done: (world) => frontierSurgesStarted(world), action: { kind: 'surge_defence' },
+        outro: [{ speaker: 'mossprout', text: 'We held the Tree.' }, { speaker: 'mossprout', text: 'But while we did, they took back the edges.' }, { speaker: 'feastle', text: 'Right. Everyone eats double tonight. Then we take them back.' }] },
+      { id: 'surge-retake', title: 'Take back what the Mist took', detail: 'The Mist took Frontier land while we held the Tree. It is still ours: take it back.', done: (world) => frontierSurgesStarted(world) && frontierContestedTiles(world).length === 0, action: { kind: 'frontier' },
+        outro: [{ speaker: 'mossprout', text: 'They\u2019ll try again. Every morning, now.' }, { speaker: 'steppling', text: 'And every morning we push back. That\u2019s fine. I like mornings.' }] },
       { id: 'kitchen-feasts', title: 'Serve 3 of Feastle’s feasts', detail: 'Feastle’s feasts pay the most Meals. A fed team is a strong team.', done: (world) => (world.supplyRun?.kitchenServed ?? 0) >= 3, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(3, world.supplyRun?.kitchenServed ?? 0), total: 3 }), outro: [{ speaker: 'feastle', text: 'Everyone\u2019s fed, and the pantry\u2019s full.' }, { speaker: 'petalimp', text: 'Then a home for me next? I\u2019ve been sketching it for days!' }] },
       { id: 'bloom-house', title: 'Build Petalimp’s Bloom House', detail: 'Petalimp needs a home of her own. Hers makes Seeds come faster in every battle.', done: (world) => heroBuildingLevel(world, 'bloom-house') >= 1, action: { kind: 'hero_building', id: 'bloom-house' } },
     ],

@@ -26,7 +26,8 @@ export type FrontierTile = {
   power: number;
 };
 
-export type FrontierTileState = 'dark' | 'misted' | 'reclaimed';
+/** `contested`: land taken back that a Mist Surge has taken again (its battle is a retake; it feeds nothing meanwhile). */
+export type FrontierTileState = 'dark' | 'misted' | 'reclaimed' | 'contested';
 
 export const FRONTIER_VARIANT_NAMES: Readonly<Record<FrontierVariant, string>> = {
   meadow: 'the Wild Meadow',
@@ -78,7 +79,12 @@ export const FRONTIER_MISSION_PREFIX = 'frontier:';
 export const frontierMissionId = (tileId: string) => `${FRONTIER_MISSION_PREFIX}${tileId}`;
 export const frontierTileIdForMission = (missionId: string): string | null => missionId.startsWith(FRONTIER_MISSION_PREFIX) ? missionId.slice(FRONTIER_MISSION_PREFIX.length) : null;
 
-type FrontierWorld = Pick<MergeWorldState, 'encounters' | 'heartTree'>;
+type FrontierWorld = Pick<MergeWorldState, 'encounters' | 'heartTree'> & Partial<Pick<MergeWorldState, 'frontierSurges'>>;
+
+/** A contested tile's battle: taking it back again (`retake:<tile>`), its own ledger key. */
+export const FRONTIER_RETAKE_PREFIX = 'retake:';
+export const frontierRetakeMissionId = (tileId: string) => `${FRONTIER_RETAKE_PREFIX}${tileId}`;
+export const frontierTileIdForRetake = (missionId: string): string | null => missionId.startsWith(FRONTIER_RETAKE_PREFIX) ? missionId.slice(FRONTIER_RETAKE_PREFIX.length) : null;
 
 /** The Frontier opens with Chapter 2 ("Push It Back"): once Chapter 1 (the lit window) is claimed. */
 export const FRONTIER_OPENS_AFTER_CHAPTER = 'home-for-two';
@@ -95,8 +101,13 @@ export function frontierTileLit(world: Pick<MergeWorldState, 'heartTree'>, tile:
   return heartTreeLevel(world) >= tile.tree;
 }
 
+/** A tile a Mist Surge has taken back (`world.frontierSurges.contested`). */
+export function frontierTileContested(world: Partial<Pick<MergeWorldState, 'frontierSurges'>>, tileId: string): boolean {
+  return world.frontierSurges?.contested?.[tileId] != null;
+}
+
 export function frontierTileState(world: FrontierWorld, tile: FrontierTile): FrontierTileState {
-  if (frontierTileReclaimed(world, tile.id)) return 'reclaimed';
+  if (frontierTileReclaimed(world, tile.id)) return frontierTileContested(world, tile.id) ? 'contested' : 'reclaimed';
   return frontierTileLit(world, tile) ? 'misted' : 'dark';
 }
 
@@ -105,13 +116,23 @@ export function frontierTileStates(world: FrontierWorld): Record<string, Frontie
   return Object.fromEntries(FRONTIER_TILES.map((tile) => [tile.id, frontierTileState(world, tile)]));
 }
 
+/** Every tile ever taken back (the chapters count these: a Surge never undoes a goal). */
 export function frontierReclaimedCount(world: Pick<MergeWorldState, 'encounters'>): number {
   return FRONTIER_TILES.filter((tile) => frontierTileReclaimed(world, tile.id)).length;
 }
 
-/** The next tile to take back: the first in the light still under the Mist (the order they are met), or null. */
+/** The land held right now: taken back and not contested. What feeds the Lodge. */
+export function frontierHeldCount(world: Pick<MergeWorldState, 'encounters'> & Partial<Pick<MergeWorldState, 'frontierSurges'>>): number {
+  return FRONTIER_TILES.filter((tile) => frontierTileReclaimed(world, tile.id) && !frontierTileContested(world, tile.id)).length;
+}
+
+export function frontierContestedTiles(world: FrontierWorld): FrontierTile[] {
+  return FRONTIER_TILES.filter((tile) => frontierTileState(world, tile) === 'contested');
+}
+
+/** The next tile to fight for: land the Mist took again first, then the first in the light still under the Mist. */
 export function nextFrontierTile(world: FrontierWorld): FrontierTile | null {
-  return FRONTIER_TILES.find((tile) => frontierTileState(world, tile) === 'misted') ?? null;
+  return frontierContestedTiles(world)[0] ?? FRONTIER_TILES.find((tile) => frontierTileState(world, tile) === 'misted') ?? null;
 }
 
 /** The Heart Tree level that lights the next dark tile, or null once every tile is in the light. */
@@ -122,6 +143,51 @@ export function nextFrontierTreeLevel(world: FrontierWorld): number | null {
 
 /** Timber from taking a tile back, once (the land's store, paid with its battle's first clear). */
 export const frontierReclaimTimber = (tile: FrontierTile) => 1 + Math.ceil(tile.power / 2);
+
+/** Timber from taking contested land back again: a little (the land's store was there all along). */
+export const FRONTIER_RETAKE_TIMBER = 1;
+
+/**
+ * Mist Surges (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Part D3): the Mist pushes back. The first comes in Chapter 4,
+ * straight at the Heart Tree (`SURGE_DEFENCE_MISSION_ID`); while it is held, the Mist takes back two edge tiles. From
+ * then on, each new day it takes one (two once ten are held), never more than three contested at once. An edge tile is
+ * held land beside open Mist: a Frontier tile not held, or past the third ring. Which ones is seeded by the day.
+ */
+export const SURGE_DEFENCE_MISSION_ID = 'surge:heart-tree';
+export const FIRST_SURGE_TAKES = 2;
+export const SURGE_MAX_CONTESTED = 3;
+export const dailySurgeTakes = (held: number) => (held >= 10 ? 2 : 1);
+
+export function frontierSurgesStarted(world: Partial<Pick<MergeWorldState, 'frontierSurges'>>): boolean {
+  return world.frontierSurges?.firstHeldAt != null;
+}
+
+const NEIGHBOURS: readonly HexCoord[] = [{ q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 }, { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }];
+const byCell = new Map(FRONTIER_TILES.map((tile) => [`${tile.coord.q},${tile.coord.r}`, tile]));
+const radius = (coord: HexCoord) => Math.max(Math.abs(coord.q), Math.abs(coord.r), Math.abs(coord.q + coord.r));
+function hash(text: string): number {
+  let value = 2166136261;
+  for (let index = 0; index < text.length; index += 1) value = Math.imul(value ^ text.charCodeAt(index), 16777619);
+  return value >>> 0;
+}
+
+/** Held land beside open Mist: where a Surge can strike. */
+export function frontierEdgeTiles(world: FrontierWorld): FrontierTile[] {
+  const held = (tile: FrontierTile) => frontierTileReclaimed(world, tile.id) && !frontierTileContested(world, tile.id);
+  return FRONTIER_TILES.filter((tile) => held(tile) && NEIGHBOURS.some((step) => {
+    const cell = { q: tile.coord.q + step.q, r: tile.coord.r + step.r };
+    if (radius(cell) > 3) return true;
+    const neighbour = byCell.get(`${cell.q},${cell.r}`);
+    return Boolean(neighbour && !held(neighbour));
+  }));
+}
+
+/** The tiles a Surge on this day takes (at most `count`, never past the cap), the same every time it is asked. */
+export function mistSurgePicks(world: FrontierWorld, dayId: string, count: number): string[] {
+  const room = Math.max(0, SURGE_MAX_CONTESTED - frontierContestedTiles(world).length);
+  return frontierEdgeTiles(world).map((tile) => ({ id: tile.id, rank: hash(`${dayId}:${tile.id}`) })).sort((a, b) => a.rank - b.rank)
+    .slice(0, Math.min(count, room)).map((entry) => entry.id);
+}
 
 /** Reclaimed land feeds the Lodge (`lodgeTimberWaiting`): one more Timber in its store per tile, a faster stream per three. */
 export const frontierLodgeStoreBonus = (reclaimed: number) => reclaimed;

@@ -1,4 +1,4 @@
-import { FRONTIER_VARIANT_NAMES, frontierMissionId, type FrontierTile, type FrontierVariant } from '@/constants/frontier-tiles';
+import { FRONTIER_VARIANT_NAMES, frontierMissionId, frontierRetakeMissionId, SURGE_DEFENCE_MISSION_ID, type FrontierTile, type FrontierVariant } from '@/constants/frontier-tiles';
 import { islandLevel, waves, type IslandLaneSpec, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
 import type { RegionMissionDefinition } from '@/constants/island-campaigns/types';
 
@@ -64,4 +64,46 @@ export function frontierMission(tile: FrontierTile): RegionMissionDefinition {
   const named = { ...mission, title: capitalised(mission.title) };
   cache.set(tile.id, named);
   return named;
+}
+
+const retakes = new Map<string, RegionMissionDefinition>();
+
+/**
+ * A contested tile's battle (a Mist Surge took it back): the same land's level a step harder, its own ledger key
+ * (`retake:<tile>`), a smaller purse than the first time.
+ */
+export function frontierRetakeMission(tile: FrontierTile): RegionMissionDefinition {
+  const cached = retakes.get(tile.id);
+  if (cached) return cached;
+  const harder = frontierLevelSpec({ ...tile, power: Math.min(6, tile.power + 1) });
+  const place = FRONTIER_VARIANT_NAMES[tile.variant];
+  const spec: IslandLevelSpec = { ...harder, title: `Retake ${place}`, objective: 'The Mist took it back in the night. Push it out again.', rewards: { glow: 16 + tile.power * 5, xp: 10 + tile.power * 4 } };
+  const mission = islandLevel('retake', tile.id, spec);
+  if (mission.id !== frontierRetakeMissionId(tile.id)) throw new Error(`frontier retake id drifted: ${mission.id}`);
+  retakes.set(tile.id, mission);
+  return mission;
+}
+
+/**
+ * The first Mist Surge (Chapter 4): the Mist comes for the Heart Tree itself, down every lane at once, a striker and a
+ * quick one among them. Docked under the Tree. While it is held, the Mist takes back two edge tiles of the Frontier.
+ */
+export const SURGE_DEFENCE_SPEC: IslandLevelSpec = {
+  title: 'Hold the Heart Tree', objective: 'The Mist is coming for the Heart Tree down every lane. Hold them all.', difficulty: 'thick',
+  pieces: [[36, 1], [37, 1], [38, 2], [39, 1], [40, 1], [44, 1], [46, 1]],
+  veiled: [[31, 1], [30, 1], [32, 1], [24, 2]],
+  mist: [], seeds: { every: 3 }, wisps: [],
+  lanes: [
+    ...waves('surge', { first: 2, gap: 7, hp: 5, step: 4.4, grow: 1, drop: 3 }, [[3], [1, 5], [2, 4], [3], [1, 5], [2, 4]]),
+    { id: 'nibbler', column: 2, at: 16, hp: 6, step: 4.4, look: 'nibbler', strike: 5 },
+    { id: 'quick', column: 4, at: 26, hp: 5, step: 2.8, look: 'snuffer' },
+  ],
+  rewards: { glow: 60, xp: 40 },
+};
+
+let defence: RegionMissionDefinition | null = null;
+export function surgeDefenceMission(): RegionMissionDefinition {
+  defence ??= islandLevel('surge', 'heart-tree', SURGE_DEFENCE_SPEC);
+  if (defence.id !== SURGE_DEFENCE_MISSION_ID) throw new Error(`surge defence id drifted: ${defence.id}`);
+  return defence;
 }

@@ -1,6 +1,6 @@
 import type { MergeCharacterId, MergeWorldState } from '@/types/merge-world';
 import type { UpgradeBenefitIcon } from '@/features/upgrade-stage/upgrade-panel-model';
-import { frontierLodgeRateBonus, frontierLodgeStoreBonus, frontierReclaimedCount } from '@/constants/frontier-tiles';
+import { frontierHeldCount, frontierLodgeRateBonus, frontierLodgeStoreBonus } from '@/constants/frontier-tiles';
 
 /**
  * Hero buildings (cozy 4X, Phase 1): every friend who comes home brings a building to their own tile, the way
@@ -162,11 +162,12 @@ export const lodgeTimberStore = (level: number) => (level < 1 ? 0 : 4 + level * 
  * Timber waiting at the Lodge, from its level and when it was last collected. Land taken back from the Mist feeds it
  * (`constants/frontier-tiles.ts`): a bigger store for every Frontier tile reclaimed, a faster stream for every three.
  */
-export function lodgeTimberWaiting(world: Pick<MergeWorldState, 'heroBuildings'> & Partial<Pick<MergeWorldState, 'encounters'>>, now: number): number {
+export function lodgeTimberWaiting(world: Pick<MergeWorldState, 'heroBuildings'> & Partial<Pick<MergeWorldState, 'encounters' | 'frontierSurges'>>, now: number): number {
   const lodge = world.heroBuildings?.['explorers-lodge'];
   if (!lodge || lodge.level < 1) return 0;
   const since = Math.max(0, now - (lodge.collectedAt ?? lodge.builtAt));
-  const reclaimed = frontierReclaimedCount(world);
+  // Land the Mist has taken again (contested) feeds nothing until it is taken back.
+  const reclaimed = frontierHeldCount(world);
   return Math.min(lodgeTimberStore(lodge.level) + frontierLodgeStoreBonus(reclaimed), Math.floor(since / LODGE_PRODUCTION_INTERVAL_MS) * (lodgeTimberPerInterval(lodge.level) + frontierLodgeRateBonus(reclaimed)));
 }
 
