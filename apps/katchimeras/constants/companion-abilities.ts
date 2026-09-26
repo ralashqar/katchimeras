@@ -9,7 +9,7 @@ import type { MergeCharacterId } from '@/types/merge-world';
 export const COMPANION_ABILITIES: readonly CompanionAbilityDefinition[] = [
   {
     id: 'bloom', companion: 'mossprout', name: 'Bloom', targeting: 'item',
-    description: 'Raise one plant a step: a bigger piece clears more Mist when it merges.',
+    description: 'Raise one plant a size: it shoots harder at once.',
     tiers: [
       { level: 1, chargeEvery: 8, maxTier: 2 },
       { level: 2, chargeEvery: 7, maxTier: 2 },
@@ -22,7 +22,7 @@ export const COMPANION_ABILITIES: readonly CompanionAbilityDefinition[] = [
   },
   {
     id: 'clear-path', companion: 'steppling', name: 'Clear Path', targeting: 'mist',
-    description: 'Steppling clears one Mist cell, whatever it is.',
+    description: 'Steppling clears one Mist cell, whatever it holds, and frees what is under it.',
     tiers: [
       { level: 1, chargeEvery: 6 },
       { level: 2, chargeEvery: 5 },
@@ -33,7 +33,7 @@ export const COMPANION_ABILITIES: readonly CompanionAbilityDefinition[] = [
   },
   {
     id: 'focus', companion: 'baristabbit', name: 'Focus', targeting: 'none',
-    description: 'The next merge clears as if it were one step bigger.',
+    description: 'The next merge lands a size bigger.',
     tiers: [
       { level: 1, chargeEvery: 7, boost: 1 },
       { level: 2, chargeEvery: 6, boost: 1 },

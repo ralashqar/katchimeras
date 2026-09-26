@@ -51,6 +51,9 @@ export const FIRST_BATTLE_LINES = {
   pushed: 'Hold on! I pushed it back. Keep going!',
 } as const;
 
+/** The first battle's enemy, arriving: a Mistwisp's own words, before Mossprout's (the one time they are named). */
+export const FIRST_BATTLE_WISP = { speaker: 'Mistwisp', text: 'One light left. We will take it too.' } as const;
+
 /** The Mist retreats (beat 7): the veil lift, and Mossprout can hardly believe it. */
 export const MIST_RETREAT_LINES: readonly string[] = ['We did it.', 'We actually did it.'];
 

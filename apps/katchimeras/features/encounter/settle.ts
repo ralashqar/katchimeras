@@ -144,6 +144,20 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
     if (run.ability) run = { ...run, ability: { ...run.ability, charge: run.ability.charge + 1 } };
     // The second hero's ability charges from the same merges.
     if (run.partnerAbility) run = { ...run, partnerAbility: { ...run.partnerAbility, charge: run.partnerAbility.charge + 1 } };
+    // Focus in a Lanes battle: the merge lands a size bigger (or more), and the boost is spent.
+    const lanesBoost = lanes ? before.run.boost?.next ?? 0 : 0;
+    if (lanesBoost > 0) {
+      let made = state.board[result.mergedCell]?.occupant;
+      for (let step = 0; step < lanesBoost && made?.kind === 'item'; step += 1) {
+        const up = items.get(made.definitionId)?.nextItemId;
+        if (!up) break;
+        const cells = [...state.board];
+        made = { ...made, definitionId: up };
+        cells[result.mergedCell] = { ...cells[result.mergedCell]!, occupant: made };
+        state = { ...state, board: cells, revision: state.revision + 1 };
+      }
+      run = { ...run, boost: { next: 0, water: run.boost?.water ?? 0 } };
+    }
     if (lanes && mechanicState.kind === 'lanes') {
       const made = state.board[result.mergedCell]?.occupant;
       mechanicState = lanesAfterMerge(mechanicState, made?.kind === 'item' ? made.instanceId : null);

@@ -191,7 +191,7 @@ export const KingdomOpeningMergeDock = memo(function KingdomOpeningMergeDock({ r
 /** How far the header's bottom edge sits under the top of the bar. */
 const HEADER_TUCK = 24;
 
-export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, landings, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, headerGap, overlay, rootRef, animateArrivals, onHoverCell, externalEffects, heldMist, hideBar = false }: {
+export const MistMissionDock = memo(function MistMissionDock({ state, boardStep, progress, required, layout = OPENING_BOARD_LAYOUT, barTitle = 'Drive off the Mist', interactionKey, sessionId, hiddenItemIds, width, bottomInset, landings, onCommand, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onClose, closeLabel, header, footer, headerGap, overlay, rootRef, animateArrivals, onHoverCell, externalEffects, heldMist, hideBar = false }: {
   /** The cell a held piece is over (-1 when none). */
   onHoverCell?: (cell: number, source: number) => void;
   /** Effects the owner asks the board to play on cells (a piece a wisp ate puffs away). */
@@ -228,6 +228,8 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
   closeLabel?: string;
   /** A card above the bar (a friend's request tray). */
   header?: ReactNode;
+  /** Under the board (a Lanes battle's hero abilities): the space over it stays the wisps'. */
+  footer?: ReactNode;
   /** How far the header's bottom edge sits above the top of the bar; negative tucks it under. Default: tucked by HEADER_TUCK. */
   headerGap?: number;
   /** Drawn over the whole dock (a delivery flight into the board). */
@@ -365,6 +367,7 @@ export const MistMissionDock = memo(function MistMissionDock({ state, boardStep,
       trayEntries={[]}
       width={boardWidth}
     />
+    {footer ? <View pointerEvents="box-none" style={{ width: boardWidth, alignSelf: 'center', marginTop: 8 }}>{footer}</View> : null}
     {overlay}
   </Animated.View>;
 });

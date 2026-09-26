@@ -412,6 +412,15 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
       {encounter.outcome?.cleared ? <View style={styles.pill}><Text style={styles.pillValue}>{gradeLabel(encounter.outcome.grade)}</Text></View> : null}
     </View>
   </View> : null;
+  // Lanes: the heroes' abilities under the board (the sky over it stays the wisps'), charged by merges.
+  const heroFooter = encounter?.lanes && (lead || partner) ? <View pointerEvents="box-none" style={styles.heroRow}>
+    {([[lead, 0], [partner, 1]] as const).map(([shown, slot]) => shown ? <Pressable key={`hero-ability:${slot}`} accessibilityRole="button" accessibilityState={{ disabled: !shown.ready }}
+      accessibilityLabel={`${shown.definition.name}: ${shown.definition.description} ${shown.ready ? 'Ready' : `${shown.charge} of ${shown.tier.chargeEvery} charged`}`}
+      onPress={() => pressAbility(slot)} style={[styles.heroButton, shown.ready ? styles.abilityReady : null, picking && pickSlot === slot ? styles.abilityPicking : null]}>
+      <Text style={styles.abilityName}>{shown.definition.name}</Text>
+      <Text style={styles.abilityCharge}>{shown.ready ? (picking && pickSlot === slot ? 'Choose a target' : 'Ready') : `${Math.min(shown.charge, shown.tier.chargeEvery)}/${shown.tier.chargeEvery} merges`}</Text>
+    </Pressable> : null)}
+  </View> : null;
   const cellBox = (cell: number) => {
     const metrics = boardMetricsRef.current;
     if (!metrics || !boardOffset) return null;
@@ -480,7 +489,7 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
     interactionKey={`${mission.id}:${boardStep?.id ?? 'free'}`} sessionId={sessionId} hiddenItemIds={hiddenItemIds}
     width={width} bottomInset={bottomInset} landings={landings}
     onCommand={dispatch} onBoardMetrics={handleMetrics} onBlockedInteraction={onBlockedInteraction} onEntranceSettled={handleEntranceSettled}
-    rootRef={rootRef} header={header} headerGap={encounter ? 6 : undefined} overlay={overlay} onHoverCell={encounter?.territory ? aimFromCell : undefined}
+    rootRef={rootRef} header={header} footer={heroFooter} headerGap={encounter ? 6 : undefined} overlay={overlay} onHoverCell={encounter?.territory ? aimFromCell : undefined}
     layout={boardLayout}
     animateArrivals={Boolean(encounter)} externalEffects={effectCells} heldMist={heldMist} hideBar={Boolean(encounter?.lanes)} />;
 });
@@ -489,6 +498,8 @@ const styles = StyleSheet.create({
   header: { alignSelf: 'stretch', alignItems: 'center', gap: 6 },
   speechRow: { alignItems: 'center' },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  heroRow: { flexDirection: 'row', alignItems: 'stretch', justifyContent: 'center', gap: 10 },
+  heroButton: { flex: 1, maxWidth: 200, alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, borderCurve: 'continuous', backgroundColor: 'rgba(244,249,253,0.78)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.75)' },
   pill: { flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#F4F9FD', borderWidth: 1.5, borderColor: '#FFFFFF', boxShadow: '0 3px 10px rgba(20,40,60,0.14)' },
   pillLow: { backgroundColor: '#FFF0E6', borderColor: '#FFD9C2' },
   meterPill: { alignItems: 'center' },

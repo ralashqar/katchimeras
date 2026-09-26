@@ -132,7 +132,7 @@ import { mergeOrderReady, mergeOrderServingCells } from '@/utils/merge-world/eng
 import { createSupplyRunBoard, kitchenOpen, supplyOrder, supplyRunSlots } from '@/features/supply-run/supply-run';
 import { LastClearingHeartTree } from '@/components/katchadeck/world/last-clearing-heart-tree';
 import { LastClearingTitleCard } from '@/components/katchadeck/world/last-clearing-title-card';
-import { FIRST_BATTLE, firstBattleLine, LOST_TRAIL_BATTLES, LOST_TRAIL_RESCUE_CELL, lostTrailLine, rescueBattleLine, scriptedBattleGuide, stickyBattleGuide } from '@/constants/last-clearing-battle';
+import { FIRST_BATTLE, firstBattleLine, LOST_TRAIL_BATTLES, LOST_TRAIL_RESCUE_CELL, lostTrailLine, FIRST_BATTLE_INTRO_MS, rescueBattleLine, scriptedBattleGuide, stickyBattleGuide } from '@/constants/last-clearing-battle';
 import { LastClearingStepplingMeets, TrappedFriendSilhouette } from '@/components/katchadeck/world/last-clearing-rescue';
 import { mergeCellCenter, mergeCellOrigin } from '@/utils/merge-world/board-geometry';
 
@@ -1130,7 +1130,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [battle?.store.mechanicState, battle?.store.state, battleEncounter, openingBoardActive]);
   const firstBattleHintKey = firstBattleHint ? `${firstBattleHint.kind}:${firstBattleHint.from}:${firstBattleHint.to}` : null;
   const battleMerges = battle?.store.merges ?? 0;
-  const firstBattleHintDelay = firstBattleStepActive && battleMerges === 0 ? 0 : firstBattleHint?.kind === 'wake' || battleMerges === 0 ? FIRST_BATTLE_WAKE_HINT_DELAY_MS : FIRST_BATTLE_HINT_DELAY_MS;
+  // The first battle's first finger waits for the enemy's entrance (a Mistwisp arrives and speaks): the wisps first, then the lesson.
+  const firstBattleHintDelay = firstBattleStepActive && battleMerges === 0 ? FIRST_BATTLE_INTRO_MS : firstBattleHint?.kind === 'wake' || battleMerges === 0 ? FIRST_BATTLE_WAKE_HINT_DELAY_MS : FIRST_BATTLE_HINT_DELAY_MS;
   const [shownBattleHint, setShownBattleHint] = useState<{ key: string; revision: number } | null>(null);
   useEffect(() => {
     setShownBattleHint(null);

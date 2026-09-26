@@ -1,5 +1,5 @@
 import { islandLevel, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
-import { FIRST_BATTLE_LINES, LOST_TRAIL_LINES, LOST_TRAIL_STONE_BATTLE_IDS, LOST_TRAIL_VOICE, LOST_TRAIL_VOICE_LINES } from '@/features/onboarding/last-clearing';
+import { FIRST_BATTLE_LINES, FIRST_BATTLE_WISP, LOST_TRAIL_LINES, LOST_TRAIL_STONE_BATTLE_IDS, LOST_TRAIL_VOICE, LOST_TRAIL_VOICE_LINES } from '@/features/onboarding/last-clearing';
 import type { SpeechLine } from '@/components/katchadeck/world/friend-speech-bubble';
 import type { RescueBattleCopy } from '@/types/hatchable-companion';
 import type { EncounterDefinition } from '@/types/encounter';
@@ -63,6 +63,11 @@ const WAKE_LINE_MERGES = 3;
 
 export const FIRST_BATTLE: EncounterDefinition = islandLevel('last-clearing', 'first-battle', SPEC).encounter;
 
+/** The first wisp's own line stays up this long after it arrives. */
+const FIRST_WISP_LINE_MS = 2_600;
+/** The first battle's finger waits for the enemy's entrance and its line (ms after the dock is up). */
+export const FIRST_BATTLE_INTRO_MS = 3_400;
+
 /** A line stays up this long after a wisp was pushed back. */
 const PUSHED_LINE_MS = 4_000;
 
@@ -71,7 +76,7 @@ const PUSHED_LINE_MS = 4_000;
  * first wisp comes down, relief when it falls, the spitter's Mist, the last stand, and a steadying word whenever a
  * wisp had to be pushed back.
  */
-export function firstBattleLine(input: { mechanicState: MissionMechanicState; merges: number; board: MergeWorldState }): string | null {
+export function firstBattleLine(input: { mechanicState: MissionMechanicState; merges: number; board: MergeWorldState }): SpeechLine | null {
   const lanes = input.mechanicState.kind === 'lanes' ? input.mechanicState : null;
   if (!lanes) return null;
   const mechanic = FIRST_BATTLE.mechanic?.kind === 'lanes' ? FIRST_BATTLE.mechanic : null;
@@ -80,6 +85,8 @@ export function firstBattleLine(input: { mechanicState: MissionMechanicState; me
   const arrived = (index: number) => lanes.clock >= (mechanic.wisps[index]?.at ?? 0) - advance;
   const alive = (index: number) => (lanes.wisps[index]?.damage ?? 0) < (mechanic.wisps[index]?.hp ?? 0);
   if (lanes.lastPushAt != null && lanes.clock - lanes.lastPushAt < PUSHED_LINE_MS) return FIRST_BATTLE_LINES.pushed;
+  // The enemy first: as the first wisp arrives it speaks, then Mossprout sees them.
+  if (input.merges === 0 && arrived(FIRST_LIGHT) && lanes.clock - (mechanic.wisps[FIRST_LIGHT]!.at - advance) < FIRST_WISP_LINE_MS) return { ...FIRST_BATTLE_WISP, muffled: true };
   if (input.merges === 0) return FIRST_BATTLE_LINES.found;
   const sleeping = input.board.board.some((cell) => cell?.mist?.kind === 'echo' || cell?.mist?.kind === 'veiled');
   if (input.merges < WAKE_LINE_MERGES && sleeping) return FIRST_BATTLE_LINES.wake;

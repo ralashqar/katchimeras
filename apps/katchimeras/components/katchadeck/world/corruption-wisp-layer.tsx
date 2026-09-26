@@ -8,6 +8,7 @@ import { pulseTarget } from '@/features/mission-mechanics/dark-wisps';
 import { StyleSheet, Text, View, type View as ViewType } from 'react-native';
 import Animated, { cancelAnimation, Easing, FadeInDown, FadeOut, ZoomIn, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
+import * as Haptics from 'expo-haptics';
 
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import type { RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
@@ -29,6 +30,8 @@ const LINGER_MS = 800;
 const DEATH_MS = 440;
 /** A wisp's arrival: it swells up out of nothing with a little overshoot, then shivers into place. */
 const ENTRANCE_MS = 460;
+/** A wisp arriving mid-battle: longer, bigger overshoot (`CorruptionWisp`). */
+const ARRIVAL_MS = 620;
 const ENTRANCE_STAGGER_MS = 150;
 /**
  * A board put away mid-mission: the wisps still standing shrink and fade out
@@ -393,13 +396,23 @@ const CorruptionWisp = memo(function CorruptionWisp({ drift = false, vy = 0, ind
   const entrance = useSharedValue(0);
   // A wisp already felled when it mounts (a resumed board) was never here: no death to play.
   const [gone, setGone] = useState(() => !alive);
-  // v2: one held back until called arrives the first time it is alive.
+  // A wisp arriving mid-battle (a Lanes wisp coming in over its column, one held back until called) makes an entrance:
+  // it bursts in big from nothing, overshoots once, shudders, a ring of Mist bursts where it appears, and the phone
+  // bumps. It is the enemy arriving, and it should read that way.
+  const [arrivalNonce, setArrivalNonce] = useState(0);
   useEffect(() => {
     if (!alive || !gone) return;
     setGone(false);
     death.value = 0;
     entrance.value = 0;
-    entrance.value = withTiming(1, { duration: reduceMotion ? 80 : ENTRANCE_MS, easing: Easing.out(Easing.back(1.6)) });
+    entrance.value = withTiming(1, { duration: reduceMotion ? 80 : ARRIVAL_MS, easing: Easing.out(Easing.back(2.4)) });
+    if (!reduceMotion) {
+      shake.value = withDelay(ARRIVAL_MS - 120, withSequence(
+        withTiming(1, { duration: 45 }), withTiming(-1, { duration: 60 }), withTiming(0.6, { duration: 50 }), withTiming(-0.3, { duration: 45 }), withTiming(0, { duration: 40 }),
+      ));
+      setArrivalNonce((value) => value + 1);
+      arrivalHaptic();
+    }
   // Only when it comes to life.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alive]);
@@ -518,6 +531,7 @@ const CorruptionWisp = memo(function CorruptionWisp({ drift = false, vy = 0, ind
       <Image accessibilityIgnoresInvertColors accessibilityLabel={look ? `A ${look} wisp` : 'A corruption wisp'} contentFit="contain" source={isDarkWispLook(look) ? DARK_WISP_LOOK_ART[look] : WISP_ART} style={StyleSheet.absoluteFill} transition={0} />
     </Animated.View>
     {!alive ? <DeathBurst size={size} reduceMotion={reduceMotion} /> : null}
+    {arrivalNonce && alive ? <ArrivalBurst key={`arrival:${arrivalNonce}`} size={size} /> : null}
     {aimed && alive ? <Animated.View entering={reduceMotion ? undefined : ZoomIn.duration(160)} exiting={reduceMotion ? undefined : FadeOut.duration(140)} pointerEvents="none" style={[styles.aim, { width: size * 1.35, height: size * 1.35, borderRadius: size, left: -size * 0.175, top: -size * 0.175 }]} /> : null}
     {/* Its badges arrive with it: they grow in as it does, never before it. */}
     <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, badgeStyle]}>
@@ -572,6 +586,29 @@ const Ember = memo(function Ember({ ember, size }: { ember: (typeof EMBERS)[numb
 });
 
 /** The wisp's last breath: a ring of embers thrown outward and gone. */
+/** A wisp's arrival: a ring of Mist bursting out from where it appears, and motes flung from it. */
+function ArrivalBurst({ size }: { size: number }) {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
+    return () => cancelAnimation(t);
+  }, [t]);
+  const ring = useAnimatedStyle(() => ({ opacity: (1 - t.value) * 0.85, transform: [{ scale: 0.5 + t.value * 1.6 }] }));
+  return <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.burst]}>
+    <Animated.View style={[{ position: 'absolute', width: size, height: size, borderRadius: size / 2, borderWidth: Math.max(3, size * 0.07), borderColor: 'rgba(150,110,220,0.9)' }, ring]} />
+    {Array.from({ length: DEATH_MOTES }, (_, index) => <DeathMote key={index} index={index} size={size * 1.3} t={t} />)}
+  </View>;
+}
+
+/** One bump for arrivals close together (a wave of three is one moment, not three). */
+let lastArrivalHapticAt = 0;
+function arrivalHaptic() {
+  const now = Date.now();
+  if (now - lastArrivalHapticAt < 450 || process.env.EXPO_OS !== 'ios') return;
+  lastArrivalHapticAt = now;
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+}
+
 function DeathBurst({ size, reduceMotion }: { size: number; reduceMotion: boolean }) {
   const t = useSharedValue(0);
   useEffect(() => {
