@@ -610,7 +610,7 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
         ...current,
         coins: Math.min(999_999, current.coins + glow),
         materials: { ...current.materials, timber: (current.materials?.timber ?? 0) + timber, meals: (current.materials?.meals ?? 0) + meals },
-        supplyRun: { slots, served, crates: (run.crates ?? 0) + (crate ? 1 : 0) },
+        supplyRun: { slots, served, crates: (run.crates ?? 0) + (crate ? 1 : 0), kitchenServed: (run.kitchenServed ?? 0) + (command.kitchen ? 1 : 0) },
       }, command.now));
     }
     case 'upgradeHeartTree': {
@@ -4449,10 +4449,10 @@ function normalizeMaterials(value: unknown): MergeWorldState['materials'] {
 function normalizeSupplyRun(value: unknown): MergeWorldState['supplyRun'] {
   if (!value || typeof value !== 'object') return undefined;
   const raw = value as { slots?: unknown; served?: unknown };
-  const raw2 = raw as { crates?: unknown };
+  const raw2 = raw as { crates?: unknown; kitchenServed?: unknown };
   const slots = Array.isArray(raw.slots) && raw.slots.length === 2 && raw.slots.every((slot) => Number.isInteger(slot) && Number(slot) >= 0)
     ? [Number(raw.slots[0]), Number(raw.slots[1])] as const : [0, 0] as const;
-  return { slots, served: Math.max(0, Math.floor(Number(raw.served) || 0)), crates: Math.max(0, Math.floor(Number(raw2.crates) || 0)) };
+  return { slots, served: Math.max(0, Math.floor(Number(raw.served) || 0)), crates: Math.max(0, Math.floor(Number(raw2.crates) || 0)), kitchenServed: Math.max(0, Math.floor(Number(raw2.kitchenServed) || 0)) };
 }
 
 function normalizeHeartTree(value: unknown): MergeWorldState['heartTree'] {

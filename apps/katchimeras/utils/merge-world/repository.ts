@@ -783,8 +783,8 @@ export async function ensureStoredOpeningGlow(receiptId: string, amount: number 
 }
 
 /** A Supply Run order served: Timber and Glow into the world, once per pool index (`completeSupplyOrder`). */
-export function completeStoredSupplyOrder(slot: 0 | 1, index: number, timber: number, glow: number, crate?: { every: number; timber: number; glow: number; meals?: number }, meals = 0, now = gameNow()) {
-  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'completeSupplyOrder', slot, index, timber, glow, meals, ...(crate ? { crate } : {}), now }), now);
+export function completeStoredSupplyOrder(slot: 0 | 1, index: number, timber: number, glow: number, crate?: { every: number; timber: number; glow: number; meals?: number }, meals = 0, now = gameNow(), kitchen = false) {
+  return reduceStoredMergeWorld((state) => reduceMergeWorld(state, { type: 'completeSupplyOrder', slot, index, timber, glow, meals, ...(crate ? { crate } : {}), ...(kitchen ? { kitchen: true } : {}), now }), now);
 }
 
 /** A hero building up a level (`upgradeHeroBuilding`); throws the reason when it cannot. */

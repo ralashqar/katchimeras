@@ -126,7 +126,7 @@ import { ConversationNarrativeOverlay } from '@/components/katchadeck/world/conv
 import { SupplyRunDock, type SupplyRunOrder } from '@/components/katchadeck/world/supply-run-dock';
 import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from '@/components/katchadeck/games/merge-serve-reward-overlay';
 import { mergeOrderReady, mergeOrderServingCells } from '@/utils/merge-world/engine';
-import { createSupplyRunBoard, kitchenOpen, SUPPLY_CRATE, supplyOrder, supplyRunSlots } from '@/features/supply-run/supply-run';
+import { createSupplyRunBoard, kitchenOpen, supplyOrder, supplyRunSlots } from '@/features/supply-run/supply-run';
 import { LastClearingHeartTree } from '@/components/katchadeck/world/last-clearing-heart-tree';
 import { LastClearingTitleCard } from '@/components/katchadeck/world/last-clearing-title-card';
 import { FIRST_BATTLE, firstBattleLine, LOST_TRAIL_BATTLES, LOST_TRAIL_RESCUE_CELL, lostTrailLine, rescueBattleLine, scriptedBattleGuide, stickyBattleGuide } from '@/constants/last-clearing-battle';
@@ -3064,7 +3064,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const kitchen = kitchenOpen(mergeWorld);
   const createCafeBoard = useCallback((now: number) => createSupplyRunBoard(now, kitchen), [kitchen]);
   // v2: coffee is the Café's one drink chain (a board saved with juice on it starts fresh).
-  const supplyRunStore = useMissionBoard('katchimeras.cafe.v2', supplyRunOpen ? (kitchen ? 'kitchen' : 'supply-run') : null, createCafeBoard);
+  const supplyRunStore = useMissionBoard('katchimeras.cafe.v3', supplyRunOpen ? (kitchen ? 'kitchen' : 'supply-run') : null, createCafeBoard);
   const supplyRunDocked = supplyRunOpen && screenFocused && Boolean(supplyRunStore.state);
   // Back ends a Café visit whenever: the board keeps everything for next time. Not while an order's pieces are flying.
   const leaveCafe = useCallback(() => { if (!supplyServingRef.current) setSupplyRunOpen(false); }, []);
@@ -3107,21 +3107,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (!served?.changed) return false;
     const before = mergeWorldRef.current.coins;
     const servedBefore = mergeWorldRef.current.supplyRun?.served ?? 0;
-    // The Explorer's Lodge pays extra Glow in every crate; Feastle's Kitchen extra Meals.
-    const lodge = heroBuildingLevel(mergeWorldRef.current, 'explorers-lodge');
     const { timber, meals } = supplyOrderPayout(entry);
-    const crate = { ...SUPPLY_CRATE, glow: SUPPLY_CRATE.glow + lodgeCrateGlowBonus(lodge), meals: SUPPLY_CRATE.meals + kitchenCrateMealsBonus(heroBuildingLevel(mergeWorldRef.current, 'feastle-kitchen')) };
-    const paid = await completeStoredSupplyOrder(entry.slot, entry.index, timber, entry.order.reward.coins, crate, meals).catch((error) => { console.warn('The order could not be paid', error); return null; });
-    const servedAfter = paid?.state.supplyRun?.served ?? servedBefore;
-    if (servedAfter > servedBefore && servedAfter % SUPPLY_CRATE.every === 0) {
-      // A crate filled: its bonus is shown (the order's own pay already flew in). The visit goes on; Back ends it.
-      setSupplyCrateFull(true);
-      setBattleReward({ key: `supply-crate:${servedAfter}`, eyebrow: 'Café crate', title: 'Crate filled!', stars: 0,
-        glow: crate.glow, timber: crate.timber, meals: crate.meals, before: before + entry.order.reward.coins,
-        finish: () => { setSupplyCrateFull(false); } });
-      countGlowIn(before, entry.order.reward.coins);
-      return true;
-    }
+    // One continuous board: each order pays and the next takes its place (no crates).
+    await completeStoredSupplyOrder(entry.slot, entry.index, timber, entry.order.reward.coins, undefined, meals, undefined, kitchen).catch((error) => { console.warn('The order could not be paid', error); return null; });
     countGlowIn(before, entry.order.reward.coins);
     return true;
   // `countGlowIn` is declared below and stable.
@@ -3311,12 +3299,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // the goal is a crate; no bar at all otherwise.
   const cafeBar = useMemo(() => {
     const goal = chapterState?.goal;
-    if (goal?.action.kind !== 'supply_run') return null;
-    const served = mergeWorld.supplyRun?.served ?? 0;
-    const orders = /^Serve (\d+)/.exec(goal.title);
-    if (orders) return { progress: Math.min(served, Number(orders[1])), required: Number(orders[1]) };
-    return { progress: served % SUPPLY_CRATE.every, required: SUPPLY_CRATE.every };
-  }, [chapterState?.goal, mergeWorld.supplyRun?.served]);
+    const count = goal?.action.kind === 'supply_run' ? goal.progress?.(mergeWorld) : null;
+    return count ? { progress: count.current, required: count.total } : null;
+  }, [chapterState?.goal, mergeWorld]);
   // When the Café's goal is done, the visit ends on its own and the next goal opens: nothing to find, no bar to restart.
   const cafeGoalRef = useRef<string | null>(null);
   useEffect(() => {

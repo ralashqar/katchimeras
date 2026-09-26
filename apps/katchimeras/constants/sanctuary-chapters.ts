@@ -35,6 +35,8 @@ export type ChapterGoal = {
   detail: string;
   done: (world: MergeWorldState) => boolean;
   action: ChapterGoalAction;
+  /** How far along a counted goal is (the Café's orders): the Café's bar shows it. */
+  progress?: (world: MergeWorldState) => { current: number; total: number };
   /** A light kept on a misted tile while this goal is the one to do (Baristabbit's lit window): where to look. */
   beacon?: { tileId: string; color: string };
 };
@@ -119,7 +121,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     },
     goals: [
       { id: 'baristabbit-home', title: 'Answer the lit window', detail: 'Someone has kept a lamp lit by that window all this time. The wisps are drawn to it. Get there first.', done: (world) => world.companionDiscovery.records.some((record) => record.characterId === 'baristabbit'), action: { kind: 'world_offer', offerId: 'mist:baristabbit-home' }, beacon: LIT_WINDOW_BEACON },
-      { id: 'supply-run', title: 'Serve 3 orders at Baristabbit’s Café', detail: 'Heroes fight on full bellies. Merge what friends ask for and serve it: every order pays Meals.', done: (world) => (world.supplyRun?.served ?? 0) >= 3, action: { kind: 'supply_run' } },
+      { id: 'supply-run', title: 'Serve your first order at the Café', detail: 'Heroes fight on full bellies. Merge what a friend asks for and serve it: every order pays Meals.', done: (world) => (world.supplyRun?.served ?? 0) >= 1, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(1, world.supplyRun?.served ?? 0), total: 1 }) },
       { id: 'train-mossprout', title: 'Train Mossprout to level 2', detail: 'Battles gave Mossprout experience. Meals and Glow turn it into strength.', done: (world) => heroLevel(world, 'mossprout') >= 2, action: { kind: 'hero', characterId: 'mossprout' } },
     ],
     reward: { glow: 50 },
@@ -130,7 +132,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     goals: [
       { id: 'lodge-built', title: 'Build Steppling\u2019s Explorer\u2019s Lodge', detail: 'Every friend who comes home needs a home of their own. Glow and Timber.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 1, action: { kind: 'hero_building', id: 'explorers-lodge' } },
       { id: 'cafe-built', title: 'Build Baristabbit\u2019s Caf\u00e9', detail: 'A real caf\u00e9 around his window: better drinks, and more Meals from every order.', done: (world) => heroBuildingLevel(world, 'baristabbit-cafe') >= 1, action: { kind: 'hero_building', id: 'baristabbit-cafe' } },
-      { id: 'supply-crate', title: 'Fill a Caf\u00e9 crate', detail: 'Five orders at the Caf\u00e9 fill a crate. The Lodge makes every order pay more Timber.', done: (world) => (world.supplyRun?.crates ?? 0) >= 1, action: { kind: 'supply_run' } },
+      { id: 'supply-orders', title: 'Serve 4 orders at the Café', detail: 'Every order pays Meals and Timber. The Lodge makes every order pay more Timber.', done: (world) => (world.supplyRun?.served ?? 0) >= 4, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(4, world.supplyRun?.served ?? 0), total: 4 }) },
       { id: 'lodge-2', title: 'Upgrade the Lodge to level 2', detail: 'A bigger Lodge lets Steppling grow further, and pays more on every run.', done: (world) => heroBuildingLevel(world, 'explorers-lodge') >= 2, action: { kind: 'hero_building', id: 'explorers-lodge' } },
       { id: 'tree-2', title: 'Grow the Heart Tree to level 2', detail: 'Nothing in the Sanctuary grows past the Heart Tree. The Lodge’s Timber helps.', done: (world) => heartTreeLevel(world) >= 2, action: { kind: 'heart_tree' } },
     ],
@@ -162,7 +164,7 @@ export const SANCTUARY_CHAPTERS: readonly SanctuaryChapter[] = [
     goals: [
       { id: 'feastle-home', title: 'Follow the smell of supper', detail: 'Someone has kept a table warm in the Mist. A spoon taps against a bowl.', done: (world) => world.companionDiscovery.records.some((record) => record.characterId === 'feastle'), action: { kind: 'world_offer', offerId: 'mist:feastle-home' } },
       { id: 'kitchen-built', title: 'Build Feastle\u2019s Kitchen', detail: 'Feastle wants a proper stove. Better dishes, and bigger crates.', done: (world) => heroBuildingLevel(world, 'feastle-kitchen') >= 1, action: { kind: 'hero_building', id: 'feastle-kitchen' } },
-      { id: 'kitchen-crate', title: 'Fill a Kitchen crate', detail: 'Feastle’s feasts pay the most Meals. A fed team is a strong team.', done: (world) => (world.supplyRun?.crates ?? 0) >= 2, action: { kind: 'supply_run' } },
+      { id: 'kitchen-feasts', title: 'Serve 3 of Feastle’s feasts', detail: 'Feastle’s feasts pay the most Meals. A fed team is a strong team.', done: (world) => (world.supplyRun?.kitchenServed ?? 0) >= 3, action: { kind: 'supply_run' }, progress: (world) => ({ current: Math.min(3, world.supplyRun?.kitchenServed ?? 0), total: 3 }) },
       { id: 'bloom-house', title: 'Build Petalimp’s Bloom House', detail: 'Petalimp needs a home of her own. Hers makes Seeds come faster in every battle.', done: (world) => heroBuildingLevel(world, 'bloom-house') >= 1, action: { kind: 'hero_building', id: 'bloom-house' } },
     ],
     reward: { glow: 55 },

@@ -42,7 +42,7 @@ test('Feastle comes home without an Egg once Petalimp is home, and turns the Caf
   assert.equal(kitchenOpen(home), true);
   const board = createSupplyRunBoard(1_000, true);
   const generators = board.board.flatMap((cell) => (cell.occupant?.kind === 'generator' ? [cell.occupant.generatorId] : []));
-  assert.deepEqual(generators.sort(), ['cafe-counter', 'hearth-pantry', 'ritual-bar']);
+  assert.deepEqual(generators.sort(), ['hearth-pantry', 'ritual-bar'], 'the coffee bar, and Feastle’s food chain');
   const chains = new Set(generators.flatMap((id) => {
     const generator = board.generators[id];
     return [...(generator?.tierOneDropDefinitionIds ?? []), ...(generator?.forcedDropDefinitionId ? [generator.forcedDropDefinitionId] : [])].map((drop) => drop.replace(/:\d+$/, ''));

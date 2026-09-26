@@ -6,13 +6,13 @@ import type { MergeCharacterId, MergeOrder, MergeWorldState } from '@/types/merg
  * Baristabbit's Café (cozy 4X, the calm half of the loop; the gathering that feeds the team): a docked board with no
  * wisps, where the Sanctuary's friends order drinks and treats. Merge up what they ask for and serve it: each order pays
  * Meals (the team's food, spent training heroes), a little Timber and a little Glow, and the next order takes its place.
- * The Ritual Bar pours drinks and the Café Counter bakes pastries; a few pieces sleep under the Mist at the start and
+ * The Ritual Bar pours coffee (the one chain); a few pieces sleep under the Mist at the start and
  * wake the way the first boards taught. It opens once Baristabbit is home.
  *
  * Each of the two cards belongs to one friend (Steppling, then Mossprout) and keeps them: only the order on it changes.
  * Each friend's orders come from their own authored list, in order, and repeat a little richer each time round. The world
  * keeps which order each card shows (`supplyRun.slots`) and how many have been served, so a relaunch shows the same two
- * and nothing is paid twice. Every `SUPPLY_CRATE.every` orders fill a crate, which pays a bonus and ends the visit.
+ * and nothing is paid twice. It is one continuous board: no crates, no end; Back ends a visit whenever.
  */
 export type CafeChain = 'drink:refresh' | 'drink:hot' | 'food:cafe-pastry' | 'food:table' | 'food:dessert';
 export type SupplyOrderSpec = {
@@ -30,20 +30,20 @@ export type SupplyOrderSpec = {
 export const SUPPLY_SLOT_CHARACTERS: readonly [MergeCharacterId, MergeCharacterId] = ['steppling', 'mossprout'];
 
 /**
- * Steppling wants trail snacks and a coffee for the road; Mossprout wants something warm and a biscuit under the Heart
- * Tree. The Café pours one drink chain, coffee (`drink:hot`: Tiny Espresso, Caramel Latte, Strawberry Boba...), and bakes
- * one pastry chain.
+ * The Café pours one chain, coffee (`drink:hot`: Tiny Espresso, Caramel Latte, Strawberry Boba, Matcha Cloud Frappe...),
+ * from the Ritual Bar: nothing else to learn while the Café is being introduced. Steppling wants something for the trail;
+ * Mossprout something warm under the Heart Tree. The first orders are small.
  */
 export const SUPPLY_ORDER_POOLS: Readonly<Record<'steppling' | 'mossprout', readonly SupplyOrderSpec[]>> = {
   steppling: [
     { title: 'Coffee for the trail', wants: [['drink:hot', 2, 1]], meals: 3, timber: 1, glow: 5, line: 'A Caramel Latte for the road!' },
-    { title: 'Trail biscuits', wants: [['food:cafe-pastry', 2, 2]], meals: 4, timber: 1, glow: 6, line: 'Two Cookie Pairs. One for now, one for later.' },
-    { title: 'A proper picnic', wants: [['drink:hot', 3, 1], ['food:cafe-pastry', 2, 1]], meals: 6, timber: 2, glow: 8, line: 'A Strawberry Boba and cookies. That\u2019s a real picnic.' },
+    { title: 'Two for the road', wants: [['drink:hot', 2, 2]], meals: 5, timber: 1, glow: 6, line: 'Two Lattes. One for now, one for later.' },
+    { title: 'A proper boba', wants: [['drink:hot', 3, 1]], meals: 6, timber: 2, glow: 8, line: 'A Strawberry Boba. That\u2019s a real picnic.' },
   ],
   mossprout: [
     { title: 'Something warm', wants: [['drink:hot', 2, 1]], meals: 3, timber: 1, glow: 5, line: 'A Caramel Latte. Warm paws, warm heart.' },
-    { title: 'Coffee under the Tree', wants: [['drink:hot', 2, 1], ['food:cafe-pastry', 1, 1]], meals: 4, timber: 1, glow: 6, line: 'A latte and a biscuit, under the Heart Tree.' },
-    { title: 'A little treat', wants: [['drink:hot', 3, 1]], meals: 6, timber: 2, glow: 8, line: 'A Strawberry Boba. Just this once.' },
+    { title: 'Boba under the Tree', wants: [['drink:hot', 3, 1]], meals: 6, timber: 1, glow: 6, line: 'A Strawberry Boba, under the Heart Tree.' },
+    { title: 'A little treat', wants: [['drink:hot', 4, 1]], meals: 9, timber: 2, glow: 9, line: 'A Matcha Cloud Frappe. Just this once.' },
   ],
 };
 
@@ -65,9 +65,6 @@ export const KITCHEN_ORDER_POOLS: Readonly<Record<'steppling' | 'mossprout', rea
     { title: 'A Sanctuary feast', wants: [['food:table', 4, 1], ['food:dessert', 3, 1]], meals: 16, timber: 2, glow: 14, line: 'A Meal and a Cupcake for everyone. Well. For me first.' },
   ],
 };
-
-/** Every this many orders fill a crate: a bonus on top of the order. The visit goes on; Back ends it whenever. */
-export const SUPPLY_CRATE = { every: 5, timber: 5, glow: 25, meals: 8 } as const;
 
 /** The order a card shows: its friend's list at `index` (the list repeats, a little richer each time round). */
 export function supplyOrder(slot: 0 | 1, index: number, kitchen = false): MergeOrder & { timber: number; meals: number; line: string } {
@@ -94,24 +91,22 @@ export function supplyRunSlots(world: Pick<MergeWorldState, 'supplyRun'>): reado
 export const kitchenOpen = (world: Pick<MergeWorldState, 'companionDiscovery'>) => world.companionDiscovery.records.some((record) => record.characterId === 'feastle');
 
 /**
- * The board: a few drinks and biscuits, a chain asleep under the Mist to wake, the Ritual Bar and the Caf\u00e9 Counter;
- * a Kitchen's has the Hearth Pantry too, with an Ingredient and a Flour Scoop beside it.
+ * The board: a few coffees, a chain asleep under the Mist to wake, and the Ritual Bar; a Kitchen's has the Hearth
+ * Pantry too, with an Ingredient and a Dessert beside it.
  */
 export function createSupplyRunBoard(now: number, kitchen = false): MergeWorldState {
   const base = createMissionState({
     items: [
-      { cell: 37, definitionId: 'drink:hot:1' }, { cell: kitchen ? 29 : 38, definitionId: 'drink:hot:1' }, { cell: 39, definitionId: 'food:cafe-pastry:1' },
-      { cell: 30, definitionId: 'drink:hot:1' }, { cell: 33, definitionId: 'food:cafe-pastry:1' },
+      { cell: 37, definitionId: 'drink:hot:1' }, { cell: kitchen ? 29 : 38, definitionId: 'drink:hot:1' }, { cell: 30, definitionId: 'drink:hot:1' },
       ...(kitchen ? [{ cell: 26, definitionId: 'food:table:1' }, { cell: 22, definitionId: 'food:dessert:1' }] : []),
     ],
     echoes: [{ cell: 31, id: 'cafe:sleeper-1', definitionId: 'drink:hot:1' }],
     veiled: [
       { cell: 24, id: 'cafe:veiled-1', definitionId: 'drink:hot:2' },
-      { cell: 32, id: 'cafe:veiled-2', definitionId: 'food:cafe-pastry:1' },
+      { cell: 32, id: 'cafe:veiled-2', definitionId: 'drink:hot:1' },
       { cell: 25, id: 'cafe:veiled-3', definitionId: 'drink:hot:2' },
     ],
   }, 'baristabbit', now);
   const bar = placeSpawner(base, { id: 'bar', generatorId: 'ritual-bar', cell: 40, charges: 99, drops: ['drink:hot:1'] }, 40);
-  const counter = placeSpawner(bar, { id: 'counter', generatorId: 'cafe-counter', cell: 36, charges: 99, drops: ['food:cafe-pastry:1'] }, 36);
-  return kitchen ? placeSpawner(counter, { id: 'pantry', generatorId: 'hearth-pantry', cell: 38, charges: 99, drops: ['food:table:1', 'food:dessert:1'] }, 38) : counter;
+  return kitchen ? placeSpawner(bar, { id: 'pantry', generatorId: 'hearth-pantry', cell: 38, charges: 99, drops: ['food:table:1', 'food:dessert:1'] }, 38) : bar;
 }

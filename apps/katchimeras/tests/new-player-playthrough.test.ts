@@ -11,7 +11,7 @@ import { sanctuaryChapterState, type ChapterGoal } from '@/constants/sanctuary-c
 import { upgradeHeartwoodBuilding } from '@/features/heartwood-buildings/buildings-world';
 import { groveTrack, islandTrack } from '@/features/level-tracks/level-track';
 import { goalNeed } from '@/features/sanctuary/goal-need';
-import { kitchenOpen, SUPPLY_CRATE, supplyOrder, supplyRunSlots } from '@/features/supply-run/supply-run';
+import { kitchenOpen, supplyOrder, supplyRunSlots } from '@/features/supply-run/supply-run';
 import { buildingUpgradeModel, companionUpgradeModel, heartTreeUpgradeModel, heroBuildingUpgradeModel } from '@/features/upgrade-stage/upgrade-panel-model';
 import { worldUpgradeOffers } from '@/features/world-upgrades/world-upgrade-offers';
 import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
@@ -54,7 +54,7 @@ test('a new player gets from Steppling home to the Bloom Garden’s first battle
     const slots = supplyRunSlots(world);
     const slot = ((world.supplyRun?.served ?? 0) % 2) as 0 | 1;
     const order = supplyOrder(slot, slots[slot], kitchenOpen(world));
-    apply({ type: 'completeSupplyOrder', slot, index: slots[slot], timber: order.timber, glow: order.reward.coins, meals: order.meals, crate: SUPPLY_CRATE, now: now++ }, `serve ${order.title}`);
+    apply({ type: 'completeSupplyOrder', slot, index: slots[slot], timber: order.timber, glow: order.reward.coins, meals: order.meals, kitchen: kitchenOpen(world), now: now++ }, `serve ${order.title}`);
   };
   const playGrove = () => {
     const track = groveTrack(world, { ftueComplete: true });

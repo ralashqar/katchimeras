@@ -10,7 +10,7 @@ export const HEART_TREE_MAX_LEVEL = 8;
 
 /** Glow and Timber to grow from each level (index = the level it is at; the first session wakes it to 1). */
 const GLOW_COSTS = [0, 40, 80, 140, 220, 320, 450, 600] as const;
-const TIMBER_COSTS = [0, 5, 10, 16, 24, 34, 46, 60] as const;
+const TIMBER_COSTS = [0, 3, 10, 16, 24, 34, 46, 60] as const;
 
 /** What the Tree is called at each stage of its growth, by the Heartwood art stage it shows. */
 export const HEART_TREE_STAGE_NAMES: Readonly<Record<HeartwoodStage, string>> = {

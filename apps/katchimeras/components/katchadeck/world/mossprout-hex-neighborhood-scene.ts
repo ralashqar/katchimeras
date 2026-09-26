@@ -258,13 +258,14 @@ export const MOSSPROUT_NATURE_ISLAND_ART: Record<string, NatureArtSpec> = {
 
 // Fill complete inner rings before starting an outer ring. Source coordinates
 // remain content/save identities; only their presentation positions change.
-// First ring: Nursery, Mossprout, Bloom/Petalimp, Baristabbit, Steppling, Feastle.
+// First ring: Nursery, Mossprout, Bloom/Petalimp, Baristabbit, Feastle, Steppling. Baristabbit's Café and Feastle's
+// Kitchen stand side by side (one shared board, their orders mixed).
 const coordKey = (coord: HexCoord) => `${coord.q},${coord.r}`;
 const ringSources = [
   MOSSPROUT_NATURE_ISLAND_ART['seed-nursery'].coord,
   MAIN.coord,
   MOSSPROUT_NATURE_ISLAND_ART['bloom-garden'].coord,
-  ...['baristabbit', 'steppling', 'feastle'].flatMap(id => {
+  ...['baristabbit', 'feastle', 'steppling'].flatMap(id => {
     const definition = hatchableByCompanion(id);
     return definition ? [definition.tile.coord] : [];
   }),

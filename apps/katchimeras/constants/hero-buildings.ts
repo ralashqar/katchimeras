@@ -39,7 +39,7 @@ export type HeroBuildingDefinition = {
 export const HERO_BUILDING_MAX_LEVEL = 10;
 /** Glow and Timber to go up from each level (index = the level it is at; 0 builds it). */
 const GLOW_COSTS = [30, 50, 80, 120, 170, 230, 300, 380, 470, 570] as const;
-const TIMBER_COSTS = [4, 6, 8, 11, 14, 18, 22, 27, 32, 38] as const;
+const TIMBER_COSTS = [2, 4, 7, 10, 14, 18, 22, 27, 32, 38] as const;
 
 export const HERO_BUILDINGS: readonly HeroBuildingDefinition[] = [
   {

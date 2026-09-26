@@ -12,7 +12,8 @@ export const KATCHIMERA_LEVEL_XP: readonly number[] = [0, 40, 100, 180, 280, 400
 /** Glow to go from a level to the next (index = level - 1). */
 export const KATCHIMERA_LEVEL_GLOW: readonly number[] = [15, 30, 50, 80, 120, 170, 230, 300, 380];
 /** Meals to go from a level to the next (index = level - 1): a fed team is a strong team. Earned at the Café. */
-export const KATCHIMERA_LEVEL_MEALS: readonly number[] = [5, 10, 16, 24, 34, 46, 60, 76, 94];
+// Light at first (Sept 2026: the Café is being introduced): one order feeds Mossprout's first level.
+export const KATCHIMERA_LEVEL_MEALS: readonly number[] = [3, 6, 12, 20, 30, 42, 56, 72, 90];
 export const PLAYABLE_KATCHIMERAS: readonly MergeCharacterId[] = ['mossprout', 'steppling', 'baristabbit', 'shellio', 'voyagle'];
 
 export const isPlayableKatchimera = (id: string): id is MergeCharacterId => (PLAYABLE_KATCHIMERAS as readonly string[]).includes(id);

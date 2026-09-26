@@ -570,7 +570,7 @@ export type MergeWorldState = {
   /** Timber builds; Meals feed the team (earned at Baristabbit's Café, spent training heroes). */
   materials?: { timber: number; meals?: number };
   /** The Supply Run's order slots (which pool index each of the two shows) and how many orders have been served. */
-  supplyRun?: { slots: readonly [number, number]; served: number; crates?: number };
+  supplyRun?: { slots: readonly [number, number]; served: number; crates?: number; /** Orders served while the Café is a Kitchen (Feastle's feasts). */ kitchenServed?: number };
   /** Kept for saves written before `gardenLessons`; mirrors `gardenLessons.steppling`. */
   stepplingGardenLesson?: { preparedAt: number; servedAt?: number };
   /** Each hatchable companion's garden lesson (parcel, grow, serve): prepared once, served once. */
@@ -672,7 +672,7 @@ export type MergeWorldCommand =
   /** A board-local order (a Supply Run's): its items leave the board, and nothing else about the board's world changes. */
   | { type: 'serveBoardOrder'; order: MergeOrder; now: number }
   /** A Supply Run order served: its slot moves on to the next pool index, and it pays Timber and Glow. Once per index. */
-  | { type: 'completeSupplyOrder'; slot: 0 | 1; index: number; timber: number; glow: number; meals?: number; crate?: { every: number; timber: number; glow: number; meals?: number }; now: number }
+  | { type: 'completeSupplyOrder'; slot: 0 | 1; index: number; timber: number; glow: number; meals?: number; crate?: { every: number; timber: number; glow: number; meals?: number }; kitchen?: boolean; now: number }
   /** Glow the story hands over once (e.g. Steppling's mist price), keyed in the encounter ledger's receipts. */
   | { type: 'grantStoryGlow'; receiptId: string; amount: number; now: number; /** Experience for a hero, paid with the same receipt (a scripted battle's). */ xp?: { katchimeraId: MergeCharacterId; amount: number } }
   /** Keep going on a lost level: its Glow, once per receipt; refused when the Glow is not there. */
