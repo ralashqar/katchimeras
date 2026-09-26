@@ -1,3 +1,4 @@
+import { resolveCreatureIdleFallbackSource } from '@/constants/creature-idle-animation-sources';
 import { heroTileLayerId } from '@/constants/hero-buildings';
 import { EGG_FEED_TARGET_Y_RATIO } from '@/features/today/egg-feed-target';
 import { LevelTrackStones, type LevelTrackStone } from './level-track-stones';
@@ -2148,7 +2149,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               const companion = hatchableByTile(beacon.tileId)?.companion;
               // Exactly their resident: the same art, frame and spot they take once home, drawn as a shadow.
               const visualKey = companion ? katchimeraSkinById.get(companion)?.visualKey ?? companion : null;
-              const source = visualKey ? worldAssetSource(`creature:${visualKey}`, KINGDOM_RENDERING.havenImageLod) : null;
+              // The still frame of the animated idle they stand in once home (Steppling standing), else their world sprite.
+              const source = visualKey ? resolveCreatureIdleFallbackSource(visualKey) ?? worldAssetSource(`creature:${visualKey}`, KINGDOM_RENDERING.havenImageLod) : null;
               return anchor && source && companion ? <TileBeacon key={`tile-beacon-${beacon.tileId}`} frame={residentCreatureFrame(anchor.x, anchor.y, creatureWorldSize, usesSharedResidentStage(companion))} source={source} color={beacon.color} /> : null;
             }) : null}
             {focusedMossproutWorld && tileBubbles?.length ? tileBubbles.map((bubble) => {

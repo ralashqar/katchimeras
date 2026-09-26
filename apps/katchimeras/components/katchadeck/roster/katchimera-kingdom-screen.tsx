@@ -2891,8 +2891,25 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }
   }, [screenFocused, stepplingLesson.active, stepplingLesson.run, havenMergeBoardActive, companionSlots, interactionCreatureId, activeInteractionResidentId, activeLessonHatchable.companion, selectResident, openGarden]);
 
+  // A friend rescued in battle (no ticket): a tap on their tile goes straight into the rescue (the camera is already
+  // on the tile, the battle's story card, then the board), never through a panel with a 0 Glow button and a zoom out.
+  const rescueStartingRef = useRef(false);
+  const enterRescue = useCallback(async (definition: HatchableCompanionDefinition) => {
+    if (rescueStartingRef.current) return;
+    rescueStartingRef.current = true;
+    try {
+      const result = await payStoredHatchableMission(definition.companion, hatchableTicketReceiptId(definition.discoveryFlow.runId));
+      await startHatchableDiscovery(definition);
+      await resumeHatchableDiscovery(definition, result.state);
+    } catch (error) { console.warn('The rescue could not start', error); }
+    finally { rescueStartingRef.current = false; }
+  }, []);
   const openUpgradeOffer = useCallback(async (offer: WorldUpgradeOffer) => {
     if (storyHoldRef.current && !storyBypassRef.current) return;
+    if (offer.action === 'Enter the Mist' && offer.hatchable && offer.hatchable.state !== 'sleeping') {
+      const definition = hatchableByTile(offer.id.slice('mist:'.length));
+      if (definition?.mission.encounter) { void enterRescue(definition); return; }
+    }
     // The trial's clock on the Rush Track opens today's ladder, not an upgrade.
     if (offer.trial) { setRushNotice(null); setRushSheetOpen(true); return; }
     // Mossprout's own tile carries the Grove's track, and the Daily Mist's once the Grove is done.
@@ -3357,7 +3374,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [chapterState?.chapter, chapterState?.goal]);
   const tapOpeningTile = useCallback(() => {
     setOpeningTileTap(null);
-    setChapterOpeningPlace(null);
+    // The camera stays on the tile while the rescue takes it over (its own framing of the same tile), then lets go.
+    setTimeout(() => setChapterOpeningPlace((place) => (place?.tileId ? null : place)), 1_400);
     // The one guided way through the story's hold: this tap opens the tile's panel.
     storyBypassRef.current = true;
     try { followChapterGoalRef.current?.(); } finally { storyBypassRef.current = false; }
