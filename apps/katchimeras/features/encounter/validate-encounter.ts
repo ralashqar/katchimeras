@@ -10,7 +10,8 @@ import { isDarkWispLook } from '@/constants/dark-wisp-looks';
 
 const INTENT_KINDS = new Set(['surge', 'snuff', 'shroud', 'root', 'devour', 'ward', 'mend', 'call', 'gather', 'burrow', 'spores', 'rain', 'bind', 'shield', 'corrupt', 'move', 'rest']);
 
-const MIST_TYPES = new Set(['light', 'dense', 'root', 'wisp-bound']);
+/** `bound`: a piece caught in the Mist (freed by a merge beside it, or its twin merged in): it always holds that piece. */
+const MIST_TYPES = new Set(['light', 'dense', 'root', 'wisp-bound', 'bound']);
 
 /** A board with a budget, Mist of its own, spawners or a cache: an encounter, not a plain mission. */
 export function isEncounterDefinition(mission: Omit<HatchableMissionDefinition, 'camera'> | EncounterDefinition): mission is EncounterDefinition {
@@ -41,6 +42,7 @@ export function validateEncounterDefinition(encounter: EncounterDefinition, boar
   for (const mist of encounter.mist ?? []) {
     claim(mist.cell, `${mist.type} mist`);
     if (!MIST_TYPES.has(mist.type)) issues.push(`${id}: ${mist.type} is not a kind of Mist`);
+    if (mist.type === 'bound' && mist.holds?.kind !== 'item') issues.push(`${id}: bound Mist at ${mist.cell} holds no piece`);
     if (mist.hp != null && (!Number.isInteger(mist.hp) || mist.hp <= 0)) issues.push(`${id}: mist at cell ${mist.cell} needs positive hits`);
     if (mist.type === 'wisp-bound' && (!mist.wispId || !wispIds.has(mist.wispId))) issues.push(`${id}: wisp-bound mist at cell ${mist.cell} names no wisp on the board`);
     if (mist.type === 'bound' && (mist.holds?.kind !== 'item' || !items.get(mist.holds.definitionId)?.nextItemId)) issues.push(`${id}: a bound piece at cell ${mist.cell} must hold a known piece that can still merge`);

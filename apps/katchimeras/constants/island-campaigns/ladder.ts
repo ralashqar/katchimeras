@@ -1,6 +1,7 @@
 import { encounterFromRestoration } from '@/features/encounter/adapt';
 import { withSolvedBudget } from '@/features/encounter/budget';
 import { EXTRA_RUNGS } from './extra-rungs';
+import { AMBERLEAF_LANES_SPECS, BLOSSLE_LANES_SPECS, DRIZZLET_LANES_SPECS, FERNIP_LANES_SPECS, MISTLE_LANES_SPECS } from './friend-island-levels';
 import { islandLevel, lanesPatternSpecs, MIST_LEVEL_SPEC, PETALIMP_LEVEL_SPECS, type IslandLevelSpec } from './island-levels';
 import { ENCOUNTER_DEFAULT_GRADES, type EncounterDefinition, type EncounterDifficulty } from '@/types/encounter';
 import type { MossproutNatureIslandLevel } from '@/types/merge-world';
@@ -93,7 +94,12 @@ export function chapterBoards(campaign: IslandCampaignDefinition, chapter: Islan
 /** Bundled islands whose levels are written out by hand. */
 const BUNDLED_LEVEL_SPECS: Readonly<Record<string, Partial<Record<1 | 2 | 3 | 4, readonly IslandLevelSpec[]>>>> = {
   'island-campaign:petalimp-bloom': PETALIMP_LEVEL_SPECS,
-  // Fernip's own levels were territory battles (the Water chain); his island plays the Lanes pattern now.
+  // The later friends, each island with its own idea and boss (`friend-island-levels.ts`, Sept 2026).
+  'island-campaign:fernip-wildgrowth': FERNIP_LANES_SPECS,
+  'island-campaign:blossle-nursery': BLOSSLE_LANES_SPECS,
+  'island-campaign:drizzlet-pond': DRIZZLET_LANES_SPECS,
+  'island-campaign:amberleaf-orchard': AMBERLEAF_LANES_SPECS,
+  'island-campaign:mistle-ancient-tree': MISTLE_LANES_SPECS,
 };
 
 /** The id of a friend's first level, the one that lifts the Mist off their island. */

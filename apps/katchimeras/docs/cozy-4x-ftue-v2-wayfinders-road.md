@@ -285,6 +285,25 @@ Mistle's chapter reveals the lore turn: the Mist is a forgetting, and the Hollow
   - An XP shortfall names the hero (`GoalNeed.heroId`), and the Frontier battle the card starts brings them as partner.
   - An island hero's panel frames their island, and their level-up plays on it.
 
+**The later islands, written out (Sept 26 2026):**
+- **What changed.** `constants/island-campaigns/friend-island-levels.ts` replaces the pattern levels for Fernip, Blossle, Drizzlet, Amberleaf and Mistle: 40 hand-made Lanes levels, each island built around one idea and ending on its own boss.
+
+| Island | Idea | Boss |
+|---|---|---|
+| Wildgrowth | The undergrowth: plants start caught (`bound` Mist), creepers leave Mist behind them, nibblers | the Overgrowth |
+| Nursery | Swarms of small, quick wisps, and faster Seeds | the Seed Caller |
+| Pond | Rain: every wisp spits Mist | the Rainmaker |
+| Orchard | Heavy wardens with quick escorts | the Hungry Harvest |
+| Ancient Grove | All of it together | the Forgotten Keeper |
+
+- **Fairness.** All 40 pass `lanesFairness` (`tests/friend-island-levels.test.ts`):
+  - a careful player wins at least 4 of 6;
+  - doing nothing loses;
+  - a novice wins at least 3 of 6 on calm levels;
+  - a novice wins at most 2 of 6 against a boss.
+- **Validator.** The encounter validator now accepts `bound` Mist, which must hold a piece.
+- **Fallback.** `lanesPatternSpecs` stays only for islands that have no levels of their own (content packs).
+
 ### D3. Frontier tiles and Mist Surges (the 4X layer)
 - **New tile kind `frontier`.** It fills the empty ring-2 cells (4) and ring-3 cells (18) through `ringSources` in `mossprout-hex-neighborhood-scene.ts:245-263`, with authored frontier ids in `constants/frontier-tiles.ts`. Its states are `misted | contested | reclaimed`, stored in `world.frontier[tileId]` and changed by engine commands `reclaimFrontierTile` and `contestFrontierTile`.
 - **Art:** 4 wild reclaimed variants (meadow, copse, brook, stones), plus a contested edge overlay drawn at runtime. It goes through the shared-world hex pipeline (`shared-world-discovery-v2/briefs.json` → generate → matte → package → bounds → review). The misted state reuses `dream_mist_locked_hex_tile_v4`.
