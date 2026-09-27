@@ -17,7 +17,7 @@ const BOTTOM_ROWS = [36, 37, 38, 39, 40, 43, 44, 45, 46, 47] as const;
  */
 const BARISTABBIT_RESCUE_SPEC: IslandLevelSpec = {
   title: 'The Lit Window', objective: 'Bring down every wisp, and burn the thick Mist off whoever kept the lamp lit.', difficulty: 'calm',
-  pieces: [[43, 1], [44, 2], [45, 1], [46, 2], [47, 1], [36, 1], [38, 2], [40, 1], [30, 2], [32, 2]],
+  pieces: [[43, 1], [44, 2], [45, 1], [46, 2], [39, 1], [36, 1], [38, 2], [40, 1], [30, 2], [32, 2]],
   mist: [16, 18, 24, 23, 25].map((cell) => ({ cell, type: 'light' as const })),
   rescue: { cell: 17 },
   wisps: [], seeds: { every: 3, area: BOTTOM_ROWS }, rows: 5,
@@ -43,7 +43,7 @@ export const BARISTABBIT_RESCUE_BATTLE: EncounterDefinition = islandLevel('rescu
  */
 const FEASTLE_RESCUE_SPEC: IslandLevelSpec = {
   title: 'A Warm Table', objective: 'Bring down every wisp, and burn the thick Mist off whoever laid the table.', difficulty: 'calm',
-  pieces: [[43, 1], [44, 2], [45, 1], [46, 2], [47, 1], [36, 2], [38, 1], [40, 2], [30, 2], [32, 2]],
+  pieces: [[43, 1], [44, 2], [45, 1], [46, 2], [39, 1], [36, 2], [38, 1], [40, 2], [30, 2], [32, 2]],
   mist: [16, 18, 24, 23, 25].map((cell) => ({ cell, type: 'light' as const })),
   rescue: { cell: 17 },
   wisps: [], seeds: { every: 3, area: BOTTOM_ROWS }, rows: 5,

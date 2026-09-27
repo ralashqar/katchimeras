@@ -13,7 +13,7 @@ const SPECS: Readonly<Record<string, IslandLevelSpec>> = {
   // Dawnle, past the Hollow Tree: moths drawn to the lamp, a weaver among them, and the lamp's old guard.
   dawnle: {
     title: 'The Lamp Beyond', objective: 'Bring down every wisp, and burn the thick Mist off whoever kept the lamp lit.', difficulty: 'thick',
-    pieces: [[43, 1], [44, 2], [45, 1], [46, 2], [47, 1], [36, 2], [38, 1], [40, 2], [30, 2], [32, 2]],
+    pieces: [[43, 1], [44, 2], [45, 1], [46, 2], [39, 1], [36, 2], [38, 1], [40, 2], [30, 2], [32, 2]],
     mist: [16, 18, 24, 23, 25].map((cell) => ({ cell, type: 'light' as const })),
     rescue: { cell: 17 },
     wisps: [], seeds: { every: 3, area: BOTTOM_ROWS }, rows: 5,

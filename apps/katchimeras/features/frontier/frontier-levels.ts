@@ -104,7 +104,7 @@ export function frontierRetakeMission(tile: FrontierTile): RegionMissionDefiniti
  */
 export const SURGE_DEFENCE_SPEC: IslandLevelSpec = {
   title: 'Hold the Heart Tree', objective: 'The Mist is coming for the Heart Tree down every lane. Hold them all.', difficulty: 'thick',
-  pieces: [[36, 1], [37, 1], [38, 2], [39, 1], [40, 1], [44, 1], [46, 1]],
+  pieces: [[36, 1], [37, 1], [39, 1], [40, 1], [44, 1], [46, 1]], sleepers: [[38, 1]],
   veiled: [[31, 1], [30, 1], [32, 1], [24, 2]],
   mist: [], seeds: { every: 3 }, wisps: [],
   lanes: [

@@ -144,7 +144,6 @@ export type LanesTickResult = {
   /** Mist wisps spat this tick, for the board to strike. */
   spat: LaneSpit[];
   /** Seeds the Sprinkler launched this tick: from its cell, arcing to theirs (the board flies them). */
-  sown: { from: number; to: number; instanceId: string; definitionId: string }[];
   /** The Sprinkler's sparks this tick: from its cell at a wisp, for how much (it lands with `shots`). */
   sparks: { from: number; wisp: number; damage: number }[];
 };
@@ -241,7 +240,7 @@ export function lanesSprinklerTapped(mechanic: LanesMechanic, state: LanesState,
 }
 
 export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: MergeWorldState, dt: number, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID, luck: LanesLuck = {}): LanesTickResult {
-  if (input.breached != null || lanesComplete(mechanic, input)) return { state: input, board, fired: [], effects: [], changed: false, moved: false, hit: false, spat: [], sown: [], sparks: [] };
+  if (input.breached != null || lanesComplete(mechanic, input)) return { state: input, board, fired: [], effects: [], changed: false, moved: false, hit: false, spat: [], sparks: [] };
   const from = input.clock;
   const clock = from + Math.max(0, dt);
   const wisps: LaneWispState[] = input.wisps.map((wisp) => ({ ...wisp }));
@@ -527,51 +526,16 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     }
   }
 
-  // Pieces arrive on their own: every so often one lands on a random empty cell (never the one a wisp is on). A
-  // full board waits and the piece lands the moment a cell is free.
+  // The Seed Sprinkler (`docs/lanes-variety-design.md`): every Seed a Lanes board gets flies out of it on a tap (the
+  // board's spawn flight); here a charge comes back to it every beat, up to what it holds, and the sparks its taps
+  // queued fly.
   let nextSeedAt = input.nextSeedAt;
-  let seeded = input.seeded ?? 0;
-  let nextInstance = board.nextInstance;
-  const sown: LanesTickResult['sown'] = [];
+  const seeded = input.seeded ?? 0;
+  const nextInstance = board.nextInstance;
   const pendingSparks: LaneShot[] = [];
   const sparks: LanesTickResult['sparks'] = [];
   const seeds = mechanic.seeds;
-  const tappedSprinkler = Boolean(mechanic.sprinkler && !mechanic.sprinkler.auto);
-  // One Seed lands on its own (a rush's Sprinkler, or Seeds with none): where the Sprinkler sends it; every few launches
-  // it sparks the nearest wisp within its reach. False when there was no room.
-  const launch = (drops: readonly [string, string], key: string): boolean => {
-    const cell = sprinklerLanding(mechanic, { ...input, clock, wisps, advance }, current(), window, key);
-    if (cell == null) return false;
-    const sprinkler = mechanic.sprinkler ? sprinklerCell(current(), window) : null;
-    const at = sprinkler != null ? laneOf(window, sprinkler) : null;
-    const lucky = seededUnit(`lanes-luck:${seeded}`) < Math.max(0, Math.min(1, luck.tierTwoChance ?? 0));
-    const definitionId = lucky ? drops[1] : drops[0];
-    const instanceId = `merge-item:${nextInstance}`;
-    cells ??= [...board.board];
-    cells[cell] = { ...cells[cell]!, occupant: { kind: 'item', instanceId, definitionId } };
-    if (sprinkler != null) sown.push({ from: sprinkler, to: cell, instanceId, definitionId });
-    nextInstance += 1;
-    seeded += 1;
-    changed = true;
-    const every = Math.max(1, Math.floor(luck.sparkEvery ?? DEFAULT_SPARK_EVERY));
-    if (sprinkler != null && at && seeded % every === 0) {
-      let target = -1;
-      let best = Infinity;
-      mechanic.wisps.forEach((_, index) => {
-        if (!arrived(index) || !alive(index)) return;
-        const distance = chebyshev({ column: col(index), row: laneRowOf(wisps[index]!.row) }, at);
-        if (distance <= mechanic.sprinkler!.sparkReach && distance < best) { best = distance; target = index; }
-      });
-      if (target >= 0) {
-        const damage = Math.max(1, Math.floor(luck.sparkDamage ?? DEFAULT_SPARK_DAMAGE));
-        pendingSparks.push({ id: ++seq, fromCell: sprinkler, wisp: target, damage, firedAt: clock, landsAt: clock + LANE_SPARK_MS });
-        sparks.push({ from: sprinkler, wisp: target, damage });
-      }
-    }
-    return true;
-  };
-  if (seeds && breached == null && tappedSprinkler) {
-    // A tapped Sprinkler: a charge comes back to it every beat (up to what it holds); its taps land their own Seeds.
+  if (seeds && mechanic.sprinkler && breached == null) {
     const everyMs = seeds.everyMs * (1 - Math.max(0, Math.min(0.6, luck.seedPace ?? 0)));
     nextSeedAt ??= everyMs;
     if (clock >= nextSeedAt) {
@@ -582,18 +546,12 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       }
       nextSeedAt = clock + everyMs;
     }
-    // Sparks its taps queued fly now, at a wisp still standing.
     for (const queued of input.sparkQueue ?? []) {
       if (!alive(queued.wisp) || !arrived(queued.wisp)) continue;
       pendingSparks.push({ id: ++seq, fromCell: queued.from, wisp: queued.wisp, damage: queued.damage, firedAt: clock, landsAt: clock + LANE_SPARK_MS });
       sparks.push(queued);
       changed = true;
     }
-  } else if (seeds && breached == null) {
-    // Seeds on their own (a rush's Sprinkler, or none): one every beat, and a full board waits for a free cell.
-    const everyMs = seeds.everyMs * (1 - Math.max(0, Math.min(0.6, luck.seedPace ?? 0)));
-    nextSeedAt ??= everyMs;
-    if (clock >= nextSeedAt && launch(seeds.drops, `lanes-seed:${seeded}:${Math.round(nextSeedAt)}`)) nextSeedAt = clock + everyMs;
   }
 
   shots.push(...pendingSparks);
@@ -650,7 +608,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     ...(mechanic.sprinkler ? { sparkEvery: Math.max(1, Math.floor(luck.sparkEvery ?? DEFAULT_SPARK_EVERY)), sparkDamage: Math.max(1, Math.floor(luck.sparkDamage ?? DEFAULT_SPARK_DAMAGE)) } : {}),
   };
   const next = current();
-  return { state, board: nextInstance === next.nextInstance ? next : { ...next, nextInstance }, fired, effects, changed, moved, hit, spat, sown, sparks };
+  return { state, board: nextInstance === next.nextInstance ? next : { ...next, nextInstance }, fired, effects, changed, moved, hit, spat, sparks };
 }
 
 const isFree = (board: MergeWorldState, cell: number) => { const entry = board.board[cell]; return Boolean(entry) && !entry!.locked && !entry!.mist && !entry!.occupant; };

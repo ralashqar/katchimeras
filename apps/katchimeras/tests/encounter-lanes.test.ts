@@ -164,30 +164,25 @@ test('an empty sky never waits: with no wisp standing, the next arrives at once 
   assert.equal(40_000 - (played.state.advance ?? 0) - (30_000 - (played.state.advance ?? 0)), 10_000, 'the spacing after it is kept');
 });
 
-test('a rush’s pieces arrive on their own: a Seed on a random empty cell every beat (never under a wisp), a Sprout by the player’s luck, and a full board waits', () => {
-  const seeded = setup({ pod: undefined, seeds: { every: 1 }, sprinkler: 'auto', lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] });
-  assert.deepEqual(seeded.encounter.spawners.map((spawner) => [spawner.generatorId, spawner.charges]), [['seed-sprinkler', 0]], 'nothing to tap: the rush’s Seed Sprinkler launches them');
-  const board = run(seeded.mechanic, seeded.lanes, seeded.state, 3_050, seeded.window).board;
-  const items = seeded.window.cellIndices.filter((cell) => board.board[cell]?.occupant?.kind === 'item');
-  assert.equal(items.length, 3, 'one a second');
-  assert.ok(items.every((cell) => board.board[cell]!.occupant?.kind === 'item' && board.board[cell]!.occupant.definitionId === 'nature:garden:1'), 'Seeds');
-  const lucky = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 900 }, seeded.state, 200, seeded.window, MERGE_ITEMS_BY_ID, { tierTwoChance: 1 });
-  const sprout = seeded.window.cellIndices.find((cell) => lucky.board.board[cell]?.occupant?.kind === 'item');
-  assert.ok(sprout != null && lucky.board.board[sprout]!.occupant?.kind === 'item' && lucky.board.board[sprout]!.occupant.definitionId === 'nature:garden:2', 'the Seed Nursery’s luck makes it a Sprout');
-  // A board with no empty cell: the piece waits, and lands the moment one frees.
-  const full = { ...seeded.state, board: seeded.state.board.map((cell, index) => (seeded.window.cellIndices.includes(index) ? { ...cell, locked: true, mist: { kind: 'encounter' as const, type: 'light' as const, hp: 1 } } : cell)) };
-  const waited = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 900 }, full, 200, seeded.window);
-  assert.ok(!waited.changed && (waited.state.nextSeedAt ?? 0) <= waited.state.clock, 'nothing lands, and it is still due');
+test('Seeds only ever fly out of the Seed Sprinkler: nothing lands on its own, and a level with no room for it does not build', () => {
+  const seeded = setup({ pod: undefined, seeds: { every: 1 }, lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] });
+  assert.deepEqual(seeded.encounter.spawners.map((spawner) => spawner.generatorId), ['seed-sprinkler'], 'no Pod: the Sprinkler is the Seeds');
+  const board = run(seeded.mechanic, seeded.lanes, seeded.state, 5_050, seeded.window).board;
+  const before = seeded.window.cellIndices.filter((cell) => seeded.state.board[cell]?.occupant?.kind === 'item').length;
+  assert.equal(seeded.window.cellIndices.filter((cell) => board.board[cell]?.occupant?.kind === 'item').length, before, 'no Seed lands without a tap');
+  const full = [36, 37, 38, 39, 40, 43, 44, 45, 46, 47].map((cell) => [cell, 1] as const);
+  assert.throws(() => setup({ pod: undefined, pieces: full, seeds: { every: 1 }, lanes: [{ id: 'a', column: 3, at: 0, hp: 5, step: 6 }] }), /no room for the Seed Sprinkler/);
 });
 
-test('the Bloom House makes Seeds land sooner: its pace shortens every beat', () => {
-  const seeded = setup({ pod: undefined, seeds: { every: 1 }, sprinkler: 'auto', lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] });
-  // 1 s beats; at 40% pace the first lands at 600 ms.
-  const early = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 500 }, seeded.state, 100, seeded.window, MERGE_ITEMS_BY_ID, { seedPace: 0.4 });
-  assert.ok(early.changed, 'landed at 600 ms, not 1 s');
+test('the Bloom House brings the Sprinkler’s charges back sooner: its pace shortens every beat', () => {
+  const seeded = setup({ pod: undefined, seeds: { every: 1 }, lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] });
+  const spent = { ...seeded.state, generators: { ...seeded.state.generators, 'seed-sprinkler': { ...seeded.state.generators['seed-sprinkler']!, charges: 0 } } };
+  // 1 s beats; at 40% pace the first charge is back at 600 ms.
+  const early = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 500 }, spent, 100, seeded.window, MERGE_ITEMS_BY_ID, { seedPace: 0.4 });
+  assert.equal(early.board.generators['seed-sprinkler']!.charges, 1, 'a charge back at 600 ms, not 1 s');
   assert.equal(early.state.nextSeedAt, 1_200, 'and the next beat is 600 ms after it');
-  const plain = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 500 }, seeded.state, 100, seeded.window, MERGE_ITEMS_BY_ID);
-  assert.equal(plain.changed, false, 'with no Bloom House, nothing yet');
+  const plain = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 500 }, spent, 100, seeded.window, MERGE_ITEMS_BY_ID);
+  assert.equal(plain.board.generators['seed-sprinkler']!.charges, 0, 'with no Bloom House, nothing yet');
 });
 
 test('a striker knocks the nearest plant under it down a tier (a Seed off the board); a trained hero hits harder', async () => {

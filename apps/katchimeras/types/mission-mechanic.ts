@@ -250,12 +250,12 @@ export type MissionMechanicDefinition =
       forgiving?: boolean;
       /**
        * The Seed Sprinkler (`docs/lanes-variety-design.md`): the Seeds come out of it, a spawner standing on the board
-       * (the `seed-sprinkler` generator's cell, wherever it is). Tapped (the default): each tap launches a Seed from its
-       * small supply, which refills a charge every `seeds.everyMs`; every few launches it sparks the nearest wisp within
-       * `sparkReach` (the Seed Nursery sets how often and how hard). `auto` (a rush): it launches on its own instead, to
-       * a free cell within `reach`.
+       * (the `seed-sprinkler` generator's cell, wherever it is). Each tap launches a Seed from its small supply to a
+       * free cell within `reach` (the board flies it there); a charge comes back every `seeds.everyMs`; every few
+       * launches it sparks the nearest wisp within `sparkReach` (the Seed Nursery sets how often and how hard). Seeds
+       * never land on a Lanes board any other way.
        */
-      sprinkler?: { reach: number; sparkReach: number; auto?: boolean };
+      sprinkler?: { reach: number; sparkReach: number };
     };
 
 /** What a mechanic remembers between strikes; saved with the board. */

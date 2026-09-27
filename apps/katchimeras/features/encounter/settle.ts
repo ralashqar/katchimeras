@@ -168,7 +168,7 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
   // The Seed Sprinkler (`docs/lanes-variety-design.md`): its tap's Seed lands where it sends it (the board flies it
   // there, as any spawner's piece); every few launches it sparks a wisp near it.
   let landedCell: number | null = null;
-  if (lanes && action === 'tap' && command.type === 'tapGenerator' && command.generatorId === SEED_SPRINKLER_ID && mechanic.kind === 'lanes' && !mechanic.sprinkler?.auto && mechanicState.kind === 'lanes') {
+  if (lanes && action === 'tap' && command.type === 'tapGenerator' && command.generatorId === SEED_SPRINKLER_ID && mechanic.kind === 'lanes' && mechanicState.kind === 'lanes') {
     const launched = lanesSprinklerTapped(mechanic, mechanicState, state, window, result.spawnedCell ?? null);
     mechanicState = launched.state;
     state = launched.board;

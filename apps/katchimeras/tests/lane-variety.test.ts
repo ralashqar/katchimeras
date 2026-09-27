@@ -102,7 +102,7 @@ test('the Seed Sprinkler stands on the board: a tap launches a Seed near it, its
   assert.equal(board.generators[SPRINKLER_ID]!.charges, SPRINKLER_CHARGES, 'a small supply to tap');
   let lanes = createLanesState(mechanic);
   // Nothing comes on its own (and the wisp comes near).
-  for (let t = 0; t < 7_600; t += 100) { const ticked = lanesTick(mechanic, lanes, board, 100, window, undefined, { sparkEvery: 3 }); lanes = ticked.state; board = ticked.board; assert.equal(ticked.sown.length, 0, 'no Seed without a tap'); }
+  for (let t = 0; t < 7_600; t += 100) { const ticked = lanesTick(mechanic, lanes, board, 100, window, undefined, { sparkEvery: 3 }); lanes = ticked.state; board = ticked.board; }
   const sown: { from: number; to: number }[] = [];
   let sparks = 0;
   let run = createEncounterRun(encounter);
@@ -124,20 +124,11 @@ test('the Seed Sprinkler stands on the board: a tap launches a Seed near it, its
   assert.equal(board.generators[SPRINKLER_ID]!.charges, SPRINKLER_CHARGES - 3);
   const refilled = lanesTick(mechanic, lanes, board, 1_100, window);
   assert.equal(refilled.board.generators[SPRINKLER_ID]!.charges, SPRINKLER_CHARGES - 2, 'a charge back on the beat');
-  // A rush's Sprinkler launches on its own, with nothing to tap.
-  const rush = islandLevel('test', 'rush', { ...base, seeds: { every: 1 }, sprinkler: 'auto', lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] }).encounter;
-  const rushMechanic = resolveMechanic(encounterMechanicHost(rush)) as LanesMechanic;
-  let rushBoard = createEncounterState(rush, 'mossprout', 1);
-  assert.equal(rushBoard.generators[SPRINKLER_ID]!.charges, 0);
-  let rushLanes = createLanesState(rushMechanic);
-  let launched = 0;
-  for (let t = 0; t < 3_050; t += 100) { const ticked = lanesTick(rushMechanic, rushLanes, rushBoard, 100, encounterWindow(rush)); rushLanes = ticked.state; rushBoard = ticked.board; launched += ticked.sown.length; }
-  assert.equal(launched, 3, 'one a beat, on its own');
   // A make-do level: no Sprinkler, no Seeds, and it says so.
   const makeDo = islandLevel('test', 'make-do', { ...base, seeds: { every: 1 }, makeDo: true, lanes: [{ id: 'a', column: 3, at: 0, hp: 4, step: 5 }] });
   assert.equal(makeDo.encounter.spawners.length, 0);
   assert.equal(makeDo.encounter.mechanic?.kind === 'lanes' && makeDo.encounter.mechanic.seeds, undefined);
   assert.match(makeDo.objective, /No Sprinkler here/);
-  const scripted = islandLevel('test', 'scripted', { ...base, seeds: { every: 1 }, forgiving: true, lanes: [{ id: 'a', column: 3, at: 0, hp: 4, step: 5 }] }).encounter;
-  assert.equal(sprinklerCell(createEncounterState(scripted, 'mossprout', 1), encounterWindow(scripted)), null, 'a scripted first-session board has no Sprinkler');
+  const { FIRST_BATTLE, LOST_TRAIL_BATTLES } = await import('@/constants/last-clearing-battle');
+  for (const first of [FIRST_BATTLE, ...LOST_TRAIL_BATTLES]) assert.ok(first.spawners.length === 0 && first.mechanic?.kind === 'lanes' && !first.mechanic.seeds, `the first session has no Seeds and no Sprinkler (${first.id})`);
 });

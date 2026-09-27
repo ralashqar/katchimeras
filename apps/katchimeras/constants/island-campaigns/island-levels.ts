@@ -80,9 +80,9 @@ export type IslandLevelSpec = {
   forgiving?: boolean;
   /**
    * Lanes: the Seed Sprinkler's cell (tap it for a Seed). Absent, a Lanes level with Seeds has one on a free bottom
-   * cell; `false` has none. `auto`: it launches on its own (a rush).
+   * cell. Every Seed a Lanes level gets comes out of it: a level with Seeds and no room for it does not build.
    */
-  sprinkler?: number | false | 'auto';
+  sprinkler?: number;
   /**
    * A "make do" level (`docs/lanes-variety-design.md`): no Sprinkler and no Seeds; only what is on the board and what
    * waking the Mist brings. Every merge counts.
@@ -218,9 +218,10 @@ export function islandLevel(campaignId: string, key: string, rawSpec: IslandLeve
   const bound: EncounterMistCell[] = (spec.bound ?? []).map(([cell, value]) => ({ cell, type: 'bound', holds: { kind: 'item', definitionId: tier(value) } }));
   // The Seed Sprinkler: where the level says, else the first free bottom cell (never on a piece, Mist or the rescue).
   const taken = new Set([...used, ...(spec.rescue ? [spec.rescue.cell] : [])]);
-  const sprinklerAt = !lanes || !spec.seeds || spec.makeDo || spec.forgiving || spec.sprinkler === false ? null
-    : typeof spec.sprinkler === 'number' ? spec.sprinkler
-    : [47, 43, 46, 44, 45, 40, 36, 38].find((cell) => WINDOW.has(cell) && !taken.has(cell)) ?? null;
+  const sprinklerAt = !lanes || !spec.seeds ? null
+    : spec.sprinkler ?? [47, 43, 46, 44, 45, 40, 36, 38, 39, 37].find((cell) => WINDOW.has(cell) && !taken.has(cell)) ?? null;
+  // Seeds never just appear on a Lanes board: each flies out of the Sprinkler.
+  if (lanes && spec.seeds && sprinklerAt == null) throw new Error(`${campaignId}:${key}: Seeds with no room for the Seed Sprinkler`);
   const mist = [...spec.mist, ...bound, ...ring, ...(spec.rescue ? [{ cell: spec.rescue.cell, type: 'dense' as const }] : [])];
   const encounter: EncounterDefinition = {
     id,
@@ -236,10 +237,10 @@ export function islandLevel(campaignId: string, key: string, rawSpec: IslandLeve
     spawners: [
       ...(spec.pod ? [{ id: 'pod', generatorId: 'wild-garden', cell: spec.pod.cell, charges: spec.pod.charges, drops: [tier(1)], recharge: { kind: 'merges' as const, every: spec.pod.every, amount: 1 } }] : []),
       ...(spec.spring ? [{ id: 'spring', generatorId: 'mist-spring', cell: spec.spring.cell, charges: spec.spring.charges, drops: [`${WATER_CHAIN}:1`], recharge: { kind: 'merges' as const, every: spec.spring.every, amount: 1 }, ...(spec.spring.under ? { hidden: true } : {}) }] : []),
-      ...(sprinklerAt != null ? [{ id: 'sprinkler', generatorId: 'seed-sprinkler', cell: sprinklerAt, ...(spec.sprinkler === 'auto' ? { charges: 0, drops: [] } : { charges: SPRINKLER_CHARGES, drops: [tier(1)] }) }] : []),
+      ...(sprinklerAt != null ? [{ id: 'sprinkler', generatorId: 'seed-sprinkler', cell: sprinklerAt, charges: SPRINKLER_CHARGES, drops: [tier(1)] }] : []),
     ],
     mechanic: lanes
-      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(sprinklerAt != null ? { sprinkler: { reach: 2, sparkReach: 2, ...(spec.sprinkler === 'auto' ? { auto: true } : {}) } } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: laneWisps(lanes) }
+      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(sprinklerAt != null ? { sprinkler: { reach: 2, sparkReach: 2 } } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: laneWisps(lanes) }
       : { kind: 'dark-wisps', wisps, damageByTier: [1, 1, 2, 3], targeting: 'adjacent', ...(tactics ? { mode: 'tactics' as const } : { rest: spec.rest ?? REST_BY_DIFFICULTY[spec.difficulty] }) },
     required: lanes ? laneWisps(lanes).reduce((sum, lane) => sum + lane.hp, 0) : wisps.filter((wisp) => !wisp.hidden).reduce((sum, wisp) => sum + wisp.hp, 0),
     wisps: [],

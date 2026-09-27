@@ -32,9 +32,13 @@ Engines stand on a cell of the board. They take space, which is the trade-off.
 
 | Kind | Share | Seeds | Where |
 |---|---|---|---|
-| **Sprinkler** | most (about 60%) | tapped from the Sprinkler | every battle past the first session unless it says otherwise |
+| **Sprinkler** | most (about 75%) | tapped from the Sprinkler | every battle past the first session unless it says otherwise |
 | **Make do** | about 25% | none: only the board and what waking the Mist brings | a couple per island and per Frontier land (`makeDo: true`); the level card says "No Sprinkler here" |
-| **Rush** | events and some Surges | the Sprinkler launches on its own (`sprinkler: 'auto'`) | the time trial and rush events |
+
+Rules every battle keeps (pinned by `tests/wake-chain.test.ts`, played by `features/encounter/wake-chain.ts`):
+- **Every Seed flies out of the Sprinkler.** Nothing lands on a Lanes board on its own; a level with Seeds and no room for the Sprinkler does not build.
+- **Everything shown asleep can be woken.** A veiled piece opens only when a sleeper beside it wakes, and a sleeper wakes only with its twin, so every veiled piece sits in a chain from a sleeper.
+- **A battle without Seeds has enough to wake its chain**, and at least 3 pieces left over to fight with.
 
 The first session (the first battle and the Lost Trail rescue) has no Seeds at all: every piece is on the board or wakes out of the Mist. The Sprinkler arrives in the battle after it.
 
