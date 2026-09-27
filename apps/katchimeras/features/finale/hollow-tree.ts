@@ -19,7 +19,7 @@ export const HOLLOW_TREE_FINALE_SPEC: IslandLevelSpec = {
   title: 'The Hollow Heart',
   objective: 'Its keeper forgot why it keeps. Two bulwarks guard it: bring them down first. Then it remembers, and it changes.',
   difficulty: 'boss',
-  pieces: [[36, 2], [37, 1], [38, 2], [39, 1], [40, 2], [44, 1]], mist: [light(22), light(26)], seeds: { every: 3.2 }, wisps: [],
+  pieces: [[36, 2], [37, 1], [38, 2], [39, 1], [40, 2], [44, 1]], mist: [light(22), light(26)], seeds: { every: 3.2 }, stormPot: {}, wisps: [],
   lanes: [
     { id: 'heart', column: 3, at: 3, hp: 22, step: 7.5, drop: 2, look: 'hollow', spit: 8 },
     { id: 'bulwark-left', column: 2, at: 5, hp: 8, step: 7, look: 'bulwark', shield: true },

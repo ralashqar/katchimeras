@@ -70,6 +70,10 @@ LOOKS: dict[str, str] = {
                 'as if it is about to split into two halves, with a small curl on each half of its head.',
     'snatcher': 'A small crouched body with one long, thin, stretchy smoke arm ending in a little three-fingered claw '
                 'hand that clutches a small bright green seed, the only colour on it. Sneaky, mischievous.',
+    # The Crawler (the Spark chain's first foe): it climbs out of the Mist and creeps across the board itself.
+    'crawler': 'A low, flat, wide body hugging the ground like a little beetle, with six short stubby smoke legs '
+               'splayed out beneath it mid-step, and two short feeler curls on its head. It is clearly crawling along '
+               'the ground, not floating. Beady glowing eyes.',
     # The finale (Chapter 10): the Hollow Tree's forgotten keeper, in two phases.
     'hollow': 'An enormous ancient boss wisp with grey bark-like plates grown over its shoulders and head like a hollow '
               'old tree, and a large dark round hollow right through the middle of its chest with a faint warm golden '

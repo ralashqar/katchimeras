@@ -1,5 +1,5 @@
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
-import { laneArrived, laneAlive, laneColumn, laneFire, laneOf, lanesTick, SEED_SPRINKLER_ID } from '@/features/mission-mechanics/lanes';
+import { laneArrived, laneAlive, laneColumn, laneFire, laneOf, lanesTick, laneRowOf, laneZap, SEED_SPRINKLER_ID, STORM_CHAIN, STORM_POT_ID } from '@/features/mission-mechanics/lanes';
 import { createMechanicState, resolveMechanic } from '@/features/mission-mechanics/mechanic';
 import type { EncounterDefinition } from '@/types/encounter';
 import type { MergeItemDefinition, MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
@@ -44,6 +44,9 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
   const loose = (state: MergeWorldState, cell: number) => { const entry = state.board[cell]; return entry && !entry.locked && !entry.mist && entry.occupant?.kind === 'item' ? entry.occupant : null; };
   const isFree = (state: MergeWorldState, cell: number) => { const entry = state.board[cell]; return Boolean(entry) && !entry!.locked && !entry!.mist && !entry!.occupant; };
   const tierOf = (definitionId: string) => Math.floor(items.get(definitionId)?.tier ?? 1);
+  // The Spark chain zaps what is near it instead of shooting up its column (`laneZap`).
+  const isSpark = (definitionId: string) => items.get(definitionId)?.chainId === STORM_CHAIN;
+  const shootsUp = (definitionId: string) => (isSpark(definitionId) ? null : laneFire(tierOf(definitionId)));
   const move = (from: SettleBefore, a: number, b: number): SettleBefore | null => {
     const command: MergeWorldCommand = { type: 'move', from: a, to: b, now: NOW };
     const result = reduceMissionMove(from.state, a, b, NOW, items);
@@ -54,7 +57,7 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
   const tap = (from: SettleBefore): SettleBefore | null => {
     for (const cell of window.cellIndices) {
       const occupant = from.state.board[cell]?.occupant;
-      if (occupant?.kind !== 'generator' || occupant.generatorId === SEED_SPRINKLER_ID || (from.state.generators[occupant.generatorId]?.charges ?? 0) <= 0) continue;
+      if (occupant?.kind !== 'generator' || occupant.generatorId === SEED_SPRINKLER_ID || occupant.generatorId === STORM_POT_ID || (from.state.generators[occupant.generatorId]?.charges ?? 0) <= 0) continue;
       const command = { type: 'tapGenerator' as const, generatorId: occupant.generatorId, now: NOW, seed: tapSeed(from.run), spendEnergy: false as const, enforceCharges: true as const };
       const result = reduceMergeWorld(from.state, command);
       if (!result.changed || result.spawnedCell == null) continue;
@@ -63,6 +66,11 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
       return { state: settled.state, run: { ...settled.run, actions: settled.run.actions + 1 }, mechanicState: settled.mechanicState };
     }
     return null;
+  };
+  const standing = (at: SettleBefore): { column: number; row: number }[] => {
+    if (at.mechanicState.kind !== 'lanes') return [];
+    const state = at.mechanicState;
+    return mechanic.wisps.flatMap((_, index) => (laneArrived(mechanic, state, index) && laneAlive(mechanic, state, index) ? [{ column: laneColumn(mechanic, state, index), row: laneRowOf(state.wisps[index]!.row) }] : []));
   };
   // Each column's lowest standing wisp's row, or null.
   const threats = (at: SettleBefore): (number | null)[] => {
@@ -85,7 +93,7 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
     return rows.map((row, column) => (row == null ? 0 : window.cellIndices.reduce((sum, cell) => {
       const place = laneOf(window, cell)!;
       const piece = loose(at.state, cell);
-      const fire = piece ? laneFire(tierOf(piece.definitionId)) : null;
+      const fire = piece ? shootsUp(piece.definitionId) : null;
       return place.column === column && place.row > row && fire ? sum + fire.damage / fire.periodMs : sum;
     }, 0)));
   };
@@ -110,8 +118,17 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
     const covered = cover(from);
     type Choice = { score: number; run: () => SettleBefore | null };
     const choices: Choice[] = [];
+    // Wisps close enough to the board for a Spark plant to reach: where each stands.
+    const nearBoard = standing(from).filter((wisp) => wisp.row >= -2);
+    const reaches = (cell: number, reach: number) => { const at = laneOf(window, cell)!; return nearBoard.some((wisp) => Math.max(Math.abs(wisp.column - at.column), Math.abs(wisp.row - at.row)) <= reach); };
     for (const pair of pairs) {
       const place = laneOf(window, pair.b)!;
+      const pa = loose(from.state, pair.a);
+      if (pa && isSpark(pa.definitionId)) {
+        const zap = laneZap(pair.tier);
+        choices.push({ score: pair.tier * 10 + (zap && reaches(pair.b, zap.reach) ? 35 : 0) - (safe(from, pair.b) ? 0 : 100), run: () => move(from, pair.a, pair.b) });
+        continue;
+      }
       const row = rows[place.column];
       const under = row != null && place.row > row;
       choices.push({ score: pair.tier * 10 + (pair.wake ? 20 : 0) + (under ? 30 + (5 - covered[place.column]! * 1_000) : 0) - (safe(from, pair.b) ? 0 : 100), run: () => move(from, pair.a, pair.b) });
@@ -121,9 +138,18 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
     if (danger) {
       const targets = cells.filter((cell) => laneOf(window, cell)!.column === danger.column && isFree(from.state, cell) && safe(from, cell)).sort((x, y) => laneOf(window, y)!.row - laneOf(window, x)!.row);
       const shooter = cells
-        .filter((cell) => { const piece = loose(from.state, cell); const place = laneOf(window, cell)!; return piece && laneFire(tierOf(piece.definitionId)) && (rows[place.column] == null || covered[place.column]! > 0.0009); })
+        .filter((cell) => { const piece = loose(from.state, cell); const place = laneOf(window, cell)!; return piece && shootsUp(piece.definitionId) && (rows[place.column] == null || covered[place.column]! > 0.0009); })
         .sort((x, y) => tierOf(loose(from.state, y)!.definitionId) - tierOf(loose(from.state, x)!.definitionId))[0];
       if (targets[0] != null && shooter != null) choices.push({ score: 25 + danger.score * 4, run: () => move(from, shooter, targets[0]!) });
+    }
+    if (nearBoard.length) {
+      for (const cell of cells) {
+        const piece = loose(from.state, cell);
+        const zap = piece && isSpark(piece.definitionId) ? laneZap(tierOf(piece.definitionId)) : null;
+        if (!zap || reaches(cell, zap.reach)) continue;
+        const spot = cells.filter((target) => isFree(from.state, target) && safe(from, target) && reaches(target, zap.reach))[0];
+        if (spot != null) { choices.push({ score: 28 + tierOf(piece!.definitionId) * 4, run: () => move(from, cell, spot) }); break; }
+      }
     }
     const pieces = cells.filter((cell) => loose(from.state, cell)).length;
     if (room >= 2) choices.push({ score: pieces < 6 ? 45 : 12, run: () => tap(from) });
@@ -153,15 +179,18 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
       nextThink += think;
       // The Seed Sprinkler is a quick tap between moves: a player launches a Seed when there is room and fewer than three
       // loose Seeds to merge (never flooding the board with them).
-      const sprinkler = node.state.generators[SEED_SPRINKLER_ID];
-      const seedsLoose = window.cellIndices.filter((cell) => { const piece = loose(node.state, cell); return piece && tierOf(piece.definitionId) === 1; }).length;
-      if (sprinkler && sprinkler.charges > 0 && seedsLoose < 3 && window.cellIndices.filter((cell) => isFree(node.state, cell)).length >= 2) {
-        const command = { type: 'tapGenerator' as const, generatorId: SEED_SPRINKLER_ID, now: NOW, seed: tapSeed(node.run), spendEnergy: false as const, enforceCharges: true as const };
+      // The Storm Pot the same way, for its own chain's Seeds.
+      for (const [engine, chain] of [[SEED_SPRINKLER_ID, 'nature:garden'], [STORM_POT_ID, STORM_CHAIN]] as const) {
+      const sprinkler = node.state.generators[engine];
+      const seedsLoose = window.cellIndices.filter((cell) => { const piece = loose(node.state, cell); return piece && tierOf(piece.definitionId) === 1 && items.get(piece.definitionId)?.chainId === chain; }).length;
+      if (sprinkler && sprinkler.charges > 0 && seedsLoose < (engine === STORM_POT_ID ? 2 : 3) && window.cellIndices.filter((cell) => isFree(node.state, cell)).length >= 2) {
+        const command = { type: 'tapGenerator' as const, generatorId: engine, now: NOW, seed: tapSeed(node.run), spendEnergy: false as const, enforceCharges: true as const };
         const result = reduceMergeWorld(node.state, command);
         if (result.changed && result.spawnedCell != null) {
           const settled = settleAction(binding, node, command, result);
           if (!settled.refused) node = { state: settled.state, run: settled.run, mechanicState: settled.mechanicState };
         }
+      }
       }
       const next = act(node);
       if (next) { node = next; actions += 1; }

@@ -5,6 +5,7 @@ import type { DarkWispLook } from './dark-wisp-looks';
 export const DARK_WISP_LODS: Readonly<Record<DarkWispLook, { 128: ImageSourcePropType; 256: ImageSourcePropType }>> = {
   'bulwark': { 128: require('@incubator/art-cutouts/dark-wisps/bulwark-128.webp'), 256: require('@incubator/art-cutouts/dark-wisps/bulwark-256.webp') },
   'caller': { 128: require('@incubator/art-cutouts/dark-wisps/caller-128.webp'), 256: require('@incubator/art-cutouts/dark-wisps/caller-256.webp') },
+  'crawler': { 128: require('@incubator/art-cutouts/dark-wisps/crawler-128.webp'), 256: require('@incubator/art-cutouts/dark-wisps/crawler-256.webp') },
   'creeper': { 128: require('@incubator/art-cutouts/dark-wisps/creeper-128.webp'), 256: require('@incubator/art-cutouts/dark-wisps/creeper-256.webp') },
   'dasher': { 128: require('@incubator/art-cutouts/dark-wisps/dasher-128.webp'), 256: require('@incubator/art-cutouts/dark-wisps/dasher-256.webp') },
   'forgotten': { 128: require('@incubator/art-cutouts/dark-wisps/forgotten-128.webp'), 256: require('@incubator/art-cutouts/dark-wisps/forgotten-256.webp') },

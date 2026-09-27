@@ -142,6 +142,9 @@ export const LOW_RESOLVE = 3;
 /** The first time a player's battle has the Seed Sprinkler on its board (seen once, ever). */
 export const SEED_SPRINKLER_LINE = 'That’s the Seed Sprinkler. Tap it for a Seed. Every third one, it sparks a wisp that gets too close.';
 export const SEED_SPRINKLER_SEEN_ID = 'engine:seed-sprinkler';
+/** The Storm Pot, the first time a player sees one: Steppling, who storms follow around. */
+export const STORM_POT_LINE = 'A Storm Pot. Storms follow me around. Its plants don’t shoot up: they zap whatever gets close, any way round.';
+export const STORM_POT_SEEN_ID = 'engine:storm-pot';
 
 export const WISP_KIND_LINES: Readonly<Record<string, string>> = {
   nibbler: 'A nibbler. It knocks the plant under it down a size.',
@@ -153,6 +156,7 @@ export const WISP_KIND_LINES: Readonly<Record<string, string>> = {
   splitter: 'A splitter. When it falls, it bursts into two small ones.',
   caller: 'A caller. It calls little ones down its lane until it falls.',
   snatcher: 'A snatcher. It steals the smallest piece under it.',
+  crawler: 'A crawler. It climbs out of the Mist and walks right up to your plants. Zap it, or shoot it from below.',
   hollow: 'The Hollow Heart. It forgot everything. Its bulwarks first, then the heart.',
   forgotten: 'The last of it. It remembers now, a little. Let it rest.',
 };

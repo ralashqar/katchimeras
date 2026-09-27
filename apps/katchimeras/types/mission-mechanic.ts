@@ -65,6 +65,13 @@ export type LaneWisp = {
   callEvery?: number;
   /** Brought by another wisp (its index): a splitter's shards when it falls, a caller's mistlings when it calls. */
   spawn?: { by: number; on: 'death' | 'call' };
+  /**
+   * A crawler (`docs/lanes-variety-design.md`): it climbs out of the Mist on board cell `crawlFrom` when it arrives,
+   * then every `crawlEvery` ms creeps a cell toward the nearest plant; beside one, it knocks it down a tier instead.
+   * With no plant left it creeps down, and one that leaves the bottom row gets through.
+   */
+  crawlEvery?: number;
+  crawlFrom?: number;
 };
 /** Mist a wisp spat down its column: at which cell, and when it lands (ms of level time). */
 export type LaneSpit = { id: number; wisp: number; cell: number; firedAt: number; landsAt: number; /** A striker's bolt at a plant, not Mist. */ strike?: boolean; /** A frost wisp's bolt: the plant freezes. */ frost?: boolean; /** A snatcher's grab: the piece is taken. */ snatch?: boolean };
@@ -76,7 +83,8 @@ export type LaneWispState = { row: number; damage: number; holdUntil: number; ce
   /** A weaver's column now (absent: its own), when it moves next, and how many moves it has made. */ column?: number; weaveAt?: number; weaves?: number;
   /** A dasher: when it lunges next, and the lunge it is in. */ dashAt?: number; dashFrom?: number; dashUntil?: number;
   /** When it mends, freezes, snatches or calls next. */ mendAt?: number; frostAt?: number; snatchAt?: number; callAt?: number;
-  /** A spawned wisp: when it was brought (absent: not yet). */ bornAt?: number };
+  /** A spawned wisp: when it was brought (absent: not yet). */ bornAt?: number;
+  /** A crawler: when it creeps next (absent: not yet out of the Mist). */ crawlAt?: number };
 /** Glow a piece fired up its column: from which cell, at which wisp (-1: nothing over it), for how much, and when it lands (ms of level time). */
 export type LaneShot = { id: number; fromCell: number; wisp: number; damage: number; firedAt: number; landsAt: number };
 
@@ -256,6 +264,11 @@ export type MissionMechanicDefinition =
        * never land on a Lanes board any other way.
        */
       sprinkler?: { reach: number; sparkReach: number };
+      /**
+       * The Storm Pot (`docs/lanes-variety-design.md`): the Spark chain's spawner. Each tap launches a Spark Seed to a
+       * free cell within `reach` of it; a charge comes back every `everyMs`. Spark plants zap instead of shooting.
+       */
+      stormPot?: { reach: number; everyMs: number };
     };
 
 /** What a mechanic remembers between strikes; saved with the board. */
@@ -267,7 +280,8 @@ export type MissionMechanicState =
   /** Damage on each wisp, how many actions have been spent, and the action each wisp was last struck on (-1: never). */
   /** Lanes: the level's clock (ms of play), every wisp as it stands, each piece's next shot time, the Glow in the air, and who got through. */
   | { kind: 'lanes'; strikes: number; clock: number; wisps: LaneWispState[]; ready: Record<string, number>; shots: LaneShot[]; seq: number; breached: number | null; /** Mist spat by wisps over the board, still falling. */ spits?: LaneSpit[]; /** How far the level has skipped ahead to bring the next wisp in when none was left (ms off every later arrival). */ advance?: number; /** When the next piece arrives on its own, and how many have. */ nextSeedAt?: number; seeded?: number; /** A forgiving level: wisps pushed back rather than let through, and when the last was. */ pushedBack?: number; lastPushAt?: number; /** Plants a frost wisp froze: by piece, until when. */ frozen?: Record<string, number>;
-    /** The Seed Sprinkler (a tapped one): Seeds launched, its spark (the player's, set each tick), and sparks its taps queued. */ launches?: number; sparkEvery?: number; sparkDamage?: number; sparkQueue?: { from: number; wisp: number; damage: number }[] }
+    /** The Seed Sprinkler (a tapped one): Seeds launched, its spark (the player's, set each tick), and sparks its taps queued. */ launches?: number; sparkEvery?: number; sparkDamage?: number; sparkQueue?: { from: number; wisp: number; damage: number }[];
+    /** The Storm Pot's next charge (level time). */ nextStormAt?: number }
   | {
       kind: 'dark-wisps'; strikes: number; actions: number; damage: number[]; struckAt: number[];
       /** v2: turns until each wisp acts, where it is in its cycle, its ward, damage taken while gathering, and whether it was called in. */

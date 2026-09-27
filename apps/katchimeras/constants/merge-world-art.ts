@@ -47,6 +47,12 @@ export const MERGE_WORLD_ITEM_ART = {
   'nature:garden:5': require('@incubator/art-merge-world/items/nature-garden-5-shooter.webp'),
   'nature:garden:6': require('@incubator/art-merge-world/items/nature-garden-6-shooter.webp'),
   'nature:garden:7': require('@incubator/art-merge-world/items/nature-garden-7-shooter.webp'),
+  // The Spark chain (the Storm Pot's): plants that hold lightning, drawn beside the garden shooters.
+  'nature:storm:1': require('@incubator/art-merge-world/items/nature-storm-1.webp'),
+  'nature:storm:2': require('@incubator/art-merge-world/items/nature-storm-2.webp'),
+  'nature:storm:3': require('@incubator/art-merge-world/items/nature-storm-3.webp'),
+  'nature:storm:4': require('@incubator/art-merge-world/items/nature-storm-4.webp'),
+  'nature:storm:5': require('@incubator/art-merge-world/items/nature-storm-5.webp'),
   'nature:waterside:1': require('@incubator/art-merge-world/items/nature-waterside-1-pebble.webp'),
   'nature:waterside:2': require('@incubator/art-merge-world/items/nature-waterside-2-shell.webp'),
   'nature:waterside:3': require('@incubator/art-merge-world/items/nature-waterside-3-tidepool.webp'),

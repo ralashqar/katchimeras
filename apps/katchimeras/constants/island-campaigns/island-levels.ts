@@ -60,6 +60,8 @@ export type IslandLaneSpec = {
   /** A splitter: when it falls it bursts into this many small shards beside it. */ splits?: number;
   /** A caller: every `every` seconds it calls one of its `count` mistlings (of `hp`) down its column. */ calls?: { every: number; count: number; hp?: number };
   /** A boss's next phase: it comes, where it fell, when the wisp with this id falls (its `at` is ignored). */ after?: string;
+  /** A crawler: it climbs out of the Mist on board cell `from` and creeps a cell toward the nearest plant every `every` seconds. */
+  crawl?: { every: number; from: number };
 };
 
 export type IslandLevelSpec = {
@@ -88,6 +90,11 @@ export type IslandLevelSpec = {
    * waking the Mist brings. Every merge counts.
    */
   makeDo?: true;
+  /**
+   * Lanes: the Storm Pot (`docs/lanes-variety-design.md`), the Spark chain's spawner, tapped like the Sprinkler; `every`
+   * seconds a charge comes back. It stands on `cell`, else on the first free bottom cell the Sprinkler is not on.
+   */
+  stormPot?: { cell?: number; every?: number };
   /**
    * A Spring: it makes the Water chain (Pebble, Shell, Tidepool), whose merges wash the Mist twice as hard. `under`
    * hides it under Mist of that kind at its cell: clearing that cell is how it is found.
@@ -151,6 +158,7 @@ const seconds = (value: number) => Math.round(value * 1_000);
  */
 export function laneWisps(lanes: readonly IslandLaneSpec[]): LaneWisp[] {
   const authored: LaneWisp[] = lanes.map((lane) => ({
+    ...(lane.crawl ? { crawlEvery: seconds(lane.crawl.every), crawlFrom: lane.crawl.from } : {}),
     id: lane.id, hp: lane.hp, column: lane.column - 1, at: seconds(lane.at), stepMs: seconds(lane.step),
     ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}),
     ...(lane.spit ? { spitEvery: seconds(lane.spit) } : {}), ...(lane.strike ? { strikeEvery: seconds(lane.strike) } : {}),
@@ -180,10 +188,18 @@ export function laneWisps(lanes: readonly IslandLaneSpec[]): LaneWisp[] {
 
 /** What a tapped Seed Sprinkler holds at the start of a battle (and refills to). */
 export const SPRINKLER_CHARGES = 6;
+/** What a Storm Pot holds at the start of a battle (and refills to). */
+export const STORM_POT_CHARGES = 4;
+
+/**
+ * A crawler (`docs/lanes-variety-design.md`): it climbs out of the Mist on board cell `from` at `at` seconds, then
+ * creeps a cell toward the nearest plant every `every` seconds, knocking a plant beside it down a tier.
+ */
+export const crawler = (id: string, from: number, at: number, hp: number, every = 2.8): IslandLaneSpec => ({ id, column: from % 7, at, hp, step: every, look: 'crawler', crawl: { every, from } });
 
 export function islandLevel(campaignId: string, key: string, rawSpec: IslandLevelSpec, lines: CorruptionWispLines = ISLAND_WISP_LINES): RegionMissionDefinition {
   // A "make do" level has no Seeds at all, and says so.
-  const spec: IslandLevelSpec = rawSpec.makeDo ? { ...rawSpec, seeds: undefined, objective: `${rawSpec.objective} No Sprinkler here: make do with what you find.` } : rawSpec;
+  const spec: IslandLevelSpec = rawSpec.makeDo ? { ...rawSpec, seeds: undefined, stormPot: undefined, objective: `${rawSpec.objective} No Sprinkler here: make do with what you find.` } : rawSpec;
   const chain = spec.chain ?? 'nature:garden';
   // A level with walking wisps is a merge-tactics battle: five rows, every action a turn, no Mist rings.
   const tactics = spec.wisps.some((wisp) => wisp.kind);
@@ -217,7 +233,12 @@ export function islandLevel(campaignId: string, key: string, rawSpec: IslandLeve
   }
   const bound: EncounterMistCell[] = (spec.bound ?? []).map(([cell, value]) => ({ cell, type: 'bound', holds: { kind: 'item', definitionId: tier(value) } }));
   // The Seed Sprinkler: where the level says, else the first free bottom cell (never on a piece, Mist or the rescue).
-  const taken = new Set([...used, ...(spec.rescue ? [spec.rescue.cell] : [])]);
+  const stormPotAt = !lanes || !spec.stormPot ? null
+    : spec.stormPot.cell ?? [43, 36, 40, 44, 46, 45, 37, 39].find((cell) => WINDOW.has(cell) && !used.has(cell) && cell !== spec.rescue?.cell) ?? null;
+  if (lanes && spec.stormPot && stormPotAt == null) throw new Error(`${campaignId}:${key}: no room for the Storm Pot`);
+  const taken = new Set([...used, ...(spec.rescue ? [spec.rescue.cell] : []), ...(stormPotAt != null ? [stormPotAt] : [])]);
+  // A crawler climbs out on its own cell: never one a piece is on.
+  for (const lane of lanes ?? []) if (lane.crawl && (!WINDOW.has(lane.crawl.from) || spec.pieces.some(([cell]) => cell === lane.crawl!.from) || lane.crawl.from === stormPotAt)) throw new Error(`${campaignId}:${key}: crawler ${lane.id} cannot climb out at ${lane.crawl.from}`);
   const sprinklerAt = !lanes || !spec.seeds ? null
     : spec.sprinkler ?? [47, 43, 46, 44, 45, 40, 36, 38, 39, 37].find((cell) => WINDOW.has(cell) && !taken.has(cell)) ?? null;
   // Seeds never just appear on a Lanes board: each flies out of the Sprinkler.
@@ -238,9 +259,10 @@ export function islandLevel(campaignId: string, key: string, rawSpec: IslandLeve
       ...(spec.pod ? [{ id: 'pod', generatorId: 'wild-garden', cell: spec.pod.cell, charges: spec.pod.charges, drops: [tier(1)], recharge: { kind: 'merges' as const, every: spec.pod.every, amount: 1 } }] : []),
       ...(spec.spring ? [{ id: 'spring', generatorId: 'mist-spring', cell: spec.spring.cell, charges: spec.spring.charges, drops: [`${WATER_CHAIN}:1`], recharge: { kind: 'merges' as const, every: spec.spring.every, amount: 1 }, ...(spec.spring.under ? { hidden: true } : {}) }] : []),
       ...(sprinklerAt != null ? [{ id: 'sprinkler', generatorId: 'seed-sprinkler', cell: sprinklerAt, charges: SPRINKLER_CHARGES, drops: [tier(1)] }] : []),
+      ...(stormPotAt != null ? [{ id: 'storm-pot', generatorId: 'storm-pot', cell: stormPotAt, charges: STORM_POT_CHARGES, drops: ['nature:storm:1'] }] : []),
     ],
     mechanic: lanes
-      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(sprinklerAt != null ? { sprinkler: { reach: 2, sparkReach: 2 } } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: laneWisps(lanes) }
+      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(sprinklerAt != null ? { sprinkler: { reach: 2, sparkReach: 2 } } : {}), ...(stormPotAt != null ? { stormPot: { reach: 2, everyMs: seconds(spec.stormPot?.every ?? 7) } } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: laneWisps(lanes) }
       : { kind: 'dark-wisps', wisps, damageByTier: [1, 1, 2, 3], targeting: 'adjacent', ...(tactics ? { mode: 'tactics' as const } : { rest: spec.rest ?? REST_BY_DIFFICULTY[spec.difficulty] }) },
     required: lanes ? laneWisps(lanes).reduce((sum, lane) => sum + lane.hp, 0) : wisps.filter((wisp) => !wisp.hidden).reduce((sum, wisp) => sum + wisp.hp, 0),
     wisps: [],
@@ -326,51 +348,53 @@ export const PETALIMP_LEVEL_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Islan
   ],
   2: [
     {
-      title: 'Colour in the Rows', objective: 'They come faster now, and leave Mist behind them. Keep a strong piece under each one.', difficulty: 'thick',
+      title: 'Colour in the Rows', objective: 'They come faster now, and leave Mist behind them. Keep a strong piece under each one.', difficulty: 'thick', stormPot: {},
       pieces: [[36, 1], [37, 1], [38, 1], [39, 1], [44, 1], [46, 1]], sleepers: [[31, 1]],
       veiled: [[24, 2], [30, 1], [32, 1], [23, 1], [25, 1], [29, 2], [33, 2]],
       mist: [], seeds: { every: 3.2 }, wisps: [],
       lanes: waves('wisp', { first: 2, gap: 7, hp: 6, step: 4, grow: 1, drop: 2, spit: 7 }, [[2], [4], [1, 3], [5, 2], [4, 1, 3]]),
     },
     {
-      title: 'Pollinators', objective: 'A big one comes down among the rest, and a nibbler strikes your plants down a size. Merge big where it matters most.', difficulty: 'thick',
+      title: 'Pollinators', objective: 'A big one comes down among the rest, and a nibbler strikes your plants down a size. Merge big where it matters most.', difficulty: 'thick', stormPot: {},
       pieces: [[36, 1], [38, 2], [40, 1], [43, 1], [44, 1], [46, 1]], sleepers: [[37, 1], [39, 1]],
       veiled: [[30, 1], [32, 1], [29, 2], [33, 2], [31, 2], [22, 1], [26, 1]],
       mist: [], seeds: { every: 3.2 }, wisps: [],
       lanes: [...waves('wisp', { first: 2, gap: 7, hp: 6, step: 3.8, grow: 1, drop: 2, spit: 7 }, [[1], [5], [2, 4], [1, 5], [2, 3, 4]]), { id: 'big', column: 3, at: 16, hp: 12, step: 4.5, drop: 2, look: 'warden', spit: 7 },
         // The first striker (Sept 2026, enemy variety): it knocks the nearest plant under it down a tier.
-        { id: 'nibbler', column: 1, at: 11, hp: 6, step: 4.2, look: 'nibbler', strike: 5 }],
+        { id: 'nibbler', column: 1, at: 11, hp: 6, step: 4.2, look: 'nibbler', strike: 5 }, crawler('crawler', 16, 14, 5, 3.2)],
     },
   ],
   3: [
     {
-      title: 'The Trellis', objective: 'These drop Mist on every cell they pass. Merge beside the Mist to clear it, and keep room to merge.', difficulty: 'thick',
+      title: 'The Trellis', objective: 'These drop Mist on every cell they pass. Merge beside the Mist to clear it, and keep room to merge.', difficulty: 'thick', stormPot: {},
       pieces: SEEDS, mist: [light(22), dense(24), light(26), light(30), light(32)], seeds: { every: 3.2 }, wisps: [],
       lanes: waves('wisp', { first: 2, gap: 7, hp: 6, step: 4, grow: 1, drop: 1, spit: 8 }, [[2], [4], [1, 5], [3, 2], [4, 1, 5]]),
     },
     {
-      title: 'They Came Back at Night', objective: 'Quick ones, one after another, down every column. Keep every column covered.', difficulty: 'dark',
+      title: 'They Came Back at Night', objective: 'Quick ones, one after another, down every column. Keep every column covered.', difficulty: 'dark', stormPot: {},
       pieces: [[36, 2], [37, 1], [38, 2], [39, 1], [44, 1], [46, 1]], mist: [light(22), light(26)], seeds: { every: 4 }, wisps: [],
       lanes: waves('wisp', { first: 2, gap: 6, hp: 6, step: 3.4, grow: 1, drop: 2, spit: 8 }, [[1, 5], [3], [2, 4], [1, 5, 3], [2, 4, 1]]),
     },
   ],
   4: [
     {
-      title: 'The Long Border', objective: 'Two slow, tough ones hold the middle while fast ones run the edges. Split your pieces.', difficulty: 'dark',
+      title: 'The Long Border', objective: 'Two slow, tough ones hold the middle while fast ones run the edges. Split your pieces.', difficulty: 'dark', stormPot: {},
       pieces: [[36, 2], [37, 1], [38, 1], [39, 1], [40, 2], [44, 1]], mist: [light(23), light(25)], seeds: { every: 4 }, wisps: [],
       lanes: [
         { id: 'wall-left', column: 2, at: 2, hp: 16, step: 5, drop: 2, look: 'warden', spit: 6 },
         { id: 'wall-right', column: 4, at: 8, hp: 16, step: 5, drop: 2, look: 'warden', spit: 6 },
         ...waves('fast', { first: 14, gap: 5.5, hp: 5, step: 2.8, grow: 1, spit: 7 }, [[1], [5, 3], [1, 5], [3, 1, 5]]),
+        crawler('crawler', 18, 16, 9, 2.4),
       ],
     },
     {
-      title: 'The Colour Thief', objective: 'It took the colour first. It comes down the middle, slow and strong, dropping Mist all the way, and it does not come alone.', difficulty: 'boss',
+      title: 'The Colour Thief', objective: 'It took the colour first. It comes down the middle, slow and strong, dropping Mist all the way, and it does not come alone.', difficulty: 'boss', stormPot: {},
       pieces: [[36, 1], [37, 1], [38, 2], [39, 1], [40, 1], [44, 1]], mist: [light(22), dense(24), light(26)], seeds: { every: 3.8 }, wisps: [],
       lanes: [
         { id: 'thief', column: 3, at: 3, hp: 26, step: 6, drop: 1, look: 'thief', spit: 5 },
         ...waves('escort', { first: 8, gap: 8, hp: 6, step: 3.5, grow: 1, drop: 2, spit: 6 }, [[1], [5], [2, 4], [1, 5], [2, 4, 1]]),
         { id: 'nibbler', column: 5, at: 14, hp: 7, step: 4, look: 'nibbler', strike: 5 },
+        crawler('crawler', 16, 20, 10, 2.4),
       ],
       rewards: { glow: 50, xp: 30 },
     },

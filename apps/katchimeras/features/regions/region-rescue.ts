@@ -1,4 +1,4 @@
-import { islandLevel, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
+import { crawler, islandLevel, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
 import type { RegionMissionDefinition } from '@/constants/island-campaigns/types';
 import { regionFriendRescueId, type RegionFriend } from '@/constants/region-friends';
 
@@ -16,9 +16,10 @@ const SPECS: Readonly<Record<string, IslandLevelSpec>> = {
     pieces: [[43, 1], [44, 2], [45, 1], [46, 2], [39, 1], [36, 2], [38, 1], [40, 2], [30, 2], [32, 2]],
     mist: [16, 18, 24, 23, 25].map((cell) => ({ cell, type: 'light' as const })),
     rescue: { cell: 17 },
-    wisps: [], seeds: { every: 3, area: BOTTOM_ROWS }, rows: 5,
+    wisps: [], seeds: { every: 3, area: BOTTOM_ROWS }, stormPot: {}, rows: 5,
     lanes: [
       { id: 'moth-1', column: 2, at: 2, hp: 6, step: 5.4 },
+      crawler('crawler', 15, 16, 8, 2.8),
       { id: 'moth-2', column: 4, at: 2.6, hp: 6, step: 5.4 },
       { id: 'weaver', column: 1, at: 9, hp: 6, step: 4.6, look: 'weaver', weave: 2.6 },
       { id: 'spitter', column: 5, at: 10, hp: 6, step: 5, spit: 6 },

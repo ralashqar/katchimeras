@@ -1,5 +1,5 @@
 import type { EncounterMistCell } from '@/types/encounter';
-import { waves, type IslandLaneSpec, type IslandLevelSpec } from './island-levels';
+import { crawler, waves, type IslandLaneSpec, type IslandLevelSpec } from './island-levels';
 
 /**
  * The later friends' islands, written out by hand (cozy 4X v2, Sept 2026): every level a Lanes battle, each island
@@ -42,9 +42,9 @@ export const FERNIP_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly IslandL
       lanes: waves('wisp', { first: 2, gap: 9, hp: 4, step: 4.8, grow: 1, drop: 3 }, [[3], [2], [4], [1, 5]]),
     },
     {
-      title: 'Creepers', objective: 'Creepers leave Mist on every cell they pass. Bring them down before they cover your plants.', difficulty: 'calm',
+      title: 'Creepers', objective: 'Creepers leave Mist on every cell they pass. Bring them down before they cover your plants.', difficulty: 'calm', stormPot: {},
       ...FRONT, mist: [], seeds: { every: 3 }, wisps: [],
-      lanes: [...waves('wisp', { first: 2, gap: 9, hp: 4, step: 4.6, grow: 1, drop: 3 }, [[2], [4], [1, 5]]), creeper('creeper', 3, 10, 6, 5)],
+      lanes: [...waves('wisp', { first: 2, gap: 9, hp: 4, step: 4.6, grow: 1, drop: 3 }, [[2], [4], [1, 5]]), creeper('creeper', 3, 10, 6, 5), crawler('crawler', 16, 12, 5, 3.0)],
     },
   ],
   2: [
@@ -54,9 +54,9 @@ export const FERNIP_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly IslandL
       lanes: [...waves('wisp', { first: 2, gap: 8, hp: 5, step: 4.2, grow: 1, drop: 2 }, [[1], [5], [2, 4], [1, 5]]), nibbler('nibbler-a', 3, 9, 6), creeper('creeper', 2, 18, 6)],
     },
     {
-      title: 'The Tangle Thickens', objective: 'Two creepers cover the board while the rest come down. Keep room to merge.', difficulty: 'thick',
+      title: 'The Tangle Thickens', objective: 'Two creepers cover the board while the rest come down. Keep room to merge.', difficulty: 'thick', stormPot: {},
       ...FRONT, mist: [rooted(22), rooted(26)], seeds: { every: 3.2 }, wisps: [],
-      lanes: [creeper('creeper-a', 2, 3, 6), creeper('creeper-b', 4, 9, 6), ...waves('wisp', { first: 14, gap: 7, hp: 5, step: 4, grow: 1, drop: 2 }, [[3], [1, 5], [2, 4]])],
+      lanes: [creeper('creeper-a', 2, 3, 6), creeper('creeper-b', 4, 9, 6), ...waves('wisp', { first: 14, gap: 7, hp: 5, step: 4, grow: 1, drop: 2 }, [[3], [1, 5], [2, 4]]), crawler('crawler', 18, 14, 7, 2.6)],
     },
   ],
   3: [
@@ -67,7 +67,7 @@ export const FERNIP_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly IslandL
       lanes: [...waves('wisp', { first: 2, gap: 7, hp: 6, step: 4, grow: 1, drop: 2 }, [[2], [4], [1, 3], [5, 2], [4, 1]]), snatcher('snatcher', 5, 12, 6)],
     },
     {
-      title: 'Nothing Grows Here', objective: 'Nibblers on both sides, creepers down the middle. Keep your biggest plants away from the nibblers.', difficulty: 'dark',
+      title: 'Nothing Grows Here', objective: 'Nibblers on both sides, creepers down the middle. Keep your biggest plants away from the nibblers.', difficulty: 'dark', stormPot: {},
       pieces: [[36, 2], [37, 1], [38, 2], [39, 1], [40, 2], [44, 1]], mist: [light(23), light(25)], seeds: { every: 3.4 }, wisps: [],
       lanes: [nibbler('nibbler-a', 1, 4, 7), nibbler('nibbler-b', 5, 10, 7), creeper('creeper', 3, 6, 8), ...waves('wisp', { first: 16, gap: 6, hp: 6, step: 3.6, grow: 1, drop: 2 }, [[2, 4], [1, 5], [3, 2]])],
     },
@@ -79,13 +79,14 @@ export const FERNIP_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly IslandL
       lanes: [creeper('creeper-a', 2, 3, 8), creeper('creeper-b', 4, 7, 8), snatcher('snatcher', 3, 12, 7), ...waves('wisp', { first: 16, gap: 6, hp: 7, step: 3.4, grow: 1, drop: 2 }, [[1, 5], [2, 4], [3, 1, 5]])],
     },
     {
-      title: 'The Overgrowth', objective: 'The heart of the Wildgrowth has woken. It comes down the middle, burying everything in Mist, and its creepers come with it.', difficulty: 'boss',
+      title: 'The Overgrowth', objective: 'The heart of the Wildgrowth has woken. It comes down the middle, burying everything in Mist, and its creepers come with it.', difficulty: 'boss', stormPot: {},
       pieces: [[36, 1], [37, 1], [38, 2], [39, 1], [40, 1], [44, 1]], mist: [light(22), light(26)], seeds: { every: 3.8 }, wisps: [],
       lanes: [
         { id: 'overgrowth', column: 3, at: 3, hp: 26, step: 6, drop: 1, look: 'overgrowth', spit: 6 },
         creeper('creeper-a', 1, 9, 7), creeper('creeper-b', 5, 15, 7),
         ...waves('escort', { first: 12, gap: 8, hp: 6, step: 3.6, grow: 1, drop: 2 }, [[2], [4], [1, 5], [2, 4]]),
         nibbler('nibbler', 4, 20, 7),
+        crawler('crawler', 16, 20, 10, 2.4),
       ],
       rewards: BOSS_REWARD,
     },
@@ -107,7 +108,7 @@ export const BLOSSLE_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Island
   ],
   2: [
     {
-      title: 'The Quick Ones', objective: 'Quick little wisps race down the edges. Keep a plant under the outside lanes.', difficulty: 'thick',
+      title: 'The Quick Ones', objective: 'Quick little wisps race down the edges. Keep a plant under the outside lanes.', difficulty: 'thick', stormPot: {},
       ...FRONT, mist: [light(23), light(25)], seeds: { every: 2.8 }, wisps: [],
       lanes: [...waves('wisp', { first: 2, gap: 6, hp: 4, step: 4, grow: 1, drop: 2 }, [[3], [2, 4], [3], [2, 4]]), quick('quick-a', 1, 8, 4), quick('quick-b', 5, 14, 4), quick('quick-c', 1, 22, 5)],
     },
@@ -132,12 +133,12 @@ export const BLOSSLE_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Island
   ],
   4: [
     {
-      title: 'Every Last Seed', objective: 'Swarms, quick ones and a nibbler among them. Merge fast and never leave a lane empty.', difficulty: 'dark',
+      title: 'Every Last Seed', objective: 'Swarms, quick ones and a nibbler among them. Merge fast and never leave a lane empty.', difficulty: 'dark', stormPot: {},
       pieces: [[36, 2], [37, 1], [38, 1], [39, 1], [40, 2], [44, 1]], mist: [light(22), light(26)], seeds: { every: 3 }, wisps: [],
-      lanes: [...waves('swarm', { first: 2, gap: 7, hp: 5, step: 3.5, grow: 1, drop: 2 }, [[2, 4], [1, 3, 5], [2, 4], [1, 5, 3]]), quick('quick-a', 1, 9, 6), nibbler('nibbler', 5, 15, 7)],
+      lanes: [...waves('swarm', { first: 2, gap: 7, hp: 5, step: 3.5, grow: 1, drop: 2 }, [[2, 4], [1, 3, 5], [2, 4], [1, 5, 3]]), quick('quick-a', 1, 9, 6), nibbler('nibbler', 5, 15, 7), crawler('crawler', 18, 16, 7, 2.8)],
     },
     {
-      title: 'The Seed Caller', objective: 'It calls the swarm down around it, wave after wave. Bring it down in the middle while you hold the edges.', difficulty: 'boss',
+      title: 'The Seed Caller', objective: 'It calls the swarm down around it, wave after wave. Bring it down in the middle while you hold the edges.', difficulty: 'boss', stormPot: {},
       pieces: [[36, 1], [37, 1], [38, 2], [39, 1], [40, 1], [44, 1]], mist: [light(22), light(26)], seeds: { every: 3.2 }, wisps: [],
       lanes: [
         // It really calls: a mistling down its own column every few seconds, until it falls.
@@ -171,9 +172,9 @@ export const DRIZZLET_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Islan
       lanes: waves('wisp', { first: 2, gap: 8, hp: 5, step: 4.2, grow: 1, drop: 2, spit: 7 }, [[1], [5], [2, 4], [3], [1, 5]]),
     },
     {
-      title: 'Downpour', objective: 'A big cloud in the middle spits Mist on everything under it. Bring it down fast.', difficulty: 'thick',
+      title: 'Downpour', objective: 'A big cloud in the middle spits Mist on everything under it. Bring it down fast.', difficulty: 'thick', stormPot: {},
       ...FRONT, mist: [], seeds: { every: 3.2 }, wisps: [],
-      lanes: [warden('cloud', 3, 4, 12, 5.4, 4), ...waves('wisp', { first: 10, gap: 7, hp: 5, step: 4, grow: 1, drop: 2, spit: 7 }, [[1], [5], [2, 4], [1, 5]])],
+      lanes: [warden('cloud', 3, 4, 12, 5.4, 4), ...waves('wisp', { first: 10, gap: 7, hp: 5, step: 4, grow: 1, drop: 2, spit: 7 }, [[1], [5], [2, 4], [1, 5]]), crawler('crawler', 16, 14, 7, 2.6)],
     },
   ],
   3: [
@@ -183,7 +184,7 @@ export const DRIZZLET_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Islan
       lanes: waves('wisp', { first: 2, gap: 7, hp: 6, step: 4, grow: 1, drop: 2, spit: 6 }, [[2], [4], [1, 5], [3, 2], [4, 1, 5]]),
     },
     {
-      title: 'The Flood', objective: 'Two clouds and quick ones between them. Keep a strong plant in every lane.', difficulty: 'dark',
+      title: 'The Flood', objective: 'Two clouds and quick ones between them. Keep a strong plant in every lane.', difficulty: 'dark', stormPot: {},
       pieces: [[36, 2], [37, 1], [38, 2], [39, 1], [40, 2], [44, 1]], mist: [light(22), light(26)], seeds: { every: 3.4 }, wisps: [],
       lanes: [warden('cloud-a', 2, 3, 12, 5.4, 5), warden('cloud-b', 4, 10, 12, 5.4, 5), frost('frost', 1, 14, 6), quick('quick', 5, 18, 5), ...waves('wisp', { first: 22, gap: 6, hp: 6, step: 3.6, grow: 1, spit: 7 }, [[3], [1, 5]])],
     },
@@ -195,7 +196,7 @@ export const DRIZZLET_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Islan
       lanes: [...waves('wisp', { first: 2, gap: 7, hp: 5, step: 4, grow: 1, drop: 2, spit: 7 }, [[2, 4], [1, 5], [3], [2, 4]]), frost('frost', 3, 15, 6)],
     },
     {
-      title: 'The Rainmaker', objective: 'It has kept the Pond grey for years. It comes down the middle, spitting Mist on every row, and the rain comes with it.', difficulty: 'boss',
+      title: 'The Rainmaker', objective: 'It has kept the Pond grey for years. It comes down the middle, spitting Mist on every row, and the rain comes with it.', difficulty: 'boss', stormPot: {},
       pieces: [[36, 1], [37, 1], [38, 2], [39, 1], [40, 1], [44, 1]], mist: [light(22), light(26)], seeds: { every: 3.6 }, wisps: [],
       lanes: [
         { id: 'rainmaker', column: 3, at: 3, hp: 26, step: 6, drop: 1, look: 'shrouder', spit: 4 },
@@ -227,9 +228,9 @@ export const AMBERLEAF_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Isla
       lanes: [warden('big-a', 2, 3, 13, 6), warden('big-b', 4, 12, 13, 6), ...waves('wisp', { first: 6, gap: 8, hp: 5, step: 4.2, grow: 1, drop: 2 }, [[5], [1], [3], [5, 1]])],
     },
     {
-      title: 'Bitter Fruit', objective: 'A nibbler hides among the big ones. Keep your big plants out of its lane.', difficulty: 'thick',
+      title: 'Bitter Fruit', objective: 'A nibbler hides among the big ones. Keep your big plants out of its lane.', difficulty: 'thick', stormPot: {},
       ...FRONT, mist: [light(22), light(26)], seeds: { every: 3.2 }, wisps: [],
-      lanes: [warden('big', 3, 3, 14, 6), nibbler('nibbler', 1, 8, 6), quick('quick', 5, 14, 5), ...waves('wisp', { first: 18, gap: 7, hp: 5, step: 4, grow: 1, drop: 2 }, [[2, 4], [1, 5]])],
+      lanes: [warden('big', 3, 3, 14, 6), nibbler('nibbler', 1, 8, 6), quick('quick', 5, 14, 5), ...waves('wisp', { first: 18, gap: 7, hp: 5, step: 4, grow: 1, drop: 2 }, [[2, 4], [1, 5]]), crawler('crawler', 18, 14, 7, 2.6)],
     },
   ],
   3: [
@@ -239,9 +240,9 @@ export const AMBERLEAF_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Isla
       lanes: [warden('big-a', 1, 3, 12, 6), warden('big-b', 5, 8, 12, 6), warden('big-c', 3, 15, 14, 6), ...waves('wisp', { first: 10, gap: 8, hp: 5, step: 4, grow: 1, drop: 2 }, [[2], [4], [2, 4]])],
     },
     {
-      title: 'Storm in the Orchard', objective: 'Big ones spitting Mist, quick ones running through. Hold on.', difficulty: 'dark',
+      title: 'Storm in the Orchard', objective: 'Big ones spitting Mist, quick ones running through. Hold on.', difficulty: 'dark', stormPot: {},
       pieces: [[36, 2], [37, 1], [38, 2], [39, 1], [40, 2], [44, 1]], mist: [light(22), light(26)], seeds: { every: 3.4 }, wisps: [],
-      lanes: [warden('big-a', 2, 3, 14, 5.8, 7), bulwark('bulwark', 3, 6, 9), quick('quick-a', 1, 13, 6), quick('quick-b', 5, 17, 6), quick('quick-c', 4, 22, 6)],
+      lanes: [warden('big-a', 2, 3, 14, 5.8, 7), bulwark('bulwark', 3, 6, 9), quick('quick-a', 1, 13, 6), quick('quick-b', 5, 17, 6), quick('quick-c', 4, 22, 6), crawler('crawler', 16, 12, 7, 2.8)],
     },
   ],
   4: [
@@ -251,7 +252,7 @@ export const AMBERLEAF_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Isla
       lanes: [warden('big', 3, 3, 18, 6), nibbler('nibbler-a', 1, 8, 7), nibbler('nibbler-b', 5, 14, 7), ...waves('wisp', { first: 12, gap: 7, hp: 6, step: 3.8, grow: 1, drop: 2 }, [[2], [4], [2, 4]])],
     },
     {
-      title: 'The Hungry Harvest', objective: 'It has been feeding on the Orchard for years. Slow, huge and hard to move, and the quick ones run beside it.', difficulty: 'boss',
+      title: 'The Hungry Harvest', objective: 'It has been feeding on the Orchard for years. Slow, huge and hard to move, and the quick ones run beside it.', difficulty: 'boss', stormPot: {},
       pieces: [[36, 1], [37, 1], [38, 2], [39, 1], [40, 1], [44, 1]], mist: [light(22), light(26)], seeds: { every: 3.6 }, wisps: [],
       lanes: [
         // It feeds: every few seconds it mends every wisp beside it, itself too. Bring it down fast.
@@ -272,14 +273,14 @@ export const MISTLE_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly IslandL
       lanes: [...waves('wisp', { first: 2, gap: 9, hp: 4, step: 4.6, grow: 1, drop: 3, spit: 9 }, [[3], [2], [4]]), creeper('creeper', 1, 20, 5, 5)],
     },
     {
-      title: 'Whispers', objective: 'Quick ones and creepers together. Cover every lane and keep the board clear.', difficulty: 'calm',
+      title: 'Whispers', objective: 'Quick ones and creepers together. Cover every lane and keep the board clear.', difficulty: 'calm', stormPot: {},
       ...FRONT, mist: [], seeds: { every: 3 }, wisps: [],
-      lanes: [...waves('wisp', { first: 2, gap: 9, hp: 4, step: 4.6, grow: 1, drop: 3 }, [[2], [4], [1, 5]]), quick('quick', 3, 12, 4, 3), creeper('creeper', 5, 22, 5, 5)],
+      lanes: [...waves('wisp', { first: 2, gap: 9, hp: 4, step: 4.6, grow: 1, drop: 3 }, [[2], [4], [1, 5]]), quick('quick', 3, 12, 4, 3), creeper('creeper', 5, 22, 5, 5), crawler('crawler', 18, 12, 5, 3.0)],
     },
   ],
   2: [
     {
-      title: 'Where the Light Went', objective: 'Big ones, spitting ones and nibblers. Everything you have learned, all at once.', difficulty: 'thick',
+      title: 'Where the Light Went', objective: 'Big ones, spitting ones and nibblers. Everything you have learned, all at once.', difficulty: 'thick', stormPot: {},
       pieces: [[36, 2], [37, 1], [38, 1], [39, 1], [40, 2], [44, 1]], mist: [light(23), light(25)], seeds: { every: 3.2 }, wisps: [],
       lanes: [warden('big', 3, 3, 12, 6, 7), nibbler('nibbler', 1, 9, 6), ...waves('wisp', { first: 6, gap: 8, hp: 5, step: 4.2, grow: 1, drop: 2, spit: 8 }, [[5], [2], [4, 1]])],
     },
@@ -297,16 +298,16 @@ export const MISTLE_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly IslandL
       lanes: [warden('big', 3, 3, 14, 6), ...waves('swarm', { first: 5, gap: 7, hp: 4, step: 3.6, grow: 1, drop: 2 }, [[1, 5], [2, 4], [1, 5], [2, 4]])],
     },
     {
-      title: 'Nothing Remembers', objective: 'The oldest wisps of all: quick, spitting, striking. Keep every lane covered and every plant big.', difficulty: 'dark',
+      title: 'Nothing Remembers', objective: 'The oldest wisps of all: quick, spitting, striking. Keep every lane covered and every plant big.', difficulty: 'dark', stormPot: {},
       pieces: [[36, 2], [37, 1], [38, 2], [39, 1], [40, 2], [44, 1]], mist: [light(23), light(25)], seeds: { every: 3.4 }, wisps: [],
-      lanes: [...waves('wisp', { first: 2, gap: 7, hp: 6, step: 3.6, grow: 1, drop: 2, spit: 7 }, [[2, 4], [1, 5], [3], [2, 4]]), weaver('weaver', 2, 10, 6), dasher('dasher', 4, 16, 6), quick('quick-b', 3, 22, 6)],
+      lanes: [...waves('wisp', { first: 2, gap: 7, hp: 6, step: 3.6, grow: 1, drop: 2, spit: 7 }, [[2, 4], [1, 5], [3], [2, 4]]), weaver('weaver', 2, 10, 6), dasher('dasher', 4, 16, 6), quick('quick-b', 3, 22, 6), crawler('crawler', 16, 16, 9, 2.4)],
     },
   ],
   4: [
     {
-      title: 'At the Foot of the Oldest Tree', objective: 'Everything the Mist has left, all at once. This is the last of it before the heart.', difficulty: 'dark',
+      title: 'At the Foot of the Oldest Tree', objective: 'Everything the Mist has left, all at once. This is the last of it before the heart.', difficulty: 'dark', stormPot: {},
       pieces: [[36, 2], [37, 1], [38, 2], [39, 1], [40, 2], [44, 1]], mist: [light(22), light(26)], seeds: { every: 3.6 }, wisps: [],
-      lanes: [warden('big', 3, 3, 16, 6, 7), weaver('weaver', 1, 8, 7), mender('mender', 4, 13, 8), ...waves('wisp', { first: 16, gap: 7, hp: 6, step: 3.6, grow: 1, drop: 2, spit: 8 }, [[2, 4], [1, 5]])],
+      lanes: [warden('big', 3, 3, 16, 6, 7), weaver('weaver', 1, 8, 7), mender('mender', 4, 13, 8), ...waves('wisp', { first: 16, gap: 7, hp: 6, step: 3.6, grow: 1, drop: 2, spit: 8 }, [[2, 4], [1, 5]]), crawler('crawler', 18, 14, 9, 2.4)],
     },
     {
       title: 'The Forgotten Keeper', objective: 'It kept the oldest tree before the Mist, and forgot why. It comes down the middle, and every old wisp comes with it.', difficulty: 'boss',

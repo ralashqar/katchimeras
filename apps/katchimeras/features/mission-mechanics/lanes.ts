@@ -35,6 +35,23 @@ export function laneFire(tier: number): { periodMs: number; damage: number } | n
   return null;
 }
 
+/** The Spark chain (the Storm Pot's plants): they zap instead of shooting up their column. */
+export const STORM_CHAIN = 'nature:storm';
+export const STORM_POT_ID = 'storm-pot';
+
+/**
+ * A Spark plant's zap (`docs/lanes-variety-design.md`): every `periodMs` it strikes the nearest wisp within `reach`
+ * cells in any direction (over the board's edge too, never high in the sky), then jumps on `jumps` times to the next
+ * nearest within reach of the last; the Tempest Bloom's also stuns. A Spark Seed does not zap.
+ */
+export function laneZap(tier: number): { periodMs: number; reach: number; jumps: number; damage: number; stunMs: number } | null {
+  if (tier >= 5) return { periodMs: 2_000, reach: 2, jumps: 2, damage: 4, stunMs: 1_000 };
+  if (tier >= 4) return { periodMs: 2_200, reach: 2, jumps: 2, damage: 3, stunMs: 0 };
+  if (tier >= 3) return { periodMs: 2_400, reach: 1, jumps: 1, damage: 2, stunMs: 0 };
+  if (tier >= 2) return { periodMs: 2_600, reach: 1, jumps: 0, damage: 1, stunMs: 0 };
+  return null;
+}
+
 /** How long Glow takes to fly up this many rows. */
 export const laneFlightMs = (rows: number) => 160 + Math.max(1, rows) * 70;
 /** A merged piece fires this soon after it is made. */
@@ -155,6 +172,8 @@ export type LanesTickResult = {
   /** Seeds the Sprinkler launched this tick: from its cell, arcing to theirs (the board flies them). */
   /** The Sprinkler's sparks this tick: from its cell at a wisp, for how much (it lands with `shots`). */
   sparks: { from: number; wisp: number; damage: number }[];
+  /** Spark plants' zaps: from which cell, at which wisps in turn (the first, then each it jumped to). */
+  zaps: { from: number; wisps: number[]; damage: number }[];
 };
 
 /** The board row a wisp is over: the cell its centre is in. */
@@ -182,11 +201,11 @@ export const LANE_SPARK_MS = 180;
 export const DEFAULT_SPARK_EVERY = 3;
 export const DEFAULT_SPARK_DAMAGE = 1;
 
-/** Where the Seed Sprinkler stands on the board, or null. */
-export function sprinklerCell(board: MergeWorldState, window: MissionWindow): number | null {
+/** Where the Seed Sprinkler (or another engine: the Storm Pot) stands on the board, or null. */
+export function sprinklerCell(board: MergeWorldState, window: MissionWindow, generatorId: string = SEED_SPRINKLER_ID): number | null {
   for (const cell of window.cellIndices) {
     const occupant = board.board[cell]?.occupant;
-    if (occupant?.kind === 'generator' && occupant.generatorId === SEED_SPRINKLER_ID) return cell;
+    if (occupant?.kind === 'generator' && occupant.generatorId === generatorId) return cell;
   }
   return null;
 }
@@ -196,16 +215,17 @@ const chebyshev = (a: { column: number; row: number }, b: { column: number; row:
  * Where the Sprinkler's next Seed lands: a free cell within its reach (never one a wisp is on), else any free cell of
  * the Seeds' area; one of them by `key`. Null when there is no room.
  */
-export function sprinklerLanding(mechanic: LanesMechanic, state: LanesState, board: MergeWorldState, window: MissionWindow, key: string, also: number | null = null): number | null {
+export function sprinklerLanding(mechanic: LanesMechanic, state: LanesState, board: MergeWorldState, window: MissionWindow, key: string, also: number | null = null, engine: { generatorId: string; reach: number } | null = null): number | null {
   const occupied = new Set(mechanic.wisps.flatMap((_, index) => {
     if (!laneArrived(mechanic, state, index) || !laneAlive(mechanic, state, index)) return [];
     const cell = laneCell(window, laneColumn(mechanic, state, index), laneRowOf(state.wisps[index]!.row));
     return cell == null ? [] : [cell];
   }));
   const anywhere = (mechanic.seeds?.area ?? window.cellIndices).filter((cell) => window.cellIndices.includes(cell) && (cell === also || isFree(board, cell)) && !occupied.has(cell));
-  const sprinkler = mechanic.sprinkler ? sprinklerCell(board, window) : null;
+  const source = engine ?? (mechanic.sprinkler ? { generatorId: SEED_SPRINKLER_ID, reach: mechanic.sprinkler.reach } : null);
+  const sprinkler = source ? sprinklerCell(board, window, source.generatorId) : null;
   const at = sprinkler != null ? laneOf(window, sprinkler) : null;
-  const near = at ? anywhere.filter((cell) => chebyshev(laneOf(window, cell)!, at) <= Math.max(1, mechanic.sprinkler!.reach)) : [];
+  const near = at && source ? anywhere.filter((cell) => chebyshev(laneOf(window, cell)!, at) <= Math.max(1, source.reach)) : [];
   const free = near.length ? near : anywhere;
   return free.length ? free[Math.min(free.length - 1, Math.floor(seededUnit(key) * free.length))]! : null;
 }
@@ -248,8 +268,23 @@ export function lanesSprinklerTapped(mechanic: LanesMechanic, state: LanesState,
   return { state: { ...state, launches, ...(target ? { sparkQueue: [...(state.sparkQueue ?? []), { ...target, damage }] } : {}) }, board: next, landed };
 }
 
+/**
+ * A tap on the Storm Pot: the Spark Seed the tap made lands on a free cell within its reach, clear of every wisp (the
+ * board flies it there, as any spawner's piece).
+ */
+export function lanesStormPotTapped(mechanic: LanesMechanic, state: LanesState, board: MergeWorldState, window: MissionWindow, spawnedCell: number | null): { board: MergeWorldState; landed: number | null } {
+  const seed = spawnedCell != null ? board.board[spawnedCell]?.occupant : null;
+  if (!mechanic.stormPot || spawnedCell == null || seed?.kind !== 'item') return { board, landed: spawnedCell };
+  const landed = sprinklerLanding({ ...mechanic, seeds: undefined }, state, board, window, `lanes-storm:${spawnedCell}:${Math.round(state.clock)}:${board.nextInstance}`, spawnedCell, { generatorId: STORM_POT_ID, reach: mechanic.stormPot.reach }) ?? spawnedCell;
+  if (landed === spawnedCell) return { board, landed };
+  const cells = [...board.board];
+  cells[landed] = { ...cells[landed]!, occupant: seed };
+  cells[spawnedCell] = { ...cells[spawnedCell]!, occupant: null };
+  return { board: { ...board, board: cells }, landed };
+}
+
 export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: MergeWorldState, dt: number, window: MissionWindow, items: ReadonlyMap<string, MergeItemDefinition> = MERGE_ITEMS_BY_ID, luck: LanesLuck = {}): LanesTickResult {
-  if (input.breached != null || lanesComplete(mechanic, input)) return { state: input, board, fired: [], effects: [], changed: false, moved: false, hit: false, spat: [], sparks: [] };
+  if (input.breached != null || lanesComplete(mechanic, input)) return { state: input, board, fired: [], effects: [], changed: false, moved: false, hit: false, spat: [], sparks: [], zaps: [] };
   const from = input.clock;
   const clock = from + Math.max(0, dt);
   const wisps: LaneWispState[] = input.wisps.map((wisp) => ({ ...wisp }));
@@ -358,6 +393,64 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     const wisp = wisps[index]!;
     if (!arrived(index) || !alive(index)) continue;
     if (from < arrivalAt(index)) moved = true;
+    // A crawler climbs out of the Mist on its cell, then creeps across the board toward the nearest plant.
+    if (spec.crawlEvery) {
+      if (wisp.crawlAt == null) {
+        const place = spec.crawlFrom != null ? laneOf(window, spec.crawlFrom) : null;
+        wisp.column = place?.column ?? spec.column;
+        wisp.row = place?.row ?? 0;
+        wisp.crawlAt = clock + spec.crawlEvery;
+        moved = true;
+        changed = true;
+        continue;
+      }
+      if (wisp.holdUntil > clock || wisp.crawlAt > clock) continue;
+      wisp.crawlAt = clock + spec.crawlEvery;
+      const here = { column: col(index), row: laneRowOf(wisp.row) };
+      const boardNow = current();
+      let goal: { cell: number; column: number; row: number; distance: number } | null = null;
+      for (const cell of window.cellIndices) {
+        if (!looseItem(boardNow, cell)) continue;
+        const at = laneOf(window, cell)!;
+        const distance = Math.abs(at.column - here.column) + Math.abs(at.row - here.row);
+        if (!goal || distance < goal.distance) goal = { cell, ...at, distance };
+      }
+      if (goal && goal.distance <= 1) {
+        // Beside a plant: it knocks it down a tier (a Seed off the board).
+        const piece = looseItem(boardNow, goal.cell)!;
+        const lower = previousTier(items, piece.definitionId);
+        cells ??= [...board.board];
+        cells[goal.cell] = { ...cells[goal.cell]!, occupant: lower ? { ...piece, definitionId: lower } : null };
+        effects.push({ kind: 'corrupted', wisp: index, cell: goal.cell });
+        moved = true;
+        changed = true;
+        continue;
+      }
+      const toward = (delta: number) => Math.sign(delta);
+      const steps = goal
+        ? (Math.abs(goal.row - here.row) >= Math.abs(goal.column - here.column)
+          ? [{ column: 0, row: toward(goal.row - here.row) }, { column: toward(goal.column - here.column), row: 0 }]
+          : [{ column: toward(goal.column - here.column), row: 0 }, { column: 0, row: toward(goal.row - here.row) }])
+        : [{ column: 0, row: 1 }, { column: here.column < window.columns / 2 ? 1 : -1, row: 0 }];
+      for (const step of steps) {
+        if (!step.column && !step.row) continue;
+        const next = { column: here.column + step.column, row: here.row + step.row };
+        if (next.row >= window.rows) {
+          // Off the bottom row: it got through (a forgiving level sends it back to the top).
+          if (mechanic.forgiving) { wisp.row = 0; pushedBack += 1; lastPushAt = clock; changed = true; break; }
+          breached = index; changed = true; effects.push({ kind: 'breached', wisp: index });
+          break;
+        }
+        const cell = laneCell(window, next.column, next.row);
+        if (cell == null || boardNow.board[cell]?.occupant) continue;
+        wisp.column = next.column;
+        wisp.row = next.row;
+        moved = true;
+        changed = true;
+        break;
+      }
+      continue;
+    }
     // A weaver slides a column over now and then, once it is near the board; a piece in its way goes under Mist.
     if (spec.weaveEvery && wisp.row >= -1.5) {
       const due = wisp.weaveAt ?? clock + spec.weaveEvery;
@@ -544,6 +637,20 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   const pendingSparks: LaneShot[] = [];
   const sparks: LanesTickResult['sparks'] = [];
   const seeds = mechanic.seeds;
+  // The Storm Pot: a charge back every beat, up to what it holds.
+  let nextStormAt = input.nextStormAt;
+  if (mechanic.stormPot && breached == null) {
+    const everyMs = mechanic.stormPot.everyMs * (1 - Math.max(0, Math.min(0.6, luck.seedPace ?? 0)));
+    nextStormAt ??= everyMs;
+    if (clock >= nextStormAt) {
+      const generator = board.generators[STORM_POT_ID];
+      if (generator && generator.charges < generator.capacity) {
+        board = { ...board, generators: { ...board.generators, [STORM_POT_ID]: { ...generator, charges: generator.charges + 1 } } };
+        changed = true;
+      }
+      nextStormAt = clock + everyMs;
+    }
+  }
   if (seeds && mechanic.sprinkler && breached == null) {
     const everyMs = seeds.everyMs * (1 - Math.max(0, Math.min(0.6, luck.seedPace ?? 0)));
     nextSeedAt ??= everyMs;
@@ -567,12 +674,46 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   // Every piece due to fire fires: up its column at the lowest wisp over it, or off the top with nothing there.
   const ready: Record<string, number> = {};
   const fired: LaneShot[] = [];
+  const zaps: LanesTickResult['zaps'] = [];
   if (breached == null) {
     const boardNow = current();
     for (const cell of window.cellIndices) {
       const piece = looseItem(boardNow, cell);
       if (!piece) continue;
-      const fire = laneFire(Math.floor(items.get(piece.definitionId)?.tier ?? 1));
+      const made = items.get(piece.definitionId);
+      if (made?.chainId === STORM_CHAIN) {
+        // A Spark plant zaps the nearest wisp within its reach, any direction, and jumps on from it.
+        const zap = laneZap(Math.floor(made.tier ?? 1));
+        if (!zap) continue;
+        if (frozen[piece.instanceId] > clock) { ready[piece.instanceId] = Math.max(input.ready[piece.instanceId] ?? 0, frozen[piece.instanceId]!); continue; }
+        const due = input.ready[piece.instanceId] ?? clock + zap.periodMs / 2;
+        if (due > clock) { ready[piece.instanceId] = due; continue; }
+        const struck: number[] = [];
+        let origin = laneOf(window, cell)!;
+        for (let jump = 0; jump <= zap.jumps; jump += 1) {
+          let target = -1;
+          let best = Infinity;
+          mechanic.wisps.forEach((_, index) => {
+            if (struck.includes(index) || !arrived(index) || !alive(index)) return;
+            const distance = chebyshev({ column: col(index), row: laneRowOf(wisps[index]!.row) }, origin);
+            if (distance <= zap.reach && distance < best) { best = distance; target = index; }
+          });
+          if (target < 0) break;
+          struck.push(target);
+          origin = { column: col(target), row: laneRowOf(wisps[target]!.row) };
+        }
+        // Nothing in reach: it zaps the moment something comes.
+        if (!struck.length) { ready[piece.instanceId] = clock; continue; }
+        ready[piece.instanceId] = clock + zap.periodMs;
+        struck.forEach((wisp, order) => {
+          shots.push({ id: ++seq, fromCell: cell, wisp, damage: zap.damage + Math.max(0, Math.floor(luck.shotPower ?? 0)), firedAt: clock, landsAt: clock + LANE_SPARK_MS * (order + 1) });
+          if (zap.stunMs) wisps[wisp]!.holdUntil = Math.max(wisps[wisp]!.holdUntil, clock + zap.stunMs);
+        });
+        zaps.push({ from: cell, wisps: struck, damage: zap.damage });
+        changed = true;
+        continue;
+      }
+      const fire = laneFire(Math.floor(made?.tier ?? 1));
       if (!fire) continue;
       // Frozen: it holds its fire until it thaws.
       if (frozen[piece.instanceId] > clock) { ready[piece.instanceId] = Math.max(input.ready[piece.instanceId] ?? 0, frozen[piece.instanceId]!); continue; }
@@ -614,10 +755,11 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     ...(pushedBack ? { pushedBack, ...(lastPushAt != null ? { lastPushAt } : {}) } : {}),
     ...(Object.keys(frozen).length ? { frozen } : {}),
     ...(input.launches ? { launches: input.launches } : {}),
+    ...(nextStormAt != null ? { nextStormAt } : {}),
     ...(mechanic.sprinkler ? { sparkEvery: Math.max(1, Math.floor(luck.sparkEvery ?? DEFAULT_SPARK_EVERY)), sparkDamage: Math.max(1, Math.floor(luck.sparkDamage ?? DEFAULT_SPARK_DAMAGE)) } : {}),
   };
   const next = current();
-  return { state, board: nextInstance === next.nextInstance ? next : { ...next, nextInstance }, fired, effects, changed, moved, hit, spat, sparks };
+  return { state, board: nextInstance === next.nextInstance ? next : { ...next, nextInstance }, fired, effects, changed, moved, hit, spat, sparks, zaps };
 }
 
 const isFree = (board: MergeWorldState, cell: number) => { const entry = board.board[cell]; return Boolean(entry) && !entry!.locked && !entry!.mist && !entry!.occupant; };
@@ -664,7 +806,7 @@ export function normalizeLanesState(mechanic: LanesMechanic, value: unknown, str
   if (typeof value !== 'object') return null;
   const raw = value as Partial<LanesState>;
   if (!Array.isArray(raw.wisps) || raw.wisps.length !== mechanic.wisps.length || !Number.isFinite(raw.clock)) return null;
-  const optional = (wisp: Partial<LaneWispState> | undefined) => Object.fromEntries((['spitAt', 'strikeAt', 'column', 'weaveAt', 'weaves', 'dashAt', 'dashFrom', 'dashUntil', 'mendAt', 'frostAt', 'snatchAt', 'callAt', 'bornAt'] as const)
+  const optional = (wisp: Partial<LaneWispState> | undefined) => Object.fromEntries((['spitAt', 'strikeAt', 'column', 'weaveAt', 'weaves', 'dashAt', 'dashFrom', 'dashUntil', 'mendAt', 'frostAt', 'snatchAt', 'callAt', 'bornAt', 'crawlAt'] as const)
     .filter((key) => Number.isFinite(wisp?.[key])).map((key) => [key, Number(wisp![key])]));
   const wisps = raw.wisps.map((wisp) => ({ row: Number(wisp?.row) || 0, damage: Math.max(0, Number(wisp?.damage) || 0), holdUntil: Number(wisp?.holdUntil) || 0, cells: Math.max(0, Math.floor(Number(wisp?.cells) || 0)), ...optional(wisp) }));
   return {
@@ -678,5 +820,6 @@ export function normalizeLanesState(mechanic: LanesMechanic, value: unknown, str
     ...(Array.isArray(raw.spits) ? { spits: raw.spits.filter((spit) => spit && Number.isFinite(spit.landsAt)).map((spit) => ({ ...spit })) } : {}),
     ...(raw.frozen && typeof raw.frozen === 'object' ? { frozen: Object.fromEntries(Object.entries(raw.frozen).filter(([, until]) => Number.isFinite(until))) } : {}),
     ...(Number.isFinite(raw.launches) ? { launches: Math.max(0, Math.floor(Number(raw.launches))) } : {}),
+    ...(Number.isFinite(raw.nextStormAt) ? { nextStormAt: Number(raw.nextStormAt) } : {}),
   };
 }

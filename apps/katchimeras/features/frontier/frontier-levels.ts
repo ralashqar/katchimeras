@@ -1,5 +1,5 @@
 import { FRONTIER_VARIANT_NAMES, frontierMissionId, frontierRetakeMissionId, SURGE_DEFENCE_MISSION_ID, type FrontierTile, type FrontierVariant } from '@/constants/frontier-tiles';
-import { islandLevel, waves, type IslandLaneSpec, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
+import { crawler, islandLevel, waves, type IslandLaneSpec, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
 import type { RegionMissionDefinition } from '@/constants/island-campaigns/types';
 
 /**
@@ -46,6 +46,10 @@ export function frontierLevelSpec(tile: FrontierTile): IslandLevelSpec {
     if (tile.variant === 'brook') lanes.push({ id: 'frost', column: 2, at: 14, hp: hp + 1, step: 4.4, look: 'frost', frost: 6 });
     if (tile.variant === 'stones') lanes.push({ id: 'bulwark', column: 4, at: 17, hp: hp + 2, step: 6.5, look: 'bulwark', shield: true });
   }
+  // Crawlers (`docs/lanes-variety-design.md`): the Copse's own, from the first Copse on (the second Frontier battle, where
+  // the Storm Pot comes in to answer them); every other land's from power 3. They climb out on the top row.
+  const crawlers = tile.variant === 'copse' ? (power >= 4 ? 2 : 1) : power >= 3 && power < 6 ? 1 : 0;
+  for (let index = 0; index < crawlers; index += 1) lanes.push(crawler(`crawler-${index + 1}`, index === 0 ? 16 : 18, 10 + index * 14, Math.max(4, hp - 1), power <= 2 ? 3.6 : Math.max(2.6, 3.4 - power * 0.1)));
   const boss = power >= 6;
   if (boss) lanes.push({ id: 'heart', column: 3, at: 3, hp: 24, step: 6, drop: 1, look: 'warden', spit: 6 });
   // The first tile plays like the first boards: sleepers and veiled pieces to wake. After it, a garden already growing.
@@ -54,6 +58,8 @@ export function frontierLevelSpec(tile: FrontierTile): IslandLevelSpec {
   const makeDo = tile.variant === 'stones' && power >= 2 && power <= 3;
   return {
     ...(makeDo ? { makeDo: true as const } : {}),
+    // The Storm Pot, from the second Frontier battle on (the first is the Sprinkler's alone).
+    ...(!makeDo && tile.id !== 'frontier-1' ? { stormPot: {} } : {}),
     title: `Take back ${FRONTIER_VARIANT_NAMES[tile.variant]}`,
     objective: boss ? 'The Mist’s oldest keeper guards the way to the Hollow Tree. It comes down the middle with others at its side.' : OBJECTIVES[tile.variant],
     difficulty: boss ? 'boss' : power <= 2 ? 'calm' : power <= 4 ? 'thick' : 'dark',
@@ -106,8 +112,9 @@ export const SURGE_DEFENCE_SPEC: IslandLevelSpec = {
   title: 'Hold the Heart Tree', objective: 'The Mist is coming for the Heart Tree down every lane. Hold them all.', difficulty: 'thick',
   pieces: [[36, 1], [37, 1], [39, 1], [40, 1], [44, 1], [46, 1]], sleepers: [[38, 1]],
   veiled: [[31, 1], [30, 1], [32, 1], [24, 2]],
-  mist: [], seeds: { every: 3 }, wisps: [],
+  mist: [], seeds: { every: 3 }, stormPot: {}, wisps: [],
   lanes: [
+    crawler('crawler', 16, 20, 7, 2.8),
     ...waves('surge', { first: 2, gap: 8, hp: 5, step: 4.6, grow: 1, drop: 3 }, [[3], [1, 5], [2, 4], [3]]),
     { id: 'nibbler', column: 2, at: 16, hp: 6, step: 4.6, look: 'nibbler', strike: 6 },
     // A dasher lunges at the Tree, and a splitter bursts into shards where it falls.

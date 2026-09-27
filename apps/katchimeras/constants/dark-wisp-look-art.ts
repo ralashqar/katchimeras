@@ -20,6 +20,7 @@ export const DARK_WISP_LOOK_ART: Readonly<Record<DarkWispLook, ImageSourcePropTy
   frost: require('@incubator/art-cutouts/dark-wisps/frost.webp'),
   splitter: require('@incubator/art-cutouts/dark-wisps/splitter.webp'),
   snatcher: require('@incubator/art-cutouts/dark-wisps/snatcher.webp'),
+  crawler: require('@incubator/art-cutouts/dark-wisps/crawler.webp'),
   hollow: require('@incubator/art-cutouts/dark-wisps/hollow.webp'),
   forgotten: require('@incubator/art-cutouts/dark-wisps/forgotten.webp'),
 };

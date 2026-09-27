@@ -11,7 +11,7 @@ import { canAfford, encounterStatus, objectiveMet, recordCoverage, spend, type E
 import { chainRole } from './chains';
 import { clearBoundMist, glowShots, harmonyPulse, openMistCell, type GlowShot, type MistOpened } from './mist';
 import { seededUnit } from './seed';
-import { lanesAfterMerge, lanesCrash, lanesSprinklerTapped, SEED_SPRINKLER_ID } from '@/features/mission-mechanics/lanes';
+import { lanesAfterMerge, lanesCrash, lanesSprinklerTapped, SEED_SPRINKLER_ID, lanesStormPotTapped, STORM_POT_ID } from '@/features/mission-mechanics/lanes';
 
 /**
  * Everything that follows a board command on an encounter, in one place and
@@ -171,6 +171,11 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
   if (lanes && action === 'tap' && command.type === 'tapGenerator' && command.generatorId === SEED_SPRINKLER_ID && mechanic.kind === 'lanes' && mechanicState.kind === 'lanes') {
     const launched = lanesSprinklerTapped(mechanic, mechanicState, state, window, result.spawnedCell ?? null);
     mechanicState = launched.state;
+    state = launched.board;
+    landedCell = launched.landed;
+  }
+  if (lanes && action === 'tap' && command.type === 'tapGenerator' && command.generatorId === STORM_POT_ID && mechanic.kind === 'lanes' && mechanicState.kind === 'lanes') {
+    const launched = lanesStormPotTapped(mechanic, mechanicState, state, window, result.spawnedCell ?? null);
     state = launched.board;
     landedCell = launched.landed;
   }

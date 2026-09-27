@@ -36,7 +36,7 @@ import { FriendSpeechBubble } from './friend-speech-bubble';
 import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightningLayer, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
 import { MistMissionDock, type GlowLandingSource, type OpeningGlowStore } from './kingdom-opening-merge-dock';
 import { laneWispPoint } from './corruption-wisp-layer';
-import { LANE_MISS_ROW, laneOf } from '@/features/mission-mechanics/lanes';
+import { LANE_MISS_ROW, LANE_SPARK_MS, laneOf } from '@/features/mission-mechanics/lanes';
 import { RECOIL_SQUASH_MS, spriteRecoil } from '@/components/katchadeck/games/sprite-recoil';
 import { useAppForeground } from '@/hooks/use-app-foreground';
 
@@ -333,6 +333,24 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
             from: { left: offset.x + bounds.left, top: offset.y + bounds.top, width: bounds.width, height: bounds.height },
             to: { left: at.x - origin.x - size / 2, top: at.y - origin.y - size / 2, width: size, height: size },
           }];
+        });
+        if (made.length) setBolts((current) => [...current, ...made]);
+      }
+      // A Spark plant's zap: the same bolt, from the plant to the wisp it strikes, then on from that wisp to each it jumps to.
+      if (result?.zaps.length && metrics && offset) {
+        const origin = { x: metrics.x - offset.x, y: metrics.y - offset.y };
+        const made = result.zaps.flatMap((zap): MistBolt[] => {
+          const { bounds } = mergeCellFrame(metrics.geometry, zap.from);
+          let from = { left: offset.x + bounds.left, top: offset.y + bounds.top, width: bounds.width, height: bounds.height };
+          const size = bounds.width * 0.5;
+          return zap.wisps.flatMap((wisp, order): MistBolt[] => {
+            const at = landings?.sinkRef?.current?.pointOf?.(wisp);
+            if (!at) return [];
+            const to = { left: at.x - origin.x - size / 2, top: at.y - origin.y - size / 2, width: size, height: size };
+            const bolt: MistBolt = { id: ++boltSeq.current, tone: 'glow', delay: order * LANE_SPARK_MS, onImpact: () => {}, from, to };
+            from = to;
+            return [bolt];
+          });
         });
         if (made.length) setBolts((current) => [...current, ...made]);
       }

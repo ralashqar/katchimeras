@@ -95,6 +95,8 @@ export const MERGE_ITEM_CATALOG: readonly MergeItemDefinition[] = [
   ...chain('adventure:trail', 'figure.walk', '#D6A66D', ['Sock', 'Shoe', 'Boot', 'Hiking Gear', 'Adventure Pack', 'Expedition Kit']),
   ...chain('adventure:travel', 'globe.americas.fill', '#A9A1E8', ['Ticket', 'Map', 'Travel Journal', 'Suitcase', 'Grand Journey', 'Memory Globe']),
   ...chain('nature:garden', 'leaf.fill', '#82C891', ['Seed', 'Sprout', 'Plant', 'Flower', 'Rare Flower', 'Magical Plant', 'Ancient Tree']),
+  // Lanes (`docs/lanes-variety-design.md`): the Storm Pot's Spark chain. Its plants zap the nearest wisp in any direction.
+  ...chain('nature:storm', 'sparkles', '#8F7CE6', ['Spark Seed', 'Static Sprout', 'Thunder Bulb', 'Storm Lily', 'Tempest Bloom']),
   ...chain('nature:waterside', 'water.waves', '#77C8D0', ['Pebble', 'Shell', 'Tidepool', 'Water Lily', 'Moonlit Cove', 'Ocean Sanctuary']),
   ...chain('nature:keepsake', 'sparkles', '#79AA76', ['Dew Bead', 'Pressed Leaf', 'Memory Sprig', 'Field Journal', 'Memory Terrarium', 'Living Archive']),
   ...chain('comfort:rest', 'sparkles', '#B7A5D8', ['Pillow Feather', 'Cushion', 'Pillow', 'Blanket Nest', 'Cosy Bed', 'Dream Room']),
@@ -178,12 +180,14 @@ export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
   generator('mist-spring', 'Mist Spring', 'water.waves', '#6FB9C9', 48, ['nature:waterside', 'nature:waterside'], 'A spring the Mist was hiding: Pebbles that wash the Mist away.'),
   // Lanes (`docs/lanes-variety-design.md`): the Seed Sprinkler launches the battle's Seeds on its own and sparks wisps near it.
   generator('seed-sprinkler', 'Seed Sprinkler', 'leaf.fill', '#7FB05A', 48, ['nature:garden', 'nature:garden'], 'Tap it to launch a Seed. It refills as the battle goes on, and every third launch sparks a wisp that comes too close.'),
+  // The Spark chain's spawner: a battle's second chain, tapped like the Sprinkler.
+  generator('storm-pot', 'Storm Pot', 'bolt.fill', '#6F7BD8', 48, ['nature:storm', 'nature:storm'], 'Tap it to launch a Spark Seed. Spark plants zap the nearest wisp in any direction, close by.'),
   ...packEntries('mergeGenerators').map((entry) => generator(entry.id, entry.name, entry.icon, entry.color, entry.initialCell, entry.chainIds, entry.unlockDescription)),
 ];
 
 export const MERGE_GENERATORS_BY_ID = new Map(MERGE_GENERATORS.map((item) => [item.id, item]));
 /** Item makers that only a battle places: never on the player's own board, never in its echoes. */
-export const ENCOUNTER_ONLY_GENERATORS: ReadonlySet<string> = new Set(['mist-spring', 'seed-sprinkler']);
+export const ENCOUNTER_ONLY_GENERATORS: ReadonlySet<string> = new Set(['mist-spring', 'seed-sprinkler', 'storm-pot']);
 
 // One authored Dream Echo for every shared generator tier-one drop. The Seed
 // is deliberately omitted because Mossprout's FTUE already authors and clears
@@ -277,7 +281,7 @@ export const KATCHIMERA_MERGE_PROFILES: Record<string, KatchimeraMergeProfile> =
 };
 
 // The Seed Sprinkler owns no chain: its Seeds are the battle's (`LanesMechanic.seeds`), never the Garden Basket's to lose.
-export const GENERATOR_BY_CHAIN = Object.fromEntries(MERGE_GENERATORS.filter((item) => item.id !== 'seed-sprinkler').flatMap((item) => item.chainIds.map((chainId) => [chainId, item.id]))) as Record<string, string>;
+export const GENERATOR_BY_CHAIN = Object.fromEntries(MERGE_GENERATORS.filter((item) => item.id !== 'seed-sprinkler' && item.id !== 'storm-pot').flatMap((item) => item.chainIds.map((chainId) => [chainId, item.id]))) as Record<string, string>;
 
 /** The bundled characters and generators, before any a content pack brought. */
 export const MERGE_CHARACTER_IDS_BUNDLED: readonly MergeCharacterId[] = Object.keys(KATCHIMERA_MERGE_PROFILES);
