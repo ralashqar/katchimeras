@@ -9,7 +9,7 @@ import type { useOpeningGlow } from '@/components/katchadeck/world/kingdom-openi
 import { abilityFor, abilityReady, partnerAbilityFor, partnerAbilityReady, abilityTargets } from '@/features/encounter/abilities';
 import { encounterMechanicHost } from '@/features/encounter/adapt';
 import { createEncounterState } from '@/features/encounter/create-state';
-import { encounterLine, WISP_KIND_LINES, EXPOSED_WISP_LINE, GATHER_LINE, SPREAD_LINE, KEEP_GOING_RESOLVE, LOW_RESOLVE, THREAT_LINE, WISP_ACT_LINES, WISP_ACT_ORDER } from '@/features/encounter/encounter-copy';
+import { encounterLine, SEED_SPRINKLER_LINE, SEED_SPRINKLER_SEEN_ID, WISP_KIND_LINES, EXPOSED_WISP_LINE, GATHER_LINE, SPREAD_LINE, KEEP_GOING_RESOLVE, LOW_RESOLVE, THREAT_LINE, WISP_ACT_LINES, WISP_ACT_ORDER } from '@/features/encounter/encounter-copy';
 import { lossReason as encounterLossReason, resolveLeft, type EncounterLossReason, type EncounterStatus } from '@/features/encounter/encounter-run';
 import { encounterOutcome, type EncounterOutcome } from '@/features/encounter/outcome';
 import { encounterRunId } from '@/features/encounter/run-id';
@@ -29,6 +29,7 @@ import { createMissionState, missionBoardStep } from './steppling-mission';
 import { useMissionBoard, type MissionCommandResult } from './use-opening-mission-board';
 import { laneAlive, laneArrived } from '@/features/mission-mechanics/lanes';
 import { katchimeraSkinById } from '@/constants/katchimera-skins';
+import { markStoredChapterOpened } from '@/utils/merge-world/repository';
 
 /** How long a hero's ability callout stays in the battle's speech bubble. */
 const ABILITY_CALL_MS = 1_800;
@@ -117,7 +118,7 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
   /** The Katchimera brought in, and the helper Wisp; Mossprout at level one when absent. */
   loadout?: EncounterLoadout | null;
   /** The world whose Haven shapes the encounter (its buildings). */
-  world?: Pick<MergeWorldState, 'heartwoodBuildings'> | null;
+  world?: (Pick<MergeWorldState, 'heartwoodBuildings'> & Partial<Pick<MergeWorldState, 'chapterOpeningsSeen'>>) | null;
   tileNode: View | null;
   boardMetrics: MergeBoardScreenMetrics | null;
   cameraSettled: boolean;
@@ -259,11 +260,18 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     if (mechanic.kind !== 'lanes') return;
     if (kindsSeenRef.current.runId !== runId) kindsSeenRef.current = { runId: runId ?? null, seen: new Set() };
     const seen = kindsSeenRef.current.seen;
+    // The Seed Sprinkler, the first time a player sees one (once, ever).
+    if (mechanic.sprinkler && !seen.has('sprinkler') && !world?.chapterOpeningsSeen?.includes(SEED_SPRINKLER_SEEN_ID)) {
+      seen.add('sprinkler');
+      void markStoredChapterOpened(SEED_SPRINKLER_SEEN_ID).catch(() => undefined);
+      setKindLine({ speaker: 'Mossprout', text: SEED_SPRINKLER_LINE });
+      return;
+    }
     const arrived = mechanic.wisps.find((wisp, index) => wisp.look && WISP_KIND_LINES[wisp.look] && !seen.has(wisp.look) && laneArrived(mechanic, state, index) && laneAlive(mechanic, state, index));
     if (!arrived?.look) return;
     seen.add(arrived.look);
     setKindLine({ speaker: 'Mossprout', text: WISP_KIND_LINES[arrived.look]! });
-  }, [host, runId, store.mechanicState]);
+  }, [host, runId, store.mechanicState, world?.chapterOpeningsSeen]);
   useEffect(() => {
     if (!kindLine) return;
     const timer = setTimeout(() => setKindLine(null), KIND_LINE_MS);

@@ -139,6 +139,10 @@ export const LOW_RESOLVE = 3;
  * The first time a kind of wisp comes down in a battle, Mossprout says what it is and what to do about it (Lanes
  * variety, Sept 2026). The Mist's voice: no exclamation, the Mist capitalised.
  */
+/** The first time a player's battle has the Seed Sprinkler on its board (seen once, ever). */
+export const SEED_SPRINKLER_LINE = 'That’s the Seed Sprinkler. Tap it for a Seed. Every third one, it sparks a wisp that gets too close.';
+export const SEED_SPRINKLER_SEEN_ID = 'engine:seed-sprinkler';
+
 export const WISP_KIND_LINES: Readonly<Record<string, string>> = {
   nibbler: 'A nibbler. It knocks the plant under it down a size.',
   weaver: 'A weaver. It slides between lanes: cover the ones beside it too.',

@@ -84,3 +84,60 @@ test('a caller calls its mistlings down one at a time; those never called fade w
   const later = run(mechanic, felled, after.board, 200, window);
   assert.equal(laneAlive(mechanic, later.state, 3), false, 'the third never comes');
 });
+
+test('the Seed Sprinkler stands on the board: a tap launches a Seed near it, its supply refills on the beat, every third launch sparks a wisp in reach', async () => {
+  const { sprinklerCell, SPRINKLER_ID } = { ...(await import('@/features/mission-mechanics/lanes')), SPRINKLER_ID: 'seed-sprinkler' };
+  const { settleAction, tapSeed } = await import('@/features/encounter/settle');
+  const { createEncounterRun } = await import('@/features/encounter/encounter-run');
+  const { reduceMergeWorld } = await import('@/utils/merge-world/engine');
+  const { SPRINKLER_CHARGES } = await import('@/constants/island-campaigns/island-levels');
+  const encounter = islandLevel('test', 'sprinkler', { ...base, seeds: { every: 1 }, lanes: [{ id: 'near', column: 5, at: 0, hp: 50, step: 1.2 }] }).encounter;
+  const host = encounterMechanicHost(encounter);
+  const mechanic = resolveMechanic(host) as LanesMechanic;
+  const window = encounterWindow(encounter);
+  let board = createEncounterState(encounter, 'mossprout', 1);
+  const at = sprinklerCell(board, window);
+  assert.equal(at, 47, 'on a free bottom corner cell');
+  assert.equal(board.board[47]!.occupant?.kind, 'generator');
+  assert.equal(board.generators[SPRINKLER_ID]!.charges, SPRINKLER_CHARGES, 'a small supply to tap');
+  let lanes = createLanesState(mechanic);
+  // Nothing comes on its own (and the wisp comes near).
+  for (let t = 0; t < 7_600; t += 100) { const ticked = lanesTick(mechanic, lanes, board, 100, window, undefined, { sparkEvery: 3 }); lanes = ticked.state; board = ticked.board; assert.equal(ticked.sown.length, 0, 'no Seed without a tap'); }
+  const sown: { from: number; to: number }[] = [];
+  let sparks = 0;
+  let run = createEncounterRun(encounter);
+  for (let tap = 0; tap < 3; tap += 1) {
+    const command = { type: 'tapGenerator' as const, generatorId: SPRINKLER_ID, now: 1, seed: tapSeed(run), spendEnergy: false as const, enforceCharges: true as const };
+    const settled = settleAction({ encounter, host, window }, { state: board, run, mechanicState: lanes }, command, reduceMergeWorld(board, command));
+    board = settled.state; run = settled.run; lanes = settled.mechanicState as LanesState;
+    const landed = settled.spawnedCell!;
+    assert.equal(board.board[landed]!.occupant?.kind, 'item', 'the tap’s Seed is on the cell it was sent to (the board flies it there)');
+    sown.push({ from: at!, to: landed });
+    const ticked = lanesTick(mechanic, lanes, board, 100, window);
+    lanes = ticked.state; board = ticked.board; sparks += ticked.sparks.length;
+  }
+  assert.equal(sown.length, 3, 'one Seed a tap');
+  assert.ok(sown.every((seed) => seed.from === 47), 'out of the Sprinkler');
+  const near = (cell: number) => { const index = window.cellIndices.indexOf(cell); return Math.max(Math.abs((index % 5) - 4), Math.abs(Math.floor(index / 5) - 4)) <= 2; };
+  assert.ok(sown.every((seed) => near(seed.to)), 'to cells within its reach');
+  assert.equal(sparks, 1, 'the third launch sparked the wisp that came close');
+  assert.equal(board.generators[SPRINKLER_ID]!.charges, SPRINKLER_CHARGES - 3);
+  const refilled = lanesTick(mechanic, lanes, board, 1_100, window);
+  assert.equal(refilled.board.generators[SPRINKLER_ID]!.charges, SPRINKLER_CHARGES - 2, 'a charge back on the beat');
+  // A rush's Sprinkler launches on its own, with nothing to tap.
+  const rush = islandLevel('test', 'rush', { ...base, seeds: { every: 1 }, sprinkler: 'auto', lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] }).encounter;
+  const rushMechanic = resolveMechanic(encounterMechanicHost(rush)) as LanesMechanic;
+  let rushBoard = createEncounterState(rush, 'mossprout', 1);
+  assert.equal(rushBoard.generators[SPRINKLER_ID]!.charges, 0);
+  let rushLanes = createLanesState(rushMechanic);
+  let launched = 0;
+  for (let t = 0; t < 3_050; t += 100) { const ticked = lanesTick(rushMechanic, rushLanes, rushBoard, 100, encounterWindow(rush)); rushLanes = ticked.state; rushBoard = ticked.board; launched += ticked.sown.length; }
+  assert.equal(launched, 3, 'one a beat, on its own');
+  // A make-do level: no Sprinkler, no Seeds, and it says so.
+  const makeDo = islandLevel('test', 'make-do', { ...base, seeds: { every: 1 }, makeDo: true, lanes: [{ id: 'a', column: 3, at: 0, hp: 4, step: 5 }] });
+  assert.equal(makeDo.encounter.spawners.length, 0);
+  assert.equal(makeDo.encounter.mechanic?.kind === 'lanes' && makeDo.encounter.mechanic.seeds, undefined);
+  assert.match(makeDo.objective, /No Sprinkler here/);
+  const scripted = islandLevel('test', 'scripted', { ...base, seeds: { every: 1 }, forgiving: true, lanes: [{ id: 'a', column: 3, at: 0, hp: 4, step: 5 }] }).encounter;
+  assert.equal(sprinklerCell(createEncounterState(scripted, 'mossprout', 1), encounterWindow(scripted)), null, 'a scripted first-session board has no Sprinkler');
+});

@@ -176,12 +176,14 @@ export const MERGE_GENERATORS: readonly MergeGeneratorDefinition[] = [
   generator('creative-playroom', 'Creative Playroom', 'sparkles', '#9A72C4', 47, ['creative:art', 'creative:screen'], 'Art materials and playful screens for making and imagining.'),
   // Encounter v2: a battle's Spring, found under the Mist; it makes the waterside chain. Never on the player's own board.
   generator('mist-spring', 'Mist Spring', 'water.waves', '#6FB9C9', 48, ['nature:waterside', 'nature:waterside'], 'A spring the Mist was hiding: Pebbles that wash the Mist away.'),
+  // Lanes (`docs/lanes-variety-design.md`): the Seed Sprinkler launches the battle's Seeds on its own and sparks wisps near it.
+  generator('seed-sprinkler', 'Seed Sprinkler', 'leaf.fill', '#7FB05A', 48, ['nature:garden', 'nature:garden'], 'Tap it to launch a Seed. It refills as the battle goes on, and every third launch sparks a wisp that comes too close.'),
   ...packEntries('mergeGenerators').map((entry) => generator(entry.id, entry.name, entry.icon, entry.color, entry.initialCell, entry.chainIds, entry.unlockDescription)),
 ];
 
 export const MERGE_GENERATORS_BY_ID = new Map(MERGE_GENERATORS.map((item) => [item.id, item]));
 /** Item makers that only a battle places: never on the player's own board, never in its echoes. */
-export const ENCOUNTER_ONLY_GENERATORS: ReadonlySet<string> = new Set(['mist-spring']);
+export const ENCOUNTER_ONLY_GENERATORS: ReadonlySet<string> = new Set(['mist-spring', 'seed-sprinkler']);
 
 // One authored Dream Echo for every shared generator tier-one drop. The Seed
 // is deliberately omitted because Mossprout's FTUE already authors and clears
@@ -274,7 +276,8 @@ export const KATCHIMERA_MERGE_PROFILES: Record<string, KatchimeraMergeProfile> =
   cheerlet: profile('cheerlet', ['social:celebration', 'social:gathering'], ['food:dessert', 'drink:refresh'], 'spot reasons for joy without forcing positivity'),
 };
 
-export const GENERATOR_BY_CHAIN = Object.fromEntries(MERGE_GENERATORS.flatMap((item) => item.chainIds.map((chainId) => [chainId, item.id]))) as Record<string, string>;
+// The Seed Sprinkler owns no chain: its Seeds are the battle's (`LanesMechanic.seeds`), never the Garden Basket's to lose.
+export const GENERATOR_BY_CHAIN = Object.fromEntries(MERGE_GENERATORS.filter((item) => item.id !== 'seed-sprinkler').flatMap((item) => item.chainIds.map((chainId) => [chainId, item.id]))) as Record<string, string>;
 
 /** The bundled characters and generators, before any a content pack brought. */
 export const MERGE_CHARACTER_IDS_BUNDLED: readonly MergeCharacterId[] = Object.keys(KATCHIMERA_MERGE_PROFILES);

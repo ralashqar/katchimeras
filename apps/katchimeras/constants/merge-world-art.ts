@@ -148,6 +148,9 @@ export const MERGE_WORLD_GENERATOR_ART = {
   'community-cart': require('@incubator/art-merge-world/generators/community-cart.webp'),
   'study-desk': require('@incubator/art-merge-world/generators/study-desk.webp'),
   'creative-playroom': require('@incubator/art-merge-world/generators/creative-playroom.webp'),
+  // Lanes board engines (`docs/lanes-variety-design.md`).
+  'seed-sprinkler': require('@incubator/art-merge-world/generators/seed-sprinkler.webp'),
+  'storm-pot': require('@incubator/art-merge-world/generators/storm-pot.webp'),
 } as const;
 export type MergeWorldAuthoredGeneratorId = keyof typeof MERGE_WORLD_GENERATOR_ART;
 

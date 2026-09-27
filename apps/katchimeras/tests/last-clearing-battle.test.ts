@@ -56,7 +56,7 @@ test('the Mist lift frames Mossprout the way a tap on him does, not the old Egg 
   assert.ok(camera?.kind === 'focus_target' && (camera.zoom ?? 0) < 2.5, 'no 3x Egg close-up');
 });
 
-test('the first battle is a chain: five guided wakes put a Sprout in every lane, and new Seeds land only in the bottom rows', () => {
+test('the first battle is a chain: five guided wakes put a Sprout in every lane, and no Seeds arrive', () => {
   let board = createEncounterState(FIRST_BATTLE, 'mossprout', 1);
   let lanes: LanesState = createLanesState(mechanic);
   const item = (cell: number) => { const entry = board.board[cell]; return entry?.mist ? null : entry?.occupant?.kind === 'item' ? entry.occupant.definitionId : null; };
@@ -69,15 +69,13 @@ test('the first battle is a chain: five guided wakes put a Sprout in every lane,
   }
   for (let column = 0; column < 5; column += 1) assert.equal(item(laneCell(window, column, 3)!), 'nature:garden:2', `a Sprout shooting up lane ${column + 1}`);
   assert.equal(firstBattleGuide(board, lanes)?.kind, 'wake', 'the finger goes on up the chain: a Sprout to the one above it');
-  const bottom = new Set([3, 4].flatMap((row) => [0, 1, 2, 3, 4].map((column) => laneCell(window, column, row)!)));
-  const before = new Set(window.cellIndices.filter((cell) => item(cell)));
+  const before = window.cellIndices.filter((cell) => item(cell)).length;
   for (let t = 0; t < 20_000; t += 100) {
     const result = lanesTick(mechanic, lanes, board, 100, window, MERGE_ITEMS_BY_ID);
     lanes = result.state as LanesState; board = result.board;
   }
-  const landed = window.cellIndices.filter((cell) => item(cell) === 'nature:garden:1' && !before.has(cell));
-  assert.ok(landed.length > 0, 'Seeds keep arriving');
-  for (const cell of landed) assert.ok(bottom.has(cell), `a new Seed lands in the bottom rows, not at ${cell}`);
+  assert.equal(mechanic.seeds, undefined, 'no Seeds in the first session: every piece is on the board or wakes out of the Mist');
+  assert.ok(window.cellIndices.filter((cell) => item(cell)).length <= before, 'nothing arrives on its own');
   assert.ok(mechanic.wisps.length >= 12 && new Set(mechanic.wisps.map((wisp) => wisp.column)).size === 5, 'waves of wisps across every lane');
 });
 
@@ -94,11 +92,12 @@ test('the rescue is won only with every wisp down and the trapped cell out of th
   assert.equal(encounterStatus(rescue, host, allDown, run, board, trailWindow), 'playing', 'the wisps down is not enough while he is still under the Mist');
   const cleared = { ...board, board: board.board.map((cell, index) => index === LOST_TRAIL_RESCUE_CELL ? { ...cell, mist: null } : cell) };
   assert.equal(encounterStatus(rescue, host, allDown, run, cleared, trailWindow), 'cleared', 'free, and every wisp down: the rescue is won');
-  // The finger: a merge landing as near the trapped cell as the pieces allow.
+  // The finger: a sleeper to wake (no Seeds come in the first session), else a merge landing as near the trapped cell
+  // as the pieces allow.
   const guide = scriptedBattleGuide(rescue, board, createLanesState(lanesMechanic));
-  assert.equal(guide?.kind, 'merge');
+  assert.ok(guide?.kind === 'wake' || guide?.kind === 'merge', `the finger guides (${guide?.kind})`);
   const near = (cell: number) => { const a = laneOf(trailWindow, cell)!; const b = laneOf(trailWindow, LOST_TRAIL_RESCUE_CELL)!; return Math.abs(a.column - b.column) + Math.abs(a.row - b.row); };
-  assert.ok(near(guide!.to) <= near(guide!.from), 'the merge lands on the nearer piece');
+  if (guide?.kind === 'merge') assert.ok(near(guide.to) <= near(guide.from), 'the merge lands on the nearer piece');
 });
 
 test('every Lost Trail battle can be won by a careful player', () => {

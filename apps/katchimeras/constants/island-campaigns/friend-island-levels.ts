@@ -62,7 +62,8 @@ export const FERNIP_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly IslandL
   3: [
     {
       title: 'Root and Branch', objective: 'The roots bind whatever they touch. Free what they hold and cover every column.', difficulty: 'thick',
-      pieces: [[36, 2], [38, 1], [40, 2], [44, 1], [46, 1]], bound: [[37, 1], [39, 1], [29, 1], [33, 1]], mist: [rooted(23), rooted(25), light(31)], seeds: { every: 3.2 }, wisps: [],
+      makeDo: true,
+      pieces: [[36, 2], [38, 1], [40, 2], [43, 1], [44, 1], [45, 1], [46, 1], [47, 1]], bound: [[37, 1], [39, 1], [29, 1], [33, 1]], veiled: [[30, 2], [32, 2], [24, 1], [22, 1], [26, 1]], mist: [rooted(23), rooted(25), light(31)], wisps: [],
       lanes: [...waves('wisp', { first: 2, gap: 7, hp: 6, step: 4, grow: 1, drop: 2 }, [[2], [4], [1, 3], [5, 2], [4, 1]]), snatcher('snatcher', 5, 12, 6)],
     },
     {
@@ -119,7 +120,8 @@ export const BLOSSLE_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Island
   3: [
     {
       title: 'Empty Pots', objective: 'The Mist has taken the pots. Clear it, merge in the gaps, and keep up with the swarm.', difficulty: 'thick',
-      pieces: [[36, 1], [37, 1], [39, 1], [40, 1], [44, 1], [46, 1]], sleepers: [[38, 1]], mist: [dense(30), dense(32), light(23), light(25)], seeds: { every: 2.8 }, wisps: [],
+      makeDo: true,
+      pieces: [[36, 1], [37, 1], [39, 1], [40, 1], [43, 1], [44, 1], [45, 1], [46, 1], [47, 1]], sleepers: [[38, 1]], veiled: [[29, 1], [31, 2], [33, 1], [24, 2], [22, 1], [26, 1]], mist: [dense(30), dense(32), light(23), light(25)], wisps: [],
       lanes: [...waves('swarm', { first: 2, gap: 7, hp: 4, step: 3.8, grow: 1, drop: 2 }, [[2, 4], [1, 5], [3], [2, 4]]), splitter('splitter', 3, 18, 7)],
     },
     {
@@ -158,13 +160,14 @@ export const DRIZZLET_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Islan
     {
       title: 'Puddles', objective: 'More rain, more Mist. Keep the bottom rows clear so you can keep merging.', difficulty: 'calm',
       ...FRONT, mist: [light(22), light(26)], seeds: { every: 3 }, wisps: [],
-      lanes: waves('wisp', { first: 2, gap: 8, hp: 4, step: 4.6, grow: 1, drop: 3, spit: 8 }, [[2], [4], [1, 5], [3], [2, 4]]),
+      lanes: waves('wisp', { first: 2, gap: 8, hp: 4, step: 5, grow: 1, drop: 3, spit: 8 }, [[2], [4], [1, 5], [3], [2, 4]]),
     },
   ],
   2: [
     {
       title: 'The Still Water', objective: 'The Pond is thick with Mist already. Clear a way, then meet them.', difficulty: 'thick',
-      pieces: [[36, 1], [37, 1], [39, 1], [40, 1], [44, 1], [46, 1]], sleepers: [[38, 1]], mist: [light(29), dense(31), light(33), light(23), light(25)], seeds: { every: 3.2 }, wisps: [],
+      makeDo: true,
+      pieces: [[36, 1], [37, 1], [39, 1], [40, 1], [43, 1], [44, 1], [45, 1], [46, 1], [47, 1]], sleepers: [[38, 1]], veiled: [[30, 2], [32, 2], [24, 2], [22, 1], [26, 1]], mist: [light(29), dense(31), light(33), light(23), light(25)], wisps: [],
       lanes: waves('wisp', { first: 2, gap: 8, hp: 5, step: 4.2, grow: 1, drop: 2, spit: 7 }, [[1], [5], [2, 4], [3], [1, 5]]),
     },
     {
@@ -189,7 +192,7 @@ export const DRIZZLET_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Islan
     {
       title: 'Grey Skies', objective: 'Everything spits. Everything. Wash the board, merge big, and hold every lane.', difficulty: 'dark',
       pieces: [[36, 2], [37, 1], [38, 1], [39, 1], [40, 2], [44, 1]], mist: [light(23), light(25)], seeds: { every: 3.6 }, wisps: [],
-      lanes: [...waves('wisp', { first: 2, gap: 7, hp: 6, step: 3.9, grow: 1, drop: 2, spit: 6 }, [[2, 4], [1, 5], [3], [2, 4]]), frost('frost', 3, 15, 7)],
+      lanes: [...waves('wisp', { first: 2, gap: 7, hp: 5, step: 4, grow: 1, drop: 2, spit: 7 }, [[2, 4], [1, 5], [3], [2, 4]]), frost('frost', 3, 15, 6)],
     },
     {
       title: 'The Rainmaker', objective: 'It has kept the Pond grey for years. It comes down the middle, spitting Mist on every row, and the rain comes with it.', difficulty: 'boss',
@@ -213,13 +216,14 @@ export const AMBERLEAF_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Isla
     {
       title: 'The Gleaners', objective: 'Quick ones run down the edges beside the big ones. Watch the outside lanes.', difficulty: 'calm',
       ...FRONT, mist: [], seeds: { every: 3 }, wisps: [],
-      lanes: [warden('big', 2, 3, 9, 6.6), quick('quick-a', 5, 9, 3, 3.4), quick('quick-b', 1, 18, 3, 3.4), ...waves('wisp', { first: 22, gap: 9, hp: 4, step: 4.6, drop: 3 }, [[4], [3]])],
+      lanes: [warden('big', 2, 3, 9, 6.6), quick('quick-a', 5, 9, 3, 3.8), quick('quick-b', 1, 18, 3, 3.8), ...waves('wisp', { first: 22, gap: 9, hp: 4, step: 5, drop: 3 }, [[4], [3]])],
     },
   ],
   2: [
     {
       title: 'Heavy Branches', objective: 'Two big ones, one after the other. Merge up, not out.', difficulty: 'thick',
-      pieces: [[36, 2], [37, 1], [38, 1], [39, 1], [40, 2], [44, 1]], mist: [light(23), light(25)], seeds: { every: 3.2 }, wisps: [],
+      makeDo: true,
+      pieces: [[36, 2], [37, 1], [38, 1], [39, 1], [40, 2], [43, 1], [44, 1], [45, 1], [46, 1], [47, 1]], veiled: [[29, 1], [30, 2], [31, 2], [32, 2], [33, 1], [24, 3], [22, 1], [26, 1]], mist: [light(23), light(25)], wisps: [],
       lanes: [warden('big-a', 2, 3, 13, 6), warden('big-b', 4, 12, 13, 6), ...waves('wisp', { first: 6, gap: 8, hp: 5, step: 4.2, grow: 1, drop: 2 }, [[5], [1], [3], [5, 1]])],
     },
     {
@@ -281,7 +285,8 @@ export const MISTLE_LANES_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly IslandL
     },
     {
       title: 'Roots of the Old Tree', objective: 'The old roots hold your plants. Free them before the creepers bury the rest.', difficulty: 'thick',
-      pieces: [[36, 1], [38, 2], [40, 1], [44, 1], [46, 1]], bound: [[37, 1], [39, 1], [31, 1]], mist: [rooted(23), rooted(25)], seeds: { every: 3.2 }, wisps: [],
+      makeDo: true,
+      pieces: [[36, 1], [38, 2], [40, 1], [43, 1], [44, 1], [45, 1], [46, 1], [47, 1]], bound: [[37, 1], [39, 1], [31, 1]], veiled: [[29, 1], [30, 2], [32, 2], [33, 1], [24, 2], [22, 1], [26, 1]], mist: [rooted(23), rooted(25)], wisps: [],
       lanes: [creeper('creeper-a', 2, 3, 7), creeper('creeper-b', 4, 9, 7), ...waves('wisp', { first: 12, gap: 7, hp: 5, step: 4, grow: 1, drop: 2 }, [[1, 5], [3], [2, 4]])],
     },
   ],

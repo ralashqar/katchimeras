@@ -164,9 +164,9 @@ test('an empty sky never waits: with no wisp standing, the next arrives at once 
   assert.equal(40_000 - (played.state.advance ?? 0) - (30_000 - (played.state.advance ?? 0)), 10_000, 'the spacing after it is kept');
 });
 
-test('pieces arrive on their own: a Seed on a random empty cell every beat (never under a wisp), a Sprout by the player’s luck, and a full board waits', () => {
-  const seeded = setup({ pod: undefined, seeds: { every: 1 }, lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] });
-  assert.equal(seeded.encounter.spawners.length, 0, 'no Pod to tap');
+test('a rush’s pieces arrive on their own: a Seed on a random empty cell every beat (never under a wisp), a Sprout by the player’s luck, and a full board waits', () => {
+  const seeded = setup({ pod: undefined, seeds: { every: 1 }, sprinkler: 'auto', lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] });
+  assert.deepEqual(seeded.encounter.spawners.map((spawner) => [spawner.generatorId, spawner.charges]), [['seed-sprinkler', 0]], 'nothing to tap: the rush’s Seed Sprinkler launches them');
   const board = run(seeded.mechanic, seeded.lanes, seeded.state, 3_050, seeded.window).board;
   const items = seeded.window.cellIndices.filter((cell) => board.board[cell]?.occupant?.kind === 'item');
   assert.equal(items.length, 3, 'one a second');
@@ -181,7 +181,7 @@ test('pieces arrive on their own: a Seed on a random empty cell every beat (neve
 });
 
 test('the Bloom House makes Seeds land sooner: its pace shortens every beat', () => {
-  const seeded = setup({ pod: undefined, seeds: { every: 1 }, lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] });
+  const seeded = setup({ pod: undefined, seeds: { every: 1 }, sprinkler: 'auto', lanes: [{ id: 'a', column: 3, at: 0, hp: 50, step: 60 }] });
   // 1 s beats; at 40% pace the first lands at 600 ms.
   const early = lanesTick(seeded.mechanic, { ...seeded.lanes, clock: 500 }, seeded.state, 100, seeded.window, MERGE_ITEMS_BY_ID, { seedPace: 0.4 });
   assert.ok(early.changed, 'landed at 600 ms, not 1 s');

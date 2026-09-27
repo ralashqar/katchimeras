@@ -1,5 +1,5 @@
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
-import { laneArrived, laneAlive, laneColumn, laneFire, laneOf, lanesTick } from '@/features/mission-mechanics/lanes';
+import { laneArrived, laneAlive, laneColumn, laneFire, laneOf, lanesTick, SEED_SPRINKLER_ID } from '@/features/mission-mechanics/lanes';
 import { createMechanicState, resolveMechanic } from '@/features/mission-mechanics/mechanic';
 import type { EncounterDefinition } from '@/types/encounter';
 import type { MergeItemDefinition, MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
@@ -54,7 +54,7 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
   const tap = (from: SettleBefore): SettleBefore | null => {
     for (const cell of window.cellIndices) {
       const occupant = from.state.board[cell]?.occupant;
-      if (occupant?.kind !== 'generator' || (from.state.generators[occupant.generatorId]?.charges ?? 0) <= 0) continue;
+      if (occupant?.kind !== 'generator' || occupant.generatorId === SEED_SPRINKLER_ID || (from.state.generators[occupant.generatorId]?.charges ?? 0) <= 0) continue;
       const command = { type: 'tapGenerator' as const, generatorId: occupant.generatorId, now: NOW, seed: tapSeed(from.run), spendEnergy: false as const, enforceCharges: true as const };
       const result = reduceMergeWorld(from.state, command);
       if (!result.changed || result.spawnedCell == null) continue;
@@ -151,6 +151,18 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
     ms += TICK_MS;
     if (ms >= nextThink) {
       nextThink += think;
+      // The Seed Sprinkler is a quick tap between moves: a player launches a Seed when there is room and fewer than three
+      // loose Seeds to merge (never flooding the board with them).
+      const sprinkler = node.state.generators[SEED_SPRINKLER_ID];
+      const seedsLoose = window.cellIndices.filter((cell) => { const piece = loose(node.state, cell); return piece && tierOf(piece.definitionId) === 1; }).length;
+      if (sprinkler && sprinkler.charges > 0 && seedsLoose < 3 && window.cellIndices.filter((cell) => isFree(node.state, cell)).length >= 2) {
+        const command = { type: 'tapGenerator' as const, generatorId: SEED_SPRINKLER_ID, now: NOW, seed: tapSeed(node.run), spendEnergy: false as const, enforceCharges: true as const };
+        const result = reduceMergeWorld(node.state, command);
+        if (result.changed && result.spawnedCell != null) {
+          const settled = settleAction(binding, node, command, result);
+          if (!settled.refused) node = { state: settled.state, run: settled.run, mechanicState: settled.mechanicState };
+        }
+      }
       const next = act(node);
       if (next) { node = next; actions += 1; }
     }

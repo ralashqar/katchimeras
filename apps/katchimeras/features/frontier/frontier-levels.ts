@@ -27,14 +27,15 @@ const capitalised = (text: string) => text.charAt(0).toUpperCase() + text.slice(
 export function frontierLevelSpec(tile: FrontierTile): IslandLevelSpec {
   const power = tile.power;
   const hp = 3 + power;
-  const step = Math.max(3.2, 4.8 - power * 0.3);
+  // The calm lands (power 2 and under) come down a little slower: a novice should win them.
+  const step = Math.max(3.2, 4.8 - power * 0.3 + (power <= 2 ? 0.3 : 0));
   const count = power <= 1 ? 3 : power === 2 ? 4 : 5;
   const spit = tile.variant === 'brook' && power >= 2 ? Math.max(6, 10 - power) : power >= 4 ? Math.max(6, 11 - power) : undefined;
   const lanes: IslandLaneSpec[] = [
     ...waves('wisp', { first: 2, gap: power <= 1 ? 9 : 8, hp, step, grow: power >= 2 ? 1 : 0, drop: power >= 3 ? 2 : 3, ...(spit ? { spit } : {}) }, PATTERNS[tile.variant].slice(0, count)),
   ];
   // The Copse's nibbler gives way to its snatcher from power 3 (one thief in the trees at a time).
-  if ((tile.variant === 'copse' && power === 2) || (power >= 4 && tile.variant !== 'copse')) lanes.push({ id: 'nibbler', column: tile.variant === 'copse' ? 5 : 1, at: 12, hp: hp + 1, step, look: 'nibbler', strike: 5 });
+  if ((tile.variant === 'copse' && power === 2) || (power >= 4 && tile.variant !== 'copse')) lanes.push({ id: 'nibbler', column: tile.variant === 'copse' ? 5 : 1, at: 12, hp: hp + 1, step, look: 'nibbler', strike: power <= 2 ? 7 : 5 });
   if (tile.variant === 'meadow' && power >= 2) lanes.push({ id: 'quick', column: 1, at: 14, hp, step: 2.6, look: 'snuffer' });
   if (tile.variant === 'stones' && power >= 2 && power < 6) lanes.push({ id: 'warden', column: 3, at: 18, hp: 8 + power * 2, step: 6.5, look: 'warden' });
   // From power 3, each land brings its own new kind of wisp: the Meadow a weaver, the Copse a snatcher, the Brook a
@@ -49,13 +50,17 @@ export function frontierLevelSpec(tile: FrontierTile): IslandLevelSpec {
   if (boss) lanes.push({ id: 'heart', column: 3, at: 3, hp: 24, step: 6, drop: 1, look: 'warden', spit: 6 });
   // The first tile plays like the first boards: sleepers and veiled pieces to wake. After it, a garden already growing.
   const first = power <= 1;
+  // The Stones at power 2 and 3 are "make do" land: no Sprinkler, a fuller board, more asleep under the Mist.
+  const makeDo = tile.variant === 'stones' && power >= 2 && power <= 3;
   return {
+    ...(makeDo ? { makeDo: true as const } : {}),
     title: `Take back ${FRONTIER_VARIANT_NAMES[tile.variant]}`,
     objective: boss ? 'The Mist’s oldest keeper guards the way to the Hollow Tree. It comes down the middle with others at its side.' : OBJECTIVES[tile.variant],
     difficulty: boss ? 'boss' : power <= 2 ? 'calm' : power <= 4 ? 'thick' : 'dark',
-    pieces: [[36, 1], [37, 1], [39, 1], [40, 1], [44, 1], [46, 1]],
+    pieces: makeDo ? [[36, 1], [37, 1], [39, 1], [40, 1], [43, 1], [44, 1], [45, 1], [46, 1], [47, 1]] : [[36, 1], [37, 1], [39, 1], [40, 1], [44, 1], [46, 1]],
     sleepers: [[38, 1]],
-    veiled: first ? [[31, 1], [30, 1], [32, 1], [24, 2], [23, 1], [25, 1], [29, 2], [33, 2]] : [[31, 1], [30, 1], [32, 1], [24, 2], [29, 2], [33, 2]],
+    veiled: first ? [[31, 1], [30, 1], [32, 1], [24, 2], [23, 1], [25, 1], [29, 2], [33, 2]]
+      : makeDo ? [[31, 1], [30, 1], [32, 1], [24, 2], [29, 2], [33, 2], [23, 1], [25, 1], [22, 1], [26, 1]] : [[31, 1], [30, 1], [32, 1], [24, 2], [29, 2], [33, 2]],
     mist: [], seeds: { every: first ? 3 : 3.2 }, wisps: [],
     lanes,
     rewards: { glow: 20 + power * 6, xp: 12 + power * 5 },

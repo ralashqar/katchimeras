@@ -310,6 +310,22 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
         });
         if (made.length) setBolts((current) => [...current, ...made]);
       }
+      // The Seed Sprinkler's spark: a golden bolt from it to the wisp it strikes.
+      if (result?.sparks.length && metrics && offset) {
+        const origin = { x: metrics.x - offset.x, y: metrics.y - offset.y };
+        const made = result.sparks.flatMap((spark): MistBolt[] => {
+          const at = landings?.sinkRef?.current?.pointOf?.(spark.wisp);
+          if (!at) return [];
+          const { bounds } = mergeCellFrame(metrics.geometry, spark.from);
+          const size = bounds.width * 0.5;
+          return [{
+            id: ++boltSeq.current, tone: 'glow', delay: 0, onImpact: () => {},
+            from: { left: offset.x + bounds.left, top: offset.y + bounds.top, width: bounds.width, height: bounds.height },
+            to: { left: at.x - origin.x - size / 2, top: at.y - origin.y - size / 2, width: size, height: size },
+          }];
+        });
+        if (made.length) setBolts((current) => [...current, ...made]);
+      }
       if (!result?.fired.length || !metrics || !landings?.launchBolts) return;
       const window = aimWindowRef.current;
       const board = stateRef.current.board;
@@ -555,3 +571,4 @@ const styles = StyleSheet.create({
   lossActions: { alignSelf: 'stretch', gap: 8 },
   lossFootnote: { height: 0 },
 });
+

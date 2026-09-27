@@ -19,12 +19,12 @@ import type { MissionMechanicState } from '@/types/mission-mechanic';
  *   neighbours to half Mist. Five guided wakes put a shooting Sprout in every column.
  * - Row three hides a Sprout over every column, opened by the Sprout beneath it: bring that Sprout up and it wakes as a
  *   Plant, in the same column, shooting harder. Two Plants sleep in row two, over the second and fourth columns.
- * - New Seeds land only in the bottom two rows (`seeds.area`), under the plants, never up where the wisps come in.
+ * - No Seeds arrive (`docs/lanes-variety-design.md`): every piece is on the board or wakes out of the Mist. The Seed
+ *   Sprinkler comes in the battle after the first session.
  * - The wisps, in waves across every lane as the plants fill the board: one down the middle ("first light"), a pair
  *   either side of it, a spitter and its partner down the outside lanes, three at once, then all five lanes together.
  * A wave cleared early brings the next straight in. The finger guides every wake.
  */
-const BOTTOM_ROWS = [36, 37, 38, 39, 40, 43, 44, 45, 46, 47] as const;
 const SPEC: IslandLevelSpec = {
   title: 'They found us', objective: 'Wake what sleeps under the Mist. Bring down every wisp.', difficulty: 'calm',
   pieces: [[43, 1], [44, 1], [45, 1], [46, 1], [47, 1]],
@@ -34,7 +34,7 @@ const SPEC: IslandLevelSpec = {
     [29, 2], [30, 2], [31, 2], [32, 2], [33, 2],
     [23, 3], [25, 3],
   ],
-  mist: [], wisps: [], seeds: { every: 3, area: BOTTOM_ROWS }, forgiving: true, rows: 5,
+  mist: [], wisps: [], forgiving: true, rows: 5,
   lanes: [
     { id: 'first', column: 3, at: 3, hp: 3, step: 7 },
     { id: 'pair-left', column: 2, at: 9, hp: 3, step: 6.5 },
@@ -243,13 +243,11 @@ function rescueMerge(board: MergeWorldState, window: MissionWindow, loose: (cell
   return best?.guide ?? null;
 }
 
-const TRAIL_BOTTOM_ROWS = [36, 37, 38, 39, 40, 43, 44, 45, 46, 47] as const;
-
 /**
  * The Lost Trail's battle (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Act I), docked under Steppling's misted
  * trailhead, and not losable in the first session: Steppling trapped under thick Mist at the top of the middle lane,
  * ringed by light Mist. On the way, one quick wisp and one that spits. Won with every wisp down and that cell cleared
- * (`rescue`).
+ * (`rescue`). No Seeds arrive: the pieces on the board, and more asleep under the Mist beside them.
  */
 const TRAIL_SPECS: readonly IslandLevelSpec[] = [
   {
@@ -257,7 +255,9 @@ const TRAIL_SPECS: readonly IslandLevelSpec[] = [
     pieces: [[43, 1], [44, 2], [45, 2], [46, 2], [47, 1], [37, 1], [38, 2], [39, 1], [31, 2]],
     mist: [16, 18, 24].map((cell) => ({ cell, type: 'light' as const })),
     rescue: { cell: 17 },
-    wisps: [], seeds: { every: 3, area: TRAIL_BOTTOM_ROWS }, forgiving: true, rows: 5,
+    sleepers: [[36, 1], [40, 1]],
+    veiled: [[29, 2], [30, 2], [32, 2], [33, 2], [22, 3], [23, 2], [25, 2], [26, 3]],
+    wisps: [], forgiving: true, rows: 5,
     lanes: [
       { id: 'guard-1', column: 2, at: 2, hp: 4, step: 6 },
       { id: 'guard-2', column: 4, at: 2.6, hp: 4, step: 6 },

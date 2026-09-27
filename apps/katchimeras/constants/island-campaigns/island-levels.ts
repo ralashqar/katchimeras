@@ -79,6 +79,16 @@ export type IslandLevelSpec = {
   /** Lanes: a level that cannot be lost (the first battle); a wisp that would get through is pushed back. */
   forgiving?: boolean;
   /**
+   * Lanes: the Seed Sprinkler's cell (tap it for a Seed). Absent, a Lanes level with Seeds has one on a free bottom
+   * cell; `false` has none. `auto`: it launches on its own (a rush).
+   */
+  sprinkler?: number | false | 'auto';
+  /**
+   * A "make do" level (`docs/lanes-variety-design.md`): no Sprinkler and no Seeds; only what is on the board and what
+   * waking the Mist brings. Every merge counts.
+   */
+  makeDo?: true;
+  /**
    * A Spring: it makes the Water chain (Pebble, Shell, Tidepool), whose merges wash the Mist twice as hard. `under`
    * hides it under Mist of that kind at its cell: clearing that cell is how it is found.
    */
@@ -168,7 +178,12 @@ export function laneWisps(lanes: readonly IslandLaneSpec[]): LaneWisp[] {
   return [...authored, ...brought];
 }
 
-export function islandLevel(campaignId: string, key: string, spec: IslandLevelSpec, lines: CorruptionWispLines = ISLAND_WISP_LINES): RegionMissionDefinition {
+/** What a tapped Seed Sprinkler holds at the start of a battle (and refills to). */
+export const SPRINKLER_CHARGES = 6;
+
+export function islandLevel(campaignId: string, key: string, rawSpec: IslandLevelSpec, lines: CorruptionWispLines = ISLAND_WISP_LINES): RegionMissionDefinition {
+  // A "make do" level has no Seeds at all, and says so.
+  const spec: IslandLevelSpec = rawSpec.makeDo ? { ...rawSpec, seeds: undefined, objective: `${rawSpec.objective} No Sprinkler here: make do with what you find.` } : rawSpec;
   const chain = spec.chain ?? 'nature:garden';
   // A level with walking wisps is a merge-tactics battle: five rows, every action a turn, no Mist rings.
   const tactics = spec.wisps.some((wisp) => wisp.kind);
@@ -201,6 +216,11 @@ export function islandLevel(campaignId: string, key: string, spec: IslandLevelSp
     }
   }
   const bound: EncounterMistCell[] = (spec.bound ?? []).map(([cell, value]) => ({ cell, type: 'bound', holds: { kind: 'item', definitionId: tier(value) } }));
+  // The Seed Sprinkler: where the level says, else the first free bottom cell (never on a piece, Mist or the rescue).
+  const taken = new Set([...used, ...(spec.rescue ? [spec.rescue.cell] : [])]);
+  const sprinklerAt = !lanes || !spec.seeds || spec.makeDo || spec.forgiving || spec.sprinkler === false ? null
+    : typeof spec.sprinkler === 'number' ? spec.sprinkler
+    : [47, 43, 46, 44, 45, 40, 36, 38].find((cell) => WINDOW.has(cell) && !taken.has(cell)) ?? null;
   const mist = [...spec.mist, ...bound, ...ring, ...(spec.rescue ? [{ cell: spec.rescue.cell, type: 'dense' as const }] : [])];
   const encounter: EncounterDefinition = {
     id,
@@ -216,9 +236,10 @@ export function islandLevel(campaignId: string, key: string, spec: IslandLevelSp
     spawners: [
       ...(spec.pod ? [{ id: 'pod', generatorId: 'wild-garden', cell: spec.pod.cell, charges: spec.pod.charges, drops: [tier(1)], recharge: { kind: 'merges' as const, every: spec.pod.every, amount: 1 } }] : []),
       ...(spec.spring ? [{ id: 'spring', generatorId: 'mist-spring', cell: spec.spring.cell, charges: spec.spring.charges, drops: [`${WATER_CHAIN}:1`], recharge: { kind: 'merges' as const, every: spec.spring.every, amount: 1 }, ...(spec.spring.under ? { hidden: true } : {}) }] : []),
+      ...(sprinklerAt != null ? [{ id: 'sprinkler', generatorId: 'seed-sprinkler', cell: sprinklerAt, ...(spec.sprinkler === 'auto' ? { charges: 0, drops: [] } : { charges: SPRINKLER_CHARGES, drops: [tier(1)] }) }] : []),
     ],
     mechanic: lanes
-      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: laneWisps(lanes) }
+      ? { kind: 'lanes', ...(spec.forgiving ? { forgiving: true } : {}), ...(sprinklerAt != null ? { sprinkler: { reach: 2, sparkReach: 2, ...(spec.sprinkler === 'auto' ? { auto: true } : {}) } } : {}), ...(spec.seeds ? { seeds: { everyMs: Math.round(spec.seeds.every * 1_000), drops: [tier(1), tier(2)] as const, ...(spec.seeds.area?.length ? { area: spec.seeds.area } : {}) } } : {}), wisps: laneWisps(lanes) }
       : { kind: 'dark-wisps', wisps, damageByTier: [1, 1, 2, 3], targeting: 'adjacent', ...(tactics ? { mode: 'tactics' as const } : { rest: spec.rest ?? REST_BY_DIFFICULTY[spec.difficulty] }) },
     required: lanes ? laneWisps(lanes).reduce((sum, lane) => sum + lane.hp, 0) : wisps.filter((wisp) => !wisp.hidden).reduce((sum, wisp) => sum + wisp.hp, 0),
     wisps: [],
@@ -299,7 +320,7 @@ export const PETALIMP_LEVEL_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly Islan
       veiled: [[31, 2], [30, 1], [32, 1], [29, 2], [33, 2], [24, 1], [23, 2], [25, 2]],
       mist: [], seeds: { every: 3 }, wisps: [],
       // The chain climbs the middle column, so the wisps come down either side of it.
-      lanes: waves('wisp', { first: 2, gap: 8, hp: 4, step: 4.6, grow: 1, drop: 2, spit: 10 }, [[1], [4], [2, 5], [1, 4], [2, 5]]),
+      lanes: waves('wisp', { first: 2, gap: 8, hp: 4, step: 5, grow: 1, drop: 2, spit: 10 }, [[1], [4], [2, 5], [1, 4], [2, 5]]),
     },
   ],
   2: [

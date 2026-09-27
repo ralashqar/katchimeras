@@ -11,7 +11,7 @@ import { canAfford, encounterStatus, objectiveMet, recordCoverage, spend, type E
 import { chainRole } from './chains';
 import { clearBoundMist, glowShots, harmonyPulse, openMistCell, type GlowShot, type MistOpened } from './mist';
 import { seededUnit } from './seed';
-import { lanesAfterMerge, lanesCrash } from '@/features/mission-mechanics/lanes';
+import { lanesAfterMerge, lanesCrash, lanesSprinklerTapped, SEED_SPRINKLER_ID } from '@/features/mission-mechanics/lanes';
 
 /**
  * Everything that follows a board command on an encounter, in one place and
@@ -37,6 +37,8 @@ export type SettleResult = {
   shots?: GlowShot[];
   status: EncounterStatus;
   /** The action was refused; nothing above changed. */
+  /** A spawner tap whose piece was sent elsewhere (the Seed Sprinkler): where it landed. */
+  spawnedCell?: number;
   refused?: MergeWorldFailureReason;
 };
 
@@ -163,6 +165,15 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
       mechanicState = lanesAfterMerge(mechanicState, made?.kind === 'item' ? made.instanceId : null);
     }
   }
+  // The Seed Sprinkler (`docs/lanes-variety-design.md`): its tap's Seed lands where it sends it (the board flies it
+  // there, as any spawner's piece); every few launches it sparks a wisp near it.
+  let landedCell: number | null = null;
+  if (lanes && action === 'tap' && command.type === 'tapGenerator' && command.generatorId === SEED_SPRINKLER_ID && mechanic.kind === 'lanes' && !mechanic.sprinkler?.auto && mechanicState.kind === 'lanes') {
+    const launched = lanesSprinklerTapped(mechanic, mechanicState, state, window, result.spawnedCell ?? null);
+    mechanicState = launched.state;
+    state = launched.board;
+    landedCell = launched.landed;
+  }
   if (action === 'tap' && run.focus && command.type === 'tapGenerator' && command.generatorId === run.focus.generatorId) {
     const taps = run.focus.taps - 1;
     run = { ...run, focus: taps > 0 ? { ...run.focus, taps } : null };
@@ -190,5 +201,5 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
     effects = [...effects, ...crash.effects];
   }
   run = recordCoverage(run, state, window);
-  return { state, run, mechanicState, strike, effects, opened, ...(shots.length ? { shots } : {}), status: encounterStatus(encounter, host, mechanicState, run, state, window) };
+  return { state, run, mechanicState, strike, effects, opened, ...(shots.length ? { shots } : {}), ...(landedCell != null ? { spawnedCell: landedCell } : {}), status: encounterStatus(encounter, host, mechanicState, run, state, window) };
 }

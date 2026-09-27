@@ -796,15 +796,21 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   // `fadeSolo` outlives `soloLayerId` by one fade: the animated style must stay
   // attached to the other tiles until they are fully back, because a view
   // whose animated style is detached keeps its last applied opacity (0).
+  // Once they have faded out they are not drawn at all (`soloSettled`): a battle renders its own tile, not the world.
+  // They mount again (at opacity 0, under the same style) the moment the board goes, and fade back in.
   const othersOpacity = useSharedValue(soloLayerId ? 0 : 1);
   const [fadeSolo, setFadeSolo] = useState<string | null>(soloLayerId);
+  const [soloSettled, setSoloSettled] = useState(Boolean(soloLayerId));
   useEffect(() => {
     const duration = reduceMotion ? 120 : 520;
     if (soloLayerId) {
       setFadeSolo(soloLayerId);
-      othersOpacity.value = withTiming(0, { duration, easing: Easing.inOut(Easing.quad) });
+      othersOpacity.value = withTiming(0, { duration, easing: Easing.inOut(Easing.quad) }, (finished) => {
+        if (finished) runOnJS(setSoloSettled)(true);
+      });
       return;
     }
+    setSoloSettled(false);
     othersOpacity.value = withTiming(1, { duration, easing: Easing.inOut(Easing.quad) }, (finished) => {
       if (finished) runOnJS(setFadeSolo)(null);
     });
@@ -2004,6 +2010,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               // surfaces below. A second camera-scaled copy here would soften
               // when the Garden is focused and can briefly double the reveal.
               if (layer.id.startsWith('plant:')) return null;
+              // A docked battle's world: only its own tile is drawn once the rest have faded.
+              if (soloSettled && fadeSolo && layer.id !== fadeSolo) return null;
               // Authored focus/reveals retain full art before the camera moves.
               // Free-pan LOD changes only from the last settled snapshot.
               const layerLod = focusedMossproutWorld && !storyCameraInputLocked && !tutorialCamera && !interactionResidentId && !discoveredEggInteraction && !upgradePresentation && !discoveryRevealFamilyId && !settlingUpgrade
@@ -2177,8 +2185,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               return (
                 <Pressable
                   key={`nature-island-hit-target-${islandId}`}
-                  ref={natureIslandTargetRefs.get(islandId)}
-                  collapsable={false}
                   accessibilityHint="Opens this island's growth and upgrade details"
                   accessibilityLabel={`${definition?.name ?? 'Nature island'}, level ${level} of 4`}
                   accessibilityRole="button"
@@ -2187,10 +2193,16 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 />
               );
             }) : null}
+            {/* Each island's place on screen, mounted whatever the story holds (a chapter's signal flare is measured from
+                it while the world is held, when the island's tap target is not there). */}
+            {focusedMossproutWorld && onNatureIslandTargetChange ? natureIslandFrames.map(({ frame, islandId }) => (
+              <View key={`nature-island-target-${islandId}`} ref={natureIslandTargetRefs.get(islandId)} collapsable={false} pointerEvents="none" style={[styles.natureIslandHitTarget, frame]} />
+            )) : null}
             {focusedMossproutWorld && onStoryTileTargetChange ? storyTileFrames.map(({ tileId, frame }) => (
               <View key={`story-tile-target-${tileId}`} ref={storyTileTargetRefs.get(tileId)} collapsable={false} pointerEvents="none" style={[styles.natureIslandHitTarget, frame]} />
             )) : null}
-            {focusedMossproutWorld && tileBeacons?.length ? tileBeacons.map((beacon) => {
+            <Animated.View pointerEvents="box-none" style={fadeSolo ? [StyleSheet.absoluteFill, othersStyle] : StyleSheet.absoluteFill}>
+            {focusedMossproutWorld && !soloSettled && tileBeacons?.length ? tileBeacons.map((beacon) => {
               // The friend waiting in the Mist: their silhouette where they will stand once it clears, glowing.
               const layer = scene.tileArtLayers.find((candidate) => candidate.id === `structure:${beacon.tileId}`);
               const anchor = layer?.restingAnchor ?? layer?.residentAnchor;
@@ -2201,7 +2213,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               const source = visualKey ? resolveCreatureIdleFallbackSource(visualKey) ?? worldAssetSource(`creature:${visualKey}`, KINGDOM_RENDERING.havenImageLod) : null;
               return anchor && source && companion ? <TileBeacon key={`tile-beacon-${beacon.tileId}`} frame={residentCreatureFrame(anchor.x, anchor.y, creatureWorldSize, usesSharedResidentStage(companion))} source={source} color={beacon.color} /> : null;
             }) : null}
-            {focusedMossproutWorld ? REGION_FRIENDS.map((friend) => {
+            {focusedMossproutWorld && !soloSettled ? REGION_FRIENDS.map((friend) => {
               // A region friend home again stands on their home (their standing still frame): tap them for their panel.
               if ((mossproutGarden?.regionHomes?.[friend.tileId] ?? 'misted') !== 'home' || revealingRegionTileId === friend.tileId) return null;
               const layer = scene.tileArtLayers.find((candidate) => candidate.id === `structure:${friend.tileId}`);
@@ -2214,9 +2226,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               const frame = scene.tileArtLayers.find((layer) => layer.id === `structure:${bubble.tileId}`)?.interactionFrame;
               return frame ? <TileBubble key={`tile-bubble-${bubble.tileId}`} frame={frame} label={bubble.label} art={bubble.art} onPress={bubble.onPress} accessibilityLabel={bubble.accessibilityLabel} /> : null;
             }) : null}
-            {focusedMossproutWorld ? lostSilhouettes.map(({ tileId, frame, source }) => (
+            {focusedMossproutWorld && !soloSettled ? lostSilhouettes.map(({ tileId, frame, source }) => (
               <LostSilhouette key={`lost-silhouette-${tileId}`} frame={frame} source={source} />
             )) : null}
+            </Animated.View>
             {focusedMossproutWorld && (mossproutGarden?.hatchableTiles?.[gatewayTileId] ?? mossproutGarden?.gateway) ? scene.tileArtLayers.filter((layer) => layer.id === `structure:${gatewayTileId}`).map((layer) => (
               <Pressable ref={onGatewayTargetChange} collapsable={false} key={gatewayTileId} accessibilityRole="button" accessibilityLabel={(mossproutGarden.hatchableTiles?.[gatewayTileId] ?? mossproutGarden.gateway) === 'locked' ? `${hatchableByTile(gatewayTileId)?.tile.name ?? 'Misty clearing'}, clear mist for ${hatchableByTile(gatewayTileId)?.tile.price ?? 40} Glow` : 'A new friend is resting here'} onPress={interactionEnabled && !upgradePresentation ? onSelectGateway : undefined} style={[styles.natureIslandHitTarget, layer.frame]}>
               </Pressable>
@@ -2248,7 +2261,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
               return home ? <View collapsable={false} pointerEvents="none" ref={onHomeTileTargetChange}
                 style={{ position: 'absolute', left: home.frame.left, top: home.frame.top, width: home.frame.width, height: home.frame.height }} /> : null;
             })() : null}
-            <Animated.View pointerEvents={soloLayerId ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle]}>{creatureNodes}</Animated.View>
+            <Animated.View pointerEvents={soloLayerId ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle]}>{soloSettled ? null : creatureNodes}</Animated.View>
           </Animated.View>
           {/* Plants share the marker parent so badge zIndex can paint above every seed. */}
           <Animated.View pointerEvents={soloLayerId || hideWorldTiles ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle, hideWorldTiles && { opacity: 0 }]}>{memoryPlantProjections.map((plant) => (

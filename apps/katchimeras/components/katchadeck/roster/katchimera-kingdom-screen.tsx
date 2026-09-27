@@ -2759,7 +2759,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const timer = setTimeout(() => setRestorationHandoff(null), RESTORATION_HANDOFF_MAX_MS);
     return () => clearTimeout(timer);
   }, [pendingIslandCampaign?.phase, restorationHandoff, upgradeError]);
-  const soloLayerId = rushSpec ? `nature:mossprout:${WISP_RUSH_HOST.islandId}` : stepplingBoardBusy ? `structure:${activeHatchable.tile.id}` : journeyBoardBusy && journeyMission ? `structure:${journeyMission.tile.id}` : islandEncounterBusy && islandEncounterIslandId ? `nature:mossprout:${islandEncounterIslandId}` : restorationBoardBusy && restorationIslandId ? `nature:mossprout:${restorationIslandId}` : null;
+  // The tile a docked board plays on: every other tile fades away (and is not drawn) while it is up. A Frontier, region,
+  // Hollow Tree or Surge battle docks under its own tile (`structure:<id>`), an island campaign's under its island.
+  const soloLayerId = rushSpec ? `nature:mossprout:${WISP_RUSH_HOST.islandId}` : stepplingBoardBusy ? `structure:${activeHatchable.tile.id}` : journeyBoardBusy && journeyMission ? `structure:${journeyMission.tile.id}` : islandEncounterBusy && islandEncounterDockTileId ? `structure:${islandEncounterDockTileId}` : islandEncounterBusy && islandEncounterIslandId ? `nature:mossprout:${islandEncounterIslandId}` : restorationBoardBusy && restorationIslandId ? `nature:mossprout:${restorationIslandId}` : null;
   // No marker percentage while the board is up: the request lives on the dock's tray instead.
   const soloOfferId = stepplingBoardBusy ? `mist:${activeHatchable.tile.id}` : null;
   // No tutorial on a friend's board: the step only locks the board once its bar is full.

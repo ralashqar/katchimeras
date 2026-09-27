@@ -25,6 +25,9 @@ export function encounterProfile(world: (Pick<MergeWorldState, 'heartwoodBuildin
     seedPace: bloomSeedPace(heroBuildingLevel(world, 'bloom-house')),
     wispSlow: fernWispSlow(heroBuildingLevel(world, 'fern-thicket')),
     shotPower: heroShotPower(loadout?.level ?? 1),
+    // The Seed Sprinkler sparks more often, and harder, as the Seed Nursery grows.
+    sparkEvery: nursery >= 4 ? 2 : 3,
+    sparkDamage: nursery >= 5 ? 2 : 1,
     // Territory: a common helper Wisp's steadiness opens Mist before the first move (a legendary two cells).
     openCells: rootCellarOpenCells(heartwoodBuildingLevel(world, 'root-cellar')) + (perk?.kind === 'reveal' ? perk.cells : 0) + (perk?.kind === 'resolve' ? perk.amount : 0),
     // The Dew Spring's calm holds the wisps back a turn at levels 3, 6 and 9.
