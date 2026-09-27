@@ -6,6 +6,8 @@ import type { MergeWorldState } from '@/types/merge-world';
 import type { EncounterOutcome } from './outcome';
 import { getStoredJson, onStorageReset, setStoredJson } from '@/utils/app-storage';
 import { encounterRunId } from './run-id';
+import type { BattleTileScene } from './battle-tile';
+import type { BattleTileFraming } from './battle-framing';
 
 /** Rollback preserves the existing saves and embedded encounter path. */
 export const BATTLE_SCENE_ENABLED = process.env.EXPO_PUBLIC_BATTLE_SCENE !== '0';
@@ -24,6 +26,8 @@ export type BattleSession = {
   loadout: EncounterLoadout;
   world: Pick<MergeWorldState, 'heartwoodBuildings' | 'chapterOpeningsSeen'>;
   backdrop: DayBackgroundSceneId;
+  tileScene?: BattleTileScene;
+  tileFraming?: BattleTileFraming;
   status: 'playing' | 'returning' | 'returned';
   result?: { kind: 'won'; outcome: EncounterOutcome; runId: string } | { kind: 'left' };
 };
@@ -58,6 +62,9 @@ export function battleResumeAttempt(session: BattleSession, saved: { runId?: str
   const attempt = saved?.run?.attempt;
   return Number.isSafeInteger(attempt) && attempt! > 0 && saved?.runId === encounterRunId(session.encounter, attempt!, session.loadout) ? attempt! : 1;
 }
-export function useBattleSession() {
-  return useSyncExternalStore(subscribe, getBattleSession, getBattleSession);
+const noBattleSession = () => null;
+export function useBattleSession(enabled = true) {
+  // Embedded battles must use their own outcomes, even with a dedicated result on disk.
+  const snapshot = enabled ? getBattleSession : noBattleSession;
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
 }

@@ -126,7 +126,8 @@ function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View onStartShouldSetResponderCapture={DEV_TOOLS_ENABLED ? captureEmergencyDevGesture : undefined} style={{ flex: 1 }}>
+      <View onStartShouldSetResponderCapture={DEV_TOOLS_ENABLED ? captureEmergencyDevGesture : undefined}
+        onTouchStart={DEV_TOOLS_ENABLED ? captureEmergencyDevGesture : undefined} style={{ flex: 1 }}>
       <ThemeProvider value={navigationTheme}>
         <GameUIProvider>
           <EconomyProvider>

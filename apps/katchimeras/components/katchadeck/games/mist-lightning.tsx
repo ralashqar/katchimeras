@@ -1,4 +1,6 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { createEffectDeadlines } from '@/features/encounter/effect-deadlines';
+import { useEffectSlots } from '@/hooks/use-effect-slots';
 import { useCombatEffects } from './combat-effects';
 import { StyleSheet, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming, type SharedValue } from 'react-native-reanimated';
@@ -16,9 +18,10 @@ export const MIST_BOLT_REACH = 0.25;
 export const MIST_BOLT_LEAD_MS = 90;
 export const MIST_BOLT_STAGGER_MS = 110;
 const MIST_BOLT_SEGMENTS = 7;
-const MIST_BOLT_MOTES = 8;
+const MIST_BOLT_MOTES = 4;
+const MIST_BOLT_POOL = 8;
 
-/** Publish a whole volley to the scene canvas without mounting a native tree for each bolt. */
+/** Default: pooled native lightning. The diagnostic canvas remains an explicit opt-in. */
 export function MistLightningLayer({ bolts, origin, reduceMotion, onDone }: {
   bolts: readonly MistBolt[]; origin: { x: number; y: number } | null; reduceMotion: boolean; onDone: (id: number) => void;
 }) {
@@ -38,59 +41,102 @@ export function MistLightningLayer({ bolts, origin, reduceMotion, onDone }: {
     const owned = submitted.current;
     return () => { effects?.cancel([...owned.values()]); owned.clear(); };
   }, [effects]);
-  return effects && origin ? null : <>{bolts.map((bolt) => <MistLightning key={bolt.id} bolt={bolt} reduceMotion={reduceMotion} onDone={onDone} />)}</>;
+  return effects && origin ? null : <NativeMistLightningLayer bolts={bolts} reduceMotion={reduceMotion} onDone={onDone} />;
 }
 
-export const MistLightning = memo(function MistLightning({ bolt, reduceMotion, onDone }: { bolt: MistBolt; reduceMotion: boolean; onDone: (id: number) => void }) {
-  const t = useSharedValue(0);
+function NativeMistLightningLayer({ bolts, reduceMotion, onDone }: { bolts: readonly MistBolt[]; reduceMotion: boolean; onDone: (id: number) => void }) {
+  const slots = useEffectSlots(bolts, MIST_BOLT_POOL);
+  const [deadlines] = useState(createEffectDeadlines);
+  const scheduled = useRef(new Map<number, number[]>());
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
   useEffect(() => {
+    const live = new Set(bolts.map((bolt) => bolt.id));
+    for (const [id, tasks] of scheduled.current) if (!live.has(id)) {
+      tasks.forEach(deadlines.cancel);
+      scheduled.current.delete(id);
+    }
+    for (const bolt of bolts) if (!scheduled.current.has(bolt.id)) {
+      const duration = reduceMotion ? 180 : MIST_BOLT_MS;
+      scheduled.current.set(bolt.id, [
+        deadlines.schedule(bolt.delay + duration * MIST_BOLT_REACH, bolt.onImpact),
+        deadlines.schedule(bolt.delay + duration + 40, () => onDoneRef.current(bolt.id)),
+      ]);
+    }
+  }, [bolts, deadlines, reduceMotion]);
+  useEffect(() => {
+    const owned = scheduled.current;
+    return () => { deadlines.clear(); owned.clear(); };
+  }, [deadlines]);
+  return <>{slots.map((bolt, slot) => <MistLightning key={slot} bolt={bolt} reduceMotion={reduceMotion} />)}</>;
+}
+
+export const MistLightning = memo(function MistLightning({ bolt, reduceMotion }: { bolt: MistBolt | null; reduceMotion: boolean }) {
+  const t = useSharedValue(0);
+  const last = useRef(bolt);
+  if (bolt) last.current = bolt;
+  const drawn = last.current;
+  const boltId = bolt?.id;
+  const boltRef = useRef(bolt);
+  boltRef.current = bolt;
+  useEffect(() => {
+    cancelAnimation(t);
+    t.value = 0;
+    const current = boltRef.current;
+    if (!current) return;
     const duration = reduceMotion ? 180 : MIST_BOLT_MS;
-    t.value = withDelay(bolt.delay, withTiming(1, { duration, easing: Easing.linear }));
-    const impact = setTimeout(bolt.onImpact, bolt.delay + duration * MIST_BOLT_REACH);
-    const done = setTimeout(() => onDone(bolt.id), bolt.delay + duration + 40);
-    return () => { clearTimeout(impact); clearTimeout(done); cancelAnimation(t); };
+    t.value = withDelay(current.delay, withTiming(1, { duration, easing: Easing.linear }));
+    return () => cancelAnimation(t);
   // Once per bolt.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bolt.id]);
-  const a = { x: bolt.from.left + bolt.from.width / 2, y: bolt.from.top + bolt.from.height / 2 };
-  const b = { x: bolt.to.left + bolt.to.width / 2, y: bolt.to.top + bolt.to.height / 2 };
-  const thickness = Math.max(5, bolt.to.width * 0.09);
-  const tone = bolt.tone ?? 'glow';
-  return <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+  }, [boltId]);
+  const geometry = useMemo(() => drawn ? {
+    a: { x: drawn.from.left + drawn.from.width / 2, y: drawn.from.top + drawn.from.height / 2 },
+    b: { x: drawn.to.left + drawn.to.width / 2, y: drawn.to.top + drawn.to.height / 2 },
+    thickness: Math.max(5, drawn.to.width * 0.09),
+  } : null, [drawn]);
+  if (!drawn || !geometry) return null;
+  const { a, b, thickness } = geometry;
+  const tone = drawn.tone ?? 'glow';
+  return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: bolt ? 1 : 0 }]}>
     {reduceMotion ? null : Array.from({ length: MIST_BOLT_SEGMENTS }, (_, segment) => <MistBoltSegment key={segment} t={t} a={a} b={b} segment={segment} thickness={thickness} tone={tone} />)}
-    <MistImpact t={t} at={b} size={bolt.to.width} tone={tone} />
+    <MistImpact t={t} at={b} size={drawn.to.width} tone={tone} />
   </View>;
 });
 
-/** One stretch of the zigzag; the ends stay pinned to the two cells, the kinks jitter as it flickers. */
-function MistBoltSegment({ t, a, b, segment, thickness, tone }: { t: SharedValue<number>; a: { x: number; y: number }; b: { x: number; y: number }; segment: number; thickness: number; tone: 'glow' | 'mist' }) {
-  const style = useAnimatedStyle(() => {
-    const p = t.value;
+/** Static zigzag geometry; only opacity animates, avoiding per-frame native layout updates. */
+const MistBoltSegment = memo(function MistBoltSegment({ t, a, b, segment, thickness, tone }: { t: SharedValue<number>; a: { x: number; y: number }; b: { x: number; y: number }; segment: number; thickness: number; tone: 'glow' | 'mist' }) {
+  const geometry = useMemo(() => {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const length = Math.max(1, Math.hypot(dx, dy));
     const kink = Math.min(10, Math.max(5, length * 0.06));
     const point = (index: number) => {
       const s = index / MIST_BOLT_SEGMENTS;
-      const bend = index === 0 || index === MIST_BOLT_SEGMENTS ? 0 : (index % 2 ? 1 : -1) * Math.sin(Math.PI * s) * (kink + Math.sin(p * 28 + index) * 2.5);
+      const bend = index === 0 || index === MIST_BOLT_SEGMENTS ? 0 : (index % 2 ? 1 : -1) * Math.sin(Math.PI * s) * kink;
       return { x: a.x + dx * s - (dy / length) * bend, y: a.y + dy * s + (dx / length) * bend };
     };
     const from = point(segment);
     const to = point(segment + 1);
+    return {
+      left: from.x, top: from.y - thickness / 2, height: thickness,
+      width: Math.hypot(to.x - from.x, to.y - from.y) + 1,
+      transform: [{ rotate: `${Math.atan2(to.y - from.y, to.x - from.x)}rad` }],
+    };
+  }, [a, b, segment, thickness]);
+  const style = useAnimatedStyle(() => {
+    const p = t.value;
     // It grows from the piece to the cell, holds bright on impact, then flickers out.
     const grow = Math.min(1, p / MIST_BOLT_REACH);
     const shown = p > 0 && segment / MIST_BOLT_SEGMENTS < grow;
     const fade = p < MIST_BOLT_REACH ? 1 : Math.max(0, 1 - (p - MIST_BOLT_REACH) / (1 - MIST_BOLT_REACH));
     const flicker = 0.72 + 0.28 * Math.abs(Math.sin(p * 55 + segment));
     return {
-      left: from.x, top: from.y - thickness / 2, height: thickness,
-      width: Math.hypot(to.x - from.x, to.y - from.y) + 1,
       opacity: shown ? fade * flicker : 0,
-      transform: [{ rotate: `${Math.atan2(to.y - from.y, to.x - from.x)}rad` }],
     };
   });
-  return <Animated.View style={[styles.bolt, tone === 'mist' && styles.boltMist, style]}><View style={[styles.boltCore, tone === 'mist' && styles.boltCoreMist]} /></Animated.View>;
-}
+  return <Animated.View style={[styles.bolt, tone === 'mist' && styles.boltMist, geometry, style]}><View style={[styles.boltCore, tone === 'mist' && styles.boltCoreMist]} /></Animated.View>;
+});
 
 /** The impact: a bright ring pulsing out of the struck cell, and motes thrown from it. */
 function MistImpact({ t, at, size, tone }: { t: SharedValue<number>; at: { x: number; y: number }; size: number; tone: 'glow' | 'mist' }) {

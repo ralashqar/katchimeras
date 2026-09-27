@@ -1,5 +1,9 @@
 import { useCombatActive } from '@/components/katchadeck/games/combat-effects';
 import { useBattleQuality } from '@/features/encounter/battle-performance';
+import { useDetailedCombatWisps } from '@/features/encounter/combat-presentation';
+import { CombatProfileBoundary } from '@/features/encounter/combat-profile';
+import { PooledLaneWisps } from './pooled-lane-wisps';
+import { recordMergeRender } from '@/utils/merge-world/performance';
 import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { INTENT_WORDS } from '@/features/encounter/encounter-copy';
@@ -135,12 +139,15 @@ export function wispLayout(target: CorruptionWispTarget, views: readonly Mission
     if (views.some((view) => view.placement.kind === 'lane')) {
       const bottom = mergeCellFrame(geometry, anchor.window.cellIndices[anchor.window.cellIndices.length - 1]!).bounds;
       const frame = { x: metrics.x + first.left, y: metrics.y + first.top, width: last.left + last.width - first.left, height: bottom.top + bottom.height - first.top };
+      const columnPoints = Array.from({ length: anchor.window.columns }, (_, column) => {
+        const top = laneWispPoint(metrics, anchor.window, column, 0);
+        return { ...top, pitch: laneWispPoint(metrics, anchor.window, column, 1).y - top.y };
+      });
       const wisps = views.map((view) => {
         const column = view.placement.kind === 'lane' ? view.placement.column : 0;
         const row = view.placement.kind === 'lane' ? view.placement.row : -1;
-        const point = laneWispPoint(metrics, anchor.window, column, row);
-        const pitch = laneWispPoint(metrics, anchor.window, column, row + 1).y - point.y;
-        return { x: point.x, y: point.y, size: Math.max(36, first.width * (view.placement.kind === 'lane' ? view.placement.size ?? 0.9 : 0.9)), vy: (view.drift ?? 0) * pitch };
+        const point = columnPoints[Math.max(0, Math.min(columnPoints.length - 1, column))]!;
+        return { x: point.x, y: point.y + row * point.pitch, size: Math.max(36, first.width * (view.placement.kind === 'lane' ? view.placement.size ?? 0.9 : 0.9)), vy: (view.drift ?? 0) * point.pitch };
       });
       return { frame, wisps, captionTop: frame.y - 34 };
     }
@@ -336,6 +343,8 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
 
 /** Window-space, above the map and under the Glow flights: the wisps themselves. */
 export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, screenRef }: { wisps: CorruptionWisps; screenRef: RefObject<ViewType | null> }) {
+  recordMergeRender('wisp-layer');
+  const detailed = useDetailedCombatWisps();
   const [origin, setOrigin] = useState<RewardFlightPoint>({ x: 0, y: 0 });
   const layout = wisps.layout;
   const initialLiveIds = useRef(new Set(wisps.views.filter((view) => view.alive).map((view) => view.id)));
@@ -372,8 +381,13 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
   if (!layout) return null;
   // Territory wisps sit on the board's own cells, and lane wisps come down its columns: both are drawn over the docked board.
   const onBoard = wisps.views.some((view) => view.placement.kind === 'cell' || view.placement.kind === 'lane');
+  const leanLanes = !detailed && wisps.views.every((view) => view.placement.kind === 'lane');
   return <View pointerEvents="none" style={[StyleSheet.absoluteFill, onBoard ? styles.layerOnBoard : styles.layer]}>
-    {wisps.views.map((view, index) => view.alive || retained.has(view.id) ? <CorruptionWisp
+    {leanLanes ? <PooledLaneWisps capacity={wisps.views.length} items={wisps.views.flatMap((view, index) => view.alive || retained.has(view.id) ? [{
+      id: view.id, x: (layout.wisps[index]?.x ?? layout.frame.x) - origin.x, y: (layout.wisps[index]?.y ?? layout.frame.y) - origin.y,
+      vy: layout.wisps[index]?.vy ?? 0, size: layout.wisps[index]?.size ?? 48, alive: view.alive, leaving: wisps.leaving,
+      hp: Math.max(0, view.hp - view.damage), look: view.look ?? null, guarded: Boolean(view.guarded), strike: wisps.strikes[index] ?? 0,
+    }] : [])} /> : wisps.views.map((view, index) => view.alive || retained.has(view.id) ? <CorruptionWisp
       key={view.id} index={index} arriving={!initialLiveIds.current.has(view.id)} enterDelayMs={view.enterDelayMs} drift={view.placement.kind === 'lane'} vy={layout.wisps[index]?.vy ?? 0}
       x={(layout.wisps[index]?.x ?? layout.frame.x) - origin.x} y={(layout.wisps[index]?.y ?? layout.frame.y) - origin.y}
       size={layout.wisps[index]?.size ?? 48}
@@ -403,7 +417,7 @@ export const MissionWisps = memo(function MissionWisps({ target, glow, screenRef
 }) {
   const wisps = useCorruptionWisps(target);
   glow.sinkRef.current = wisps.sink;
-  return wisps.visible ? <CorruptionWispLayer wisps={wisps} screenRef={screenRef} /> : null;
+  return wisps.visible ? <CombatProfileBoundary id="wisps"><CorruptionWispLayer wisps={wisps} screenRef={screenRef} /></CombatProfileBoundary> : null;
 });
 
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */

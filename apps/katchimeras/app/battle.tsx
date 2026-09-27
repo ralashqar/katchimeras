@@ -24,8 +24,10 @@ import { hatchableByCompanion } from '@/constants/hatchable-companions/registry'
 import { regionFriendForMission } from '@/constants/region-friends';
 import { BattleGuide } from '@/components/katchadeck/games/battle-guide';
 import { BattlePerformanceProbe } from '@/features/encounter/battle-performance';
+import { CombatProfileBoundary, CombatProfilePanel } from '@/features/encounter/combat-profile';
 import { CombatEffectsProvider } from '@/components/katchadeck/games/combat-effects';
 import { BattleArtContext, useBattleArt } from '@/features/encounter/battle-art';
+import { BattleTile } from '@/components/katchadeck/games/battle-tile';
 
 export default function BattleRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
@@ -35,7 +37,7 @@ export default function BattleRoute() {
     <Text style={styles.error}>This battle is no longer available.</Text>
     <KatchaButton label="Return to the world" onPress={() => router.replace('/katchimeras')} />
   </View>;
-  return <BattleScene key={session.id} session={session} />;
+  return <CombatProfileBoundary id="battle-host"><BattleScene key={session.id} session={session} /></CombatProfileBoundary>;
 }
 
 function BattleScene({ session }: { session: BattleSession }) {
@@ -50,9 +52,12 @@ function BattleScene({ session }: { session: BattleSession }) {
   const [metrics, setMetrics] = useState<MergeBoardScreenMetrics | null>(null);
   const [settled, setSettled] = useState(false);
   const [backgroundReady, setBackgroundReady] = useState(false);
+  const [tileReady, setTileReady] = useState(false);
+  const markTileReady = useCallback(() => setTileReady(true), []);
   const [effectsReady, setEffectsReady] = useState(false);
   const markEffectsReady = useCallback(() => setEffectsReady(true), []);
   const [error, setError] = useState<string | null>(null);
+  const tileFailed = useCallback(() => { setTileReady(true); setError('The battle tile could not load. Return and try again.'); }, []);
   const finishing = useRef(false);
   const [settling, setSettling] = useState(false);
   const [initialAttempt] = useState(() => battleResumeAttempt(session, readMissionSnapshot<StoredMission>(session.encounter.storageKey)));
@@ -107,10 +112,10 @@ function BattleScene({ session }: { session: BattleSession }) {
   missionRef.current = mission;
   const art = useBattleArt(session.encounter, metrics);
   const playing = focused && foreground && !transition.active && session.status === 'playing' && !settling
-    && settled && backgroundReady && effectsReady && art.ready;
+    && settled && backgroundReady && tileReady && effectsReady && art.ready && !error;
   const entranceSettled = useCallback(() => setSettled(true), []);
   useGameSurfaceReadiness('battle', { data: Boolean(mission.store.state), layout: Boolean(metrics), foreground: settled && effectsReady && art.ready,
-    background: backgroundReady, interaction_target: settled, route: true }, focused);
+    background: backgroundReady && tileReady, interaction_target: settled, route: true }, focused);
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => { leave(); return true; });
     return () => sub.remove();
@@ -129,7 +134,7 @@ function BattleScene({ session }: { session: BattleSession }) {
     <Image source={backdrop.havenSource} contentFit="cover" style={StyleSheet.absoluteFill} transition={0}
       onLoad={() => setBackgroundReady(true)} onError={() => setError('The battle background could not load. Return and try again.')} />
     <View pointerEvents="none" style={styles.dim} />
-    <View ref={setAnchor} collapsable={false} pointerEvents="none" style={{ position: 'absolute', left: width * 0.15, top: insets.top + 60, width: width * 0.7, height: height * 0.24 }} />
+    <BattleTile session={session} width={width} height={height} anchorRef={setAnchor} onReady={markTileReady} onError={tileFailed} />
     <View style={[styles.back, { top: insets.top + 8 }]}><KatchimeraBackButton accessibilityLabel="Leave battle" onPress={leave} /></View>
     <View style={StyleSheet.absoluteFill} pointerEvents={playing ? 'box-none' : 'none'}>
       {mission.mission && mission.store.state ? <HatchableMissionDock key={mission.runId} strictReadiness paused={!playing}
@@ -139,11 +144,12 @@ function BattleScene({ session }: { session: BattleSession }) {
         onBoardMetrics={setMetrics} onEntranceSettled={entranceSettled} /> : null}
     </View>
     <MissionWisps target={mission.wispTarget} glow={glow.store} screenRef={root} />
-    <MissionGlowLayer store={glow.store} screenRef={root} />
+    <MissionGlowLayer store={glow.store} screenRef={root} retainPool />
     {playing && settled && mission.store.state && mission.store.mechanicState && (session.source.kind === 'first' || session.source.kind === 'trail')
       ? <BattleGuide first={session.source.kind === 'first'} encounter={session.encounter} state={mission.store.state}
         mechanicState={mission.store.mechanicState} merges={mission.store.merges} metrics={metrics} screenRef={root} /> : null}
     <BattlePerformanceProbe active={playing} label={session.encounter.id} />
+    <CombatProfilePanel active={playing} label={`dedicated:${session.encounter.id}`} />
     {error || art.error || mission.stalled ? <View style={[styles.notice, { top: insets.top + 60 }]}>
       <Text style={styles.error}>{error ?? 'The battle could not load.'}</Text>
       <KatchaButton label="Return to the world" onPress={leave} />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { AppState } from 'react-native';
 import { missionWrites, readMissionSnapshot } from '@/features/encounter/mission-persistence';
-import { measureMergeWork } from '@/utils/merge-world/performance';
+import { measureMergeOperation, measureMergeWork } from '@/utils/merge-world/performance';
 import { lanesKeepGoing, lanesTick, type LanesTickResult } from '@/features/mission-mechanics/lanes';
 
 import type { MergeWorldCommand, MergeWorldCommandResult, MergeWorldState } from '@/types/merge-world';
@@ -142,7 +142,7 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     if (next.placed != null) placedRef.current = next.placed;
     if (next.mechanicState !== undefined) mechanicStateRef.current = next.mechanicState;
     if (next.run !== undefined) runRef.current = next.run;
-    saveMission(storageKey, activeRunId, stateRef.current, mergesRef.current, placedRef.current, mechanicSaveState(mechanicStateRef.current), runRef.current);
+    measureMergeOperation('battle.snapshot', () => saveMission(storageKey, activeRunId, stateRef.current!, mergesRef.current, placedRef.current, mechanicSaveState(mechanicStateRef.current), runRef.current));
     setState(stateRef.current);
     if (next.merges != null) setMerges(next.merges);
     if (next.placed != null) setPlacedDeliveries(next.placed);
@@ -215,10 +215,10 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     const effective: MergeWorldCommand = binding?.encounter && activeRun && command.type === 'tapGenerator'
       ? { ...command, seed: tapSeed(activeRun), enforceCharges: true, dropProfile: dropProfileFor(activeRun, command.generatorId, binding.profile ?? DEFAULT_ENCOUNTER_PROFILE) }
       : command;
-    const result = reduceMergeWorld(current, effective);
+    const result = measureMergeOperation('battle.command.reduce', () => reduceMergeWorld(current, effective));
     if (!result.changed) return result;
     if (binding?.encounter && activeRun && mechanicStateRef.current) {
-      const settled = settleAction({ encounter: binding.encounter, host: binding.host, window: binding.window }, { state: current, run: activeRun, mechanicState: mechanicStateRef.current }, effective, result);
+      const settled = measureMergeOperation('battle.command.settle', () => settleAction({ encounter: binding.encounter!, host: binding.host, window: binding.window }, { state: current, run: activeRun, mechanicState: mechanicStateRef.current! }, effective, result));
       if (settled.refused) return { state: current, changed: false, failureReason: settled.refused, message: NO_RESOLVE_MESSAGE };
       commit({ state: settled.state, merges: settled.run.merges, mechanicState: settled.mechanicState, run: settled.run });
       return { ...result, state: settled.state, strike: settled.strike, effects: settled.effects, opened: settled.opened, status: settled.status, ...(settled.shots ? { shots: settled.shots } : {}), ...(settled.spawnedCell != null ? { spawnedCell: settled.spawnedCell } : {}) };

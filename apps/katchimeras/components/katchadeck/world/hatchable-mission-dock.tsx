@@ -394,7 +394,10 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
     });
   }, [aimWindow, mechanicState, state.board]);
   // Spores a wisp has dropped: a free cell that turns to Mist unless a piece is put on it.
-  const spores = useMemo(() => (mechanicState ? wispViews(mechanic, mission, mechanicState).flatMap((view) => view.spores ?? []) : []), [mechanic, mechanicState, mission]);
+  // Only Dark Wisps produce spores. Avoid building every lane wisp's visual
+  // description a second time on each board/health update just to find none.
+  const spores = useMemo(() => (mechanic.kind === 'dark-wisps' && mechanicState?.kind === 'dark-wisps'
+    ? wispViews(mechanic, mission, mechanicState).flatMap((view) => view.spores ?? []) : []), [mechanic, mechanicState, mission]);
   // What every wisp will do after the player's next action, shown on the board before it happens.
   const tactics = mechanicIsTactics(mechanic);
   const plans = useMemo((): WispPlan[] => {

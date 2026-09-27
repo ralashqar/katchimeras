@@ -1,5 +1,6 @@
 import { memo, useCallback, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, type ViewStyle } from 'react-native';
+import { CombatProfileBoundary } from '@/features/encounter/combat-profile';
 
 import type { MergeBoardInteractionGate, MergeRailInteractionGate } from '@/features/onboarding/merge-ftue';
 import type { MergeBoardSessionId } from '@/features/onboarding/merge-ftue-interaction-coordinator';
@@ -18,12 +19,12 @@ const sameBoardPresentation = (a: MergeWorldState | null, b: MergeWorldState | n
 type MergeBoardProps = Omit<ComponentProps<typeof FeastlePersistentMergeBoard>, 'state'>;
 const SubscribedMergeBoard = memo(function SubscribedMergeBoard(props: MergeBoardProps) {
   const state = useMergeWorldSelector(selectBoard, sameBoardPresentation);
-  return state ? <FeastlePersistentMergeBoard {...props} state={state} /> : null;
+  return state ? <CombatProfileBoundary id="board"><FeastlePersistentMergeBoard {...props} state={state} /></CombatProfileBoundary> : null;
 });
 const MergeBoard = memo(function MergeBoard({ state, ...props }: MergeBoardProps & { state?: MergeWorldState | null }) {
   // Combat owns its board and has no world provider. Only the world-backed branch subscribes.
   if (state === undefined) return <SubscribedMergeBoard {...props} />;
-  return state ? <FeastlePersistentMergeBoard {...props} state={state} /> : null;
+  return state ? <CombatProfileBoundary id="board"><FeastlePersistentMergeBoard {...props} state={state} /></CombatProfileBoundary> : null;
 });
 
 export type MergePlaySurfaceLayout = {
@@ -139,6 +140,8 @@ export const MergePlaySurface = memo(function MergePlaySurface({
 }: MergePlaySurfaceProps) {
   const [boardAreaHeight, setBoardAreaHeight] = useState(0);
   const retainedEntries = useRef<readonly MergeTrayEntry[]>([]);
+  const retainedBoardGate = useRef(boardInteractionGate);
+  retainedBoardGate.current = reuseShallowValue(retainedBoardGate.current, boardInteractionGate);
   const retainedRailGate = useRef(railInteractionGate);
   retainedRailGate.current = reuseShallowValue(retainedRailGate.current, railInteractionGate);
   const stableEntries = useMemo(() => {
@@ -184,7 +187,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
             animateEntrance={animateEntrance}
             animateArrivals={animateArrivals}
             hiddenItemInstanceIds={hiddenItemInstanceIds}
-            interactionGate={boardInteractionGate}
+          interactionGate={retainedBoardGate.current}
             interactionSessionKey={interactionSessionKey}
             layout={boardLayout}
             maxHeight={boardAreaHeight - 1}

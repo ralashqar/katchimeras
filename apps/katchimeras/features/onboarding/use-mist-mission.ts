@@ -18,7 +18,7 @@ import { missionPairs, missionWakes, missionWindow } from '@/features/mission-me
 import { mechanicComplete, mechanicIsTactics, resolveMechanic, wispViews } from '@/features/mission-mechanics/mechanic';
 import { wispExposed } from '@/features/mission-mechanics/dark-wisps';
 import { resolveEncounterForPlay, resolveMissionForPlay } from '@/features/mission-mechanics/preview';
-import { missionWispTarget } from '@/features/mission-mechanics/wisp-target';
+import { missionWispTarget, reuseLiveWispTarget } from '@/features/mission-mechanics/wisp-target';
 import { useDevMissionMechanicPreview } from '@/hooks/use-dev-mission-mechanic-preview';
 import type { CompanionAbilityDefinition, CompanionAbilityTier } from '@/types/companion-ability';
 import type { EncounterDefinition, EncounterLoadout } from '@/types/encounter';
@@ -236,9 +236,14 @@ export function useMistMission({ guided = true, initialAttempt = 1, active, miss
     get: () => liveRef.current ?? { kind: 'glow-strikes', strikes: 0 },
     subscribe: (listener) => { liveListeners.current.add(listener); return () => { liveListeners.current.delete(listener); }; },
   }), []);
-  const wispTarget = useMemo((): CorruptionWispTarget | null => active && played && host && store.mechanicState
+  const targetRef = useRef<CorruptionWispTarget | null>(null);
+  const wispTarget = useMemo((): CorruptionWispTarget | null => {
+    const next = active && played && host && store.mechanicState
     ? missionWispTarget({ key: encounter ? `${encounter.id}:${attempt}` : played.id, host, mechanicState: store.mechanicState, node: tileNode, boardMetrics, window, lines: played.lines, settled: cameraSettled, revealNonce, ...(mechanic?.kind === 'dark-wisps' || mechanic?.kind === 'lanes' ? { live } : {}) })
-    : null, [active, attempt, boardMetrics, cameraSettled, encounter, host, live, mechanic?.kind, played, revealNonce, store.mechanicState, tileNode, window]);
+    : null;
+    targetRef.current = reuseLiveWispTarget(targetRef.current, next);
+    return targetRef.current;
+  }, [active, attempt, boardMetrics, cameraSettled, encounter, host, live, mechanic?.kind, played, revealNonce, store.mechanicState, tileNode, window]);
   // The encounter's own beats: what the last command did to the board, the cache opening on a spent board, the friend's line.
   const [effects, setEffects] = useState<MechanicEffect[]>([]);
   const [cacheLine, setCacheLine] = useState(false);
@@ -364,7 +369,7 @@ export function useMistMission({ guided = true, initialAttempt = 1, active, miss
     definition: encounter, resolveLeft: store.run.resolve.budget == null ? null : resolveLeft(store.run), status: store.status, outcome, ability, partnerAbility, speech, effects,
     // Lanes are never lost to the Mist's hold: no meter.
     territory: store.run.territory && !lanes ? { mist: store.run.territory.last, overrun: store.run.territory.overrun, cells: encounter.rows * 5 } : null,
-    lanes: lanes && store.mechanicState?.kind === 'lanes' ? { left: wispViews(lanes, host!, store.mechanicState).filter((wisp) => wisp.damage < wisp.hp).length } : null,
+    lanes: lanes && store.mechanicState?.kind === 'lanes' ? { left: lanes.wisps.reduce((count, wisp, index) => count + ((store.mechanicState?.kind === 'lanes' ? store.mechanicState.wisps[index]?.damage ?? 0 : 0) < wisp.hp ? 1 : 0), 0) } : null,
     tick: lanes ? laneTick : null,
     // Merge tactics: every action is a turn.
     turns: host && mechanicIsTactics(resolveMechanic(host)) ? store.run.actions : store.run.merges, lossReason, keepGoingCost: payKeepGoing ? keepGoingCost ?? 0 : 0,

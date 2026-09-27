@@ -1,4 +1,5 @@
 import { resolveCreatureIdleFallbackSource } from '@/constants/creature-idle-animation-sources';
+import { projectBattleTile, type CaptureBattleTile } from '@/features/encounter/battle-framing';
 import { heroTileLayerId } from '@/constants/hero-buildings';
 import { EGG_FEED_TARGET_Y_RATIO } from '@/features/today/egg-feed-target';
 import { LevelTrackStones, type LevelTrackStone } from './level-track-stones';
@@ -31,6 +32,7 @@ import {
 import { Fragment, memo, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, LayoutChangeEvent, PixelRatio, Pressable, StyleSheet, Text, View, type ImageSourcePropType, type View as ViewType } from 'react-native';
 import { acquireLifecycleResource, scheduleForegroundLifecycleAudit } from '@/utils/lifecycle-performance';
+import { recordMergeRender } from '@/utils/merge-world/performance';
 import { useExitRetention } from '@/hooks/use-exit-retention';
 import { worldTileImageLod } from '@/utils/world-image-resolution';
 import { GestureDetector } from 'react-native-gesture-handler';
@@ -187,6 +189,7 @@ type Props = {
   initialCameraSnapshot?: KingdomCameraSnapshot | null;
   onCameraSnapshotChange?: (snapshot: KingdomCameraSnapshot) => void;
   onCameraMotionChange?: (moving: boolean) => void;
+  battleTileCaptureRef?: RefObject<CaptureBattleTile | null>;
   onOpenGarden?: (orderId?: string | null) => void;
   upgradeOffers?: readonly WorldUpgradeOffer[];
   selectedUpgradeOffer?: WorldUpgradeOffer | null;
@@ -540,6 +543,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   initialCameraSnapshot,
   onCameraSnapshotChange,
   onCameraMotionChange,
+  battleTileCaptureRef,
   onOpenGarden,
   gardenEventAdornment,
   lanternPostAdornment,
@@ -613,6 +617,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   soloLayerId = null,
   soloOfferId = null,
 }: Props) {
+  recordMergeRender('world-map');
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [settledImageScale, setSettledImageScale] = useState(initialCameraSnapshot?.scale ?? 1.25);
   useEffect(() => {
@@ -1826,6 +1831,25 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (tileId === camera.focusedTileId) return reduceMotion ? 1.04 : presentation.focusedScale;
     return presentation.unfocusedScale;
   }, [camera.focusedTileId, camera.isMoving, presentation, reduceMotion]);
+  useEffect(() => {
+    if (!battleTileCaptureRef) return;
+    let current = true;
+    battleTileCaptureRef.current = layerId => new Promise(resolve => {
+      const layer = scene.tileArtLayers.find(candidate => candidate.id === layerId);
+      const node = rootRef.current;
+      if (!current || !camera.ready || camera.isMoving || !layer || !node) { resolve(null); return; }
+      const tile = scene.tileById.get(layerId);
+      node.measureInWindow((x, y, width, height) => {
+        if (!current || width <= 0 || height <= 0) { resolve(null); return; }
+        resolve(projectBattleTile(layer.frame, scene, camera.snapshot, { x, y }, {
+          x: tile?.cx ?? layer.frame.left + layer.frame.width / 2,
+          y: tile?.cy ?? layer.frame.top + layer.frame.height / 2,
+          scale: tileFocusScale(layerId),
+        }));
+      });
+    });
+    return () => { current = false; battleTileCaptureRef.current = null; };
+  }, [battleTileCaptureRef, camera.isMoving, camera.ready, camera.snapshot, scene, tileFocusScale]);
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setViewport((current) => (current.width === width && current.height === height ? current : { width, height }));

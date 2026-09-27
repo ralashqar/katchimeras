@@ -8,6 +8,9 @@ import * as Haptics from 'expo-haptics';
 
 import { MergePlaySurface } from '@/components/katchadeck/games/merge-play-surface';
 import { useCombatEffects, type CombatEffects } from '@/components/katchadeck/games/combat-effects';
+import { createEffectDeadlines } from '@/features/encounter/effect-deadlines';
+import { CombatProfileBoundary } from '@/features/encounter/combat-profile';
+import { recordMergeRender } from '@/utils/merge-world/performance';
 import type { MergeBoardScreenMetrics } from '@/components/katchadeck/games/feastle-persistent-merge-board';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
 import { REWARD_TOKEN_FLIGHT_MS, REWARD_TOKEN_HOVER_MS, REWARD_TOKEN_RISE_MS, REWARD_TOKEN_STAGGER_MS, RewardTokenFlight, type RewardFlightPoint } from '@/components/katchadeck/ui/reward-token-flight';
@@ -46,7 +49,8 @@ const BAR_FILL_COLOR = '#6A46C9';
 const BAR_TRACK_COLOR = 'rgba(84,66,128,0.24)';
 
 export type OpeningGlowFlight = { id: number; index: number; from: RewardFlightPoint; to: RewardFlightPoint; art?: ArtSource; size?: number; count?: number; group?: number; key?: number; /** A Merge vs Mist Glow shot: always bursts where it lands, as a strike. */ shot?: boolean;
-  /** Lanes: a bolt straight up its column, flown for exactly this long (the level lands its damage on the same clock), after `delay` ms. */ direct?: number; delay?: number };
+  /** Lanes: a bolt straight up its column, flown for exactly this long (the level lands its damage on the same clock), after `delay` ms. */ direct?: number; delay?: number;
+  /** Overflow keeps its landing clock but does not allocate another native effect tree. */ hidden?: boolean };
 /** One Glow shot of a merge's volley (Merge vs Mist), in window space. */
 export type GlowVolleyShot = { from: RewardFlightPoint; to: RewardFlightPoint };
 
@@ -75,14 +79,15 @@ const STRIKE_SPARK = '#FFF1B8';
 const STRIKE_SPARK_HOT = '#FFFFFF';
 const STRIKE_EMBER = '#6A2FA0';
 const STRIKE_EMBER_DEEP = '#3B1657';
-const STRIKE_PARTICLES = 10;
+const STRIKE_PARTICLES = 6;
 /** Glow tokens kept mounted from merge to merge: three merges' Glow in the air at once. Past that, a flight is mounted fresh. */
 const GLOW_TOKEN_POOL = 16;
-/** Lanes bolts kept mounted: every plant on a full board firing at once, with room to spare. Past that, a bolt is mounted fresh. */
+/** Lanes bolts kept mounted. Overflow keeps its logical landing without mounting more native views. */
 const GLOW_BOLT_POOL = 16;
 /** Bursts alive at once, a pool each. A landing past the cap still counts and still strikes; it only bursts nowhere. */
 const STRIKE_BURST_POOL = 6;
 const IMPACT_BURST_POOL = 4;
+const RICH_IMPACTS = process.env.EXPO_PUBLIC_RICH_COMBAT_IMPACTS !== '0';
 /** How long the pooled views stay mounted after the last Glow has gone, so a streak never remounts them. */
 const GLOW_POOL_WARM_MS = 4_000;
 
@@ -425,6 +430,7 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
   screenRef: RefObject<ViewType | null>;
 }) {
   const [origin, setOrigin] = useState<RewardFlightPoint>({ x: 0, y: 0 });
+  recordMergeRender('flight-layer');
   useEffect(() => {
     screenRef.current?.measureInWindow((x, y) => setOrigin((current) => current.x === x && current.y === y ? current : { x, y }));
   }, [screenRef]);
@@ -434,7 +440,7 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
   // grew with every fast merge in a streak.
   // Lane bolts fly straight on their own clock; every other flight rises, hovers and homes in, from the pool.
   const pooled = useMemo(() => flights.filter((flight) => !flight.direct), [flights]);
-  const bolts = useMemo(() => flights.filter((flight) => flight.direct), [flights]);
+  const bolts = useMemo(() => flights.filter((flight) => flight.direct && !flight.hidden), [flights]);
   const tokens = usePoolSlots(pooled, GLOW_TOKEN_POOL);
   const boltSlots = usePoolSlots(bolts, GLOW_BOLT_POOL);
   const strikes = useMemo(() => impacts.filter((impact) => impact.wisp), [impacts]);
@@ -448,10 +454,15 @@ export function OpeningGlowLayer({ flights, impacts, onArrive, onImpactDone, scr
       onArrive={() => onArrive(flight.id)}>
       <GlowTokenArt art={flight.art} size={flight.size} />
     </RewardTokenFlight>)}
-    {boltSlots.slots.map((flight, slot) => <GlowBolt key={`bolt-slot-${slot}`} flight={flight} origin={origin} onArrive={onArrive} />)}
-    {boltSlots.overflow.map((flight) => <GlowBolt key={flight.id} flight={flight} origin={origin} onArrive={onArrive} />)}
-    {strikeSlots.slots.map((impact, slot) => <WispStrikeBurst key={slot} impact={impact} origin={origin} onDone={onImpactDone} />)}
-    {impactSlots.slots.map((impact, slot) => <ImpactBurst key={slot} impact={impact} origin={origin} onDone={onImpactDone} />)}
+    <CombatProfileBoundary id="projectiles">{boltSlots.slots.map((flight, slot) => <GlowBolt key={`bolt-slot-${slot}`} flight={flight} origin={origin} onArrive={onArrive} />)}</CombatProfileBoundary>
+    <CombatProfileBoundary id="impacts">
+      {strikeSlots.slots.map((impact, slot) => RICH_IMPACTS
+        ? <WispStrikeBurst key={`strike-${slot}`} impact={impact} origin={origin} onDone={onImpactDone} />
+        : <CompactImpactBurst key={`strike-${slot}`} impact={impact} origin={origin} onDone={onImpactDone} wisp />)}
+      {impactSlots.slots.map((impact, slot) => RICH_IMPACTS
+        ? <ImpactBurst key={`impact-${slot}`} impact={impact} origin={origin} onDone={onImpactDone} />
+        : <CompactImpactBurst key={`impact-${slot}`} impact={impact} origin={origin} onDone={onImpactDone} wisp={false} />)}
+    </CombatProfileBoundary>
   </View>;
 }
 
@@ -494,6 +505,8 @@ const GlowTokenArt = memo(function GlowTokenArt({ art, size }: { art?: ArtSource
 
 /** Lanes: one Glow token straight from its piece to the wisp it is aimed at, landing exactly when the level lands it. */
 const GlowBolt = memo(function GlowBolt({ flight, origin, onArrive }: { flight: OpeningGlowFlight | null; origin: RewardFlightPoint; onArrive: (id: number) => void }) {
+  recordMergeRender('projectile-slot');
+  useEffect(() => { recordMergeRender('projectile-slot-mount'); }, []);
   // Pooled: a slot keeps its view and worklets from one bolt to the next; a new bolt only moves it and restarts its
   // clock. Between bolts it is hidden where it landed. (Mounting a view per shot, several a second, was the cost.)
   const progress = useSharedValue(0);
@@ -654,6 +667,8 @@ type PooledBurstProps = { impact: OpeningImpact | null; origin: RewardFlightPoin
 
 /** The clock and place of one pooled burst: restarted for each impact the slot is handed, hidden between them. */
 function usePooledBurst({ impact, origin, onDone }: PooledBurstProps, reduceMotion: boolean) {
+  recordMergeRender('impact-slot');
+  useEffect(() => { recordMergeRender('impact-slot-mount'); }, []);
   const t = useSharedValue(0);
   const shown = useSharedValue(0);
   const x = useSharedValue(0);
@@ -676,11 +691,29 @@ function usePooledBurst({ impact, origin, onDone }: PooledBurstProps, reduceMoti
     // On its own clock, keyed to the impact: a landing elsewhere re-rendering the layer used to
     // restart every live burst's timing and its removal, so a streak's bursts never died.
     const timer = setTimeout(() => onDoneRef.current(impactId), duration + 40);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); cancelAnimation(t); };
   }, [impactId, reduceMotion, shown, t]);
   const rootStyle = useAnimatedStyle(() => ({ opacity: shown.value, transform: [{ translateX: x.value }, { translateY: y.value }] }));
   return { t, rootStyle };
 }
+
+/** One expanding flash/ring replaces the per-hit cloud and six animated shards.
+ * Damage/arrival and retirement keep their existing clocks; this is decoration only.
+ */
+const CompactImpactBurst = memo(function CompactImpactBurst({ wisp, ...props }: PooledBurstProps & { wisp: boolean }) {
+  const reduceMotion = useReducedMotion();
+  const { t, rootStyle } = usePooledBurst(props, reduceMotion);
+  const flareStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(0, 1 - t.value),
+    transform: [{ scale: reduceMotion ? 1 : 0.55 + t.value * 0.95 }],
+  }));
+  return <Animated.View pointerEvents="none" style={[styles.burst, rootStyle]}>
+    <Animated.View style={flareStyle}>
+      <View style={wisp ? styles.strikeCore : styles.burstFlash} />
+      <View style={wisp ? styles.strikeRing : styles.burstRing} />
+    </Animated.View>
+  </Animated.View>;
+});
 
 /** A ring and a scatter of Glow motes from the landing point, gone in a moment. A pooled slot, moved to each impact it is handed. */
 const ImpactBurst = memo(function ImpactBurst({ impact, origin, onDone }: PooledBurstProps) {
@@ -848,6 +881,7 @@ function createOpeningGlowStore(): OpeningGlowStore {
       if (batching === 0 && dirty) { dirty = false; notify(); }
     }
   };
+  const overflowLandings = createEffectDeadlines(batch);
   const update = (change: Partial<OpeningGlowState>) => {
     const next = { ...state, ...change };
     // Snapshots keep their identity unless their own fields moved: a landing does not wake the finale's subscriber.
@@ -893,11 +927,12 @@ function createOpeningGlowStore(): OpeningGlowStore {
     target.measureInWindow((x, y, width, height) => push({ x: x + width / 2, y: y + height * 0.55 }));
   };
   const arrive = (id: number) => batch(() => {
+    const struck = state.flights.find((flight) => flight.id === id);
+    if (!struck) return; // Late or duplicated completions cannot land a shot twice.
     const finale = id === finaleIdRef.current;
     const onShotLand = shotLandings.get(id);
     if (onShotLand) { shotLandings.delete(id); onShotLand(); }
     // A token that struck a wisp: the wisp flinches on every token and takes one hit per burst.
-    const struck = state.flights.find((flight) => flight.id === id);
     if (struck?.key != null) {
       sinkRef.current?.struck(struck.key);
       if (struck.group != null && !landedGroups.current.has(struck.group)) {
@@ -976,14 +1011,18 @@ function createOpeningGlowStore(): OpeningGlowStore {
       return;
     }
     const made: OpeningGlowFlight[] = [];
+    let visible = state.flights.filter((flight) => flight.direct && !flight.hidden).length;
     for (const bolt of bolts) {
       const aimed = bolt.wisp >= 0 ? sinkRef.current?.pointOf?.(bolt.wisp) ?? null : null;
       const to = aimed ?? bolt.to;
       if (!to) continue;
       // Each its own group: a bolt at a wisp flinches it and bursts where it lands; a miss fades out on its way up.
-      made.push({ id: ++nextId.current, index: 0, count: 1, from: bolt.from, to, group: ++groupSeq.current, ...(aimed ? { key: bolt.wisp } : {}), direct: Math.max(80, bolt.durationMs), ...(bolt.delayMs ? { delay: bolt.delayMs } : {}), ...(bolt.art ? { art: bolt.art } : {}), ...(bolt.size ? { size: bolt.size } : {}) });
+      const hidden = visible >= GLOW_BOLT_POOL;
+      if (!hidden) visible++;
+      made.push({ id: ++nextId.current, index: 0, count: 1, from: bolt.from, to, group: ++groupSeq.current, ...(aimed ? { key: bolt.wisp } : {}), direct: Math.max(80, bolt.durationMs), hidden, ...(bolt.delayMs ? { delay: bolt.delayMs } : {}), ...(bolt.art ? { art: bolt.art } : {}), ...(bolt.size ? { size: bolt.size } : {}) });
     }
     if (made.length) setFlights((current) => [...current, ...made]);
+    for (const flight of made) if (flight.hidden) overflowLandings.schedule((flight.delay ?? 0) + flight.direct!, () => arrive(flight.id));
   };
   const launchFinale = (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null): number => {
     const id = ++nextId.current;
@@ -1008,7 +1047,7 @@ function createOpeningGlowStore(): OpeningGlowStore {
     getFinale: () => finaleSnapshot,
     finaleHoldRef, sinkRef, targetRef, effectsRef,
     launch, launchItem, launchShot, launchVolley, launchBolts, launchFinale, arrive, impactDone,
-    dispose: () => { if (finaleTimer) clearTimeout(finaleTimer); finaleTimer = undefined; shotLandings.clear(); landedGroups.current.clear(); },
+    dispose: () => { overflowLandings.clear(); if (finaleTimer) clearTimeout(finaleTimer); finaleTimer = undefined; shotLandings.clear(); landedGroups.current.clear(); },
   };
 }
 
@@ -1031,20 +1070,20 @@ export function useOpeningGlow(targetNode: ViewType | null) {
 }
 
 /** The Glow flights and bursts, subscribed on their own: a landing re-renders this layer, not the screen. */
-export const MissionGlowLayer = memo(function MissionGlowLayer({ store, screenRef }: { store: OpeningGlowStore; screenRef: RefObject<ViewType | null> }) {
+export const MissionGlowLayer = memo(function MissionGlowLayer({ store, screenRef, retainPool = false }: { store: OpeningGlowStore; screenRef: RefObject<ViewType | null>; retainPool?: boolean }) {
   const effects = useCombatEffects();
   useEffect(() => { store.effectsRef.current = effects; return () => { store.effectsRef.current = null; }; }, [effects, store]);
   const { flights, impacts } = useSyncExternalStore(store.subscribe, store.getFlights, store.getFlights);
   const live = flights.length > 0 || impacts.length > 0;
-  // The pooled views stay mounted a while after the last landing: the next merge of a streak reuses them.
+  // A combat session retains its allocated slots even between waves; idle slots run no animations.
   const [warm, setWarm] = useState(false);
   useEffect(() => {
-    if (live) { setWarm(true); return; }
+    if (live || retainPool) { setWarm(true); return; }
     const timer = setTimeout(() => setWarm(false), GLOW_POOL_WARM_MS);
     return () => clearTimeout(timer);
-  }, [live]);
-  if (!live && !warm) return null;
-  return <OpeningGlowLayer flights={flights} impacts={impacts} onArrive={store.arrive} onImpactDone={store.impactDone} screenRef={screenRef} />;
+  }, [live, retainPool]);
+  if (!live && !warm && !retainPool) return null;
+  return <CombatProfileBoundary id="effects"><OpeningGlowLayer flights={flights} impacts={impacts} onArrive={store.arrive} onImpactDone={store.impactDone} screenRef={screenRef} /></CombatProfileBoundary>;
 });
 
 const styles = StyleSheet.create({

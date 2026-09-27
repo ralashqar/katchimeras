@@ -329,8 +329,9 @@ test('drag coordinates are filtered before stationary sprite style work', () => 
   const dragPhase = { value: 1 };
   const grabX = { value: 20 }, grabY = { value: 30 };
   const dragTranslationX = { value: 0 }, dragTranslationY = { value: 0 };
-  const read = new Function('instanceId', 'activeDragId', 'dragPhase', 'grabX', 'grabY', 'dragTranslationX', 'dragTranslationY', selector[1]);
-  const position = (id: string) => read(id, activeDragId, dragPhase, grabX, grabY, dragTranslationX, dragTranslationY);
+  const read = new Function('active', 'instanceId', 'activeDragId', 'dragPhase', 'grabX', 'grabY', 'dragTranslationX', 'dragTranslationY', selector[1]);
+  const position = (id: string) => read(true, id, activeDragId, dragPhase, grabX, grabY, dragTranslationX, dragTranslationY);
+  assert.equal(read(false, 'moving', activeDragId, dragPhase, grabX, grabY, dragTranslationX, dragTranslationY), null);
   for (let frame = 0; frame < 60; frame++) {
     dragTranslationX.value = frame;
     dragTranslationY.value = -frame;

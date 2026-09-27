@@ -1,6 +1,10 @@
 import { BATTLE_SCENE_ENABLED, getBattleSession, saveBattleSession, startBattleSession, useBattleSession, type BattleSession, type IslandBattleContext } from '@/features/encounter/battle-session';
+import { battleTileLayerId } from '@/features/encounter/battle-tile';
+import { captureSettledBattleTile, type CaptureBattleTile } from '@/features/encounter/battle-framing';
 import { battleSourceCampaign } from '@/features/sanctuary/battle-source';
 import { CombatEffectsProvider } from '@/components/katchadeck/games/combat-effects';
+import { CombatProfileBoundary, CombatProfilePanel } from '@/features/encounter/combat-profile';
+import { recordMergeRender } from '@/utils/merge-world/performance';
 import { FRONTIER_VARIANT_NAMES, frontierOpen, frontierSurgesStarted, frontierTileById, frontierTileContested, frontierTileLit, frontierTileReclaimed, frontierTileState, frontierTileStates, nextFrontierTile, type FrontierTileState } from '@/constants/frontier-tiles';
 import { frontierMission, frontierRetakeMission, surgeDefenceMission } from '@/features/frontier/frontier-levels';
 import { HOLLOW_TREE_FINALE_ID, HOLLOW_TREE_STRUCTURE_ID, hollowTreeFinaleMission, hollowTreeRestored } from '@/features/finale/hollow-tree';
@@ -401,6 +405,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   worldEggTargetRef,
   worldSubjectPresentation,
 }: Props) {
+  recordMergeRender('world-screen');
   const router = useRouter();
   // Every hatchable companion's runs; the live one is whose discovery (and whose garden lesson) the Kingdom shows.
   const hatchableRuns = useHatchableRuns();
@@ -438,7 +443,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // The campaign pivot: a rung up as an encounter, docked under its island, or under Mossprout's own tile for the Daily Mist.
   // Or under a Frontier tile (`frontierTileId`): the land's own battle (`constants/frontier-tiles.ts`).
   // Or under a structure (`structureId`: the Heart Tree, for the first Mist Surge's defence).
-  const battleSession = useBattleSession();
+  const battleSession = useBattleSession(BATTLE_SCENE_ENABLED);
   const [islandEncounter, setIslandEncounter] = useState<IslandBattleContext | null>(() => {
     const pending = getBattleSession();
     return BATTLE_SCENE_ENABLED && pending?.source.kind === 'island'
@@ -602,6 +607,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [ftueTargetRevision, setFtueTargetRevision] = useState(0);
   const [ftueCameraSettled, setFtueCameraSettled] = useState(false);
   const cameraSettleRevisionRef = useRef(0);
+  const cameraSettledRef = useRef(false);
+  const battleTileCaptureRef = useRef<CaptureBattleTile | null>(null);
+  const battleEntryRevisionRef = useRef(0);
+  const battleEnteringRef = useRef(false);
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradePresentation, setUpgradePresentation] = useState<HavenTileUpgradePresentation | null>(null);
@@ -762,12 +771,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     void ftueStepId;
     return (moving: boolean) => {
     const revision = ++cameraSettleRevisionRef.current;
+    cameraSettledRef.current = false;
     setFtueCameraSettled(false);
     if (moving) {
       return;
     }
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (cameraSettleRevisionRef.current === revision) setFtueCameraSettled(true);
+      if (cameraSettleRevisionRef.current === revision) { cameraSettledRef.current = true; setFtueCameraSettled(true); }
     }));
     };
   }, [ftueStepId]);
@@ -2533,8 +2543,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     }
   });
   useEffect(() => { if (screenFocused) void settleBattleReturn(); }, [battleSession?.id, battleSession?.status, screenFocused, settleBattleReturn]);
-  const openDedicatedBattle = useStableCallback((resume = false) => {
-    if (!BATTLE_SCENE_ENABLED || !screenFocused || battleReward || battleReturnError) return;
+  const openDedicatedBattle = useStableCallback(async (resume = false) => {
+    const revision = ++battleEntryRevisionRef.current;
+    if (!BATTLE_SCENE_ENABLED || !screenFocused || !ftueCameraSettled || !cameraSettledRef.current || battleEnteringRef.current || battleReward || battleReturnError) return;
     const pending = getBattleSession();
     if (pending?.status === 'returning') return;
     let input: Omit<BattleSession, 'id' | 'version' | 'status' | 'result'> | null = null;
@@ -2545,8 +2556,16 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     else if (islandEncounterActive && islandEncounter) input = { ...common, sourceKey: `island:${islandEncounter.mission.id}`, source: { kind: 'island', context: islandEncounter }, encounter: islandEncounter.mission.encounter, loadout: islandEncounter.loadout };
     if (!input) return;
     if (!resume && input.source.kind !== 'island' && pending?.sourceKey === input.sourceKey && pending.status === 'returned') return;
-    const selected = input;
+    const frame = await captureSettledBattleTile(
+      () => battleEntryRevisionRef.current === revision && cameraSettledRef.current,
+      () => battleTileCaptureRef.current?.(battleTileLayerId(input!.source)) ?? Promise.resolve(null),
+    );
+    if (!frame) return;
+    const { plantableMemories: _memories, ...tileGarden } = mossproutGardenScene;
+    const selected = { ...input, tileFraming: { frame, viewport: { width: window.width, height: window.height } }, tileScene: { garden: tileGarden, levels: mergeWorld.haven.mossproutNatureIslands,
+      reveals: canvasNatureIslandReveals, homeVeiled: homeVeil === 'veiled' || homeVeil === 'lifting' } };
     let destinationStarted = false;
+    battleEnteringRef.current = true;
     transitionTo({ target: 'battle', announcement: 'Entering battle', expectedPathname: '/battle', requiredReadiness: ['data', 'background', 'foreground', 'layout', 'interaction_target', 'route'],
       navigate: async () => {
         await flushMergeWorld();
@@ -2556,13 +2575,19 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         destinationStarted = true;
       },
       onReturn: () => {
+        battleEnteringRef.current = false;
         const session = getBattleSession();
         if (session?.sourceKey === selected.sourceKey) saveBattleSession({ ...session, status: 'returned', result: { kind: 'left' } });
         if (destinationStarted) router.back();
       },
     });
   });
-  useEffect(() => { openDedicatedBattle(); }, [openDedicatedBattle, firstBattleStepActive, trailStoneIndex, trailIntroSeen, stepplingMissionActive, rescueIntroPending, rescueRevealing, islandEncounterActive, islandEncounter, battleReward]);
+  useEffect(() => {
+    const entryRevision = battleEntryRevisionRef;
+    if (!screenFocused) battleEnteringRef.current = false;
+    void openDedicatedBattle();
+    return () => { entryRevision.current++; };
+  }, [openDedicatedBattle, screenFocused, ftueCameraSettled, firstBattleStepActive, trailStoneIndex, trailIntroSeen, stepplingMissionActive, rescueIntroPending, rescueRevealing, islandEncounterActive, islandEncounter, battleReward]);
   useEffect(() => {
     // Back puts the encounter away (the board keeps); it never leaves the Kingdom from here.
     if (!islandEncounterActive) return;
@@ -3943,17 +3968,20 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // that a board is on screen. Owning the Garden must not disable this tap.
   const wispLanternAllowed = sharedAdventureAllowed && !heartwoodRecap
     && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed');
-  const wispLanternAdornment = lanternEligible(mergeWorld) ? <WispLanternWorld
+  const lanternVisible = lanternEligible(mergeWorld);
+  const openWispLantern = useCallback(() => setWispLanternOpen(true), []);
+  const wispLanternAdornment = useMemo(() => lanternVisible ? <WispLanternWorld
     level={mergeWorld.wispLanternProgress?.level}
     planted={Boolean(mergeWorld.wispLanternPlacement)} rewards={mergeWorld.wispLanternProgress?.rewards}
-    onPress={wispLanternAllowed ? () => setWispLanternOpen(true) : undefined} /> : null;
+    onPress={wispLanternAllowed ? openWispLantern : undefined} /> : null,
+  [lanternVisible, mergeWorld.wispLanternPlacement, mergeWorld.wispLanternProgress, openWispLantern, wispLanternAllowed]);
 
   // Each building stands on its own patch. While one is open on the stage the others stay drawn but do not take taps.
   // A built one stays drawn through the rest of the first session (the Spring the first seed became); the signs on
   // empty patches are offers, and wait until the first session is over.
   const buildingOffersShown = heartwoodBuildingsEligible(mergeWorld) && !ftueStepId;
-  const heartwoodBuiltSlots = HEARTWOOD_BUILDINGS.filter((building) => heartwoodBuildingLevel(mergeWorld, building.id) > 0).map((building) => building.slotId);
-  const heartwoodBuildingAdornments = Object.fromEntries(HEARTWOOD_BUILDINGS.flatMap((building) => {
+  const heartwoodBuiltSlots = useMemo(() => HEARTWOOD_BUILDINGS.filter((building) => heartwoodBuildingLevel(mergeWorld, building.id) > 0).map((building) => building.slotId), [mergeWorld]);
+  const heartwoodBuildingAdornments = useMemo(() => Object.fromEntries(HEARTWOOD_BUILDINGS.flatMap((building) => {
     const level = heartwoodBuildingLevel(mergeWorld, building.id);
     // An unbuilt patch's sign is an offer: it only shows while the world is free to take it. Its first build keeps
     // the spot mounted, sign away, so the coins have somewhere to land and the building can swell up out of it.
@@ -3964,7 +3992,29 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       impactNonce={buildingImpact?.id === building.id ? buildingImpact.nonce : 0}
       charged={buildingFx?.id === building.id && buildingFx.phase !== 'payment'} spawning={spawning}
       onPress={wispLanternAllowed ? () => setBuildingPanelId(building.id) : undefined} />]];
-  }));
+  })), [buildingFx, buildingImpact, buildingOffersShown, buildingPanelId, mergeWorld, wispLanternAllowed]);
+
+  // Combat updates the mission in this screen. Keep unchanged map inputs stable
+  // so those updates don't reconcile the entire hex scene underneath the board.
+  const openHeartwood = useCallback(() => { setSelectedHeartwoodBed(undefined); setHeartwoodOpenToken(value => value + 1); }, []);
+  const selectHeartwoodBed = useCallback((slotId: MossproutGardenPlantSlotId) => { setSelectedHeartwoodBed(slotId); setHeartwoodOpenToken(value => value + 1); }, []);
+  const openAdventure = useCallback(() => setAdventureOpen(true), []);
+  const openWarmDelivery = useCallback(() => { setRouteCompanion('feastle'); setAdventureOpen(true); }, []);
+  const dismissCanvasUpgrade = useCallback(() => upgradeDismiss.current?.(), []);
+  const lanternPostAdornment = useMemo(() => SHARED_ADVENTURE_ENABLED && kingdomGoal?.introducedAt
+    ? <LanternPost progress={mergeWorld.sharedAdventure} onPress={sharedAdventureAllowed ? openAdventure : undefined} /> : null,
+  [kingdomGoal?.introducedAt, mergeWorld.sharedAdventure, openAdventure, sharedAdventureAllowed]);
+  const hearthAdornment = useMemo(() => sharedAdventureAllowed && mergeWorld.sharedAdventure?.completedAt
+    ? <KatchaButton label="🍲 Warm delivery" onPress={openWarmDelivery} /> : null,
+  [mergeWorld.sharedAdventure?.completedAt, openWarmDelivery, sharedAdventureAllowed]);
+  const gardenEventAdornment = useMemo(() => worldEventsAllowed ? <View style={{ gap: 8 }}>
+    {treeStage !== 'dormant' ? <KatchaButton label={`🌱 Garden supplies ${gardenSupplyStatus(mergeWorld.sharedAdventure?.gardenSupply, eventClock).stored}/2`} onPress={() => setHeartwoodOpenToken(value => value + 1)} /> : null}
+    <GardenEventAdornment world={mergeWorld} onExplore={eventActions.length ? () => { void openWorldEvent(eventActions[0]); } : undefined} />
+  </View> : null, [eventActions, eventClock, mergeWorld, openWorldEvent, treeStage, worldEventsAllowed]);
+  const canvasUpgradeOffers = useMemo(() => screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingEggOpen && !ordinaryUpgradeRun && !upgradeHandoffPending
+    ? kingdomGoalGuideActive ? visibleUpgradeOffers.filter((offer) => offer.id === `nature:${goalIslandId}`) : visibleUpgradeOffers
+    : NO_UPGRADE_OFFERS,
+  [activeInteractionResidentId, goalIslandId, interactionCreatureId, kingdomGoalGuideActive, ordinaryUpgradeRun, screenFocused, stepplingEggOpen, upgradeHandoffPending, visibleUpgradeOffers]);
 
   useEffect(() => {
     if (!wispLanternAllowed || !lanternEligible(mergeWorld) || wispAutoPresented.current || eventSelection || wakeHandoffCampaign || revealedFriendCardId || heartwoodOpenToken > 0) return;
@@ -4013,21 +4063,18 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       </View> : BATTLE_SCENE_ENABLED && !battleReward && battleSession?.status === 'returned' && battleSession.result?.kind === 'left' && battleSession.source.kind !== 'island' && (firstBattleStepActive || stepplingMissionActive || trailStoneIndex >= 0) ? <View style={{ position: 'absolute', bottom: 40, left: 24, right: 24, zIndex: 200 }}>
         <KatchaButton label="Resume battle" onPress={() => openDedicatedBattle(true)} />
       </View> : null}
-      <KingdomHexCanvas
-        onHeartwoodPress={sharedAdventureAllowed ? () => { setSelectedHeartwoodBed(undefined); setHeartwoodOpenToken(value => value + 1); } : undefined}
+      <CombatProfileBoundary id="world-map"><KingdomHexCanvas
+        onHeartwoodPress={sharedAdventureAllowed ? openHeartwood : undefined}
         wispLanternAdornment={wispLanternAdornment}
         heartwoodBuildingAdornments={heartwoodBuildingAdornments}
         heartwoodBuildingFx={buildingFx}
         heartwoodBuiltSlots={heartwoodBuiltSlots}
         wispLanternPlanted={Boolean(mergeWorld.wispLanternPlacement)}
         onPlantWispLantern={wispPlanting ? plantWispLantern : undefined}
-        onSelectHeartwoodBed={sharedAdventureAllowed ? (slotId) => { setSelectedHeartwoodBed(slotId); setHeartwoodOpenToken(value => value + 1); } : undefined}
-        lanternPostAdornment={SHARED_ADVENTURE_ENABLED && kingdomGoal?.introducedAt ? <LanternPost progress={mergeWorld.sharedAdventure} onPress={sharedAdventureAllowed ? () => setAdventureOpen(true) : undefined} /> : null}
-        hearthAdornment={sharedAdventureAllowed && mergeWorld.sharedAdventure?.completedAt ? <KatchaButton label="🍲 Warm delivery" onPress={() => { setRouteCompanion('feastle'); setAdventureOpen(true); }} /> : null}
-        gardenEventAdornment={worldEventsAllowed ? <View style={{ gap: 8 }}>
-          {treeStage !== 'dormant' ? <KatchaButton label={`🌱 Garden supplies ${gardenSupplyStatus(mergeWorld.sharedAdventure?.gardenSupply, eventClock).stored}/2`} onPress={() => setHeartwoodOpenToken(value => value + 1)} /> : null}
-          <GardenEventAdornment world={mergeWorld} onExplore={eventActions.length ? () => { void openWorldEvent(eventActions[0]); } : undefined} />
-        </View> : null}
+        onSelectHeartwoodBed={sharedAdventureAllowed ? selectHeartwoodBed : undefined}
+        lanternPostAdornment={lanternPostAdornment}
+        hearthAdornment={hearthAdornment}
+        gardenEventAdornment={gardenEventAdornment}
         background={background}
         cameraLocked={lanternSurfaceOpen || eventBoardActive || ftueLocksCamera(ftueStep) || glowDiscoveryLocksCamera(glowRun) || stepplingEncounter.open || stepplingLesson.active || kingdomGoalGuideActive || Boolean(selectedUpgrade) || Boolean(upgradeStageSubject) || Boolean(requiredUpgradeStory) || restorationBoardVisible || rushSheetOpen || Boolean(rushSpec) || islandEncounterActive
           // The Café holds the camera on its tile: nothing behind the board moves it.
@@ -4065,6 +4112,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         mossproutGarden={mossproutGardenScene}
         onCameraSnapshotChange={onCameraSnapshotChange}
         onCameraMotionChange={handleCameraMotionChange}
+        battleTileCaptureRef={battleTileCaptureRef}
         onInteractionExitFocusComplete={closeResidentInteraction}
         onOpenGarden={ftueStepId ? undefined : openGarden}
         onGardenPlotTargetChange={setGardenPlotNode}
@@ -4076,11 +4124,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         openingWeatherActive={homeVeil === 'veiled' && !missionBoardDocked}
         sleepingMarkersInert={Boolean(ftueStepId)}
         onTileUpgradeOfferPress={wispPlanting ? plantWispLantern : beginFirstSeedPlanting}
-        upgradeOffers={screenFocused && !activeInteractionResidentId && !interactionCreatureId && !stepplingEggOpen && !ordinaryUpgradeRun && !upgradeHandoffPending
-          ? kingdomGoalGuideActive ? visibleUpgradeOffers.filter((offer) => offer.id === `nature:${goalIslandId}`) : visibleUpgradeOffers
-          : NO_UPGRADE_OFFERS}
+        upgradeOffers={canvasUpgradeOffers}
         selectedUpgradeOffer={selectedUpgrade}
-        onDismissUpgrade={() => upgradeDismiss.current?.()}
+        onDismissUpgrade={dismissCanvasUpgrade}
         upgradePanelOpen={upgradePanelOpen || Boolean(upgradeStageSubject)}
         upgradeStageSubject={sharedUpgrade ? null : upgradeStageSubject}
         onUpgradeStageArt={setUpgradeStageArt}
@@ -4124,7 +4170,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         focusedMossproutWorld
         worldEggTargetRef={worldEggTargetRef}
         worldSubjectPresentation={openingLiftCameraHeld ? null : worldSubjectPresentation}
-      />
+      /></CombatProfileBoundary>
       {/* The companion journal is a life-input feature: off with them (`constants/product-scope.ts`). */}
       {LIFE_INPUT_ENABLED && !activeInteractionResidentId && !interactionCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && (!ftueStepId || ftueStepId === 'companion.meditating') ? <View style={{ position: 'absolute', left: 16, bottom: Math.max(insets.bottom, 12) + 10, zIndex: 30 }}>
         <CompanionJournalButton familyId="mossprout" />
@@ -4673,7 +4719,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       </View> : null}
       {/* The wisps under the Glow flights. Both own their state: a landing or a strike re-renders them, never this screen. */}
       <MissionWisps target={wispTarget} glow={openingGlow.store} screenRef={screenRef} />
-      <MissionGlowLayer store={openingGlow.store} screenRef={screenRef} />
+      <MissionGlowLayer store={openingGlow.store} screenRef={screenRef} retainPool={openingBoardActive || stepplingMissionActive || journeyMissionActive || islandEncounterActive} />
+      <CombatProfilePanel active={screenFocused && !BATTLE_SCENE_ENABLED && (openingBoardActive || stepplingMissionActive || journeyMissionActive || islandEncounterActive)} label="embedded-combat" />
       {detailCreatureId ? (() => {
         const slot = visibleCompanionSlots.find((candidate) => candidate.kind === 'owned' && candidate.creature.creatureId === detailCreatureId);
         if (!slot || slot.kind !== 'owned') return null;

@@ -17,9 +17,14 @@ function fixture() {
   const store = createSelectorStore({ state: world as MergeWorldState | null });
   const Context = createContext<typeof store | null>(null);
   let selectorCalls = 0;
+  let boardRenders = 0;
   const module = loadNativeModule('components/katchadeck/games/merge-play-surface.tsx', {
     'react-native': nativeViews,
-    './feastle-persistent-merge-board': { FeastlePersistentMergeBoard: host('Board') },
+    '@/features/encounter/combat-profile': { CombatProfileBoundary: ({ children }: React.PropsWithChildren) => children },
+    './feastle-persistent-merge-board': { FeastlePersistentMergeBoard: (props: Record<string, unknown>) => {
+      boardRenders++;
+      return React.createElement(host('Board'), props);
+    } },
     './merge-cell-inspector': { MergeCellInspector: () => null },
     './merge-order-rail': { MergeOrderRail: () => null },
     '@/features/merge-world/merge-world-provider': {
@@ -43,7 +48,7 @@ function fixture() {
     const stage = tree.root.findAllByType(host('View')).find((view) => view.props.onLayout && view.props.pointerEvents === undefined)!;
     await act(async () => stage.props.onLayout({ nativeEvent: { layout: { height: 500, width: 400 } } }));
   };
-  return { Surface, Context, props, store, mission, world, layout, selectorCalls: () => selectorCalls };
+  return { Surface, Context, props, store, mission, world, layout, selectorCalls: () => selectorCalls, boardRenders: () => boardRenders };
 }
 
 test('combat mounts and updates its supplied board after layout without a world provider', async () => {
@@ -56,6 +61,26 @@ test('combat mounts and updates its supplied board after layout without a world 
   await act(async () => tree!.update(<f.Surface {...f.props} boardState={moved} />));
   assert.equal(tree!.root.findByType(host('Board')).props.state, moved);
   assert.equal(f.selectorCalls(), 0, 'an independent board never subscribes to the world');
+  await act(async () => tree!.unmount());
+});
+
+test('parent UI updates skip the board with equivalent gates, but changed tutorial gates and commands stay live', async () => {
+  const f = fixture();
+  let tree: ReactTestRenderer;
+  await act(async () => { tree = create(<f.Surface {...f.props} boardState={f.mission} boardInteractionGate={{ kind: 'open' }} />); });
+  await f.layout(tree!);
+  const before = f.boardRenders();
+  for (let i = 0; i < 12; i++) {
+    await act(async () => tree!.update(<f.Surface {...f.props} boardState={f.mission} boardInteractionGate={{ kind: 'open' }} trayEntries={[]} onOpenChat={() => {}} />));
+  }
+  assert.equal(f.boardRenders(), before, 'cosmetic parent updates must not render the board');
+  await act(async () => tree!.update(<f.Surface {...f.props} boardState={f.mission} boardInteractionGate={{ kind: 'locked' }} />));
+  assert.equal(f.boardRenders(), before + 1);
+  assert.equal(tree!.root.findByType(host('Board')).props.interactionGate.kind, 'locked');
+  const onCommand = () => null;
+  await act(async () => tree!.update(<f.Surface {...f.props} boardState={f.mission} boardInteractionGate={{ kind: 'locked' }} onCommand={onCommand} />));
+  assert.equal(f.boardRenders(), before + 2);
+  assert.equal(tree!.root.findByType(host('Board')).props.onCommand, onCommand);
   await act(async () => tree!.unmount());
 });
 

@@ -231,7 +231,7 @@ test('the Kingdom wires the Last Clearing: the cold open, the first battle docke
   assert.match(screen, /\(ftueRun\.stepId === routeFtueStepId \|\| \(ftueRun\.stepId === OPENING_MIST_LIFT_STEP_ID && routeFtueStepId === OPENING_MIST_CLEAR_STEP_ID\)\)/, 'the opening run survives the frame between the store and the route');
   assert.match(dock, /const finale = openingMistProgress\(runRef\.current\) \+ 1 >= OPENING_MERGE_REQUIRED;[\s\S]*?setHiddenItemIds[\s\S]*?onFinale\?\.\(from, event\.resultDefinitionId\);/, 'the last merge’s item leaves the board for the mist');
   // The flights live in the Glow's own store: the layer that draws them subscribes, the screen does not.
-  assert.match(screen, /<MissionGlowLayer store=\{openingGlow\.store\} screenRef=\{screenRef\} \/>/, 'landed Glow bursts where it hits the mist');
+  assert.match(screen, /<MissionGlowLayer store=\{openingGlow\.store\} screenRef=\{screenRef\} retainPool=\{openingBoardActive \|\| stepplingMissionActive \|\| journeyMissionActive \|\| islandEncounterActive\} \/>/, 'landed Glow bursts where it hits the mist, retaining its pool during combat');
   assert.match(dock, /export const MissionGlowLayer = memo\(function MissionGlowLayer[\s\S]*?useSyncExternalStore\(store\.subscribe, store\.getFlights, store\.getFlights\);[\s\S]*?<OpeningGlowLayer flights=\{flights\} impacts=\{impacts\} onArrive=\{store\.arrive\} onImpactDone=\{store\.impactDone\}/);
   assert.match(dock, /const finale = useSyncExternalStore\(store\.subscribe, store\.getFinale, store\.getFinale\);/, 'the screen subscribes to the finale alone');
   assert.match(dock, /if \(next\.flights !== state\.flights \|\| next\.impacts !== state\.impacts\) flightsSnapshot = /, 'snapshots keep their identity unless their own fields moved');
@@ -275,7 +275,7 @@ test('the Kingdom wires the Last Clearing: the cold open, the first battle docke
   assert.match(screen, /state=\{battle\.store\.state\} send=\{battle\.store\.send\}/, 'the dock plays the battle’s own board, not the provider');
   assert.doesNotMatch(dock, /useMergeWorldState|useMergeWorldActions/, 'the dock has no link to the persistent board');
   const surface = readFileSync('components/katchadeck/games/merge-play-surface.tsx', 'utf8');
-  assert.match(surface, /const state = override \?\? subscribed;/, 'the surface renders an explicit board over the provider one');
+  assert.match(surface, /if \(state === undefined\) return <SubscribedMergeBoard \{\.\.\.props\} \/>;/, 'only a board without an explicit state subscribes to the world provider');
   assert.match(route, /if \(stepId === 'world\.mist_open'\) \{\s*commitFtueAction\(\{ actionId: 'world\.look_closer'/);
   const tab = readFileSync('app/(tabs)/katchimeras.tsx', 'utf8');
   assert.match(tab, /const eggPresentationActive = mossproutFtueUsesEggStage\(ftueStep\?\.id\)/);

@@ -15,6 +15,7 @@
     "start": "npm run start --workspace=katchimeras --",
     "live-ops:studio": "node tooling/live-ops-studio/server.cjs",
     "start:dev-client": "npm run start:dev-client --workspace=katchimeras --",
+    "start:dev-client:debug": "npm run start:dev-client:debug --workspace=katchimeras --",
     "typecheck": "npm run typecheck --workspace=katchimeras && tsc --noEmit -p tsconfig.packages.json && npm run typecheck --workspace=egg-snap",
     "lint": "npm run lint --workspace=katchimeras && npm run lint:shared",
     "check": "npm run check:boundaries && npm run check --workspace=katchimeras && npm run test:packages",

@@ -70,6 +70,7 @@ export function nativeMotionHarness() {
   };
   return {
     animated,
+    activeAnimationCount: () => [...values].filter((value) => value.animation !== undefined).length,
     advance(ms: number) {
       now += ms;
       const callbacks: Motion[] = [];

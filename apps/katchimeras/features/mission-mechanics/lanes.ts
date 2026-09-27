@@ -89,20 +89,29 @@ export function lanesProgress(mechanic: LanesMechanic, state: LanesState) {
 export const lanesComplete = (mechanic: LanesMechanic, state: LanesState) => mechanic.wisps.every((_, index) => !laneAlive(mechanic, state, index));
 
 export function lanesViews(mechanic: LanesMechanic, state: LanesState): MissionWispView[] {
+  const shields = new Map<number, number>();
+  mechanic.wisps.forEach((wisp, index) => {
+    if (!wisp.shield || !laneArrived(mechanic, state, index) || !laneAlive(mechanic, state, index)) return;
+    const column = laneColumn(mechanic, state, index);
+    shields.set(column, (shields.get(column) ?? 0) + 1);
+  });
   return mechanic.wisps.map((wisp, index) => {
     const standing: Partial<LaneWispState> & { row: number; damage: number } = state.wisps[index] ?? { row: startRow(mechanic, index), damage: 0 };
     // A dasher mid-lunge drifts at its lunge's pace.
     const dashing = standing.dashUntil != null && state.clock < standing.dashUntil;
+    const column = laneColumn(mechanic, state, index);
+    const guarding = (shields.get(column - 1) ?? 0) + (shields.get(column) ?? 0) + (shields.get(column + 1) ?? 0)
+      - (wisp.shield && laneArrived(mechanic, state, index) && laneAlive(mechanic, state, index) ? 1 : 0);
     return {
       id: wisp.id, hp: wisp.hp, damage: Math.min(wisp.hp, standing.damage),
       // Not here yet: drawn as not standing, so it arrives (grows in) the moment it is.
       alive: laneArrived(mechanic, state, index) && standing.damage < wisp.hp,
-      placement: { kind: 'lane', column: laneColumn(mechanic, state, index), row: standing.row },
+      placement: { kind: 'lane', column, row: standing.row },
       enterDelayMs: 0,
       drift: laneArrived(mechanic, state, index) && standing.damage < wisp.hp && state.breached == null && (standing.holdUntil ?? 0) <= state.clock ? (dashing ? Math.max(1, wisp.dashRows ?? 2) / LANE_DASH_MS : 1 / Math.max(250, wisp.stepMs)) : 0,
       ...(wisp.look ? { look: wisp.look } : {}),
       // A bulwark beside it (and standing) shields it: its ring shows it.
-      ...(mechanic.wisps.some((other, j) => j !== index && other.shield && laneArrived(mechanic, state, j) && laneAlive(mechanic, state, j) && Math.abs(laneColumn(mechanic, state, j) - laneColumn(mechanic, state, index)) <= 1) ? { guarded: true } : {}),
+      ...(guarding > 0 ? { guarded: true } : {}),
     };
   });
 }

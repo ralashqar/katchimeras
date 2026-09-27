@@ -29,6 +29,8 @@ import Animated, {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { MergeBoardEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
+import { CombatProfileBoundary } from '@/features/encounter/combat-profile';
+import { useRetainedRenderSlots } from '@/hooks/use-retained-render-slots';
 import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightningLayer, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
 import { RECOIL_SQUASH_MS, spriteRecoil } from '@/components/katchadeck/games/sprite-recoil';
 import { canReuseSpawnSprites, createMergeBoardEffects, type MergeBoardEffectKind } from '@/utils/merge-world/board-effects';
@@ -42,7 +44,7 @@ import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import { mergeGeneratorArtCacheKey, mergeItemArtCacheKey, useMergeArtCache, type MergeArtCache } from '@/hooks/use-merge-art-cache';
 import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { beginCriticalInteractionWork } from '@/utils/critical-interaction';
-import { recordMergeRender } from '@/utils/merge-world/performance';
+import { measureMergeOperation, recordMergeRender } from '@/utils/merge-world/performance';
 import type { MergeBoardOccupant, MergeDreamMist, MergeWorldCommand, MergeWorldCommandResult, MergeWorldFailureReason, MergeWorldState } from '@/types/merge-world';
 import { mergeCellFeedbackForFailure, type MergeCellFeedbackTone } from '@/utils/merge-board-feedback';
 import { MERGE_MORPH_DURATION_MS, MERGE_MORPH_REDUCED_MOTION_DURATION_MS, MERGE_SPRITE_SURFACE_SCALE, SPAWN_MOTION_DURATION_MS, isMistMergeTransition, mergeMotionPiecewise, mergeSpriteMotionFrame, spawnSpriteMotionFrame, type MergeBoardMotionKind } from '@/utils/merge-board-motion';
@@ -291,6 +293,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     sprites: spritesFromState(initialState),
   }));
   const { busy, motions, presentation, sprites } = visualState;
+  const visibleSprites = useMemo(() => sprites.filter(sprite => visibleCellSet.has(sprite.cell) && !hiddenItemInstanceIds?.has(spriteId(sprite))), [hiddenItemInstanceIds, sprites, visibleCellSet]);
+  const spriteSlots = useRetainedRenderSlots(visibleSprites, spriteId);
   const presentationRef = useRef(presentation);
   const [initialSpriteDelays] = useState(() => new Map(
     animateEntrance
@@ -709,7 +713,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     }
 
     const command: MergeWorldCommand = { type: 'move', from: sprite.cell, to, now: gameNow() };
-    const predicted = onCommand(command);
+    const predicted = measureMergeOperation('board.onCommand', () => onCommand(command));
     if (!predicted) returnHome();
     if (!predicted) return;
     if (!predicted.changed) {
@@ -814,7 +818,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     const from = current.board.findIndex((cell) => cell.occupant?.kind === 'generator' && cell.occupant.generatorId === generatorId);
     const now = gameNow();
     const command: MergeWorldCommand = { type: 'tapGenerator', generatorId, now, seed: `${now}:${current.revision}:${generatorId}` };
-    const predicted = onCommand(command);
+    const predicted = measureMergeOperation('board.onCommand', () => onCommand(command));
     if (!predicted) return;
     if (from >= 0) onSelect(from);
     const to = predicted.spawnedCell;
@@ -1307,13 +1311,15 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
       {onHoverCell ? <HoverCellReporter hoverCell={hoverCell} sourceCell={activeSourceCell} onHoverCell={onHoverCell} /> : null}
     </View>
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      <MergeBoardEffectsLayer controller={boardEffects} activity={effectsActivity} geometry={geometry} reduceMotion={reduceMotion} size={cellSize} />
+      <CombatProfileBoundary id="board-effects"><MergeBoardEffectsLayer controller={boardEffects} activity={effectsActivity} geometry={geometry} reduceMotion={reduceMotion} size={cellSize} /></CombatProfileBoundary>
       <MistLightningLayer bolts={revealBolts} origin={screenOrigin.current} reduceMotion={reduceMotion} onDone={retireRevealBolt} />
-      {sprites.filter((sprite) => visibleCellSet.has(sprite.cell) && !hiddenItemInstanceIds?.has(spriteId(sprite))).map((sprite) => {
+      <CombatProfileBoundary id="board-sprites">{spriteSlots.map(({ key, item: sprite, active }) => {
         const frame = cellFrames[sprite.cell];
+        if (!frame) return null;
         const id = spriteId(sprite);
         const matchHint = sprite.occupant.kind === 'item' ? matchHintForCell(sprite.cell) : null;
         return <PersistentSprite
+          active={active}
           baseX={frame.center.x - cellSize / 2}
           baseY={frame.center.y - cellSize / 2}
           cellSize={cellSize}
@@ -1326,8 +1332,8 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           grabX={grabX}
           grabY={grabY}
           instanceId={id}
-          key={id}
-          motion={motions[id]}
+          key={key}
+          motion={active ? motions[id] : undefined}
           matchHint={matchHint}
           cachedSource={sprite.occupant.kind === 'item'
             ? artCache.get(mergeItemArtCacheKey(sprite.occupant.definitionId))
@@ -1340,7 +1346,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
           projectionInset={inset}
           reduceMotion={reduceMotion}
         />;
-      })}
+      })}</CombatProfileBoundary>
     </View>
     {selectedCell != null && presentation.board[selectedCell] && (presentation.board[selectedCell].occupant || presentation.board[selectedCell].locked)
       ? <SelectedCellCorners cell={selectedCell} dragPhase={dragPhase} geometry={geometry} reduceMotion={reduceMotion} staticFrame={presentation.board[selectedCell].locked} />
@@ -1372,6 +1378,7 @@ const BoardCell = memo(function BoardCell({ accessibilityActionLabel, accessibil
   mistMotion: boolean;
   onActivate: (cell: number) => void;
 }) {
+  recordMergeRender('board-cell');
   const checkerboardInset = Math.min(width, height) * (5 / 128);
   const checkerboardRadius = Math.max(6, Math.min(width, height) * (14 / 128));
   const rootbound = mist?.kind === 'rootbound_echo' ? mist : null;
@@ -1679,7 +1686,8 @@ function MergeMatchHint({ active, children, offsetX, offsetY }: { active: boolea
   return <Animated.View style={[styles.matchHint, style]}>{children}</Animated.View>;
 }
 
-const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, generatorLevel, grabX, grabY, matchHint, motion, cachedSource, projection, projectionGridHeight, projectionInset, reduceMotion, onComplete, occupant }: {
+const PersistentSprite = memo(function PersistentSprite({ active, instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, generatorLevel, grabX, grabY, matchHint, motion, cachedSource, projection, projectionGridHeight, projectionInset, reduceMotion, onComplete, occupant }: {
+  active: boolean;
   instanceId: string;
   baseX: number;
   baseY: number;
@@ -1704,6 +1712,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   occupant: MergeBoardOccupant;
 }) {
   recordMergeRender('sprite');
+  useEffect(() => { recordMergeRender('sprite-mount'); return () => recordMergeRender('sprite-unmount'); }, []);
   const x = useSharedValue(baseX);
   const y = useSharedValue(baseY);
   const targetX = useSharedValue(baseX);
@@ -1719,14 +1728,15 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   const entranceProgress = useSharedValue(entranceDelay == null ? 1 : 0);
   const matchHintProgress = useSharedValue(0);
   const entranceReduceMotion = useRef(reduceMotion).current;
-  const matchHintActive = matchHint != null && !motion;
+  const matchHintActive = active && matchHint != null && !motion;
   const matchHintOffsetX = matchHint?.x ?? 0;
   const matchHintOffsetY = matchHint?.y ?? 0;
   const artBaseSize = occupant.kind === 'generator' ? cellSize : cellSize - 4;
   // Lanes: when this piece shoots, it squashes down and fattens, then stretches up as the shot leaves its mouth, and
   // springs back (`spriteRecoil`). Anchored at its soil, so it never lifts off the cell.
   const recoil = useSharedValue(0);
-  useEffect(() => spriteRecoil.subscribe(instanceId, () => {
+  useLayoutEffect(() => { previousMotionToken.current = null; cancelAnimation(recoil); recoil.value = 0; }, [instanceId, recoil]);
+  useEffect(() => active ? spriteRecoil.subscribe(instanceId, () => {
     if (reduceMotion) return;
     cancelAnimation(recoil);
     recoil.value = withSequence(
@@ -1734,16 +1744,16 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
       withTiming(-1, { duration: 90, easing: Easing.out(Easing.quad) }),
       withSpring(0, { damping: 9, stiffness: 260, mass: 0.5 }),
     );
-  }), [instanceId, recoil, reduceMotion]);
+  }) : undefined, [active, instanceId, recoil, reduceMotion]);
 
   useEffect(() => {
-    if (entranceDelay == null) return;
+    if (entranceDelay == null || !active) { entranceProgress.value = 1; return; }
     entranceProgress.value = 0;
     entranceProgress.value = entranceReduceMotion
       ? withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) })
       : withDelay(entranceDelay, withSpring(1, { damping: 13, mass: 0.58, stiffness: 240 }));
     return () => cancelAnimation(entranceProgress);
-  }, [entranceDelay, entranceProgress, entranceReduceMotion]);
+  }, [active, entranceDelay, entranceProgress, entranceReduceMotion]);
 
   useEffect(() => {
     cancelAnimation(matchHintProgress);
@@ -1757,7 +1767,7 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   }, [matchHintActive, matchHintProgress]);
 
   useAnimatedReaction(
-    () => activeDragId.value === instanceId ? dragEpoch.value : -1,
+    () => active && activeDragId.value === instanceId ? dragEpoch.value : -1,
     (epoch) => {
       if (epoch < 0 || capturedDragEpoch.value === epoch) return;
       const p = progress.value;
@@ -1790,11 +1800,11 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
       spriteOpacity.value = withTiming(1, { duration: 70 });
       scale.value = withSpring(1.035, { damping: 34, stiffness: 420, mass: 0.7 });
     },
-    [cellSize, instanceId, reduceMotion],
+    [active, cellSize, instanceId, reduceMotion],
   );
 
   useAnimatedReaction(
-    () => activeDragId.value === instanceId ? dragPhase.value : 0,
+    () => active && activeDragId.value === instanceId ? dragPhase.value : 0,
     (phase, previousPhase) => {
       if (phase !== 2 || previousPhase === 2) return;
       x.value = grabX.value + dragTranslationX.value;
@@ -1802,10 +1812,11 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
       animating.value = 0;
       scale.value = withTiming(1, { duration: 80 });
     },
-    [instanceId],
+    [active, instanceId],
   );
 
   useLayoutEffect(() => {
+    if (!active) { previousMotionToken.current = null; return; }
     if (!motion || previousMotionToken.current === motion.token) return;
     previousMotionToken.current = motion.token;
     scheduleOnUI(() => {
@@ -1848,13 +1859,13 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
         progress.value = withSpring(1, motion.kind === 'swap' ? SWAP_SPRING : MOVE_SPRING, finish);
       }
     });
-  }, [activeDragId, activeMotionKind, animating, arcHeight, baseX, baseY, dragPhase, instanceId, motion, onComplete, progress, reduceMotion, scale, spriteOpacity, targetX, targetY, x, y]);
+  }, [active, activeDragId, activeMotionKind, animating, arcHeight, baseX, baseY, dragPhase, instanceId, motion, onComplete, progress, reduceMotion, scale, spriteOpacity, targetX, targetY, x, y]);
 
   useLayoutEffect(() => {
-    if (motion) return;
+    if (active && motion) return;
     scheduleOnUI(() => {
       'worklet';
-      if (activeDragId.value === instanceId && dragPhase.value !== 0) return;
+      if (active && activeDragId.value === instanceId && dragPhase.value !== 0) return;
       cancelAnimation(progress);
       cancelAnimation(scale);
       cancelAnimation(spriteOpacity);
@@ -1867,17 +1878,25 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
       spriteOpacity.value = 1;
       scale.value = 1;
     });
-  }, [activeDragId, activeMotionKind, animating, baseX, baseY, dragPhase, instanceId, motion, progress, scale, spriteOpacity, targetX, targetY, x, y]);
+  }, [active, activeDragId, activeMotionKind, animating, baseX, baseY, dragPhase, instanceId, motion, progress, scale, spriteOpacity, targetX, targetY, x, y]);
+
+  useEffect(() => {
+    if (active) return;
+    cancelAnimation(recoil);
+    cancelAnimation(entranceProgress);
+    cancelAnimation(matchHintProgress);
+  }, [active, entranceProgress, matchHintProgress, recoil]);
 
   useEffect(() => () => {
     cancelAnimation(entranceProgress);
     cancelAnimation(matchHintProgress);
     cancelAnimation(progress);
+    cancelAnimation(recoil);
     cancelAnimation(scale);
     cancelAnimation(spriteOpacity);
     cancelAnimation(x);
     cancelAnimation(y);
-  }, [entranceProgress, matchHintProgress, progress, scale, spriteOpacity, x, y]);
+  }, [entranceProgress, matchHintProgress, progress, recoil, scale, spriteOpacity, x, y]);
 
   // Compute the authored frame once per moving sprite. Scale and position
   // share it rather than each allocating/calculating the entire frame.
@@ -1935,9 +1954,9 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
   // drag subscription in this cheap selector: unchanged null does not notify
   // the expensive position/style mapper for every stationary sprite.
   const dragPosition = useDerivedValue(() => {
-    if (activeDragId.value !== instanceId || dragPhase.value === 0) return null;
+    if (!active || activeDragId.value !== instanceId || dragPhase.value === 0) return null;
     return { x: grabX.value + dragTranslationX.value, y: grabY.value + dragTranslationY.value };
-  }, [activeDragId, dragPhase, dragTranslationX, dragTranslationY, grabX, grabY, instanceId]);
+  }, [active, activeDragId, dragPhase, dragTranslationX, dragTranslationY, grabX, grabY, instanceId]);
 
   const animatedStyle = useAnimatedStyle(() => {
     const p = progress.value;
@@ -1966,28 +1985,31 @@ const PersistentSprite = memo(function PersistentSprite({ instanceId, baseX, bas
     };
   }, [animating, arcHeight, authoredFrame, cellSize, dragPosition, entranceProgress, matchHintOffsetX, matchHintOffsetY, matchHintProgress, progress, projection, spriteOpacity, targetX, targetY, visualScale, x, y]);
 
-  return <Animated.View pointerEvents="none" style={[styles.sprite, { height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
+  return <Animated.View pointerEvents="none" style={[styles.sprite, { display: active ? 'flex' : 'none', height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
     <Animated.View pointerEvents="none" style={[styles.spriteArtSurface, { height: nativeArtSize, width: nativeArtSize, left: (cellSize - nativeArtSize) / 2, top: (cellSize - nativeArtSize) / 2 }, artLayoutStyle]}>
       {occupant.kind === 'generator'
-        ? <PersistentGeneratorArt cachedSource={cachedSource} fill generatorId={occupant.generatorId} level={generatorLevel} size={nativeArtSize} />
+        ? <PersistentGeneratorArt active={active} cachedSource={cachedSource} fill generatorId={occupant.generatorId} level={generatorLevel} size={nativeArtSize} />
         : <PersistentMergeItemArt cachedSource={cachedSource} definitionId={occupant.definitionId} fill size={nativeArtSize} />}
     </Animated.View>
   </Animated.View>;
 });
 
-function PersistentGeneratorArt({ cachedSource, fill = false, generatorId, level, size }: { cachedSource?: ImageRef; fill?: boolean; generatorId: string; level: number; size: number }) {
+function PersistentGeneratorArt({ active, cachedSource, fill = false, generatorId, level, size }: { active: boolean; cachedSource?: ImageRef; fill?: boolean; generatorId: string; level: number; size: number }) {
   const art = mergeWorldGeneratorArt(generatorId, { level });
   const usesProgressionArt = (generatorId === 'wild-garden' && level > 1) || generatorId === 'memory-nursery';
   const source = usesProgressionArt ? art : cachedSource ?? art;
   return <View style={[styles.generatorSprite, fill ? StyleSheet.absoluteFillObject : { height: size, width: size }]}>
-    <GeneratorSparkles size={size} />
+    <GeneratorSparkles active={active} size={size} />
     {source ? <Image accessibilityIgnoresInvertColors allowDownscaling={false} cachePolicy="memory" contentFit="contain" recyclingKey={`merge-generator-${generatorId}`} source={source} style={styles.generatorArt} transition={0} /> : null}
   </View>;
 }
 
-function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion, staticFrame }: { cell: number; dragPhase: SharedValue<number>; geometry: MergeBoardGeometry; reduceMotion: boolean; staticFrame: boolean }) {
+const SelectedCellCorners = memo(function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion, staticFrame }: { cell: number; dragPhase: SharedValue<number>; geometry: MergeBoardGeometry; reduceMotion: boolean; staticFrame: boolean }) {
+  recordMergeRender('board-selection');
   const pulse = useSharedValue(0);
-  const visibility = useSharedValue(dragPhase.value === 1 ? 0 : 1);
+  // Reading a shared value here synchronously waits for the UI thread on every
+  // React render. Initialize invisibly; the reaction owns visibility on the UI.
+  const visibility = useSharedValue(0);
   const dropScale = useSharedValue(1);
   const frame = mergeCellFrame(geometry, cell);
   useEffect(() => {
@@ -2009,7 +2031,10 @@ function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion, staticFr
         dropScale.value = 1;
         return;
       }
-      if (phase === 1) {
+      if (previousPhase == null) {
+        visibility.value = phase === 1 ? 0 : 1;
+        dropScale.value = phase === 1 && !reduceMotion ? 0.82 : 1;
+      } else if (phase === 1) {
         cancelAnimation(visibility);
         cancelAnimation(dropScale);
         visibility.value = withTiming(0, { duration: reduceMotion ? 1 : 80, easing: Easing.out(Easing.quad) });
@@ -2051,19 +2076,19 @@ function SelectedCellCorners({ cell, dragPhase, geometry, reduceMotion, staticFr
       transition={0}
     />
   </Animated.View>;
-}
+});
 
 // One rising sparkle at a time, cycling through irregular launch lanes.
 const GENERATOR_SPARKLE_LANES = [0.12, 0.68, 0.35, 0.79, 0.22, 0.55, 0.43, 0.72] as const;
 const GENERATOR_SPARKLE_CYCLE_MS = 700;
 
-function GeneratorSparkles({ size }: { size: number }) {
+function GeneratorSparkles({ active, size }: { active: boolean; size: number }) {
   const foreground = useAppForeground();
   const reduceMotion = useReducedMotion();
   const progress = useSharedValue(0);
   useEffect(() => {
     cancelAnimation(progress);
-    if (!foreground || reduceMotion) {
+    if (!active || !foreground || reduceMotion) {
       progress.value = 0.46;
       return;
     }
@@ -2073,7 +2098,7 @@ function GeneratorSparkles({ size }: { size: number }) {
       easing: Easing.linear,
     }), -1, false);
     return () => cancelAnimation(progress);
-  }, [foreground, progress, reduceMotion]);
+  }, [active, foreground, progress, reduceMotion]);
   const sparkleStyle = useAnimatedStyle(() => {
     const wholeCycle = Math.floor(progress.value);
     const cycle = wholeCycle % GENERATOR_SPARKLE_LANES.length;

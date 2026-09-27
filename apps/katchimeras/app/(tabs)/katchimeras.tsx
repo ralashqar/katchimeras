@@ -1,4 +1,5 @@
 import { useCompanionCameraCover } from '@/hooks/use-companion-camera-cover';
+import { CombatProfileBoundary } from '@/features/encounter/combat-profile';
 import { KatchimeraRosterRouteScreen, type KatchimeraWorldSession } from '@/components/katchadeck/roster/katchimera-roster-route-screen';
 import { KatchimeraCompanionRouteScreen } from '@/components/katchadeck/world/katchimera-companion-route-screen';
 import { MossproutEggFtueSurface } from '@/components/katchadeck/world/mossprout-egg-ftue-surface';
@@ -167,14 +168,14 @@ export default function KatchimerasScreen() {
   const worldInteractionActive = eggPresentationActive || havenHostedCompanionActive;
   return (
     <View style={styles.routeHost}>
-      <KatchimeraRosterRouteScreen
+      <CombatProfileBoundary id="world-host"><KatchimeraRosterRouteScreen
         interactionRequest={requestedWorldInteraction}
         onInteractionRequestConsumed={consumeWorldInteractionRequest}
         onWorldSessionChange={handleWorldSessionChange}
         worldEggTargetRef={worldEggTargetRef}
         worldSession={worldSession}
         worldSubjectPresentation={presentedWorldSubject}
-      />
+      /></CombatProfileBoundary>
       {worldInteractionActive ? (
         <View style={styles.worldInteractionLayer}>
           <MossproutOpeningSurface

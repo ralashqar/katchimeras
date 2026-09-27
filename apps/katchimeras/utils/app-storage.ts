@@ -1,6 +1,7 @@
 import { gameClock } from '@/utils/game-clock';
 import 'expo-sqlite/localStorage/install';
 import Storage from 'expo-sqlite/kv-store';
+import { measureMergeOperation } from '@/utils/merge-world/performance';
 
 function getStorage() {
   return globalThis.localStorage ?? null;
@@ -97,7 +98,8 @@ export function setStoredJson<T>(key: string, value: T) {
 }
 
 export async function setStoredJsonAsync<T>(key: string, value: T) {
-  await Storage.setItemAsync(key, JSON.stringify(value));
+  const serialized = measureMergeOperation('storage.serialize', () => JSON.stringify(value));
+  await Storage.setItemAsync(key, serialized);
 }
 
 export function setStoredRaw(key: string, value: string) {

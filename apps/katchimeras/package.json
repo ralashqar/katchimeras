@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "start:dev-client": "expo start --dev-client",
+    "start:dev-client": "node scripts/start-dev-client.cjs",
+    "start:dev-client:debug": "expo start --dev-client",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",

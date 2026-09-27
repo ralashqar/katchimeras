@@ -25,6 +25,7 @@ test('battle waits for readiness, pauses in background, and flushes a cleared bo
   }
   const module = loadNativeModule('app/battle.tsx', {
     'react-native': { ...nativeViews, Text: host('Text'), BackHandler: { addEventListener: () => ({ remove() {} }) } },
+    '@/features/encounter/combat-profile': { CombatProfilePanel: () => null, CombatProfileBoundary: ({ children }: React.PropsWithChildren) => children },
     'expo-image': { Image: host('Image') },
     '@react-navigation/native': { useIsFocused: () => true },
     'expo-router': { useLocalSearchParams: () => ({ sessionId: 'fixture' }), useRouter: () => router },
@@ -46,6 +47,7 @@ test('battle waits for readiness, pauses in background, and flushes a cleared bo
     '@/constants/hatchable-companions/registry': { hatchableByCompanion() {} },
     '@/constants/region-friends': { regionFriendForMission() {} },
     '@/components/katchadeck/games/battle-guide': { BattleGuide: () => null },
+    '@/components/katchadeck/games/battle-tile': { BattleTile: host('BattleTile') },
     '@/features/encounter/battle-performance': { BattlePerformanceProbe: () => null },
     '@/components/katchadeck/games/combat-effects': { CombatEffectsProvider: Effects },
     '@/features/encounter/battle-art': { BattleArtContext: createContext(new Map()), useBattleArt: () => ({ ready: true, images: new Map() }) },
@@ -57,12 +59,17 @@ test('battle waits for readiness, pauses in background, and flushes a cleared bo
   assert.equal(dock().props.paused, true);
   await act(async () => {
     dock().props.onEntranceSettled();
-    dock().props.onBoardMetrics({});
+    dock().props.onBoardMetrics({ y: 500 });
     tree!.root.findByType(host('Image')).props.onLoad();
   });
   assert.equal(dock().props.paused, true, 'ready assets cannot start play behind the curtain');
   curtain = false;
   await act(async () => tree!.update(<Route />));
+  assert.equal(dock().props.paused, true, 'the selected tile must load before play');
+  const tile = tree!.root.findByType(host('BattleTile'));
+  assert.equal(tile.props.session, session);
+  assert.ok(tile.props.height > 0);
+  await act(async () => tile.props.onReady());
   assert.equal(dock().props.paused, false);
   foreground = false;
   await act(async () => tree!.update(<Route />));
