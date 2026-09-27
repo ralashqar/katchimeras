@@ -105,7 +105,8 @@ export type EncounterDockState = {
  * Katchimera's ability, spawners, Mist, the cache, a loss the player can
  * retry or push through.
  */
-export function useMistMission({ guided = true, active, mission, encounter: authored, owner, loadout, world, tileNode, boardMetrics, cameraSettled, glow, complete, onLeave, keepGoingCost, payKeepGoing, speechFor }: {
+export function useMistMission({ guided = true, initialAttempt = 1, active, mission, encounter: authored, owner, loadout, world, tileNode, boardMetrics, cameraSettled, glow, complete, onLeave, keepGoingCost, payKeepGoing, speechFor }: {
+  initialAttempt?: number;
   /** Whether the host draws the board's guidance (hand, spotlight). A board with none is free from the first move:
    * a first-merge lesson nobody can see would refuse every other touch. */
   guided?: boolean;
@@ -142,8 +143,13 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
   const window = useMemo(() => missionWindow(encounter?.rows ?? 4), [encounter?.rows]);
   const wispSlow = profile.wispSlow ?? 0;
   const host = useMemo(() => (encounter ? encounterMechanicHost(encounter, { wispSlow }) : played), [encounter, played, wispSlow]);
-  const [attempt, setAttempt] = useState(1);
-  useEffect(() => { setAttempt(1); }, [encounter?.id]);
+  const [attempt, setAttempt] = useState(initialAttempt);
+  const attemptEncounter = useRef(encounter?.id);
+  useEffect(() => {
+    if (attemptEncounter.current === encounter?.id) return;
+    attemptEncounter.current = encounter?.id;
+    setAttempt(1);
+  }, [encounter?.id]);
   const binding = useMemo(() => host ? { host, window, ...(encounter ? { encounter, loadout: effectiveLoadout, profile, attempt } : {}) } : null, [attempt, effectiveLoadout, encounter, host, profile, window]);
   const create = useCallback((now: number) => (encounter ? createEncounterState(encounter, owner!, now, profile) : createMissionState(played!.seed, owner!, now)), [encounter, owner, played, profile]);
   const runId = active && played && owner ? (encounter ? encounterRunId(encounter, attempt, effectiveLoadout) : played.id) : null;
@@ -241,7 +247,7 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     if (result?.effects?.length) setEffects(result.effects);
     return result;
   }, [store.send]);
-  const { openCache, useAbility, keepGoing } = store;
+  const { openCache, useAbility: activateAbility, keepGoing } = store;
   useEffect(() => {
     if (!active || !encounter || store.status !== 'stuck') return;
     const timer = setTimeout(() => { if (openCache().length) setCacheLine(true); }, CACHE_DELAY_MS);
@@ -339,13 +345,13 @@ export function useMistMission({ guided = true, active, mission, encounter: auth
     void payKeepGoing(`continue:${runId}:${continues}`).then((paid) => { if (paid) keepGoing(KEEP_GOING_RESOLVE); }).catch(() => undefined);
   }, [continues, keepGoing, payKeepGoing, runId]);
   const onUseAbility = useCallback((target: number | null, slot: 0 | 1 = 0) => {
-    const effects = useAbility(target, slot);
+    const effects = activateAbility(target, slot);
     const used = slot === 1 ? partnerAbility : ability;
     if (!effects || !used?.definition.callout) return;
     const who = slot === 1 ? partnerAbility?.companionId : effectiveLoadout?.companionId;
     const speaker = (who ? katchimeraSkinById.get(who)?.displayName : null) ?? used.definition.name;
     setAbilityCall({ speaker, text: used.definition.callout });
-  }, [ability, effectiveLoadout?.companionId, partnerAbility, useAbility]);
+  }, [ability, activateAbility, effectiveLoadout?.companionId, partnerAbility]);
   useEffect(() => {
     if (!abilityCall) return;
     const timer = setTimeout(() => setAbilityCall(null), ABILITY_CALL_MS);

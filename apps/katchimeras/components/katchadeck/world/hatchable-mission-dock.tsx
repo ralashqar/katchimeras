@@ -33,17 +33,20 @@ import type { MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
 import type { MissionMechanicState, MissionStrike } from '@/types/mission-mechanic';
 import { mergeCellCenter, mergeCellFrame } from '@/utils/merge-world/board-geometry';
 import { FriendSpeechBubble } from './friend-speech-bubble';
-import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightning, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
+import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightningLayer, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
 import { MistMissionDock, type GlowLandingSource, type OpeningGlowStore } from './kingdom-opening-merge-dock';
 import { laneWispPoint } from './corruption-wisp-layer';
 import { LANE_MISS_ROW, laneOf } from '@/features/mission-mechanics/lanes';
 import { RECOIL_SQUASH_MS, spriteRecoil } from '@/components/katchadeck/games/sprite-recoil';
+import { useAppForeground } from '@/hooks/use-app-foreground';
 
 /** Lanes: the round Glow seed a shooter plant fires, and where its mouth is (a fraction down its cell). */
 const GLOW_SEED_BULLET = require('@incubator/art-merge-world/items/glow-seed-bullet.webp');
 const LANE_MOUTH_Y = 0.24;
 
 type HatchableMissionDockProps = {
+  paused?: boolean;
+  strictReadiness?: boolean;
   /** Whose mission: the board's seed, bar, guidance and mechanic come from the definition (a friend's, or a journey tile's without a camera). */
   mission: Omit<HatchableMissionDefinition, 'camera'>;
   state: MergeWorldState;
@@ -132,7 +135,8 @@ const NextMistPulse = memo(function NextMistPulse({ reduceMotion }: { reduceMoti
   return <Animated.View pointerEvents="none" style={[styles.nextMist, style]} />;
 });
 
-export const HatchableMissionDock = memo(function HatchableMissionDock({ mission, state, send, merges, mechanicState, encounter, width, bottomInset, landings, onStrike, onFinale, onReveal, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: HatchableMissionDockProps) {
+export const HatchableMissionDock = memo(function HatchableMissionDock({ paused = false, strictReadiness = false, mission, state, send, merges, mechanicState, encounter, width, bottomInset, landings, onStrike, onFinale, onReveal, onBoardMetrics, onBlockedInteraction, onEntranceSettled }: HatchableMissionDockProps) {
+  const foreground = useAppForeground();
   const sessionRef = useRef<ReturnType<typeof createMergeBoardSession> | null>(null);
   if (!sessionRef.current) sessionRef.current = createMergeBoardSession();
   const sessionId = sessionRef.current.id;
@@ -164,6 +168,11 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
   // the settled board already holds its Mist: no render ever shows a cell cleared before its Glow has landed.
   type HeldMist = MergeWorldState['board'][number]['mist'];
   const heldRef = useRef<Record<number, HeldMist>>({});
+  const heldTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const timers = heldTimers.current;
+    return () => { timers.forEach(clearTimeout); timers.clear(); };
+  }, []);
   const [heldTick, setHeldTick] = useState(0);
   const heldMist = useMemo((): Readonly<Record<number, HeldMist>> | undefined => (Object.keys(heldRef.current).length ? { ...heldRef.current } : undefined),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -220,7 +229,8 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
       },
     }));
     setBolts((current) => [...current, ...made]);
-    setTimeout(() => release(all), HELD_MIST_SAFETY_MS);
+    const timer = setTimeout(() => { heldTimers.current.delete(timer); release(all); }, HELD_MIST_SAFETY_MS);
+    heldTimers.current.add(timer);
   }, []);
   const retireBolt = useCallback((id: number) => setBolts((current) => current.filter((bolt) => bolt.id !== id)), []);
   const dispatch = useCallback((command: MergeWorldCommand): MissionCommandResult | null => {
@@ -282,7 +292,7 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
   const laneTick = encounter?.tick ?? null;
   const laneTickRef = useRef(laneTick);
   laneTickRef.current = laneTick;
-  const lanesRunning = Boolean(laneTick) && entered && (encounter?.status === 'playing' || encounter?.status === 'stuck');
+  const lanesRunning = !paused && foreground && Boolean(laneTick) && entered && (encounter?.status === 'playing' || encounter?.status === 'stuck');
   useEffect(() => {
     if (!lanesRunning) return;
     let last = Date.now();
@@ -453,7 +463,7 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
     return { left: boardOffset.x + bounds.left, top: boardOffset.y + bounds.top, width: bounds.width, height: bounds.height };
   };
   const overlay = encounter ? <>
-    {bolts.map((bolt) => <MistLightning key={bolt.id} bolt={bolt} reduceMotion={reduceMotion} onDone={retireBolt} />)}
+    <MistLightningLayer bolts={bolts} origin={boardOffset && boardMetricsRef.current ? { x: boardMetricsRef.current.x - boardOffset.x, y: boardMetricsRef.current.y - boardOffset.y } : null} reduceMotion={reduceMotion} onDone={retireBolt} />
     {plans.flatMap((plan) => {
       const key = `plan:${plan.wisp}:${plan.kind}`;
       // A Drifter's next step: an arrow from where it is to the Mist it drifts into.
@@ -513,6 +523,7 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ mission
   </> : undefined;
 
   return <MistMissionDock
+    strictReadiness={strictReadiness}
     state={state} boardStep={boardStep} progress={progress.current} required={progress.total} barTitle={mission.barTitle}
     interactionKey={`${mission.id}:${boardStep?.id ?? 'free'}`} sessionId={sessionId} hiddenItemIds={hiddenItemIds}
     width={width} bottomInset={bottomInset} landings={landings}
@@ -571,4 +582,3 @@ const styles = StyleSheet.create({
   lossActions: { alignSelf: 'stretch', gap: 8 },
   lossFootnote: { height: 0 },
 });
-

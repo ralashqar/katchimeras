@@ -5,6 +5,11 @@ import Storage from 'expo-sqlite/kv-store';
 function getStorage() {
   return globalThis.localStorage ?? null;
 }
+const resetListeners = new Set<() => void>();
+export function onStorageReset(listener: () => void) {
+  resetListeners.add(listener);
+  return () => { resetListeners.delete(listener); };
+}
 
 /**
  * Writes held back for a moment. The localStorage adapter is synchronous SQLite: every write is
@@ -137,6 +142,7 @@ export function getStoredKeys(): string[] {
 // reset" to return to a genuinely fresh first-run. Does not touch native OS
 // permissions (camera / photos).
 export function clearAllStoredValues() {
+  resetListeners.forEach((listener) => listener());
   gameClock.setOffset(0);
   for (const pending of deferredWrites.values()) clearTimeout(pending.timer);
   deferredWrites.clear();

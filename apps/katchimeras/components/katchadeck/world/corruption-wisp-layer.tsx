@@ -1,12 +1,13 @@
+import { useCombatActive } from '@/components/katchadeck/games/combat-effects';
+import { useBattleQuality } from '@/features/encounter/battle-performance';
 import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { INTENT_WORDS } from '@/features/encounter/encounter-copy';
 import { usePulseAim } from '@/features/encounter/pulse-aim';
-import { DARK_WISP_LOOK_ART } from '@/constants/dark-wisp-look-art';
-import { isDarkWispLook } from '@/constants/dark-wisp-looks';
+import { useWispArt } from '@/features/encounter/battle-art';
 import { pulseTarget } from '@/features/mission-mechanics/dark-wisps';
 import { StyleSheet, Text, View, type View as ViewType } from 'react-native';
-import Animated, { cancelAnimation, Easing, FadeInDown, FadeOut, ZoomIn, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
+import Animated, { runOnUI, cancelAnimation, Easing, FadeInDown, FadeOut, ZoomIn, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, type SharedValue } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 
@@ -20,7 +21,6 @@ import { wispLineForFall, type CorruptionWispLines } from '@/features/onboarding
 import type { MissionMechanicLive, MissionMechanicState, MissionStrike, MissionWispView } from '@/types/mission-mechanic';
 import { mergeCellCenter, mergeCellFrame } from '@/utils/merge-world/board-geometry';
 
-const WISP_ART = require('@incubator/art-cutouts/corruption-wisp.png');
 const SOFT_GLOW = require('@incubator/art-characters/soft-glow.png');
 const RIM = '#A24BFF';
 const EMBER_LIGHT = '#C58BFF';
@@ -338,6 +338,25 @@ export function useCorruptionWisps(target: CorruptionWispTarget | null): Corrupt
 export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, screenRef }: { wisps: CorruptionWisps; screenRef: RefObject<ViewType | null> }) {
   const [origin, setOrigin] = useState<RewardFlightPoint>({ x: 0, y: 0 });
   const layout = wisps.layout;
+  const initialLiveIds = useRef(new Set(wisps.views.filter((view) => view.alive).map((view) => view.id)));
+  // Only live enemies and their short death tails own native views/worklets.
+  const [retained, setRetained] = useState<ReadonlySet<string>>(() => new Set(wisps.views.filter((view) => view.alive).map((view) => view.id)));
+  const retirements = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const present = new Set(wisps.views.filter((view) => view.alive).map((view) => view.id));
+    setRetained((current) => {
+      const added = [...present].filter((id) => !current.has(id));
+      return added.length ? new Set([...current, ...added]) : current;
+    });
+    for (const id of present) { const timer = retirements.current.get(id); if (timer) clearTimeout(timer); retirements.current.delete(id); }
+    for (const id of retained) if (!present.has(id) && !retirements.current.has(id)) {
+      retirements.current.set(id, setTimeout(() => {
+        retirements.current.delete(id);
+        setRetained((current) => { const next = new Set(current); next.delete(id); return next; });
+      }, 1000));
+    }
+  }, [retained, wisps.views]);
+  useEffect(() => { const timers = retirements.current; return () => { timers.forEach(clearTimeout); timers.clear(); }; }, []);
   // Measured again only when the frame the wisps are laid out in moves, not on every place update (a drifting Lanes
   // wisp updates several times a second), and a measurement that has not changed does not render the layer again.
   const frameX = layout?.frame.x ?? 0;
@@ -354,8 +373,8 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
   // Territory wisps sit on the board's own cells, and lane wisps come down its columns: both are drawn over the docked board.
   const onBoard = wisps.views.some((view) => view.placement.kind === 'cell' || view.placement.kind === 'lane');
   return <View pointerEvents="none" style={[StyleSheet.absoluteFill, onBoard ? styles.layerOnBoard : styles.layer]}>
-    {wisps.views.map((view, index) => <CorruptionWisp
-      key={view.id} index={index} enterDelayMs={view.enterDelayMs} drift={view.placement.kind === 'lane'} vy={layout.wisps[index]?.vy ?? 0}
+    {wisps.views.map((view, index) => view.alive || retained.has(view.id) ? <CorruptionWisp
+      key={view.id} index={index} arriving={!initialLiveIds.current.has(view.id)} enterDelayMs={view.enterDelayMs} drift={view.placement.kind === 'lane'} vy={layout.wisps[index]?.vy ?? 0}
       x={(layout.wisps[index]?.x ?? layout.frame.x) - origin.x} y={(layout.wisps[index]?.y ?? layout.frame.y) - origin.y}
       size={layout.wisps[index]?.size ?? 48}
       pip={view.hp > 1 ? `${Math.max(0, view.hp - view.damage)}` : null}
@@ -364,7 +383,7 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
       guarded={Boolean(view.guarded) && view.alive}
       look={view.look ?? null}
       weakTo={view.weakTo ?? null}
-      alive={view.alive} leaving={wisps.leaving} strikeNonce={wisps.strikes[index] ?? 0} />)}
+      alive={view.alive} leaving={wisps.leaving} strikeNonce={wisps.strikes[index] ?? 0} /> : null)}
     {wisps.caption ? <Animated.View key={wisps.caption.id} entering={FadeInDown.duration(220)} exiting={FadeOut.duration(260)} pointerEvents="none"
       style={[styles.caption, { left: layout.frame.x - origin.x, width: layout.frame.width, top: layout.captionTop - origin.y }]}>
       <Text style={styles.captionText}>{wisps.caption.text}</Text>
@@ -388,19 +407,27 @@ export const MissionWisps = memo(function MissionWisps({ target, glow, screenRef
 });
 
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */
-const CorruptionWisp = memo(function CorruptionWisp({ guarded = false, drift = false, vy = 0, index, enterDelayMs, x, y, size, pip, intent, aimed = false, look = null, weakTo = null, alive, leaving, strikeNonce }: { /** Shielded by a bulwark beside it: a ring of violet light, and nothing gets through it. */ guarded?: boolean; /** Lanes: it drifts down steadily; its place arrives every tick, and it moves between them on its own at its speed. */ drift?: boolean; /** Lanes: its drift, px per ms (0 while it holds). */ vy?: number; /** v2: the chain it is weak to. */ weakTo?: 'growth' | 'water' | null; /** v2: its Dark Wisp art, when it has one. */ look?: string | null; /** v2: the wisp a held piece would hit. */ aimed?: boolean; index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; /** v2: what it will do next, and in how many turns. */ intent: MissionWispView['intent'] | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
+const CorruptionWisp = memo(function CorruptionWisp({ arriving = false, guarded = false, drift = false, vy = 0, index, enterDelayMs, x, y, size, pip, intent, aimed = false, look = null, weakTo = null, alive, leaving, strikeNonce }: { arriving?: boolean; /** Shielded by a bulwark beside it: a ring of violet light, and nothing gets through it. */ guarded?: boolean; /** Lanes: it drifts down steadily; its place arrives every tick, and it moves between them on its own at its speed. */ drift?: boolean; /** Lanes: its drift, px per ms (0 while it holds). */ vy?: number; /** v2: the chain it is weak to. */ weakTo?: 'growth' | 'water' | null; /** v2: its Dark Wisp art, when it has one. */ look?: string | null; /** v2: the wisp a held piece would hit. */ aimed?: boolean; index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; /** v2: what it will do next, and in how many turns. */ intent: MissionWispView['intent'] | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
   const reduceMotion = useReducedMotion();
+  const art = useWispArt(look, size);
+  const motionActive = useCombatActive();
+  const quality = useBattleQuality();
   const hover = useSharedValue(0);
   const shake = useSharedValue(0);
   const pulse = useSharedValue(0);
   const death = useSharedValue(0);
   const entrance = useSharedValue(0);
   // A wisp already felled when it mounts (a resumed board) was never here: no death to play.
-  const [gone, setGone] = useState(() => !alive);
+  const [gone, setGone] = useState(() => !alive || arriving);
   // A wisp arriving mid-battle (a Lanes wisp coming in over its column, one held back until called) makes an entrance:
   // it bursts in big from nothing, overshoots once, shudders, a ring of Mist bursts where it appears, and the phone
   // bumps. It is the enemy arriving, and it should read that way.
   const [arrivalNonce, setArrivalNonce] = useState(0);
+  useEffect(() => {
+    if (!arrivalNonce) return;
+    const timer = setTimeout(() => setArrivalNonce(0), 740);
+    return () => clearTimeout(timer);
+  }, [arrivalNonce]);
   useEffect(() => {
     if (!alive || !gone) return;
     setGone(false);
@@ -418,6 +445,7 @@ const CorruptionWisp = memo(function CorruptionWisp({ guarded = false, drift = f
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alive]);
   useEffect(() => {
+    if (arriving) return;
     if (reduceMotion) { entrance.value = 1; return; }
     const delay = enterDelayMs ?? index * ENTRANCE_STAGGER_MS;
     entrance.value = withDelay(delay, withTiming(1, { duration: ENTRANCE_MS, easing: Easing.out(Easing.back(1.6)) }));
@@ -432,11 +460,11 @@ const CorruptionWisp = memo(function CorruptionWisp({ guarded = false, drift = f
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (reduceMotion) { hover.value = 0.5; pulse.value = 0.5; return; }
+    if (reduceMotion || !motionActive || !alive) { cancelAnimation(hover); cancelAnimation(pulse); hover.value = 0.5; pulse.value = 0.5; return; }
     hover.value = withDelay(index * 380, withRepeat(withTiming(1, { duration: 1_900 + index * 140, easing: Easing.inOut(Easing.sin) }), -1, true));
     pulse.value = withDelay(index * 210, withRepeat(withTiming(1, { duration: 1_450, easing: Easing.inOut(Easing.sin) }), -1, true));
     return () => { cancelAnimation(hover); cancelAnimation(pulse); };
-  }, [hover, index, pulse, reduceMotion]);
+  }, [alive, hover, index, motionActive, pulse, reduceMotion]);
   const firstStrike = useRef(true);
   useEffect(() => {
     if (firstStrike.current) { firstStrike.current = false; return; }
@@ -502,38 +530,35 @@ const CorruptionWisp = memo(function CorruptionWisp({ guarded = false, drift = f
   const [base] = useState(() => ({ x, y }));
   const placeX = useSharedValue(x);
   const placeY = useSharedValue(y);
-  const lastX = useRef(x);
   useEffect(() => {
-    if (reduceMotion) { placeX.value = x; placeY.value = y; return; }
-    if (drift && vy > 0) {
-      // Drifting: aim a little ahead of where the level says it is and move there at its own speed. The next place
-      // arrives before it gets there, so the motion never stops or changes pace; a small lag or lead corrects itself.
-      // A weaver sliding a column over glides across rather than jumping.
-      if (Math.abs(lastX.current - x) > 1) placeX.value = withTiming(x, { duration: 380, easing: Easing.inOut(Easing.cubic) });
-      lastX.current = x;
-      const ahead = y + vy * DRIFT_LEAD_MS;
-      const distance = ahead - placeY.value;
-      if (distance > 0 && Math.abs(placeY.value - y) < vy * DRIFT_LEAD_MS * 2) {
-        placeY.value = withTiming(ahead, { duration: distance / vy, easing: Easing.linear });
-        return;
+    runOnUI((nextX: number, nextY: number, speed: number, drifting: boolean, reduced: boolean, active: boolean) => {
+      'worklet';
+      cancelAnimation(placeX); cancelAnimation(placeY);
+      if (!active) return;
+      if (reduced) { placeX.value = nextX; placeY.value = nextY; return; }
+      const sideways = Math.abs(placeX.value - nextX) > 1;
+      placeX.value = withTiming(nextX, { duration: sideways ? 380 : 220, easing: Easing.inOut(Easing.cubic) });
+      if (drifting && speed > 0) {
+        const ahead = nextY + speed * DRIFT_LEAD_MS;
+        const distance = ahead - placeY.value;
+        if (distance > 0 && Math.abs(placeY.value - nextY) < speed * DRIFT_LEAD_MS * 2) {
+          placeY.value = withTiming(ahead, { duration: distance / speed, easing: Easing.linear });
+          return;
+        }
       }
-      placeY.value = withTiming(y, { duration: 220, easing: Easing.out(Easing.quad) });
-      return;
-    }
-    const glide = drift ? { duration: 220, easing: Easing.out(Easing.quad) } : { duration: 420, easing: Easing.inOut(Easing.cubic) };
-    lastX.current = x;
-    placeX.value = withTiming(x, drift && Math.abs(placeX.value - x) > 1 ? { duration: 380, easing: Easing.inOut(Easing.cubic) } : glide);
-    placeY.value = withTiming(y, glide);
-  }, [drift, placeX, placeY, reduceMotion, vy, x, y]);
+      placeY.value = withTiming(nextY, { duration: drifting ? 220 : 420, easing: Easing.out(Easing.quad) });
+    })(x, y, vy, drift, reduceMotion, motionActive);
+    return () => { cancelAnimation(placeX); cancelAnimation(placeY); };
+  }, [drift, motionActive, placeX, placeY, reduceMotion, vy, x, y]);
   const placeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: placeX.value - base.x }, { translateY: placeY.value - base.y }] }));
   if (gone) return null;
   return <Animated.View pointerEvents="none" style={[styles.wisp, { left: base.x - size / 2, top: base.y - size / 2, width: size, height: size }, placeStyle]}>
     <Animated.View style={[StyleSheet.absoluteFill, styles.rim, rimStyle]}>
       <Image accessibilityIgnoresInvertColors contentFit="contain" source={SOFT_GLOW} style={StyleSheet.absoluteFill} tintColor={RIM} transition={0} />
     </Animated.View>
-    {!reduceMotion && alive ? EMBERS.map((ember, emberIndex) => <Ember key={emberIndex} ember={ember} size={size} />) : null}
+    {!reduceMotion && motionActive && quality === 'standard' && alive ? EMBERS.map((ember, emberIndex) => <Ember key={emberIndex} ember={ember} size={size} />) : null}
     <Animated.View style={[StyleSheet.absoluteFill, bodyStyle]}>
-      <Image accessibilityIgnoresInvertColors accessibilityLabel={look ? `A ${look} wisp` : 'A corruption wisp'} contentFit="contain" source={isDarkWispLook(look) ? DARK_WISP_LOOK_ART[look] : WISP_ART} style={StyleSheet.absoluteFill} transition={0} />
+      <Image accessibilityIgnoresInvertColors accessibilityLabel={look ? `A ${look} wisp` : 'A corruption wisp'} contentFit="contain" source={art} style={StyleSheet.absoluteFill} transition={0} />
     </Animated.View>
     {!alive ? <DeathBurst size={size} reduceMotion={reduceMotion} /> : null}
     {arrivalNonce && alive ? <ArrivalBurst key={`arrival:${arrivalNonce}`} size={size} /> : null}

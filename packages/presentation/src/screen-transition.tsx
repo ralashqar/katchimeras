@@ -235,7 +235,11 @@ function GameScreenTransitionProvider({ children }: PropsWithChildren) {
           retryCountRef.current = 1;
           readinessRef.current = NOT_READY;
           setReadiness(NOT_READY);
-          try { activeRequest.navigate(); } catch (error) {
+          try { void Promise.resolve(activeRequest.navigate()).catch((error) => {
+            if (requestRef.current?.id !== activeRequest.id) return;
+            console.warn('[screen-transition] Recovery navigation failed', error);
+            commitPhase('failed_recoverable');
+          }); } catch (error) {
             console.warn('[screen-transition] Recovery navigation failed', error);
             commitPhase('failed_recoverable');
             return;
@@ -258,7 +262,11 @@ function GameScreenTransitionProvider({ children }: PropsWithChildren) {
     readinessRef.current = NOT_READY;
     setReadiness(NOT_READY);
     commitPhase('waiting_ready');
-    try { current.navigate(); } catch (error) {
+    try { void Promise.resolve(current.navigate()).catch((error) => {
+      if (requestRef.current?.id !== current.id) return;
+      console.warn('[screen-transition] Manual retry failed', error);
+      commitPhase('failed_recoverable');
+    }); } catch (error) {
       console.warn('[screen-transition] Manual retry failed', error);
       commitPhase('failed_recoverable');
       return;

@@ -2264,10 +2264,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             <Animated.View pointerEvents={soloLayerId ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle]}>{soloSettled ? null : creatureNodes}</Animated.View>
           </Animated.View>
           {/* Plants share the marker parent so badge zIndex can paint above every seed. */}
-          <Animated.View pointerEvents={soloLayerId || hideWorldTiles ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle, hideWorldTiles && { opacity: 0 }]}>{memoryPlantProjections.map((plant) => (
+          <Animated.View pointerEvents={soloLayerId || hideWorldTiles ? 'none' : 'box-none'} style={[StyleSheet.absoluteFill, othersStyle, hideWorldTiles && { opacity: 0 }]}>{soloSettled ? null : memoryPlantProjections.map((plant) => (
             <ProjectedMemoryPlant
               onSettled={onMemoryPlantSettled}
-              animateReveal={!plant.preview && memoryPlantRevealKeys.has(plant.visualKey)}
+              animateReveal={!fadeSolo && !plant.preview && memoryPlantRevealKeys.has(plant.visualKey)}
               opacity={plant.preview ? 0.2 : 1}
               cameraScale={camera.scaleValue}
               cameraTranslateX={camera.translationXValue}

@@ -1,4 +1,5 @@
-import { memo, useEffect } from 'react';
+import { memo, useEffect, useRef } from 'react';
+import { useCombatEffects } from './combat-effects';
 import { StyleSheet, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withDelay, withTiming, type SharedValue } from 'react-native-reanimated';
 
@@ -16,6 +17,29 @@ export const MIST_BOLT_LEAD_MS = 90;
 export const MIST_BOLT_STAGGER_MS = 110;
 const MIST_BOLT_SEGMENTS = 7;
 const MIST_BOLT_MOTES = 8;
+
+/** Publish a whole volley to the scene canvas without mounting a native tree for each bolt. */
+export function MistLightningLayer({ bolts, origin, reduceMotion, onDone }: {
+  bolts: readonly MistBolt[]; origin: { x: number; y: number } | null; reduceMotion: boolean; onDone: (id: number) => void;
+}) {
+  const effects = useCombatEffects();
+  const submitted = useRef(new Map<number, number>());
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
+  useEffect(() => {
+    if (!effects || !origin) return;
+    for (const bolt of bolts) if (!submitted.current.has(bolt.id)) {
+      submitted.current.set(bolt.id, effects.lightning(bolt, origin, () => doneRef.current(bolt.id)));
+    }
+    const live = new Set(bolts.map((bolt) => bolt.id));
+    for (const [id, token] of submitted.current) if (!live.has(id)) { effects.cancel([token]); submitted.current.delete(id); }
+  }, [bolts, effects, origin]);
+  useEffect(() => {
+    const owned = submitted.current;
+    return () => { effects?.cancel([...owned.values()]); owned.clear(); };
+  }, [effects]);
+  return effects && origin ? null : <>{bolts.map((bolt) => <MistLightning key={bolt.id} bolt={bolt} reduceMotion={reduceMotion} onDone={onDone} />)}</>;
+}
 
 export const MistLightning = memo(function MistLightning({ bolt, reduceMotion, onDone }: { bolt: MistBolt; reduceMotion: boolean; onDone: (id: number) => void }) {
   const t = useSharedValue(0);

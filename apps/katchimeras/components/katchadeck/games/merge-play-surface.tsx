@@ -15,10 +15,14 @@ import { reuseShallowRows, reuseShallowValue } from '@/utils/merge-world/selecto
 const selectBoard = (snapshot: { state: MergeWorldState | null }) => snapshot.state;
 const sameBoardPresentation = (a: MergeWorldState | null, b: MergeWorldState | null) => a === b || Boolean(a && b
   && a.board === b.board && a.generators === b.generators && a.activeOrders === b.activeOrders);
-const SubscribedMergeBoard = memo(function SubscribedMergeBoard({ state: override, ...props }: Omit<ComponentProps<typeof FeastlePersistentMergeBoard>, 'state'> & { state?: MergeWorldState | null }) {
-  // An independent board (the opening's mission) renders its own state; the page renders the provider's.
-  const subscribed = useMergeWorldSelector(selectBoard, sameBoardPresentation);
-  const state = override ?? subscribed;
+type MergeBoardProps = Omit<ComponentProps<typeof FeastlePersistentMergeBoard>, 'state'>;
+const SubscribedMergeBoard = memo(function SubscribedMergeBoard(props: MergeBoardProps) {
+  const state = useMergeWorldSelector(selectBoard, sameBoardPresentation);
+  return state ? <FeastlePersistentMergeBoard {...props} state={state} /> : null;
+});
+const MergeBoard = memo(function MergeBoard({ state, ...props }: MergeBoardProps & { state?: MergeWorldState | null }) {
+  // Combat owns its board and has no world provider. Only the world-backed branch subscribes.
+  if (state === undefined) return <SubscribedMergeBoard {...props} />;
   return state ? <FeastlePersistentMergeBoard {...props} state={state} /> : null;
 });
 
@@ -41,7 +45,7 @@ export type MergePlaySurfaceProps = {
   railHidden?: boolean;
   counterHidden?: boolean;
   inspectorHidden?: boolean;
-  /** Render this board instead of the provider's: an independent board with its own state and store. */
+  /** Supplied: an independent board, with null while loading. Omitted: subscribe to the world provider. */
   boardState?: MergeWorldState | null;
   focusOrderId?: string;
   hiddenItemInstanceIds?: ReadonlySet<string>;
@@ -175,7 +179,7 @@ export const MergePlaySurface = memo(function MergePlaySurface({
       {counterHidden ? null : <ServiceCounter viewportWidth={counterWidth ?? width} />}
       <View onLayout={measureBoardArea} style={styles.boardStage}>
         {boardAreaHeight > 0 ? (
-          <SubscribedMergeBoard
+          <MergeBoard
             state={boardState}
             animateEntrance={animateEntrance}
             animateArrivals={animateArrivals}

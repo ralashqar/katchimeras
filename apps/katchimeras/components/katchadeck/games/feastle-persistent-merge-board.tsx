@@ -29,7 +29,7 @@ import Animated, {
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { MergeBoardEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
-import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightning, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
+import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightningLayer, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
 import { RECOIL_SQUASH_MS, spriteRecoil } from '@/components/katchadeck/games/sprite-recoil';
 import { canReuseSpawnSprites, createMergeBoardEffects, type MergeBoardEffectKind } from '@/utils/merge-world/board-effects';
 import { mergeWorldGeneratorArt, mergeWorldItemArt, mossproutRootRewardArt, RESIDENT_CARD_ART } from '@/constants/merge-world-art';
@@ -245,9 +245,10 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     [geometry, renderedCellIndices],
   );
   const boardRef = useRef<View>(null);
+  const screenOrigin = useRef<{ x: number; y: number } | null>(null);
   const reportScreenMetrics = useCallback(() => {
     const frame = requestAnimationFrame(() => {
-      boardRef.current?.measureInWindow((x, y) => onScreenMetrics?.({ geometry, x, y }));
+      boardRef.current?.measureInWindow((x, y) => { screenOrigin.current = { x, y }; onScreenMetrics?.({ geometry, x, y }); });
     });
     return () => cancelAnimationFrame(frame);
   }, [geometry, onScreenMetrics]);
@@ -1307,7 +1308,7 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
     </View>
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
       <MergeBoardEffectsLayer controller={boardEffects} activity={effectsActivity} geometry={geometry} reduceMotion={reduceMotion} size={cellSize} />
-      {revealBolts.map((bolt) => <MistLightning key={bolt.id} bolt={bolt} reduceMotion={reduceMotion} onDone={retireRevealBolt} />)}
+      <MistLightningLayer bolts={revealBolts} origin={screenOrigin.current} reduceMotion={reduceMotion} onDone={retireRevealBolt} />
       {sprites.filter((sprite) => visibleCellSet.has(sprite.cell) && !hiddenItemInstanceIds?.has(spriteId(sprite))).map((sprite) => {
         const frame = cellFrames[sprite.cell];
         const id = spriteId(sprite);

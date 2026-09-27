@@ -1,4 +1,6 @@
+import { BATTLE_SCENE_ENABLED, getBattleSession, saveBattleSession, startBattleSession, useBattleSession, type BattleSession, type IslandBattleContext } from '@/features/encounter/battle-session';
 import { battleSourceCampaign } from '@/features/sanctuary/battle-source';
+import { CombatEffectsProvider } from '@/components/katchadeck/games/combat-effects';
 import { FRONTIER_VARIANT_NAMES, frontierOpen, frontierSurgesStarted, frontierTileById, frontierTileContested, frontierTileLit, frontierTileReclaimed, frontierTileState, frontierTileStates, nextFrontierTile, type FrontierTileState } from '@/constants/frontier-tiles';
 import { frontierMission, frontierRetakeMission, surgeDefenceMission } from '@/features/frontier/frontier-levels';
 import { HOLLOW_TREE_FINALE_ID, HOLLOW_TREE_STRUCTURE_ID, hollowTreeFinaleMission, hollowTreeRestored } from '@/features/finale/hollow-tree';
@@ -436,7 +438,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // The campaign pivot: a rung up as an encounter, docked under its island, or under Mossprout's own tile for the Daily Mist.
   // Or under a Frontier tile (`frontierTileId`): the land's own battle (`constants/frontier-tiles.ts`).
   // Or under a structure (`structureId`: the Heart Tree, for the first Mist Surge's defence).
-  const [islandEncounter, setIslandEncounter] = useState<{ campaignId?: string; islandId?: string; frontierTileId?: string; structureId?: string; mission: RegionMissionDefinition; loadout: EncounterLoadout } | null>(null);
+  const battleSession = useBattleSession();
+  const [islandEncounter, setIslandEncounter] = useState<IslandBattleContext | null>(() => {
+    const pending = getBattleSession();
+    return BATTLE_SCENE_ENABLED && pending?.source.kind === 'island'
+      && (pending.status === 'playing' || (pending.status === 'returning' && pending.result?.kind === 'won')) ? pending.source.context : null;
+  });
   const islandEncounterRung = islandEncounter;
   const islandEncounterIslandId = islandEncounter?.islandId ?? null;
   const islandEncounterDockTileId = islandEncounter?.frontierTileId ?? islandEncounter?.structureId ?? null;
@@ -1119,15 +1126,15 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const completeFirstBattle = useCallback(async () => {
     // The first battle's light is the opening Glow (the same receipt the story's effect keeps): the Heart Tree's price.
     const before = mergeWorldRef.current.coins;
-    const lit = await ensureStoredOpeningGlow(`${activeFtueRunId ?? 'current'}:opening-glow`).catch(() => null);
-    await grantStoredStoryGlow(`${FIRST_BATTLE_ID}:xp:${activeFtueRunId ?? 'current'}`, 0, undefined, { katchimeraId: 'mossprout', amount: FIRST_BATTLE_XP }).catch(() => undefined);
+    const lit = await ensureStoredOpeningGlow(`${activeFtueRunId ?? 'current'}:opening-glow`);
+    await grantStoredStoryGlow(`${FIRST_BATTLE_ID}:xp:${activeFtueRunId ?? 'current'}`, 0, undefined, { katchimeraId: 'mossprout', amount: FIRST_BATTLE_XP });
     setBattleReward({ key: FIRST_BATTLE_ID, title: 'They found us', stars: gradeStars(battleOutcomeRef.current?.grade), glow: lit?.granted ? lit.amount : GLOW.firstRestorationCost, xp: FIRST_BATTLE_XP, before,
       finish: () => {
         clearMission(FIRST_BATTLE.storageKey);
         dispatchFtueEvent({ type: 'battle_won', battleId: FIRST_BATTLE_ID, revision: 1 }, FIRST_BATTLE_ID);
       } });
   }, [activeFtueRunId]);
-  const firstBattle = useMistMission({ guided: false, active: firstBattleStepActive, mission: null, encounter: FIRST_BATTLE, owner: 'mossprout', loadout: FIRST_BATTLE_LOADOUT, world: mergeWorld, tileNode: homeTileNode,
+  const firstBattle = useMistMission({ guided: false, active: firstBattleStepActive && !BATTLE_SCENE_ENABLED, mission: null, encounter: FIRST_BATTLE, owner: 'mossprout', loadout: FIRST_BATTLE_LOADOUT, world: mergeWorld, tileNode: homeTileNode,
     boardMetrics: openingDockSettled ? openingBoardMetrics : null, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: completeFirstBattle, speechFor: firstBattleLine });
   // The Lost Trail's three battles (step 5), docked under the trail's tile the same way; each opens with its own card.
   const trailStoneIndex = (LOST_TRAIL_STONE_STEP_IDS as readonly string[]).indexOf(ftueStepId ?? '');
@@ -1139,7 +1146,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const before = mergeWorldRef.current.coins;
     // Paid once per run, whatever happens to the card: a relaunch replays the battle, never the payment.
     const xp = LOST_TRAIL_STONE_XP[index]!;
-    await grantStoredStoryGlow(`${battleId}:${activeFtueRunId ?? 'current'}`, glow, undefined, { katchimeraId: 'mossprout', amount: xp }).catch(() => undefined);
+    await grantStoredStoryGlow(`${battleId}:${activeFtueRunId ?? 'current'}`, glow, undefined, { katchimeraId: 'mossprout', amount: xp });
     setBattleReward({ key: battleId, title: LOST_TRAIL_STONES[index]!.title, stars: gradeStars(battleOutcomeRef.current?.grade), glow, xp, before,
       finish: () => {
         clearMission(encounter.storageKey);
@@ -1148,14 +1155,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }), [activeFtueRunId]);
   const trailSpeech = useMemo(() => LOST_TRAIL_BATTLES.map((_, index) => (input: Parameters<typeof lostTrailLine>[1]) => lostTrailLine(index, input)), []);
   const trailBoardMetrics = openingDockSettled ? openingBoardMetrics : null;
-  const trail1 = useMistMission({ guided: false, active: trailStoneActive(0), mission: null, encounter: LOST_TRAIL_BATTLES[0]!, owner: 'mossprout', loadout: FIRST_BATTLE_LOADOUT, world: mergeWorld, tileNode: lostTrailNode,
+  const trail1 = useMistMission({ guided: false, active: trailStoneActive(0) && !BATTLE_SCENE_ENABLED, mission: null, encounter: LOST_TRAIL_BATTLES[0]!, owner: 'mossprout', loadout: FIRST_BATTLE_LOADOUT, world: mergeWorld, tileNode: lostTrailNode,
     boardMetrics: trailBoardMetrics, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: trailComplete[0]!, speechFor: trailSpeech[0] });
   // One scripted battle is docked at a time: the first battle, or the Lost Trail stone under way.
   const trailBattle = trailStoneIndex >= 0 && trailStoneActive(trailStoneIndex) ? trail1 : null;
   const battle = firstBattleStepActive ? firstBattle : trailBattle;
   const battleEncounter = firstBattleStepActive ? FIRST_BATTLE : trailBattle ? LOST_TRAIL_BATTLES[trailStoneIndex]! : null;
   const openingBoardActive = Boolean(battle?.store.state);
-  battleOutcomeRef.current = battle?.encounter?.outcome ?? null;
+  battleOutcomeRef.current = battleSession?.result?.kind === 'won' ? battleSession.result.outcome : battle?.encounter?.outcome ?? null;
   const openingProgress = openingMistProgress(openingRun);
   const openingStep = ftueStepId ? mossproutFtueStep(ftueStepId) ?? null : null;
   // The same beat the dock projects: spotlight and finger on the first pairs, the Basket refill, or nothing.
@@ -1292,7 +1299,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (!encounter) return completeHatchableMission(activeHatchable);
     const before = mergeWorldRef.current.coins;
     const { glow, xp } = encounter.rewards;
-    await grantStoredStoryGlow(`rescue:${activeHatchable.companion}:${activeHatchable.discoveryFlow.runId}`, glow, undefined, { katchimeraId: 'mossprout', amount: xp }).catch(() => undefined);
+    await grantStoredStoryGlow(`rescue:${activeHatchable.companion}:${activeHatchable.discoveryFlow.runId}`, glow, undefined, { katchimeraId: 'mossprout', amount: xp });
     const definition = activeHatchable;
     setBattleReward({ key: `rescue:${definition.companion}`, title: definition.tile.name, stars: gradeStars(hatchableRescueGradeRef.current), glow, xp: xp || undefined, before,
       finish: () => {
@@ -1313,9 +1320,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // A rescue battle waits for its story: the intro card is read (once the camera is on the tile) before the wisps come.
   const [rescueIntroSeen, setRescueIntroSeen] = useState<string | null>(null);
   const rescueIntroPending = stepplingMissionActive && Boolean(hatchableRescue) && rescueIntroSeen !== activeHatchable.discoveryFlow.runId;
-  const hatchableMist = useMistMission({ guided: !hatchableRescue, active: stepplingMissionActive && !rescueIntroPending && !rescueRevealing, mission: hatchableRescue ? null : activeHatchable.mission, encounter: hatchableRescue, owner: hatchableRescue ? 'mossprout' : activeHatchable.companion,
+  const hatchableMist = useMistMission({ guided: !hatchableRescue, active: stepplingMissionActive && !rescueIntroPending && !rescueRevealing && !(BATTLE_SCENE_ENABLED && hatchableRescue), mission: hatchableRescue ? null : activeHatchable.mission, encounter: hatchableRescue, owner: hatchableRescue ? 'mossprout' : activeHatchable.companion,
     loadout: hatchableRescue ? hatchableRescueLoadout : null, world: mergeWorld, tileNode: gatewayTileNode, boardMetrics: openingBoardMetrics, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: completeActiveHatchable, speechFor: hatchableRescueSpeech });
-  hatchableRescueGradeRef.current = hatchableMist.encounter?.outcome?.grade;
+  hatchableRescueGradeRef.current = battleSession?.source.kind === 'rescue' && battleSession.result?.kind === 'won' ? battleSession.result.outcome.grade : hatchableMist.encounter?.outcome?.grade;
   const stepplingMission = hatchableMist.store;
   const stepplingMissionStep = hatchableMist.step;
   const stepplingMissionGuidanceVisible = hatchableMist.guidanceVisible;
@@ -2495,11 +2502,67 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const encounter = islandEncounterRung?.mission.encounter;
     return regionRescueFriend && encounter ? (input: Parameters<typeof rescueBattleLine>[1]) => rescueBattleLine(encounter, input, regionRescueFriend.rescue) : undefined;
   }, [islandEncounterRung, regionRescueFriend]);
-  const islandMist = useMistMission({ guided: false, speechFor: regionRescueSpeech, keepGoingCost: GLOW.keepGoingCost, payKeepGoing: payIslandKeepGoing, active: islandEncounterActive, mission: null, encounter: islandEncounterRung?.mission.encounter ?? null, owner: 'mossprout', loadout: islandEncounter?.loadout ?? null, world: mergeWorld, tileNode: islandEncounterTileNode,
+  const islandMist = useMistMission({ guided: false, speechFor: regionRescueSpeech, keepGoingCost: GLOW.keepGoingCost, payKeepGoing: payIslandKeepGoing, active: islandEncounterActive && !BATTLE_SCENE_ENABLED, mission: null, encounter: islandEncounterRung?.mission.encounter ?? null, owner: 'mossprout', loadout: islandEncounter?.loadout ?? null, world: mergeWorld, tileNode: islandEncounterTileNode,
     // A battle's wisps stand on the board's cells: they appear only once the dock has finished rising, where they stay.
     boardMetrics: openingDockSettled ? openingBoardMetrics : null, cameraSettled: ftueCameraSettled, glow: openingGlow, complete: completeIslandEncounter, onLeave: leaveIslandEncounter });
-  islandMistOutcomeRef.current = { outcome: islandMist.encounter?.outcome ?? null, runId: islandMist.runId };
+  islandMistOutcomeRef.current = battleSession?.source.kind === 'island' && battleSession.result?.kind === 'won' ? battleSession.result : { outcome: islandMist.encounter?.outcome ?? null, runId: islandMist.runId };
   const islandEncounterBusy = islandEncounterActive && !islandMist.landed;
+  const [battleReturnError, setBattleReturnError] = useState<string | null>(null);
+  const returnedBattleRef = useRef<string | null>(null);
+  const settleBattleReturn = useStableCallback(async () => {
+    const pending = getBattleSession();
+    if (!BATTLE_SCENE_ENABLED || !pending || pending.status === 'playing' || !pending.result || returnedBattleRef.current === pending.id) return;
+    // Acknowledged story rewards still need their card after a process restart until the story advances.
+    if (pending.status === 'returned' && (pending.source.kind === 'island' || pending.result.kind !== 'won'
+      || (pending.source.kind === 'first' && !firstBattleStepActive)
+      || (pending.source.kind === 'trail' && trailStoneIndex !== pending.source.index)
+      || (pending.source.kind === 'rescue' && !stepplingMissionActive))) return;
+    returnedBattleRef.current = pending.id;
+    try {
+      if (pending.result.kind === 'won') {
+        if (pending.source.kind === 'island') await completeIslandEncounter();
+        else if (pending.source.kind === 'first') await completeFirstBattle();
+        else if (pending.source.kind === 'trail') await trailComplete[pending.source.index]?.();
+        else await completeActiveHatchable();
+      }
+      saveBattleSession({ ...pending, status: 'returned' });
+      setBattleReturnError(null);
+    } catch {
+      returnedBattleRef.current = null;
+      setBattleReturnError('Your battle is saved. Tap to finish returning.');
+    }
+  });
+  useEffect(() => { if (screenFocused) void settleBattleReturn(); }, [battleSession?.id, battleSession?.status, screenFocused, settleBattleReturn]);
+  const openDedicatedBattle = useStableCallback((resume = false) => {
+    if (!BATTLE_SCENE_ENABLED || !screenFocused || battleReward || battleReturnError) return;
+    const pending = getBattleSession();
+    if (pending?.status === 'returning') return;
+    let input: Omit<BattleSession, 'id' | 'version' | 'status' | 'result'> | null = null;
+    const common = { world: { heartwoodBuildings: mergeWorld.heartwoodBuildings, chapterOpeningsSeen: mergeWorld.chapterOpeningsSeen }, backdrop: background.sceneId };
+    if (firstBattleStepActive) input = { ...common, sourceKey: `first:${activeFtueRunId}`, source: { kind: 'first', run: activeFtueRunId ?? 'current' }, encounter: FIRST_BATTLE, loadout: FIRST_BATTLE_LOADOUT };
+    else if (trailStoneIndex >= 0 && trailStoneActive(trailStoneIndex)) input = { ...common, sourceKey: `trail:${activeFtueRunId}:${trailStoneIndex}`, source: { kind: 'trail', run: activeFtueRunId ?? 'current', index: trailStoneIndex }, encounter: LOST_TRAIL_BATTLES[trailStoneIndex]!, loadout: FIRST_BATTLE_LOADOUT };
+    else if (stepplingMissionActive && hatchableRescue && !rescueIntroPending && !rescueRevealing) input = { ...common, sourceKey: `rescue:${activeHatchable.discoveryFlow.runId}`, source: { kind: 'rescue', companion: activeHatchable.companion, run: activeHatchable.discoveryFlow.runId }, encounter: hatchableRescue, loadout: hatchableRescueLoadout };
+    else if (islandEncounterActive && islandEncounter) input = { ...common, sourceKey: `island:${islandEncounter.mission.id}`, source: { kind: 'island', context: islandEncounter }, encounter: islandEncounter.mission.encounter, loadout: islandEncounter.loadout };
+    if (!input) return;
+    if (!resume && input.source.kind !== 'island' && pending?.sourceKey === input.sourceKey && pending.status === 'returned') return;
+    const selected = input;
+    let destinationStarted = false;
+    transitionTo({ target: 'battle', announcement: 'Entering battle', expectedPathname: '/battle', requiredReadiness: ['data', 'background', 'foreground', 'layout', 'interaction_target', 'route'],
+      navigate: async () => {
+        await flushMergeWorld();
+        const session = startBattleSession(selected);
+        const destination = { pathname: '/battle' as const, params: { sessionId: session.id } };
+        if (destinationStarted) router.replace(destination); else router.push(destination);
+        destinationStarted = true;
+      },
+      onReturn: () => {
+        const session = getBattleSession();
+        if (session?.sourceKey === selected.sourceKey) saveBattleSession({ ...session, status: 'returned', result: { kind: 'left' } });
+        if (destinationStarted) router.back();
+      },
+    });
+  });
+  useEffect(() => { openDedicatedBattle(); }, [openDedicatedBattle, firstBattleStepActive, trailStoneIndex, trailIntroSeen, stepplingMissionActive, rescueIntroPending, rescueRevealing, islandEncounterActive, islandEncounter, battleReward]);
   useEffect(() => {
     // Back puts the encounter away (the board keeps); it never leaves the Kingdom from here.
     if (!islandEncounterActive) return;
@@ -3944,6 +4007,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
 
   return (
     <View collapsable={false} onLayout={onContentReady} ref={screenRef} style={styles.screen}>
+      <CombatEffectsProvider screenRef={screenRef} active={screenFocused}>
+      {battleReturnError ? <View style={{ position: 'absolute', bottom: 40, left: 24, right: 24, zIndex: 200 }}>
+        <KatchaButton label={battleReturnError} onPress={() => { void settleBattleReturn(); }} />
+      </View> : BATTLE_SCENE_ENABLED && !battleReward && battleSession?.status === 'returned' && battleSession.result?.kind === 'left' && battleSession.source.kind !== 'island' && (firstBattleStepActive || stepplingMissionActive || trailStoneIndex >= 0) ? <View style={{ position: 'absolute', bottom: 40, left: 24, right: 24, zIndex: 200 }}>
+        <KatchaButton label="Resume battle" onPress={() => openDedicatedBattle(true)} />
+      </View> : null}
       <KingdomHexCanvas
         onHeartwoodPress={sharedAdventureAllowed ? () => { setSelectedHeartwoodBed(undefined); setHeartwoodOpenToken(value => value + 1); } : undefined}
         wispLanternAdornment={wispLanternAdornment}
@@ -4670,6 +4739,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         cue={glowWorldTarget.kind === 'haven_garden_button' ? { kind: 'tap', target: glowWorldTarget } : null}
         spotlight={{ targets: glowScene?.view.kind === 'garden' ? [glowWorldTarget, { kind: 'haven_guide' }] : [glowWorldTarget], grouping: 'bounding_rect' }} screenRef={screenRef} targetRefs={ftueTargetRefs} targetRevision={ftueTargetRevision}
       /> : null}
+      </CombatEffectsProvider>
     </View>
   );
 });

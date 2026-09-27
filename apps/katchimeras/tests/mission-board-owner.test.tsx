@@ -15,6 +15,11 @@ test('one screen hosts every friend’s board: a board just switched to never sh
   // that as Petalimp's progress and sent Petalimp's delivery request before a single merge.
   const storage = new Map<string, unknown>();
   const module = loadNativeModule('features/onboarding/use-opening-mission-board.ts', {
+    'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } },
+    '@/features/encounter/mission-persistence': {
+      readMissionSnapshot: (key: string) => storage.get(key) ?? null,
+      missionWrites: { put: (key: string, value: unknown) => storage.set(key, value), flush: async () => {}, release() {} },
+    },
     '@/features/mission-mechanics/mechanic': mechanic,
     '@/utils/merge-world/engine': engine,
     './opening-mission-state': openingMissionState,
