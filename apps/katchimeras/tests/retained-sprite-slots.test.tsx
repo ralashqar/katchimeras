@@ -30,7 +30,7 @@ test('sprite allocation preserves live/retiring identities, reuses vacancies and
   assert.deepEqual(new Set(slots.filter(s => s.active).map(s => s.id)), new Set(many.map(identify)));
 });
 
-test('actual sprite views survive new identities, retire motion safely and unsubscribe from old recoil', async () => {
+test('every piece has its own sprite view: a retired view never completes a stale motion or keeps its recoil, and a piece raised in place crossfades to its new art', async () => {
   const motion = nativeMotionHarness();
   const recoil = new Map<string, () => void>();
   let mounts = 0;
@@ -48,11 +48,16 @@ test('actual sprite views survive new identities, retire motion safely and unsub
     useAnimatedReaction: () => {},
     useDerivedValue: (read: () => unknown) => ({ get value() { return read(); } }),
     scheduleOnUI: (work: () => void) => work(),
+    runOnJS: (fn: (...args: unknown[]) => void) => fn,
     withSpring: (to: number, _options: unknown, done?: (finished: boolean) => void) => motion.animated.withTiming(to, { duration: 100 }, done),
     recordMergeRender: (name: string) => { if (name === 'sprite-mount') mounts++; },
     spriteRecoil: { subscribe: (id: string, callback: () => void) => { recoil.set(id, callback); return () => { recoil.delete(id); }; } },
     RECOIL_SQUASH_MS: 50, MERGE_SPRITE_SURFACE_SCALE: 2,
     MOVE_SPRING: {}, SWAP_SPRING: {},
+    StyleSheet: { absoluteFill: {} },
+    MERGE_ITEMS_BY_ID: new Map([['seed', { tier: 1 }], ['sprout', { tier: 2 }]]),
+    LEVEL_UP_MS: 640, LEVEL_DOWN_MS: 420, LEVEL_UP_PALETTE: {},
+    UpgradeBurst: 'UpgradeBurst',
     styles: { sprite: {}, spriteArtSurface: {} },
     PersistentMergeItemArt: 'ItemArt', PersistentGeneratorArt: 'GeneratorArt',
   }, 'PersistentSprite').PersistentSprite as unknown as React.ComponentType<any>;
@@ -61,23 +66,22 @@ test('actual sprite views survive new identities, retire motion safely and unsub
     dragTranslationX: shared, dragTranslationY: shared, grabX: shared, grabY: shared,
     entranceDelay: null, generatorLevel: 1, matchHint: null, reduceMotion: false,
     projectionGridHeight: 300, projectionInset: 0, onComplete };
-  function Fixture({ items, token }: { items: Item[]; token: number }) {
-    const slots = useRetainedRenderSlots(items, identify);
-    return <>{slots.map(slot => <Sprite key={slot.key} {...stable} active={slot.active} instanceId={slot.id}
-      baseX={100} baseY={200} occupant={{ kind: 'item', instanceId: slot.id, definitionId: 'test' }}
-      motion={slot.active ? { kind: 'move', startX: 0, startY: 0, token, operationId: token } : undefined} />)}</>;
+  // As the board draws them: one view per piece, keyed by the piece.
+  function Fixture({ items, token, definitionId = 'seed', moving = true }: { items: Item[]; token: number; definitionId?: string; moving?: boolean }) {
+    return <>{items.map(item => <Sprite key={item.id} {...stable} active instanceId={item.id}
+      baseX={100} baseY={200} occupant={{ kind: 'item', instanceId: item.id, definitionId }}
+      motion={moving ? { kind: 'move', startX: 0, startY: 0, token, operationId: token } : undefined} />)}</>;
   }
   let tree!: ReactTestRenderer;
   await act(async () => { tree = create(<Fixture items={[{ id: 'a' }]} token={1} />); });
-  const originalViews = tree.root.findAllByType('AnimatedView' as any);
   assert.equal(mounts, 1);
-  // Retire while a completion is pending; replacement must not receive that completion.
+  // Retired while a completion is pending: nothing completes for it, and it stops listening for recoil.
   await act(async () => tree.update(<Fixture items={[]} token={1} />));
   motion.advance(500);
   assert.equal(completed.length, 0);
   assert.equal(recoil.size, 0);
   assert.equal(motion.activeAnimationCount(), 0);
-  for (let i = 2; i <= 20; i++) {
+  for (let i = 2; i <= 6; i++) {
     const id = `new-${i}`;
     await act(async () => tree.update(<Fixture items={[{ id }]} token={i} />));
     assert.deepEqual([...recoil.keys()], [id]);
@@ -85,20 +89,21 @@ test('actual sprite views survive new identities, retire motion safely and unsub
     assert.equal(completed.at(-1), `${i}:${id}`);
     await act(async () => tree.update(<Fixture items={[]} token={i} />));
   }
-  assert.equal(mounts, 1, '19 replacement items allocate no new sprite animation graph');
+  assert.equal(mounts, 6, 'each new piece mounts a view of its own, never one another piece left behind');
   await act(async () => tree.update(<Fixture items={[{ id: 'interrupted' }]} token={21} />));
   await act(async () => tree.update(<Fixture items={[{ id: 'replacement' }]} token={22} />));
   await act(async () => motion.advance(200));
-  assert.equal(completed.includes('21:interrupted'), false, 'direct reuse also cancels the previous owner');
+  assert.equal(completed.includes('21:interrupted'), false, 'a replaced piece never completes');
   assert.equal(completed.at(-1), '22:replacement');
-  await act(async () => tree.update(<Fixture items={[{ id: 'hidden-then-shown' }]} token={23} />));
-  await act(async () => tree.update(<Fixture items={[]} token={23} />));
-  await act(async () => tree.update(<Fixture items={[{ id: 'hidden-then-shown' }]} token={23} />));
-  await act(async () => motion.advance(200));
-  assert.equal(completed.at(-1), '23:hidden-then-shown', 'a temporarily hidden item can resume the same motion token');
-  await act(async () => tree.update(<Fixture items={[]} token={23} />));
-  assert.deepEqual(tree.root.findAllByType('AnimatedView' as any), originalViews);
-  assert.equal(motion.activeAnimationCount(), 0);
+  // Raised a tier where it stands (Bloom): the old art shows beside the new while they cross, then only the new.
+  await act(async () => tree.update(<Fixture items={[{ id: 'bloom' }]} token={30} moving={false} />));
+  await act(async () => tree.update(<Fixture items={[{ id: 'bloom' }]} token={30} definitionId="sprout" moving={false} />));
+  const arts = () => tree.root.findAllByType('ItemArt' as any).map((node) => node.props.definitionId);
+  assert.deepEqual(arts().sort(), ['seed', 'sprout'], 'crossing: the Seed going, the Sprout coming');
+  assert.equal(tree.root.findAllByType('UpgradeBurst' as any).length, 1, 'raised: the upgrade energy rises');
+  await act(async () => motion.advance(800));
+  assert.deepEqual(arts(), ['sprout'], 'settled: only the Sprout');
+  assert.equal(tree.root.findAllByType('UpgradeBurst' as any).length, 0);
   await act(async () => tree.unmount());
   assert.equal(recoil.size, 0);
 });

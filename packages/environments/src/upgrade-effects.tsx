@@ -12,6 +12,7 @@ import Animated, {
   withDelay,
   withRepeat,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 
@@ -143,11 +144,6 @@ const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
     };
   }, [cover, phase, reducedMotion, reveal]);
 
-  const raysStyle = useAnimatedStyle(() => ({
-    opacity: cover.value * interpolate(reveal.value, [0, 0.55, 1], [0.56, 0.3, 0]),
-    transform: [{ translateY: interpolate(reveal.value, [0, 1], [18, -22]) }],
-  }));
-
   const showCoins = coinsEnabled && !reducedMotion && (phase === 'payment' || phase === 'cover');
   const showEnergy = !reducedMotion && ['cover', 'reveal', 'react'].includes(phase);
   const showReaction = reactionEnabled && (phase === 'react' || phase === 'complete');
@@ -174,30 +170,9 @@ const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
       )) : null}
 
       {showEnergy ? (
-        <>
-          {/* Tile artwork belongs exclusively to HavenUpgradeTileArt. Drawing
-              the target here revealed its silhouette before the real blend. */}
-          <View pointerEvents="none" style={[styles.energyArea, area]}>
-            <Animated.View style={[StyleSheet.absoluteFill, raysStyle]}>
-              {LIGHT_RAYS.map((ray, index) => (
-                <View key={`${presentation.nonce}:ray:${index}`} style={[styles.ray, {
-                  height: area.height * ray.height,
-                  left: area.width * ray.x - ray.width / 2,
-                  transform: [{ rotateZ: `${ray.tilt}deg` }],
-                  width: ray.width,
-                }]}>
-                  <LinearGradient colors={['transparent', presentation.palette.accent, 'transparent']} locations={[0, 0.6, 1]} style={StyleSheet.absoluteFill} />
-                </View>
-              ))}
-            </Animated.View>
-            {RISING_PARTICLES.map((particle, index) => (
-              <RisingParticle key={`${presentation.nonce}:particle:${index}`} index={index} particle={particle} palette={presentation.palette} />
-            ))}
-            {[0.3, 0.5, 0.7].map((x, index) => (
-              <RisingArrow accent={presentation.palette.accent} delay={index * 90} key={`${presentation.nonce}:arrow:${index}`} x={area.width * x} />
-            ))}
-          </View>
-        </>
+        // Tile artwork belongs exclusively to HavenUpgradeTileArt. Drawing
+        // the target here revealed its silhouette before the real blend.
+        <UpgradeEnergy area={area} cover={cover} nonce={presentation.nonce} palette={presentation.palette} reveal={reveal} />
       ) : null}
 
       {showReaction && presentation.reactionLine.trim() ? (
@@ -207,6 +182,68 @@ const HavenUpgradeEffects = memo(function HavenUpgradeEffects({
       ) : null}
     </View>
   );
+});
+
+/** The upgrade's rising energy over an area: light rays, rising embers and leaves, and three rising arrows. */
+function UpgradeEnergy({ area, cover, nonce, palette, reveal, travelScale = 1, particleCount = RISING_PARTICLES.length, rayWidthScale = 1 }: {
+  area: EffectRect;
+  cover: SharedValue<number>;
+  nonce: number | string;
+  palette: HavenTileUpgradePresentation['palette'];
+  reveal: SharedValue<number>;
+  travelScale?: number;
+  particleCount?: number;
+  rayWidthScale?: number;
+}) {
+  const raysStyle = useAnimatedStyle(() => ({
+    opacity: cover.value * interpolate(reveal.value, [0, 0.55, 1], [0.56, 0.3, 0]),
+    transform: [{ translateY: interpolate(reveal.value, [0, 1], [18 * travelScale, -22 * travelScale]) }],
+  }));
+  return <View pointerEvents="none" style={[styles.energyArea, area]}>
+    <Animated.View style={[StyleSheet.absoluteFill, raysStyle]}>
+      {LIGHT_RAYS.map((ray, index) => (
+        <View key={`${nonce}:ray:${index}`} style={[styles.ray, {
+          height: area.height * ray.height,
+          left: area.width * ray.x - (ray.width * rayWidthScale) / 2,
+          transform: [{ rotateZ: `${ray.tilt}deg` }],
+          width: ray.width * rayWidthScale,
+        }]}>
+          <LinearGradient colors={['transparent', palette.accent, 'transparent']} locations={[0, 0.6, 1]} style={StyleSheet.absoluteFill} />
+        </View>
+      ))}
+    </Animated.View>
+    {RISING_PARTICLES.slice(0, particleCount).map((particle, index) => (
+      <RisingParticle key={`${nonce}:particle:${index}`} index={index} particle={particle} palette={palette} travelScale={travelScale} />
+    ))}
+    {[0.3, 0.5, 0.7].map((x, index) => (
+      <RisingArrow accent={palette.accent} delay={index * 90} key={`${nonce}:arrow:${index}`} x={area.width * x} />
+    ))}
+  </View>;
+}
+
+/**
+ * The tile upgrade's energy as one shot, for anything smaller that levels up in place (a merge piece Bloom raises a
+ * tier): the rays rise and fade, the embers and arrows climb from the area. `travelScale` shortens the climb for a
+ * small area. Nothing under Reduced Motion.
+ */
+const UpgradeBurst = memo(function UpgradeBurst({ area, nonce, palette, reducedMotion, travelScale = 1, particleCount = 18 }: {
+  area: EffectRect;
+  nonce: number | string;
+  palette: HavenTileUpgradePresentation['palette'];
+  reducedMotion: boolean;
+  travelScale?: number;
+  particleCount?: number;
+}) {
+  const cover = useSharedValue(0);
+  const reveal = useSharedValue(0);
+  useEffect(() => {
+    if (reducedMotion) return;
+    cover.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
+    reveal.value = withDelay(260, withTiming(1, { duration: 620, easing: Easing.out(Easing.cubic) }));
+    return () => { cancelAnimation(cover); cancelAnimation(reveal); };
+  }, [cover, reducedMotion, reveal]);
+  if (reducedMotion) return null;
+  return <UpgradeEnergy area={area} cover={cover} nonce={nonce} palette={palette} particleCount={particleCount} rayWidthScale={Math.max(0.35, travelScale)} reveal={reveal} travelScale={travelScale} />;
 });
 
 function UpgradeCoin({ from, index, target, vector }: {
@@ -242,10 +279,11 @@ function UpgradeCoin({ from, index, target, vector }: {
   return <Animated.View style={[styles.coin, style]}><Image contentFit="contain" source={COIN_ART} style={StyleSheet.absoluteFill} transition={0} /></Animated.View>;
 }
 
-function RisingParticle({ index, palette, particle }: {
+function RisingParticle({ index, palette, particle, travelScale = 1 }: {
   index: number;
   palette: HavenTileUpgradePresentation['palette'];
   particle: (typeof RISING_PARTICLES)[number];
+  travelScale?: number;
 }) {
   const progress = useSharedValue(0);
   useEffect(() => {
@@ -255,8 +293,8 @@ function RisingParticle({ index, palette, particle }: {
   const style = useAnimatedStyle(() => ({
     opacity: interpolate(progress.value, [0, 0.12, 0.72, 1], [0, 1, 0.78, 0]),
     transform: [
-      { translateX: interpolate(progress.value, [0, 1], [0, particle.drift]) },
-      { translateY: interpolate(progress.value, [0, 1], [0, -particle.travel]) },
+      { translateX: interpolate(progress.value, [0, 1], [0, particle.drift * travelScale]) },
+      { translateY: interpolate(progress.value, [0, 1], [0, -particle.travel * travelScale]) },
       { rotateZ: `${particle.rotation + interpolate(progress.value, [0, 1], [0, index % 2 ? 100 : -100])}deg` },
       { scale: interpolate(progress.value, [0, 0.18, 1], [0.45, 1, 0.62]) },
     ],
@@ -379,5 +417,5 @@ const styles = StyleSheet.create({
   upArrow: { fontFamily: fontFamily, fontSize: 25, fontWeight: '900', position: 'absolute', textAlign: 'center', top: -5, width: 28 },
 });
 
-return { HavenUpgradeEffects, HavenAmbientEmbers };
+return { HavenUpgradeEffects, HavenAmbientEmbers, UpgradeBurst };
 }

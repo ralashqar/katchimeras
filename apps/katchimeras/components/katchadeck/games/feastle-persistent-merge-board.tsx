@@ -30,7 +30,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { MergeBoardEffectsLayer } from '@/components/katchadeck/games/merge-spawn-effects-layer';
 import { CombatProfileBoundary } from '@/features/encounter/combat-profile';
-import { useRetainedRenderSlots } from '@/hooks/use-retained-render-slots';
+import { UpgradeBurst } from '@/components/katchadeck/world/haven-upgrade-effects';
 import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightningLayer, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
 import { RECOIL_SQUASH_MS, spriteRecoil } from '@/components/katchadeck/games/sprite-recoil';
 import { canReuseSpawnSprites, createMergeBoardEffects, type MergeBoardEffectKind } from '@/utils/merge-world/board-effects';
@@ -294,7 +294,10 @@ export const FeastlePersistentMergeBoard = memo(function FeastlePersistentMergeB
   }));
   const { busy, motions, presentation, sprites } = visualState;
   const visibleSprites = useMemo(() => sprites.filter(sprite => visibleCellSet.has(sprite.cell) && !hiddenItemInstanceIds?.has(spriteId(sprite))), [hiddenItemInstanceIds, sprites, visibleCellSet]);
-  const spriteSlots = useRetainedRenderSlots(visibleSprites, spriteId);
+  // One view per piece, keyed by the piece itself. A pooled view handed from one piece to another kept that piece's
+  // position, opacity and scale until the UI thread caught up: a new piece flashed where another had stood, or stayed
+  // invisible while still in play.
+  const spriteSlots = useMemo(() => visibleSprites.map((item) => ({ key: spriteId(item), item, active: true })), [visibleSprites]);
   const presentationRef = useRef(presentation);
   const [initialSpriteDelays] = useState(() => new Map(
     animateEntrance
@@ -1686,6 +1689,11 @@ function MergeMatchHint({ active, children, offsetX, offsetY }: { active: boolea
   return <Animated.View style={[styles.matchHint, style]}>{children}</Animated.View>;
 }
 
+/** A piece raised a tier in place (Bloom): the crossfade and bounce, and the upgrade energy's colours. */
+const LEVEL_UP_MS = 640;
+const LEVEL_DOWN_MS = 420;
+const LEVEL_UP_PALETTE = { accent: '#FFD45E', glow: '#FFF6C2', mist: '#E9F7D8', primary: '#9BE071' } as const;
+
 const PersistentSprite = memo(function PersistentSprite({ active, instanceId, baseX, baseY, cellSize, activeDragId, dragEpoch, dragPhase, dragTranslationX, dragTranslationY, entranceDelay, generatorLevel, grabX, grabY, matchHint, motion, cachedSource, projection, projectionGridHeight, projectionInset, reduceMotion, onComplete, occupant }: {
   active: boolean;
   instanceId: string;
@@ -1713,8 +1721,8 @@ const PersistentSprite = memo(function PersistentSprite({ active, instanceId, ba
 }) {
   recordMergeRender('sprite');
   useEffect(() => { recordMergeRender('sprite-mount'); return () => recordMergeRender('sprite-unmount'); }, []);
-  const x = useSharedValue(baseX);
-  const y = useSharedValue(baseY);
+  const x = useSharedValue(active && motion ? motion.startX : baseX);
+  const y = useSharedValue(active && motion ? motion.startY : baseY);
   const targetX = useSharedValue(baseX);
   const targetY = useSharedValue(baseY);
   const scale = useSharedValue(1);
@@ -1934,6 +1942,46 @@ const PersistentSprite = memo(function PersistentSprite({ active, instanceId, ba
   }, [animating, authoredFrame, cellSize, entranceProgress, matchHintProgress, progress, projection, projectionGridHeight, projectionInset, scale, targetY, y]);
 
   const nativeArtSize = artBaseSize * MERGE_SPRITE_SURFACE_SCALE;
+  // A piece that changes tier where it stands (Bloom raises it; a wisp knocks it down): the old art scales out as the
+  // new one scales in with a single bounce, and a raised piece gets the tile upgrade's rising energy. A merge shows its
+  // own change through its motion, so only a change with no motion plays this.
+  const definitionId = occupant.kind === 'item' ? occupant.definitionId : null;
+  const previousDefinition = useRef(definitionId);
+  const levelSequence = useRef(0);
+  const [levelChange, setLevelChange] = useState<{ id: number; from: string; up: boolean } | null>(null);
+  const levelProgress = useSharedValue(1);
+  const retireLevelChange = useCallback((id: number) => setLevelChange((current) => (current?.id === id ? null : current)), []);
+  useLayoutEffect(() => {
+    const before = previousDefinition.current;
+    previousDefinition.current = definitionId;
+    if (!active || !before || !definitionId || before === definitionId || motion) return;
+    const id = ++levelSequence.current;
+    const up = (MERGE_ITEMS_BY_ID.get(definitionId)?.tier ?? 0) > (MERGE_ITEMS_BY_ID.get(before)?.tier ?? 0);
+    cancelAnimation(levelProgress);
+    if (reduceMotion) { levelProgress.value = 1; setLevelChange(null); return; }
+    setLevelChange({ id, from: before, up });
+    levelProgress.value = 0;
+    levelProgress.value = withTiming(1, { duration: up ? LEVEL_UP_MS : LEVEL_DOWN_MS, easing: Easing.linear }, (finished) => {
+      if (finished) runOnJS(retireLevelChange)(id);
+    });
+  // Only a change of the piece itself starts it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [definitionId]);
+  const newArtStyle = useAnimatedStyle(() => {
+    const p = levelProgress.value;
+    if (p >= 1) return { opacity: 1, transform: [{ scale: 1 }] };
+    return {
+      opacity: interpolate(p, [0, 0.28, 0.5, 1], [0, 0, 1, 1]),
+      transform: [{ scale: interpolate(p, [0, 0.28, 0.72, 1], [0.5, 0.5, 1.16, 1]) }],
+    };
+  });
+  const oldArtStyle = useAnimatedStyle(() => {
+    const p = levelProgress.value;
+    return {
+      opacity: interpolate(p, [0, 0.16, 0.42, 1], [1, 1, 0, 0]),
+      transform: [{ scale: interpolate(p, [0, 0.42, 1], [1, 0.55, 0.55]) }],
+    };
+  });
   const artLayoutStyle = useAnimatedStyle(() => {
     const squash = Math.max(0, recoil.value);
     const stretch = Math.max(0, -recoil.value);
@@ -1986,10 +2034,14 @@ const PersistentSprite = memo(function PersistentSprite({ active, instanceId, ba
   }, [animating, arcHeight, authoredFrame, cellSize, dragPosition, entranceProgress, matchHintOffsetX, matchHintOffsetY, matchHintProgress, progress, projection, spriteOpacity, targetX, targetY, visualScale, x, y]);
 
   return <Animated.View pointerEvents="none" style={[styles.sprite, { display: active ? 'flex' : 'none', height: cellSize, left: 0, top: 0, width: cellSize }, animatedStyle]}>
+    {levelChange?.up ? <UpgradeBurst area={{ height: cellSize, left: 0, top: 0, width: cellSize }} nonce={levelChange.id} palette={LEVEL_UP_PALETTE} reducedMotion={reduceMotion} travelScale={cellSize / 150} /> : null}
     <Animated.View pointerEvents="none" style={[styles.spriteArtSurface, { height: nativeArtSize, width: nativeArtSize, left: (cellSize - nativeArtSize) / 2, top: (cellSize - nativeArtSize) / 2 }, artLayoutStyle]}>
       {occupant.kind === 'generator'
         ? <PersistentGeneratorArt active={active} cachedSource={cachedSource} fill generatorId={occupant.generatorId} level={generatorLevel} size={nativeArtSize} />
-        : <PersistentMergeItemArt cachedSource={cachedSource} definitionId={occupant.definitionId} fill size={nativeArtSize} />}
+        : <>
+            {levelChange ? <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, oldArtStyle]}><PersistentMergeItemArt definitionId={levelChange.from} fill size={nativeArtSize} /></Animated.View> : null}
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, newArtStyle]}><PersistentMergeItemArt cachedSource={cachedSource} definitionId={occupant.definitionId} fill size={nativeArtSize} /></Animated.View>
+          </>}
     </Animated.View>
   </Animated.View>;
 });

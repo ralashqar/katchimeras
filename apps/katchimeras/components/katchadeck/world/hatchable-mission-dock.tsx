@@ -33,7 +33,7 @@ import type { MergeWorldCommand, MergeWorldState } from '@/types/merge-world';
 import type { MissionMechanicState, MissionStrike } from '@/types/mission-mechanic';
 import { mergeCellCenter, mergeCellFrame } from '@/utils/merge-world/board-geometry';
 import { FriendSpeechBubble } from './friend-speech-bubble';
-import { MIST_BOLT_LEAD_MS, MIST_BOLT_STAGGER_MS, MistLightningLayer, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
+import { MIST_BOLT_LEAD_MS, MIST_BOLT_MS, MIST_BOLT_REACH, MIST_BOLT_STAGGER_MS, MistLightningLayer, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
 import { MistMissionDock, type GlowLandingSource, type OpeningGlowStore } from './kingdom-opening-merge-dock';
 import { laneWispPoint } from './corruption-wisp-layer';
 import { LANE_MISS_ROW, LANE_SPARK_MS, laneOf } from '@/features/mission-mechanics/lanes';
@@ -122,6 +122,8 @@ const LANE_TICK_MAX_MS = 250;
 
 /** Merge vs Mist: held Mist lets go by this long after a volley even if a landing never arrives (a store torn down mid-flight). */
 const HELD_MIST_SAFETY_MS = 4_000;
+/** How long past a volley's last landing held Mist (and a piece it freed) waits for a landing that was never reported. */
+const HELD_MIST_GRACE_MS = 260;
 
 /** A cell the Mist takes next: it breathes dark, so the player sees it before committing to a merge. */
 const NextMistPulse = memo(function NextMistPulse({ reduceMotion }: { reduceMotion: boolean }) {
@@ -229,7 +231,10 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
       },
     }));
     setBolts((current) => [...current, ...made]);
-    const timer = setTimeout(() => { heldTimers.current.delete(timer); release(all); }, HELD_MIST_SAFETY_MS);
+    // A bolt whose landing is never reported (cancelled with its layer, or dropped mid-flight) must not leave the Mist
+    // held or a freed piece hidden: everything lets go just after the volley's last bolt would have landed.
+    const lastLanding = MIST_BOLT_LEAD_MS + (shots.length - 1) * MIST_BOLT_STAGGER_MS + MIST_BOLT_MS * MIST_BOLT_REACH;
+    const timer = setTimeout(() => { heldTimers.current.delete(timer); release(all); }, Math.min(HELD_MIST_SAFETY_MS, lastLanding + HELD_MIST_GRACE_MS));
     heldTimers.current.add(timer);
   }, []);
   const retireBolt = useCallback((id: number) => setBolts((current) => current.filter((bolt) => bolt.id !== id)), []);

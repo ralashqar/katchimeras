@@ -79,7 +79,12 @@ Important naming distinction: `effects-layer` / `effect-slot` counters describe 
 
 Presentation version 3:
 
-- Board sprites now keep stable render slots across item identities. Previously each merge-result instance mounted a new sprite with its own shared values, derived values and animated views. Retired slots remain hidden at the board's peak simultaneous sprite count; active sprites and consumed pieces still finishing their motion are never dropped. Slots stop motion and recoil subscriptions when retired and are released with the board. This trades retained peak view memory for less allocation during play.
+- ~~Board sprites now keep stable render slots across item identities. Previously each merge-result instance mounted a new sprite with its own shared values, derived values and animated views. Retired slots remain hidden at the board's peak simultaneous sprite count; active sprites and consumed pieces still finishing their motion are never dropped. Slots stop motion and recoil subscriptions when retired and are released with the board. This trades retained peak view memory for less allocation during play.~~ **Reverted Sept 28 2026 (correctness).** A view handed from one piece to another kept that piece's shared values (position, opacity, scale) until the UI thread caught up. On device this showed as:
+  - a spawned piece flashing on another cell before its flight;
+  - pieces going invisible while still in play;
+  - a Bloomed piece vanishing.
+
+  Board sprites are now keyed by the piece again. A sprite that mounts with a motion starts at the motion's start. `tests/retained-sprite-slots.test.tsx` pins this. The pool hook remains for effect layers, where a stale frame is harmless. Do not pool board sprites again without resetting every shared value on the UI thread before the view is shown.
 - Full wisp impact particles are restored by default after phone testing did not show a clear benefit from simplifying them. The pooled cloud, core, halo, ring and six shards remain available; `EXPO_PUBLIC_RICH_COMBAT_IMPACTS=0` opts into the two-view compact experiment for comparison. Hit, damage and retirement clocks stay unchanged. No Skia or frame callbacks are added.
 - Separate React boundaries now measure `board-sprites`, `board-effects`, `projectiles` and `impacts`. Counters include `sprite-mount`, `sprite-unmount`, `projectile-slot-mount`, `impact-slot-mount` and their render counts. Reports identify `presentationVersion: 3` and `impacts: compact`.
 
