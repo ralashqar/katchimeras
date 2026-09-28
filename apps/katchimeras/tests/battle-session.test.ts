@@ -4,6 +4,8 @@ import React, { act } from 'react';
 import { create, type ReactTestRenderer } from 'react-test-renderer';
 import { FIRST_BATTLE } from '@/constants/last-clearing-battle';
 import { encounterRunId } from '@/features/encounter/run-id';
+import { encounterProfile } from '@/features/encounter/spawner-profile';
+import { combatLessonMission } from '@/constants/combat-campaign';
 import type { BattleSession } from '@/features/encounter/battle-session';
 import { loadNativeModule } from './helpers/native-motion-harness';
 
@@ -14,6 +16,7 @@ function fixture(env: Record<string, string> = {}) {
   const resets: (() => void)[] = [];
   const load = () => loadNativeModule('features/encounter/battle-session.ts', {
     './run-id': { encounterRunId },
+    './spawner-profile': { encounterProfile },
     '@/utils/app-storage': {
       getStoredJson: (key: string, fallback: unknown) => disk.get(key) ?? fallback,
       setStoredJson: (key: string, value: unknown) => { disk.set(key, JSON.parse(JSON.stringify(value))); },
@@ -78,4 +81,19 @@ test('embedded mode ignores a previous dedicated victory without deleting its sa
   await act(async () => { api.saveBattleSession({ ...won, result: { kind: 'left' } }); });
   assert.equal((observed as BattleSession | null)?.result?.kind, 'left', 'enabled consumers still receive updates');
   await act(async () => { tree.unmount(); });
+});
+
+
+test('combat freezes upgrades and resumes the chosen support', () => {
+  const f = fixture(); const api = f.load();
+  const next = { ...input, sourceKey: 'combat:test', encounter: combatLessonMission(3).encounter,
+    loadout: { companionId: 'mossprout', level: 5 } as BattleSession['loadout'], world: { heartwoodBuildings: {}, chapterOpeningsSeen: [], heroBuildings: { 'bloom-house': { level: 6, builtAt: 1 } } } };
+  const started = api.startBattleSession(next);
+  assert.equal(started.loadout.combatProfile?.damageMultiplier, 1.32);
+  assert.ok((started.loadout.combatProfile?.seedPace ?? 0) > 0);
+  api.saveBattleSession({ ...started, prepared: true, loadout: { ...started.loadout, secondaryGenerator: 'dew-well' } });
+  const resumed = api.startBattleSession({ ...next, loadout: { ...next.loadout, level: 9 } });
+  assert.equal(resumed.loadout.level, 5);
+  assert.equal(resumed.loadout.secondaryGenerator, 'dew-well');
+  assert.equal(f.load().getBattleSession()?.prepared, true);
 });

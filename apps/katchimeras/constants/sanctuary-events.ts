@@ -1,5 +1,6 @@
 import type { KatchimeraSkinId } from '@/types/katchimera';
 import type { MergeWorldState } from '@/types/merge-world';
+import { COMBAT_V2_ENABLED } from '@/features/mission-mechanics/combat-rules';
 
 /**
  * The Sanctuary's special events (cozy 4X v2, Sept 2026): repeatable modes that sit beside the main quest, each its own
@@ -45,12 +46,16 @@ export const WISP_RUSH_EVENT: SanctuaryEvent = {
 export const MIST_PUZZLES_EVENT: SanctuaryEvent = {
   id: 'mist-puzzles',
   kind: 'daily-puzzle',
-  name: 'Mist Puzzles',
+  name: COMBAT_V2_ENABLED ? 'Expeditions' : 'Mist Puzzles',
   host: { speaker: 'mossprout', name: 'Mossprout' },
-  tagline: 'Three puzzle patches a day. Here the wisps only move when you do: every merge is a turn. Think first.',
+  tagline: COMBAT_V2_ENABLED ? 'Three daily battles and a weekly guardian. Choose your garden, read the warnings, and hold the lanes.' : 'Three puzzle patches a day. Here the wisps only move when you do: every merge is a turn. Think first.',
   // After the Wild Tangle (Chapter 5): the player knows plants, lanes and wisps well enough to try them another way.
-  opensAfterChapter: 'wild-tangle',
-  intro: [
+  opensAfterChapter: COMBAT_V2_ENABLED ? 'the-signal' : 'wild-tangle',
+  intro: COMBAT_V2_ENABLED ? [
+    { speaker: 'mossprout', text: 'Three paths through the Mist open each day. We can choose which ones to explore.' },
+    { speaker: 'steppling', text: 'Bring a support garden. Shields, healing, or light: each path needs a different plan.' },
+    { speaker: 'mossprout', text: 'Once we defend the Heart Tree, a guardian will challenge us each week too.' },
+  ] : [
     { speaker: 'mossprout', text: 'The Mist has left puzzles in the old Garden beds. Three new ones every morning.' },
     { speaker: 'mossprout', text: 'Here the wisps only move when you do. Every merge is a turn, and they answer it.' },
     { speaker: 'fernip', text: 'Oh, I like these. Take your time. The Mist does not get to rush you here.' },

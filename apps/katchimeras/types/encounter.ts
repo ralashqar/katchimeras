@@ -23,7 +23,7 @@ export type EncounterGrade = 'cleared' | 'bright' | 'perfect';
  * bound (a piece caught in the Mist: a pulse frees it, or its twin merged into it).
  */
 export type EncounterMistType = 'light' | 'dense' | 'root' | 'wisp-bound' | 'bound';
-export type EncounterMistHolds = { kind: 'item'; definitionId: string } | { kind: 'spawner'; spawnerId: string };
+export type EncounterMistHolds = { kind: 'item'; definitionId: string; instanceId?: string } | { kind: 'spawner'; spawnerId: string };
 export type EncounterMistCell = {
   cell: number;
   type: EncounterMistType;
@@ -78,6 +78,7 @@ export type EncounterCompanion = { slot: 'any' | readonly MergeCharacterId[]; re
 export type EncounterRewards = { glow: number; xp: number; firstClear?: { wispId?: WispId; glow?: number } };
 
 export type EncounterDefinition = {
+  recommendedLevel?: number;
   id: string;
   storageKey: string;
   rows: 3 | 4 | 5;
@@ -120,6 +121,10 @@ export const TERRITORY_DEFAULT_STARS: readonly [number, number] = [0.25, 0.45];
 
 /** What the player brings in: the Katchimera and its level, and one helper Wisp. */
 export type EncounterLoadout = {
+  frontierReward?: 'timber' | 'glow';
+  secondaryGenerator?: import('@/features/mission-mechanics/combat-rules').SecondaryGenerator;
+  /** Frozen at battle entry and included in the attempt identity. */
+  combatProfile?: import('@/features/encounter/encounter-run').EncounterProfile;
   companionId: MergeCharacterId; level: number; wispId?: WispId;
   /** The second hero (the slot Chapter 3 opens; `features/encounter/team.ts`): their own ability, charged by the same merges, and the same XP. */
   partner?: { companionId: MergeCharacterId; level: number };

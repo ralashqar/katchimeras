@@ -7,6 +7,7 @@ import { useEffectSlots } from '@/hooks/use-effect-slots';
 import { loadNativeModule, nativeMotionHarness, nativeViews } from './helpers/native-motion-harness';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const health = loadNativeModule('components/katchadeck/world/wisp-health-bar.tsx', { 'react-native': { ...nativeViews, Text: 'Text' } });
 const host = (name: string) => name as unknown as React.ComponentType<Record<string, unknown>>;
 
 test('lane enemies reuse native slots across waves, keep every enemy, and run no ambient loops', async () => {
@@ -14,6 +15,7 @@ test('lane enemies reuse native slots across waves, keep every enemy, and run no
   const counts: Record<string, number> = {};
   let active = true;
   const api = loadNativeModule('components/katchadeck/world/pooled-lane-wisps.tsx', {
+    './wisp-health-bar': health,
     'react-native': { ...nativeViews, Text: host('Text') }, 'expo-image': { Image: host('Image') },
     'react-native-reanimated': { ...motion.animated, Easing: { ...motion.animated.Easing, linear: (x: number) => x }, withRepeat() { throw Error('No ambient loops'); }, useFrameCallback() { throw Error('No frame callback'); } },
     '@/components/katchadeck/games/combat-effects': { useCombatActive: () => active },
@@ -22,7 +24,7 @@ test('lane enemies reuse native slots across waves, keep every enemy, and run no
     '@/utils/merge-world/performance': { recordMergeRender: (name: string) => { counts[name] = (counts[name] ?? 0) + 1; } },
   });
   const Pool = api.PooledLaneWisps as React.ComponentType<{ items: LaneWispSprite[]; capacity: number }>;
-  const make = (id: string): LaneWispSprite => ({ id, x: 80, y: 90, size: 48, vy: 0.01, alive: true, leaving: false, hp: 4, look: id, guarded: false, strike: 0 });
+  const make = (id: string): LaneWispSprite => ({ id, x: 80, y: 90, size: 48, vy: 0.01, alive: true, leaving: false, hp: 4, maxHp: 4, look: id, guarded: false, strike: 0 });
   let tree!: ReactTestRenderer;
   await act(async () => { tree = create(<Pool items={[make('a'), make('b'), make('c')]} capacity={60} />); });
   const images = tree.root.findAllByType(host('Image'));
@@ -49,4 +51,22 @@ test('lane enemies reuse native slots across waves, keep every enemy, and run no
   await act(async () => tree.unmount());
   assert.equal(counts['wisp-slot-unmount'], 24);
   assert.equal(motion.activeAnimationCount(), 0);
+});
+
+test('wisp health rounds its label and shrinks its red fill with precise damage', async () => {
+  const Bar = health.WispHealthBar as React.ComponentType<{ hp: number; maxHp: number }>;
+  let tree!: ReactTestRenderer;
+  await act(async () => { tree = create(<Bar hp={7.6} maxHp={10} />); });
+  const label = () => tree.root.findByType(host('Text')).children.join('');
+  const fill = () => tree.root.findAllByType(host('View'))[1]!.props.style;
+  assert.equal(label(), '8');
+  assert.equal(fill()[1].width, '76%');
+  assert.equal(fill()[0].backgroundColor, '#DA3548');
+  await act(async () => tree.update(<Bar hp={2.4} maxHp={10} />));
+  assert.equal(label(), '2');
+  assert.equal(fill()[1].width, '24%');
+  await act(async () => tree.update(<Bar hp={-1} maxHp={10} />));
+  assert.equal(label(), '0');
+  assert.equal(fill()[1].width, '0%');
+  await act(async () => tree.unmount());
 });

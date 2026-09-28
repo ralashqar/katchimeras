@@ -32,7 +32,7 @@ export function openMistCell(board: MergeWorldState, cell: number): { board: Mer
   const mist = encounterMist(current);
   const holds = mist?.holds;
   const cells = [...board.board];
-  const item = holds?.kind === 'item' ? { kind: 'item' as const, instanceId: `mist-held:${board.nextInstance}`, definitionId: holds.definitionId } : null;
+  const item = holds?.kind === 'item' ? { kind: 'item' as const, instanceId: holds.instanceId ?? `mist-held:${board.nextInstance}`, definitionId: holds.definitionId } : null;
   cells[cell] = { ...current, locked: false, blocker: null, mist: null, occupant: item ?? current.occupant };
   return { board: { ...board, board: cells, nextInstance: item ? board.nextInstance + 1 : board.nextInstance, revision: board.revision + 1 }, opened: { cell, ...(holds ? { holds } : {}) } };
 }

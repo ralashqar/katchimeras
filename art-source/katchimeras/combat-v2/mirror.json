@@ -1,0 +1,7 @@
+{
+  "name": "mirror",
+  "prompt": "Production transparent mobile game sprite: a floating purple mist wisp with a broad silver mirror shield as its belly, narrow glowing eyes above the shield. Original cozy merge defence art. Rounded handcrafted clay-toy 3D render, three-quarter view looking slightly down, soft upper-left studio lighting. Purple smoky clay character, threatening but cute, simple readable silhouette. Centered with 15% transparent padding, fully visible. No text, labels, backdrop, border, UI, ground plane or extra objects. Genuine transparent alpha background. Match the style and camera of the supplied enemy reference.",
+  "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a0e9ac-6ffa-7452-a266-08a9e9d1af0f\\exec-2788cbe7-ae0c-4c70-acb0-3e66e3082ff1.png",
+  "tool": "image_gen",
+  "destination": "C:/Users/daruk/Projects/Katchimeras/katchimeras/art-source/katchimeras/combat-v2/mirror.png"
+}

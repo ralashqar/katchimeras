@@ -311,11 +311,16 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     if (mechanic.kind !== 'lanes') return null;
     // The Haven's Seed Nursery: the chance a piece that arrives on its own is a Sprout.
     const done = measureMergeWork('battle.tick');
-    const result = lanesTick(mechanic, before, current, dt, binding.window, undefined, { tierTwoChance: binding.profile?.tierTwoChance ?? 0, seedPace: binding.profile?.seedPace ?? 0, shotPower: binding.profile?.shotPower ?? 0, sparkEvery: binding.profile?.sparkEvery, sparkDamage: binding.profile?.sparkDamage });
+    const result = lanesTick(mechanic, before, current, dt, binding.window, undefined, binding.profile ?? {});
     done();
     if (!result.changed) { mechanicStateRef.current = result.state; return result; }
     commit({ state: result.board, mechanicState: result.state });
     return result;
+  }, [commit]);
+  const startWave = useCallback(() => {
+    const current = mechanicStateRef.current;
+    if (!mine() || current?.kind !== 'lanes' || !current.combat?.preparingMs) return;
+    if (stateRef.current) commit({ state: stateRef.current, mechanicState: { ...current, combat: { ...current.combat, preparingMs: 0 } } });
   }, [commit]);
   // Until this board's own save has loaded, there is no board: never the last one's.
   const owned = owner != null && owner === boardKey;
@@ -328,7 +333,7 @@ export function useMissionBoard(storageKey: string, runId: string | null, create
     state: owned ? state : null, merges: owned ? merges : 0, mergesRef: mergesRef as RefObject<number>, placedDeliveries: owned ? placedDeliveries : 0,
     mechanicState: owned ? mechanicState : null, mechanicStateRef: mechanicStateRef as RefObject<MissionMechanicState | null>,
     run: owned ? run : null, status,
-    send, place, reset, reseed, useAbility, openCache: openBoardCache, keepGoing, tick, flush,
+    send, place, reset, reseed, useAbility, openCache: openBoardCache, keepGoing, tick, startWave, flush,
   };
 }
 

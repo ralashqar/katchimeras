@@ -6,6 +6,7 @@ import type { MergeWorldState } from '@/types/merge-world';
 import type { EncounterOutcome } from './outcome';
 import { getStoredJson, onStorageReset, setStoredJson } from '@/utils/app-storage';
 import { encounterRunId } from './run-id';
+import { encounterProfile } from './spawner-profile';
 import type { BattleTileScene } from './battle-tile';
 import type { BattleTileFraming } from './battle-framing';
 
@@ -18,13 +19,14 @@ export type BattleSource = { kind: 'island'; context: IslandBattleContext }
   | { kind: 'trail'; run: string; index: number }
   | { kind: 'rescue'; companion: string; run: string };
 export type BattleSession = {
+  prepared?: boolean;
   version: 1;
   id: string;
   sourceKey: string;
   source: BattleSource;
   encounter: EncounterDefinition;
   loadout: EncounterLoadout;
-  world: Pick<MergeWorldState, 'heartwoodBuildings' | 'chapterOpeningsSeen'>;
+  world: Pick<MergeWorldState, 'heartwoodBuildings' | 'chapterOpeningsSeen'> & Partial<Pick<MergeWorldState, 'heroBuildings' | 'chaptersClaimed'>>;
   backdrop: DayBackgroundSceneId;
   tileScene?: BattleTileScene;
   tileFraming?: BattleTileFraming;
@@ -53,7 +55,10 @@ export function saveBattleSession(session: BattleSession) {
 }
 export function startBattleSession(input: Omit<BattleSession, 'id' | 'status' | 'version' | 'result'>): BattleSession {
   const previous = getBattleSession();
-  const session: BattleSession = { ...input, version: 1, id: previous?.sourceKey === input.sourceKey ? previous.id : `${input.encounter.id}:${Date.now()}`, status: 'playing' };
+  if (previous?.sourceKey === input.sourceKey && previous.status === 'playing' && previous.encounter.mechanic?.kind === 'lanes' && previous.encounter.mechanic.rulesVersion === 2) return previous;
+  const loadout = input.encounter.mechanic?.kind === 'lanes' && input.encounter.mechanic.rulesVersion === 2
+    ? { ...input.loadout, combatProfile: input.loadout.combatProfile ?? encounterProfile(input.world, input.loadout) } : input.loadout;
+  const session: BattleSession = { ...input, loadout, version: 1, id: previous?.sourceKey === input.sourceKey ? previous.id : `${input.encounter.id}:${Date.now()}`, status: 'playing' };
   saveBattleSession(session);
   return session;
 }

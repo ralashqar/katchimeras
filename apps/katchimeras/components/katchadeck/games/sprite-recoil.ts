@@ -2,15 +2,16 @@
  * A board piece's shooting recoil (Lanes, `docs/encounter-lanes.md`): whoever fires a piece names it here and only that
  * piece's sprite plays its squash and stretch, on the UI thread. Nothing re-renders for a shot, however many fly.
  */
-const listeners = new Map<string, Set<() => void>>();
+type RecoilKind = 'shot' | 'impact';
+const listeners = new Map<string, Set<(kind: RecoilKind) => void>>();
 
 export const spriteRecoil = {
   /** The piece with this instance id just fired. */
-  emit(instanceId: string) {
-    for (const listener of [...(listeners.get(instanceId) ?? [])]) listener();
+  emit(instanceId: string, kind: RecoilKind = 'shot') {
+    for (const listener of [...(listeners.get(instanceId) ?? [])]) listener(kind);
   },
-  subscribe(instanceId: string, listener: () => void): () => void {
-    const set = listeners.get(instanceId) ?? new Set<() => void>();
+  subscribe(instanceId: string, listener: (kind: RecoilKind) => void): () => void {
+    const set = listeners.get(instanceId) ?? new Set<(kind: RecoilKind) => void>();
     set.add(listener);
     listeners.set(instanceId, set);
     return () => {

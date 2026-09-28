@@ -51,7 +51,7 @@ function withTrackBadges(world: MergeWorldState, offers: readonly WorldUpgradeOf
   // Cozy 4X: no Grove on Mossprout's tile (its battles were the old territory kind); battles are on friends' islands.
   if (sanctuaryFounded(world)) return badged;
   const grove = groveTrack(world, { ftueComplete: true });
-  const home = grove.cleared < grove.total ? grove : dailyMistUnlocked(world) ? dailyTrack(world, localDayId(new Date(gameNow()))) : null;
+  const home = grove.cleared < grove.total ? grove : dailyMistUnlocked(world) ? dailyTrack(world, combatDayId(gameNow())) : null;
   if (!home || (world.haven.tileStages.mossprout ?? 0) < 1) return badged;
   // Framed as Mossprout's own restore marker is: over his garden.
   return [...badged, {
@@ -64,6 +64,7 @@ import { LevelTrackSheet } from '@/components/katchadeck/world/level-track-sheet
 import { dailyTrack, groveTrack, islandTrack, isMistLevel, type LevelNode } from '@/features/level-tracks/level-track';
 import { claimStoredTrackMilestone, payStoredEncounterContinue } from '@/utils/merge-world/repository';
 import { dailyMistUnlocked } from '@/features/encounters/daily-mist';
+import { combatDayId } from '@/features/encounters/combat-events';
 import type { RegionMissionDefinition } from '@/constants/island-campaigns/types';
 import { recordEncounterBond } from '@/features/encounter/encounter-bond';
 import { FriendWispsSheet } from '@/components/katchadeck/wisps/friend-wisps-sheet';
@@ -2491,7 +2492,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (finale && !cleared) setHollowRevealing(false);
     if (rescuedNow && !cleared) setRegionRevealing(null);
     if (cleared) setBattleReward({ key: `encounter:${runId}`, eyebrow: reclaimed ? 'Land taken back' : cleared?.surged ? 'The Heart Tree held' : finale ? 'The Hollow Tree wakes' : rescuedNow ? 'Rescued' : undefined, title: found.mission.title, stars: gradeStars(cleared.grade), glow: cleared.glow, xp: cleared.xp || undefined, xpEach: Boolean(cleared.partnerId),
-      timber: reclaimed?.timber || undefined,
+      timber: reclaimed?.timber || undefined, combat: outcome.combat,
       before: Math.max(0, result.state.coins - cleared.glow), finish: reclaimed ? () => playFrontierReveal(reclaimed.tileId) : finale ? playHollowReveal : rescuedNow ? () => playRegionReveal(rescuedNow) : () => undefined });
     setIslandEncounter(null);
     // The Frontier and the Heart Tree's defence have no track: the player stays on the map.
@@ -2502,7 +2503,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     // track back when it ends. Any other level lands straight back on its tile's levels.
     if (cleared?.islandRaised) return;
     setTrackReopen(focus.campaignId ? { kind: 'island', campaignId: focus.campaignId }
-      : focus.mission.id.startsWith('daily:') ? { kind: 'daily' } : { kind: 'grove' });
+      : (focus.mission.id.startsWith('daily:') || focus.mission.id.startsWith('weekly:')) ? { kind: 'daily' } : { kind: 'grove' });
   }, [grantTrackPack, liftIslandMist, playFrontierReveal, playHollowReveal, playRegionReveal]);
   // A region friend's rescue speaks as a rescue does (the voice in the Mist, the lead's steer).
   const regionRescueFriend = islandEncounterRung ? regionFriendForMission(islandEncounterRung.mission.id) : null;
@@ -2547,7 +2548,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const pending = getBattleSession();
     if (pending?.status === 'returning') return;
     let input: Omit<BattleSession, 'id' | 'version' | 'status' | 'result'> | null = null;
-    const common = { world: { heartwoodBuildings: mergeWorld.heartwoodBuildings, chapterOpeningsSeen: mergeWorld.chapterOpeningsSeen }, backdrop: background.sceneId };
+    const common = { world: { heartwoodBuildings: mergeWorld.heartwoodBuildings, heroBuildings: mergeWorld.heroBuildings, chaptersClaimed: mergeWorld.chaptersClaimed, chapterOpeningsSeen: mergeWorld.chapterOpeningsSeen }, backdrop: background.sceneId };
     if (firstBattleStepActive) input = { ...common, sourceKey: `first:${activeFtueRunId}`, source: { kind: 'first', run: activeFtueRunId ?? 'current' }, encounter: FIRST_BATTLE, loadout: FIRST_BATTLE_LOADOUT };
     else if (trailStoneIndex >= 0 && trailStoneActive(trailStoneIndex)) input = { ...common, sourceKey: `trail:${activeFtueRunId}:${trailStoneIndex}`, source: { kind: 'trail', run: activeFtueRunId ?? 'current', index: trailStoneIndex }, encounter: LOST_TRAIL_BATTLES[trailStoneIndex]!, loadout: FIRST_BATTLE_LOADOUT };
     else if (stepplingMissionActive && hatchableRescue && !rescueIntroPending && !rescueRevealing) input = { ...common, sourceKey: `rescue:${activeHatchable.discoveryFlow.runId}`, source: { kind: 'rescue', companion: activeHatchable.companion, run: activeHatchable.discoveryFlow.runId }, encounter: hatchableRescue, loadout: hatchableRescueLoadout };
@@ -2745,7 +2746,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const openTrack = useMemo(() => {
     if (!trackOpen) return null;
     if (trackOpen.kind === 'grove') return groveTrack(mergeWorld, { ftueComplete: !ftueStepId });
-    if (trackOpen.kind === 'daily') return dailyTrack(mergeWorld, localDayId(new Date(gameNow())));
+    if (trackOpen.kind === 'daily') return dailyTrack(mergeWorld, combatDayId(gameNow()));
     const campaign = islandCampaignById.get(trackOpen.campaignId);
     return campaign ? islandTrack(mergeWorld, campaign) : null;
   }, [ftueStepId, mergeWorld, trackOpen]);
@@ -3430,7 +3431,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const openRushEvent = useCallback(() => { setRushNotice(null); setRushResult(null); setRushSheetOpen(true); }, []);
   // Every event open now, with today's progress: the Events sheet lists them, and one button opens it.
   const [eventsOpen, setEventsOpen] = useState(false);
-  const puzzlesDone = dailyMistDay(mergeWorld, localDayId(new Date(gameNow()))).filter((slot) => slot.cleared).length;
+  const puzzlesDone = dailyMistDay(mergeWorld, combatDayId(gameNow())).filter((slot) => slot.cleared).length;
   const eventEntries = useMemo((): EventEntry[] => SANCTUARY_EVENTS.map((event) => event.id === WISP_RUSH_EVENT.id
     ? { event, host: rushHostName, progress: { done: rushHeatsDone, total: HEATS_PER_DAY }, open: rushEventOpen }
     : { event, host: event.host.name, progress: { done: puzzlesDone, total: 3 }, open: sanctuaryEventOpen(mergeWorld, event) }), [mergeWorld, puzzlesDone, rushEventOpen, rushHeatsDone, rushHostName]);

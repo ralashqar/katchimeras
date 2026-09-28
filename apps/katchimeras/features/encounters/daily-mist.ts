@@ -9,6 +9,8 @@ import { missionWindow } from '@/features/mission-mechanics/board-window';
 import { ISLAND_WISP_LINES } from '@/features/onboarding/corruption-wisps';
 import { ENCOUNTER_DEFAULT_GRADES, type EncounterDefinition, type EncounterDifficulty, type EncounterGrade, type EncounterMistCell } from '@/types/encounter';
 import type { MergeWorldState } from '@/types/merge-world';
+import { COMBAT_V2_ENABLED } from '@/features/mission-mechanics/combat-rules';
+import { dailyCombatMission } from './combat-events';
 
 /**
  * The Daily Mist: three patches a day, the same three for everyone, made
@@ -27,7 +29,8 @@ export const dailyMissionId = (dayId: string, slot: DailyMistSlot) => `daily:${d
 /** Open after the first session, once the Kingdom's goal has been introduced. */
 /** The Daily Mist opens once the Grove's Thick Mist (its fifth patch) is cleared: the player has met every Mist it uses. */
 export const DAILY_MIST_UNLOCK_MISSION_ID = 'sleeping-grove:5';
-export function dailyMistUnlocked(world: Pick<MergeWorldState, 'encounters'>): boolean {
+export function dailyMistUnlocked(world: Pick<MergeWorldState, 'encounters'> & Partial<Pick<MergeWorldState, 'chaptersClaimed'>>): boolean {
+  if (COMBAT_V2_ENABLED) return Boolean(world.chaptersClaimed?.includes('the-signal'));
   return Boolean(world.encounters?.clears[DAILY_MIST_UNLOCK_MISSION_ID]);
 }
 
@@ -92,6 +95,7 @@ export function fillDailyTemplate(template: DailyMistTemplate, dayId: string, at
 
 /** The day's mission for a slot: a template picked by the date, filled and searched; rerolled until it clears, else its plain fill. */
 export function dailyMistMission(dayId: string, slot: DailyMistSlot, world?: Pick<MergeWorldState, 'unlockedCharacters'> | null): RegionMissionDefinition {
+  if (COMBAT_V2_ENABLED) return dailyCombatMission(dayId, slot);
   const templates = DAILY_MIST_TEMPLATES.filter((template) => template.slot === slot);
   const chains = dailyMistChains(world);
   const template = templates[hashSeed(`daily-mist:${dayId}:${slot}`) % templates.length]!;

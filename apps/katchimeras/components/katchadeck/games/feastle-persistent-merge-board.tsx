@@ -1743,16 +1743,22 @@ const PersistentSprite = memo(function PersistentSprite({ active, instanceId, ba
   // Lanes: when this piece shoots, it squashes down and fattens, then stretches up as the shot leaves its mouth, and
   // springs back (`spriteRecoil`). Anchored at its soil, so it never lifts off the cell.
   const recoil = useSharedValue(0);
-  useLayoutEffect(() => { previousMotionToken.current = null; cancelAnimation(recoil); recoil.value = 0; }, [instanceId, recoil]);
-  useEffect(() => active ? spriteRecoil.subscribe(instanceId, () => {
+  const impactScale = useSharedValue(1);
+  useLayoutEffect(() => { previousMotionToken.current = null; cancelAnimation(recoil); recoil.value = 0; cancelAnimation(impactScale); impactScale.value = 1; }, [instanceId, recoil, impactScale]);
+  useEffect(() => active ? spriteRecoil.subscribe(instanceId, (kind) => {
     if (reduceMotion) return;
+    if (kind === 'impact') {
+      cancelAnimation(impactScale);
+      impactScale.value = withSequence(withTiming(1.3, { duration: 90 }), withTiming(0.88, { duration: 110 }), withTiming(1, { duration: 160 }));
+      return;
+    }
     cancelAnimation(recoil);
     recoil.value = withSequence(
       withTiming(1, { duration: RECOIL_SQUASH_MS, easing: Easing.out(Easing.quad) }),
       withTiming(-1, { duration: 90, easing: Easing.out(Easing.quad) }),
       withSpring(0, { damping: 9, stiffness: 260, mass: 0.5 }),
     );
-  }) : undefined, [active, instanceId, recoil, reduceMotion]);
+  }) : undefined, [active, instanceId, recoil, reduceMotion, impactScale]);
 
   useEffect(() => {
     if (entranceDelay == null || !active) { entranceProgress.value = 1; return; }
@@ -1891,20 +1897,23 @@ const PersistentSprite = memo(function PersistentSprite({ active, instanceId, ba
   useEffect(() => {
     if (active) return;
     cancelAnimation(recoil);
+    cancelAnimation(impactScale);
+    impactScale.value = 1;
     cancelAnimation(entranceProgress);
     cancelAnimation(matchHintProgress);
-  }, [active, entranceProgress, matchHintProgress, recoil]);
+  }, [active, entranceProgress, matchHintProgress, recoil, impactScale]);
 
   useEffect(() => () => {
     cancelAnimation(entranceProgress);
     cancelAnimation(matchHintProgress);
     cancelAnimation(progress);
     cancelAnimation(recoil);
+    cancelAnimation(impactScale);
     cancelAnimation(scale);
     cancelAnimation(spriteOpacity);
     cancelAnimation(x);
     cancelAnimation(y);
-  }, [entranceProgress, matchHintProgress, progress, recoil, scale, spriteOpacity, x, y]);
+  }, [entranceProgress, matchHintProgress, progress, recoil, impactScale, scale, spriteOpacity, x, y]);
 
   // Compute the authored frame once per moving sprite. Scale and position
   // share it rather than each allocating/calculating the entire frame.
@@ -1991,7 +2000,7 @@ const PersistentSprite = memo(function PersistentSprite({ active, instanceId, ba
       transform: [
         // Kept on its soil: the art's foot stays put as it squashes and stretches.
         { translateY: (1 - scaleY) * cellSize * 0.42 },
-        { scale: visualScale.value / MERGE_SPRITE_SURFACE_SCALE },
+        { scale: visualScale.value * impactScale.value / MERGE_SPRITE_SURFACE_SCALE },
         { scaleX },
         { scaleY },
       ],

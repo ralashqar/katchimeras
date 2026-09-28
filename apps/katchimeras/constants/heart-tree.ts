@@ -45,5 +45,5 @@ export function sanctuaryFounded(world: Pick<MergeWorldState, 'heartTree' | 'kin
   return world.heartTree != null || world.kingdomGoal?.introducedAt != null;
 }
 
-/** The highest level any other building may reach: one past the Tree. */
-export const buildingLevelCap = (treeLevel: number) => treeLevel + 1;
+/** One past the Tree until it is fully grown, when every building can reach its final level. */
+export const buildingLevelCap = (treeLevel: number) => treeLevel >= HEART_TREE_MAX_LEVEL ? 10 : treeLevel + 1;

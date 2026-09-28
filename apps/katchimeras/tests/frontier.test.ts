@@ -3,6 +3,8 @@ import test from 'node:test';
 import { FRONTIER_TILES, frontierMissionId, frontierTileStates, nextFrontierTile, nextFrontierTreeLevel, frontierReclaimTimber } from '@/constants/frontier-tiles';
 import { frontierMission } from '@/features/frontier/frontier-levels';
 import { lanesFairness } from '@/features/encounter/lanes-playtest';
+import { recommendedCombatProfile } from '@/features/encounter/spawner-profile';
+import { COMBAT_V2_ENABLED } from '@/features/mission-mechanics/combat-rules';
 import { createInitialMergeWorldState, reduceMergeWorld } from '@/utils/merge-world/engine';
 
 test('the Frontier fills the empty second ring and all of the third, never twice on a cell', () => {
@@ -26,7 +28,7 @@ test('every Frontier battle is plants that shoot, fair to a careful player and l
   for (const tile of FRONTIER_TILES) {
     const encounter = frontierMission(tile).encounter;
     assert.equal(encounter.mechanic?.kind, 'lanes', tile.id);
-    const careful = lanesFairness(encounter, 'careful', 6);
+    const careful = lanesFairness(encounter, 'careful', 6, COMBAT_V2_ENABLED ? recommendedCombatProfile(encounter.recommendedLevel ?? 1) : undefined);
     assert.ok(careful.wins >= 4, `${tile.id} (${tile.variant}, power ${tile.power}): the careful player won ${careful.wins} of 6`);
     assert.equal(lanesFairness(encounter, 'idle', 1).wins, 0, `${tile.id}: doing nothing must lose`);
     if (encounter.difficulty === 'calm') {
@@ -60,7 +62,7 @@ test('a Surge’s battles are fair: every retake, and the Heart Tree’s defence
   const { frontierRetakeMission, surgeDefenceMission } = await import('@/features/frontier/frontier-levels');
   for (const encounter of [...FRONTIER_TILES.map((tile) => frontierRetakeMission(tile).encounter), surgeDefenceMission().encounter]) {
     assert.equal(encounter.mechanic?.kind, 'lanes', encounter.id);
-    const careful = lanesFairness(encounter, 'careful', 6);
+    const careful = lanesFairness(encounter, 'careful', 6, COMBAT_V2_ENABLED ? recommendedCombatProfile(encounter.recommendedLevel ?? 1) : undefined);
     assert.ok(careful.wins >= 4, `${encounter.id}: the careful player won ${careful.wins} of 6`);
     assert.equal(lanesFairness(encounter, 'idle', 1).wins, 0, `${encounter.id}: doing nothing must lose`);
   }
@@ -76,6 +78,13 @@ test('the first Surge is held at the Heart Tree and takes two edge tiles; then o
   assert.equal(reduceMergeWorld(world, { type: 'mistSurge', dayId: '2026-09-27', now: 5 }).changed, false, 'no Surge before the first is held');
   const defence = surgeDefenceMission();
   const held = reduceMergeWorld(world, { type: 'completeEncounter', receiptId: 'd', missionId: SURGE_DEFENCE_MISSION_ID, katchimeraId: 'mossprout', helperWispId: null, outcome: { cleared: true, grade: 'bright' } as never, difficulty: defence.difficulty, base: defence.rewards, now: Date.UTC(2026, 8, 26, 12) });
+  if (COMBAT_V2_ENABLED) {
+    assert.equal(held.encounterCleared?.surged?.length, 0);
+    assert.equal(frontierHeldCount(held.state), 4);
+    assert.equal(frontierContestedTiles(held.state).length, 0);
+    assert.equal(reduceMergeWorld(held.state, { type: 'mistSurge', dayId: '2099-01-01', now: 8 }).changed, false);
+    return;
+  }
   assert.equal(held.encounterCleared?.surged?.length, 2, 'the Mist took two edge tiles while the Tree was held');
   world = held.state;
   assert.equal(frontierContestedTiles(world).length, 2);

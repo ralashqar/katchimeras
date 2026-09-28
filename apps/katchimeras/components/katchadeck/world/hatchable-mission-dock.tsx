@@ -34,6 +34,7 @@ import type { MissionMechanicState, MissionStrike } from '@/types/mission-mechan
 import { mergeCellCenter, mergeCellFrame } from '@/utils/merge-world/board-geometry';
 import { FriendSpeechBubble } from './friend-speech-bubble';
 import { MIST_BOLT_LEAD_MS, MIST_BOLT_MS, MIST_BOLT_REACH, MIST_BOLT_STAGGER_MS, MistLightningLayer, type MistBolt } from '@/components/katchadeck/games/mist-lightning';
+import { WallImpactBurst, type WallBurst } from '@/components/katchadeck/games/wall-impact-burst';
 import { MistMissionDock, type GlowLandingSource, type OpeningGlowStore } from './kingdom-opening-merge-dock';
 import { laneWispPoint } from './corruption-wisp-layer';
 import { LANE_MISS_ROW, LANE_SPARK_MS, laneOf } from '@/features/mission-mechanics/lanes';
@@ -181,6 +182,8 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
     [state, heldTick]);
   const [bolts, setBolts] = useState<readonly MistBolt[]>([]);
   const boltSeq = useRef(0);
+  const [wallBursts, setWallBursts] = useState<readonly WallBurst[]>([]);
+  const retireWallBurst = useCallback((id: number) => setWallBursts(current => current.filter(burst => burst.id !== id)), []);
   const launchShots = useCallback((shots: readonly GlowShot[], before: MergeWorldState, after: MergeWorldState, window: MissionWindow | null) => {
     const metrics = boardMetricsRef.current;
     const offset = boardOffsetRef.current;
@@ -310,6 +313,16 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
       const metrics = boardMetricsRef.current;
       // A wisp over the board spits Mist: a violet bolt from the wisp down to the cell it lands on.
       const offset = boardOffsetRef.current;
+      if (result && metrics && offset) {
+        const impacts = result.effects.flatMap((effect): WallBurst[] => {
+          if (effect.kind !== 'wall-impact') return [];
+          spriteRecoil.emit(effect.instanceId, 'impact');
+          landings?.strikeWisp?.(effect.wisp);
+          const { bounds } = mergeCellFrame(metrics.geometry, effect.cell);
+          return [{ id: ++boltSeq.current, left: offset.x + bounds.left, top: offset.y + bounds.top, size: bounds.width, tier: effect.tier }];
+        });
+        if (impacts.length) setWallBursts(current => [...current, ...impacts].slice(-12));
+      }
       if (result?.spat.length && metrics && offset) {
         const origin = { x: metrics.x - offset.x, y: metrics.y - offset.y };
         const made = result.spat.flatMap((spit): MistBolt[] => {
@@ -345,6 +358,8 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
       if (result?.zaps.length && metrics && offset) {
         const origin = { x: metrics.x - offset.x, y: metrics.y - offset.y };
         const made = result.zaps.flatMap((zap): MistBolt[] => {
+          const shooter = stateRef.current.board[zap.from]?.occupant;
+          if (shooter?.kind === 'item') spriteRecoil.emit(shooter.instanceId);
           const { bounds } = mergeCellFrame(metrics.geometry, zap.from);
           let from = { left: offset.x + bounds.left, top: offset.y + bounds.top, width: bounds.width, height: bounds.height };
           const size = bounds.width * 0.5;
@@ -490,6 +505,7 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
   };
   const overlay = encounter ? <>
     <MistLightningLayer bolts={bolts} origin={boardOffset && boardMetricsRef.current ? { x: boardMetricsRef.current.x - boardOffset.x, y: boardMetricsRef.current.y - boardOffset.y } : null} reduceMotion={reduceMotion} onDone={retireBolt} />
+    {wallBursts.map(burst => <WallImpactBurst key={burst.id} burst={burst} reduceMotion={reduceMotion} onDone={retireWallBurst} />)}
     {plans.flatMap((plan) => {
       const key = `plan:${plan.wisp}:${plan.kind}`;
       // A Drifter's next step: an arrow from where it is to the Mist it drifts into.

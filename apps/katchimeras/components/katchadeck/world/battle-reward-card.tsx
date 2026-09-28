@@ -10,6 +10,7 @@ import { GLOW } from '@/constants/glow';
 import { KatchaUI } from '@/constants/katcha-ui';
 
 export type BattleReward = {
+  combat?: { elapsedMs: number; breaches: number; prevented: number; abilityUses: number };
   key: string;
   /** Over the title: Victory by default (a Supply Run's crate says so). */
   eyebrow?: string;
@@ -42,6 +43,7 @@ export function BattleRewardCard({ reward, onContinue }: { reward: BattleReward;
       <Animated.View style={[styles.card, cardStyle]}>
         <Text style={styles.eyebrow}>{reward.eyebrow ?? 'Victory'}</Text>
         <Text style={styles.title}>{reward.title}</Text>
+        {reward.combat ? <Text style={[styles.eyebrow, { textAlign: 'center' }]}>{Math.ceil(reward.combat.elapsedMs / 1000)}s · {reward.combat.breaches} hearts lost · {reward.combat.prevented} hits shielded</Text> : null}
         {reward.stars > 0 ? <View style={styles.stars}>
           {[0, 1, 2].map((index) => <Star key={index} lit={index < reward.stars} delayMs={(reduceMotion ? 0 : 380) + index * (reduceMotion ? 0 : 220)} />)}
         </View> : null}

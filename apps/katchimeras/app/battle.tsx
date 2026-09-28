@@ -28,6 +28,9 @@ import { CombatProfileBoundary, CombatProfilePanel } from '@/features/encounter/
 import { CombatEffectsProvider } from '@/components/katchadeck/games/combat-effects';
 import { BattleArtContext, useBattleArt } from '@/features/encounter/battle-art';
 import { BattleTile } from '@/components/katchadeck/games/battle-tile';
+import { CombatTacticsOverlay } from '@/components/katchadeck/games/combat-tactics-overlay';
+import { CombatPreparation } from '@/components/katchadeck/games/combat-preparation';
+import { withCombatGenerator } from '@/features/encounter/combat-loadout';
 
 export default function BattleRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
@@ -37,6 +40,11 @@ export default function BattleRoute() {
     <Text style={styles.error}>This battle is no longer available.</Text>
     <KatchaButton label="Return to the world" onPress={() => router.replace('/katchimeras')} />
   </View>;
+  if (session.status === 'playing' && session.encounter.mechanic?.kind === 'lanes' && session.encounter.mechanic.rulesVersion === 2 && !session.prepared) {
+    return <CombatPreparation session={session} onBack={() => router.replace('/katchimeras')} onStart={(generator, frontierReward) => {
+      saveBattleSession({ ...session, prepared: true, encounter: withCombatGenerator(session.encounter, generator), loadout: { ...session.loadout, secondaryGenerator: generator, frontierReward } });
+    }} />;
+  }
   return <CombatProfileBoundary id="battle-host"><BattleScene key={session.id} session={session} /></CombatProfileBoundary>;
 }
 
@@ -145,6 +153,9 @@ function BattleScene({ session }: { session: BattleSession }) {
     </View>
     <MissionWisps target={mission.wispTarget} glow={glow.store} screenRef={root} />
     <MissionGlowLayer store={glow.store} screenRef={root} retainPool />
+    {mission.store.mechanicState?.kind === 'lanes' && mission.store.state && session.encounter.mechanic?.kind === 'lanes' && playing ? <CombatTacticsOverlay
+      state={mission.store.mechanicState} board={mission.store.state} mechanic={session.encounter.mechanic} metrics={metrics}
+      top={insets.top + 8} onStartWave={mission.store.startWave} /> : null}
     {playing && settled && mission.store.state && mission.store.mechanicState && (session.source.kind === 'first' || session.source.kind === 'trail')
       ? <BattleGuide first={session.source.kind === 'first'} encounter={session.encounter} state={mission.store.state}
         mechanicState={mission.store.mechanicState} merges={mission.store.merges} metrics={metrics} screenRef={root} /> : null}

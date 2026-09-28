@@ -7,6 +7,8 @@ import { ENCOUNTER_DEFAULT_GRADES, type EncounterDefinition, type EncounterDiffi
 import type { MossproutNatureIslandLevel } from '@/types/merge-world';
 import { ISLAND_WISP_LINES } from '@/features/onboarding/corruption-wisps';
 import type { IslandCampaignChapter, IslandCampaignDefinition, RegionMissionDefinition } from './types';
+import { COMBAT_V2_ENABLED } from '@/features/mission-mechanics/combat-rules';
+import { combatBossSpec, combatLessonSpec } from '@/constants/combat-campaign';
 
 /**
  * A region's ladder: every rung of every chapter, in order. A chapter
@@ -81,7 +83,10 @@ export function chapterBoards(campaign: IslandCampaignDefinition, chapter: Islan
   if (chapter.missions?.length) return [...chapter.missions];
   const lines = campaign.copy.wispLines ?? ISLAND_WISP_LINES;
   const authored = BUNDLED_LEVEL_SPECS[campaign.campaignId]?.[chapter.level as 1 | 2 | 3 | 4];
-  if (authored?.length) return authored.map((spec, index) => islandLevel(campaign.campaignId, `c${chapter.level}-${index + 1}`, spec, lines));
+  if (authored?.length) return authored.map((spec, index) => {
+    const modern = COMBAT_V2_ENABLED ? spec.difficulty === 'boss' ? combatBossSpec(campaign.campaignId.includes('drizzlet') ? 1 : campaign.campaignId.includes('mistle') ? 2 : 0, Math.min(2, chapter.level - 2)) : combatLessonSpec(Math.min(23, (chapter.level - 1) * 6 + index + 2), Math.min(9, chapter.level * 2 - 1)) : spec;
+    return islandLevel(campaign.campaignId, `c${chapter.level}-${index + 1}`, modern, lines);
+  });
   if (chapter.restoration && (chapter.restoration.rush || chapter.restoration.mechanic)) {
     const rush = Boolean(chapter.restoration.rush);
     const encounter = encounterFromRestoration(chapter.restoration, campaign.campaignId, chapter.level, restorationStorageKey(campaign.campaignId, chapter.level), chapter.fallbackOrder.requirements, CHAPTER_DIFFICULTY[chapter.level - 1]);
@@ -120,7 +125,7 @@ export function mistLevel(campaign: IslandCampaignDefinition): RegionMissionDefi
 /** The mist level's board before its budget is read (the budget generator solves this). */
 export function mistLevelBoard(campaign: IslandCampaignDefinition): EncounterDefinition {
   // Level one of every friend: two Mistwisps in lanes and the light Mist, played by Light.
-  return islandLevel(campaign.campaignId, 'mist', MIST_LEVEL_SPEC, campaign.copy.wispLines ?? ISLAND_WISP_LINES).encounter;
+  return islandLevel(campaign.campaignId, 'mist', COMBAT_V2_ENABLED ? combatLessonSpec(0) : MIST_LEVEL_SPEC, campaign.copy.wispLines ?? ISLAND_WISP_LINES).encounter;
 }
 
 const ladders = new WeakMap<IslandCampaignDefinition, RegionRung[]>();

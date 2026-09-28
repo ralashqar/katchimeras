@@ -9,7 +9,7 @@ export const DARK_WISP_LOOKS = ['snuffer', 'shrouder', 'nibbler', 'creeper', 'wa
   // Lanes variety (Sept 2026): a look for each new kind of wisp.
   'weaver', 'dasher', 'bulwark', 'frost', 'splitter', 'snatcher', 'crawler',
   // The finale's keeper, in its phases.
-  'hollow', 'forgotten'] as const;
+  'hollow', 'forgotten', 'gunner', 'bomber', 'burrower', 'mirror', 'bramble-sentinel', 'stormglass-matron'] as const;
 export type DarkWispLook = (typeof DARK_WISP_LOOKS)[number];
 
 

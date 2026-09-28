@@ -7,6 +7,7 @@ import { encounterSolvabilityIssues, solveEncounter } from './solvability';
 import { fairness } from './playtest';
 import { lanesFairness } from './lanes-playtest';
 import { isDarkWispLook } from '@/constants/dark-wisp-looks';
+import { recommendedCombatProfile } from './spawner-profile';
 
 const INTENT_KINDS = new Set(['surge', 'snuff', 'shroud', 'root', 'devour', 'ward', 'mend', 'call', 'gather', 'burrow', 'spores', 'rain', 'bind', 'shield', 'corrupt', 'move', 'rest']);
 
@@ -93,7 +94,7 @@ export function validateEncounterDefinition(encounter: EncounterDefinition, boar
   if (issues.length) return issues;
   // Lanes are checked on their clock by the lanes player (`docs/encounter-lanes.md`): the careful one wins four of five.
   if (encounter.mechanic?.kind === 'lanes') {
-    const record = lanesFairness(encounter, 'careful', 5);
+    const record = lanesFairness(encounter, 'careful', 5, encounter.mechanic.rulesVersion === 2 ? recommendedCombatProfile(encounter.recommendedLevel ?? 1) : undefined);
     return record.wins >= 4 ? [] : [`${id}: the careful player won ${record.wins} of 5 on the clock; it must win at least 4`];
   }
   // A territory battle is checked by playing it (the careful player wins on at least four of five seeds).

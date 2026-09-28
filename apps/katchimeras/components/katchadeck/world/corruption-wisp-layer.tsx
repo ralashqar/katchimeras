@@ -1,3 +1,4 @@
+import { WispHealthBar } from './wisp-health-bar';
 import { useCombatActive } from '@/components/katchadeck/games/combat-effects';
 import { useBattleQuality } from '@/features/encounter/battle-performance';
 import { useDetailedCombatWisps } from '@/features/encounter/combat-presentation';
@@ -386,12 +387,12 @@ export const CorruptionWispLayer = memo(function CorruptionWispLayer({ wisps, sc
     {leanLanes ? <PooledLaneWisps capacity={wisps.views.length} items={wisps.views.flatMap((view, index) => view.alive || retained.has(view.id) ? [{
       id: view.id, x: (layout.wisps[index]?.x ?? layout.frame.x) - origin.x, y: (layout.wisps[index]?.y ?? layout.frame.y) - origin.y,
       vy: layout.wisps[index]?.vy ?? 0, size: layout.wisps[index]?.size ?? 48, alive: view.alive, leaving: wisps.leaving,
-      hp: Math.max(0, view.hp - view.damage), look: view.look ?? null, guarded: Boolean(view.guarded), strike: wisps.strikes[index] ?? 0,
+      hp: Math.max(0, view.hp - view.damage), maxHp: view.hp, look: view.look ?? null, guarded: Boolean(view.guarded), strike: wisps.strikes[index] ?? 0,
     }] : [])} /> : wisps.views.map((view, index) => view.alive || retained.has(view.id) ? <CorruptionWisp
       key={view.id} index={index} arriving={!initialLiveIds.current.has(view.id)} enterDelayMs={view.enterDelayMs} drift={view.placement.kind === 'lane'} vy={layout.wisps[index]?.vy ?? 0}
       x={(layout.wisps[index]?.x ?? layout.frame.x) - origin.x} y={(layout.wisps[index]?.y ?? layout.frame.y) - origin.y}
       size={layout.wisps[index]?.size ?? 48}
-      pip={view.hp > 1 ? `${Math.max(0, view.hp - view.damage)}` : null}
+      hp={Math.max(0, view.hp - view.damage)} maxHp={view.hp}
       intent={view.intent ?? null}
       aimed={aimedIndex === index}
       guarded={Boolean(view.guarded) && view.alive}
@@ -421,7 +422,7 @@ export const MissionWisps = memo(function MissionWisps({ target, glow, screenRef
 });
 
 /** One wisp: hovering, rimmed in violet, shedding embers; it flinches when struck and shrinks away when it falls. */
-const CorruptionWisp = memo(function CorruptionWisp({ arriving = false, guarded = false, drift = false, vy = 0, index, enterDelayMs, x, y, size, pip, intent, aimed = false, look = null, weakTo = null, alive, leaving, strikeNonce }: { arriving?: boolean; /** Shielded by a bulwark beside it: a ring of violet light, and nothing gets through it. */ guarded?: boolean; /** Lanes: it drifts down steadily; its place arrives every tick, and it moves between them on its own at its speed. */ drift?: boolean; /** Lanes: its drift, px per ms (0 while it holds). */ vy?: number; /** v2: the chain it is weak to. */ weakTo?: 'growth' | 'water' | null; /** v2: its Dark Wisp art, when it has one. */ look?: string | null; /** v2: the wisp a held piece would hit. */ aimed?: boolean; index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Hits it still takes, shown under it when it takes more than one. */ pip: string | null; /** v2: what it will do next, and in how many turns. */ intent: MissionWispView['intent'] | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
+const CorruptionWisp = memo(function CorruptionWisp({ arriving = false, guarded = false, drift = false, vy = 0, index, enterDelayMs, x, y, size, hp, maxHp, intent, aimed = false, look = null, weakTo = null, alive, leaving, strikeNonce }: { arriving?: boolean; /** Shielded by a bulwark beside it: a ring of violet light, and nothing gets through it. */ guarded?: boolean; /** Lanes: it drifts down steadily; its place arrives every tick, and it moves between them on its own at its speed. */ drift?: boolean; /** Lanes: its drift, px per ms (0 while it holds). */ vy?: number; /** v2: the chain it is weak to. */ weakTo?: 'growth' | 'water' | null; /** v2: its Dark Wisp art, when it has one. */ look?: string | null; /** v2: the wisp a held piece would hit. */ aimed?: boolean; index: number; /** A wisp that pops up mid-mission says when; the first ones arrive in order. */ enterDelayMs?: number; x: number; y: number; size: number; /** Remaining and maximum health for the bar under the wisp. */ hp: number; maxHp: number; /** v2: what it will do next, and in how many turns. */ intent: MissionWispView['intent'] | null; alive: boolean; leaving: boolean; strikeNonce: number }) {
   const reduceMotion = useReducedMotion();
   const art = useWispArt(look, size);
   const motionActive = useCombatActive();
@@ -580,7 +581,7 @@ const CorruptionWisp = memo(function CorruptionWisp({ arriving = false, guarded 
     {aimed && alive ? <Animated.View entering={reduceMotion ? undefined : ZoomIn.duration(160)} exiting={reduceMotion ? undefined : FadeOut.duration(140)} pointerEvents="none" style={[styles.aim, { width: size * 1.35, height: size * 1.35, borderRadius: size, left: -size * 0.175, top: -size * 0.175 }]} /> : null}
     {/* Its badges arrive with it: they grow in as it does, never before it. */}
     <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, badgeStyle]}>
-      {pip && alive ? <View style={[styles.pip, { top: size * 0.86 }]}><Text style={styles.pipText}>{pip}</Text></View> : null}
+      {alive ? <WispHealthBar hp={hp} maxHp={maxHp} guarded={guarded} /> : null}
       {intent && alive ? <IntentChip intent={intent} size={size} /> : null}
       {weakTo && alive ? <View accessible accessibilityLabel={`Weak to ${weakTo === 'growth' ? 'Growth' : 'Water'}`} style={[styles.weak, { top: size * 0.86, right: -size * 0.12 }, weakTo === 'water' ? styles.weakWater : styles.weakGrowth]}>
         <IconSymbol name={weakTo === 'water' ? 'water.waves' : 'leaf.fill'} size={11} color="#FFFFFF" />
@@ -685,8 +686,6 @@ const styles = StyleSheet.create({
   // Over the docked board (60), under the Glow (100).
   layerOnBoard: { zIndex: 61 },
   caption: { position: 'absolute', alignItems: 'center', zIndex: 4 },
-  pip: { position: 'absolute', alignSelf: 'center', zIndex: 3, paddingHorizontal: 7, paddingVertical: 1, borderRadius: 9, backgroundColor: 'rgba(38,18,58,0.78)' },
-  pipText: { fontFamily: 'FredokaBold', fontSize: 12, color: '#F3E6FF', textAlign: 'center' },
   aim: { position: 'absolute', borderWidth: 3, borderColor: '#FFD27A', backgroundColor: 'rgba(255,210,122,0.12)', zIndex: 2 },
   guardRing: { position: 'absolute', borderWidth: 3, borderColor: 'rgba(196,150,255,0.95)', backgroundColor: 'rgba(170,120,255,0.18)', zIndex: 1 },
   weak: { position: 'absolute', zIndex: 4, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },

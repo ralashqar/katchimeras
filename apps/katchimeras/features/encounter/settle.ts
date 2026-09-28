@@ -11,6 +11,7 @@ import { canAfford, encounterStatus, objectiveMet, recordCoverage, spend, type E
 import { chainRole } from './chains';
 import { clearBoundMist, glowShots, harmonyPulse, openMistCell, type GlowShot, type MistOpened } from './mist';
 import { seededUnit } from './seed';
+import { mergeBurst } from './merge-burst';
 import { lanesAfterMerge, lanesCrash, lanesSprinklerTapped, SEED_SPRINKLER_ID, lanesStormPotTapped, STORM_POT_ID } from '@/features/mission-mechanics/lanes';
 
 /**
@@ -60,6 +61,7 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
   const unchanged = (refused?: MergeWorldFailureReason): SettleResult => ({ ...before, strike: null, effects: [], opened: [], status: encounterStatus(encounter, host, before.mechanicState, before.run, before.state, window), ...(refused ? { refused } : {}) });
   const action = actionOf(command, result);
   if (!action) return unchanged();
+  if (action === 'tap' && before.mechanicState.kind === 'lanes' && (before.mechanicState.combat?.preparingMs ?? 0) > 0) return unchanged();
   // A territory battle: nothing costs; a turn is a merge, and only merges give the wisps their turn.
   const territory = Boolean(before.run.territory);
   const cost = territory ? 0 : resolveCost(action);
@@ -143,9 +145,10 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
       } else if (fallen.length) gained = recharge.amount * fallen.length;
       if (gained > 0) state = { ...state, generators: { ...state.generators, [spawner.generatorId]: { ...generator, charges: generator.charges + gained, capacity: Math.max(generator.capacity, generator.charges + gained) } } };
     }
-    if (run.ability) run = { ...run, ability: { ...run.ability, charge: run.ability.charge + 1 } };
+    const preparing = mechanicState.kind === 'lanes' && (mechanicState.combat?.preparingMs ?? 0) > 0;
+    if (run.ability && !preparing) run = { ...run, ability: { ...run.ability, charge: run.ability.charge + 1 } };
     // The second hero's ability charges from the same merges.
-    if (run.partnerAbility) run = { ...run, partnerAbility: { ...run.partnerAbility, charge: run.partnerAbility.charge + 1 } };
+    if (run.partnerAbility && !preparing) run = { ...run, partnerAbility: { ...run.partnerAbility, charge: run.partnerAbility.charge + 1 } };
     // Focus in a Lanes battle: the merge lands a size bigger (or more), and the boost is spent.
     const lanesBoost = lanes ? before.run.boost?.next ?? 0 : 0;
     if (lanesBoost > 0) {
@@ -163,6 +166,7 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
     if (lanes && mechanicState.kind === 'lanes') {
       const made = state.board[result.mergedCell]?.occupant;
       mechanicState = lanesAfterMerge(mechanicState, made?.kind === 'item' ? made.instanceId : null);
+      if (mechanic.kind === 'lanes' && result.mergedCell != null) mechanicState = mergeBurst(mechanic, mechanicState, state, window, result.mergedCell, run.loadout?.level);
     }
   }
   // The Seed Sprinkler (`docs/lanes-variety-design.md`): its tap's Seed lands where it sends it (the board flies it
@@ -174,7 +178,7 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
     state = launched.board;
     landedCell = launched.landed;
   }
-  if (lanes && action === 'tap' && command.type === 'tapGenerator' && command.generatorId === STORM_POT_ID && mechanic.kind === 'lanes' && mechanicState.kind === 'lanes') {
+  if (lanes && action === 'tap' && command.type === 'tapGenerator' && mechanic.kind === 'lanes' && command.generatorId === (mechanic.secondary?.generatorId ?? STORM_POT_ID) && mechanicState.kind === 'lanes') {
     const launched = lanesStormPotTapped(mechanic, mechanicState, state, window, result.spawnedCell ?? null);
     state = launched.board;
     landedCell = launched.landed;

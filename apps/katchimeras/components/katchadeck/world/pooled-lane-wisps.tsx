@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { WispHealthBar } from './wisp-health-bar';
 import { Image } from 'expo-image';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useCombatActive } from '@/components/katchadeck/games/combat-effects';
@@ -7,7 +8,7 @@ import { useWispArt } from '@/features/encounter/battle-art';
 import { useEffectSlots } from '@/hooks/use-effect-slots';
 import { recordMergeRender } from '@/utils/merge-world/performance';
 
-export type LaneWispSprite = { id: string; x: number; y: number; size: number; vy: number; alive: boolean; leaving: boolean; hp: number; look: string | null; guarded: boolean; strike: number };
+export type LaneWispSprite = { id: string; x: number; y: number; size: number; vy: number; alive: boolean; leaving: boolean; hp: number; maxHp: number; look: string | null; guarded: boolean; strike: number };
 const DRIFT_MS = 220;
 
 /** Capacity is the authored enemy count: visible enemies are never dropped by an effects budget. */
@@ -70,11 +71,9 @@ const LaneWispSlot = memo(function LaneWispSlot({ item }: { item: LaneWispSprite
   if (!drawn) return null;
   return <Animated.View pointerEvents="none" style={[styles.slot, { width: size, height: size }, style]}>
     <Image source={art} accessibilityLabel={`${drawn.look ?? 'Corruption'} wisp`} contentFit="contain" transition={0} style={StyleSheet.absoluteFill} />
-    {item?.alive && (drawn.hp > 1 || drawn.guarded) ? <View style={styles.badge}><Text style={styles.text}>{drawn.guarded ? '◆ ' : ''}{drawn.hp}</Text></View> : null}
+    {item?.alive ? <WispHealthBar hp={drawn.hp} maxHp={drawn.maxHp} guarded={drawn.guarded} /> : null}
   </Animated.View>;
 }, (a, b) => a.item === b.item || Boolean(a.item && b.item &&
   a.item.id === b.item.id && a.item.x === b.item.x && a.item.y === b.item.y && a.item.size === b.item.size && a.item.vy === b.item.vy &&
-  a.item.alive === b.item.alive && a.item.leaving === b.item.leaving && a.item.hp === b.item.hp && a.item.look === b.item.look && a.item.guarded === b.item.guarded && a.item.strike === b.item.strike));
-const styles = StyleSheet.create({ slot: { position: 'absolute', left: 0, top: 0 },
-  badge: { position: 'absolute', bottom: -3, alignSelf: 'center', paddingHorizontal: 5, borderRadius: 7, backgroundColor: '#291B3C' },
-  text: { color: '#FFFFFF', fontSize: 11, fontWeight: '700' } });
+  a.item.alive === b.item.alive && a.item.leaving === b.item.leaving && a.item.hp === b.item.hp && a.item.maxHp === b.item.maxHp && a.item.look === b.item.look && a.item.guarded === b.item.guarded && a.item.strike === b.item.strike));
+const styles = StyleSheet.create({ slot: { position: 'absolute', left: 0, top: 0 } });

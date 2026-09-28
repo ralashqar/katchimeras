@@ -1,8 +1,11 @@
 import { TERRITORY_DEFAULT_STARS, type EncounterDefinition, type EncounterGrade } from '@/types/encounter';
 import { resolveLeft, type EncounterRunState, type EncounterStatus } from './encounter-run';
+import type { MissionMechanicState } from '@/types/mission-mechanic';
 
 /** How an attempt ended, for the outcome sheet and the world's ledger. */
 export type EncounterOutcome = {
+  frontierReward?: 'timber' | 'glow';
+  combat?: { elapsedMs: number; breaches: number; prevented: number; abilityUses: number };
   cleared: boolean;
   grade: EncounterGrade;
   /** Resolve left at the end; null on a board with no budget. */
@@ -37,11 +40,15 @@ export function encounterGrade(encounter: EncounterDefinition, run: EncounterRun
   return 'cleared';
 }
 
-export function encounterOutcome(encounter: EncounterDefinition, run: EncounterRunState, status: EncounterStatus): EncounterOutcome {
+export function encounterOutcome(encounter: EncounterDefinition, run: EncounterRunState, status: EncounterStatus, mechanicState?: MissionMechanicState | null): EncounterOutcome {
   const cleared = status === 'cleared';
+  const combat = mechanicState?.kind === 'lanes' ? mechanicState.combat : null;
+  const laneGrade = !cleared || run.resolve.continues > 0 || run.cacheOpened ? 'cleared' : combat?.breaches === 0 ? 'perfect' : combat?.breaches === 1 ? 'bright' : 'cleared';
   return {
     cleared,
-    grade: cleared ? encounterGrade(encounter, run) : 'cleared',
+    ...(run.loadout?.frontierReward ? { frontierReward: run.loadout.frontierReward } : {}),
+    grade: combat ? laneGrade : cleared ? encounterGrade(encounter, run) : 'cleared',
+    ...(combat && mechanicState?.kind === 'lanes' ? { combat: { elapsedMs: mechanicState.clock, breaches: combat.breaches, prevented: combat.prevented, abilityUses: (run.ability?.uses ?? 0) + (run.partnerAbility?.uses ?? 0) } } : {}),
     resolveLeft: run.resolve.budget == null ? null : resolveLeft(run),
     actions: run.actions,
     merges: run.merges,

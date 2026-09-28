@@ -119,7 +119,7 @@ export function useMistMission({ guided = true, initialAttempt = 1, active, miss
   /** The Katchimera brought in, and the helper Wisp; Mossprout at level one when absent. */
   loadout?: EncounterLoadout | null;
   /** The world whose Haven shapes the encounter (its buildings). */
-  world?: (Pick<MergeWorldState, 'heartwoodBuildings'> & Partial<Pick<MergeWorldState, 'chapterOpeningsSeen'>>) | null;
+  world?: (Pick<MergeWorldState, 'heartwoodBuildings'> & Partial<Pick<MergeWorldState, 'chapterOpeningsSeen' | 'heroBuildings'>>) | null;
   tileNode: View | null;
   boardMetrics: MergeBoardScreenMetrics | null;
   cameraSettled: boolean;
@@ -139,7 +139,7 @@ export function useMistMission({ guided = true, initialAttempt = 1, active, miss
   // What the dock and the guidance read: the encounter carries every field a mission has, with guides of its own or the mission's.
   const played = useMemo((): MistMissionDefinition | null => (encounter ? { ...encounter, guides: guided ? encounter.guides ?? mission?.guides ?? FREE_GUIDES : FREE_GUIDES } : mission ? resolveMissionForPlay(mission, preview) : null), [encounter, guided, mission, preview]);
   const effectiveLoadout = useMemo((): EncounterLoadout | null => encounter ? loadout ?? { companionId: 'mossprout', level: 1 } : null, [encounter, loadout]);
-  const profile = useMemo(() => encounterProfile(world ?? null, effectiveLoadout), [effectiveLoadout, world]);
+  const profile = useMemo(() => effectiveLoadout?.combatProfile ?? encounterProfile(world ?? null, effectiveLoadout), [effectiveLoadout, world]);
   const window = useMemo(() => missionWindow(encounter?.rows ?? 4), [encounter?.rows]);
   const wispSlow = profile.wispSlow ?? 0;
   const host = useMemo(() => (encounter ? encounterMechanicHost(encounter, { wispSlow }) : played), [encounter, played, wispSlow]);
@@ -315,7 +315,7 @@ export function useMistMission({ guided = true, initialAttempt = 1, active, miss
     if (!found) return null;
     return { definition: found.definition, tier: found.tier, charge: store.run.partnerAbility?.charge ?? 0, ready: partnerAbilityReady(store.run, found.tier), targets: abilityTargets(found.definition, found.tier, store.state, window), companionId: effectiveLoadout.partner.companionId };
   }, [effectiveLoadout, encounter, store.run, store.state, window]);
-  const outcome = useMemo(() => (encounter && store.run && store.status ? encounterOutcome(encounter, store.run, store.status) : null), [encounter, store.run, store.status]);
+  const outcome = useMemo(() => (encounter && store.run && store.status ? encounterOutcome(encounter, store.run, store.status, store.mechanicState) : null), [encounter, store.run, store.status, store.mechanicState]);
   // A hero using their ability says so, for a moment, in the battle's speech bubble.
   const [abilityCall, setAbilityCall] = useState<SpeechLine | null>(null);
   const speech = useMemo(() => {

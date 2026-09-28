@@ -10,6 +10,8 @@ import { createEncounterState, encounterWindow } from './create-state';
 import { createEncounterRun, encounterStatus, lossReason, type EncounterLossReason } from './encounter-run';
 import { seededUnit } from './seed';
 import { settleAction, tapSeed, type SettleBefore } from './settle';
+import { DEFAULT_ENCOUNTER_PROFILE, type EncounterProfile } from './encounter-run';
+import { combatChain, combatFire, SECONDARY_CHAINS } from '@/features/mission-mechanics/combat-rules';
 
 /**
  * A Lanes level played on its clock (`docs/encounter-lanes.md`), for tuning and tests. The level ticks every 100 ms;
@@ -26,15 +28,16 @@ const NOW = 1_000;
 const TICK_MS = 100;
 const THINK_MS: Record<LanesStyle, number> = { careful: 1_200, careless: 3_000, idle: Number.POSITIVE_INFINITY };
 
-export function lanesPlaytest(encounter: EncounterDefinition, input: { style: LanesStyle; attempt?: number; maxMs?: number; items?: ReadonlyMap<string, MergeItemDefinition> }): LanesPlaytestResult {
+export function lanesPlaytest(encounter: EncounterDefinition, input: { style: LanesStyle; attempt?: number; maxMs?: number; items?: ReadonlyMap<string, MergeItemDefinition>; profile?: EncounterProfile; heroLevel?: number }): LanesPlaytestResult {
   const items = input.items ?? MERGE_ITEMS_BY_ID;
-  const host = encounterMechanicHost(encounter);
+  const host = encounterMechanicHost(encounter, { wispSlow: input.profile?.wispSlow ?? 0 });
   const mechanic = resolveMechanic(host);
   if (mechanic.kind !== 'lanes') throw new Error(`${encounter.id} is not a Lanes level`);
   const window = encounterWindow(encounter);
   const binding = { encounter, host, window, items };
   const attempt = input.attempt ?? 1;
-  let node: SettleBefore = { state: createEncounterState(encounter, 'mossprout', NOW), run: createEncounterRun(encounter, { attempt }), mechanicState: createMechanicState(mechanic) };
+  const profile = input.profile ?? DEFAULT_ENCOUNTER_PROFILE;
+  let node: SettleBefore = { state: createEncounterState(encounter, 'mossprout', NOW, profile), run: createEncounterRun(encounter, { attempt, profile, loadout: { companionId: 'mossprout', level: input.heroLevel ?? 1 } }), mechanicState: createMechanicState(mechanic) };
   const maxMs = input.maxMs ?? 300_000;
   const think = THINK_MS[input.style];
   let nextThink = think;
@@ -46,7 +49,7 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
   const tierOf = (definitionId: string) => Math.floor(items.get(definitionId)?.tier ?? 1);
   // The Spark chain zaps what is near it instead of shooting up its column (`laneZap`).
   const isSpark = (definitionId: string) => items.get(definitionId)?.chainId === STORM_CHAIN;
-  const shootsUp = (definitionId: string) => (isSpark(definitionId) ? null : laneFire(tierOf(definitionId)));
+  const shootsUp = (definitionId: string) => isSpark(definitionId) ? null : mechanic.rulesVersion === 2 ? combatFire(tierOf(definitionId), combatChain(definitionId) ?? 'garden') : laneFire(tierOf(definitionId));
   const move = (from: SettleBefore, a: number, b: number): SettleBefore | null => {
     const command: MergeWorldCommand = { type: 'move', from: a, to: b, now: NOW };
     const result = reduceMissionMove(from.state, a, b, NOW, items);
@@ -172,7 +175,7 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
       node = { ...node, state: cache.board, run: cache.run };
     }
     if (node.mechanicState.kind !== 'lanes') break;
-    const ticked = lanesTick(mechanic, node.mechanicState, node.state, TICK_MS, window, items);
+    const ticked = lanesTick(mechanic, node.mechanicState, node.state, TICK_MS, window, items, profile);
     node = { ...node, state: ticked.board, mechanicState: ticked.state };
     ms += TICK_MS;
     if (ms >= nextThink) {
@@ -180,11 +183,11 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
       // The Seed Sprinkler is a quick tap between moves: a player launches a Seed when there is room and fewer than three
       // loose Seeds to merge (never flooding the board with them).
       // The Storm Pot the same way, for its own chain's Seeds.
-      for (const [engine, chain] of [[SEED_SPRINKLER_ID, 'nature:garden'], [STORM_POT_ID, STORM_CHAIN]] as const) {
+      for (const [engine, chain] of [[SEED_SPRINKLER_ID, 'nature:garden'], [mechanic.secondary?.generatorId ?? STORM_POT_ID, mechanic.secondary ? `nature:${SECONDARY_CHAINS[mechanic.secondary.generatorId]}` : STORM_CHAIN]] as const) {
       const sprinkler = node.state.generators[engine];
       const seedsLoose = window.cellIndices.filter((cell) => { const piece = loose(node.state, cell); return piece && tierOf(piece.definitionId) === 1 && items.get(piece.definitionId)?.chainId === chain; }).length;
       if (sprinkler && sprinkler.charges > 0 && seedsLoose < (engine === STORM_POT_ID ? 2 : 3) && window.cellIndices.filter((cell) => isFree(node.state, cell)).length >= 2) {
-        const command = { type: 'tapGenerator' as const, generatorId: engine, now: NOW, seed: tapSeed(node.run), spendEnergy: false as const, enforceCharges: true as const };
+        const command = { type: 'tapGenerator' as const, generatorId: engine, now: NOW, seed: tapSeed(node.run), spendEnergy: false as const, enforceCharges: true as const, dropProfile: { tierTwoChance: profile.tierTwoChance, tierThreeChance: profile.tierThreeChance } };
         const result = reduceMergeWorld(node.state, command);
         if (result.changed && result.spawnedCell != null) {
           const settled = settleAction(binding, node, command, result);
@@ -202,11 +205,11 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
 }
 
 /** A Lanes level's record over several seeds. */
-export function lanesFairness(encounter: EncounterDefinition, style: LanesStyle, seeds = 10): { wins: number; seeds: number; seconds: number } {
+export function lanesFairness(encounter: EncounterDefinition, style: LanesStyle, seeds = 10, profile?: EncounterProfile): { wins: number; seeds: number; seconds: number } {
   let wins = 0;
   let total = 0;
   for (let attempt = 1; attempt <= seeds; attempt += 1) {
-    const result = lanesPlaytest(encounter, { style, attempt });
+    const result = lanesPlaytest(encounter, { style, attempt, profile, heroLevel: profile ? encounter.recommendedLevel : undefined });
     if (result.won) wins += 1;
     total += result.ms;
   }

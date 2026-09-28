@@ -48,6 +48,9 @@ export type IslandWispSpec = {
  * `step` seconds, leaving Mist on the free cell it steps off every `drop` steps.
  */
 export type IslandLaneSpec = {
+  attack?: 'gunner' | 'bomber' | 'burrower' | 'mirror';
+  wave?: number;
+  breachDamage?: number;
   id: string; column: number; at: number; hp: number; step: number; drop?: number; look?: string;
   /** While over the board, it spits Mist down its column every this many seconds. */ spit?: number;
   /** A striker: it strikes the nearest plant in its column every this many seconds, dropping it a tier. */ strike?: number;
@@ -65,6 +68,10 @@ export type IslandLaneSpec = {
 };
 
 export type IslandLevelSpec = {
+  combatV2?: boolean;
+  secondaryGenerator?: import('@/features/mission-mechanics/combat-rules').SecondaryGenerator;
+  terrain?: readonly import('@/features/mission-mechanics/combat-rules').CombatTerrain[];
+  recommendedLevel?: number;
   title: string;
   objective: string;
   difficulty: EncounterDifficulty;
@@ -159,6 +166,9 @@ const seconds = (value: number) => Math.round(value * 1_000);
 export function laneWisps(lanes: readonly IslandLaneSpec[]): LaneWisp[] {
   const authored: LaneWisp[] = lanes.map((lane) => ({
     ...(lane.crawl ? { crawlEvery: seconds(lane.crawl.every), crawlFrom: lane.crawl.from } : {}),
+    ...(lane.attack ? { attack: lane.attack, attackEveryMs: 7000 } : {}),
+    ...(lane.wave != null ? { wave: lane.wave } : {}),
+    ...(lane.breachDamage ? { breachDamage: lane.breachDamage } : {}),
     id: lane.id, hp: lane.hp, column: lane.column - 1, at: seconds(lane.at), stepMs: seconds(lane.step),
     ...(lane.drop ? { dropEvery: lane.drop } : {}), ...(lane.look ? { look: lane.look } : {}),
     ...(lane.spit ? { spitEvery: seconds(lane.spit) } : {}), ...(lane.strike ? { strikeEvery: seconds(lane.strike) } : {}),
@@ -183,7 +193,7 @@ export function laneWisps(lanes: readonly IslandLaneSpec[]): LaneWisp[] {
       brought.push({ id: `${lane.id}:mistling-${call + 1}`, hp: lane.calls!.hp ?? 3, column, at: 0, stepMs: 3_400, look: 'mistling', spawn: { by: index, on: 'call' } });
     }
   });
-  return [...authored, ...brought];
+  return [...authored, ...brought.map((child) => ({ ...child, wave: lanes[child.spawn!.by]?.wave ?? 0 }))];
 }
 
 /** What a tapped Seed Sprinkler holds at the start of a battle (and refills to). */
@@ -245,6 +255,7 @@ export function islandLevel(campaignId: string, key: string, rawSpec: IslandLeve
   if (lanes && spec.seeds && sprinklerAt == null) throw new Error(`${campaignId}:${key}: Seeds with no room for the Seed Sprinkler`);
   const mist = [...spec.mist, ...bound, ...ring, ...(spec.rescue ? [{ cell: spec.rescue.cell, type: 'dense' as const }] : [])];
   const encounter: EncounterDefinition = {
+    ...(spec.recommendedLevel ? { recommendedLevel: spec.recommendedLevel } : {}),
     id,
     storageKey: `katchimeras.encounter.${campaignId.replace(/:/g, '.')}.${key}.${lanes ? 'lanes4' : tactics ? 'v6' : 'v5'}`,
     rows,
@@ -274,6 +285,14 @@ export function islandLevel(campaignId: string, key: string, rawSpec: IslandLeve
     rewards: spec.rewards ?? { glow: 0, xp: 0 },
     lines,
   };
+  if (lanes && spec.combatV2 && encounter.mechanic?.kind === 'lanes') {
+    const generatorId = spec.secondaryGenerator ?? 'storm-pot';
+    const secondaryChain = ({ 'storm-pot': 'storm', 'ward-planter': 'bulwark', 'dew-well': 'dew', 'lantern-post': 'lantern' } as const)[generatorId];
+    encounter.mechanic = { ...encounter.mechanic, wisps: encounter.mechanic.wisps.map((wisp) => ({ ...wisp, startRow: 2 })), rulesVersion: 2, breachBudget: 3, preparationMs: 5000, terrain: spec.terrain,
+      ...(stormPotAt != null ? { secondary: { generatorId, everyMs: 7000, reach: 2 } } : {}) };
+    encounter.spawners = encounter.spawners.map((spawner) => spawner.generatorId === 'storm-pot' ? { ...spawner, id: generatorId, generatorId, drops: [`nature:${secondaryChain}:1`] } : spawner);
+    encounter.storageKey += '.combat2';
+  }
   return { id, title: spec.title, objective: spec.objective, difficulty: spec.difficulty, encounter, rewards: encounter.rewards };
 }
 

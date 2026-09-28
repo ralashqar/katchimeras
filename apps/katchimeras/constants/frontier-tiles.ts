@@ -3,6 +3,7 @@ import { heartTreeLevel } from '@/constants/heart-tree';
 import { hollowTreeRestored } from '@/constants/finale';
 import { regionRing, type RegionId } from '@/constants/regions';
 import type { MergeWorldState } from '@/types/merge-world';
+import { COMBAT_V2_ENABLED } from '@/features/mission-mechanics/combat-rules';
 
 /**
  * The Frontier (cozy 4X v2, `docs/cozy-4x-ftue-v2-wayfinders-road.md` Part D3): wild land around the Sanctuary, under
@@ -115,7 +116,7 @@ export function frontierTileLit(world: Pick<MergeWorldState, 'heartTree'> & Part
 
 /** A tile a Mist Surge has taken back (`world.frontierSurges.contested`). */
 export function frontierTileContested(world: Partial<Pick<MergeWorldState, 'frontierSurges'>>, tileId: string): boolean {
-  return world.frontierSurges?.contested?.[tileId] != null;
+  return !COMBAT_V2_ENABLED && world.frontierSurges?.contested?.[tileId] != null;
 }
 
 export function frontierTileState(world: FrontierWorld, tile: FrontierTile): FrontierTileState {

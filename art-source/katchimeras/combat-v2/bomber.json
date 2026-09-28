@@ -1,0 +1,7 @@
+{
+  "name": "bomber",
+  "prompt": "Production transparent mobile game sprite: a round purple mist wisp carrying a large glowing purple seed bomb underneath its body, angry bright eyes. Original cozy merge defence art. Rounded handcrafted clay-toy 3D render, three-quarter view looking slightly down, soft upper-left studio lighting. Purple smoky clay character, threatening but cute, simple readable silhouette. Centered with 15% transparent padding, fully visible. No text, labels, backdrop, border, UI, ground plane or extra objects. Genuine transparent alpha background. Match the style and camera of the supplied enemy reference.",
+  "source": "C:\\Users\\daruk\\.codex\\generated_images\\01a0e9ac-6ffa-7452-a266-08a9e9d1af0f\\exec-06935e6a-89a4-4ce3-a5fc-979bee288da8.png",
+  "tool": "image_gen",
+  "destination": "C:/Users/daruk/Projects/Katchimeras/katchimeras/art-source/katchimeras/combat-v2/bomber.png"
+}

@@ -14,5 +14,6 @@ export function encounterFingerprint(encounter: EncounterDefinition): string {
 export function encounterRunId(encounter: EncounterDefinition, attempt: number, loadout: EncounterLoadout | null): string {
   // A partner (the second hero slot) makes it a different run; a lone hero's id is unchanged, so their saves resume.
   const partner = loadout?.partner ? `:+${loadout.partner.companionId}:${loadout.partner.level}` : '';
-  return `${encounter.id}:${Math.max(1, Math.floor(attempt))}:${loadout?.companionId ?? '-'}:${loadout?.level ?? 0}:${loadout?.wispId ?? '-'}${partner}:${encounterFingerprint(encounter)}`;
+  const combat = loadout?.combatProfile || loadout?.secondaryGenerator ? `:combat:${hashSeed(JSON.stringify([loadout.combatProfile, loadout.secondaryGenerator])).toString(36)}` : '';
+  return `${encounter.id}:${Math.max(1, Math.floor(attempt))}:${loadout?.companionId ?? '-'}:${loadout?.level ?? 0}:${loadout?.wispId ?? '-'}${partner}:${encounterFingerprint(encounter)}${combat}`;
 }

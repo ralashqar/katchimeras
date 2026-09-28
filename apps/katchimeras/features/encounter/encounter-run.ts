@@ -9,6 +9,12 @@ import { hashSeed } from './seed';
 
 /** What the Haven brings into every encounter: the buildings' benefits and the helper Wisp's perk, as numbers. */
 export type EncounterProfile = {
+  damageMultiplier?: number;
+  shieldBonus?: number;
+  healBonus?: number;
+  supportPace?: number;
+  openingShield?: boolean;
+  warningMs?: number;
   /** Dew Spring: Resolve added to the board's budget. */
   startingResolve: number;
   /** Charges added to every spawner at the start. */

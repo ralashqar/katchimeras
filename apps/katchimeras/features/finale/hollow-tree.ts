@@ -1,6 +1,8 @@
 import { islandLevel, waves, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
 import type { RegionMissionDefinition } from '@/constants/island-campaigns/types';
 import { HOLLOW_TREE_FINALE_ID } from '@/constants/finale';
+import { COMBAT_V2_ENABLED } from '@/features/mission-mechanics/combat-rules';
+import { combatBossSpec } from '@/constants/combat-campaign';
 
 /**
  * The finale (Chapter 10, `docs/cozy-4x-ftue-v2-wayfinders-road.md`): the Hollow Tree was the first Sanctuary, and the
@@ -35,7 +37,7 @@ export const HOLLOW_TREE_FINALE_SPEC: IslandLevelSpec = {
 
 let finale: RegionMissionDefinition | null = null;
 export function hollowTreeFinaleMission(): RegionMissionDefinition {
-  finale ??= islandLevel('finale', 'hollow-tree', HOLLOW_TREE_FINALE_SPEC);
+  finale ??= islandLevel('finale', 'hollow-tree', COMBAT_V2_ENABLED ? combatBossSpec(2, 2) : HOLLOW_TREE_FINALE_SPEC);
   if (finale.id !== HOLLOW_TREE_FINALE_ID) throw new Error(`finale id drifted: ${finale.id}`);
   return finale;
 }

@@ -1,8 +1,10 @@
 import type { ImageSourcePropType } from 'react-native';
 import type { DarkWispLook } from './dark-wisp-looks';
+import { COMBAT_ENEMY_ART } from './combat-art.gen';
 
 /** The Dark Wisp looks' cutouts, apart from the pure look rules so the engine and its tests never load an image. */
 export const DARK_WISP_LOOK_ART: Readonly<Record<DarkWispLook, ImageSourcePropType>> = {
+  ...COMBAT_ENEMY_ART,
   snuffer: require('@incubator/art-cutouts/dark-wisps/snuffer.webp'),
   shrouder: require('@incubator/art-cutouts/dark-wisps/shrouder.webp'),
   nibbler: require('@incubator/art-cutouts/dark-wisps/nibbler.webp'),

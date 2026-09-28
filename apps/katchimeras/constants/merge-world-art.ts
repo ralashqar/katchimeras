@@ -1,10 +1,12 @@
 import { artKeys, artSource, type ArtSource } from '@/utils/art-source';
+import { COMBAT_ITEM_ART, COMBAT_GENERATOR_ART } from './combat-art.gen';
 import { MOSSPROUT_ROOTBOUND_GATES_BY_ID } from '@/constants/merge-world-catalog';
 import { VEILED_MEMORY_CARD_ART } from '@/constants/memory-card-art';
 
 export const RESIDENT_CARD_ART = VEILED_MEMORY_CARD_ART;
 
 export const MERGE_WORLD_ITEM_ART = {
+  ...COMBAT_ITEM_ART,
   // The carried card and every locked resident-card cell intentionally share
   // one face: the FTUE teaches a literal identical-card merge.
   'mossprout:resident-card:sealed': RESIDENT_CARD_ART,
@@ -144,6 +146,7 @@ export const MERGE_WORLD_ITEM_ART = {
 export type MergeWorldAuthoredItemId = keyof typeof MERGE_WORLD_ITEM_ART;
 
 export const MERGE_WORLD_GENERATOR_ART = {
+  ...COMBAT_GENERATOR_ART,
   'hearth-pantry': require('@incubator/art-merge-world/generators/hearth-pantry.webp'),
   'ritual-bar': require('@incubator/art-merge-world/generators/ritual-bar.webp'),
   'cafe-counter': require('@incubator/art-merge-world/generators/cafe-counter.webp'),

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "bomber",
+    "path": "art/assets/images/katchimeras/cutouts/dark-wisps/bomber.webp",
+    "bytes": 26634
+  },
+  {
+    "id": "bramble-sentinel",
+    "path": "art/assets/images/katchimeras/cutouts/dark-wisps/bramble-sentinel.webp",
+    "bytes": 34326
+  },
+  {
+    "id": "burrower",
+    "path": "art/assets/images/katchimeras/cutouts/dark-wisps/burrower.webp",
+    "bytes": 30758
+  },
+  {
+    "id": "dew-well",
+    "path": "art/assets/images/katchimeras/merge-world/generators/dew-well.webp",
+    "bytes": 22916
+  },
+  {
+    "id": "gunner",
+    "path": "art/assets/images/katchimeras/cutouts/dark-wisps/gunner.webp",
+    "bytes": 17324
+  },
+  {
+    "id": "lantern-post",
+    "path": "art/assets/images/katchimeras/merge-world/generators/lantern-post.webp",
+    "bytes": 18182
+  },
+  {
+    "id": "mirror",
+    "path": "art/assets/images/katchimeras/cutouts/dark-wisps/mirror.webp",
+    "bytes": 22622
+  },
+  {
+    "id": "nature-bulwark-1",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-bulwark-1.webp",
+    "bytes": 11902
+  },
+  {
+    "id": "nature-bulwark-2",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-bulwark-2.webp",
+    "bytes": 19980
+  },
+  {
+    "id": "nature-bulwark-3",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-bulwark-3.webp",
+    "bytes": 20712
+  },
+  {
+    "id": "nature-bulwark-4",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-bulwark-4.webp",
+    "bytes": 28376
+  },
+  {
+    "id": "nature-bulwark-5",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-bulwark-5.webp",
+    "bytes": 31116
+  },
+  {
+    "id": "nature-dew-1",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-dew-1.webp",
+    "bytes": 18222
+  },
+  {
+    "id": "nature-dew-2",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-dew-2.webp",
+    "bytes": 15754
+  },
+  {
+    "id": "nature-dew-3",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-dew-3.webp",
+    "bytes": 23078
+  },
+  {
+    "id": "nature-dew-4",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-dew-4.webp",
+    "bytes": 23436
+  },
+  {
+    "id": "nature-dew-5",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-dew-5.webp",
+    "bytes": 27034
+  },
+  {
+    "id": "nature-lantern-1",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-lantern-1.webp",
+    "bytes": 17456
+  },
+  {
+    "id": "nature-lantern-2",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-lantern-2.webp",
+    "bytes": 17780
+  },
+  {
+    "id": "nature-lantern-3",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-lantern-3.webp",
+    "bytes": 20648
+  },
+  {
+    "id": "nature-lantern-4",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-lantern-4.webp",
+    "bytes": 19980
+  },
+  {
+    "id": "nature-lantern-5",
+    "path": "art/assets/images/katchimeras/merge-world/items/nature-lantern-5.webp",
+    "bytes": 22692
+  },
+  {
+    "id": "stormglass-matron",
+    "path": "art/assets/images/katchimeras/cutouts/dark-wisps/stormglass-matron.webp",
+    "bytes": 35230
+  },
+  {
+    "id": "ward-planter",
+    "path": "art/assets/images/katchimeras/merge-world/generators/ward-planter.webp",
+    "bytes": 18384
+  }
+]

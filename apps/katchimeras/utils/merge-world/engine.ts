@@ -1,4 +1,5 @@
 import { ISLAND_HEROES } from '@/constants/katchimera-progression';
+import { COMBAT_V2_ENABLED } from '@/features/mission-mechanics/combat-rules';
 import { dailySurgeTakes, FIRST_SURGE_TAKES, FRONTIER_RETAKE_TIMBER, frontierHeldCount, frontierLodgeStoreBonus, frontierReclaimTimber, frontierTileById, frontierTileContested, frontierTileIdForMission, frontierTileIdForRetake, mistSurgePicks, SURGE_DEFENCE_MISSION_ID } from '@/constants/frontier-tiles';
 import { HERO_BUILDING_MAX_LEVEL, heroBuildingById, heroCompanionHome, heroBuildingCost, heroBuildingForCompanion, heroBuildingLevel, heroLevelCap, LODGE_PRODUCTION_INTERVAL_MS, lodgeTimberStore, lodgeTimberWaiting, type HeroBuildingId } from '@/constants/hero-buildings';
 import { buildingLevelCap, heartTreeCost, heartTreeLevel } from '@/constants/heart-tree';
@@ -668,6 +669,7 @@ function reduceMergeWorldCommand(state: MergeWorldState, command: MergeWorldComm
       return changed(touch({ ...current, chapterOpeningsSeen: [...(current.chapterOpeningsSeen ?? []), command.chapterId] }, command.now));
     }
     case 'mistSurge': {
+      if (COMBAT_V2_ENABLED) return unchanged(current);
       // Once a day, once the first Surge was held: the Mist takes back held edge land (`mistSurgePicks`).
       const surges = current.frontierSurges;
       if (surges?.firstHeldAt == null || surges.lastDay === command.dayId) return unchanged(current);
@@ -1755,7 +1757,7 @@ function normalizeFrontierSurges(value: unknown): MergeWorldState['frontierSurge
     ? Object.fromEntries(Object.entries(source.contested as Record<string, unknown>).filter(([id, at]) => frontierTileById(id) && typeof at === 'number' && Number.isFinite(at)) as [string, number][])
     : {};
   return {
-    contested,
+    contested: COMBAT_V2_ENABLED ? {} : contested,
     ...(typeof source.lastDay === 'string' ? { lastDay: source.lastDay } : {}),
     ...(typeof source.firstHeldAt === 'number' && Number.isFinite(source.firstHeldAt) ? { firstHeldAt: source.firstHeldAt } : {}),
   };
@@ -1806,13 +1808,17 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
     next = { ...next, frontierSurges: { ...next.frontierSurges, contested } };
   }
   const frontierTile = (firstClear ? frontierTileById(frontierTileIdForMission(command.missionId) ?? '') : null) ?? retakenTile;
-  const reclaimedTimber = retakenTile ? FRONTIER_RETAKE_TIMBER : frontierTile ? frontierReclaimTimber(frontierTile) : 0;
+  let reclaimedTimber = retakenTile ? FRONTIER_RETAKE_TIMBER : frontierTile ? frontierReclaimTimber(frontierTile) : 0;
   if (reclaimedTimber > 0) next = { ...next, materials: { ...next.materials, timber: (next.materials?.timber ?? 0) + reclaimedTimber } };
+  if (COMBAT_V2_ENABLED && frontierTile && firstClear && !retakenTile) {
+    if (command.outcome.frontierReward === 'glow') { paid.glow += 18; next = { ...next, coins: next.coins + 18 }; }
+    else if (command.outcome.frontierReward === 'timber') { reclaimedTimber += 4; next = { ...next, materials: { ...next.materials, timber: (next.materials?.timber ?? 0) + 4 } }; }
+  }
   // The first Surge held at the Heart Tree (Chapter 4): the Surges begin, and while the Tree was held the Mist took
   // back two edge tiles. That day's Surge is this one.
   let surged: string[] | undefined;
   if (command.missionId === SURGE_DEFENCE_MISSION_ID && next.frontierSurges?.firstHeldAt == null) {
-    surged = mistSurgePicks(next, dayId, FIRST_SURGE_TAKES);
+    surged = COMBAT_V2_ENABLED ? [] : mistSurgePicks(next, dayId, FIRST_SURGE_TAKES);
     next = { ...next, frontierSurges: { contested: { ...next.frontierSurges?.contested, ...Object.fromEntries(surged.map((id) => [id, command.now])) }, lastDay: dayId, firstHeldAt: command.now } };
   }
   let islandRaised: NonNullable<MergeWorldCommandResult['encounterCleared']>['islandRaised'];
@@ -4778,9 +4784,9 @@ const isEncounterGrade = (value: unknown): value is EncounterGrade => value === 
 function normalizeEncounterMist(mist: { type?: unknown; hp?: unknown; wispId?: unknown; holds?: unknown }, legacyLocked: boolean, index: number): MergeBoardCell['mist'] {
   if (typeof mist.type !== 'string' || !ENCOUNTER_MIST_TYPES.has(mist.type)) return legacyLocked ? authoredDormantMistForCell(index) : null;
   const type = mist.type as EncounterMistType;
-  const rawHolds = mist.holds && typeof mist.holds === 'object' ? mist.holds as { kind?: unknown; definitionId?: unknown; spawnerId?: unknown } : null;
+  const rawHolds = mist.holds && typeof mist.holds === 'object' ? mist.holds as { kind?: unknown; definitionId?: unknown; spawnerId?: unknown; instanceId?: unknown } : null;
   const holds: EncounterMistHolds | undefined = rawHolds?.kind === 'item' && typeof rawHolds.definitionId === 'string' && MERGE_ITEMS_BY_ID.has(rawHolds.definitionId)
-    ? { kind: 'item', definitionId: rawHolds.definitionId }
+    ? { kind: 'item', definitionId: rawHolds.definitionId, ...(typeof rawHolds.instanceId === 'string' ? { instanceId: rawHolds.instanceId } : {}) }
     : rawHolds?.kind === 'spawner' && typeof rawHolds.spawnerId === 'string'
       ? { kind: 'spawner', spawnerId: rawHolds.spawnerId }
       : undefined;

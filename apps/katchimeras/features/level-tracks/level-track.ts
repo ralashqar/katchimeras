@@ -5,6 +5,8 @@ import type { IslandCampaignDefinition, IslandCampaignPanelAction, RegionMission
 import { islandWakeLockedReason, islandWakeState } from '@/constants/island-campaigns/wake-order';
 import { encounterRewards } from '@/features/encounter/encounter-rewards';
 import { dailyMistMissions } from '@/features/encounters/daily-mist';
+import { weeklyCombatMissions } from '@/features/encounters/combat-events';
+import { COMBAT_V2_ENABLED } from '@/features/mission-mechanics/combat-rules';
 import { groveProgress } from '@/features/encounters/grove-progress';
 import type { EncounterDifficulty } from '@/types/encounter';
 import type { MergeWorldState, MossproutNatureIslandId } from '@/types/merge-world';
@@ -186,21 +188,21 @@ export function groveTrack(world: MergeWorldState, input: { ftueComplete: boolea
 
 /** Today's three Daily Mist patches: every one open, each paying in full once today. No chests; it starts over tomorrow. */
 export function dailyTrack(world: MergeWorldState, dayId: string): LevelTrack {
-  const missions = dailyMistMissions(dayId, world);
+  const missions = [...dailyMistMissions(dayId, world), ...(COMBAT_V2_ENABLED ? weeklyCombatMissions(dayId, world) : [])];
   const slots = world.encounters?.daily[dayId]?.slots ?? {};
   const nodes: LevelNode[] = missions.map((mission, index) => {
-    const clear = slots[String(index)] ?? null;
+    const clear = index < 3 ? slots[String(index)] ?? null : world.encounters?.clears[mission.id] ? { grade: world.encounters.clears[mission.id]!.bestGrade } : null;
     const done = Boolean(clear);
     return {
       key: mission.id, number: index + 1, title: mission.title, mission, difficulty: mission.difficulty,
       state: done ? 'done' : 'next', playable: true, stars: gradeStars(clear?.grade ?? world.encounters?.clears[mission.id]?.bestGrade),
-      reward: rewardFor(world, DAILY_TRACK_ID, mission, done), boss: false,
+      reward: rewardFor(world, DAILY_TRACK_ID, mission, done), boss: index >= 3,
     };
   });
   const cleared = nodes.filter((node) => node.state === 'done').length;
   return {
-    id: DAILY_TRACK_ID, kind: 'daily', title: 'The Daily Mist',
-    caption: cleared === nodes.length ? 'Every patch cleared today. New ones grow tomorrow.' : 'Three patches, new every day. Each pays in full once today.',
+    id: DAILY_TRACK_ID, kind: 'daily', title: COMBAT_V2_ENABLED ? 'Expeditions & weekly guardian' : 'The Daily Mist',
+    caption: COMBAT_V2_ENABLED ? 'Daily paths reset at midnight UTC. The guardian changes on Monday. Each first clear pays once.' : cleared === nodes.length ? 'Every patch cleared today. New ones grow tomorrow.' : 'Three patches, new every day. Each pays in full once today.',
     campaignId: null, islandId: null,
     chapters: [{ level: 0, title: null, story: 'none', storyAction: null, storyLabel: null, levels: nodes }],
     levels: nodes, cleared, total: nodes.length,

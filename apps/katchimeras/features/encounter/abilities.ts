@@ -14,14 +14,17 @@ import type { LanesState } from '@/features/mission-mechanics/lanes';
 export function abilityFor(loadout: EncounterLoadout | null): { definition: CompanionAbilityDefinition; tier: CompanionAbilityTier } | null {
   if (!loadout) return null;
   const definition = abilityForCompanion(loadout.companionId);
-  return definition ? { definition, tier: abilityTier(definition, loadout.level) } : null;
+  if (!definition) return null;
+  const combatDefinition = loadout.combatProfile && definition.id === 'ripple' ? { ...definition, description: 'Give every plant one shield to block its next hit or status.' }
+    : loadout.combatProfile && definition.id === 'rainfall' ? { ...definition, description: 'Wash away Mist, slow the wisps, and restore one heart to every plant.' } : definition;
+  return { definition: combatDefinition, tier: abilityTier(definition, loadout.level) };
 }
 
 export const abilityReady = (run: EncounterRunState, tier: CompanionAbilityTier): boolean => Boolean(run.ability) && run.ability!.charge >= Math.max(1, Math.floor(tier.chargeEvery));
 
 /** The partner's ability (the second hero slot), from the loadout, or null with no partner or an ability-less one. */
 export function partnerAbilityFor(loadout: EncounterLoadout | null): { definition: CompanionAbilityDefinition; tier: CompanionAbilityTier } | null {
-  return loadout?.partner ? abilityFor({ companionId: loadout.partner.companionId, level: loadout.partner.level }) : null;
+  return loadout?.partner ? abilityFor({ companionId: loadout.partner.companionId, level: loadout.partner.level, combatProfile: loadout.combatProfile }) : null;
 }
 export const partnerAbilityReady = (run: EncounterRunState, tier: CompanionAbilityTier): boolean => Boolean(run.partnerAbility) && run.partnerAbility!.charge >= Math.max(1, Math.floor(tier.chargeEvery));
 
@@ -125,10 +128,19 @@ export function applyAbility(definition: CompanionAbilityDefinition, tier: Compa
  * lanes), every other on the board (`applyAbility`). The lanes after come back with it when they changed.
  */
 export function applyBattleAbility(definition: CompanionAbilityDefinition, tier: CompanionAbilityTier, board: MergeWorldState, window: MissionWindow, run: EncounterRunState, target: number | null, lanes: LaneAbilityInput | null): { board: MergeWorldState; run: EncounterRunState; effects: AbilityEffect[]; lanes?: LanesState } | null {
+  if ((lanes?.state.combat?.preparingMs ?? 0) > 0) return null;
+  if (definition.id === 'ripple' && lanes?.state.combat && abilityReady(run, tier)) {
+    const plants = Object.fromEntries(Object.entries(lanes.state.combat.plants).map(([id, plant]) => [id, { ...plant, shield: Math.min(3, plant.shield + 1) }]));
+    if (!Object.keys(plants).length) return null;
+    return { board, run: { ...run, ability: { charge: 0, uses: run.ability!.uses + 1 } }, lanes: { ...lanes.state, combat: { ...lanes.state.combat, plants } }, effects: [{ kind: 'lane', effect: { kind: 'rained', cleared: [], wisps: [] } }] };
+  }
   if (!definition.lanes) return applyAbility(definition, tier, board, window, run, target);
   if (!lanes || !abilityReady(run, tier)) return null;
   const applied = applyLaneAbility(definition, tier, board, window, lanes);
   if (!applied) return null;
+  if (definition.id === 'rainfall' && applied.lanes.combat) {
+    applied.lanes = { ...applied.lanes, combat: { ...applied.lanes.combat, plants: Object.fromEntries(Object.entries(applied.lanes.combat.plants).map(([id, plant]) => [id, { ...plant, hearts: Math.min(plant.tier, plant.hearts + 1) }])) } };
+  }
   return { board: applied.board, run: { ...run, ability: { charge: 0, uses: run.ability!.uses + 1 } }, effects: applied.effects.map((effect) => ({ kind: 'lane' as const, effect })), lanes: applied.lanes };
 }
 

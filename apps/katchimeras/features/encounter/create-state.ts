@@ -74,5 +74,13 @@ export function createEncounterState(encounter: EncounterDefinition, owner: Merg
     state = placeSpawner(state, spawner, spawner.cell, profile.extraCharges);
   }
   if (profile.openCells > 0) state = revealMistCells(state, window, profile.openCells).board;
+  if (encounter.mechanic?.kind === 'lanes' && encounter.mechanic.terrain?.length) {
+    const terrainCells = [...state.board];
+    for (const terrain of encounter.mechanic.terrain) {
+      if (terrain.kind !== 'stone' || !inside.has(terrain.cell) || terrainCells[terrain.cell]?.occupant) continue;
+      terrainCells[terrain.cell] = { ...terrainCells[terrain.cell]!, locked: true, mist: null };
+    }
+    state = { ...state, board: terrainCells };
+  }
   return state;
 }

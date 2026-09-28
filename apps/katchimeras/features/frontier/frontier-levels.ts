@@ -1,6 +1,9 @@
 import { FRONTIER_VARIANT_NAMES, frontierMissionId, frontierRetakeMissionId, SURGE_DEFENCE_MISSION_ID, type FrontierTile, type FrontierVariant } from '@/constants/frontier-tiles';
 import { crawler, islandLevel, waves, type IslandLaneSpec, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
 import type { RegionMissionDefinition } from '@/constants/island-campaigns/types';
+import { COMBAT_V2_ENABLED } from '@/features/mission-mechanics/combat-rules';
+import { combatLessonSpec, combatBossSpec } from '@/constants/combat-campaign';
+import { FRONTIER_TILES } from '@/constants/frontier-tiles';
 
 /**
  * A Frontier tile's battle (`constants/frontier-tiles.ts`): one Lanes level, generated from the tile's power and its
@@ -25,6 +28,10 @@ const OBJECTIVES: Readonly<Record<FrontierVariant, string>> = {
 const capitalised = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 export function frontierLevelSpec(tile: FrontierTile): IslandLevelSpec {
+  if (COMBAT_V2_ENABLED) {
+    const index = Math.max(0, FRONTIER_TILES.findIndex((entry) => entry.id === tile.id));
+    return tile.power >= 6 ? combatBossSpec(0, 1) : combatLessonSpec(index % 24, Math.min(10, tile.power * 2 - 1));
+  }
   const power = tile.power;
   const hp = 3 + power;
   // The calm lands (power 2 and under) come down a little slower: a novice should win them.
@@ -126,7 +133,7 @@ export const SURGE_DEFENCE_SPEC: IslandLevelSpec = {
 
 let defence: RegionMissionDefinition | null = null;
 export function surgeDefenceMission(): RegionMissionDefinition {
-  defence ??= islandLevel('surge', 'heart-tree', SURGE_DEFENCE_SPEC);
+  defence ??= islandLevel('surge', 'heart-tree', COMBAT_V2_ENABLED ? combatBossSpec(0) : SURGE_DEFENCE_SPEC);
   if (defence.id !== SURGE_DEFENCE_MISSION_ID) throw new Error(`surge defence id drifted: ${defence.id}`);
   return defence;
 }

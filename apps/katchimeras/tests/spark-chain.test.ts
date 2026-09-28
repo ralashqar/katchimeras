@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { mergeBurst } from '@/features/encounter/merge-burst';
 import test from 'node:test';
 import { crawler, islandLevel, STORM_POT_CHARGES, type IslandLaneSpec, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
 import { MERGE_ITEMS_BY_ID } from '@/constants/merge-world-catalog';
@@ -88,4 +89,24 @@ test('a crawler climbs out of the Mist on its cell, creeps to the nearest plant 
   const through = play(alone.mechanic, alone.lanes, alone.board, 7_000, alone.window);
   assert.equal(through.state.breached, 0, 'with no plant to reach, it walks off the bottom row');
   assert.equal(laneAlive(alone.mechanic, through.state, 0), true);
+});
+
+for (const modern of [false, true]) test(`lightning merge immediately fires one visible, ranged zap (v2=${modern})`, () => {
+  // A wisp BELOW the plant is still in its lightning reach.
+  const { mechanic: legacy, window, board, lanes } = setup({}, [crawler('near', 38, 0, 50, 999), crawler('far', 17, 0, 50, 999)]);
+  const mechanic = modern ? { ...legacy, rulesVersion: 2 as const } : legacy;
+  const state = modern ? createLanesState(mechanic) : lanes;
+  const merged = { ...board, board: board.board.map((cell, index) => index === 31 ? { ...cell, occupant: { kind: 'item' as const, instanceId: 'merged-spark', definitionId: 'nature:storm:2' } } : cell) };
+  const queued = mergeBurst(mechanic, state, merged, window, 31);
+  assert.equal(queued.shots.length, 0, 'no invisible extra burst');
+  const first = lanesTick(mechanic, queued, merged, 1, window);
+  assert.deepEqual(first.zaps.map(zap => zap.wisps), [[0]], 'fires on first tick, toward nearby wisp only');
+  const landed = lanesTick(mechanic, first.state, first.board, 200, window);
+  assert.equal(landed.zaps.length, 0, 'merge does not fire twice');
+  assert.equal(landed.state.wisps[0]!.damage, laneZap(2)!.damage);
+  assert.equal(landed.state.wisps[1]!.damage, 0);
+
+  const distant = { ...merged, board: merged.board.map((cell, index) => index === 31 ? { ...cell, occupant: null } : index === 43 ? { ...cell, occupant: { kind: 'item' as const, instanceId: 'distant-spark', definitionId: 'nature:storm:2' } } : cell) };
+  const waiting = lanesTick(mechanic, mergeBurst(mechanic, state, distant, window, 43), distant, 1, window);
+  assert.equal(waiting.zaps.length, 0, 'no strike beyond tier reach');
 });

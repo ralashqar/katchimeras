@@ -24,6 +24,8 @@ test('battle waits for readiness, pauses in background, and flushes a cleared bo
     return <>{children}</>;
   }
   const module = loadNativeModule('app/battle.tsx', {
+    '@/components/katchadeck/games/combat-tactics-overlay': { CombatTacticsOverlay: () => null },
+    '@/components/katchadeck/games/combat-preparation': { CombatPreparation: host('Preparation') },
     'react-native': { ...nativeViews, Text: host('Text'), BackHandler: { addEventListener: () => ({ remove() {} }) } },
     '@/features/encounter/combat-profile': { CombatProfilePanel: () => null, CombatProfileBoundary: ({ children }: React.PropsWithChildren) => children },
     'expo-image': { Image: host('Image') },

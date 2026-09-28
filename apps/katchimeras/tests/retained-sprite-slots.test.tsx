@@ -32,12 +32,20 @@ test('sprite allocation preserves live/retiring identities, reuses vacancies and
 
 test('every piece has its own sprite view: a retired view never completes a stale motion or keeps its recoil, and a piece raised in place crossfades to its new art', async () => {
   const motion = nativeMotionHarness();
-  const recoil = new Map<string, () => void>();
+  const recoil = new Map<string, (kind?: 'impact') => void>();
   let mounts = 0;
   const completed: string[] = [];
   const onComplete = (operation: number, id: string) => completed.push(`${operation}:${id}`);
   const Sprite = loadNativeModule('components/katchadeck/games/feastle-persistent-merge-board.tsx', {}, {
     ...motion.animated, ...React,
+    interpolate: (value: number, input: number[], output: number[]) => {
+      if (value <= input[0]!) return output[0];
+      for (let i = 1; i < input.length; i++) if (value <= input[i]!) {
+        const fraction = (value - input[i - 1]!) / (input[i]! - input[i - 1]!);
+        return output[i - 1]! + fraction * (output[i]! - output[i - 1]!);
+      }
+      return output.at(-1);
+    },
     Animated: motion.animated.default,
     useSharedValue: (initial: unknown) => {
       // Non-numeric motion kind values don't run animations.
@@ -51,7 +59,7 @@ test('every piece has its own sprite view: a retired view never completes a stal
     runOnJS: (fn: (...args: unknown[]) => void) => fn,
     withSpring: (to: number, _options: unknown, done?: (finished: boolean) => void) => motion.animated.withTiming(to, { duration: 100 }, done),
     recordMergeRender: (name: string) => { if (name === 'sprite-mount') mounts++; },
-    spriteRecoil: { subscribe: (id: string, callback: () => void) => { recoil.set(id, callback); return () => { recoil.delete(id); }; } },
+    spriteRecoil: { subscribe: (id: string, callback: (kind?: 'impact') => void) => { recoil.set(id, callback); return () => { recoil.delete(id); }; } },
     RECOIL_SQUASH_MS: 50, MERGE_SPRITE_SURFACE_SCALE: 2,
     MOVE_SPRING: {}, SWAP_SPRING: {},
     StyleSheet: { absoluteFill: {} },
@@ -104,6 +112,20 @@ test('every piece has its own sprite view: a retired view never completes a stal
   await act(async () => motion.advance(800));
   assert.deepEqual(arts(), ['sprout'], 'settled: only the Sprout');
   assert.equal(tree.root.findAllByType('UpgradeBurst' as any).length, 0);
+  const artScale = () => tree.root.findAllByType('AnimatedView' as any)
+    .flatMap(node => [node.props.style].flat()).find(style => style?.read?.().transform?.some((part: any) => 'scaleX' in part))
+    .read().transform.find((part: any) => 'scale' in part).scale;
+  const normalScale = artScale();
+  await act(async () => recoil.get('bloom')!('impact'));
+  await act(async () => motion.advance(90));
+  assert.ok(artScale() > normalScale, 'wall expands on impact');
+  await act(async () => motion.advance(110));
+  assert.ok(artScale() < normalScale, 'wall compresses after the burst');
+  await act(async () => motion.advance(160));
+  assert.equal(artScale(), normalScale, 'wall settles at its original size');
+  await act(async () => recoil.get('bloom')!('impact'));
+
   await act(async () => tree.unmount());
   assert.equal(recoil.size, 0);
+  assert.equal(motion.activeAnimationCount(), 0, 'unmount cancels impact animation');
 });
