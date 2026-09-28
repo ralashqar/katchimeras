@@ -43,6 +43,9 @@ test('battle resolves the same authored tile for home, trail, rescue and island 
     assert.ok(Math.abs(frame.top + (layer.focusPoint.y - layer.frame.top) * scale - 844 * 0.36) < 0.001);
   }
   assert.equal(tile.resolveBattleTile(cases[1]![0]).source, 'steppling-home:misted:full');
+  for (const id of ['structure:baristabbit-home', 'nature:mossprout:rush-track', 'family:mossprout']) {
+    assert.equal(tile.resolveWorldActivityTile(id).id, id, 'activities resolve their actual authored tile');
+  }
 });
 
 test('tile readiness waits for base and overlay; repeated board renders retain the native images', async () => {
@@ -59,7 +62,7 @@ test('tile readiness waits for base and overlay; repeated board renders retain t
     width: 390, height: 844, onReady: () => ready++, onError() {} };
   let tree!: ReactTestRenderer;
   await act(async () => { tree = create(<Tile {...props} />); });
-  assert.deepEqual({ ...tree.root.findByType(nativeViews.View).props.style }, { position: 'absolute', ...frame });
+  assert.deepEqual({ ...tree.root.findByType(host('View')).props.style }, { position: 'absolute', ...frame });
   const images = tree.root.findAllByType(host('Image'));
   await act(async () => images[0]!.props.onLoad());
   assert.equal(ready, 0);

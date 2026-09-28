@@ -40,8 +40,9 @@ const HeatClock = memo(function HeatClock({ remainingMs, running, score, goal }:
  * tile (told of each new wisp through `live`). Pieces arrive on their own and pop in with the board's own entrance.
  * What a time trial adds is its clock: it starts on the first move, and when it runs out the score is what fell.
  */
-export const WispRushDock = memo(function WispRushDock({ spec, goal, title, live, width, bottomInset, landings, onStrike, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onFinished, onVoided, onClose }: {
+export const WispRushDock = memo(function WispRushDock({ spec, goal, title, live, width, bottomInset, landings, onStrike, onBoardMetrics, onBlockedInteraction, onEntranceSettled, onFinished, onVoided, onClose, strictReadiness }: {
   spec: HeatSpec;
+  strictReadiness?: boolean;
   /** Wisps to strike down for the run to count (the bar). */
   goal: number;
   title: string;
@@ -96,7 +97,7 @@ export const WispRushDock = memo(function WispRushDock({ spec, goal, title, live
     return moved.result;
   }, [onStrike, send]);
 
-  return <MistMissionDock
+  return <MistMissionDock strictReadiness={strictReadiness}
     state={run.board.world} boardStep={null} progress={Math.min(goal, score)} required={Math.max(1, goal)}
     barTitle={run.started ? title : `${title} · the clock starts on your first move`}
     interactionKey={`wisp-rush:${spec.id}`} sessionId={sessionRef.current.id} hiddenItemIds={EMPTY_IDS} animateArrivals

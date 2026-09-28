@@ -1,3 +1,6 @@
+import { getActivitySession, saveActivitySession, startActivitySession, useActivitySession, type ActivitySource } from '@/features/activities/activity-session';
+import { kitchenOpen } from '@/features/supply-run/supply-run';
+import { residentArtLayerId } from '@/components/katchadeck/world/shared-resident-presentation';
 import { BATTLE_SCENE_ENABLED, getBattleSession, saveBattleSession, startBattleSession, useBattleSession, type BattleSession, type IslandBattleContext } from '@/features/encounter/battle-session';
 import { battleTileLayerId } from '@/features/encounter/battle-tile';
 import { captureSettledBattleTile, type CaptureBattleTile } from '@/features/encounter/battle-framing';
@@ -13,8 +16,6 @@ import { regionRescueMission } from '@/features/regions/region-rescue';
 import { sanctuaryFounded } from '@/constants/heart-tree';
 import { FIRST_GOAL_COACH_ID, goalNeed, type GoalNeedSource } from '@/features/sanctuary/goal-need';
 import type { SanctuaryChapterState } from '@/constants/sanctuary-chapters';
-import type { MergeWorldCommand } from '@/types/merge-world';
-import { cafeDropProfile, cafeMealsBonus, kitchenCrateMealsBonus } from '@/constants/hero-buildings';
 import { battleLoadout, heroSlots, withPartner } from '@/features/encounter/team';
 import { BARISTABBIT_HATCHABLE } from '@/constants/hatchable-companions/baristabbit';
 import { loadWispState } from '@/utils/wisp-storage';
@@ -83,13 +84,12 @@ import { worldEventActions, worldEventConversation, type WorldEventAction, type 
 import { availableLocalEvents } from '@/features/live-ops/local-catalog';
 import { useHarmonyProgress } from '@/features/live-ops/use-harmony-progress';
 import { companionConversationDefinitionById } from '@/constants/companion-conversations-v2';
-import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, ensureStoredFirstSpringLight, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , restoreStoredHeartTree, rescueStoredWorldFriend, revealStoredStoryTile, surgeStoredFrontier, grantStoredStoryGlow, claimStoredChapterReward, completeStoredSupplyOrder, markStoredChapterOpened, upgradeStoredHeroBuilding, acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, recordStoredTimeTrialHeat, startStoredEncounter, abandonStoredEncounter, completeStoredEncounter, upgradeStoredKatchimera } from '@/utils/merge-world/repository';
+import { plantStoredWispLantern, upgradeStoredWispLantern, upgradeStoredHeartwoodBuilding, ensureStoredFirstSpring, ensureStoredFirstSpringBuilt, ensureStoredFirstSpringLight, applyStoredAdventure, applyStoredLocalEvent , acknowledgeStoredIslandCampaignChapterReturn, acknowledgeStoredIslandCampaignResidentCardReveal, acknowledgeStoredIslandCampaignResidentDiscovery, activateStoredIslandCampaignChapter, completeStoredIslandCampaignChapter, completeStoredIslandRestoration, recordStoredIslandRestorationProgress, requestStoredIslandCampaignDelivery, saveUpgradeStoryRead, ensureStoredOpeningGlow , restoreStoredHeartTree, rescueStoredWorldFriend, revealStoredStoryTile, surgeStoredFrontier, grantStoredStoryGlow, claimStoredChapterReward, markStoredChapterOpened, upgradeStoredHeroBuilding, acknowledgeStoredKingdomGoalCoachmark, payStoredHatchableMission, claimStoredTimeTrialChest, startStoredEncounter, abandonStoredEncounter, completeStoredEncounter, upgradeStoredKatchimera } from '@/utils/merge-world/repository';
 import { canUpgradeKatchimera, heroHome, ISLAND_HEROES, isPlayableKatchimera, katchimeraLevel, playableHeroes, PLAYABLE_KATCHIMERAS } from '@/constants/katchimera-progression';
 import { encounterRunId } from '@/features/encounter/run-id';
 import type { EncounterLoadout } from '@/types/encounter';
 import type { HatchableCompanionDefinition } from '@/types/hatchable-companion';
 import type { EncounterLoadoutChoice } from '@/components/katchadeck/upgrade/upgrade-mission-rows';
-import { LocalEventMissionDock } from '@/components/katchadeck/world/local-event-mission-dock';
 import { WorldEventActionCard } from '@/components/katchadeck/world/world-event-action-card';
 import { GardenEventAdornment } from '@/components/katchadeck/world/garden-event-adornment';
 import { LocalWorldEvents } from '@/components/katchadeck/world/local-world-events';
@@ -133,19 +133,15 @@ import { heartTreeLevel } from '@/constants/heart-tree';
 import { collectStoredHeroBuilding, upgradeStoredHeartTree } from '@/utils/merge-world/repository';
 import { lodgeTimberWaiting } from '@/constants/hero-buildings';
 import { HeroRosterSheet } from '@/components/katchadeck/world/hero-roster-sheet';
-import { heroBuildingById, heroBuildingLevel, lodgeCrateGlowBonus, lodgeTimberBonus, type HeroBuildingId } from '@/constants/hero-buildings';
+import { heroBuildingById, heroBuildingLevel, type HeroBuildingId } from '@/constants/hero-buildings';
 import { LIFE_INPUT_ENABLED } from '@/constants/product-scope';
 import { SignalFlare } from '@/components/katchadeck/world/signal-flare';
 import { ConversationNarrativeOverlay } from '@/components/katchadeck/world/conversation-narrative-overlay';
-import { SupplyRunDock, type SupplyRunOrder } from '@/components/katchadeck/world/supply-run-dock';
-import { MergeServeRewardOverlay, type MergeScreenPoint, type MergeServeRewardFlight } from '@/components/katchadeck/games/merge-serve-reward-overlay';
-import { mergeOrderReady, mergeOrderServingCells } from '@/utils/merge-world/engine';
-import { cafeChains, createSupplyRunBoard, kitchenOpen, supplyOrder, supplyRunChains, supplyRunSlots } from '@/features/supply-run/supply-run';
 import { LastClearingHeartTree } from '@/components/katchadeck/world/last-clearing-heart-tree';
 import { LastClearingTitleCard } from '@/components/katchadeck/world/last-clearing-title-card';
 import { FIRST_BATTLE, firstBattleLine, LOST_TRAIL_BATTLES, LOST_TRAIL_RESCUE_CELL, lostTrailLine, FIRST_BATTLE_INTRO_MS, rescueBattleLine, scriptedBattleGuide, stickyBattleGuide } from '@/constants/last-clearing-battle';
 import { LastClearingStepplingMeets, TrappedFriendSilhouette } from '@/components/katchadeck/world/last-clearing-rescue';
-import { mergeCellCenter, mergeCellOrigin } from '@/utils/merge-world/board-geometry';
+import { mergeCellOrigin } from '@/utils/merge-world/board-geometry';
 
 /** A first-battle hint shows once the board has asked for the same thing this long. */
 const FIRST_BATTLE_HINT_DELAY_MS = 1_200;
@@ -241,7 +237,7 @@ import { IslandRestorationDock } from '@/components/katchadeck/world/island-rest
 import { WispRushDock } from '@/components/katchadeck/world/wisp-rush-dock';
 import { WispRushSheet, type WispRushResult } from '@/components/katchadeck/world/wisp-rush-sheet';
 import { createRushLive, heatHost, WISP_RUSH_HOST } from '@/features/time-trial/heat-mechanic';
-import { HEATS_PER_DAY, heatFor, heatFromRules, heatPars } from '@/features/time-trial/ladder';
+import { HEATS_PER_DAY, heatFor, heatFromRules } from '@/features/time-trial/ladder';
 import { heatsCleared, nextHeatIndex, timeTrialFor } from '@/features/time-trial/trial-world';
 import { eventIntroSeenId, MIST_PUZZLES_EVENT, SANCTUARY_EVENTS, sanctuaryEventOpen, WISP_RUSH_EVENT, type SanctuaryEvent } from '@/constants/sanctuary-events';
 import { EventsSheet, type EventEntry } from '@/components/katchadeck/world/events-sheet';
@@ -444,6 +440,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // Or under a Frontier tile (`frontierTileId`): the land's own battle (`constants/frontier-tiles.ts`).
   // Or under a structure (`structureId`: the Heart Tree, for the first Mist Surge's defence).
   const battleSession = useBattleSession(BATTLE_SCENE_ENABLED);
+  const activitySession = useActivitySession();
+  const activityReturnPending = activitySession?.status === 'returning';
   const [islandEncounter, setIslandEncounter] = useState<IslandBattleContext | null>(() => {
     const pending = getBattleSession();
     return BATTLE_SCENE_ENABLED && pending?.source.kind === 'island'
@@ -2802,14 +2800,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const [chapterRushAttempt, setChapterRushAttempt] = useState(0);
   const [chapterRushNote, setChapterRushNote] = useState<string | null>(null);
   const activeRush = useMemo(() => {
-    if (rushSpec && rushRun) return { kind: 'daily' as const, spec: rushSpec, goal: heatPars(rushSpec).bronze, title: `Heat ${rushRun.index + 1}`, runKey: `${rushSpec.id}:${rushRun.attempt}`, node: rushTileNode };
     if (chapterRush && islandRestoration) {
       const id = `${islandRestoration.campaign.campaignId}:${islandRestoration.level}:${chapterRushAttempt}`;
       const { goal, ...rules } = chapterRush;
       return { kind: 'chapter' as const, spec: heatFromRules(id, rules), goal, title: islandRestoration.chapter.title, runKey: id, node: restorationTileNode };
     }
     return null;
-  }, [chapterRush, chapterRushAttempt, islandRestoration, restorationTileNode, rushRun, rushSpec, rushTileNode]);
+  }, [chapterRush, chapterRushAttempt, islandRestoration, restorationTileNode]);
   const activeRushKey = activeRush?.runKey ?? null;
   // The run's wisps reach the wisp layer through this, not through this screen: a wisp appearing re-renders nothing here.
   const rushLive = useMemo(() => createRushLive(), [activeRushKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -2977,18 +2974,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const finishRushHeat = useStableCallback((score: number) => {
     const active = activeRush;
     if (!active || rushResultTimerRef.current) return;
-    const run = rushRun;
     const restoration = islandRestoration;
     // The last Glow is still in the air: the result waits for it to land and for the wisp to fall.
     rushResultTimerRef.current = setTimeout(() => {
       rushResultTimerRef.current = null;
-      if (active.kind === 'daily' && run) {
-        void recordStoredTimeTrialHeat({ dayId: run.dayId, index: run.index, score })
-          .then(({ outcome }) => { setRushResult({ index: run.index, score, outcome }); })
-          .catch((error) => setRushNotice(error instanceof Error ? error.message : 'That run could not be saved.'))
-          .finally(leaveRushHeat);
-        return;
-      }
       if (active.kind !== 'chapter' || !restoration) return;
       if (score < active.goal) {
         // Short of the chapter's goal: the clock is reset and the run starts again; nothing is lost.
@@ -3376,114 +3365,9 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // A level docked under a tile (a friend's island, the Grove, the Daily Mist) holds the world like every other board: no markers, no taps on tiles.
   // The Supply Run (`features/supply-run/supply-run.ts`): the calm board under the Lost Trail, kept between visits.
   // Once Feastle is home the Caf\u00e9 is a Kitchen: a fresh board with the Hearth Pantry, and Feastle's feasts on the cards.
-  const kitchen = kitchenOpen(mergeWorld);
-  const createCafeBoard = useCallback((now: number) => createSupplyRunBoard(now, kitchen), [kitchen]);
-  // v2: coffee is the Café's one drink chain (a board saved with juice on it starts fresh).
-  const supplyRunStore = useMissionBoard('katchimeras.cafe.v3', supplyRunOpen ? (kitchen ? 'kitchen' : 'supply-run') : null, createCafeBoard);
-  // The Café's board comes up once the camera has reached its tile, never while it is still flying there.
-  const [cafeArrived, setCafeArrived] = useState(false);
-  useEffect(() => {
-    if (!supplyRunOpen) { setCafeArrived(false); return; }
-    const timer = setTimeout(() => setCafeArrived(true), reduceMotion ? 80 : 760);
-    return () => clearTimeout(timer);
-  }, [reduceMotion, supplyRunOpen]);
-  const supplyRunDocked = supplyRunOpen && cafeArrived && screenFocused && Boolean(supplyRunStore.state);
-  // Back ends a Café visit whenever: the board keeps everything for next time. Not while an order's pieces are flying.
-  const leaveCafe = useCallback(() => { if (!supplyServingRef.current) setSupplyRunOpen(false); }, []);
-  // The Café's and the Kitchen's buildings pour better pieces: their odds ride on every generator tap.
-  const { send: cafeStoreSend } = supplyRunStore;
-  // The first visit's lesson remembers the first pour (tap the Ritual Bar) so it moves on to the merge.
-  const [cafePoured, setCafePoured] = useState(false);
-  const cafeSend = useCallback((command: MergeWorldCommand) => {
-    if (command.type === 'tapGenerator') setCafePoured(true);
-    return cafeStoreSend(command.type === 'tapGenerator'
-      ? { ...command, dropProfile: cafeDropProfile(mergeWorldRef.current, command.generatorId) } : command);
-  }, [cafeStoreSend]);
-  const cafeRailRefs = useRef(new Map<string, View>());
-  const [cafeRailRevision, setCafeRailRevision] = useState(0);
-  const setCafeRailTarget = useCallback((key: string, view: View | null) => {
-    if (view) cafeRailRefs.current.set(key, view); else cafeRailRefs.current.delete(key);
-    setCafeRailRevision((revision) => revision + 1);
-  }, []);
-  // Orders ask only for what the board's spawners can make now (the live board's, else a fresh one's).
-  const cafeChainKey = [...(supplyRunStore.state ? supplyRunChains(supplyRunStore.state) : cafeChains(kitchen))].sort().join('|');
-  const supplyRunOrders = useMemo((): SupplyRunOrder[] => {
-    const chains = new Set(cafeChainKey.split('|').filter(Boolean));
-    return supplyRunSlots(mergeWorld).map((index, slot) => ({ slot: slot as 0 | 1, index, order: supplyOrder(slot as 0 | 1, index, kitchen, chains) }));
-  }, [cafeChainKey, kitchen, mergeWorld]);
-  const [supplyCrateFull, setSupplyCrateFull] = useState(false);
-  // Serving is the Merge page's own serve (`MergeServeRewardOverlay`): each piece the order takes flies from its cell to
-  // its own slot on the card, then the order's Glow flies from the card to the counter, and only then is the order served
-  // and paid. A flight that cannot be measured serves at once instead, so Serve always works.
-  const [supplyServeFlight, setSupplyServeFlight] = useState<MergeServeRewardFlight | null>(null);
-  const [supplyHiddenItemIds, setSupplyHiddenItemIds] = useState<ReadonlySet<string>>(() => new Set());
-  const supplyServingRef = useRef<SupplyRunOrder | null>(null);
-  const supplyServeNonceRef = useRef(0);
-  const measureInScreen = useCallback((node: View | null) => new Promise<{ x: number; y: number; width: number; height: number } | null>((resolve) => {
-    if (!node) { resolve(null); return; }
-    node.measureInWindow((x, y, width, height) => resolve(width > 0 && height > 0 ? { x, y, width, height } : null));
-  }), []);
-  // What an order pays: the Explorer's Lodge adds Timber to every order; Baristabbit's Café adds Meals.
-  const supplyOrderPayout = useCallback((entry: SupplyRunOrder) => ({
-    glow: entry.order.reward.coins,
-    timber: entry.order.timber + lodgeTimberBonus(heroBuildingLevel(mergeWorldRef.current, 'explorers-lodge')),
-    meals: entry.order.meals + cafeMealsBonus(heroBuildingLevel(mergeWorldRef.current, 'baristabbit-cafe')),
-  }), []);
-  const commitSupplyOrder = useCallback(async (entry: SupplyRunOrder) => {
-    const served = supplyRunStore.send({ type: 'serveBoardOrder', order: entry.order, now: Date.now() });
-    if (!served?.changed) return false;
-    const before = mergeWorldRef.current.coins;
-    const servedBefore = mergeWorldRef.current.supplyRun?.served ?? 0;
-    const { timber, meals } = supplyOrderPayout(entry);
-    // One continuous board: each order pays and the next takes its place (no crates).
-    await completeStoredSupplyOrder(entry.slot, entry.index, timber, entry.order.reward.coins, undefined, meals, undefined, kitchen).catch((error) => { console.warn('The order could not be paid', error); return null; });
-    countGlowIn(before, entry.order.reward.coins);
-    return true;
-  // `countGlowIn` is declared below and stable.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supplyOrderPayout, supplyRunStore.send]);
-  const serveSupplyOrder = useCallback(async (entry: SupplyRunOrder, itemTargets: readonly MergeScreenPoint[]) => {
-    const board = supplyRunStore.state;
-    const metrics = openingBoardMetrics;
-    if (!board || supplyServingRef.current) return false;
-    const servingItems = mergeOrderServingCells(board, entry.order);
-    const [screenRect, coinRect, timberRect, mealsRect] = await Promise.all([measureInScreen(screenRef.current), measureInScreen(glowCurrencyArtRef.current),
-      measureInScreen(timberCurrencyArtRef.current), measureInScreen(mealsCurrencyArtRef.current)]);
-    if (reduceMotion || !metrics || !screenRect || !coinRect || servingItems.length !== itemTargets.length) return commitSupplyOrder(entry);
-    const targets = itemTargets.map((point) => ({ x: point.x - screenRect.x, y: point.y - screenRect.y }));
-    const items = servingItems.map((item, index) => {
-      const center = mergeCellCenter(metrics.geometry, item.cell);
-      return { definitionId: item.definitionId, instanceId: item.instanceId, from: { x: metrics.x - screenRect.x + center.x, y: metrics.y - screenRect.y + center.y }, to: targets[index]! };
-    });
-    const coinFrom = targets.reduce((point, target) => ({ x: point.x + target.x / targets.length, y: point.y + target.y / targets.length }), { x: 0, y: 0 });
-    const coinTo = { x: coinRect.x - screenRect.x + coinRect.width / 2, y: coinRect.y - screenRect.y + coinRect.height / 2 };
-    // Every reward the order pays flies into its own counter: Glow, and the Timber and Meals when it pays them.
-    const payout = supplyOrderPayout(entry);
-    const toCounter = (rect: { x: number; y: number; width: number; height: number }) => ({ x: rect.x - screenRect.x + rect.width / 2, y: rect.y - screenRect.y + rect.height / 2 });
-    const extras = [
-      ...(payout.timber > 0 && timberRect ? [{ id: 'timber', amount: payout.timber, art: GAME_CURRENCY_ART.timber, to: toCounter(timberRect), targetSize: { width: timberRect.width, height: timberRect.height } }] : []),
-      ...(payout.meals > 0 && mealsRect ? [{ id: 'meals', amount: payout.meals, art: GAME_CURRENCY_ART.meals, to: toCounter(mealsRect), targetSize: { width: mealsRect.width, height: mealsRect.height } }] : []),
-    ];
-    supplyServingRef.current = entry;
-    supplyServeNonceRef.current += 1;
-    setSupplyHiddenItemIds(new Set(items.map((item) => item.instanceId)));
-    setSupplyServeFlight({ coinAmount: entry.order.reward.coins, coinFrom, coinTo, coinTargetSize: { width: coinRect.width, height: coinRect.height }, energyAmount: 0, energyTo: coinTo, extras, items, nonce: supplyServeNonceRef.current, phase: 'items' });
-    return true;
-  }, [commitSupplyOrder, measureInScreen, openingBoardMetrics, reduceMotion, supplyOrderPayout, supplyRunStore.state]);
-  const supplyItemsArrived = useCallback(() => {
-    if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setSupplyServeFlight((current) => current ? { ...current, phase: 'rewards' } : null);
-  }, []);
-  const supplyCoinArrived = useCallback(() => {
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, []);
-  const finishSupplyServe = useCallback(() => {
-    const entry = supplyServingRef.current;
-    supplyServingRef.current = null;
-    setSupplyServeFlight(null);
-    if (!entry) { setSupplyHiddenItemIds(new Set()); return; }
-    void commitSupplyOrder(entry).finally(() => setSupplyHiddenItemIds(new Set()));
-  }, [commitSupplyOrder]);
+  // Request only: the dedicated activity owns the Café board and serving flights.
+  const supplyRunDocked = supplyRunOpen && screenFocused;
+  const leaveCafe = useCallback(() => setSupplyRunOpen(false), []);
   // Baristabbit's Café opens once he is home.
   const supplyRunAvailable = !ftueStepId && mergeWorld.companionDiscovery.records.some((record) => record.characterId === 'baristabbit');
   // Timber and Meals join the currency bar once there is any (or the Café has opened).
@@ -3509,7 +3393,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // The Sanctuary's next thing (`constants/sanctuary-chapters.ts`), once the first session is over.
   const chapterState = useMemo(() => sanctuaryChapterState(mergeWorld), [mergeWorld]);
   // The Sanctuary with nothing else up: its buttons, bubbles and chapter card show. Still true once every chapter is done.
-  const sanctuarySurfaceFree = !ftueStepId && screenFocused && !rushSheetOpen && !wispLanternOpen && !adventureOpen && !friendWispsFamilyId && !lockedHintFamilyId && !detailCreatureId
+  const sanctuarySurfaceFree = !activityReturnPending && !ftueStepId && screenFocused && !rushSheetOpen && !wispLanternOpen && !adventureOpen && !friendWispsFamilyId && !lockedHintFamilyId && !detailCreatureId
     && !pendingIslandDiscovery && !revealedFriendCardId && !wakeHandoffCampaign && !requiredUpgradeStory && !stepplingEncounter.open && !supplyRunOpen && !missionBoardDocked && !upgradePresentation && !buildingPanelId && !katchimeraPanelId && !heroBuildingPanelId && !heroRosterOpen && !heartTreePanelOpen
     && !activeInteractionResidentId && !interactionCreatureId && !trackOpen && !islandEncounter && !battleReward && !selectedUpgrade && !progressSheetOpen && !pendingIslandCampaign;
   const chapterSurfaceFree = Boolean(chapterState) && sanctuarySurfaceFree && !openingTileTap && !arrivalTalk && !rescueRevealing && !goalHandoff;
@@ -3680,63 +3564,79 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [chapterGoalNeed, chapterState?.goal, followKingdomNext, openGlowSource, openGoalSource, progressSummary.next, startFinaleBattle, startFrontierBattle, startRegionRescue, startSurgeDefence, upgradeOffers]);
   const followChapterGoalRef = useRef(followChapterGoal);
   followChapterGoalRef.current = followChapterGoal;
-  // The Café's first visit is taught (`docs/cozy-4x-ftue-v2-wayfinders-road.md`, Chapter 1), the way the Merge page
-  // once taught it: a spotlight and a finger, one step at a time, on the first friend's first order. Pour (tap the Ritual
-  // Bar), merge the two pieces the order's item is made of, then Serve. Baristabbit says each step.
-  const cafeLesson = useMemo(() => {
-    const board = supplyRunStore.state;
-    const entry = supplyRunOrders[0];
-    if (!supplyRunDocked || !board || !entry || (mergeWorld.supplyRun?.served ?? 0) > 0) return null;
-    const order = entry.order;
-    const say = (text: string) => ({ speaker: 'Baristabbit', text });
-    if (mergeOrderReady(board, order)) {
-      const target: FtueTarget = { kind: 'order_serve', orderId: order.id };
-      return { cue: { kind: 'tap', target } as FtueCueDefinition, spotlight: { targets: [target], grouping: 'bounding_rect', padding: 6, radius: 18, dimOpacity: 0.55 } as FtueSpotlightDefinition, line: say('That\u2019s it. Tap Serve, and Steppling eats.') };
-    }
-    const wanted = order.requirements[0]?.definitionId ?? '';
-    const tierAt = wanted.lastIndexOf(':');
-    const part = tierAt > 0 ? `${wanted.slice(0, tierAt)}:${Number(wanted.slice(tierAt + 1)) - 1}` : '';
-    const loose = board.board.flatMap((cell, index) => cell?.occupant?.kind === 'item' && !cell.mist && !cell.locked && cell.occupant.definitionId === part ? [index] : []);
-    const bar = board.board.findIndex((cell) => cell?.occupant?.kind === 'generator' && cell.occupant.generatorId === 'ritual-bar');
-    if (!cafePoured && bar >= 0) {
-      const target: FtueTarget = { kind: 'board_cell', cell: bar };
-      return { cue: { kind: 'tap', target } as FtueCueDefinition, spotlight: { targets: [target], grouping: 'bounding_rect', padding: 4, radius: 14, dimOpacity: 0.55 } as FtueSpotlightDefinition, line: say('Tap the Ritual Bar. It pours a Tiny Espresso.') };
-    }
-    if (loose.length >= 2) {
-      const from: FtueTarget = { kind: 'board_cell', cell: loose[1]! };
-      const to: FtueTarget = { kind: 'board_cell', cell: loose[0]! };
-      return { cue: { kind: 'drag', from, to } as FtueCueDefinition, spotlight: { targets: [from, to], grouping: 'bounding_rect', padding: 3, radius: 11, dimOpacity: 0.55 } as FtueSpotlightDefinition, line: say('Two of the same make the next one. Drag one onto the other.') };
-    }
-    if (bar >= 0) {
-      const target: FtueTarget = { kind: 'board_cell', cell: bar };
-      return { cue: { kind: 'tap', target } as FtueCueDefinition, spotlight: null, line: say('Pour another one.') };
-    }
-    return null;
-  }, [cafePoured, mergeWorld.supplyRun?.served, supplyRunDocked, supplyRunOrders, supplyRunStore.state]);
-  const cafeAfterFirstLine = (mergeWorld.supplyRun?.served ?? 0) === 1 ? { speaker: 'Baristabbit', text: 'That\u2019s Meals in the pantry. Meals train heroes.' } : null;
-  // The bar is the chapter goal's own count when the goal is the Café's (Serve 3 orders: 1 of 3), a crate's five when
-  // the goal is a crate; no bar at all otherwise.
-  const cafeBar = useMemo(() => {
-    const goal = chapterState?.goal;
-    const count = goal?.action.kind === 'supply_run' ? goal.progress?.(mergeWorld) : null;
-    return count ? { progress: count.current, required: count.total } : null;
-  }, [chapterState?.goal, mergeWorld]);
-  // When the Café's goal is done, the visit ends on its own and the next goal opens: nothing to find, no bar to restart.
-  const cafeGoalRef = useRef<string | null>(null);
+  const activityEntryRevision = useRef(0);
+  const activityEntering = useRef(false);
+  const requestedActivityKey = supplyRunOpen ? 'cafe' : eventBoardActive && selectedEventAction?.phase === 'board'
+    ? `event:${selectedEventAction.event.id}:${selectedEventAction.encounter.id}` : rushRun ? `rush:${rushRun.dayId}:${rushRun.index}:${rushRun.attempt}` : null;
+  const openDedicatedActivity = useStableCallback(async () => {
+    const revision = ++activityEntryRevision.current;
+    if (!requestedActivityKey || !screenFocused || !ftueCameraSettled || !cameraSettledRef.current || activityEntering.current || navigationLocked) return;
+    let source: ActivitySource;
+    let tileLayerId: string;
+    if (supplyRunOpen) {
+      const goal = sanctuaryChapterState(mergeWorld)?.goal;
+      source = { kind: 'cafe', kitchen: kitchenOpen(mergeWorld), goalId: goal?.action.kind === 'supply_run' ? goal.id : null };
+      tileLayerId = `structure:${BARISTABBIT_HATCHABLE.tile.id}`;
+    } else if (eventBoardActive && selectedEventAction?.phase === 'board') {
+      source = { kind: 'event', eventId: selectedEventAction.event.id, nodeId: selectedEventAction.encounter.id };
+      const slot = visibleCompanionSlots.find(slot => slot.familyId === eventCompanionId);
+      tileLayerId = residentArtLayerId(slot?.id ?? 'family:mossprout', eventCompanionId);
+    } else if (rushRun) {
+      source = { kind: 'rush', ...rushRun };
+      tileLayerId = `nature:mossprout:${WISP_RUSH_HOST.islandId}`;
+    } else return;
+    const frame = await captureSettledBattleTile(
+      () => activityEntryRevision.current === revision && cameraSettledRef.current,
+      () => battleTileCaptureRef.current?.(tileLayerId) ?? Promise.resolve(null),
+    );
+    if (!frame) return;
+    const { plantableMemories: _memories, ...garden } = mossproutGardenScene;
+    const input = { source, tileLayerId, backdrop: background.sceneId,
+      tileFraming: { frame, viewport: { width: window.width, height: window.height } },
+      tileScene: { garden, levels: mergeWorld.haven.mossproutNatureIslands, reveals: canvasNatureIslandReveals,
+        homeVeiled: homeVeil === 'veiled' || homeVeil === 'lifting' } };
+    activityEntering.current = true;
+    let started = false;
+    transitionTo({ target: 'activity', announcement: source.kind === 'cafe' ? 'Entering the Café' : 'Entering the event', expectedPathname: '/activity',
+      requiredReadiness: ['data', 'background', 'foreground', 'layout', 'interaction_target', 'route'],
+      navigate: async () => {
+        await flushMergeWorld();
+        const session = startActivitySession(input);
+        const destination = { pathname: '/activity' as const, params: { sessionId: session.id } };
+        if (started) router.replace(destination); else router.push(destination);
+        started = true;
+      },
+      onReturn: () => {
+        activityEntering.current = false;
+        setSupplyRunOpen(false); setEventSelection(null); setRushRun(null);
+        saveActivitySession(null);
+        if (started) router.back();
+      },
+    });
+  });
   useEffect(() => {
-    if (!supplyRunDocked) { cafeGoalRef.current = null; return; }
-    const goal = chapterState?.goal ?? null;
-    if (cafeGoalRef.current == null) { cafeGoalRef.current = goal?.action.kind === 'supply_run' ? goal.id : ''; return; }
-    if (!cafeGoalRef.current || goal?.id === cafeGoalRef.current || supplyServeFlight || battleReward) return;
-    // The goal just done has a scene: it plays over the Café, and its button leaves the Café and goes on.
-    if (chapterGoalById(cafeGoalRef.current)?.outro?.length) return;
-    const timer = setTimeout(() => {
-      setSupplyRunOpen(false);
-      // The next goal, straight there (its panel, the next friend's tile); a finished chapter shows its card instead.
-      if (goal && !chapterState?.complete) setTimeout(() => followChapterGoalRef.current?.(), 450);
-    }, 700);
-    return () => clearTimeout(timer);
-  }, [battleReward, chapterState?.complete, chapterState?.goal, supplyRunDocked, supplyServeFlight]);
+    const revision = activityEntryRevision;
+    if (!screenFocused) activityEntering.current = false;
+    void openDedicatedActivity();
+    return () => { revision.current++; };
+  }, [requestedActivityKey, ftueCameraSettled, screenFocused, navigationLocked, openDedicatedActivity]);
+  useEffect(() => {
+    if (!screenFocused || navigationLocked || !ftueCameraSettled) return;
+    const returned = getActivitySession();
+    if (returned?.status !== 'returning') return;
+    saveActivitySession(null);
+    const source = returned.source;
+    if (source.kind === 'rush') {
+      setRushRun(null); setRushResult(returned.result?.rush ?? null); setRushNotice(returned.result?.notice ?? null); setRushSheetOpen(true);
+    } else if (source.kind === 'event') {
+      const action = eventActions.find(action => action.event.id === source.eventId && action.encounter.id === source.nodeId);
+      if (action?.phase === 'resolution') void openWorldEvent(action);
+    } else if (source.goalId && chapterState?.goal?.id !== source.goalId) {
+      const done = chapterGoalById(source.goalId);
+      if (done?.outro?.length) setGoalHandoff({ goalId: source.goalId, lines: done.outro });
+      else if (returned.result?.goalCompleted && !chapterState?.complete) followChapterGoalRef.current?.();
+    }
+  }, [screenFocused, navigationLocked, ftueCameraSettled, eventActions, openWorldEvent, chapterState]);
   // A goal done with a scene (`ChapterGoal.outro`): when the goal moves on, its lines play one at a time, then the button
   // names the next goal and goes straight there, leaving whatever the goal was done in (the Café, a panel) first.
   const lastGoalIdRef = useRef<string | null | undefined>(undefined);
@@ -3798,7 +3698,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     else setChapterOpeningPlace(null);
     if (chapter) void markStoredChapterOpened(chapter.id).catch(() => undefined);
   }, [chapterState?.chapter, chapterState?.goal]);
-  const goalHandoffShown = Boolean(goalHandoff) && screenFocused && !battleReward && !supplyServeFlight && !upgradePresentation && !chapterOpeningPhase && !arrivalTalk && !rescueRevealing && !frontierRevealing && !hollowRevealing;
+  const goalHandoffShown = Boolean(goalHandoff) && screenFocused && !battleReward && !upgradePresentation && !chapterOpeningPhase && !arrivalTalk && !rescueRevealing && !frontierRevealing && !hollowRevealing;
   const tapOpeningTile = useCallback(() => {
     setOpeningTileTap(null);
     // The camera stays on the tile while the rescue takes it over (its own framing of the same tile), then lets go.
@@ -3961,7 +3861,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   );
 
   // A friend without a page is looked at on a detail card: that is an interaction too, and nothing of the world's begins under it.
-  const sharedAdventureAllowed = !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !detailCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId && !rushSheetOpen && !rushSpec && !islandEncounter && !trackOpen;
+  const sharedAdventureAllowed = !activityReturnPending && !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !detailCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId && !rushSheetOpen && !rushSpec && !islandEncounter && !trackOpen;
   const heartwoodRecap = sharedAdventureAllowed && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed') && !havenMergeBoardActive && (mergeWorld.haven.tileStages.mossprout ?? 0) >= 1 && needsHeartwoodRecap(mergeWorld);
   const worldEventsAllowed = sharedAdventureAllowed && !havenMergeBoardActive && !heartwoodRecap;
   // havenMergeBoardActive means an owned Mossprout can open the Garden, not
@@ -4247,7 +4147,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           if (offer && !mergeWorld.worldUnlocks?.['feastle:arrival']?.hatchedAt) void openUpgradeOffer(offer);
           else openGarden(undefined, 'feastle');
         }} /> : null}
-      {eventBoardActive && selectedEventAction ? <LocalEventMissionDock action={selectedEventAction} width={window.width} bottomInset={insets.bottom} onClose={() => setEventSelection(null)} /> : null}
       {screenFocused && eventError ? <View style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 160, zIndex: 120 }}><KatchaButton label={eventError} onPress={() => setEventError('')} /></View> : null}
       {screenFocused && mistExitError ? <View style={{ position: 'absolute', bottom: insets.bottom + 20, left: 24, right: 24, zIndex: 120 }}>
         <KatchaButton label="Explore the mist · Try again" onPress={() => requestResidentInteractionExit()} />
@@ -4626,15 +4525,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         <LastClearingTitleCard key={chapterState.chapter.id} eyebrow={`Chapter ${chapterState.chapter.number} complete`} title={chapterState.chapter.title}
           lines={[chapterState.chapter.closing, `+${chapterState.chapter.reward.glow} Glow`, ...(chapterState.chapter.unlock ? [chapterState.chapter.unlock] : [])]} onContinue={claimChapter} />
       ) : null}
-      {supplyRunDocked && supplyRunStore.state ? <SupplyRunDock state={supplyRunStore.state} send={cafeSend} orders={supplyRunOrders} bar={cafeBar} line={cafeLesson?.line ?? cafeAfterFirstLine}
-        hiddenItemIds={supplyHiddenItemIds} servingOrderId={supplyServeFlight ? supplyServingRef.current?.order.id ?? null : null} onRailTargetRef={setCafeRailTarget}
-        width={window.width} bottomInset={insets.bottom} onServe={serveSupplyOrder} onBoardMetrics={setOpeningBoardMetrics} onEntranceSettled={markOpeningDockSettled}
-        title={kitchen ? 'Feastle\u2019s Kitchen' : undefined} /> : null}
-      {cafeLesson && openingDockSettled && !supplyServeFlight && !battleReward ? <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: FTUE_SCENE_LAYERS.spotlight }]}>
-        <MergeFtueOverlay blockedPulseNonce={0} boardMetrics={openingBoardMetrics} cue={cafeLesson.cue} guide={null}
-          layoutNonce={cafeRailRevision} railTargetRefs={cafeRailRefs} screenRef={screenRef} spotlight={cafeLesson.spotlight}
-          state={supplyRunStore.state!} targetRevision={(supplyRunStore.state?.revision ?? 0) * 100 + cafeRailRevision} />
-      </View> : null}
       {sanctuarySurfaceFree ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Heroes" accessibilityHint="Your friends, their levels and their buildings" onPress={() => setHeroRosterOpen(true)}
           style={({ pressed }) => [styles.supplyRunButton, { bottom: Math.max(insets.bottom, 12) + (supplyRunAvailable ? 64 : 14) }, pressed ? { opacity: 0.85 } : null]}>
@@ -4664,7 +4554,6 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           <Text style={styles.supplyRunLabel}>Café</Text>
         </Pressable>
       ) : null}
-      {supplyServeFlight ? <MergeServeRewardOverlay flight={supplyServeFlight} onItemsArrive={supplyItemsArrived} onCoinArrive={supplyCoinArrived} onEnergyArrive={() => undefined} onFinish={finishSupplyServe} /> : null}
       {battleReward ? <BattleRewardCard key={`battle-reward:${battleReward.key}`} reward={battleReward} onContinue={continueBattleReward} /> : null}
       {/* A docked mini board dims the Kingdom behind it, easing in and out. */}
       <BoardSessionDim active={Boolean(openingBoardActive || supplyRunDocked || (stepplingMissionActive && stepplingMission.state) || (journeyMissionActive && journeyMissionStore.state) || (activeRush && screenFocused) || (islandEncounterActive && islandMist.store.state) || (restorationBoardVisible && !chapterRush))} />

@@ -26,10 +26,14 @@ export function battleTileLayerId(source: BattleSource): string {
 
 /** Pure layout/art resolution, run once at entry. Only the selected layer is mounted. */
 export function resolveBattleTile(source: BattleSource, snapshot?: BattleTileScene) {
+  return resolveWorldActivityTile(battleTileLayerId(source), snapshot, source.kind === 'first');
+}
+
+export function resolveWorldActivityTile(layerId: string, snapshot?: BattleTileScene, homeVeiled = false) {
   const scene = buildMossproutHexNeighborhoodScene([], snapshot?.levels ?? emptyMossproutNatureIslandLevels(),
     { ...snapshot?.garden, level: snapshot?.garden.level ?? 0, plantableMemories: [] }, snapshot?.reveals,
-    { homeVeiled: snapshot?.homeVeiled ?? source.kind === 'first' });
-  const layer = scene.tileArtLayers.find(layer => layer.id === battleTileLayerId(source))
+    { homeVeiled: snapshot?.homeVeiled ?? homeVeiled });
+  const layer = scene.tileArtLayers.find(layer => layer.id === layerId)
     ?? scene.tileArtLayers.find(layer => layer.id === 'family:mossprout')!;
   const tile = scene.tileById.get(layer.id);
   return { ...layer, focusPoint: layer.id === 'family:mossprout' && tile ? { x: tile.cx, y: tile.cy }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import { View } from 'react-native';
 import { MistMissionDock } from './kingdom-opening-merge-dock';
 import { ThemedText } from '@/components/themed-text';
@@ -8,11 +8,16 @@ import type { WorldEventAction } from '@/features/live-ops/world-event-presentat
 import { applyStoredLocalEvent } from '@/utils/merge-world/repository';
 import { reduceMergeWorld } from '@/utils/merge-world/engine';
 import type { MergeWorldCommand, MergeWorldCommandResult } from '@/types/merge-world';
+import type { MergeBoardScreenMetrics } from '../games/feastle-persistent-merge-board';
 
 const EMPTY = new Set<string>();
 const LAYOUT = { ...OPENING_BOARD_LAYOUT, rows: 3, cellIndices: missionWindow(3).cellIndices, accessibilityLabel: 'Event mission merge board, five columns by three rows' };
 /** Same draggable board, item effects and dock as rescue missions. The event transaction owns its save. */
-export function LocalEventMissionDock({ action, width, bottomInset, onClose }: { action: WorldEventAction; width: number; bottomInset: number; onClose: () => void }) {
+export function LocalEventMissionDock({ action, width, bottomInset, onClose, onBoardMetrics, onEntranceSettled, strictReadiness, pendingRef }: {
+  action: WorldEventAction; width: number; bottomInset: number; onClose: () => void; strictReadiness?: boolean;
+  onBoardMetrics?: (metrics: MergeBoardScreenMetrics | null) => void; onEntranceSettled?: () => void;
+  pendingRef?: RefObject<Promise<unknown> | null>;
+}) {
   const busy = useRef(false);
   const [error, setError] = useState('');
   const board = action.state?.board;
@@ -23,12 +28,14 @@ export function LocalEventMissionDock({ action, width, bottomInset, onClose }: {
     if (!result.changed) return result;
     busy.current = true;
     setError('');
-    void applyStoredLocalEvent({ type: 'move', eventId: action.event.id, nodeId: action.encounter.id, from: command.from, to: command.to })
+    const pending = applyStoredLocalEvent({ type: 'move', eventId: action.event.id, nodeId: action.encounter.id, from: command.from, to: command.to })
       .catch(e => setError(e instanceof Error ? e.message : 'Please try that move again.'))
       .finally(() => { busy.current = false; });
+    if (pendingRef) pendingRef.current = pending;
     return result;
   };
-  return <MistMissionDock state={board} boardStep={null} layout={LAYOUT}
+  return <MistMissionDock state={board} boardStep={null} layout={LAYOUT} strictReadiness={strictReadiness}
+    onBoardMetrics={onBoardMetrics} onEntranceSettled={onEntranceSettled}
     progress={action.state?.merges ?? 0} required={action.encounter.merges} barTitle={action.encounter.title}
     interactionKey={`${action.event.id}:${action.encounter.id}`} sessionId={`event:${action.event.id}:${action.encounter.id}`}
     hiddenItemIds={EMPTY} width={width} bottomInset={bottomInset} onCommand={send} onClose={onClose}

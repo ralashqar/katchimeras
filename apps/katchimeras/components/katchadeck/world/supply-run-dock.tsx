@@ -26,9 +26,10 @@ export type SupplyRunOrder = { slot: 0 | 1; index: number; order: ReturnType<typ
  * Back (in the top bar) puts the board away; it keeps everything for next time.
  */
 export const SupplyRunDock = memo(function SupplyRunDock({
-  state, send, orders, width, bottomInset, onServe, onBoardMetrics, onEntranceSettled, hiddenItemIds, servingOrderId, title, bar, line, onRailTargetRef,
+  state, send, orders, width, bottomInset, onServe, onBoardMetrics, onEntranceSettled, hiddenItemIds, servingOrderId, title, bar, line, onRailTargetRef, strictReadiness,
 }: {
   state: MergeWorldState;
+  strictReadiness?: boolean;
   send: (command: MergeWorldCommand) => MissionCommandResult | null;
   orders: readonly SupplyRunOrder[];
   /** The bar: the chapter goal's count when the goal is the Café's (Serve 3 orders); none otherwise. */
@@ -75,7 +76,7 @@ export const SupplyRunDock = memo(function SupplyRunDock({
       onServe={serveOrder} onRailTargetRef={onRailTargetRef} parcelTargetRef={parcelRef} />
     <ServiceCounter viewportWidth={width} />
   </View>;
-  return <MistMissionDock
+  return <MistMissionDock strictReadiness={strictReadiness}
     state={state} boardStep={null} progress={bar?.progress ?? 0} required={bar?.required ?? 1} hideBar={!bar} barTitle={title ?? "Baristabbit’s Café"}
     interactionKey="supply-run" sessionId={sessionRef.current.id} hiddenItemIds={hiddenItemIds ?? noneHidden}
     width={width} bottomInset={bottomInset}

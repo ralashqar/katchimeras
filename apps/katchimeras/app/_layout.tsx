@@ -148,6 +148,7 @@ function RootLayout() {
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="battle" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
+          <Stack.Screen name="activity" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
           <Stack.Screen name="art-lab" options={{ title: 'Katchimera Art Lab' }} />
           <Stack.Screen name="world-base-lab" options={{ title: 'World Base Lab' }} />
           <Stack.Screen name="dev-atmosphere-lab" options={{ title: 'Atmosphere Lab', headerShown: false }} />

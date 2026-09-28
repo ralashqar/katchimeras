@@ -2,6 +2,8 @@
 
 Full first, Lost Trail, rescue, island, Grove, frontier and daily encounters now run on `/battle`. The existing curtain covers preparation and return. The world route retains its camera/session shell, but its renderer and controllers unmount when the battle takes focus. Short merge lessons, restoration boards and egg reveals remain in the world.
 
+Café serving, local-event mission boards, and daily Wisp Rush heats now use the same camera-to-curtain handoff on `/activity`; see [dedicated activities](dedicated-activities.md) for ownership, persistence and return behavior.
+
 Battle entry waits for the world camera to settle before starting the curtain. It captures the selected tile's final screen frame, including camera zoom, focus scale, and canvas offset, and saves that frame with the battle session. The dedicated page draws the static tile at those same coordinates above the shared bottom-docked merge board instead of fitting it into a separate image box. Pending captures are discarded if the camera starts moving again, the encounter changes, or the world loses focus. Older sessions without a captured frame use the authored mission zoom and focus anchor.
 
 Framing validation: 11 targeted framing, tile, route and session tests passed, along with TypeScript. Tests cover camera projection, saved-frame rendering, interrupted capture, and retaining loaded tile images. Physical-device visual alignment still needs an iPhone check; mocked native measurements do not establish it.
