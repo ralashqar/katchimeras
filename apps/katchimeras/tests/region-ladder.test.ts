@@ -39,7 +39,7 @@ test('an island plays authored levels (Petalimp), the Lanes pattern when it has 
   const first = chapterMissions(petalimp, petalimp.chapters[0]!);
   assert.equal(first.length, 2);
   assert.equal(first[0]!.id, `${petalimp.campaignId}:c1-1`);
-  assert.ok(first.every((mission) => mission.encounter.spawners.every((spawner) => spawner.generatorId === 'seed-sprinkler') && mission.encounter.mechanic?.kind === 'lanes' && Boolean(mission.encounter.mechanic.seeds && mission.encounter.mechanic.sprinkler)), 'no Pod: the Seed Sprinkler, tapped, is the Seeds');
+  assert.ok(first.every((mission) => mission.encounter.spawners.every((spawner) => spawner.generatorId === 'seed-sprinkler' || spawner.generatorId === 'storm-pot') && mission.encounter.mechanic?.kind === 'lanes' && Boolean(mission.encounter.mechanic.seeds && mission.encounter.mechanic.sprinkler)), 'no Pod: the Seed Sprinkler, tapped, is the Seeds (and the Storm Pot beside it)');
   assert.ok(first.every((mission) => mission.encounter.resolve == null && mission.encounter.rows === 5), 'no Resolve, five rows');
   assert.ok(first.every((mission) => mission.encounter.mechanic?.kind === 'lanes' && mission.encounter.mechanic.wisps.length >= 2), 'Lanes: wisps come down the columns');
   const bare = ISLAND_CAMPAIGNS.find((campaign) => campaign.chapters.every((chapter) => !chapter.restoration && !chapter.missions))!;

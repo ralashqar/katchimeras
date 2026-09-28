@@ -318,7 +318,7 @@ export function waves(prefix: string, input: { first: number; gap: number; hp: n
  * Three wisps, one at a time, down the middle and either side.
  */
 export const MIST_LEVEL_SPEC: IslandLevelSpec = {
-  title: 'Lift the Mist', objective: 'Wisps are coming down. Wake what sleeps under the Mist and merge Sprouts under the wisps: every piece shoots Glow up its column.', difficulty: 'calm',
+  title: 'Lift the Mist', objective: 'Wisps are coming down. Wake what sleeps under the Mist and merge Sprouts under the wisps: every piece shoots Glow up its column.', difficulty: 'calm', stormPot: {},
   // The first boards' chain: bring a Seed to the sleeper in the middle; it wakes as a Sprout and opens the Mist above it.
   pieces: [[36, 1], [37, 1], [39, 1], [40, 1], [44, 1], [46, 1]], sleepers: [[38, 1]],
   veiled: [[31, 1], [30, 1], [32, 1], [24, 2], [23, 1], [25, 1], [29, 2], [33, 2], [17, 2]],
@@ -330,20 +330,20 @@ export const MIST_LEVEL_SPEC: IslandLevelSpec = {
 export const PETALIMP_LEVEL_SPECS: Readonly<Record<1 | 2 | 3 | 4, readonly IslandLevelSpec[]>> = {
   1: [
     {
-      title: 'Seeds Under the Mist', objective: 'They come down every column now. Move your pieces under them: a piece only shoots up its own column.', difficulty: 'calm',
+      title: 'Seeds Under the Mist', objective: 'They come down every column now. Move your pieces under them: a piece only shoots up its own column.', difficulty: 'calm', stormPot: {},
       // Two sleepers, and the Mist over them opens outward from each.
-      pieces: [[36, 1], [38, 1], [40, 1], [43, 1], [44, 1], [46, 1], [47, 1]], sleepers: [[37, 1], [39, 1]],
+      pieces: [[36, 1], [38, 1], [40, 1], [43, 1], [44, 1], [46, 1]], sleepers: [[37, 1], [39, 1]],
       veiled: [[30, 1], [32, 1], [29, 1], [33, 1], [31, 2], [23, 2], [25, 2], [22, 1], [26, 1]],
       mist: [], seeds: { every: 3 }, wisps: [],
       lanes: waves('wisp', { first: 2, gap: 9, hp: 4, step: 5, grow: 1, drop: 3 }, [[2], [4], [1, 5], [3, 2], [4, 1]]),
     },
     {
-      title: 'The First Bed', objective: 'Bigger pieces shoot harder and faster. Now the wisps spit Mist down while they are still high: keep merging beside it.', difficulty: 'calm',
+      title: 'The First Bed', objective: 'Bigger pieces shoot harder and faster. Now the wisps spit Mist down while they are still high: keep merging beside it.', difficulty: 'calm', stormPot: {},
       pieces: [[36, 2], [40, 2], [37, 1], [39, 1], [44, 1], [46, 1]], sleepers: [[38, 1]],
       veiled: [[31, 2], [30, 1], [32, 1], [29, 2], [33, 2], [24, 1], [23, 2], [25, 2]],
       mist: [], seeds: { every: 3 }, wisps: [],
       // The chain climbs the middle column, so the wisps come down either side of it.
-      lanes: waves('wisp', { first: 2, gap: 8, hp: 4, step: 5, grow: 1, drop: 2, spit: 10 }, [[1], [4], [2, 5], [1, 4], [2, 5]]),
+      lanes: [...waves('wisp', { first: 2, gap: 8, hp: 4, step: 5, grow: 1, drop: 2, spit: 10 }, [[1], [4], [2, 5], [1, 4], [2, 5]]), crawler('crawler', 16, 18, 4, 3.4)],
     },
   ],
   2: [
