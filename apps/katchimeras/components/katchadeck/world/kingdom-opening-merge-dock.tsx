@@ -851,6 +851,11 @@ export type OpeningGlowStore = GlowLandingSource & {
   launchVolley: (shots: readonly GlowVolleyShot[], onLand: (index: number) => void) => void;
   /** Lanes: one Glow token per shot, straight from its piece at the wisp it is aimed at (or, with none, to `to`, fading), flown for `durationMs`. */
   launchBolts: (bolts: readonly { from: RewardFlightPoint; wisp: number; to?: RewardFlightPoint; durationMs: number; delayMs?: number; art?: ArtSource; size?: number }[]) => void;
+  /**
+   * A hit on a wisp that no Glow token flies to (a Spark plant's zap, the Seed Sprinkler's spark): exactly what a lane
+   * bolt's landing does there. The wisp flinches and takes the hit, and the same impact burst plays where it stands.
+   */
+  strikeWisp: (wisp: number) => void;
   /** The final merge's item, large and alone, straight up into the mist. */
   launchFinale: (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null) => number;
   arrive: (id: number) => void;
@@ -1024,6 +1029,22 @@ function createOpeningGlowStore(): OpeningGlowStore {
     if (made.length) setFlights((current) => [...current, ...made]);
     for (const flight of made) if (flight.hidden) overflowLandings.schedule((flight.delay ?? 0) + flight.direct!, () => arrive(flight.id));
   };
+  const strikeWisp = (wisp: number) => {
+    const sink = sinkRef.current;
+    const at = sink?.pointOf?.(wisp) ?? null;
+    if (!sink || !at) return;
+    batch(() => {
+      sink.struck(wisp);
+      sink.landed(wisp, 'glow');
+      // The experimental world renderer draws its own impacts; the native one bursts here, as a bolt's landing does.
+      if (effectsRef.current) return;
+      const id = ++nextId.current;
+      setImpacts((bursts) => {
+        const live = bursts.reduce((count, burst) => count + (burst.wisp ? 1 : 0), 0);
+        return live >= STRIKE_BURST_POOL ? bursts : [...bursts, { id, wisp: true, at }];
+      });
+    });
+  };
   const launchFinale = (from: RewardFlightPoint, definitionId: string, strike?: MissionStrike | null): number => {
     const id = ++nextId.current;
     finaleIdRef.current = id;
@@ -1046,7 +1067,7 @@ function createOpeningGlowStore(): OpeningGlowStore {
     getFlights: () => flightsSnapshot,
     getFinale: () => finaleSnapshot,
     finaleHoldRef, sinkRef, targetRef, effectsRef,
-    launch, launchItem, launchShot, launchVolley, launchBolts, launchFinale, arrive, impactDone,
+    launch, launchItem, launchShot, launchVolley, launchBolts, strikeWisp, launchFinale, arrive, impactDone,
     dispose: () => { overflowLandings.clear(); if (finaleTimer) clearTimeout(finaleTimer); finaleTimer = undefined; shotLandings.clear(); landedGroups.current.clear(); },
   };
 }

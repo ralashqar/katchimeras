@@ -59,7 +59,7 @@ type HatchableMissionDockProps = {
   width: number;
   bottomInset: number;
   /** The Glow's store: the bar flashes on its landings, and Merge vs Mist fires its Glow shots through it. */
-  landings?: GlowLandingSource & { launchVolley?: OpeningGlowStore['launchVolley']; launchBolts?: OpeningGlowStore['launchBolts']; sinkRef?: OpeningGlowStore['sinkRef'] };
+  landings?: GlowLandingSource & { launchVolley?: OpeningGlowStore['launchVolley']; launchBolts?: OpeningGlowStore['launchBolts']; strikeWisp?: OpeningGlowStore['strikeWisp']; sinkRef?: OpeningGlowStore['sinkRef'] };
   /** A strike on the wisps: what flies is the mechanic's to say. */
   onStrike?: (from: RewardFlightPoint, strike: MissionStrike) => void;
   /** The strike that fills the bar: its item leaves the board for the mist. */
@@ -334,7 +334,7 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
           const { bounds } = mergeCellFrame(metrics.geometry, spark.from);
           const size = bounds.width * 0.5;
           return [{
-            id: ++boltSeq.current, tone: 'glow', delay: 0, onImpact: () => {},
+            id: ++boltSeq.current, tone: 'glow', delay: 0, onImpact: () => landings?.strikeWisp?.(spark.wisp),
             from: { left: offset.x + bounds.left, top: offset.y + bounds.top, width: bounds.width, height: bounds.height },
             to: { left: at.x - origin.x - size / 2, top: at.y - origin.y - size / 2, width: size, height: size },
           }];
@@ -352,7 +352,7 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
             const at = landings?.sinkRef?.current?.pointOf?.(wisp);
             if (!at) return [];
             const to = { left: at.x - origin.x - size / 2, top: at.y - origin.y - size / 2, width: size, height: size };
-            const bolt: MistBolt = { id: ++boltSeq.current, tone: 'glow', delay: order * LANE_SPARK_MS, onImpact: () => {}, from, to };
+            const bolt: MistBolt = { id: ++boltSeq.current, tone: 'glow', delay: order * LANE_SPARK_MS, onImpact: () => landings?.strikeWisp?.(wisp), from, to };
             from = to;
             return [bolt];
           });

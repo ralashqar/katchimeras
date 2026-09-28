@@ -107,3 +107,27 @@ test('leaving combat cancels both visible animations and pending overflow landin
   assert.equal(hits, 0);
   assert.equal(motion.activeAnimationCount(), 0, 'teardown stops native animation clocks');
 });
+
+test('a zap or spark strikes a wisp as a bullet’s landing does: it flinches, takes the hit, and the same impact bursts where it stands', async () => {
+  const motion = nativeMotionHarness();
+  const api = loadGlow(motion);
+  let store!: OpeningGlowStore;
+  const root = { current: null };
+  function Fixture() {
+    store = api.useOpeningGlow(null).store;
+    return <api.MissionGlowLayer store={store} screenRef={root} retainPool />;
+  }
+  await act(async () => { create(<Fixture />); });
+  const hits: number[] = [], flinches: number[] = [];
+  store.sinkRef.current = { aim: () => null, pointOf: (wisp: number) => ({ x: 40 + wisp, y: 60 }), struck: (id) => flinches.push(id), landed: (id) => hits.push(id) };
+  await act(async () => store.strikeWisp(3));
+  assert.deepEqual([flinches, hits], [[3], [3]]);
+  const impacts = store.getFlights().impacts;
+  assert.equal(impacts.length, 1);
+  assert.deepEqual([impacts[0]!.wisp, impacts[0]!.at], [true, { x: 43, y: 60 }], 'a strike burst, on the wisp');
+  for (let index = 0; index < 10; index += 1) await act(async () => store.strikeWisp(index));
+  assert.ok(store.getFlights().impacts.length <= 6, 'bursts keep to the strike pool');
+  store.sinkRef.current = null;
+  await act(async () => store.strikeWisp(1));
+  assert.equal(hits.length, 11, 'no wisp to strike: nothing');
+});
