@@ -59,6 +59,12 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
   const items = binding.items ?? MERGE_ITEMS_BY_ID;
   const mechanic = resolveMechanic(host);
   const unchanged = (refused?: MergeWorldFailureReason): SettleResult => ({ ...before, strike: null, effects: [], opened: [], status: encounterStatus(encounter, host, before.mechanicState, before.run, before.state, window), ...(refused ? { refused } : {}) });
+  if (command.type === 'move' && before.mechanicState.kind === 'lanes') {
+    const plants = before.mechanicState.combat?.plants;
+    if ([command.from, command.to].some(cell => { const piece = before.state.board[cell]?.occupant;
+      return piece?.kind === 'item' && plants?.[piece.instanceId]?.charge; })) return unchanged();
+  }
+  if (command.type === 'move' && (encounter.fixedCells?.includes(command.from) || encounter.fixedCells?.includes(command.to))) return unchanged();
   const action = actionOf(command, result);
   if (!action) return unchanged();
   if (action === 'tap' && before.mechanicState.kind === 'lanes' && (before.mechanicState.combat?.preparingMs ?? 0) > 0) return unchanged();
@@ -166,7 +172,7 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
     if (lanes && mechanicState.kind === 'lanes') {
       const made = state.board[result.mergedCell]?.occupant;
       mechanicState = lanesAfterMerge(mechanicState, made?.kind === 'item' ? made.instanceId : null);
-      if (mechanic.kind === 'lanes' && result.mergedCell != null) mechanicState = mergeBurst(mechanic, mechanicState, state, window, result.mergedCell, run.loadout?.level);
+      if (mechanic.kind === 'lanes' && result.mergedCell != null) mechanicState = mergeBurst(mechanic, mechanicState, state, window, result.mergedCell);
     }
   }
   // The Seed Sprinkler (`docs/lanes-variety-design.md`): its tap's Seed lands where it sends it (the board flies it
@@ -178,7 +184,7 @@ export function settleAction(binding: SettleBinding, before: SettleBefore, comma
     state = launched.board;
     landedCell = launched.landed;
   }
-  if (lanes && action === 'tap' && command.type === 'tapGenerator' && mechanic.kind === 'lanes' && command.generatorId === (mechanic.secondary?.generatorId ?? STORM_POT_ID) && mechanicState.kind === 'lanes') {
+  if (lanes && action === 'tap' && command.type === 'tapGenerator' && mechanic.kind === 'lanes' && (mechanic.generators?.some(g => g.generatorId === command.generatorId && g.generatorId !== SEED_SPRINKLER_ID) || command.generatorId === (mechanic.secondary?.generatorId ?? STORM_POT_ID)) && mechanicState.kind === 'lanes') {
     const launched = lanesStormPotTapped(mechanic, mechanicState, state, window, result.spawnedCell ?? null);
     state = launched.board;
     landedCell = launched.landed;

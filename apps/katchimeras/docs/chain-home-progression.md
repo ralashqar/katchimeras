@@ -1,0 +1,27 @@
+# Chain discovery and homes
+
+Combat starts directly, without a chain-selection preparation screen. The level supplies the roster. Repeatable daily/weekly rosters choose deterministically from earned chains; ordinary authored challenges retain their required chains and route players to the missing discovery.
+
+The first five Frontier hexes become Seed Nursery, Storm Garden, Ward Grove, Dew Spring and Lantern Grove. The Nursery discovery opens first, then Storm Garden after its victory. Building the Explorer's Lodge reveals Ward Grove: waiting for the entire Lodge chapter would block its three-tile goal. Dew follows The Signal and Lantern follows The Kitchen. Petalimp's rescue never requires the Dew/Lantern rewards it precedes.
+
+Discovery uses three matching half-mist merges, a single-chain generator, guaranteed tier-one drops and 16 enemies arriving from two seconds into the battle. The clock keeps running through the half-mist lesson. Generators replenish every 1.4 seconds, and the short tutorial hint disappears after three merges. Dew has four rooted Garden defenders under ranged pressure, so healing and positioning are required. Winning writes a permanent unlock, independently of whether that Frontier had already been reclaimed on an old save. Replaying never grants the reclaim reward twice.
+
+Home upgrades are capped by Heartwood and use the existing ten-level Glow schedule. Each home gives its own chain +5% strength per level above one; generator recharge improves at levels 3, 6 and 9; tier-two drop chance is 3% per level, with tier-three drops at levels 7 and 10. Nursery and Dew retain their existing saved building levels. Bloom House retains its Garden seed-speed benefit. Old saves retain earned chapter access and relevant investments through a one-time migration.
+
+Item-introduction first clears automatically include four Timber in the normal victory reward and save the receipt atomically. Older unclaimed introduction supplies recover silently; no salvage choice or extra popup interrupts results. Other Frontier battles retain their salvage choice. The result card is bounded by the safe viewport and its content scrolls on small screens.
+
+Art uses fifteen hex renders (five homes, three stages), generated through the existing fal.ai Nano Banana hex pipeline and the Mossprout reference. Runtime art stages change at levels 4 and 7. See `art-source/katchimeras/shared-world-discovery-v2/CHAIN-HOMES.md` at repository root for reproducible recipes and provenance.
+
+Chain homes use the shared UpgradeDock and level-slot components. The selected hex is framed in the upper stage, with the same bottom-half layout, slide/dismiss gestures and Glow requirements as other buildings. Successful upgrades use the shared payment, light-field and tile crossfade presentation, retaining the dock and preventing overlapping purchases. Levels 4 and 7 crossfade between the home's art stages; other levels celebrate on its current art. Reduced motion follows the other building panels' immediate update path.
+
+Merge attacks run on the combat clock and survive save/resume: Garden fires one bonus bullet at T2, then one additional bullet per tier (T3: two, T4: three), spaced 180 ms apart; Storm simultaneously targets the nearest tier-minus-one wisps within its tier-scaled reach; Lantern uses the same bullet count with piercing shots; Dew immediately heals and thaws allies in a tier-scaled circle. Sustained fire resumes on its normal cooldown. Burst origins remain at the merge cell, rewarding lane timing.
+
+Bulwark merges emit a circular shockwave with linear falloff to 25% at the edge. Tier-one seeds are inert. A wisp within 1.65 cells arms a 720 ms visible fuse; the wall compresses and shakes, lunges up to one cell toward its target, then sacrifices itself in a flash, expanding puffs and fragments. The blast deals a larger pulse with bonus damage to its primary target. Every damaged wisp receives the normal bullet-hit particles. Armed walls cannot be moved or merged, and consuming them advances the board revision so stale animations cannot restore their sprites. Both radius and damage grow with tier. The charge and remaining burst shots persist on the simulation clock, including during pauses. Procedural rings and particles preserve the existing plant art and support reduced motion.
+
+Dedicated battles return to the standard reward card without remounting the world's embedded battle dock or its dim layer. The transient grade pill has been removed; the reward card is the single results presentation.
+
+Wisps now engage the nearest plant ahead in their lane. Ordinary shooters stop at one cell and fire a dark bullet every 2.8 seconds; zappers stop at 1.25 cells and discharge violet lightning every 3.2 seconds. Skirmishers have 3.5-cell reach and fire while moving. First attacks have a wind-up, attacks obey stun/knockback holds, and shots target a cell so repositioning can dodge them. Existing bomber, burrower, mirror and crawler behaviors remain specialized. Discovery battles introduce bullets first, then alternate zappers and skirmishers; later combat lessons mix all three.
+
+Shield detonation pushes surviving targets upward 1.25 + 0.25 × tier cells (1.75 cells at tier two, 2.5 at tier five), pauses them briefly, and interrupts dashes. Merge shockwaves apply 45% of that push. Dead wisps are never displaced.
+
+The Bulwark discovery keeps the 16-wisp rush, with a nine-second cell advance to allow time to merge replacements now that tier-one seeds are inert.

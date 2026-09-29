@@ -1,3 +1,4 @@
+import { claimFrontierSalvage, upgradeChainHome } from '@/features/encounter/chain-homes';
 import { reduceAdventure } from '@/features/shared-adventure/runtime';
 import { placeLanternWorld, projectLanternWorld, startLanternWorld, upgradeLanternWorld } from '@/features/wisps/lantern-world';
 import { lanternResidentCapacity, type LanternLevel } from '@/constants/wisp-lantern-levels';
@@ -1157,4 +1158,17 @@ export async function appendSourceGameplayEvents(events: GameplayEvent[]) {
     state: { ...projectLocalEvents(state, events, gameNow()), revision: state.revision + 1, updatedAt: gameNow() },
     localGameplayEvents: events,
   }));
+}
+
+export async function upgradeStoredChainHome(chain: import('@/features/mission-mechanics/combat-rules').CombatChain, expectedLevel: number, now = gameNow()) {
+  return reduceStoredMergeWorld(state => {
+    const next = upgradeChainHome(state, chain, expectedLevel, now);
+    return { state: next === state ? state : { ...next, revision: state.revision + 1, updatedAt: now }, changed: next !== state };
+  }, now);
+}
+export async function claimStoredFrontierSalvage(missionId: string, choice: 'timber' | 'glow', now = gameNow()) {
+  return reduceStoredMergeWorld(state => {
+    const next = claimFrontierSalvage(state, missionId, choice, now);
+    return { state: next, changed: next !== state };
+  }, now);
 }

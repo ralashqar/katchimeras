@@ -37,8 +37,8 @@ export type HavenTileUpgradePresentation = {
   tileLevelUp?: { layerId: string };
   /** A friend's tile cleared with them on it (a rescue): the tile id. */
   ftueReveal?: string;
-  /** A hero building's new look on its friend's tile: the tile crossblends from one look to the next. */
-  tileLook?: { tileId: string; from: number; to: number };
+  /** A building's tile crossblend. Chain homes pass saved levels; hero buildings pass art slots. */
+  tileLook?: { tileId: string; from: number; to: number; chainHome?: boolean };
   /** A friend's tile opening with them already home: no Egg is revealed with it. */
   noEgg?: boolean;
   heartTree?: { from: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage; to: import('@/features/shared-adventure/heartwood-progression').HeartwoodStage; /** A level grown from its panel, not the first session's waking: the story is not moved on. */ grown?: boolean };

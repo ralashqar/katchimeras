@@ -537,6 +537,7 @@ export type MergeWorldState = {
   wispLanternPlacement?: { slotId: 'front-right'; plantedAt: number };
   wispLanternProgress?: import('@/features/wisps/lantern-world').LanternWorldProgress;
   /** Heartwood's economy buildings (Dew Spring, Seed Nursery, Root Cellar, Garden Stall), by id. Absent until one is built. */
+  chainProgress?: import('@/features/encounter/chain-homes').ChainProgress;
   heartwoodBuildings?: import('@/constants/heartwood-buildings').HeartwoodBuildings;
   /** Daily time trials (Wisp Rush): results and records by trial id. Boards inside a heat are never saved. */
   timeTrials?: import('@/features/time-trial/trial-world').TimeTrials;

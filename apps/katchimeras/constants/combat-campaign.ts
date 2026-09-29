@@ -43,7 +43,7 @@ export function combatLessonSpec(index: number, level = 1): IslandLevelSpec {
     const columns = wave % 2 ? [1, 3, 5] : [2, 4, 3];
     for (let slot = 0; slot < (n < 3 ? 3 : n < 16 ? 4 : 5); slot++) {
       const attack = slot === 0 ? (THREATS[n] ?? (n >= 17 ? (['gunner', 'bomber', 'burrower', 'mirror'] as const)[(n + wave) % 4] : undefined)) : undefined;
-      lanes.push({ id: `wave-${wave}-${slot}`, wave, column: columns[slot % columns.length]!, at: 1 + slot * 6, hp: Math.round((4 + n * 0.18 + wave) * scale), step: Math.max(3.8, 5.5 - n * 0.045), look: attack ?? 'snuffer', ...(attack ? { attack } : {}),
+      lanes.push({ id: `wave-${wave}-${slot}`, wave, column: columns[slot % columns.length]!, at: 1 + slot * 6, hp: Math.round((4 + n * 0.18 + wave) * scale), step: Math.max(3.8, 5.5 - n * 0.045), look: attack ?? (n < 2 ? 'snuffer' : slot % 3 === 0 ? 'shrouder' : slot % 3 === 1 ? 'gunner' : 'snuffer'), ...(attack ? { attack } : { weapon: n < 2 ? 'bullet' : slot % 3 === 0 ? 'zap' : slot % 3 === 1 ? 'skirmisher' : 'bullet' }),
         ...(n === 14 && slot === 1 ? { mend: { every: 7 }, look: 'mender' } : {}),
         ...(n === 15 && slot === 0 ? { frost: 7, look: 'frost' } : {}),
         ...(n === 16 && slot === 0 ? { splits: 2, look: 'splitter' } : {}),
@@ -59,6 +59,7 @@ export function combatLessonSpec(index: number, level = 1): IslandLevelSpec {
   if (n === 13 || n === 23) terrain.push({ cell: 32, kind: 'echo' });
   return { title, objective, combatV2: true, recommendedLevel, difficulty: recommendedLevel >= 7 || n >= 18 ? 'dark' : recommendedLevel >= 3 || n >= 6 ? 'thick' : 'calm', rows: 5,
     pieces: [[36, 2], [37, 1], [39, 1], [40, 2], [44, 1], [46, 1]], mist: [], wisps: [], seeds: { every: 3.2 }, stormPot: {},
+    requiredChains: n === 2 ? ['bulwark'] : n === 4 || n === 15 ? ['dew'] : n === 5 || n === 18 ? ['lantern'] : n === 12 || n === 19 ? ['storm'] : n >= 21 ? ['bulwark', 'dew'] : undefined,
     secondaryGenerator: SECONDARY[n] ?? (n === 15 || n === 21 ? 'dew-well' : n === 18 ? 'lantern-post' : 'storm-pot'), terrain, lanes,
     rewards: { glow: 24 + recommendedLevel * 6, xp: 14 + recommendedLevel * 4 } };
 }

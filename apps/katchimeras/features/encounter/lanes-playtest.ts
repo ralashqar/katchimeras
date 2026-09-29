@@ -51,6 +51,7 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
   const isSpark = (definitionId: string) => items.get(definitionId)?.chainId === STORM_CHAIN;
   const shootsUp = (definitionId: string) => isSpark(definitionId) ? null : mechanic.rulesVersion === 2 ? combatFire(tierOf(definitionId), combatChain(definitionId) ?? 'garden') : laneFire(tierOf(definitionId));
   const move = (from: SettleBefore, a: number, b: number): SettleBefore | null => {
+    if (encounter.fixedCells?.includes(a) || encounter.fixedCells?.includes(b)) return null;
     const command: MergeWorldCommand = { type: 'move', from: a, to: b, now: NOW };
     const result = reduceMissionMove(from.state, a, b, NOW, items);
     if (!result.changed) return null;
@@ -60,7 +61,7 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
   const tap = (from: SettleBefore): SettleBefore | null => {
     for (const cell of window.cellIndices) {
       const occupant = from.state.board[cell]?.occupant;
-      if (occupant?.kind !== 'generator' || occupant.generatorId === SEED_SPRINKLER_ID || occupant.generatorId === STORM_POT_ID || (from.state.generators[occupant.generatorId]?.charges ?? 0) <= 0) continue;
+      if (occupant?.kind !== 'generator' || (!encounter.discoveryChain && (occupant.generatorId === SEED_SPRINKLER_ID || occupant.generatorId === STORM_POT_ID)) || (from.state.generators[occupant.generatorId]?.charges ?? 0) <= 0) continue;
       const command = { type: 'tapGenerator' as const, generatorId: occupant.generatorId, now: NOW, seed: tapSeed(from.run), spendEnergy: false as const, enforceCharges: true as const };
       const result = reduceMergeWorld(from.state, command);
       if (!result.changed || result.spawnedCell == null) continue;
@@ -107,14 +108,20 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
     const pairs: { a: number; b: number; tier: number; wake?: boolean }[] = [];
     for (const a of cells) {
       const pa = loose(from.state, a);
-      if (!pa) continue;
+      if (!pa || (from.mechanicState.kind === 'lanes' && from.mechanicState.combat?.plants[pa.instanceId]?.charge)) continue;
       for (const b of cells) {
         const pb = a === b ? null : loose(from.state, b);
+        if (pb && from.mechanicState.kind === 'lanes' && from.mechanicState.combat?.plants[pb.instanceId]?.charge) continue;
         if (pb && pb.definitionId === pa.definitionId && items.get(pa.definitionId)?.nextItemId) pairs.push({ a, b, tier: tierOf(pa.definitionId) + 1 });
         // A sleeper under half Mist wakes when its twin is brought to it (and opens the full Mist beside it).
         const sleeper = from.state.board[b]?.mist;
         if (sleeper?.kind === 'echo' && sleeper.definitionId === pa.definitionId) pairs.push({ a, b, tier: tierOf(pa.definitionId) + 1, wake: true });
       }
+    }
+    // Discovery teaches matching the half-mist chain, then observing its ability.
+    if (encounter.discoveryChain) {
+      const match = pairs.find(pair => pair.wake);
+      if (match) return move(from, match.a, match.b);
     }
     const room = cells.filter((cell) => isFree(from.state, cell)).length;
     // Careful: the best of a merge, a reposition and a tap.
@@ -154,6 +161,33 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
         if (spot != null) { choices.push({ score: 28 + tierOf(piece!.definitionId) * 4, run: () => move(from, cell, spot) }); break; }
       }
     }
+    if (encounter.discoveryChain === 'dew') for (const cell of cells) {
+      const p = loose(from.state, cell);
+      if (!p || combatChain(p.definitionId) !== 'dew' || tierOf(p.definitionId) < 2) continue;
+      const scoreAt = (target: number) => {
+        const at = laneOf(window, target)!;
+        return (encounter.fixedCells ?? []).reduce((score, defender) => {
+          const d = laneOf(window, defender)!;
+          if (Math.max(Math.abs(d.column - at.column), Math.abs(d.row - at.row)) > 1) return score;
+          const covered = cells.some(other => { const q = loose(from.state, other); const place = laneOf(window, other)!;
+            return other !== cell && q && combatChain(q.definitionId) === 'dew' && tierOf(q.definitionId) >= 2 && Math.max(Math.abs(d.column - place.column), Math.abs(d.row - place.row)) <= 1; });
+          return score + (covered ? 1 : 10);
+        }, 0);
+      };
+      const spot = cells.filter(target => isFree(from.state, target)).sort((a,b) => scoreAt(b) - scoreAt(a))[0];
+      if (spot != null && scoreAt(spot) > scoreAt(cell)) choices.push({ score: 90, run: () => move(from, cell, spot) });
+    }
+    // Sacrificial walls must be actively placed near approaching enemies.
+    if (encounter.discoveryChain === 'bulwark') for (const cell of cells) {
+      const p = loose(from.state, cell);
+      if (!p || tierOf(p.definitionId) < 2 || from.mechanicState.kind !== 'lanes' || from.mechanicState.combat?.plants[p.instanceId]?.charge) continue;
+      const at = laneOf(window, cell)!;
+      if (nearBoard.some(w => Math.hypot(w.column - at.column, w.row - at.row) <= 1.5)) continue;
+      const spot = cells.find(target => isFree(from.state, target) && nearBoard.some(w => {
+        const to = laneOf(window, target)!; return to.row >= w.row && Math.hypot(w.column - to.column, w.row - to.row) <= 1;
+      }));
+      if (spot != null) choices.push({ score: 85, run: () => move(from, cell, spot) });
+    }
     const pieces = cells.filter((cell) => loose(from.state, cell)).length;
     if (room >= 2) choices.push({ score: pieces < 6 ? 45 : 12, run: () => tap(from) });
     choices.sort((x, y) => y.score - x.score);
@@ -186,7 +220,7 @@ export function lanesPlaytest(encounter: EncounterDefinition, input: { style: La
       for (const [engine, chain] of [[SEED_SPRINKLER_ID, 'nature:garden'], [mechanic.secondary?.generatorId ?? STORM_POT_ID, mechanic.secondary ? `nature:${SECONDARY_CHAINS[mechanic.secondary.generatorId]}` : STORM_CHAIN]] as const) {
       const sprinkler = node.state.generators[engine];
       const seedsLoose = window.cellIndices.filter((cell) => { const piece = loose(node.state, cell); return piece && tierOf(piece.definitionId) === 1 && items.get(piece.definitionId)?.chainId === chain; }).length;
-      if (sprinkler && sprinkler.charges > 0 && seedsLoose < (engine === STORM_POT_ID ? 2 : 3) && window.cellIndices.filter((cell) => isFree(node.state, cell)).length >= 2) {
+      if (!encounter.discoveryChain && sprinkler && sprinkler.charges > 0 && seedsLoose < (engine === STORM_POT_ID ? 2 : 3) && window.cellIndices.filter((cell) => isFree(node.state, cell)).length >= 2) {
         const command = { type: 'tapGenerator' as const, generatorId: engine, now: NOW, seed: tapSeed(node.run), spendEnergy: false as const, enforceCharges: true as const, dropProfile: { tierTwoChance: profile.tierTwoChance, tierThreeChance: profile.tierThreeChance } };
         const result = reduceMergeWorld(node.state, command);
         if (result.changed && result.spawnedCell != null) {

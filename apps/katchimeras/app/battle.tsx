@@ -29,8 +29,6 @@ import { CombatEffectsProvider } from '@/components/katchadeck/games/combat-effe
 import { BattleArtContext, useBattleArt } from '@/features/encounter/battle-art';
 import { BattleTile } from '@/components/katchadeck/games/battle-tile';
 import { CombatTacticsOverlay } from '@/components/katchadeck/games/combat-tactics-overlay';
-import { CombatPreparation } from '@/components/katchadeck/games/combat-preparation';
-import { withCombatGenerator } from '@/features/encounter/combat-loadout';
 
 export default function BattleRoute() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
@@ -40,11 +38,6 @@ export default function BattleRoute() {
     <Text style={styles.error}>This battle is no longer available.</Text>
     <KatchaButton label="Return to the world" onPress={() => router.replace('/katchimeras')} />
   </View>;
-  if (session.status === 'playing' && session.encounter.mechanic?.kind === 'lanes' && session.encounter.mechanic.rulesVersion === 2 && !session.prepared) {
-    return <CombatPreparation session={session} onBack={() => router.replace('/katchimeras')} onStart={(generator, frontierReward) => {
-      saveBattleSession({ ...session, prepared: true, encounter: withCombatGenerator(session.encounter, generator), loadout: { ...session.loadout, secondaryGenerator: generator, frontierReward } });
-    }} />;
-  }
   return <CombatProfileBoundary id="battle-host"><BattleScene key={session.id} session={session} /></CombatProfileBoundary>;
 }
 
@@ -156,6 +149,11 @@ function BattleScene({ session }: { session: BattleSession }) {
     {mission.store.mechanicState?.kind === 'lanes' && mission.store.state && session.encounter.mechanic?.kind === 'lanes' && playing ? <CombatTacticsOverlay
       state={mission.store.mechanicState} board={mission.store.state} mechanic={session.encounter.mechanic} metrics={metrics}
       top={insets.top + 8} onStartWave={mission.store.startWave} /> : null}
+    {playing && session.encounter.discoveryChain && mission.store.merges < 3 ? <View pointerEvents="none" style={[styles.discovery, { top: insets.top + 56 }]}>
+      <Text style={styles.discoveryText}>{session.encounter.mechanic?.kind === 'lanes' && session.encounter.mechanic.discoveryCells?.some(cell => mission.store.state?.board[cell]?.mist)
+        ? 'Drag a matching item onto its half-misted twin. Each match reveals the next and triggers a bonus attack.'
+        : session.source.kind === 'island' ? session.source.context.mission.objective : 'Try your new plants against the wisps.'}</Text>
+    </View> : null}
     {playing && settled && mission.store.state && mission.store.mechanicState && (session.source.kind === 'first' || session.source.kind === 'trail')
       ? <BattleGuide first={session.source.kind === 'first'} encounter={session.encounter} state={mission.store.state}
         mechanicState={mission.store.mechanicState} merges={mission.store.merges} metrics={metrics} screenRef={root} /> : null}
@@ -170,6 +168,8 @@ function BattleScene({ session }: { session: BattleSession }) {
   </View>;
 }
 const styles = StyleSheet.create({
+  discovery: { position: 'absolute', left: 18, right: 18, padding: 12, backgroundColor: '#203C36E8', borderRadius: 14, zIndex: 120 },
+  discoveryText: { color: '#F6E9C8', fontSize: 14, lineHeight: 20 },
   scene: { flex: 1, backgroundColor: '#25243D' },
   dim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(18,17,38,0.42)' },
   back: { position: 'absolute', left: 16, zIndex: 120 },

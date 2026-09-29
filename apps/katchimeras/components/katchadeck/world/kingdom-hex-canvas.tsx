@@ -732,7 +732,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       ? { ...mossproutNatureIslandLevels, [upgradePresentation.natureIslandId]: upgradePresentation.fromStage as MossproutNatureIslandLevel }
       : mossproutNatureIslandLevels;
     const fromGarden = upgradePresentation.tileLook
-      ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), heroTileLooks: { ...mossproutGarden?.heroTileLooks, [upgradePresentation.tileLook.tileId]: upgradePresentation.tileLook.from } }
+      ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), ...(upgradePresentation.tileLook.chainHome ? { chainHomeLevels: { ...mossproutGarden?.chainHomeLevels, [upgradePresentation.tileLook.tileId]: upgradePresentation.tileLook.from } } : { heroTileLooks: { ...mossproutGarden?.heroTileLooks, [upgradePresentation.tileLook.tileId]: upgradePresentation.tileLook.from } }) }
       : upgradePresentation.heartTree
       ? { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), heartwoodStage: upgradePresentation.heartTree.from }
       : revealingHatchableTileId
@@ -836,10 +836,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     }
     if (focusedMossproutWorld && upgradePresentation.tileLook && mossproutNatureIslandLevels) {
       // A hero building's new look: its friend's tile, one look to the next; nothing else changes.
-      const { tileId, from, to } = upgradePresentation.tileLook;
+      const { tileId, from, to, chainHome } = upgradePresentation.tileLook;
       const layerId = heroTileLayerId(tileId);
       const atLook = (look: number) => buildMossproutHexNeighborhoodScene(companionSlots, mossproutNatureIslandLevels,
-        { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), heroTileLooks: { ...mossproutGarden?.heroTileLooks, [tileId]: look } }, mossproutNatureIslandReveals);
+        { ...(mossproutGarden ?? { level: 0, plantableMemories: [] }), ...(chainHome ? { chainHomeLevels: { ...mossproutGarden?.chainHomeLevels, [tileId]: look } } : { heroTileLooks: { ...mossproutGarden?.heroTileLooks, [tileId]: look } }) }, mossproutNatureIslandReveals);
       const fromLayer = atLook(from).tileArtLayers.find((layer) => layer.id === layerId);
       const toLayer = atLook(to).tileArtLayers.find((layer) => layer.id === layerId);
       const footprint = toLayer?.interactionFrame ?? toLayer?.frame;
@@ -1390,10 +1390,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       if (lift) focusTutorialResident(lift.x, lift.y, { anchorY: lift.anchorY, durationMs, zoom: lift.zoom, unbounded: true });
     };
     if (upgradeSelectionCommitted || upgradePresentation) {
-      upgradeCameraCommitted.current = true;
+      // Chain homes retain their dock during the reveal, like other building panels.
+      // Keep the tile in its upper band and restore the overview when the dock closes.
+      const retainedDock = Boolean(upgradePresentation?.tileLook?.chainHome);
+      upgradeCameraCommitted.current = !retainedDock;
       // The purchase plays where FTUE framed the tile, not where the panel lifted it.
       if (upgradeLift.current) lower();
-      else if (upgradeStageFrame.current && !upgradeCommitZoomed.current && !preserveUpgradeCamera) {
+      else if (upgradeStageFrame.current && !upgradeCommitZoomed.current && !preserveUpgradeCamera && !retainedDock) {
         // The panel has left and the whole screen is the tile's again. Its reveal (mist lifting, the island growing)
         // assumes a close-up (`cameraAlreadyFocused`), so zoom in now, before the mist clears: the band above the
         // panel framed the tile far smaller than that, and the zoom used to arrive only with the board.

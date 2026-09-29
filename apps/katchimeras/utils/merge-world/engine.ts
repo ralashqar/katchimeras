@@ -1,3 +1,4 @@
+import { chainHomeForTile, freshChainProgress, normalizeChainProgress, unlockChainHome } from '@/features/encounter/chain-homes';
 import { ISLAND_HEROES } from '@/constants/katchimera-progression';
 import { COMBAT_V2_ENABLED } from '@/features/mission-mechanics/combat-rules';
 import { dailySurgeTakes, FIRST_SURGE_TAKES, FRONTIER_RETAKE_TIMBER, frontierHeldCount, frontierLodgeStoreBonus, frontierReclaimTimber, frontierTileById, frontierTileContested, frontierTileIdForMission, frontierTileIdForRetake, mistSurgePicks, SURGE_DEFENCE_MISSION_ID } from '@/constants/frontier-tiles';
@@ -263,6 +264,7 @@ export function createInitialMergeWorldState(now = Date.now(), characterIds: str
     recentOrderKeys: [],
     expansions: [],
     unlockedRegions: ['central-clearing', 'inner-mist'],
+    chainProgress: freshChainProgress(),
     boardAwakeningReceipts: [],
     processedActivityReceiptIds: [],
     activityEnergyByDay: {},
@@ -1159,6 +1161,7 @@ export function normalizeMergeWorldState(value: unknown, now = Date.now()): Merg
   // Version 3's five single-chain generators migrate into the shared eight.
   normalized = identityOrders(normalized, now);
   normalized = repairOrderChains(normalized);
+  normalized.chainProgress = normalizeChainProgress(normalized, source.chainProgress, now);
   return reconcileUpgradeProgress(ensureOrdersRequireMerge(refreshTime(normalized, now)));
 }
 
@@ -1808,11 +1811,16 @@ function completeEncounter(state: MergeWorldState, command: Extract<MergeWorldCo
     next = { ...next, frontierSurges: { ...next.frontierSurges, contested } };
   }
   const frontierTile = (firstClear ? frontierTileById(frontierTileIdForMission(command.missionId) ?? '') : null) ?? retakenTile;
+  const discoveryTileId = frontierTileIdForMission(command.missionId);
+  if (discoveryTileId) next = unlockChainHome(next, discoveryTileId, command.now);
   let reclaimedTimber = retakenTile ? FRONTIER_RETAKE_TIMBER : frontierTile ? frontierReclaimTimber(frontierTile) : 0;
   if (reclaimedTimber > 0) next = { ...next, materials: { ...next.materials, timber: (next.materials?.timber ?? 0) + reclaimedTimber } };
   if (COMBAT_V2_ENABLED && frontierTile && firstClear && !retakenTile) {
-    if (command.outcome.frontierReward === 'glow') { paid.glow += 18; next = { ...next, coins: next.coins + 18 }; }
-    else if (command.outcome.frontierReward === 'timber') { reclaimedTimber += 4; next = { ...next, materials: { ...next.materials, timber: (next.materials?.timber ?? 0) + 4 } }; }
+    // Item introductions have one standard result, with supplies paid in this same transaction.
+    const frontierReward = command.outcome.frontierReward ?? (discoveryTileId && chainHomeForTile(discoveryTileId) ? 'timber' : undefined);
+    if (next.chainProgress && frontierReward) next.chainProgress = { ...next.chainProgress, salvage: { ...next.chainProgress.salvage, [command.missionId]: frontierReward } };
+    if (frontierReward === 'glow') { paid.glow += 18; next = { ...next, coins: next.coins + 18 }; }
+    else if (frontierReward === 'timber') { reclaimedTimber += 4; next = { ...next, materials: { ...next.materials, timber: (next.materials?.timber ?? 0) + 4 } }; }
   }
   // The first Surge held at the Heart Tree (Chapter 4): the Surges begin, and while the Tree was held the Mist took
   // back two edge tiles. That day's Surge is this one.

@@ -42,7 +42,7 @@ test('the Tree’s light reaches the Frontier ring by ring; a won battle takes t
   let world = createInitialMergeWorldState(0);
   world = { ...world, heartTree: { receiptId: 't', restoredAt: 0, level: 1 } } as typeof world;
   const states = frontierTileStates(world);
-  assert.equal(Object.values(states).filter((state) => state === 'misted').length, 5, 'Tree 1 lights the second ring');
+  assert.equal(Object.values(states).filter((state) => state === 'misted').length, COMBAT_V2_ENABLED ? 1 : 5, 'Garden discovery opens the first chain home');
   assert.equal(nextFrontierTreeLevel(world), 2);
   const tile = nextFrontierTile(world)!;
   assert.equal(tile.id, 'frontier-1');
@@ -50,7 +50,7 @@ test('the Tree’s light reaches the Frontier ring by ring; a won battle takes t
   const win = (receiptId: string) => reduceMergeWorld(world, { type: 'completeEncounter', receiptId, missionId: frontierMissionId(tile.id), katchimeraId: 'mossprout', helperWispId: null, outcome: { cleared: true, grade: 'bright' } as never, difficulty: mission.difficulty, base: mission.rewards, now: 10 });
   const won = win('a');
   assert.equal(won.encounterCleared?.reclaimed?.tileId, tile.id);
-  assert.equal(won.state.materials?.timber ?? 0, (world.materials?.timber ?? 0) + frontierReclaimTimber(tile));
+  assert.equal(won.state.materials?.timber ?? 0, (world.materials?.timber ?? 0) + frontierReclaimTimber(tile) + (COMBAT_V2_ENABLED ? 4 : 0));
   assert.equal(frontierTileStates(won.state)[tile.id], 'reclaimed');
   world = won.state;
   const again = win('b');

@@ -85,7 +85,9 @@ export function chapterBoards(campaign: IslandCampaignDefinition, chapter: Islan
   const authored = BUNDLED_LEVEL_SPECS[campaign.campaignId]?.[chapter.level as 1 | 2 | 3 | 4];
   if (authored?.length) return authored.map((spec, index) => {
     const modern = COMBAT_V2_ENABLED ? spec.difficulty === 'boss' ? combatBossSpec(campaign.campaignId.includes('drizzlet') ? 1 : campaign.campaignId.includes('mistle') ? 2 : 0, Math.min(2, chapter.level - 2)) : combatLessonSpec(Math.min(23, (chapter.level - 1) * 6 + index + 2), Math.min(9, chapter.level * 2 - 1)) : spec;
-    return islandLevel(campaign.campaignId, `c${chapter.level}-${index + 1}`, modern, lines);
+    // Recruiting Petalimp unlocks Dew; this rescue cannot require that reward first.
+    const reachable = campaign.campaignId.includes('petalimp') ? { ...modern, requiredChains: modern.requiredChains?.filter(chain => chain !== 'dew' && chain !== 'lantern') } : modern;
+    return islandLevel(campaign.campaignId, `c${chapter.level}-${index + 1}`, reachable, lines);
   });
   if (chapter.restoration && (chapter.restoration.rush || chapter.restoration.mechanic)) {
     const rush = Boolean(chapter.restoration.rush);

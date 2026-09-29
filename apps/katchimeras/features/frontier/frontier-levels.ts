@@ -1,3 +1,5 @@
+import { chainHomeForTile } from '@/features/encounter/chain-homes';
+import { chainDiscoveryMission } from '@/features/encounter/chain-discovery';
 import { FRONTIER_VARIANT_NAMES, frontierMissionId, frontierRetakeMissionId, SURGE_DEFENCE_MISSION_ID, type FrontierTile, type FrontierVariant } from '@/constants/frontier-tiles';
 import { crawler, islandLevel, waves, type IslandLaneSpec, type IslandLevelSpec } from '@/constants/island-campaigns/island-levels';
 import type { RegionMissionDefinition } from '@/constants/island-campaigns/types';
@@ -84,6 +86,8 @@ const cache = new Map<string, RegionMissionDefinition>();
 
 /** A Frontier tile's battle, as a mission the island dock plays (id `frontier:<tile>`, the ledger's key). */
 export function frontierMission(tile: FrontierTile): RegionMissionDefinition {
+  const home = chainHomeForTile(tile.id);
+  if (COMBAT_V2_ENABLED && home) return chainDiscoveryMission(home.chain);
   const cached = cache.get(tile.id);
   if (cached) return cached;
   const mission = islandLevel('frontier', tile.id, frontierLevelSpec(tile));

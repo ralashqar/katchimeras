@@ -103,10 +103,11 @@ for (const modern of [false, true]) test(`lightning merge immediately fires one 
   assert.deepEqual(first.zaps.map(zap => zap.wisps), [[0]], 'fires on first tick, toward nearby wisp only');
   const landed = lanesTick(mechanic, first.state, first.board, 200, window);
   assert.equal(landed.zaps.length, 0, 'merge does not fire twice');
-  assert.equal(landed.state.wisps[0]!.damage, laneZap(2)!.damage);
+  assert.equal(landed.state.wisps[0]!.damage, 2);
   assert.equal(landed.state.wisps[1]!.damage, 0);
 
   const distant = { ...merged, board: merged.board.map((cell, index) => index === 31 ? { ...cell, occupant: null } : index === 43 ? { ...cell, occupant: { kind: 'item' as const, instanceId: 'distant-spark', definitionId: 'nature:storm:2' } } : cell) };
-  const waiting = lanesTick(mechanic, mergeBurst(mechanic, state, distant, window, 43), distant, 1, window);
+  const farMechanic = { ...mechanic, wisps: mechanic.wisps.map(w => ({ ...w, crawlFrom: 17 })) };
+  const waiting = lanesTick(farMechanic, mergeBurst(farMechanic, state, distant, window, 43), distant, 1, window);
   assert.equal(waiting.zaps.length, 0, 'no strike beyond tier reach');
 });

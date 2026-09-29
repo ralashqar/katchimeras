@@ -1,3 +1,5 @@
+import { ShieldLaunch } from '@/components/katchadeck/games/shield-launch';
+import { DarkWispBullet, type DarkBullet } from '@/components/katchadeck/games/dark-wisp-bullet';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type View as ViewType } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -18,7 +20,7 @@ import { pulseAim, usePulseAim } from '@/features/encounter/pulse-aim';
 import { pulseArea } from '@/features/encounter/pulse';
 import { chainRole } from '@/features/encounter/chains';
 import { glowShots, type GlowShot } from '@/features/encounter/mist';
-import { ENCOUNTER_LOSS, ENCOUNTER_LOSS_V2, gradeLabel, outcomeLine } from '@/features/encounter/encounter-copy';
+import { ENCOUNTER_LOSS, ENCOUNTER_LOSS_V2, outcomeLine } from '@/features/encounter/encounter-copy';
 import { mechanicIsTactics, mechanicPlan, mechanicPlans, mechanicProgress, mechanicTurnStrip, resolveMechanic, wispViews } from '@/features/mission-mechanics/mechanic';
 import { mergeWorldItemArt } from '@/constants/merge-world-art';
 import type { WispPlan } from '@/types/mission-mechanic';
@@ -74,6 +76,16 @@ type HatchableMissionDockProps = {
 
 /** Where the dock's overlay sits against the board: the board's frame in the dock's own coordinates. */
 type BoardOffset = { x: number; y: number };
+
+function lanePixelPitch(metrics: MergeBoardScreenMetrics, window: MissionWindow | null) {
+  if (!window) return { x: 0, y: 0 };
+  const first = mergeCellFrame(metrics.geometry, window.cellIndices[0]!).bounds;
+  const right = window.columns > 1 ? mergeCellFrame(metrics.geometry, window.cellIndices[1]!).bounds : first;
+  const belowCell = window.cellIndices[window.columns];
+  const below = belowCell != null ? mergeCellFrame(metrics.geometry, belowCell).bounds : first;
+  return { x: right.left - first.left || first.width, y: below.top - first.top || first.height };
+}
+
 
 /**
  * A hatchable companion's mission board under their misted tile: the same
@@ -161,6 +173,9 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
     // The board's frame against the dock's root, for overlays laid over its cells.
     if (metrics && rootRef.current) rootRef.current.measureInWindow((x, y) => setBoardOffset({ x: metrics.x - x, y: metrics.y - y }));
   }, [onBoardMetrics]);
+  const [spentShieldIds, setSpentShieldIds] = useState<ReadonlySet<string>>(() => new Set());
+  const combatClock = mechanicState?.kind === 'lanes' ? mechanicState.clock : 0;
+  useEffect(() => { if (combatClock === 0) setSpentShieldIds(new Set()); }, [combatClock]);
   const [hiddenItemIds, setHiddenItemIds] = useState<ReadonlySet<string>>(() => new Set());
   const mechanic = resolveMechanic(mission);
   const progress = useMemo(() => mechanicState ? mechanicProgress(mechanic, mission, mechanicState) : { current: Math.max(0, Math.min(mission.required, merges)), total: mission.required }, [mechanic, mechanicState, merges, mission]);
@@ -182,6 +197,8 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
     [state, heldTick]);
   const [bolts, setBolts] = useState<readonly MistBolt[]>([]);
   const boltSeq = useRef(0);
+  const [darkBullets, setDarkBullets] = useState<readonly DarkBullet[]>([]);
+  const retireDarkBullet = useCallback((id: number) => setDarkBullets(current => current.filter(shot => shot.id !== id)), []);
   const [wallBursts, setWallBursts] = useState<readonly WallBurst[]>([]);
   const retireWallBurst = useCallback((id: number) => setWallBursts(current => current.filter(burst => burst.id !== id)), []);
   const launchShots = useCallback((shots: readonly GlowShot[], before: MergeWorldState, after: MergeWorldState, window: MissionWindow | null) => {
@@ -316,20 +333,32 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
       if (result && metrics && offset) {
         const impacts = result.effects.flatMap((effect): WallBurst[] => {
           if (effect.kind !== 'wall-impact') return [];
-          spriteRecoil.emit(effect.instanceId, 'impact');
-          landings?.strikeWisp?.(effect.wisp);
+          if (effect.charge) return [];
+          if (effect.consumed) setSpentShieldIds(ids => new Set([...ids, effect.instanceId]));
+          else spriteRecoil.emit(effect.instanceId, 'impact');
+          for (const wisp of effect.hitWisps ?? (effect.wisp >= 0 ? [effect.wisp] : [])) landings?.strikeWisp?.(wisp);
           const { bounds } = mergeCellFrame(metrics.geometry, effect.cell);
-          return [{ id: ++boltSeq.current, left: offset.x + bounds.left, top: offset.y + bounds.top, size: bounds.width, tier: effect.tier }];
+          const at = aimWindowRef.current ? laneOf(aimWindowRef.current, effect.cell) : null;
+          const pitch = lanePixelPitch(metrics, aimWindowRef.current);
+          return [{ id: ++boltSeq.current, left: offset.x + bounds.left + ((effect.toColumn ?? at?.column ?? 0) - (at?.column ?? 0)) * pitch.x,
+            top: offset.y + bounds.top + ((effect.toRow ?? at?.row ?? 0) - (at?.row ?? 0)) * pitch.y, size: bounds.width, tier: effect.tier, radius: effect.radius, charge: effect.charge, healing: effect.healing }];
         });
         if (impacts.length) setWallBursts(current => [...current, ...impacts].slice(-12));
       }
       if (result?.spat.length && metrics && offset) {
         const origin = { x: metrics.x - offset.x, y: metrics.y - offset.y };
+        const bullets: DarkBullet[] = [];
         const made = result.spat.flatMap((spit): MistBolt[] => {
           const at = landings?.sinkRef?.current?.pointOf?.(spit.wisp);
           if (!at) return [];
           const { bounds } = mergeCellFrame(metrics.geometry, spit.cell);
           const size = bounds.width * 0.6;
+          if (spit.weapon === 'bullet') {
+            bullets.push({ id: ++boltSeq.current, from: { x: at.x - origin.x, y: at.y - origin.y },
+              to: { x: offset.x + bounds.left + bounds.width / 2, y: offset.y + bounds.top + bounds.height / 2 },
+              size: Math.max(12, bounds.width * 0.28), flightMs: spit.landsAt - spit.firedAt });
+            return [];
+          }
           return [{
             id: ++boltSeq.current, tone: 'mist', delay: 0, onImpact: () => {},
             from: { left: at.x - origin.x - size / 2, top: at.y - origin.y - size / 2, width: size, height: size },
@@ -337,6 +366,7 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
           }];
         });
         if (made.length) setBolts((current) => [...current, ...made]);
+        if (bullets.length) setDarkBullets(current => [...current, ...bullets].slice(-32));
       }
       // The Seed Sprinkler's spark: a golden bolt from it to the wisp it strikes.
       if (result?.sparks.length && metrics && offset) {
@@ -367,8 +397,8 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
             const at = landings?.sinkRef?.current?.pointOf?.(wisp);
             if (!at) return [];
             const to = { left: at.x - origin.x - size / 2, top: at.y - origin.y - size / 2, width: size, height: size };
-            const bolt: MistBolt = { id: ++boltSeq.current, tone: 'glow', delay: order * LANE_SPARK_MS, onImpact: () => landings?.strikeWisp?.(wisp), from, to };
-            from = to;
+            const bolt: MistBolt = { id: ++boltSeq.current, tone: 'glow', delay: zap.simultaneous ? 0 : order * LANE_SPARK_MS, onImpact: () => landings?.strikeWisp?.(wisp), from, to };
+            if (!zap.simultaneous) from = to;
             return [bolt];
           });
         });
@@ -485,7 +515,6 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
         <Text style={styles.abilityCharge}>{shown.ready ? (picking && pickSlot === slot ? 'Choose' : 'Ready') : `${Math.min(shown.charge, shown.tier.chargeEvery)}/${shown.tier.chargeEvery}`}</Text>
       </Pressable> : null)}
       {boostLabel ? <Animated.View entering={ZoomIn.duration(reduceMotion ? 60 : 220)} exiting={FadeOut.duration(160)} style={[styles.pill, styles.boostPill]}><Text style={styles.boostText}>{boostLabel}</Text></Animated.View> : null}
-      {encounter.outcome?.cleared ? <View style={styles.pill}><Text style={styles.pillValue}>{gradeLabel(encounter.outcome.grade)}</Text></View> : null}
     </View>
   </View> : null;
   // Lanes: the heroes' abilities under the board (the sky over it stays the wisps'), charged by merges.
@@ -505,6 +534,7 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
   };
   const overlay = encounter ? <>
     <MistLightningLayer bolts={bolts} origin={boardOffset && boardMetricsRef.current ? { x: boardMetricsRef.current.x - boardOffset.x, y: boardMetricsRef.current.y - boardOffset.y } : null} reduceMotion={reduceMotion} onDone={retireBolt} />
+    {darkBullets.map(shot => <DarkWispBullet key={shot.id} shot={shot} reduceMotion={reduceMotion} onDone={retireDarkBullet} />)}
     {wallBursts.map(burst => <WallImpactBurst key={burst.id} burst={burst} reduceMotion={reduceMotion} onDone={retireWallBurst} />)}
     {plans.flatMap((plan) => {
       const key = `plan:${plan.wisp}:${plan.kind}`;
@@ -564,13 +594,32 @@ export const HatchableMissionDock = memo(function HatchableMissionDock({ paused 
     </Animated.View> : null}
   </> : undefined;
 
+  const activeShields = mechanicState?.kind === 'lanes' ? state.board.flatMap((entry, cell) => {
+    const piece = entry.occupant;
+    if (piece?.kind !== 'item') return [];
+    const charge = mechanicState.combat?.plants[piece.instanceId]?.charge;
+    return charge ? [{ piece, cell, charge }] : [];
+  }) : [];
+  const shieldHiddenIds = new Set([...hiddenItemIds, ...spentShieldIds, ...activeShields.map(s => s.piece.instanceId)]);
+  const shieldLaunches = activeShields.map(({ piece, cell, charge }) => {
+    const metrics = boardMetricsRef.current, offset = boardOffsetRef.current, window = aimWindowRef.current;
+    if (!metrics || !offset || !window) return null;
+    const bounds = mergeCellFrame(metrics.geometry, cell).bounds;
+    const at = laneOf(window, cell)!;
+    const pitch = lanePixelPitch(metrics, window);
+    const duration = charge.at - (charge.startedAt ?? charge.at - 720);
+    return <ShieldLaunch key={piece.instanceId} definitionId={piece.definitionId} left={offset.x + bounds.left} top={offset.y + bounds.top} size={bounds.width}
+      dx={((charge.toColumn ?? at.column) - at.column) * pitch.x}
+      dy={((charge.toRow ?? at.row) - at.row) * pitch.y}
+      elapsed={Math.max(0, combatClock - (charge.startedAt ?? charge.at - 720))} duration={duration} paused={!lanesRunning} reduceMotion={reduceMotion} />;
+  });
   return <MistMissionDock
     strictReadiness={strictReadiness}
     state={state} boardStep={boardStep} progress={progress.current} required={progress.total} barTitle={mission.barTitle}
-    interactionKey={`${mission.id}:${boardStep?.id ?? 'free'}`} sessionId={sessionId} hiddenItemIds={hiddenItemIds}
+    interactionKey={`${mission.id}:${boardStep?.id ?? 'free'}`} sessionId={sessionId} hiddenItemIds={shieldHiddenIds}
     width={width} bottomInset={bottomInset} landings={landings}
     onCommand={dispatch} onBoardMetrics={handleMetrics} onBlockedInteraction={onBlockedInteraction} onEntranceSettled={handleEntranceSettled}
-    rootRef={rootRef} header={header} footer={heroFooter} headerGap={encounter ? 6 : undefined} overlay={overlay} onHoverCell={encounter?.territory ? aimFromCell : undefined}
+    rootRef={rootRef} header={header} footer={heroFooter} headerGap={encounter ? 6 : undefined} overlay={<>{overlay}{shieldLaunches}</>} onHoverCell={encounter?.territory ? aimFromCell : undefined}
     layout={boardLayout}
     animateArrivals={Boolean(encounter)} externalEffects={effectCells} heldMist={heldMist} hideBar={Boolean(encounter?.lanes)} />;
 });

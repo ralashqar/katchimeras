@@ -98,8 +98,12 @@ test('a merge fires almost at once and its Glow clears the Mist beside it; a pie
   assert.equal(settled.state.board[38]!.occupant?.kind, 'item');
   assert.ok((settled.shots ?? []).some((shot) => shot.to === 31), 'its Glow flies at the Mist beside it');
   assert.equal(settled.state.board[31]!.mist, null);
-  const made = settled.state.board[38]!.occupant!;
-  assert.ok(settled.mechanicState.kind === 'lanes' && settled.mechanicState.ready[made.kind === 'item' ? made.instanceId : ''] === 2_120, 'it fires 120 ms after it is made');
+  assert.equal(settled.mechanicState.kind, 'lanes');
+  if (settled.mechanicState.kind !== 'lanes') return;
+  const first = lanesTick(mechanic, settled.mechanicState, settled.state, 1, window);
+  assert.equal(first.fired.length, 1, 'first burst bullet fires on the next combat tick');
+  const second = lanesTick(mechanic, first.state, first.board, 180, window);
+  assert.equal(second.fired.length, 1, 'tier two adds a second rapid bullet');
   // The wisp down on the top row of column 3 (cell 17): a piece moved there is bound at once.
   const onBoard = setup({ pieces: [[36, 1]] });
   const standing = { ...onBoard.lanes, clock: 5_000, wisps: [{ ...onBoard.lanes.wisps[0]!, row: 0 }] };

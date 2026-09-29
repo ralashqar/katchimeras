@@ -63,7 +63,7 @@ test('a confirmed purchase zooms in on its tile before the reveal plays', () => 
   // the tile into the small band above it, so without this the mist cleared on a small tile at the top of the screen
   // and the zoom only arrived later, with the restoration board.
   const canvas = readFileSync('components/katchadeck/world/kingdom-hex-canvas.tsx', 'utf8');
-  assert.match(canvas, /if \(upgradeSelectionCommitted \|\| upgradePresentation\) \{[\s\S]*?if \(upgradeLift\.current\) lower\(\);\s*else if \(upgradeStageFrame\.current && !upgradeCommitZoomed\.current && !preserveUpgradeCamera\) \{[\s\S]*?focusInteractionTile\(upgradeStageFrame\.current, \{ durationMs, horizontalPadding: 16, verticalPadding: 96, screenCenterY: viewport\.height \* 0\.48, unbounded: true \}\);/, 'the whole screen is the tile’s again the moment the panel leaves');
+  assert.match(canvas, /if \(upgradeSelectionCommitted \|\| upgradePresentation\) \{[\s\S]*?if \(upgradeLift\.current\) lower\(\);\s*else if \(upgradeStageFrame\.current && !upgradeCommitZoomed\.current && !preserveUpgradeCamera && !retainedDock\) \{[\s\S]*?focusInteractionTile\(upgradeStageFrame\.current, \{ durationMs, horizontalPadding: 16, verticalPadding: 96, screenCenterY: viewport\.height \* 0\.48, unbounded: true \}\);/, 'the whole screen is the tile’s again the moment the panel leaves');
   assert.match(canvas, /upgradeCommitZoomed\.current = false;\s*upgradeFocusId\.current = subject\.id;\s*upgradeStageFrame\.current = frame;/, 'each selection zooms once, on its own tile');
 });
 
@@ -72,6 +72,7 @@ test('a stage slot shows the tile the map drew at that level, the freshly reveal
   // picture, while the map draws a revealed, unrestored island with its own art. Both now read one rule.
   const file = 'components/katchadeck/world/mossprout-hex-neighborhood-scene.ts';
   const mocks: Record<string, unknown> = {
+    '@/constants/chain-home-art.gen': loadNativeModule('constants/chain-home-art.gen.ts', { './kingdom-hex-tile-bounds.gen': loadNativeModule('constants/kingdom-hex-tile-bounds.gen.ts', {}) }),
     '@/constants/heartwood-art': { HEARTWOOD_ART: Object.fromEntries(['dormant', 'stirring', 'rooted', 'blooming', 'awakened'].map(stage => [stage, { full: stage, medium: stage, thumb: stage }])) },
     './shared-resident-presentation': { sharedResidentAnchor },
     '@/constants/mossprout-memory-plants': { mossproutMemoryPlantById: new Map() },
@@ -101,4 +102,19 @@ test('a stage slot shows the tile the map drew at that level, the freshly reveal
   assert.notEqual(slots[0], slots[3], 'never the default picture, which is the garden in bloom');
   assert.equal(new Set(slots).size, 5, 'Bloom Garden has a complete visual ladder');
   assert.equal(art.tileLevelArt('nature:bloom-garden', 0, true), 'mist', 'still under the mist, it is pictured as mist');
+  // Home upgrades preserve their own tile footprint while switching art at 4 and 7.
+  for (const [index, chain] of ['garden', 'storm', 'bulwark', 'dew', 'lantern'].entries()) {
+    const tileId = `frontier-${index + 1}`;
+    const at = (level: number) => {
+      const built = scene.buildMossproutHexNeighborhoodScene([], emptyMossproutNatureIslandLevels(), {
+        level: 0, plantableMemories: [], frontier: { [tileId]: 'reclaimed' }, chainHomeLevels: { [tileId]: level },
+      }) as { tileArtLayers: { id: string; sources: { medium: unknown }; interactionFrame: unknown }[] };
+      return built.tileArtLayers.find(layer => layer.id === `structure:${tileId}`)!;
+    };
+    assert.match(String(at(3).sources.medium), new RegExp(`chain_home_${chain}_1_`));
+    assert.match(String(at(4).sources.medium), new RegExp(`chain_home_${chain}_2_`));
+    assert.match(String(at(7).sources.medium), new RegExp(`chain_home_${chain}_3_`));
+    assert.deepEqual(at(3).interactionFrame, at(4).interactionFrame);
+  }
+
 });

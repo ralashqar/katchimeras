@@ -1,3 +1,4 @@
+import { chainHomeForTile, chainDiscoveryAvailable, chainUnlocked } from '@/features/encounter/chain-homes';
 import type { HexCoord } from '@incubator/environments/hex';
 import { heartTreeLevel } from '@/constants/heart-tree';
 import { hollowTreeRestored } from '@/constants/finale';
@@ -91,7 +92,7 @@ export const FRONTIER_MISSION_PREFIX = 'frontier:';
 export const frontierMissionId = (tileId: string) => `${FRONTIER_MISSION_PREFIX}${tileId}`;
 export const frontierTileIdForMission = (missionId: string): string | null => missionId.startsWith(FRONTIER_MISSION_PREFIX) ? missionId.slice(FRONTIER_MISSION_PREFIX.length) : null;
 
-type FrontierWorld = Pick<MergeWorldState, 'encounters' | 'heartTree'> & Partial<Pick<MergeWorldState, 'frontierSurges'>>;
+type FrontierWorld = Pick<MergeWorldState, 'encounters' | 'heartTree'> & Partial<Pick<MergeWorldState, 'frontierSurges' | 'chainProgress' | 'chaptersClaimed'>>;
 
 /** A contested tile's battle: taking it back again (`retake:<tile>`), its own ledger key. */
 export const FRONTIER_RETAKE_PREFIX = 'retake:';
@@ -120,6 +121,11 @@ export function frontierTileContested(world: Partial<Pick<MergeWorldState, 'fron
 }
 
 export function frontierTileState(world: FrontierWorld, tile: FrontierTile): FrontierTileState {
+  const home = COMBAT_V2_ENABLED ? chainHomeForTile(tile.id) : null;
+  if (home && 'chainProgress' in world) {
+    if (home.chain !== 'garden' && chainUnlocked(world, home.chain)) return 'reclaimed';
+    if (!chainDiscoveryAvailable(world, home.chain)) return 'dark';
+  }
   if (frontierTileReclaimed(world, tile.id)) return frontierTileContested(world, tile.id) ? 'contested' : 'reclaimed';
   return frontierTileLit(world, tile) ? 'misted' : 'dark';
 }
@@ -151,7 +157,7 @@ export function nextFrontierTile(world: FrontierWorld, region?: RegionId): Front
 
 /** The Heart Tree level that lights the next dark tile, or null once every tile is in the light. */
 export function nextFrontierTreeLevel(world: FrontierWorld): number | null {
-  const dark = FRONTIER_TILES.filter((tile) => frontierTileState(world, tile) === 'dark').map((tile) => tile.tree);
+  const dark = FRONTIER_TILES.filter((tile) => frontierTileState(world, tile) === 'dark' && tile.tree > heartTreeLevel(world)).map((tile) => tile.tree);
   return dark.length ? Math.min(...dark) : null;
 }
 

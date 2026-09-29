@@ -3,7 +3,7 @@ import type { MergeItemDefinition, MergeWorldState } from '@/types/merge-world';
 import type { LaneShot, LaneSpit, LaneWispState, MechanicEffect, MissionMechanicDefinition, MissionMechanicState, MissionWispView } from '@/types/mission-mechanic';
 import type { MissionWindow } from './board-window';
 import { seededUnit } from '@/features/encounter/seed';
-import { bulwarkImpact, combatChain, combatFire, newCombatState, normalizeCombatState, shieldCapacity, type PlantVitality } from './combat-rules';
+import { wispWeapon, bulwarkBlast, mergeAttack, rippleFalloff, combatChain, combatFire, newCombatState, normalizeCombatState, shieldCapacity, type PlantVitality } from './combat-rules';
 
 /**
  * Lanes (`docs/encounter-lanes.md`): a real-time battle on the docked board.
@@ -128,7 +128,7 @@ export function lanesViews(mechanic: LanesMechanic, state: LanesState): MissionW
       alive: laneArrived(mechanic, state, index) && standing.damage < wisp.hp,
       placement: { kind: 'lane', column, row: standing.row },
       enterDelayMs: 0,
-      drift: laneArrived(mechanic, state, index) && standing.damage < wisp.hp && state.breached == null && (standing.holdUntil ?? 0) <= state.clock ? (dashing ? Math.max(1, wisp.dashRows ?? 2) / LANE_DASH_MS : 1 / Math.max(250, wisp.stepMs)) : 0,
+      drift: laneArrived(mechanic, state, index) && standing.damage < wisp.hp && state.breached == null && (standing.holdUntil ?? 0) <= state.clock && standing.engagedCell == null ? (dashing ? Math.max(1, wisp.dashRows ?? 2) / LANE_DASH_MS : 1 / Math.max(250, wisp.stepMs)) : 0,
       ...(wisp.look ? { look: wisp.look } : {}),
       // A bulwark beside it (and standing) shields it: its ring shows it.
       ...(guarding > 0 || (wisp.attack === 'mirror' && Math.floor(state.clock / 4000) % 2 === 0) ? { guarded: true } : {}),
@@ -176,7 +176,7 @@ export type LanesTickResult = {
   /** The Sprinkler's sparks this tick: from its cell at a wisp, for how much (it lands with `shots`). */
   sparks: { from: number; wisp: number; damage: number }[];
   /** Spark plants' zaps: from which cell, at which wisps in turn (the first, then each it jumped to). */
-  zaps: { from: number; wisps: number[]; damage: number }[];
+  zaps: { from: number; wisps: number[]; damage: number; simultaneous?: boolean }[];
 };
 
 /** The board row a wisp is over: the cell its centre is in. */
@@ -194,7 +194,7 @@ function previousTier(items: ReadonlyMap<string, MergeItemDefinition>, definitio
 }
 
 /** What the player brings to the level: the chance a piece that arrives on its own is the better one (the Seed Nursery). */
-export type LanesLuck = { tierTwoChance?: number; /** The Bloom House: Seeds land this much sooner (a fraction). */ seedPace?: number; /** The lead hero's level: added to every shot. */ shotPower?: number;
+export type LanesLuck = { chains?: import('@/features/encounter/encounter-run').EncounterProfile['chains']; tierTwoChance?: number; /** The Bloom House: Seeds land this much sooner (a fraction). */ seedPace?: number; /** The lead hero's level: added to every shot. */ shotPower?: number;
   damageMultiplier?: number;
   shieldBonus?: number; healBonus?: number; supportPace?: number; openingShield?: boolean;
   warningMs?: number;
@@ -280,7 +280,7 @@ export function lanesSprinklerTapped(mechanic: LanesMechanic, state: LanesState,
  */
 export function lanesStormPotTapped(mechanic: LanesMechanic, state: LanesState, board: MergeWorldState, window: MissionWindow, spawnedCell: number | null): { board: MergeWorldState; landed: number | null } {
   const seed = spawnedCell != null ? board.board[spawnedCell]?.occupant : null;
-  const engine = mechanic.secondary ?? (mechanic.stormPot ? { ...mechanic.stormPot, generatorId: STORM_POT_ID } : null);
+  const engine = mechanic.generators?.find(g => g.generatorId !== SEED_SPRINKLER_ID && seed?.kind === 'item' && combatChain(seed.definitionId) === ({ 'storm-pot': 'storm', 'ward-planter': 'bulwark', 'dew-well': 'dew', 'lantern-post': 'lantern' } as Record<string, string>)[g.generatorId]) ?? mechanic.secondary ?? (mechanic.stormPot ? { ...mechanic.stormPot, generatorId: STORM_POT_ID } : null);
   if (!engine || spawnedCell == null || seed?.kind !== 'item') return { board, landed: spawnedCell };
   const landed = sprinklerLanding({ ...mechanic, seeds: undefined }, state, board, window, `lanes-storm:${spawnedCell}:${Math.round(state.clock)}:${board.nextInstance}`, spawnedCell, engine) ?? spawnedCell;
   if (landed === spawnedCell) return { board, landed };
@@ -320,7 +320,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   const frozen: Record<string, number> = Object.fromEntries(Object.entries(input.frozen ?? {}).filter(([, until]) => until > clock));
   let seq = input.seq;
   const multiplier = modern ? Math.max(1, luck.damageMultiplier ?? 1) : 1;
-  const damageOf = (damage: number) => modern ? damage * multiplier : damage + Math.max(0, Math.floor(luck.shotPower ?? 0));
+  const damageOf = (damage: number, chain = 'garden') => modern ? damage * multiplier * (luck.chains?.[chain as keyof NonNullable<LanesLuck['chains']>]?.power ?? 1) : damage + Math.max(0, Math.floor(luck.shotPower ?? 0));
   const vitality = (cell: number): PlantVitality | null => {
     const piece = looseItem(current(), cell);
     if (!combat || !piece) return null;
@@ -347,6 +347,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     const piece = looseItem(current(), cell);
     if (!piece) return;
     const health = vitality(cell);
+    if (health?.charge) return;
     if (health && (health.immuneUntil > clock || protect(cell))) return;
     if (health) { health.hearts = Math.max(0, health.hearts - amount); changed = true; if (health.hearts > 0) return; }
     const lower = previousTier(items, piece.definitionId);
@@ -389,27 +390,69 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   reconcileSpawns();
   // A bulwark shields the wisps in the columns beside it: the one standing guard over this one, if any.
   const shieldFor = (target: number): number => modern && mechanic.wisps[target]?.shield ? -1 : mechanic.wisps.findIndex((spec, index) => index !== target && spec.shield && arrived(index) && alive(index) && Math.abs(col(index) - col(target)) <= 1);
+  const pulse = (cell: number, tier: number, instanceId: string, primary = -1, merge = false, destination?: { column: number; row: number }) => {
+    if (tier < 2) return;
+    const origin = destination ?? laneOf(window, cell)!;
+    const hitWisps: number[] = [];
+    const blast = bulwarkBlast(tier);
+    const echo = merge && mechanic.terrain?.some(t => t.cell === cell && t.kind === 'echo') ? 1.5 : 1;
+    mechanic.wisps.forEach((spec, index) => {
+      if (!alive(index) || !arrived(index)) return;
+      const distance = Math.hypot(col(index) - origin.column, wisps[index]!.row - origin.row);
+      const falloff = rippleFalloff(distance, blast.radius);
+      if (!falloff) return;
+      hitWisps.push(index);
+      const damage = damageOf(blast.damage * (merge ? 0.45 : index === primary ? 1.5 : 1), 'bulwark') * falloff * echo;
+      wisps[index]!.damage = Math.min(spec.hp, wisps[index]!.damage + damage * (shieldFor(index) >= 0 ? 0.5 : 1));
+      if (alive(index)) {
+        wisps[index]!.row -= blast.pushRows * (merge ? 0.45 : 1);
+        wisps[index]!.holdUntil = Math.max(wisps[index]!.holdUntil, clock + 450 + tier * 75);
+        delete wisps[index]!.dashFrom; delete wisps[index]!.dashUntil;
+        if (spec.dashEvery) wisps[index]!.dashAt = clock + spec.dashEvery;
+      }
+      strikes += 1; hit = true; moved = true;
+    });
+    effects.push({ kind: 'wall-impact', cell, tier, instanceId, wisp: primary, radius: blast.radius, hitWisps, consumed: !merge, toColumn: origin.column, toRow: origin.row });
+    changed = true;
+  };
   const wallImpact = (cell: number, index: number, contactRow = wisps[index]!.row): boolean => {
     const piece = looseItem(current(), cell);
     if (!combat || !piece || combatChain(piece.definitionId) !== 'bulwark' || frozen[piece.instanceId] > clock) return false;
     const health = vitality(cell)!;
-    if (health.interceptAt > clock) return false;
-    const impact = bulwarkImpact(health.tier);
-    health.interceptAt = clock + impact.cooldownMs;
-    const wisp = wisps[index]!;
-    wisp.row = contactRow;
-    wisp.damage = Math.min(mechanic.wisps[index]!.hp, wisp.damage + damageOf(impact.damage) * (shieldFor(index) >= 0 ? 0.5 : 1));
-    if (alive(index)) {
-      wisp.row -= impact.pushRows;
-      wisp.holdUntil = Math.max(wisp.holdUntil, clock + impact.holdMs);
-      delete wisp.dashFrom;
-      delete wisp.dashUntil;
-      if (mechanic.wisps[index]!.dashEvery) wisp.dashAt = clock + mechanic.wisps[index]!.dashEvery!;
+    if (health.tier < 2) return false;
+    wisps[index]!.row = contactRow;
+    if (!health.charge) {
+      const origin = laneOf(window, cell)!;
+      const dx = col(index) - origin.column, dy = contactRow - origin.row;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      health.charge = { at: clock + bulwarkBlast(health.tier).chargeMs, startedAt: clock, target: index,
+        toColumn: origin.column + dx / distance, toRow: origin.row + dy / distance };
+      effects.push({ kind: 'wall-impact', cell, tier: health.tier, instanceId: piece.instanceId, wisp: index, radius: 1, charge: true });
+      changed = true;
     }
-    effects.push({ kind: 'wall-impact', wisp: index, cell, instanceId: piece.instanceId, tier: health.tier });
-    strikes += 1; changed = true; moved = true; hit = true;
+    wisps[index]!.holdUntil = Math.max(wisps[index]!.holdUntil, health.charge.at);
+    delete wisps[index]!.dashFrom; delete wisps[index]!.dashUntil;
     return true;
   };
+  // An extended proximity fuse, including adjacent lanes, followed by a one-cell lunge. Once armed it always detonates.
+  if (combat) for (const cell of window.cellIndices) {
+    const piece = looseItem(current(), cell);
+    if (!piece || combatChain(piece.definitionId) !== 'bulwark') continue;
+    const health = vitality(cell)!;
+    if (health.tier < 2) continue;
+    if (health.charge && health.charge.at <= clock) {
+      const origin = laneOf(window, cell)!;
+      pulse(cell, health.tier, piece.instanceId, health.charge.target, false, {
+        column: health.charge.toColumn ?? origin.column, row: health.charge.toRow ?? origin.row });
+      cells ??= [...board.board]; cells[cell] = { ...cells[cell]!, occupant: null };
+      delete combat.plants[piece.instanceId];
+      continue;
+    }
+    const origin = laneOf(window, cell)!;
+    const closest = mechanic.wisps.map((_, i) => i).filter(i => arrived(i) && alive(i))
+      .sort((a, b) => Math.hypot(col(a) - origin.column, wisps[a]!.row - origin.row) - Math.hypot(col(b) - origin.column, wisps[b]!.row - origin.row))[0];
+    if (closest != null && Math.hypot(col(closest) - origin.column, wisps[closest]!.row - origin.row) <= bulwarkBlast(health.tier).triggerRange) wallImpact(cell, closest);
+  }
 
   // Glow that has landed.
   const shots: LaneShot[] = [];
@@ -455,7 +498,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       continue;
     }
     if (spit.strike) {
-      if (modern) { hurt(spit.cell, 2, spit.wisp); continue; }
+      if (modern) { hurt(spit.cell, spit.damage ?? 2, spit.wisp); continue; }
       // A striker's bolt: the plant it was aimed at drops a tier (a Seed is knocked off the board); gone, nothing.
       const piece = looseItem(current(), spit.cell);
       if (piece) {
@@ -545,7 +588,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       const at = laneOf(window, cell)!;
       const neighbours = window.cellIndices.filter((other) => other !== cell && chebyshev(laneOf(window, other)!, at) <= 1);
       const injured = neighbours.map((other) => ({ cell: other, health: vitality(other) })).filter((p) => p.health && p.health.hearts < p.health.tier).sort((a, b) => (b.health!.tier - b.health!.hearts) - (a.health!.tier - a.health!.hearts) || a.cell - b.cell)[0];
-      if (injured) { injured.health!.hearts = Math.min(injured.health!.tier, injured.health!.hearts + 1 + (luck.healBonus ?? 0)); changed = true; }
+      if (injured) { injured.health!.hearts = Math.min(injured.health!.tier, injured.health!.hearts + (1 + (luck.healBonus ?? 0)) * (luck.chains?.dew?.power ?? 1)); changed = true; }
       if (tier >= 3) for (const other of neighbours) {
         const neighbour = looseItem(current(), other);
         if (neighbour && frozen[neighbour.instanceId]) { delete frozen[neighbour.instanceId]; changed = true; break; }
@@ -559,6 +602,10 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     }
   }
 
+  const weaponTarget = (index: number, range: number) => window.cellIndices
+    .filter(cell => { const at = laneOf(window, cell)!; return at.column === col(index) && at.row >= wisps[index]!.row
+      && at.row - wisps[index]!.row <= range && looseItem(current(), cell); })
+    .sort((a, b) => laneOf(window, a)!.row - laneOf(window, b)!.row)[0];
   // Wisps drift down, a row every `stepMs`, from the moment they arrive; a hold after reaching a piece pauses them.
   for (let index = 0; index < mechanic.wisps.length && breached == null; index += 1) {
     const spec = mechanic.wisps[index]!;
@@ -624,6 +671,14 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       }
       continue;
     }
+    const weaponForMove = modern ? wispWeapon(spec) : null;
+    const engaged = weaponForMove && !weaponForMove.moving ? weaponTarget(index, weaponForMove.range) : undefined;
+    if (wisp.engagedCell !== engaged) { moved = true; changed = true; }
+    wisp.engagedCell = engaged;
+    if (engaged != null) {
+      delete wisp.dashFrom; delete wisp.dashUntil;
+      continue;
+    }
     // A weaver slides a column over now and then, once it is near the board; a piece in its way goes under Mist.
     if (spec.weaveEvery && wisp.row >= -1.5) {
       const due = wisp.weaveAt ?? clock + spec.weaveEvery;
@@ -663,6 +718,17 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     if (wisp.dashFrom != null && wisp.dashUntil != null) {
       const lunge = Math.max(0, Math.min(clock, wisp.dashUntil) - Math.max(start, wisp.dashFrom));
       target += lunge * (Math.max(1, spec.dashRows ?? 2) / LANE_DASH_MS - 1 / Math.max(250, spec.stepMs));
+    }
+    const weapon = modern ? wispWeapon(spec) : null;
+    if (weapon && !weapon.moving) {
+      const ahead = weaponTarget(index, Infinity);
+      if (ahead != null) {
+        const stopRow = laneOf(window, ahead)!.row - weapon.range;
+        if (target >= stopRow) {
+          target = stopRow; wisp.engagedCell = ahead; changed = true;
+          delete wisp.dashFrom; delete wisp.dashUntil;
+        }
+      }
     }
     moved = true;
     // Each cell its centre enters on the way, in order.
@@ -732,11 +798,26 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       spits.push(spit);
       spat.push(spit);
     }
+    if (modern) for (let index = 0; index < mechanic.wisps.length; index++) {
+      const spec = mechanic.wisps[index]!, wisp = wisps[index]!;
+      const weapon = wispWeapon(spec);
+      if (!weapon || !arrived(index) || !alive(index) || wisp.holdUntil > clock) continue;
+      const cell = weaponTarget(index, weapon.range + 0.001);
+      if (cell == null) continue;
+      // First shot has a readable wind-up; changing targets cannot reset an existing cooldown.
+      wisp.strikeAt ??= Math.max(clock + 600, arrivalAt(index) + (spec.strikeEvery ?? 0));
+      if (clock < wisp.strikeAt) continue;
+      wisp.strikeAt = clock + weapon.everyMs;
+      const zap = weapon.mode === 'zap';
+      const bolt: LaneSpit = { id: ++seq, wisp: index, cell, firedAt: clock, landsAt: clock + (zap ? LANE_SPIT_MS : 360),
+        strike: true, weapon: zap ? 'zap' : 'bullet', damage: weapon.damage };
+      spits.push(bolt); spat.push(bolt); changed = true;
+    }
     // Strikers strike the nearest plant under them in their column (over the board or on it), now and then.
     for (let index = 0; index < mechanic.wisps.length; index += 1) {
       const spec = mechanic.wisps[index]!;
       const wisp = wisps[index]!;
-      if (!spec.strikeEvery || !arrived(index) || !alive(index)) continue;
+      if ((modern && wispWeapon(spec)) || !spec.strikeEvery || !arrived(index) || !alive(index)) continue;
       const due = wisp.strikeAt ?? arrivalAt(index) + spec.strikeEvery;
       if (due > clock) { wisp.strikeAt = due; continue; }
       wisp.strikeAt = clock + spec.strikeEvery;
@@ -817,21 +898,26 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   const sparks: LanesTickResult['sparks'] = [];
   const seeds = mechanic.seeds;
   // The Storm Pot: a charge back every beat, up to what it holds.
-  let nextStormAt = input.nextStormAt;
-  if ((mechanic.stormPot || mechanic.secondary) && breached == null) {
-    const everyMs = (mechanic.secondary ?? mechanic.stormPot)!.everyMs * (1 - Math.max(0, Math.min(0.6, (luck.seedPace ?? 0) + (luck.supportPace ?? 0))));
-    nextStormAt ??= everyMs;
-    if (clock >= nextStormAt) {
-      const generatorId = mechanic.secondary?.generatorId ?? STORM_POT_ID;
-      const generator = board.generators[generatorId];
+  const generatorReady = { ...input.generatorReady };
+  const engines = mechanic.generators ?? (mechanic.secondary ? [mechanic.secondary] : mechanic.stormPot ? [{ ...mechanic.stormPot, generatorId: STORM_POT_ID }] : []);
+  for (const engine of engines) if (breached == null) {
+    const chain = ({ 'seed-sprinkler': 'garden', 'storm-pot': 'storm', 'ward-planter': 'bulwark', 'dew-well': 'dew', 'lantern-post': 'lantern' } as Record<string, import('./combat-rules').CombatChain>)[engine.generatorId] ?? 'garden';
+    const homeRecharge = luck.chains?.[chain]?.recharge;
+    const pace = homeRecharge == null ? (luck.seedPace ?? 0) + (luck.supportPace ?? 0)
+      : homeRecharge + (chain === 'garden' ? luck.seedPace ?? 0 : 0) + (luck.supportPace ?? 0);
+    const everyMs = engine.everyMs * (1 - Math.max(0, Math.min(0.6, pace)));
+    const due = generatorReady[engine.generatorId] ?? input.nextStormAt ?? everyMs;
+    generatorReady[engine.generatorId] = due;
+    if (clock >= due) {
+      const generator = board.generators[engine.generatorId];
       if (generator && generator.charges < generator.capacity) {
-        board = { ...board, generators: { ...board.generators, [generatorId]: { ...generator, charges: generator.charges + 1 } } };
+        board = { ...board, generators: { ...board.generators, [engine.generatorId]: { ...generator, charges: generator.charges + 1 } } };
         changed = true;
       }
-      nextStormAt = clock + everyMs;
+      generatorReady[engine.generatorId] = clock + everyMs;
     }
   }
-  if (seeds && mechanic.sprinkler && breached == null) {
+  if (seeds && mechanic.sprinkler && !mechanic.generators && breached == null) {
     const everyMs = seeds.everyMs * (1 - Math.max(0, Math.min(0.6, luck.seedPace ?? 0)));
     nextSeedAt ??= everyMs;
     if (clock >= nextSeedAt) {
@@ -842,6 +928,8 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
       }
       nextSeedAt = clock + everyMs;
     }
+  }
+  if (mechanic.sprinkler && breached == null) {
     for (const queued of input.sparkQueue ?? []) {
       if (!alive(queued.wisp) || !arrived(queued.wisp)) continue;
       pendingSparks.push({ id: ++seq, fromCell: queued.from, wisp: queued.wisp, damage: queued.damage, firedAt: clock, landsAt: clock + LANE_SPARK_MS });
@@ -855,6 +943,43 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
   const ready: Record<string, number> = {};
   const fired: LaneShot[] = [];
   const zaps: LanesTickResult['zaps'] = [];
+  const mergeAttacks = (input.mergeAttacks ?? []).filter(attack => attack.at > clock);
+  if (breached == null) for (const attack of input.mergeAttacks ?? []) {
+    if (attack.at > clock) continue;
+    const { cell, tier, chain, instanceId } = attack;
+    const origin = laneOf(window, cell);
+    if (!origin) continue;
+    const bonus = mergeAttack(tier);
+    const echo = mechanic.terrain?.some(t => t.cell === cell && t.kind === 'echo') ? 1.5 : 1;
+    if (chain === 'bulwark') { pulse(cell, tier, instanceId, -1, true); continue; }
+    if (chain === 'dew') {
+      for (const other of window.cellIndices) {
+        const at = laneOf(window, other)!;
+        if (Math.hypot(at.column - origin.column, at.row - origin.row) > bonus.reach) continue;
+        const p = looseItem(current(), other); const health = vitality(other);
+        if (health) health.hearts = Math.min(health.tier, health.hearts + (Math.max(1, tier - 1) + (luck.healBonus ?? 0)) * (luck.chains?.dew?.power ?? 1));
+        if (p) delete frozen[p.instanceId];
+      }
+      effects.push({ kind: 'wall-impact', cell, tier, instanceId, wisp: -1, radius: bonus.reach, healing: true }); changed = true;
+      continue;
+    }
+    const targets = mechanic.wisps.map((_, i) => i).filter(i => arrived(i) && alive(i));
+    if (chain === 'storm') {
+      const struck = targets.filter(i => Math.hypot(col(i) - origin.column, wisps[i]!.row - origin.row) <= bonus.reach)
+        .sort((a,b) => Math.hypot(col(a) - origin.column, wisps[a]!.row - origin.row) - Math.hypot(col(b) - origin.column, wisps[b]!.row - origin.row)).slice(0, bonus.targets);
+      struck.forEach(wisp => shots.push({ id: ++seq, fromCell: cell, wisp, damage: damageOf(bonus.damage * 2 * echo, chain), kind: 'zap', firedAt: clock, landsAt: clock + LANE_SPARK_MS }));
+      if (struck.length) zaps.push({ from: cell, wisps: struck, damage: bonus.damage * 2, simultaneous: true });
+    } else {
+      const ahead = targets.filter(i => col(i) === origin.column && wisps[i]!.row < origin.row).sort((a,b) => wisps[b]!.row - wisps[a]!.row);
+      const struck = chain === 'lantern' ? ahead.slice(0, bonus.targets + 1) : ahead.slice(0, 1);
+      for (const wisp of struck.length ? struck : [-1]) {
+        const shot: LaneShot = { id: ++seq, fromCell: cell, wisp, damage: damageOf(bonus.damage * echo, chain), kind: 'projectile', firedAt: clock,
+          landsAt: clock + laneFlightMs(origin.row - (wisp < 0 ? -LANE_MISS_ROW : wisps[wisp]!.row)) };
+        fired.push(shot); if (wisp >= 0) shots.push(shot);
+      }
+    }
+    changed = true;
+  }
   if (breached == null) {
     const boardNow = current();
     for (const cell of window.cellIndices) {
@@ -887,7 +1012,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
         ready[piece.instanceId] = clock + zap.periodMs;
         struck.forEach((wisp, order) => {
           const wet = modern && mechanic.terrain?.some((t) => t.cell === cell && t.kind === 'puddle');
-          shots.push({ id: ++seq, fromCell: cell, wisp, damage: damageOf(zap.damage) * (wet ? 1.25 : 1), kind: 'zap', firedAt: clock, landsAt: clock + LANE_SPARK_MS * (order + 1) });
+          shots.push({ id: ++seq, fromCell: cell, wisp, damage: damageOf(zap.damage, 'storm') * (wet ? 1.25 : 1), kind: 'zap', firedAt: clock, landsAt: clock + LANE_SPARK_MS * (order + 1) });
           if (zap.stunMs) wisps[wisp]!.holdUntil = Math.max(wisps[wisp]!.holdUntil, clock + zap.stunMs);
         });
         zaps.push({ from: cell, wisps: struck, damage: zap.damage });
@@ -916,7 +1041,7 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
         if (target < 0 || row > wisps[target]!.row) target = index;
       }
       const rows = at.row - (target < 0 ? -LANE_MISS_ROW : wisps[target]!.row);
-      const shot: LaneShot = { id: ++seq, fromCell: cell, wisp: target, damage: target < 0 ? 0 : damageOf(fire.damage), kind: 'projectile', firedAt: clock, landsAt: clock + laneFlightMs(rows) };
+      const shot: LaneShot = { id: ++seq, fromCell: cell, wisp: target, damage: target < 0 ? 0 : damageOf(fire.damage, chain), kind: 'projectile', firedAt: clock, landsAt: clock + laneFlightMs(rows) };
       fired.push(shot);
       // A miss has nothing to land on: it is only flown.
       if (target >= 0) shots.push(shot);
@@ -955,17 +1080,17 @@ export function lanesTick(mechanic: LanesMechanic, input: LanesState, board: Mer
     combat.warnings = combat.warnings.filter((warning) => alive(warning.wisp));
   }
   const state: LanesState = {
-    kind: 'lanes', strikes, clock, wisps, ready, shots, seq, breached: breached ?? input.breached,
+    kind: 'lanes', strikes, clock, wisps, ready, shots, mergeAttacks, seq, breached: breached ?? input.breached,
     ...(combat ? { combat } : {}),
     ...(spits.length ? { spits } : {}), ...(advance ? { advance } : {}), ...(nextSeedAt != null ? { nextSeedAt, seeded } : {}),
     ...(pushedBack ? { pushedBack, ...(lastPushAt != null ? { lastPushAt } : {}) } : {}),
     ...(Object.keys(frozen).length ? { frozen } : {}),
     ...(input.launches ? { launches: input.launches } : {}),
-    ...(nextStormAt != null ? { nextStormAt } : {}),
+    ...(Object.keys(generatorReady).length ? { generatorReady } : {}),
     ...(mechanic.sprinkler ? { sparkEvery: Math.max(1, Math.floor(luck.sparkEvery ?? DEFAULT_SPARK_EVERY)), sparkDamage: Math.max(1, Math.floor(luck.sparkDamage ?? DEFAULT_SPARK_DAMAGE)) } : {}),
   };
   const next = current();
-  return { state, board: nextInstance === next.nextInstance ? next : { ...next, nextInstance }, fired, effects, changed, moved, hit, spat, sparks, zaps };
+  return { state, board: next === board && nextInstance === next.nextInstance ? next : { ...next, nextInstance, revision: board.revision + 1 }, fired, effects, changed, moved, hit, spat, sparks, zaps };
 }
 
 const isFree = (board: MergeWorldState, cell: number) => { const entry = board.board[cell]; return Boolean(entry) && !entry!.locked && !entry!.mist && !entry!.occupant; };
@@ -1017,7 +1142,7 @@ export function normalizeLanesState(mechanic: LanesMechanic, value: unknown, str
   if (typeof value !== 'object') return null;
   const raw = value as Partial<LanesState>;
   if (!Array.isArray(raw.wisps) || raw.wisps.length !== mechanic.wisps.length || !Number.isFinite(raw.clock)) return null;
-  const optional = (wisp: Partial<LaneWispState> | undefined) => Object.fromEntries((['spitAt', 'strikeAt', 'column', 'weaveAt', 'weaves', 'dashAt', 'dashFrom', 'dashUntil', 'mendAt', 'frostAt', 'snatchAt', 'callAt', 'bornAt', 'crawlAt'] as const)
+  const optional = (wisp: Partial<LaneWispState> | undefined) => Object.fromEntries((['engagedCell', 'spitAt', 'strikeAt', 'column', 'weaveAt', 'weaves', 'dashAt', 'dashFrom', 'dashUntil', 'mendAt', 'frostAt', 'snatchAt', 'callAt', 'bornAt', 'crawlAt'] as const)
     .filter((key) => Number.isFinite(wisp?.[key])).map((key) => [key, Number(wisp![key])]));
   const wisps = raw.wisps.map((wisp) => ({ row: Number(wisp?.row) || 0, damage: Math.max(0, Number(wisp?.damage) || 0), holdUntil: Number(wisp?.holdUntil) || 0, cells: Math.max(0, Math.floor(Number(wisp?.cells) || 0)), ...optional(wisp) }));
   return {
@@ -1025,6 +1150,7 @@ export function normalizeLanesState(mechanic: LanesMechanic, value: unknown, str
     ...(mechanic.rulesVersion === 2 ? { combat: normalizeCombatState(raw.combat, mechanic.breachBudget ?? 3) } : {}),
     ready: raw.ready && typeof raw.ready === 'object' ? { ...raw.ready } : {},
     shots: Array.isArray(raw.shots) ? raw.shots.filter((shot) => shot && Number.isFinite(shot.landsAt)).map((shot) => ({ ...shot })) : [],
+    mergeAttacks: Array.isArray(raw.mergeAttacks) ? raw.mergeAttacks.filter(a => a && Number.isInteger(a.cell) && a.cell >= 0 && a.cell < 63 && Number.isFinite(a.at) && a.at >= 0 && Number.isInteger(a.tier) && a.tier >= 1 && a.tier <= 7 && typeof a.instanceId === 'string' && ['garden', 'storm', 'bulwark', 'dew', 'lantern'].includes(a.chain)).map(a => ({ ...a })) : [],
     seq: Math.max(0, Math.floor(Number(raw.seq) || 0)),
     breached: raw.breached == null ? null : Math.floor(Number(raw.breached)),
     ...(Number.isFinite(raw.advance) && Number(raw.advance) > 0 ? { advance: Number(raw.advance) } : {}),
@@ -1032,6 +1158,7 @@ export function normalizeLanesState(mechanic: LanesMechanic, value: unknown, str
     ...(Array.isArray(raw.spits) ? { spits: raw.spits.filter((spit) => spit && Number.isFinite(spit.landsAt)).map((spit) => ({ ...spit })) } : {}),
     ...(raw.frozen && typeof raw.frozen === 'object' ? { frozen: Object.fromEntries(Object.entries(raw.frozen).filter(([, until]) => Number.isFinite(until))) } : {}),
     ...(Number.isFinite(raw.launches) ? { launches: Math.max(0, Math.floor(Number(raw.launches))) } : {}),
+    ...(raw.generatorReady ? { generatorReady: Object.fromEntries(Object.entries(raw.generatorReady).filter(([, value]) => Number.isFinite(value))) } : {}),
     ...(Number.isFinite(raw.nextStormAt) ? { nextStormAt: Number(raw.nextStormAt) } : {}),
   };
 }

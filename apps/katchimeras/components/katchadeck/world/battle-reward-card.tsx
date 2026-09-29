@@ -1,5 +1,7 @@
-import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { claimStoredFrontierSalvage } from '@/utils/merge-world/repository';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 
@@ -10,6 +12,7 @@ import { GLOW } from '@/constants/glow';
 import { KatchaUI } from '@/constants/katcha-ui';
 
 export type BattleReward = {
+  salvageMissionId?: string;
   combat?: { elapsedMs: number; breaches: number; prevented: number; abilityUses: number };
   key: string;
   /** Over the title: Victory by default (a Supply Run's crate says so). */
@@ -30,6 +33,16 @@ export type BattleReward = {
  * counts into the counter as the card goes.
  */
 export function BattleRewardCard({ reward, onContinue }: { reward: BattleReward; onContinue: () => void }) {
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [salvage, setSalvage] = useState<'timber' | 'glow' | null>(null);
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState(false);
+  const claim = async (choice: 'timber' | 'glow') => {
+    if (!reward.salvageMissionId || claiming) return;
+    setClaiming(true); setClaimError(false);
+    try { await claimStoredFrontierSalvage(reward.salvageMissionId, choice); setSalvage(choice); } catch { setClaimError(true); } finally { setClaiming(false); }
+  };
   const reduceMotion = useReducedMotion();
   const card = useSharedValue(0);
   useEffect(() => {
@@ -39,8 +52,9 @@ export function BattleRewardCard({ reward, onContinue }: { reward: BattleReward;
   const scrimStyle = useAnimatedStyle(() => ({ opacity: card.value }));
   return <View style={[StyleSheet.absoluteFill, styles.layer]}>
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim, scrimStyle]} />
-    <View style={styles.center} pointerEvents="box-none">
-      <Animated.View style={[styles.card, cardStyle]}>
+    <View style={[styles.center, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]} pointerEvents="box-none">
+      <Animated.View style={[styles.card, { maxHeight: Math.max(180, height - insets.top - insets.bottom - 32) }, cardStyle]}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} bounces={false}>
         <Text style={styles.eyebrow}>{reward.eyebrow ?? 'Victory'}</Text>
         <Text style={styles.title}>{reward.title}</Text>
         {reward.combat ? <Text style={[styles.eyebrow, { textAlign: 'center' }]}>{Math.ceil(reward.combat.elapsedMs / 1000)}s · {reward.combat.breaches} hearts lost · {reward.combat.prevented} hits shielded</Text> : null}
@@ -62,7 +76,13 @@ export function BattleRewardCard({ reward, onContinue }: { reward: BattleReward;
           </View> : null}
           {reward.xp ? <View style={styles.reward}><Text style={styles.rewardValue}>+{reward.xp} XP{reward.xpEach ? ' each' : ''}</Text></View> : null}
         </View>
-        <KatchaButton fullWidth glow pill label="Continue" onPress={onContinue} />
+        {reward.salvageMissionId && !salvage ? <View style={{ gap: 10 }}>
+          <Text style={styles.eyebrow}>Choose your first-clear salvage</Text>
+          <KatchaButton style={styles.button} label="4 Timber" disabled={claiming} onPress={() => void claim('timber')} />
+          <KatchaButton style={styles.button} label="18 Glow" disabled={claiming} onPress={() => void claim('glow')} />
+          {claimError ? <Text style={styles.eyebrow}>Could not save. Please try again.</Text> : null}
+        </View> : <KatchaButton style={styles.button} fullWidth glow pill label="Continue" onPress={onContinue} />}
+        </ScrollView>
       </Animated.View>
     </View>
   </View>;
@@ -81,13 +101,16 @@ const styles = StyleSheet.create({
   layer: { zIndex: FTUE_SCENE_LAYERS.hero + 6 },
   scrim: { backgroundColor: 'rgba(12,10,26,0.55)' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
-  card: { width: '100%', maxWidth: 340, borderRadius: 26, padding: 22, gap: 12, alignItems: 'center', backgroundColor: '#1F1B36', borderWidth: 1, borderColor: 'rgba(255,231,168,0.4)' },
+  card: { width: '100%', maxWidth: 340, borderRadius: 26, overflow: 'hidden', flexShrink: 1, backgroundColor: '#1F1B36', borderWidth: 1, borderColor: 'rgba(255,231,168,0.4)' },
+  scroll: { flexGrow: 0, flexShrink: 1 },
+  content: { padding: 22, gap: 12, alignItems: 'center' },
+  button: { height: 60, flexGrow: 0, flexShrink: 0 },
   eyebrow: { ...KatchaUI.type.label, color: '#FFE7A8' },
   title: { ...KatchaUI.type.display, fontSize: 28, lineHeight: 32, color: '#FFF8E6', textAlign: 'center' },
   stars: { flexDirection: 'row', gap: 8 },
   star: { fontSize: 38, color: 'rgba(255,255,255,0.18)' },
   starLit: { color: '#FFD36B', textShadowColor: 'rgba(255,196,92,0.7)', textShadowRadius: 12 },
-  rewards: { flexDirection: 'row', gap: 16, marginBottom: 6 },
+  rewards: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 16, marginBottom: 6 },
   reward: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   rewardIcon: { width: 26, height: 26 },
   rewardValue: { ...KatchaUI.type.title, color: '#FFF8E6' },

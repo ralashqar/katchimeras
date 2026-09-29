@@ -1,3 +1,8 @@
+import { claimStoredFrontierSalvage, upgradeStoredChainHome } from '@/utils/merge-world/repository';
+import { ChainHomePanel } from '@/components/katchadeck/world/chain-home-panel';
+import { CHAIN_HOMES, chainHomeForTile, chainUnlocked, chainDiscoveryAvailable, chainHomeLevel } from '@/features/encounter/chain-homes';
+import { authoredCombatEncounter, missingCombatChain } from '@/features/encounter/combat-loadout';
+import type { CombatChain } from '@/features/mission-mechanics/combat-rules';
 import { getActivitySession, saveActivitySession, startActivitySession, useActivitySession, type ActivitySource } from '@/features/activities/activity-session';
 import { kitchenOpen } from '@/features/supply-run/supply-run';
 import { residentArtLayerId } from '@/components/katchadeck/world/shared-resident-presentation';
@@ -791,6 +796,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const storyTiles = useMemo(() => Object.fromEntries(storyTileStateKey.split('|').filter(Boolean).map((entry) => entry.split('=') as [string, 'misted' | 'revealed'])), [storyTileStateKey]);
   // The Frontier (`constants/frontier-tiles.ts`), keyed the same way. A tile just won stays under its Mist until its
   // reveal plays (after the battle's card), so the land is seen coming back rather than already back.
+  const [chainPanel, setChainPanel] = useState<CombatChain | null>(null);
   const [frontierRevealing, setFrontierRevealing] = useState<string | null>(null);
   const frontierStateKey = Object.entries(frontierTileStates(mergeWorld)).map(([id, state]) => `${id}=${id === frontierRevealing && state === 'reclaimed' ? 'misted' : state}`).join('|');
   const frontierTiles = useMemo(() => Object.fromEntries(frontierStateKey.split('|').filter(Boolean).map((entry) => entry.split('=') as [string, FrontierTileState])), [frontierStateKey]);
@@ -834,6 +840,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     hatchableTiles,
     storyTiles,
     frontier: frontierTiles,
+    chainHomeLevels: Object.fromEntries(CHAIN_HOMES.map(home => [home.tileId, chainUnlocked(mergeWorld, home.chain) ? chainHomeLevel(mergeWorld, home.chain) : 0])),
     hollowTreeRestored: hollowTreeAwake,
     regionHomes,
     level: mergeWorld.haven.structures.mossproutGarden.level,
@@ -841,6 +848,8 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     featureLevels: mergeWorld.haven.structures.mossproutGarden.featureLevels,
   }), [
     heroTileLooks,
+    mergeWorld.chainProgress,
+    mergeWorld.heartwoodBuildings,
     treeStage,
     gatewayState,
     hatchableTiles,
@@ -1242,6 +1251,16 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     });
     await write().catch((error) => console.warn('The rescue could not be written', error));
   }, [reduceMotion]);
+  useEffect(() => {
+    if (ftueStepId || battleReward || islandEncounter || !screenFocused) return;
+    const pending = Object.keys(mergeWorld.encounters?.clears ?? {}).find(id => id.startsWith('frontier:') && mergeWorld.chainProgress && !mergeWorld.chainProgress.salvage[id]);
+    if (pending && chainHomeForTile(pending.slice('frontier:'.length))) {
+      // Recover supplies from older discovery victories without another modal.
+      void claimStoredFrontierSalvage(pending, 'timber').catch(error => console.warn('Discovery supplies could not be recovered', error));
+      return;
+    }
+    if (pending) setBattleReward({ key: `salvage:${pending}`, title: 'Your clearing supplies', stars: 0, glow: 0, before: mergeWorld.coins, salvageMissionId: pending, finish: () => undefined });
+  }, [mergeWorld, battleReward, islandEncounter, screenFocused, ftueStepId]);
   // A Frontier tile taken back: after the battle's card, its Mist lifts to its own wild land (the reveal a friend's tile
   // clears with, no one arriving). Then the tile is the world's again.
   const playFrontierReveal = useCallback((tileId: string) => {
@@ -2236,11 +2255,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       // Into the Mist: the rung docks under the island with the Katchimera and Wisp chosen on the panel.
       const rung = progress.rung;
       if (!rung) return;
+      const missing = missingCombatChain(rung.mission.encounter, mergeWorldRef.current);
+      if (missing) { setSelectedUpgrade(null); setTrackOpen(null); setChainPanel(missing); return; }
       const remembered = mergeWorldRef.current.encounters?.loadout;
       const picked: EncounterLoadoutChoice = choice ?? { katchimeraId: remembered?.katchimeraId ?? 'mossprout', helperWispId: remembered?.helperWispId ?? null, partnerId: remembered?.partnerId ?? null };
       const loadout = battleLoadout(mergeWorldRef.current, withPartner(mergeWorldRef.current, picked, playableHeroes(mergeWorldRef.current)));
       void startStoredEncounter({ missionId: rung.mission.id, runId: encounterRunId(rung.mission.encounter, 1, loadout), campaignId: campaign.campaignId, katchimeraId: loadout.companionId, helperWispId: loadout.wispId ?? null, partnerId: loadout.partner?.companionId ?? null }).catch(() => undefined);
-      setIslandEncounter({ campaignId: campaign.campaignId, islandId: campaign.islandId, mission: rung.mission, loadout });
+      setIslandEncounter({ campaignId: campaign.campaignId, islandId: campaign.islandId, mission: { ...rung.mission, encounter: authoredCombatEncounter(rung.mission.encounter, mergeWorldRef.current) }, loadout });
       setSelectedUpgrade(null);
       return;
     }
@@ -2493,6 +2514,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     if (rescuedNow && !cleared) setRegionRevealing(null);
     if (cleared) setBattleReward({ key: `encounter:${runId}`, eyebrow: reclaimed ? 'Land taken back' : cleared?.surged ? 'The Heart Tree held' : finale ? 'The Hollow Tree wakes' : rescuedNow ? 'Rescued' : undefined, title: found.mission.title, stars: gradeStars(cleared.grade), glow: cleared.glow, xp: cleared.xp || undefined, xpEach: Boolean(cleared.partnerId),
       timber: reclaimed?.timber || undefined, combat: outcome.combat,
+      ...(reclaimed && !chainHomeForTile(reclaimed.tileId) && cleared.firstClear && !result.state.chainProgress?.salvage[focus.mission.id] ? { salvageMissionId: focus.mission.id } : {}),
       before: Math.max(0, result.state.coins - cleared.glow), finish: reclaimed ? () => playFrontierReveal(reclaimed.tileId) : finale ? playHollowReveal : rescuedNow ? () => playRegionReveal(rescuedNow) : () => undefined });
     setIslandEncounter(null);
     // The Frontier and the Heart Tree's defence have no track: the player stays on the map.
@@ -2548,7 +2570,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const pending = getBattleSession();
     if (pending?.status === 'returning') return;
     let input: Omit<BattleSession, 'id' | 'version' | 'status' | 'result'> | null = null;
-    const common = { world: { heartwoodBuildings: mergeWorld.heartwoodBuildings, heroBuildings: mergeWorld.heroBuildings, chaptersClaimed: mergeWorld.chaptersClaimed, chapterOpeningsSeen: mergeWorld.chapterOpeningsSeen }, backdrop: background.sceneId };
+    const common = { world: { chainProgress: mergeWorld.chainProgress, heartwoodBuildings: mergeWorld.heartwoodBuildings, heroBuildings: mergeWorld.heroBuildings, chaptersClaimed: mergeWorld.chaptersClaimed, chapterOpeningsSeen: mergeWorld.chapterOpeningsSeen }, backdrop: background.sceneId };
     if (firstBattleStepActive) input = { ...common, sourceKey: `first:${activeFtueRunId}`, source: { kind: 'first', run: activeFtueRunId ?? 'current' }, encounter: FIRST_BATTLE, loadout: FIRST_BATTLE_LOADOUT };
     else if (trailStoneIndex >= 0 && trailStoneActive(trailStoneIndex)) input = { ...common, sourceKey: `trail:${activeFtueRunId}:${trailStoneIndex}`, source: { kind: 'trail', run: activeFtueRunId ?? 'current', index: trailStoneIndex }, encounter: LOST_TRAIL_BATTLES[trailStoneIndex]!, loadout: FIRST_BATTLE_LOADOUT };
     else if (stepplingMissionActive && hatchableRescue && !rescueIntroPending && !rescueRevealing) input = { ...common, sourceKey: `rescue:${activeHatchable.discoveryFlow.runId}`, source: { kind: 'rescue', companion: activeHatchable.companion, run: activeHatchable.discoveryFlow.runId }, encounter: hatchableRescue, loadout: hatchableRescueLoadout };
@@ -2601,9 +2623,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     const world = mergeWorldRef.current;
     const tile = frontierTileById(tileId);
     const contested = Boolean(tile && frontierTileContested(world, tileId));
-    if (!tile || !frontierTileLit(world, tile) || (frontierTileReclaimed(world, tileId) && !contested)) return false;
+    const home = chainHomeForTile(tileId);
+    if (!tile || (home ? !chainDiscoveryAvailable(world, home.chain) : !frontierTileLit(world, tile) || (frontierTileReclaimed(world, tileId) && !contested))) return false;
     // Land a Mist Surge took again is a retake: the same land a step harder.
-    const mission = contested ? frontierRetakeMission(tile) : frontierMission(tile);
+    const rawMission = contested ? frontierRetakeMission(tile) : frontierMission(tile);
+    const missing = missingCombatChain(rawMission.encounter, world);
+    if (missing) { setChainPanel(missing); return false; }
+    const mission = { ...rawMission, encounter: authoredCombatEncounter(rawMission.encounter, world) };
+    setChainPanel(null);
     const remembered = world.encounters?.loadout;
     const heroes = playableHeroes(world);
     let picked: EncounterLoadoutChoice = { katchimeraId: remembered?.katchimeraId ?? 'mossprout', helperWispId: remembered?.helperWispId ?? null, partnerId: remembered?.partnerId ?? null };
@@ -2621,7 +2648,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const startRegionRescue = useCallback((friend: RegionFriend) => {
     const world = mergeWorldRef.current;
     if (regionFriendHome(world, friend.id)) return false;
-    const mission = regionRescueMission(friend);
+    const rawMission = regionRescueMission(friend);
+    const missing = missingCombatChain(rawMission.encounter, world);
+    if (missing) { setSelectedUpgrade(null); setTrackOpen(null); setChainPanel(missing); return false; }
+    const mission = { ...rawMission, encounter: authoredCombatEncounter(rawMission.encounter, world) };
     const remembered = world.encounters?.loadout;
     const picked: EncounterLoadoutChoice = { katchimeraId: remembered?.katchimeraId ?? 'mossprout', helperWispId: remembered?.helperWispId ?? null, partnerId: remembered?.partnerId ?? null };
     const loadout = battleLoadout(world, withPartner(world, picked, playableHeroes(world)));
@@ -2636,7 +2666,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const startFinaleBattle = useCallback(() => {
     const world = mergeWorldRef.current;
     if (hollowTreeRestored(world)) return false;
-    const mission = hollowTreeFinaleMission();
+    const rawMission = hollowTreeFinaleMission();
+    const missing = missingCombatChain(rawMission.encounter, world);
+    if (missing) { setSelectedUpgrade(null); setTrackOpen(null); setChainPanel(missing); return false; }
+    const mission = { ...rawMission, encounter: authoredCombatEncounter(rawMission.encounter, world) };
     const remembered = world.encounters?.loadout;
     const heroes = playableHeroes(world);
     const picked: EncounterLoadoutChoice = { katchimeraId: remembered?.katchimeraId ?? 'mossprout', helperWispId: remembered?.helperWispId ?? null, partnerId: heroes.includes('mistle') && remembered?.katchimeraId !== 'mistle' ? 'mistle' : remembered?.partnerId ?? null };
@@ -2653,7 +2686,10 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const startSurgeDefence = useCallback(() => {
     const world = mergeWorldRef.current;
     if (frontierSurgesStarted(world)) return false;
-    const mission = surgeDefenceMission();
+    const rawMission = surgeDefenceMission();
+    const missing = missingCombatChain(rawMission.encounter, world);
+    if (missing) { setSelectedUpgrade(null); setTrackOpen(null); setChainPanel(missing); return false; }
+    const mission = { ...rawMission, encounter: authoredCombatEncounter(rawMission.encounter, world) };
     const remembered = world.encounters?.loadout;
     const picked: EncounterLoadoutChoice = { katchimeraId: remembered?.katchimeraId ?? 'mossprout', helperWispId: remembered?.helperWispId ?? null, partnerId: remembered?.partnerId ?? null };
     const loadout = battleLoadout(world, withPartner(world, picked, playableHeroes(world)));
@@ -2680,6 +2716,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       setFrontierTalk({ key: `region:${friend.id}`, lines: [{ speaker: 'mossprout', text: 'Someone is in there. I can almost hear them. Not yet, though.' }] });
       return;
     }
+    const home = chainHomeForTile(tileId);
+    if (home) {
+      if (islandEncounterRef.current || upgradePresentation || upgrading) return;
+      setSelectedUpgrade(null); setTrackOpen(null); setBuildingPanelId(null); setHeroBuildingPanelId(null); setKatchimeraPanelId(null); setHeartTreePanelOpen(false);
+      setChainPanel(home.chain); return;
+    }
     const tile = frontierTileById(tileId);
     if (!tile || !frontierOpen(world) || islandEncounterRef.current) return;
     const state = frontierTileState(world, tile);
@@ -2693,10 +2735,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       { speaker: 'mossprout', text: 'Out there the Mist is too thick. The Heart Tree\u2019s light doesn\u2019t reach it yet.' },
       { speaker: 'mossprout', text: `Grow the Tree to level ${tile.tree}, and we can fight for it.` },
     ], action: { label: 'Grow the Heart Tree', run: () => setHeartTreePanelOpen(true) } });
-  }, [openFriendPanel, startFrontierBattle, startRegionRescue]);
+  }, [openFriendPanel, startFrontierBattle, startRegionRescue, upgradePresentation, upgrading]);
   /** A level from a track, docked under its tile: a friend's island under theirs, the Grove and the Daily Mist under Mossprout's. */
   const enterTrackLevel = useCallback((node: LevelNode, choice: EncounterLoadoutChoice) => {
-    const mission = node.mission;
+    const rawMission = node.mission;
+    const missing = rawMission ? missingCombatChain(rawMission.encounter, mergeWorldRef.current) : null;
+    if (missing) { setTrackOpen(null); setChainPanel(missing); return; }
+    const mission = rawMission ? { ...rawMission, encounter: authoredCombatEncounter(rawMission.encounter, mergeWorldRef.current) } : null;
     const open = trackOpenRef.current;
     if (!mission || !open || hatchableStoryOpenRef.current) return;
     const campaign = open.kind === 'island' ? islandCampaignById.get(open.campaignId) ?? null : null;
@@ -2732,12 +2777,14 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       const campaign = waiting ? islandCampaignById.get(waiting.campaignId) : null;
       const rung = campaign && waiting ? regionRung(campaign, waiting.missionId) : null;
       if (!campaign || !rung || !waiting) return;
+      const missing = missingCombatChain(rung.mission.encounter, mergeWorldRef.current);
+      if (missing) { setChainPanel(missing); return; }
       const status = islandCampaignChapterStatus(mergeWorldRef.current, campaign, rung.chapterLevel);
       // The story it waited on opened its chapter: in it goes. Anything else (a chapter's close) lands back on the track.
       if (status !== 'mission_available' && status !== 'in_encounter') { setTrackOpen({ kind: 'island', campaignId: campaign.campaignId }); return; }
       const loadout = battleLoadout(mergeWorldRef.current, waiting.choice);
       void startStoredEncounter({ missionId: rung.mission.id, runId: encounterRunId(rung.mission.encounter, 1, loadout), campaignId: campaign.campaignId, katchimeraId: loadout.companionId, helperWispId: loadout.wispId ?? null, partnerId: loadout.partner?.companionId ?? null }).catch(() => undefined);
-      setIslandEncounter({ campaignId: campaign.campaignId, islandId: campaign.islandId, mission: rung.mission, loadout });
+      setIslandEncounter({ campaignId: campaign.campaignId, islandId: campaign.islandId, mission: { ...rung.mission, encounter: authoredCombatEncounter(rung.mission.encounter, mergeWorldRef.current) }, loadout });
     }, 250);
     return () => clearTimeout(timer);
   }, [interactionCreatureId, islandEncounter, levelAfterStory, pendingIslandCampaign, pendingIslandDiscovery, requiredUpgradeStory, screenFocused, selectedUpgrade, trackOpen, upgradePresentation]);
@@ -3395,7 +3442,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   const chapterState = useMemo(() => sanctuaryChapterState(mergeWorld), [mergeWorld]);
   // The Sanctuary with nothing else up: its buttons, bubbles and chapter card show. Still true once every chapter is done.
   const sanctuarySurfaceFree = !activityReturnPending && !ftueStepId && screenFocused && !rushSheetOpen && !wispLanternOpen && !adventureOpen && !friendWispsFamilyId && !lockedHintFamilyId && !detailCreatureId
-    && !pendingIslandDiscovery && !revealedFriendCardId && !wakeHandoffCampaign && !requiredUpgradeStory && !stepplingEncounter.open && !supplyRunOpen && !missionBoardDocked && !upgradePresentation && !buildingPanelId && !katchimeraPanelId && !heroBuildingPanelId && !heroRosterOpen && !heartTreePanelOpen
+    && !pendingIslandDiscovery && !revealedFriendCardId && !wakeHandoffCampaign && !requiredUpgradeStory && !stepplingEncounter.open && !supplyRunOpen && !missionBoardDocked && !upgradePresentation && !chainPanel && !buildingPanelId && !katchimeraPanelId && !heroBuildingPanelId && !heroRosterOpen && !heartTreePanelOpen
     && !activeInteractionResidentId && !interactionCreatureId && !trackOpen && !islandEncounter && !battleReward && !selectedUpgrade && !progressSheetOpen && !pendingIslandCampaign;
   const chapterSurfaceFree = Boolean(chapterState) && sanctuarySurfaceFree && !openingTileTap && !arrivalTalk && !rescueRevealing && !goalHandoff;
   // The first goal after the first session: a finger on the card, once, so the player knows where "next" lives.
@@ -3651,11 +3698,11 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   }, [chapterState?.goal?.id]);
   const finishGoalHandoff = useCallback(() => {
     setGoalHandoff(null);
-    const leaving = supplyRunOpen || katchimeraPanelId || heroBuildingPanelId || heartTreePanelOpen || buildingPanelId || trackOpen;
+    const leaving = chainPanel || supplyRunOpen || katchimeraPanelId || heroBuildingPanelId || heartTreePanelOpen || buildingPanelId || trackOpen;
     setSupplyRunOpen(false); setKatchimeraPanelId(null); setHeroBuildingPanelId(null); setHeartTreePanelOpen(false); setBuildingPanelId(null); setTrackOpen(null);
     // A finished chapter shows its own card; otherwise the next goal, once what was open has gone.
     if (chapterState && !chapterState.complete) setTimeout(() => followChapterGoalRef.current?.(), leaving ? 520 : 0);
-  }, [buildingPanelId, chapterState, heartTreePanelOpen, heroBuildingPanelId, katchimeraPanelId, supplyRunOpen, trackOpen]);
+  }, [chainPanel, buildingPanelId, chapterState, heartTreePanelOpen, heroBuildingPanelId, katchimeraPanelId, supplyRunOpen, trackOpen]);
   // The chapter's opening (The Signal): camera to the island, the flare, the friends' lines, the chapter's card. Once.
   const [chapterOpeningPhase, setChapterOpeningPhase] = useState<'camera' | 'flare' | 'talk' | 'title' | null>(null);
   const chapterOpening = chapterState?.openingPending ? chapterState.chapter.opening ?? null : null;
@@ -3738,6 +3785,30 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
     return result;
   }, [measureGlowCurrencyOrigin, reduceMotion]);
   // A hero building up a level: Glow leaves the counter, the world is written, and a new look crossblends on the tile.
+  const upgradeChainHomeWithFx = useCallback(async (chain: CombatChain, expectedLevel: number) => {
+    const before = mergeWorldRef.current.coins;
+    const coinOrigin = reduceMotion ? { x: 0, y: 0 } : await measureGlowCurrencyOrigin();
+    const result = await upgradeStoredChainHome(chain, expectedLevel);
+    if (!result.changed) throw new Error('Check your Glow and Heartwood level, then try again.');
+    const home = CHAIN_HOMES.find(candidate => candidate.chain === chain)!;
+    const spent = before - result.state.coins;
+    if (reduceMotion) setDisplayedGlow(result.state.coins);
+    else if (spent > 0) {
+      revealedUpgradeRef.current = null;
+      setUpgrading(true);
+      setDisplayedGlow(before);
+      setUpgradePresentation({
+        cameraAlreadyFocused: true, characterId: 'mossprout', coinCost: spent, coinOrigin,
+        creatureId: 'companion:mossprout', creatureName: home.name, fromStage: 1, toStage: 1,
+        nonce: ++upgradeNonceRef.current,
+        palette: { accent: '#FFE7A8', glow: '#FFD36B', mist: 'rgba(255,240,205,0.9)', primary: '#B07A3E' },
+        reactionLine: '', showCoins: true, status: 'playing', upgradeName: home.name,
+        visualTarget: { kind: 'haven_structure', structureId: home.tileId },
+        tileLook: { tileId: home.tileId, from: expectedLevel, to: expectedLevel + 1, chainHome: true },
+      });
+    }
+    return result;
+  }, [measureGlowCurrencyOrigin, reduceMotion]);
   const upgradeHeroBuildingWithFx = useCallback(async (id: HeroBuildingId, expectedLevel: number) => {
     const before = mergeWorldRef.current.coins;
     // Every level plays the tile upgrade (the same sequence as a Mist clear): Glow flies from the counter into the tile,
@@ -3862,7 +3933,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   );
 
   // A friend without a page is looked at on a detail card: that is an interaction too, and nothing of the world's begins under it.
-  const sharedAdventureAllowed = !activityReturnPending && !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !detailCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId && !rushSheetOpen && !rushSpec && !islandEncounter && !trackOpen;
+  const sharedAdventureAllowed = !chainPanel && !activityReturnPending && !lanternSurfaceOpen && !adventureOpen && !eventBoardActive && screenFocused && !activeInteractionResidentId && !interactionCreatureId && !detailCreatureId && !stepplingSurfaceOpen && !upgradePresentation && !navigationLocked && !kingdomGoalGuideActive && !kingdomGoalPending && !sharedUpgrade && !requiredUpgradeStory && !pendingIslandDiscovery && !progressSheetOpen && !restorationBoardVisible && !stepplingMissionActive && !journeyMissionActive && !pendingIslandCampaign && !ordinaryUpgradeRun && !ftueStepId && !rushSheetOpen && !rushSpec && !islandEncounter && !trackOpen;
   const heartwoodRecap = sharedAdventureAllowed && !(glowPanelOpen && glowGatewayActive && glowRun?.status !== 'completed') && !havenMergeBoardActive && (mergeWorld.haven.tileStages.mossprout ?? 0) >= 1 && needsHeartwoodRecap(mergeWorld);
   const worldEventsAllowed = sharedAdventureAllowed && !havenMergeBoardActive && !heartwoodRecap;
   // havenMergeBoardActive means an owned Mossprout can open the Garden, not
@@ -3882,7 +3953,13 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // empty patches are offers, and wait until the first session is over.
   const buildingOffersShown = heartwoodBuildingsEligible(mergeWorld) && !ftueStepId;
   const heartwoodBuiltSlots = useMemo(() => HEARTWOOD_BUILDINGS.filter((building) => heartwoodBuildingLevel(mergeWorld, building.id) > 0).map((building) => building.slotId), [mergeWorld]);
+  useEffect(() => {
+    if (ftueStepId || !buildingPanelId) return;
+    const home = CHAIN_HOMES.find(home => home.building === buildingPanelId);
+    if (home) { setBuildingPanelId(null); setChainPanel(home.chain); }
+  }, [buildingPanelId, ftueStepId]);
   const heartwoodBuildingAdornments = useMemo(() => Object.fromEntries(HEARTWOOD_BUILDINGS.flatMap((building) => {
+    if (!ftueStepId && (building.id === 'seed-nursery' || building.id === 'dew-spring')) return [];
     const level = heartwoodBuildingLevel(mergeWorld, building.id);
     // An unbuilt patch's sign is an offer: it only shows while the world is free to take it. Its first build keeps
     // the spot mounted, sign away, so the coins have somewhere to land and the building can swell up out of it.
@@ -3893,7 +3970,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
       impactNonce={buildingImpact?.id === building.id ? buildingImpact.nonce : 0}
       charged={buildingFx?.id === building.id && buildingFx.phase !== 'payment'} spawning={spawning}
       onPress={wispLanternAllowed ? () => setBuildingPanelId(building.id) : undefined} />]];
-  })), [buildingFx, buildingImpact, buildingOffersShown, buildingPanelId, mergeWorld, wispLanternAllowed]);
+  })), [buildingFx, buildingImpact, buildingOffersShown, buildingPanelId, mergeWorld, wispLanternAllowed, ftueStepId]);
 
   // Combat updates the mission in this screen. Keep unchanged map inputs stable
   // so those updates don't reconcile the entire hex scene underneath the board.
@@ -3947,10 +4024,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
   // Mount the camera with its saved framing, rather than initializing the overview first.
   // A Haven's details and a hidden friend's tile share the upgrade stage with the offers: the canvas frames them the same way.
   const detailFamilyId = detailCreatureId ? visibleCompanionSlots.find((slot) => slot.kind === 'owned' && slot.creature.creatureId === detailCreatureId)?.familyId ?? null : null;
-  const upgradeStageSubject = useMemo(() => lockedHintFamilyId
+  const upgradeStageSubject = useMemo(() => chainPanel
+    ? { id: `chain:${chainPanel}`, target: { kind: 'haven_structure' as const, structureId: CHAIN_HOMES.find(home => home.chain === chainPanel)!.tileId } }
+    : lockedHintFamilyId
     ? { id: `hidden:${lockedHintFamilyId}`, target: { kind: 'haven_tile' as const, familyId: lockedHintFamilyId } }
     : detailFamilyId ? { id: `haven:${detailFamilyId}`, target: { kind: 'haven_tile' as const, familyId: detailFamilyId } } : null,
-  [detailFamilyId, lockedHintFamilyId]);
+  [chainPanel, detailFamilyId, lockedHintFamilyId]);
 
   if (!glowReady || !stepplingLesson.ready) return null;
 
@@ -4555,9 +4634,12 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
           <Text style={styles.supplyRunLabel}>Café</Text>
         </Pressable>
       ) : null}
+      {chainPanel && screenFocused && !battleReward && !islandEncounter ? <ChainHomePanel key={chainPanel} chain={chainPanel} world={mergeWorld} layout={upgradeStage} bottomInset={insets.bottom}
+        registerDismiss={registerUpgradeDismiss} animating={Boolean(upgradePresentation)} onClose={() => setChainPanel(null)} onDiscover={startFrontierBattle}
+        onUpgrade={upgradeChainHomeWithFx} onGlow={() => { setChainPanel(null); openGlowSource(); }} /> : null}
       {battleReward ? <BattleRewardCard key={`battle-reward:${battleReward.key}`} reward={battleReward} onContinue={continueBattleReward} /> : null}
       {/* A docked mini board dims the Kingdom behind it, easing in and out. */}
-      <BoardSessionDim active={Boolean(openingBoardActive || supplyRunDocked || (stepplingMissionActive && stepplingMission.state) || (journeyMissionActive && journeyMissionStore.state) || (activeRush && screenFocused) || (islandEncounterActive && islandMist.store.state) || (restorationBoardVisible && !chapterRush))} />
+      <BoardSessionDim active={Boolean(openingBoardActive || supplyRunDocked || (stepplingMissionActive && stepplingMission.state) || (journeyMissionActive && journeyMissionStore.state) || (activeRush && screenFocused) || (!BATTLE_SCENE_ENABLED && islandEncounterActive && islandMist.store.state) || (restorationBoardVisible && !chapterRush))} />
       {openingBoardActive && battle?.mission && battle.store.state ? <HatchableMissionDock key={`battle-dock:${battleEncounter?.id ?? 'none'}`} mission={battle.mission}
         state={battle.store.state} send={battle.store.send} merges={battle.store.merges} mechanicState={battle.store.mechanicState} encounter={battle.encounter} width={window.width} bottomInset={insets.bottom}
         landings={openingGlow.store} onStrike={battle.onStrike} onFinale={battle.onFinale} onReveal={battle.bumpReveal} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
@@ -4588,7 +4670,7 @@ export const KatchimeraKingdomScreen = memo(function KatchimeraKingdomScreen({
         title={activeRush.kind === 'chapter' && chapterRushNote ? chapterRushNote : `${activeRush.title} · ${activeRush.goal} wisps`} width={window.width} bottomInset={insets.bottom}
         landings={openingGlow.store} onStrike={launchRushStrike} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} onFinished={finishRushHeat} onVoided={voidRushHeat} onClose={leaveRushHeat} /> : null}
-      {islandEncounterActive && islandMist.mission && islandMist.store.state ? <HatchableMissionDock mission={islandMist.mission}
+      {!BATTLE_SCENE_ENABLED && !battleReward && islandEncounterActive && islandMist.mission && islandMist.store.state ? <HatchableMissionDock mission={islandMist.mission}
         state={islandMist.store.state} send={islandMist.store.send} merges={islandMist.store.merges} mechanicState={islandMist.store.mechanicState} encounter={islandMist.encounter} width={window.width} bottomInset={insets.bottom}
         landings={openingGlow.store} onStrike={islandMist.onStrike} onFinale={islandMist.onFinale} onReveal={islandMist.bumpReveal} onBoardMetrics={setOpeningBoardMetrics} onBlockedInteraction={bumpOpeningBlocked}
         onEntranceSettled={markOpeningDockSettled} /> : null}

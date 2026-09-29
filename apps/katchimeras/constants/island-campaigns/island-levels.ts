@@ -48,6 +48,7 @@ export type IslandWispSpec = {
  * `step` seconds, leaving Mist on the free cell it steps off every `drop` steps.
  */
 export type IslandLaneSpec = {
+  weapon?: 'bullet' | 'zap' | 'skirmisher';
   attack?: 'gunner' | 'bomber' | 'burrower' | 'mirror';
   wave?: number;
   breachDamage?: number;
@@ -69,6 +70,7 @@ export type IslandLaneSpec = {
 
 export type IslandLevelSpec = {
   combatV2?: boolean;
+  requiredChains?: readonly import('@/features/mission-mechanics/combat-rules').CombatChain[];
   secondaryGenerator?: import('@/features/mission-mechanics/combat-rules').SecondaryGenerator;
   terrain?: readonly import('@/features/mission-mechanics/combat-rules').CombatTerrain[];
   recommendedLevel?: number;
@@ -166,6 +168,7 @@ const seconds = (value: number) => Math.round(value * 1_000);
 export function laneWisps(lanes: readonly IslandLaneSpec[]): LaneWisp[] {
   const authored: LaneWisp[] = lanes.map((lane) => ({
     ...(lane.crawl ? { crawlEvery: seconds(lane.crawl.every), crawlFrom: lane.crawl.from } : {}),
+    ...(lane.weapon ? { weapon: lane.weapon } : {}),
     ...(lane.attack ? { attack: lane.attack, attackEveryMs: 7000 } : {}),
     ...(lane.wave != null ? { wave: lane.wave } : {}),
     ...(lane.breachDamage ? { breachDamage: lane.breachDamage } : {}),
@@ -257,6 +260,7 @@ export function islandLevel(campaignId: string, key: string, rawSpec: IslandLeve
   const encounter: EncounterDefinition = {
     ...(spec.recommendedLevel ? { recommendedLevel: spec.recommendedLevel } : {}),
     id,
+    requiredChains: spec.requiredChains,
     storageKey: `katchimeras.encounter.${campaignId.replace(/:/g, '.')}.${key}.${lanes ? 'lanes4' : tactics ? 'v6' : 'v5'}`,
     rows,
     difficulty: spec.difficulty,

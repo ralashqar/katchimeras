@@ -169,6 +169,91 @@
       "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
       "assetKey": "shared_world_dawnle_lamp_house_hex_tile_v1",
       "prompt": "Generate Dawnle's Lamp House: the home of a friend who keeps the first light of every morning. Palette: soft sunrise peach, warm gold, pale buttercream, dusky rose and fresh pale green, with warm sandstone cliffs. Replace all Mossprout-specific top-face content from Image 1: no leaf-roof cottage, pond with bridge, planter boxes or fence. At the rear stands one small round cottage with a rounded roof in sunrise peach and gold shingles, one big round window glowing with a warm golden lamp inside, and a tiny open bell tower on the roof with a small golden bell. Beside it a tall slender lamp post with a round warm glowing lantern. Two oversized pots of pale yellow and rose morning-glory flowers at the side edges, and a short curved bench facing out toward the front. The floor is broad smooth pale spring grass with a winding path of soft buttercream stones to the front stairs. Reserve a generous quiet flat center/front clearing for the separately rendered live character, with no prop in that area. Warm, hopeful and quiet, like the moment before sunrise. No written signage, text or numbers. Match Image 1's soft cushiony toy forms and keep every main shape readable at 256 pixels. Keep Image 1's broad chunky cliff blocks, deep tapered underside and centred front stairs, rethemed in the palette."
+    },
+    "chain-storm-1": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_storm_1_hex_tile_v1",
+      "prompt": "Generate the Storm Garden, upgrade stage 1, a cozy fully developed home for this merge plant family. Replace all Mossprout-specific top-face buildings and props. Palette: sage green turf, muted lavender and warm cream stone, honey timber. Use only these few iconic large readable forms: one chunky terracotta planter holding a large soft lavender lightning flower with broad cushiony petals and a small pale-yellow bolt-shaped centre; a small rounded cream potting hut with a sage leaf roof at the rear; two broad lavender flower cushions. Leave a broad quiet central front clearing connected to the unchanged recessed front stairs. No perimeter fence or wall. Match Image 1 very closely: extremely simple soft cushiony toy shapes, smooth matte surfaces, broad color blocks, no fine textures or decorative clutter. Restrained warm light, no electric arcs, no particles, no bloom outside the silhouette. Whole deep tapered hex island visible with ample black padding. No characters, text or UI."
+    },
+    "chain-storm-2": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_storm_2_hex_tile_v1",
+      "prompt": "Generate the Storm Garden, upgrade stage 2, a cozy fully developed home for this merge plant family. Replace all Mossprout-specific top-face buildings and props. Palette: sage green turf, muted lavender and warm cream stone, honey timber. Image 2 is this home at stage 1: preserve its exact island footprint, cliff, camera, layout, palette and placement. Upgrade only the main props and building: a second larger lightning flower and a taller two-tier leaf-roof potting hut. Keep the front clearing and stairs unobstructed. Match Image 1 very closely: extremely simple soft cushiony toy shapes, smooth matte surfaces, broad color blocks, no fine textures or decorative clutter. Restrained warm light, no electric arcs, no particles, no bloom outside the silhouette. Whole deep tapered hex island visible with ample black padding. No characters, text or UI.",
+      "guide": "design/shared-world-discovery-v2/chain-storm-1/source.png"
+    },
+    "chain-storm-3": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_storm_3_hex_tile_v1",
+      "prompt": "Generate the Storm Garden, upgrade stage 3, a cozy fully developed home for this merge plant family. Replace all Mossprout-specific top-face buildings and props. Palette: sage green turf, muted lavender and warm cream stone, honey timber. Image 2 is this home at stage 1: preserve its exact island footprint, cliff, camera, layout, palette and placement. Upgrade only the main props and building: a grand three-flower lightning canopy and a compact two-storey potting hut with layered sage leaf roofs. Keep the front clearing and stairs unobstructed. Match Image 1 very closely: extremely simple soft cushiony toy shapes, smooth matte surfaces, broad color blocks, no fine textures or decorative clutter. Restrained warm light, no electric arcs, no particles, no bloom outside the silhouette. Whole deep tapered hex island visible with ample black padding. No characters, text or UI.",
+      "guide": "design/shared-world-discovery-v2/chain-storm-1/source.png"
+    },
+    "chain-bulwark-1": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_bulwark_1_hex_tile_v1",
+      "prompt": "Generate the Ward Grove, upgrade stage 1, a cozy fully developed home for this merge plant family. Replace all Mossprout-specific top-face buildings and props. Palette: sage green turf, honey timber and warm sandstone, muted teal accents. Use only these few iconic large readable forms: one broad rounded wooden shield-shaped living hedge on a chunky honey timber frame; a tiny round warm sandstone ward hut with a cushiony teal leaf roof at the rear; two broad moss cushions. Leave a broad quiet central front clearing connected to the unchanged recessed front stairs. No perimeter fence or wall. Match Image 1 very closely: extremely simple soft cushiony toy shapes, smooth matte surfaces, broad color blocks, no fine textures or decorative clutter. Restrained warm light, no electric arcs, no particles, no bloom outside the silhouette. Whole deep tapered hex island visible with ample black padding. No characters, text or UI."
+    },
+    "chain-bulwark-2": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_bulwark_2_hex_tile_v1",
+      "prompt": "Generate the Ward Grove, upgrade stage 2, a cozy fully developed home for this merge plant family. Replace all Mossprout-specific top-face buildings and props. Palette: sage green turf, honey timber and warm sandstone, muted teal accents. Image 2 is this home at stage 1: preserve its exact island footprint, cliff, camera, layout, palette and placement. Upgrade only the main props and building: a wider living shield hedge with two sturdy rounded wooden posts and a larger ward hut. Keep the front clearing and stairs unobstructed. Match Image 1 very closely: extremely simple soft cushiony toy shapes, smooth matte surfaces, broad color blocks, no fine textures or decorative clutter. Restrained warm light, no electric arcs, no particles, no bloom outside the silhouette. Whole deep tapered hex island visible with ample black padding. No characters, text or UI.",
+      "guide": "design/shared-world-discovery-v2/chain-bulwark-1/source.png"
+    },
+    "chain-bulwark-3": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_bulwark_3_hex_tile_v1",
+      "prompt": "Generate the Ward Grove, upgrade stage 3, a cozy fully developed home for this merge plant family. Replace all Mossprout-specific top-face buildings and props. Palette: sage green turf, honey timber and warm sandstone, muted teal accents. Image 2 is this home at stage 1: preserve its exact island footprint, cliff, camera, layout, palette and placement. Upgrade only the main props and building: three broad overlapping living shield hedges and a compact two-storey ward hut with layered teal leaf roofs. Keep the front clearing and stairs unobstructed. Match Image 1 very closely: extremely simple soft cushiony toy shapes, smooth matte surfaces, broad color blocks, no fine textures or decorative clutter. Restrained warm light, no electric arcs, no particles, no bloom outside the silhouette. Whole deep tapered hex island visible with ample black padding. No characters, text or UI.",
+      "guide": "design/shared-world-discovery-v2/chain-bulwark-1/source.png"
+    },
+    "chain-lantern-1": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_lantern_1_hex_tile_v1",
+      "prompt": "Generate the Lantern Grove, upgrade stage 1, a cozy fully developed home for this merge plant family. Replace all Mossprout-specific top-face buildings and props. Palette: sage green turf, honey timber, warm cream stone and soft amber accents. Use only these few iconic large readable forms: one chunky curved honey timber post carrying a single oversized rounded amber seed lantern; a tiny round cream keeper cottage with a cushiony sage leaf roof at the rear; two broad moss cushions. Leave a broad quiet central front clearing connected to the unchanged recessed front stairs. No perimeter fence or wall. Match Image 1 very closely: extremely simple soft cushiony toy shapes, smooth matte surfaces, broad color blocks, no fine textures or decorative clutter. Restrained warm light, no electric arcs, no particles, no bloom outside the silhouette. Whole deep tapered hex island visible with ample black padding. No characters, text or UI."
+    },
+    "chain-lantern-2": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_lantern_2_hex_tile_v1",
+      "prompt": "Generate the Lantern Grove, upgrade stage 2, a cozy fully developed home for this merge plant family. Replace all Mossprout-specific top-face buildings and props. Palette: sage green turf, honey timber, warm cream stone and soft amber accents. Image 2 is this home at stage 1: preserve its exact island footprint, cliff, camera, layout, palette and placement. Upgrade only the main props and building: two rounded amber seed lanterns on the central timber post and a larger keeper cottage. Keep the front clearing and stairs unobstructed. Match Image 1 very closely: extremely simple soft cushiony toy shapes, smooth matte surfaces, broad color blocks, no fine textures or decorative clutter. Restrained warm light, no electric arcs, no particles, no bloom outside the silhouette. Whole deep tapered hex island visible with ample black padding. No characters, text or UI.",
+      "guide": "design/shared-world-discovery-v2/chain-lantern-1/source.png"
+    },
+    "chain-lantern-3": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_lantern_3_hex_tile_v1",
+      "prompt": "Generate the Lantern Grove, upgrade stage 3, a cozy fully developed home for this merge plant family. Replace all Mossprout-specific top-face buildings and props. Palette: sage green turf, honey timber, warm cream stone and soft amber accents. Image 2 is this home at stage 1: preserve its exact island footprint, cliff, camera, layout, palette and placement. Upgrade only the main props and building: three oversized amber seed lanterns hanging from a broad softly curved timber arch and a compact two-storey keeper cottage with layered sage leaf roofs. Keep the front clearing and stairs unobstructed. Match Image 1 very closely: extremely simple soft cushiony toy shapes, smooth matte surfaces, broad color blocks, no fine textures or decorative clutter. Restrained warm light, no electric arcs, no particles, no bloom outside the silhouette. Whole deep tapered hex island visible with ample black padding. No characters, text or UI.",
+      "guide": "design/shared-world-discovery-v2/chain-lantern-1/source.png"
+    },
+    "chain-garden-1": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_garden_1_hex_tile_v1",
+      "prompt": "Generate Seed Nursery, upgrade stage 1. Replace all Mossprout-specific top-face props with one small round cream nursery hut with a cushiony sage leaf roof at the rear, two broad terracotta seed beds with three oversized rounded green sprouts, a chunky pastel watering can. Match the reference very closely: broad rounded cushiony matte clay shapes, very low detail, quiet sage grass, cream and warm sandstone deep tapered cliff, centered recessed front stairs. Keep a quiet front clearing. No perimeter fence, no tiny details, no characters or text. Entire island fits inside square canvas with black padding."
+    },
+    "chain-garden-2": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_garden_2_hex_tile_v1",
+      "prompt": "Generate Seed Nursery, upgrade stage 2. Replace all Mossprout-specific top-face props with one small round cream nursery hut with a cushiony sage leaf roof at the rear, two broad terracotta seed beds with three oversized rounded green sprouts, a chunky pastel watering can. Match the reference very closely: broad rounded cushiony matte clay shapes, very low detail, quiet sage grass, cream and warm sandstone deep tapered cliff, centered recessed front stairs. Keep a quiet front clearing. No perimeter fence, no tiny details, no characters or text. Entire island fits inside square canvas with black padding. Image 2 is stage 1: preserve its camera, footprint, palette, placement and stairs. Grow its existing hut into a larger two-tier leaf-roof cottage, and enlarge the seed beds and sprouts. No extra buildings, paths, platforms or clutter.",
+      "guide": "design/shared-world-discovery-v2/chain-garden-1/source.png"
+    },
+    "chain-garden-3": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_garden_3_hex_tile_v1",
+      "prompt": "Generate Seed Nursery, upgrade stage 3. Replace all Mossprout-specific top-face props with one small round cream nursery hut with a cushiony sage leaf roof at the rear, two broad terracotta seed beds with three oversized rounded green sprouts, a chunky pastel watering can. Match the reference very closely: broad rounded cushiony matte clay shapes, very low detail, quiet sage grass, cream and warm sandstone deep tapered cliff, centered recessed front stairs. Keep a quiet front clearing. No perimeter fence, no tiny details, no characters or text. Entire island fits inside square canvas with black padding. Image 2 is stage 1: preserve its camera, footprint, palette, placement and stairs. Grow its existing hut into a grand two-storey leaf-roof cottage, and enlarge the seed beds and sprouts. No extra buildings, paths, platforms or clutter.",
+      "guide": "design/shared-world-discovery-v2/chain-garden-1/source.png"
+    },
+    "chain-dew-1": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_dew_1_hex_tile_v1",
+      "prompt": "Generate Dew Spring, upgrade stage 1. Replace all Mossprout-specific top-face props with one small round cream spring hut with a cushiony pale-blue leaf roof at the rear, a shallow round warm sandstone basin with smooth pale-blue water and one large rounded dew droplet suspended above a broad green leaf, two cushiony blue flowers. Match the reference very closely: broad rounded cushiony matte clay shapes, very low detail, quiet sage grass, cream and warm sandstone deep tapered cliff, centered recessed front stairs. Keep a quiet front clearing. No perimeter fence, no tiny details, no characters or text. Entire island fits inside square canvas with black padding."
+    },
+    "chain-dew-2": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_dew_2_hex_tile_v1",
+      "prompt": "Generate Dew Spring, upgrade stage 2. Replace all Mossprout-specific top-face props with one small round cream spring hut with a cushiony pale-blue leaf roof at the rear, a shallow round warm sandstone basin with smooth pale-blue water and one large rounded dew droplet suspended above a broad green leaf, two cushiony blue flowers. Match the reference very closely: broad rounded cushiony matte clay shapes, very low detail, quiet sage grass, cream and warm sandstone deep tapered cliff, centered recessed front stairs. Keep a quiet front clearing. No perimeter fence, no tiny details, no characters or text. Entire island fits inside square canvas with black padding. Image 2 is stage 1: preserve its camera, footprint, palette, placement and stairs. Grow its existing hut into a larger two-tier leaf-roof cottage, and enlarge the spring basin and leaf fountain. No extra buildings, paths, platforms or clutter.",
+      "guide": "design/shared-world-discovery-v2/chain-dew-1/source.png"
+    },
+    "chain-dew-3": {
+      "base": "design/mossprout-hex-neighborhood-v1/main-source.png",
+      "assetKey": "chain_home_dew_3_hex_tile_v1",
+      "prompt": "Generate Dew Spring, upgrade stage 3. Replace all Mossprout-specific top-face props with one small round cream spring hut with a cushiony pale-blue leaf roof at the rear, a shallow round warm sandstone basin with smooth pale-blue water and one large rounded dew droplet suspended above a broad green leaf, two cushiony blue flowers. Match the reference very closely: broad rounded cushiony matte clay shapes, very low detail, quiet sage grass, cream and warm sandstone deep tapered cliff, centered recessed front stairs. Keep a quiet front clearing. No perimeter fence, no tiny details, no characters or text. Entire island fits inside square canvas with black padding. Image 2 is stage 1: preserve its camera, footprint, palette, placement and stairs. Grow its existing hut into a grand two-storey leaf-roof cottage, and enlarge the spring basin and leaf fountain. No extra buildings, paths, platforms or clutter.",
+      "guide": "design/shared-world-discovery-v2/chain-dew-1/source.png"
     }
   }
 }

@@ -9,6 +9,7 @@ import { hashSeed } from './seed';
 
 /** What the Haven brings into every encounter: the buildings' benefits and the helper Wisp's perk, as numbers. */
 export type EncounterProfile = {
+  chains?: Partial<Record<import('@/features/mission-mechanics/combat-rules').CombatChain, ReturnType<typeof import('./chain-homes').chainBenefits>>>;
   damageMultiplier?: number;
   shieldBonus?: number;
   healBonus?: number;

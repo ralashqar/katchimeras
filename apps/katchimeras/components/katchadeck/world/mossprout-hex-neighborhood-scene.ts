@@ -1,3 +1,5 @@
+import { CHAIN_HOME_ART } from '@/constants/chain-home-art.gen';
+import { chainHomeForTile } from '@/features/encounter/chain-homes';
 import { mossproutHexPoint, mossproutLayerGeometry, mossproutSceneEnvelope } from '@incubator/environments/mossprout-layout';
 import { MOSSPROUT_PRESET } from '@incubator/environments/mossprout-preset';
 import { HEARTWOOD_ART } from '@/constants/heartwood-art';
@@ -70,6 +72,7 @@ export type MossproutGardenSceneState = {
   /** Every story tile by tile id: under the Mist until a journey episode reveals it. */
   storyTiles?: Partial<Record<string, StoryTileState>>;
   /** Every Frontier tile by id (`constants/frontier-tiles.ts`): dark past the Tree's light, misted, or taken back. */
+  chainHomeLevels?: Readonly<Record<string, number>>;
   frontier?: Partial<Record<string, FrontierTileState>>;
   /** The Hollow Tree woken (the finale won): its restored art. */
   hollowTreeRestored?: boolean;
@@ -414,8 +417,11 @@ function reachesPlaceholderLayer(key: string, coord: HexCoord): KingdomTileArtLa
 }
 
 /** A Frontier tile: the house Mist until it is taken back (faint out past the Tree's light), then its own wild land. */
-function frontierLayer(tile: FrontierTile, state: FrontierTileState): KingdomTileArtLayer {
-  const art = state === 'reclaimed' ? FRONTIER_ART[tile.variant] : { alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS, sources: DREAM_MIST_LOCKED_NATURE_SOURCES };
+function frontierLayer(tile: FrontierTile, state: FrontierTileState, level = 0): KingdomTileArtLayer {
+  const home = chainHomeForTile(tile.id);
+  const look = level >= 7 ? 3 : level >= 4 ? 2 : 1;
+  const grown = home ? CHAIN_HOME_ART[`${home.chain}${look}` as keyof typeof CHAIN_HOME_ART] : null;
+  const art = state === 'reclaimed' ? grown ?? FRONTIER_ART[tile.variant] : { alphaBounds: DREAM_MIST_LOCKED_NATURE_ALPHA_BOUNDS, sources: DREAM_MIST_LOCKED_NATURE_SOURCES };
   const layer = layerFor(`structure:${tile.id}`, 'structure', { coord: tile.coord, ...art }, art.alphaBounds, true);
   if (state === 'dark') layer.dim = true;
   return layer;
@@ -571,7 +577,7 @@ export function buildMossproutHexNeighborhoodScene(
     return layer;
   };
   const storyTileLayers = STORY_TILES.map((tile) => ({ tile, misted: storyTileLayer(tile, false), revealed: storyTileLayer(tile, true) }));
-  const frontierLayers = DRAWN_FRONTIER.map((tile) => frontierLayer(tile, gardenState.frontier?.[tile.id] ?? 'dark'));
+  const frontierLayers = DRAWN_FRONTIER.map((tile) => frontierLayer(tile, gardenState.frontier?.[tile.id] ?? 'dark', gardenState.chainHomeLevels?.[tile.id] ?? 0));
   // The wide world (Region 2 on): its friends' homes, and the homes still to come.
   const regionHomeLayers = REGION_FRIENDS.map((friend) => regionHomeLayer(friend, gardenState.regionHomes?.[friend.tileId] ?? 'misted'));
   const placeholderLayers = REACHES_PLACEHOLDERS.map(([key, coord]) => reachesPlaceholderLayer(key, coord));

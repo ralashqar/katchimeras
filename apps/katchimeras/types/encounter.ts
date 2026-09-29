@@ -78,6 +78,9 @@ export type EncounterCompanion = { slot: 'any' | readonly MergeCharacterId[]; re
 export type EncounterRewards = { glow: number; xp: number; firstClear?: { wispId?: WispId; glow?: number } };
 
 export type EncounterDefinition = {
+  discoveryChain?: import('@/features/mission-mechanics/combat-rules').CombatChain;
+  requiredChains?: readonly import('@/features/mission-mechanics/combat-rules').CombatChain[];
+  fixedCells?: readonly number[];
   recommendedLevel?: number;
   id: string;
   storageKey: string;

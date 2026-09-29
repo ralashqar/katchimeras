@@ -1,3 +1,5 @@
+import { authoredCombatEncounter } from '@/features/encounter/combat-loadout';
+import { DEFAULT_ENCOUNTER_PROFILE } from '@/features/encounter/encounter-run';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import React, { act } from 'react';
@@ -15,6 +17,8 @@ function fixture(env: Record<string, string> = {}) {
   const disk = new Map<string, unknown>();
   const resets: (() => void)[] = [];
   const load = () => loadNativeModule('features/encounter/battle-session.ts', {
+    './combat-loadout': { authoredCombatEncounter },
+    './encounter-run': { DEFAULT_ENCOUNTER_PROFILE },
     './run-id': { encounterRunId },
     './spawner-profile': { encounterProfile },
     '@/utils/app-storage': {
